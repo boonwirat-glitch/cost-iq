@@ -1,0 +1,17 @@
+{
+  "name": "Freshket Cost IQ",
+  "short_name": "Cost IQ",
+  "description": "KAM Intelligence Platform — Freshket Commercial",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#006050",
+  "theme_color": "#006050",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23006050'/><circle cx='96' cy='96' r='60' fill='%2300d070'/><text x='96' y='110' font-size='60' text-anchor='middle' fill='%23006050' font-weight='700' font-family='sans-serif'>IQ</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

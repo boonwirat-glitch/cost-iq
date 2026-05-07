@@ -1268,8 +1268,146 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .outlet-gmv{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--n700);text-align:right;flex-shrink:0;width:80px}
 .outlet-pct{font-size:10px;color:var(--n400);text-align:right;width:36px;flex-shrink:0}
 </style>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cost IQ">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
+
+<!-- ══ LOGIN OVERLAY ══ -->
+<style>
+#login-overlay{
+  position:fixed;inset:0;
+  background:linear-gradient(160deg,#1a4a3a 0%,#0d3328 55%,#081e18 100%);
+  z-index:9999;display:flex;align-items:center;justify-content:center;
+  padding:32px 24px;
+}
+.lgi-box{
+  width:100%;max-width:380px;
+}
+.lgi-brand{
+  display:flex;align-items:center;gap:11px;margin-bottom:40px;
+}
+.lgi-logo-box{
+  width:44px;height:44px;background:var(--g500);border-radius:12px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 0 20px rgba(0,208,112,.3);
+}
+.lgi-wordmark{
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-size:22px;font-weight:700;color:#fff;letter-spacing:-.4px;
+  display:flex;align-items:center;gap:0;
+}
+.lgi-wordmark em{color:var(--amb);font-style:normal;}
+.lgi-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:linear-gradient(135deg,rgba(0,208,112,.18),rgba(0,208,112,.08));
+  border:1px solid rgba(0,208,112,.55);
+  border-radius:6px;padding:2px 7px 2px 6px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;font-weight:700;color:#4ddc97;letter-spacing:.6px;
+  vertical-align:2px;margin-left:6px;
+  animation:iq-pulse 3.5s ease-in-out infinite;
+}
+.lgi-badge svg{width:8px;height:8px;flex-shrink:0;animation:iq-spin 8s linear infinite;transform-origin:center;}
+.lgi-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:3px;font-family:'IBM Plex Sans Thai',sans-serif;letter-spacing:.2px;}
+.lgi-field{margin-bottom:14px;}
+.lgi-label{
+  display:block;font-size:11px;font-weight:700;
+  color:rgba(255,255,255,.45);margin-bottom:7px;
+  text-transform:uppercase;letter-spacing:.9px;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+}
+.lgi-input{
+  width:100%;padding:15px 16px;
+  background:rgba(255,255,255,.07);
+  border:1.5px solid rgba(255,255,255,.12);
+  border-radius:13px;font-size:15px;color:#fff;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  outline:none;transition:border-color .2s,background .2s;
+  -webkit-font-smoothing:antialiased;
+}
+.lgi-input::placeholder{color:rgba(255,255,255,.22);}
+.lgi-input:focus{border-color:rgba(0,208,112,.55);background:rgba(0,208,112,.06);}
+.lgi-err{
+  display:none;
+  background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);
+  border-radius:10px;padding:11px 14px;
+  font-size:13px;color:#fc8181;margin-bottom:14px;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+}
+.lgi-btn{
+  width:100%;padding:17px;
+  background:var(--g500);color:var(--g900);
+  border:none;border-radius:13px;
+  font-size:15px;font-weight:700;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  cursor:pointer;transition:opacity .15s,transform .1s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin-top:8px;letter-spacing:.1px;
+}
+.lgi-btn:hover{opacity:.9;}
+.lgi-btn:active{transform:scale(.98);}
+.lgi-btn:disabled{opacity:.5;cursor:default;}
+.lgi-foot{
+  text-align:center;margin-top:24px;
+  font-size:11px;color:rgba(255,255,255,.18);
+  font-family:'IBM Plex Mono',monospace;letter-spacing:.4px;
+}
+.lgi-divider{
+  display:flex;align-items:center;gap:12px;margin:28px 0 24px;
+}
+.lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
+.lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
+</style>
+
+<div id="login-overlay">
+  <div class="lgi-box">
+
+    <!-- Brand -->
+    <div class="lgi-brand">
+      <div class="lgi-logo-box">
+        <svg width="24" height="24" viewBox="0 0 20 20" fill="#006050">
+          <path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm1 11.4V13h-2v.4c0 .3-.2.6-.6.6-.3 0-.6-.3-.6-.6V13H7c-.3 0-.6-.3-.6-.6 0-.3.3-.6.6-.6h.8v-3.6c0-.5.4-1 1-1h2.4c.5 0 1 .4 1 1v3.6h.8c.3 0 .6.3.6.6 0 .3-.3.6-.6.6H11zm0-5.2H9v3h2v-3z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="lgi-wordmark">
+          freshket Cost<span class="lgi-badge">
+            <svg viewBox="0 0 10 10" fill="#4ddc97" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/>
+            </svg>IQ
+          </span>
+        </div>
+        <div class="lgi-sub">KAM Intelligence Platform</div>
+      </div>
+    </div>
+
+    <!-- Fields -->
+    <div class="lgi-field">
+      <label class="lgi-label">Email</label>
+      <input id="login-email" class="lgi-input" type="email"
+        placeholder="your@freshket.co" autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+    </div>
+    <div class="lgi-field">
+      <label class="lgi-label">Password</label>
+      <input id="login-password" class="lgi-input" type="password"
+        placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+
+    <div id="login-error" class="lgi-err"></div>
+
+    <button onclick="doLogin()" id="login-btn" class="lgi-btn">
+      <span id="login-btn-text">เข้าสู่ระบบ</span>
+    </button>
+
+    <div class="lgi-foot">Freshket Commercial · Internal Only</div>
+  </div>
+</div>
 
 <svg style="display:none">
   <symbol id="ico-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z"/><path d="M9 21V13h6v8"/></symbol>
@@ -1304,6 +1442,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
   <div class="topbar-right">
     <button class="data-btn" id="dataBtnTop" onclick="openDataPanel()" title="จัดการข้อมูล">
       <svg><use href="#ico-settings"/></svg>
+    </button>
+    <button onclick="doSignOut()" title="ออกจากระบบ" style="width:32px;height:32px;border-radius:8px;border:none;background:rgba(255,255,255,.1);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;flex-shrink:0;" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     </button>
     <div class="mode-toggle">
       <button class="mbtn on" onclick="setMode('restaurant')">ร้าน</button>
@@ -2109,6 +2250,94 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 </div>
 
 <script>
+// ══════════════════════════════════════════
+// SUPABASE CONFIG + AUTH
+// ══════════════════════════════════════════
+const SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
+const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let currentUserProfile = null;
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const btnText = document.getElementById('login-btn-text');
+  if (!email || !pwd) { showLoginError('กรุณากรอก email และ password'); return; }
+  btn.disabled = true; btnText.textContent = 'กำลังเข้าสู่ระบบ...';
+  errEl.style.display = 'none';
+  const { data, error } = await supa.auth.signInWithPassword({ email, password: pwd });
+  if (error) {
+    showLoginError('Email หรือ password ไม่ถูกต้อง');
+    btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบ';
+    return;
+  }
+  currentUser = data.user;
+  await loadUserProfile();
+  hideLoginOverlay();
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function hideLoginOverlay() {
+  const ov = document.getElementById('login-overlay');
+  if (ov) { ov.style.opacity = '0'; ov.style.transition = 'opacity .3s'; setTimeout(() => ov.style.display = 'none', 300); }
+}
+
+async function loadUserProfile() {
+  if (!currentUser) return;
+  const { data } = await supa.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentUserProfile = data;
+}
+
+async function doSignOut() {
+  await supa.auth.signOut();
+  currentUser = null; currentUserProfile = null;
+  const ov = document.getElementById('login-overlay');
+  ov.style.display = 'flex'; ov.style.opacity = '1';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+async function saveAltsToSupabase(accountId, altData) {
+  if (!currentUser || !accountId) return;
+  try {
+    await supa.from('acct_alternatives').upsert({
+      account_id: accountId,
+      data: altData,
+      generated_at: new Date().toISOString()
+    }, { onConflict: 'account_id' });
+  } catch(e) { console.warn('[Supabase] save alts failed:', e.message); }
+}
+
+async function loadAltsFromSupabase(accountId) {
+  if (!currentUser || !accountId) return null;
+  try {
+    const { data, error } = await supa.from('acct_alternatives')
+      .select('data, generated_at')
+      .eq('account_id', accountId)
+      .single();
+    if (error || !data) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
+async function checkSession() {
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadUserProfile();
+    hideLoginOverlay();
+  }
+}
+
 // ════════════════════════════════════════
 // SAMPLE DATA
 // ════════════════════════════════════════
@@ -2367,6 +2596,18 @@ function switchAccount(accountId){
     refreshAll();updateDataStatus();updateDpAccountCard();renderAccountLibrary();
     closeDataPanel();
     showToast('สลับไปแล้ว','✓');
+    // Auto-load alternatives from Supabase if not in localStorage
+    if(currentUser&&(!D.alts||!D.alts.length)){
+      loadAltsFromSupabase(accountId).then(result=>{
+        if(result&&result.data&&result.data.pairs&&result.data.pairs.length){
+          D.alts=parseAlternatives(JSON.stringify(result.data));
+          fileStatus.alternatives=true;
+          computeOPPS();refreshAll();updateDataStatus();
+          const d=result.generated_at?new Date(result.generated_at).toLocaleDateString('th-TH'):'';
+          showToast('โหลด alternatives จาก cloud'+(d?' ('+d+')':''),'☁');
+        }
+      }).catch(()=>{});
+    }
   }
 }
 
@@ -4211,6 +4452,8 @@ async function runMatcherInApp(){
   fileStatus.alternatives=true;
   computeOPPS();saveToStorage();refreshAll();updateDataStatus();
   matcherRunning=false;if(btn){btn.disabled=false;btn.classList.remove('running');}
+  // Save to Supabase so result persists across devices
+  if(currentAccountId){saveAltsToSupabase(currentAccountId,altData).then(()=>showToast('บันทึก alternatives ไว้ใน cloud แล้ว','☁'));}
   showMatcherResults(groups,pairs.length);
 }
 
@@ -5441,6 +5684,8 @@ function renderSkuDetailContent(sku,priceData){
 }
 
 (function init(){
+  // Check Supabase session first (shows/hides login overlay)
+  checkSession().catch(()=>{});
   // Restore accounts list from localStorage
   // Migrate old ciq_accounts to ciq_index (one-time migration)
   try{
