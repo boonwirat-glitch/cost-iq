@@ -3143,7 +3143,8 @@ function hideLoginOverlay() {
 
 function _autoRouteAfterLogin() {
   // Auto-load data from Google Sheets (foreground 5 files block; SKU+alts background)
-  if(typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
+  // Guard: skip if prefetch already started from login screen
+  if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
   if (role === 'tl' || role === 'admin') {
@@ -4295,8 +4296,11 @@ function ingestCSVText(type,text){
 // Background fetch flags — true once big files arrive
 let bulkSkusReady = false;
 let bulkAltsReady = false;
+let sheetsLoadStarted = false; // guard: prevent double-fetch if login completes after prefetch
 
 async function loadFromGoogleSheets(){
+  if(sheetsLoadStarted)return; // already fetching or done — skip
+  sheetsLoadStarted=true;
   // v109: 2-phase parallel fetch from Google Sheets pub CSV
   //   Phase 1 (foreground, await): 5 small files → UI ready in ~2-5s
   //   Phase 2 (background, fire-and-forget): bulk_skus (73MB) + bulk_alternatives (58MB)
@@ -4325,12 +4329,17 @@ async function loadFromGoogleSheets(){
     progEl.innerHTML=ALL.map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
   }
 
+  // gid map — ใช้ gid แทน sheet=name (reliable กว่า)
+  const _GID={portview:0,history:60027320,categories:976636070,
+    sku_current:1115922809,outlets:1335396783,alternatives:1324908402,skus:0};
+
   let loaded=0;
   async function fetchOne({type,tab,sheetId}){
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
-      const url=`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&sheet=${encodeURIComponent(tab)}`;
+      const gid=_GID[tab]??0;
+      const url=`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}`;
       const resp=await fetch(url);
       if(!resp.ok)throw new Error('HTTP '+resp.status);
       const text=await resp.text();
@@ -13491,6 +13500,8 @@ function _onFolderSelected(input){
 function _initFolderAutoLoad(){}
 
 (function init(){
+  // Prefetch Google Sheets data immediately — runs in background while user logs in
+  loadFromGoogleSheets();
   // Check Supabase session first (shows/hides login overlay)
   checkSession().catch(()=>{});
   _initFolderAutoLoad();
