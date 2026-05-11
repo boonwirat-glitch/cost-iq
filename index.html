@@ -4297,15 +4297,15 @@ async function loadFromGoogleSheets(){
   const skuId=(FRESHKET_SHEETS_SKU_ID.trim())||mainId; // fallback to main if no separate SKU sheet
   if(!mainId){console.warn('[Sheets] FRESHKET_SHEETS_ID ยังไม่ได้ตั้งค่า');return;}
 
-  // Tab → {sheetId, type}
+  // Tab → {sheetId, type, gid}
   const TABS=[
-    {tab:'portview',      type:'portview-bulk',    id:mainId},
-    {tab:'history',       type:'bulk-data',         id:mainId},
-    {tab:'categories',    type:'bulk-categories',   id:mainId},
-    {tab:'skus',          type:'bulk-skus',          id:skuId},  // ← แยกไฟล์
-    {tab:'sku_current',   type:'bulk-sku-current',  id:mainId},
-    {tab:'outlets',       type:'bulk-outlets',       id:mainId},
-    {tab:'alternatives',  type:'bulk-alternatives',  id:mainId},
+    {tab:'portview',      type:'portview-bulk',    id:mainId, gid:0},
+    {tab:'history',       type:'bulk-data',         id:mainId, gid:60027320},
+    {tab:'categories',    type:'bulk-categories',   id:mainId, gid:976636070},
+    {tab:'skus',          type:'bulk-skus',          id:skuId,  gid:0},  // ← แยกไฟล์
+    {tab:'sku_current',   type:'bulk-sku-current',  id:mainId, gid:1115922809},
+    {tab:'outlets',       type:'bulk-outlets',       id:mainId, gid:1335396783},
+    {tab:'alternatives',  type:'bulk-alternatives',  id:mainId, gid:1324908402},
   ];
 
   const btn=document.getElementById('sheets-load-btn');
@@ -4319,11 +4319,11 @@ async function loadFromGoogleSheets(){
   }
 
   let loaded=0;
-  for(const{tab,type,id}of TABS){
+  for(const{tab,type,id,gid}of TABS){
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
-      const url=`https://docs.google.com/spreadsheets/d/e/${id}/pub?output=csv&sheet=${encodeURIComponent(tab)}`;
+      const url=`https://docs.google.com/spreadsheets/d/e/${id}/pub?output=csv&gid=${gid}`;
       const res=await fetch(url);
       if(!res.ok)throw new Error('HTTP '+res.status);
       const text=await res.text();
