@@ -3142,7 +3142,7 @@ function hideLoginOverlay() {
 }
 
 function _autoRouteAfterLogin() {
-  // Auto-load data from Google Sheets (runs in background while user navigates)
+  // Auto-load data from Google Sheets (foreground 5 files block; SKU+alts background)
   if(typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
@@ -4292,55 +4292,90 @@ function ingestCSVText(type,text){
   handleFileUpload(type,{files:[file]});
 }
 
-async function loadFromGoogleSheets(){
-  const mainId=FRESHKET_SHEETS_ID.trim();
-  const skuId=(FRESHKET_SHEETS_SKU_ID.trim())||mainId; // fallback to main if no separate SKU sheet
-  if(!mainId){console.warn('[Sheets] FRESHKET_SHEETS_ID ยังไม่ได้ตั้งค่า');return;}
+// Background fetch flags — true once big files arrive
+let bulkSkusReady = false;
+let bulkAltsReady = false;
 
-  // Tab → {sheetId, type, gid}
-  const TABS=[
-    {tab:'portview',      type:'portview-bulk',    id:mainId, gid:0},
-    {tab:'history',       type:'bulk-data',         id:mainId, gid:60027320},
-    {tab:'categories',    type:'bulk-categories',   id:mainId, gid:976636070},
-    {tab:'skus',          type:'bulk-skus',          id:skuId,  gid:0},  // ← แยกไฟล์
-    {tab:'sku_current',   type:'bulk-sku-current',  id:mainId, gid:1115922809},
-    {tab:'outlets',       type:'bulk-outlets',       id:mainId, gid:1335396783},
-    {tab:'alternatives',  type:'bulk-alternatives',  id:mainId, gid:1324908402},
+async function loadFromGoogleSheets(){
+  // v109: 2-phase parallel fetch from Google Sheets pub CSV
+  //   Phase 1 (foreground, await): 5 small files → UI ready in ~2-5s
+  //   Phase 2 (background, fire-and-forget): bulk_skus (73MB) + bulk_alternatives (58MB)
+  //   Handlers (line 4138, 4233) auto-refresh UI when background data arrives.
+
+  const FOREGROUND=[
+    {type:'portview-bulk',     tab:'portview',     sheetId:FRESHKET_SHEETS_ID},
+    {type:'bulk-data',         tab:'history',      sheetId:FRESHKET_SHEETS_ID},
+    {type:'bulk-categories',   tab:'categories',   sheetId:FRESHKET_SHEETS_ID},
+    {type:'bulk-sku-current',  tab:'sku_current',  sheetId:FRESHKET_SHEETS_ID},
+    {type:'bulk-outlets',      tab:'outlets',      sheetId:FRESHKET_SHEETS_ID},
   ];
+  const BACKGROUND=[
+    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus'},
+    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts'},
+  ];
+  const ALL=[...FOREGROUND,...BACKGROUND];
 
   const btn=document.getElementById('sheets-load-btn');
   const counter=document.getElementById('sheets-loaded-count');
   const progEl=document.getElementById('sheets-progress');
   if(btn){btn.disabled=true;btn.textContent='กำลังโหลด...';}
-  if(counter){counter.style.display='inline-block';counter.textContent='0/'+TABS.length;}
+  if(counter){counter.style.display='inline-block';counter.textContent='0/'+ALL.length;}
   if(progEl){
     progEl.style.display='flex';
-    progEl.innerHTML=TABS.map(t=>`<span id="sp-${t.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${t.tab}</span>`).join('');
+    progEl.innerHTML=ALL.map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
   }
 
   let loaded=0;
-  for(const{tab,type,id,gid}of TABS){
+  async function fetchOne({type,tab,sheetId}){
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
-      const url=`https://docs.google.com/spreadsheets/d/e/${id}/pub?output=csv&gid=${gid}`;
-      const res=await fetch(url);
-      if(!res.ok)throw new Error('HTTP '+res.status);
-      const text=await res.text();
-      if(text.trim().startsWith('<')||text.trim().startsWith('{')){
-        throw new Error('tab "'+tab+'" ไม่พบ');
-      }
+      const url=`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&sheet=${encodeURIComponent(tab)}`;
+      const resp=await fetch(url);
+      if(!resp.ok)throw new Error('HTTP '+resp.status);
+      const text=await resp.text();
       ingestCSVText(type,text);
-      loaded++;
       if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
+      return true;
     }catch(err){
       if(dot){dot.style.background='rgba(240,80,0,.12)';dot.style.color='var(--org)';}
       console.warn('[Sheets]',tab,err.message);
+      return false;
     }
-    if(counter)counter.textContent=loaded+'/'+TABS.length;
   }
+
+  // ── Phase 1: foreground — await these 5 ──
+  const fgResults=await Promise.all(FOREGROUND.map(async f=>{
+    const ok=await fetchOne(f);
+    if(ok)loaded++;
+    if(counter)counter.textContent=loaded+'/'+ALL.length;
+    return ok;
+  }));
+  const fgOk=fgResults.filter(x=>x).length;
   if(btn){btn.disabled=false;btn.textContent='โหลดซ้ำ';}
-  if(loaded>0)showToast('โหลดจาก Sheets '+loaded+'/'+TABS.length+' ตาราง','✓');
+  if(fgOk>0)showToast('พร้อมใช้งาน — '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
+
+  // ── Phase 2: background — fire-and-forget for bulk_skus + bulk_alternatives ──
+  // Returning here lets the caller continue without waiting; handlers auto-refresh UI.
+  Promise.all(BACKGROUND.map(async f=>{
+    const ok=await fetchOne(f);
+    if(ok){
+      loaded++;
+      if(counter)counter.textContent=loaded+'/'+ALL.length;
+      if(f.flag==='skus')bulkSkusReady=true;
+      if(f.flag==='alts')bulkAltsReady=true;
+    }
+    return ok;
+  })).then(results=>{
+    const bgOk=results.filter(x=>x).length;
+    if(bgOk===BACKGROUND.length)showToast('SKU + ทางเลือก โหลดครบแล้ว','✓');
+    else if(bgOk>0)showToast('Background '+bgOk+'/'+BACKGROUND.length+' โหลดแล้ว','✓');
+  });
+}
+
+// Legacy alias — existing button onclick='loadFromSupabaseStorage()' still works
+async function loadFromSupabaseStorage(){
+  return loadFromGoogleSheets();
 }
 
 function _initSheetsInput(){} // no-op — UI inputs removed, using constants
@@ -9036,6 +9071,10 @@ JOIN catalog c
   AND c.catalog_price_per_kg > 0
   AND a.avg_price_per_kg / c.catalog_price_per_kg <= 10
 
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY a.account_id, a.item_id
+  ORDER BY price_diff DESC
+) <= 5
 ORDER BY a.account_id, a.monthly_gmv DESC, price_diff DESC;
 `,
 Q5B:`-- ════════════════════════════════════════════════════════════════════════════
