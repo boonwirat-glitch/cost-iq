@@ -2189,7 +2189,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <div id="mode-toggle-wrap" style="display:none">
       <div class="mode-toggle">
         <div class="mode-slider"></div>
-        <button class="mbtn on" onclick="setMode('restaurant')">ร้าน</button>
+        <button id="mbtn-restaurant" class="mbtn on" onclick="setMode('restaurant')">ร้าน</button>
         <button class="mbtn" onclick="setMode('kam')">KAM</button>
       </div>
     </div>
@@ -4285,6 +4285,7 @@ function applyMeta(){
 // ════════════════════════════════════════
 const FRESHKET_SHEETS_ID     = '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ';
 const FRESHKET_SHEETS_SKU_ID = '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV';
+const CLAUDE_API_KEY = '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';
 
 // Thin wrapper: CSV text → File → existing handleFileUpload (no parse logic duplication)
 function ingestCSVText(type,text){
@@ -9467,7 +9468,7 @@ async function callAI(modelKey,sys,messages,maxTok){
     const d=await res.json();
     return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
   } else {
-    const apiKey=(document.getElementById('matcher-api-key')?.value||'').trim();
+    const apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
     const hdrs={'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
     if(apiKey)hdrs['x-api-key']=apiKey;
     const claudeModel=modelKey==='sonnet'?'claude-sonnet-4-20250514':'claude-haiku-4-5-20251001';
@@ -9666,7 +9667,7 @@ schema: {"pack_size_issue":false,"verified":[{"catalog_item_id":"12345","catalog
   const _matLabel=g.monthly_gmv>=20000?'สินค้าหลัก (GMV สูง)':g.monthly_gmv>=5000?'สินค้ารอง':'สินค้าย่อย';
   const userMsg=`Account item:\n- item_id: ${g.id}\n- ชื่อ: ${g.name}\n- pack: ${g.pack_size||'ไม่ระบุ'}\n- ราคา/unit: ฿${g.unit_price||'?'}\n- ราคา/kg: ฿${g.price}\n- subclass: ${g.subclass}\n- ความสำคัญ: ${_matLabel} (GMV ฿${Math.round(g.monthly_gmv||0).toLocaleString()}/เดือน)\n\nAlternatives:\n${altLines}\n\nตอบ JSON`;
 
-  const _apiKey=(document.getElementById('matcher-api-key')?.value||'').trim();
+  const _apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
   const fetchPromise=callAI(matcherModel==='sonnet'?'sonnet':'haiku',sys,[{role:'user',content:userMsg}],maxTok);
   const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout (30s) — ลอง process ใหม่')),30000));
   const text=await Promise.race([fetchPromise,timeoutPromise]);
@@ -10453,6 +10454,13 @@ function showScreen(name){
   if(modeToggleWrap){
     const _showToggle=!(name==='portview'||name==='teamview');
     modeToggleWrap.style.display=_showToggle?'':'none';
+    // Dim ร้าน button if no account selected
+    const _restBtn=document.getElementById('mbtn-restaurant');
+    if(_restBtn){
+      const _hasAcct=currentAccountId&&currentAccountId!=='default';
+      _restBtn.style.opacity=_hasAcct?'':'0.35';
+      _restBtn.style.cursor=_hasAcct?'':'not-allowed';
+    }
   }
   // Clean up legacy floating back FAB on any navigation
   const legacyFab=document.getElementById('portview-return-fab');
@@ -11678,6 +11686,8 @@ function navPortHome(){
 }
 
 function setMode(mode){
+  // Guard: cannot enter restaurant mode without a selected account
+  if(mode==='restaurant'&&(!currentAccountId||currentAccountId==='default'))return;
   // Track restaurant mode visit
   if(mode==='restaurant'&&isKAM&&currentAccountId)trackVisit(currentAccountId,'restaurant');
   // ── v55 Issue 3 fix: cleanup portview/teamview state on mode change ──
@@ -11939,7 +11949,7 @@ ${_skuMovement}
 ${_ol}`;
   try{
     // F1: Add required headers for claude.ai browser context
-    const _apiKey=(document.getElementById('matcher-api-key')?.value||'').trim();
+    const _apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
     // Dynamic model: Sonnet for complex turns, Haiku for simple (Claude only; Gemini uses Flash always)
     const _chatModelKey=_needsSonnet?'sonnet':'haiku';
     const reply=await callAI(_chatModelKey,sys,chatHist,1000);
@@ -12704,7 +12714,7 @@ output format:
 - แต่ละร้านใน contact list: ระบุให้ชัดว่าต้องถามหรือทำอะไรเฉพาะเจาะจง ไม่ใช่แค่บอกว่า "โทรหา"
 - เมื่อพูดถึง SKU ให้ระบุจำนวนเงิน ฿ ไม่ใช่ % เช่น "น้ำมันปาล์มหาย ฿15,000"`;
   try{
-    const _pvApiKey=(document.getElementById('matcher-api-key')?.value||'').trim();
+    const _pvApiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
     const txt=await callAI('sonnet',sysPv,[{role:'user',content:prompt}],2000);
     if(out){out.style.display='block';out.style.animation='none';out.innerHTML=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');requestAnimationFrame(()=>{out.style.animation='insightReveal 400ms ease forwards';});}
     portviewAiDone=true;
