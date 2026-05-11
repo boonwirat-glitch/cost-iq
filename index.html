@@ -3266,13 +3266,8 @@ function showSenseSplash(onDone){
 
 function hideLoginOverlay() {
   const ov = document.getElementById('login-overlay');
-  // KEY FIX: show splash FIRST (it covers z:10000), then instantly hide login
-  // No fade on login — splash already covers it, fade is unnecessary and causes flash
-  showSenseSplash(_autoRouteAfterLogin);
-  if (ov) {
-    // Small delay so splash paint completes before login DOM removed
-    setTimeout(() => { ov.style.display = 'none'; }, 80);
-  }
+  if (ov) setTimeout(() => { ov.style.display = 'none'; }, 80);
+  _autoRouteAfterLogin();
 }
 
 function _autoRouteAfterLogin() {
