@@ -4510,8 +4510,8 @@ async function loadFromGoogleSheets(){
     {type:'bulk-outlets',      tab:'outlets',      sheetId:FRESHKET_SHEETS_ID, useCache:true},
   ];
   const BACKGROUND=[
-    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus',  useCache:false},
-    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts',  useCache:false},
+    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus',  useCache:true},
+    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts',  useCache:true},
   ];
   const ALL=[...FOREGROUND,...BACKGROUND];
 
@@ -13590,7 +13590,7 @@ function renderTeamviewKamList(){
         </div>
         <div class="tv-star-pace">${g.pace}%</div>
       </div>
-      <div class="tv-star-bar"><div class="tv-star-fill" style="width:${Math.min(g.pace,130)/1.3}%"></div></div>
+      <div class="tv-star-bar"><div class="tv-star-fill" style="width:${Math.min(g.pace,100)}%"></div></div>
       <div class="tv-full-meta">
         <div class="tv-risk-chips">${chips}</div>
         ${rrStr}
