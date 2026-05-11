@@ -3170,6 +3170,7 @@ async function loadUserProfile() {
 async function doSignOut() {
   await supa.auth.signOut();
   currentUser = null; currentUserProfile = null;
+  sheetsLoadStarted = false; // allow fresh fetch on next login
   const ov = document.getElementById('login-overlay');
   ov.style.display = 'flex'; ov.style.opacity = '1';
   document.getElementById('login-email').value = '';
@@ -9471,7 +9472,7 @@ async function callAI(modelKey,sys,messages,maxTok){
     const apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
     const hdrs={'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
     if(apiKey)hdrs['x-api-key']=apiKey;
-    const claudeModel=modelKey==='sonnet'?'claude-sonnet-4-20250514':'claude-haiku-4-5-20251001';
+    const claudeModel=modelKey==='sonnet'?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:hdrs,body:JSON.stringify({model:claudeModel,max_tokens:maxTok,system:sys,messages})});
     if(!res.ok)throw new Error('Claude API '+res.status+': '+await res.text());
     const d=await res.json();
@@ -11914,7 +11915,7 @@ async function sendChat(){
   // F3: Mode-specific persona + hard rules
   // Detect if this turn needs deep analysis (Sonnet) vs factual answer (Haiku)
   const _needsSonnet=!isFirstTurn&&(q.length>60||/วิเคราะห์|เปรียบเทียบ|แนะนำ|วางแผน|สรุปภาพรวม|ทำไม.*ลด|ทำไม.*เพิ่ม/.test(q));
-  const _chatModel=_needsSonnet?'claude-sonnet-4-20250514':'claude-haiku-4-5-20251001';
+  const _chatModel=_needsSonnet?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
   const _modeLine=isKAM
     ?`\n\n=== บทบาทผู้ถาม ===\nKAM (Key Account Manager) วิเคราะห์บัญชีลูกค้า B2B — ตอบเหมือน senior analyst ที่รู้จักร้านนี้ดี ชี้ pattern ที่ KAM อาจมองข้าม บอกตรงๆ ว่าต้องทำอะไร`
     :'\n\n=== บทบาทผู้ถาม ===\nเจ้าของ/ผู้จัดการร้านอาหาร — ตอบแบบที่ปรึกษาที่เข้าใจชีวิตร้านอาหารจริงๆ รู้ว่า food cost pressure หนักแค่ไหน เน้น action ที่ทำได้จริง ไม่ใช่ theory';
@@ -12727,6 +12728,7 @@ output format:
     if(lbl)lbl.textContent='Portfolio Insight';
     btn.classList.remove('loading');
     btn.classList.remove('done');
+    showToast('AI error: '+e.message.slice(0,60),'⚠');
   }
 }
 
@@ -13425,7 +13427,7 @@ output format:
     btn.classList.add('done');
     btn.classList.add('done-bounce');
     btn.addEventListener('animationend',e=>{if(e.animationName==='doneBounce')btn.classList.remove('done-bounce');},{once:true});
-  }catch(e){if(lbl)lbl.textContent='Team Insight';btn.classList.remove('done');}
+  }catch(e){if(lbl)lbl.textContent='Team Insight';btn.classList.remove('done');showToast('AI error: '+e.message.slice(0,60),'⚠');}
   btn.classList.remove('loading');
 }
 
