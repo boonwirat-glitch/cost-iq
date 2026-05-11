@@ -66,7 +66,36 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .data-btn svg{color:#fff;width:16px;height:16px}
 .data-btn.loaded{background:rgba(0,208,112,.25)}
 
-/* ── DATA PANEL ── */
+/* ── DATA LOAD PILL ── */
+#data-load-pill{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;padding:9px 16px 9px 12px;
+  background:rgba(10,25,52,.9);border:1px solid rgba(0,208,112,.25);border-radius:24px;
+  font-size:12px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;
+  color:rgba(255,255,255,.9);z-index:9999;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 24px rgba(0,0,0,.28);
+  opacity:0;pointer-events:none;
+  transition:opacity .35s ease,transform .45s cubic-bezier(.34,1.4,.64,1);
+}
+#data-load-pill.visible{opacity:1;}
+#data-load-pill.ready{
+  border-color:rgba(0,208,112,.75);
+  box-shadow:0 4px 24px rgba(0,0,0,.28),0 0 18px rgba(0,208,112,.22);
+  animation:dlp-pop .5s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+#data-load-pill.out{opacity:0;transform:translateX(-50%) translateY(-10px);}
+.dlp-dots{display:flex;gap:5px;align-items:center;}
+.dlp-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);
+  transition:background .25s ease,transform .25s ease;}
+.dlp-dot.done{background:var(--g500);transform:scale(1.15);}
+#dlp-ready-icon{display:none;width:14px;height:14px;flex-shrink:0;}
+@keyframes dlp-pop{
+  0%{transform:translateX(-50%) scale(1);}
+  45%{transform:translateX(-50%) scale(1.07);}
+  100%{transform:translateX(-50%) scale(1);}
+}
+@keyframes dlp-dot-in{0%{transform:scale(0);opacity:0}60%{transform:scale(1.3)}100%{transform:scale(1.15);opacity:1}}
 .data-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
 .data-overlay.on{opacity:1;pointer-events:all}
 .data-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:var(--n0);border-radius:20px 20px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.16);z-index:201;transition:transform .35s cubic-bezier(.34,1.4,.64,1);max-height:calc(100dvh - 52px);overflow-y:auto;}
@@ -2003,6 +2032,22 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 .lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
 </style>
 
+<!-- ── DATA LOAD PILL ── -->
+<div id="data-load-pill">
+  <div class="dlp-dots" id="dlp-dots">
+    <span class="dlp-dot" id="dlp-d-0"></span>
+    <span class="dlp-dot" id="dlp-d-1"></span>
+    <span class="dlp-dot" id="dlp-d-2"></span>
+    <span class="dlp-dot" id="dlp-d-3"></span>
+    <span class="dlp-dot" id="dlp-d-4"></span>
+  </div>
+  <svg id="dlp-ready-icon" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#00d070" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <span id="dlp-text">กำลังโหลด</span>
+  <span id="dlp-count" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.8)">0/5</span>
+</div>
+
 <div id="login-overlay">
   <div class="lgi-box">
 
@@ -2179,7 +2224,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     freshket <span class="iq-badge"><svg class="iq-icon" viewBox="0 0 10 10" fill="#4ddc97" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>Sense</span>
   </div>
   <div class="topbar-right">
-    <span id="aip-badge" style="font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:20px;border:1px solid rgba(0,204,106,.25);background:rgba(0,204,106,.12);color:var(--g700);cursor:pointer;flex-shrink:0;transition:all .2s" onclick="openDataPanel()" title="AI Provider">Claude</span>
+    <span id="aip-badge" style="display:none;font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:20px;border:1px solid rgba(0,204,106,.25);background:rgba(0,204,106,.12);color:var(--g700);cursor:pointer;flex-shrink:0;transition:all .2s" onclick="openDataPanel()" title="AI Provider">Claude</span>
     <button class="data-btn" id="dataBtnTop" onclick="openDataPanel()" title="จัดการข้อมูล">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ico-settings"/></svg>
     </button>
@@ -2332,7 +2377,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span id="sheets-loaded-count" style="display:none;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(38,96,200,.15);color:rgba(38,96,200,.85)">0/7</span>
-            <button id="sheets-load-btn" onclick="loadFromGoogleSheets()"
+            <button id="sheets-load-btn" onclick="reloadFromGoogleSheets()"
               style="flex-shrink:0;padding:7px 14px;border-radius:8px;border:none;background:#2660c8;color:#fff;font-size:12px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer">
               โหลดซ้ำ
             </button>
@@ -3002,7 +3047,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <button class="aix" onclick="closeChat()">✕</button>
   </div>
   <div class="aimsgs" id="aimsgs">
-    <div class="msg a"><div class="mb">สวัสดีครับ! ผมคือ <strong>Freshket Cost Advisor</strong><br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยครับ</div></div>
+    <div class="msg a" id="chat-intro-msg"><div class="mb">สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ</div></div>
   </div>
   <div class="aisugg" id="aisugg"></div>
   <div class="aiinput-row">
@@ -4300,24 +4345,94 @@ let bulkSkusReady = false;
 let bulkAltsReady = false;
 let sheetsLoadStarted = false; // guard: prevent double-fetch if login completes after prefetch
 
+// ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
+const _CSV_DB='ciq-csv-v1';
+const _CSV_TTL=6*60*60*1000; // 6 hours
+function _csvOpen(){
+  return new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open(_CSV_DB,1);
+      r.onupgradeneeded=e=>e.target.result.createObjectStore('csv');
+      r.onsuccess=e=>res(e.target.result);
+      r.onerror=()=>rej(new Error('idb open failed'));
+    }catch(e){rej(e);}
+  });
+}
+async function _csvCacheGet(tab){
+  try{
+    const db=await _csvOpen();
+    return new Promise(res=>{
+      const g=db.transaction('csv','readonly').objectStore('csv').get(tab);
+      g.onsuccess=()=>res(g.result||null);
+      g.onerror=()=>res(null);
+    });
+  }catch(e){return null;}
+}
+async function _csvCacheSet(tab,text){
+  try{
+    const db=await _csvOpen();
+    return new Promise(res=>{
+      const tx=db.transaction('csv','readwrite');
+      tx.objectStore('csv').put({text,ts:Date.now()},tab);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){return false;}
+}
+async function _csvCacheClear(){
+  try{
+    const db=await _csvOpen();
+    return new Promise(res=>{
+      const tx=db.transaction('csv','readwrite');
+      tx.objectStore('csv').clear();
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){return false;}
+}
+
+async function reloadFromGoogleSheets(){
+  await _csvCacheClear();
+  sheetsLoadStarted=false;
+  // Reset pill
+  const _pill=document.getElementById('data-load-pill');
+  if(_pill){
+    _pill.style.display='';
+    _pill.classList.remove('out','ready','visible');
+    const dotsEl=document.getElementById('dlp-dots');
+    if(dotsEl){dotsEl.style.display='flex';[...dotsEl.children].forEach(d=>d.classList.remove('done'));}
+    const rdIcon=document.getElementById('dlp-ready-icon');if(rdIcon)rdIcon.style.display='none';
+    const dlpTxt=document.getElementById('dlp-text');if(dlpTxt)dlpTxt.textContent='กำลังโหลด';
+    const dlpCnt=document.getElementById('dlp-count');if(dlpCnt)dlpCnt.textContent='0/5';
+    void _pill.offsetWidth; // force reflow before re-adding visible
+    _pill.classList.add('visible');
+  }
+  loadFromGoogleSheets();
+}
+
 async function loadFromGoogleSheets(){
   if(sheetsLoadStarted)return; // already fetching or done — skip
   sheetsLoadStarted=true;
+  // ── Loading pill: show ──
+  const _pill=document.getElementById('data-load-pill');
+  const _dlpText=document.getElementById('dlp-text');
+  const _dlpCount=document.getElementById('dlp-count');
+  if(_pill)_pill.classList.add('visible');
   // v109: 2-phase parallel fetch from Google Sheets pub CSV
   //   Phase 1 (foreground, await): 5 small files → UI ready in ~2-5s
   //   Phase 2 (background, fire-and-forget): bulk_skus (73MB) + bulk_alternatives (58MB)
   //   Handlers (line 4138, 4233) auto-refresh UI when background data arrives.
 
   const FOREGROUND=[
-    {type:'portview-bulk',     tab:'portview',     sheetId:FRESHKET_SHEETS_ID},
-    {type:'bulk-data',         tab:'history',      sheetId:FRESHKET_SHEETS_ID},
-    {type:'bulk-categories',   tab:'categories',   sheetId:FRESHKET_SHEETS_ID},
-    {type:'bulk-sku-current',  tab:'sku_current',  sheetId:FRESHKET_SHEETS_ID},
-    {type:'bulk-outlets',      tab:'outlets',      sheetId:FRESHKET_SHEETS_ID},
+    {type:'portview-bulk',     tab:'portview',     sheetId:FRESHKET_SHEETS_ID, useCache:true},
+    {type:'bulk-data',         tab:'history',      sheetId:FRESHKET_SHEETS_ID, useCache:true},
+    {type:'bulk-categories',   tab:'categories',   sheetId:FRESHKET_SHEETS_ID, useCache:true},
+    {type:'bulk-sku-current',  tab:'sku_current',  sheetId:FRESHKET_SHEETS_ID, useCache:true},
+    {type:'bulk-outlets',      tab:'outlets',      sheetId:FRESHKET_SHEETS_ID, useCache:true},
   ];
   const BACKGROUND=[
-    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus'},
-    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts'},
+    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus',  useCache:false},
+    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts',  useCache:false},
   ];
   const ALL=[...FOREGROUND,...BACKGROUND];
 
@@ -4336,15 +4451,23 @@ async function loadFromGoogleSheets(){
     sku_current:1115922809,outlets:1335396783,alternatives:1324908402,skus:0};
 
   let loaded=0;
-  async function fetchOne({type,tab,sheetId}){
+  async function fetchOne({type,tab,sheetId,useCache}){
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
-      const gid=_GID[tab]??0;
-      const url=`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}`;
-      const resp=await fetch(url);
-      if(!resp.ok)throw new Error('HTTP '+resp.status);
-      const text=await resp.text();
+      let text=null;
+      if(useCache){
+        const cached=await _csvCacheGet(tab);
+        if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL)text=cached.text;
+      }
+      if(!text){
+        const gid=_GID[tab]??0;
+        const url=`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}`;
+        const resp=await fetch(url);
+        if(!resp.ok)throw new Error('HTTP '+resp.status);
+        text=await resp.text();
+        if(useCache)_csvCacheSet(tab,text); // fire-and-forget write
+      }
       ingestCSVText(type,text);
       if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
       return true;
@@ -4356,15 +4479,33 @@ async function loadFromGoogleSheets(){
   }
 
   // ── Phase 1: foreground — await these 5 ──
-  const fgResults=await Promise.all(FOREGROUND.map(async f=>{
+  const fgResults=await Promise.all(FOREGROUND.map(async(f,idx)=>{
     const ok=await fetchOne(f);
-    if(ok)loaded++;
+    if(ok){
+      loaded++;
+      // Tick pill dot
+      const dot=document.getElementById('dlp-d-'+idx);
+      if(dot){dot.classList.add('done');dot.style.animation='dlp-dot-in .3s cubic-bezier(.34,1.56,.64,1) forwards';}
+      if(_dlpCount)_dlpCount.textContent=loaded+'/5';
+    }
     if(counter)counter.textContent=loaded+'/'+ALL.length;
     return ok;
   }));
   const fgOk=fgResults.filter(x=>x).length;
   if(btn){btn.disabled=false;btn.textContent='โหลดซ้ำ';}
   if(fgOk>0)showToast('พร้อมใช้งาน — '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
+  // ── Pill: ready micro-animation ──
+  if(_pill&&fgOk>0){
+    const _readyIcon=document.getElementById('dlp-ready-icon');
+    const _dotsEl=document.getElementById('dlp-dots');
+    if(_dotsEl)_dotsEl.style.display='none';
+    if(_readyIcon)_readyIcon.style.display='block';
+    if(_dlpText)_dlpText.textContent='พร้อมใช้งาน';
+    if(_dlpCount)_dlpCount.textContent='';
+    _pill.classList.add('ready');
+    setTimeout(()=>_pill.classList.add('out'),1800);
+    setTimeout(()=>{if(_pill)_pill.style.display='none';},2400);
+  }
 
   // ── Phase 2: background — fire-and-forget for bulk_skus + bulk_alternatives ──
   // Returning here lets the caller continue without waiting; handlers auto-refresh UI.
@@ -11837,6 +11978,17 @@ function openChat(){
   const aist=document.querySelector('.aist');
   if(ain)ain.textContent=isKAM?'Freshket Sense — KAM':'Freshket Sense';
   if(aist)aist.textContent=isKAM?'● วิเคราะห์ข้อมูลบัญชีลูกค้า':'● พร้อมช่วยลดต้นทุนร้านคุณ';
+  // F4: Update Olive intro message with current account context
+  const introMsg=document.getElementById('chat-intro-msg');
+  if(introMsg){
+    const _an=(D&&D.meta&&D.meta.accountName)||'';
+    const txt=isKAM&&_an
+      ?`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>วันนี้มีเรื่องบัญชี <strong>${_an}</strong> ให้วิเคราะห์ หรืออยากให้ช่วยเรื่องไหนเป็นพิเศษคะ`
+      :isKAM
+      ?`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>เลือกร้านที่พอร์ตก่อน แล้ว Olive จะวิเคราะห์ให้เลยค่ะ`
+      :`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย Cost Advisor จาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ`;
+    introMsg.querySelector('.mb').innerHTML=txt;
+  }
 }
 function closeChat(){chatOpen=false;document.getElementById('aipanel').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('aifab').classList.remove('open');}
 function askQ(q){document.getElementById('aiinput').value=q;sendChat();}
