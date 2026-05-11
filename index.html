@@ -2165,6 +2165,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
       color:rgba(255,255,255,.2);cursor:pointer;
       letter-spacing:.5px;padding:4px 8px;border-radius:4px;
       transition:all .3s;
+      display:none;
     "
     onmouseover="this.style.color='rgba(255,255,255,.5)'"
     onmouseout="this.style.color='rgba(255,255,255,.2)'">
@@ -2215,7 +2216,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   </div>
   <div class="spl-ticker-wrap"><span id="spl-ticker"></span></div>
   <div class="spl-bar-track"><div id="spl-bar"></div></div>
-</div> — แสดงเมื่อกด [local dev] -->
+</div><!-- แสดงเมื่อกด [local dev] -->
 <div id="local-persona-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;padding:20px">
   <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:100%;max-width:400px;max-height:80vh;overflow-y:auto">
     <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.6);letter-spacing:.8px;margin-bottom:4px">LOCAL DEV MODE</div>
@@ -3122,7 +3123,13 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         <path d="M19.5 5.5L20.18 7.82L22.5 8.5L20.18 9.18L19.5 11.5L18.82 9.18L16.5 8.5L18.82 7.82Z" fill="rgba(77,220,151,.75)"/>
       </svg>
     </div>
-    <div><div class="ain">Freshket Cost Advisor</div><div class="aist">● พร้อมช่วยลดต้นทุนร้านคุณ</div></div>
+    <div style="flex:1;min-width:0">
+      <div class="ain" style="display:flex;align-items:center;gap:5px">
+        Olive
+        <span style="font-size:9px;font-weight:600;padding:1px 6px;border-radius:8px;background:rgba(0,208,112,.12);color:var(--g700);border:1px solid rgba(0,208,112,.2)">Freshket Sense</span>
+      </div>
+      <div class="aist" id="aist-sub">● พร้อมช่วยลดต้นทุนร้านคุณ</div>
+    </div>
     <button class="aix" onclick="closeChat()">✕</button>
   </div>
   <div class="aimsgs" id="aimsgs">
@@ -3203,15 +3210,18 @@ async function doLogin() {
   if (!email || !pwd) { showLoginError('กรุณากรอก email และ password'); return; }
   btn.disabled = true; btnText.textContent = 'กำลังเข้าสู่ระบบ...';
   errEl.style.display = 'none';
-  const { data, error } = await supa.auth.signInWithPassword({ email, password: pwd });
-  if (error) {
-    showLoginError('Email หรือ password ไม่ถูกต้อง');
+  try {
+    const { data, error } = await supa.auth.signInWithPassword({ email, password: pwd });
+    if (error) { showLoginError('Email หรือ password ไม่ถูกต้อง'); return; }
+    currentUser = data.user;
+    await loadUserProfile();
+    hideLoginOverlay();
+  } catch(e) {
+    showLoginError('เกิดข้อผิดพลาด กรุณาลองใหม่');
+    console.error('[login]', e);
+  } finally {
     btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบ';
-    return;
   }
-  currentUser = data.user;
-  await loadUserProfile();
-  hideLoginOverlay();
 }
 
 function showLoginError(msg) {
@@ -12082,11 +12092,9 @@ function openChat(){
     suggEl.style.display='flex';
     suggEl.innerHTML=suggs.map(s=>`<button class="sgbtn" onclick="askQ(${JSON.stringify(s.q)})">${s.label}</button>`).join('');
   }
-  // F3: Update header based on mode
-  const ain=document.querySelector('.ain');
-  const aist=document.querySelector('.aist');
-  if(ain)ain.textContent=isKAM?'Freshket Sense — KAM':'Freshket Sense';
-  if(aist)aist.textContent=isKAM?'● วิเคราะห์ข้อมูลบัญชีลูกค้า':'● พร้อมช่วยลดต้นทุนร้านคุณ';
+  // F3: Update subtitle based on mode (header name is always Olive)
+  const aist=document.getElementById('aist-sub')||document.querySelector('.aist');
+  if(aist)aist.textContent=isKAM?'● ผู้ช่วย KAM · วิเคราะห์บัญชีลูกค้า':'● ผู้ช่วยวิเคราะห์ต้นทุนร้านคุณ';
   // F4: Update Olive intro message with current account context
   const introMsg=document.getElementById('chat-intro-msg');
   if(introMsg){
@@ -13773,6 +13781,11 @@ function _onFolderSelected(input){
 function _initFolderAutoLoad(){}
 
 (function init(){
+  // Show local-dev-btn only on localhost
+  if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'){
+    const ldb=document.getElementById('local-dev-btn');
+    if(ldb)ldb.style.display='block';
+  }
   // Prefetch Google Sheets data immediately — runs in background while user logs in
   loadFromGoogleSheets();
   // Check Supabase session first (shows/hides login overlay)
