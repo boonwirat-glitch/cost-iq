@@ -275,7 +275,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* Sections */
 .kam-section{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
 .kam-section:last-child{border-bottom:none}
-.kam-section-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(180,200,255,.6);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.kam-section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(180,200,255,.88);margin-bottom:6px;display:flex;align-items:center;gap:5px}
 .kam-section-label-dot{width:5px;height:5px;border-radius:50%;background:rgba(38,96,200,.7);flex-shrink:0}
 .kam-section-body{font-size:13px;color:rgba(255,255,255,.85);line-height:1.6}
 .kam-section-body.opener{font-size:14px;font-weight:600;color:#fff;line-height:1.5}
@@ -293,7 +293,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* KAM header text explicitly white */
 #kam-acct-name2,#kam-acct-meta2,#kam-acct-dept{color:rgba(255,255,255,.9) !important}
 .kam-dc-head{padding:10px 14px 8px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:6px}
-.kam-dc-head-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(180,200,255,.85)}
+.kam-dc-head-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:rgba(220,235,255,.95)}
 .kam-dc-body{padding:12px 14px}
 .kam-dc-insight{padding:8px 14px 12px;font-size:12px;color:rgba(220,235,255,.92);line-height:1.65;border-top:1px solid rgba(255,255,255,.08);font-style:italic}
 /* GMV card specifics */
@@ -484,9 +484,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .h-mo{font-size:11px;color:var(--amb);font-weight:600;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:5px}
 /* Frame 1: FACTUAL — ที่จ่ายไป */
 .hero-fact{margin-bottom:0}
-.hero-frame-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.35);margin-bottom:5px}
+.hero-frame-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.6);margin-bottom:5px}
 .hero-fact .hero-amt{font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:600;letter-spacing:-1.5px;color:#fff;line-height:1;margin-bottom:4px}
-.hero-fact .hero-sub{font-size:12px;color:rgba(255,255,255,.35)}
+.hero-fact .hero-sub{font-size:12px;color:rgba(255,255,255,.6)}
 /* Hero main row: spend + forecast */
 .hero-main-row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:10px}
 .hero-forecast{text-align:right;flex-shrink:0}
@@ -497,7 +497,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .hero-pace-track{height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-bottom:5px}
 .hero-pace-fill{height:100%;border-radius:2px;background:var(--g500);width:0;transition:width 1s cubic-bezier(.34,1.2,.64,1)}
 .hero-pace-row{display:flex;justify-content:space-between;align-items:center;padding-bottom:14px}
-.hero-pace-days{font-size:9px;color:rgba(255,255,255,.35)}
+.hero-pace-days{font-size:11px;color:rgba(255,255,255,.6)}
 .hero-pace-pct{font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace}
 .hero-pace-pct.great,.hero-pace-pct.safe{color:#4ddc97}
 .hero-pace-pct.warn{color:var(--amb)}
@@ -539,6 +539,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .ct{font-size:11px;font-weight:700;color:var(--n400);text-transform:uppercase;letter-spacing:.6px}
 .sec{padding:16px 16px 0}
+/* Ensure last SKU card is not hidden behind the fixed pb-footer + bnav */
+#scr-opportunities .sec{padding-bottom:170px}
 .sec:last-child{padding-bottom:16px}
 .stit{font-size:17px;font-weight:700;margin-bottom:12px}
 .link{font-size:11px;color:var(--g700);cursor:pointer;font-weight:600}
@@ -548,7 +550,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .sense-card:active{opacity:.92}
 .sense-card.sense-done{cursor:default;pointer-events:none}
 .sense-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.sense-card-eyebrow{font-size:10px;font-weight:700;letter-spacing:.8px;color:rgba(255,255,255,.35);text-transform:uppercase;font-family:'IBM Plex Sans Thai',sans-serif}
+.sense-card-eyebrow{font-size:10px;font-weight:700;letter-spacing:.8px;color:rgba(255,255,255,.6);text-transform:uppercase;font-family:'IBM Plex Sans Thai',sans-serif}
 /* Standby body */
 .sense-standby-body{display:flex;flex-direction:column;align-items:center;padding:8px 0 14px;transition:opacity .35s}
 .sense-star-ring{width:56px;height:56px;border-radius:50%;border:1.5px solid rgba(0,208,112,.35);display:flex;align-items:center;justify-content:center;margin-bottom:12px;animation:sense-ring-pulse 2.4s ease-in-out infinite}
@@ -556,7 +558,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .sense-star{font-size:22px;color:var(--g500);display:inline-block;animation:sense-star-twinkle 2.4s ease-in-out infinite}
 @keyframes sense-star-twinkle{0%,100%{opacity:.65;transform:scale(1)}50%{opacity:1;transform:scale(1.18)}}
 .sense-invite-title{font-size:15px;font-weight:700;color:rgba(255,255,255,.8);font-family:'IBM Plex Sans Thai',sans-serif;margin-bottom:4px}
-.sense-invite-sub{font-size:12px;color:rgba(255,255,255,.38);font-family:'IBM Plex Sans Thai',sans-serif}
+.sense-invite-sub{font-size:13px;color:rgba(255,255,255,.65);font-family:'IBM Plex Sans Thai',sans-serif}
 /* Loading steps on dark bg */
 .sense-load-body{padding:4px 0 8px}
 .sense-card .rest-ai-step{color:rgba(190,255,220,.7)}
@@ -568,7 +570,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .sense-score-info{flex:1;min-width:0}
 .sense-card .dlb{font-size:14px;font-weight:700;color:rgba(255,255,255,.75);font-family:'IBM Plex Sans Thai',sans-serif;margin-bottom:2px}
 .sense-card .dval{font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;line-height:1}
-.sense-card .dsc{font-size:11px;color:rgba(190,255,220,.5);line-height:1.55;margin-top:4px}
+.sense-card .dsc{font-size:12px;color:rgba(190,255,220,.72);line-height:1.55;margin-top:4px}
 /* Dial info btn on dark bg */
 .dial-info-btn{width:20px;height:20px;border-radius:50%;background:transparent;border:1.5px solid rgba(255,255,255,.2);cursor:pointer;font-size:11px;font-weight:400;color:rgba(255,255,255,.35);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s;vertical-align:middle;line-height:1}
 .dial-info-btn:hover{border-color:rgba(255,255,255,.5);color:rgba(255,255,255,.7)}
@@ -951,20 +953,21 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .plan-sel-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:1px}
 .plan-sel-sub{font-size:9px;color:rgba(255,255,255,.88);margin-top:2px}
 .plan-toggle-row{display:flex;gap:6px}
-.plan-card{flex:1;border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .18s;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05)}
-.plan-card:last-child{margin-bottom:0}
+.plan-card{border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .22s cubic-bezier(.4,0,.2,1);border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05)}
 .plan-card.selected{border-color:var(--g500);background:rgba(0,208,112,.15);box-shadow:0 0 0 1px rgba(0,208,112,.2)}
-.plan-card.unselected{opacity:.72;border-color:rgba(255,255,255,.18)}
-.plan-card.unselected:hover{opacity:.8;border-color:rgba(255,255,255,.2)}
-.plan-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px}
+.plan-card.unselected{opacity:.7;border-color:rgba(255,255,255,.15);padding:9px 14px}
+.plan-card.unselected:hover{opacity:.85;border-color:rgba(255,255,255,.28)}
+.plan-card.unselected .plan-card-desc,.plan-card.unselected .plan-card-nums{display:none}
+.plan-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.plan-card.unselected .plan-card-top{margin-bottom:0}
 .plan-card-content{flex:1;min-width:0}
-.plan-card-title{font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;gap:5px}
-.plan-card-marker{font-size:11px;line-height:1;flex-shrink:0;color:var(--g500)}
-.plan-card.unselected .plan-card-marker{color:rgba(255,255,255,.5)}
-.plan-card-desc{font-size:10px;color:rgba(255,255,255,.9);line-height:1.4;margin-bottom:5px}
-.plan-card-nums{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.9);line-height:1.4}
-.plan-card-nums .plan-save{font-size:12px;font-weight:700;color:var(--g500)}
-.plan-card.unselected .plan-card-nums .plan-save{color:rgba(255,255,255,.75)}
+.plan-card-title{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:5px}
+.plan-card.unselected .plan-card-title{font-size:13px;color:rgba(255,255,255,.75)}
+.plan-card-marker{font-size:12px;line-height:1;flex-shrink:0;color:var(--g500)}
+.plan-card.unselected .plan-card-marker{color:rgba(255,255,255,.45)}
+.plan-card-desc{font-size:12px;color:rgba(255,255,255,.85);line-height:1.4;margin-bottom:6px}
+.plan-card-nums{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.9);line-height:1.4}
+.plan-card-nums .plan-save{font-size:15px;font-weight:700;color:var(--g500)}
 .plan-card-btn{font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .15s;flex-shrink:0;white-space:nowrap}
 .plan-card-btn{display:none}
 .plan-card.unselected .plan-card-btn{display:none}
@@ -979,6 +982,33 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .pvc-star{animation:svb-star-pulse 2.1s ease-in-out infinite;display:inline-block;flex-shrink:0;}
 .pvc-desc{font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;margin-bottom:7px;}
 .pvc-cta{font-size:10px;font-weight:700;color:rgba(0,208,112,.8);display:flex;align-items:center;gap:3px;}
+
+/* ── PLAN TABS (replaces accordion cards) ── */
+.plan-tabs{display:flex;gap:4px;margin-bottom:8px}
+.plan-tab{flex:1;border-radius:9px;padding:9px 10px;cursor:pointer;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);font-family:'IBM Plex Sans Thai',sans-serif;transition:all .22s cubic-bezier(.4,0,.2,1)}
+.plan-tab.active{border-color:rgba(0,208,112,.45);background:rgba(0,208,112,.12)}
+.plan-tab:not(.active):hover{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.07)}
+.plan-tab-label{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:rgba(255,255,255,.78);margin-bottom:2px}
+.plan-tab.active .plan-tab-label{color:#fff}
+.plan-tab-count{font-size:10px;color:rgba(255,255,255,.58);font-family:'IBM Plex Mono',monospace}
+.plan-tab.active .plan-tab-count{color:rgba(255,255,255,.75)}
+/* Sense tab — preserves full identity (dark bg + glow) */
+.plan-tab.sense-tab{background:#0a1f14;border-color:rgba(0,208,112,.28);animation:pvc-border-glow 3.2s ease-in-out infinite}
+.plan-tab.sense-tab.active{border-color:rgba(0,208,112,.65);box-shadow:0 0 14px rgba(0,208,112,.12)}
+.plan-tab.sense-tab .plan-tab-label{color:rgba(77,220,151,.7)}
+.plan-tab.sense-tab.active .plan-tab-label{color:#4ddc97}
+.plan-tab.sense-tab .plan-tab-count{color:rgba(0,208,112,.55)}
+.plan-tab.sense-tab.active .plan-tab-count{color:rgba(77,220,151,.8)}
+/* Scan shimmer on sense tab pre-verify */
+.plan-tab.sense-tab.cta-mode{position:relative;overflow:hidden}
+.plan-tab.sense-tab.cta-mode::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,208,112,.1),transparent);transform:translateX(-100%);animation:pvs-scan 3s ease-in-out infinite;pointer-events:none}
+/* Tab content panel */
+.plan-tab-panel{padding:2px 0 4px}
+.ptc-desc{font-size:11px;color:rgba(255,255,255,.72);line-height:1.5;margin-bottom:5px}
+.ptc-nums{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.88);line-height:1.4}
+.ptc-nums .plan-save{font-size:15px;font-weight:700;color:var(--g500)}
+.ptc-rerun{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:7px 14px;border-radius:20px;border:1.5px solid rgba(0,208,112,.45);background:rgba(0,208,112,.1);font-size:11px;font-weight:700;color:#4ddc97;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;animation:pvc-border-glow 3.2s ease-in-out infinite;transition:background .2s,border-color .2s}
+.ptc-rerun:hover{background:rgba(0,208,112,.22);border-color:rgba(0,208,112,.75)}
 
 
 /* ── KAM SIGNAL BAR ── */
@@ -1099,8 +1129,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .pb-footer-left .pf-label{font-size:10px;color:rgba(255,255,255,.45);margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
 .pb-footer-left .pf-count{font-size:12px;font-weight:700;color:rgba(255,255,255,.8)}
 .pb-footer-center{flex:1;text-align:center}
-.pb-footer-center .pf-mo{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:rgba(255,255,255,.45);line-height:1;margin-top:3px}
-.pb-footer-center .pf-yr{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--amb);line-height:1}
+.pb-footer-center .pf-mo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--amb);line-height:1}
+.pb-footer-center .pf-yr{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:rgba(255,255,255,.4);line-height:1;margin-top:3px}
 .pb-footer-right{}
 .pb-footer-cta{background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;white-space:nowrap;transition:all .2s}
 .pb-footer-cta:hover{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.4)}
@@ -1147,7 +1177,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .oalt-rec{display:inline-flex;align-items:center;gap:2px;background:var(--g50);color:var(--g800);border-radius:10px;padding:2px 6px;font-size:9px;font-weight:700;margin-left:5px;white-space:nowrap;flex-shrink:0}
 
 /* ── TABLE VIEW ── */
-.opp-filter-info{font-size:11px;color:var(--n700);margin-bottom:10px;font-weight:500}
+.opp-filter-info{font-size:13px;color:var(--n800);margin-bottom:10px;font-weight:600}
 /* ── VERIFY BANNER ── */
 .verify-banner{display:flex;align-items:center;gap:12px;background:var(--g50);border:1.5px solid rgba(0,208,112,.25);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;cursor:pointer;transition:all .2s}
 .verify-banner:hover{border-color:var(--g500);background:rgba(0,208,112,.08)}
@@ -1453,7 +1483,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .h-kam-dot{width:14px;height:14px;border-radius:50%;background:var(--g500);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .h-kam-text{font-size:10px;color:rgba(255,255,255,.4);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .h-kam-name{color:rgba(255,255,255,.68);font-weight:600}
-.hero-mom{display:flex;align-items:center;gap:4px;margin-top:5px;font-size:10px;color:rgba(255,255,255,.45);font-weight:500}
+.hero-mom{display:flex;align-items:center;gap:4px;margin-top:5px;font-size:11px;color:rgba(255,255,255,.65);font-weight:500}
 .mom-delta{font-weight:700;font-family:'IBM Plex Mono',monospace;font-size:10px}
 .mom-up{color:#4ddc97}
 .mom-dn{color:rgba(255,120,80,.85)}
@@ -1583,7 +1613,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .gen-prog-found{font-size:12px;font-weight:700;color:var(--g700);font-family:'IBM Plex Mono',monospace}
 .gen-progress-track{height:6px;background:var(--n100);border-radius:3px;overflow:hidden;margin-bottom:6px}
 .gen-progress-fill{height:100%;background:var(--g500);border-radius:3px;transition:width .4s ease;width:0%}
-.gen-prog-detail{font-size:10px;color:var(--n400);font-family:'IBM Plex Mono',monospace}
+.gen-prog-detail{font-size:12px;color:var(--n600);font-family:'IBM Plex Mono',monospace}
 /* SKU log (live scroll) */
 .gen-sku-log{max-height:120px;overflow-y:auto;margin-top:8px;border-top:1px solid var(--n100);padding-top:8px;display:flex;flex-direction:column;gap:3px}
 .gen-sku-row{display:flex;align-items:center;gap:8px;font-size:10px;padding:2px 0}
@@ -1618,9 +1648,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:#0d1f3c}
 body.kam-mode .bnav{background:#0d2550;border-top:1px solid rgba(255,255,255,.1)}
-body.kam-mode .bnav .ni{color:rgba(255,255,255,.38)}
-body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.38)}
-body.kam-mode .bnav .ni .lb{color:rgba(255,255,255,.38)}
+body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
+body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
+body.kam-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
 /* Active tab: white icon/label + blue pill background — override global green */
 body.kam-mode .bnav .ni.on{color:#fff}
 body.kam-mode .bnav .ni.on svg{color:#fff}
@@ -1662,6 +1692,8 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .pace-meta-item{flex:1}
 .pace-meta-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
 .pace-meta-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#fff}
+.pace-info-btn{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.28);background:transparent;color:rgba(255,255,255,.5);font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;padding:0;line-height:1;transition:all .15s;flex-shrink:0;font-style:italic}
+.pace-info-btn:hover{border-color:rgba(255,255,255,.65);color:rgba(255,255,255,.9);background:rgba(255,255,255,.1)}
 .pace-meta-sub{font-size:9px;color:rgba(255,255,255,.4);margin-top:1px}
 
 /* ══ PORTVIEW (Tab 6) ══ */
@@ -1679,7 +1711,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .portview-stat.danger .portview-stat-val{color:#ff8888}
 .portview-stat.warn .portview-stat-val{color:var(--amb)}
 .portview-stat.ok .portview-stat-val{color:#4ddc97}
-.portview-stat-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.5px}
+.portview-stat-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px}
 .portview-ai-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:linear-gradient(135deg,rgba(38,96,200,.35),rgba(38,96,200,.2));border:1px solid rgba(38,96,200,.4);color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,border-color .2s,color .2s,filter .2s;margin-bottom:14px;position:relative;overflow:hidden}
 .portview-ai-btn:hover{background:linear-gradient(135deg,rgba(38,96,200,.5),rgba(38,96,200,.3))}
 /* ── Bulk SQL copy button ── */
@@ -1724,7 +1756,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 /* Pace formula row in detail card */
 .pace-formula-row{margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid rgba(255,255,255,.07)}
 .pace-formula-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.3);margin-bottom:5px}
-.pace-formula-line{font-size:10px;color:rgba(255,255,255,.55);line-height:1.6;font-family:'IBM Plex Mono',monospace}
+.pace-formula-line{font-size:11px;color:rgba(255,255,255,.7);line-height:1.6;font-family:'IBM Plex Mono',monospace}
 .pace-formula-line strong{color:rgba(255,255,255,.8);font-weight:700}
 
 .portview-acct-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -1755,7 +1787,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .portview-rep-stat{display:flex;align-items:center;gap:5px}
 .portview-rep-stat .lbl{color:rgba(255,255,255,.4)}
 /* ── Teamview variable-density cards ── */
-.tv-section-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);padding:0 2px;margin:14px 0 8px}
+.tv-section-lbl{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.78);padding:0 2px;margin:14px 0 8px}
 .tv-section-lbl:first-child{margin-top:4px}
 .tv-full-card{border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;transition:all .2s;overflow:hidden}
 .tv-full-card.danger{background:rgba(229,62,62,.07);border:1px solid rgba(229,62,62,.28)}
@@ -1789,7 +1821,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .tv-chip:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
 .tv-chip-name{flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tv-chip-pace{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#4ddc97;margin-right:8px;flex-shrink:0}
-.tv-chip-visit{font-size:9px;color:rgba(0,208,112,.55);font-weight:700;margin-right:8px;flex-shrink:0;white-space:nowrap}
+.tv-chip-visit{font-size:10px;color:rgba(0,208,112,.75);font-weight:700;margin-right:8px;flex-shrink:0;white-space:nowrap}
 .tv-chip-arrow{font-size:13px;color:rgba(255,255,255,.2);flex-shrink:0}
 
 /* ── Portview compact chip — single-row account card ── */
@@ -1814,7 +1846,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 
 /* Portview view-toggle row */
 .pv-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:0 0 10px}
-.pv-toggle-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(255,255,255,.35)}
+.pv-toggle-count{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.6)}
 .pv-toggle-btns{display:flex;align-items:center;gap:2px}
 .pv-toggle-btn{width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:rgba(255,255,255,.25);transition:color .15s}
 .pv-toggle-btn.on{color:rgba(255,255,255,.9)}
@@ -1839,6 +1871,16 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .portview-back-btn:hover{background:rgba(255,255,255,.12);color:#fff}
 
 /* ══ NAV SPACING ══ */
+
+/* ── Sense nav tab: default state — green sparkle + pulse ── */
+#nav-opportunities svg { color: var(--g500); }
+@keyframes sense-nav-pulse { 0%,100%{filter:drop-shadow(0 0 3px rgba(0,208,112,.55));} 50%{filter:drop-shadow(0 0 7px rgba(0,208,112,.9));} }
+#nav-opportunities .nwrap { animation: sense-nav-pulse 2.6s ease-in-out infinite; }
+#nav-opportunities .lb { color: var(--g500); font-weight: 700; }
+/* After senseActivated (class sense-lit): amber/gold glow */
+#nav-opportunities.sense-lit svg { color: #f6ad55; }
+#nav-opportunities.sense-lit .nwrap { animation: none; filter: drop-shadow(0 0 8px rgba(246,173,85,.55)); }
+#nav-opportunities.sense-lit .lb { color: #f6ad55; }
 .bnav{grid-template-columns:repeat(5,1fr)}
 .bnav .lb{font-size:10px}
 body.kam-mode .bnav{grid-template-columns:repeat(2,1fr)}
@@ -1953,9 +1995,9 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 .portview-tier-box.warn{background:rgba(240,176,0,.07);border:1.5px solid rgba(240,176,0,.2)}
 .portview-tier-box.danger{background:rgba(229,62,62,.07);border:1.5px solid rgba(229,62,62,.2)}
 .portview-tier-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
-.portview-tier-box.safe .portview-tier-lbl{color:rgba(77,220,151,.5)}
-.portview-tier-box.warn .portview-tier-lbl{color:rgba(240,176,0,.5)}
-.portview-tier-box.danger .portview-tier-lbl{color:rgba(229,62,62,.45)}
+.portview-tier-box.safe .portview-tier-lbl{color:rgba(77,220,151,.75)}
+.portview-tier-box.warn .portview-tier-lbl{color:rgba(240,176,0,.75)}
+.portview-tier-box.danger .portview-tier-lbl{color:rgba(229,62,62,.7)}
 .portview-tier-val{font-family:'IBM Plex Mono',monospace;font-weight:700;line-height:1;margin-bottom:4px;animation:statPop 350ms ease both}
 .portview-tier-box.safe .portview-tier-val{color:#4ddc97;font-size:21px}
 .portview-tier-box.warn .portview-tier-val{color:#f6ad55;font-size:16px;animation-delay:80ms}
@@ -2263,7 +2305,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   <symbol id="ico-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z"/><path d="M9 21V13h6v8"/></symbol>
   <symbol id="ico-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="4" width="4" height="17" rx="1"/></symbol>
   <symbol id="ico-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></symbol>
-  <symbol id="ico-sense" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2L13.55 9.45L21 12L13.55 14.55L12 22L10.45 14.55L3 12L10.45 9.45Z"/></symbol>
+  <symbol id="ico-sense" viewBox="0 0 10 10" fill="currentColor" stroke="none"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></symbol>
   <symbol id="ico-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2.5" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2.5" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2.5" fill="currentColor" stroke="none"/></symbol>
   <symbol id="ico-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></symbol>
   <symbol id="ico-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></symbol>
@@ -2865,19 +2907,6 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         </div>
       </div>
 
-      <!-- Filter pills -->
-      <div class="fpills" id="oppfilter">
-        <button class="pill on" onclick="setOppFilter('all',this)">ทั้งหมด</button>
-        <button class="pill" onclick="setOppFilter('top10',this)">Top 10</button>
-        <button class="pill" onclick="setOppFilter('top20',this)">Top 20</button>
-        <button class="pill" onclick="setOppFilter('top50',this)">Top 50</button>
-        <button class="pill" onclick="setOppFilter('custom',this)">กำหนดเอง</button>
-      </div>
-      <div id="opp-custom-row" style="display:none;margin:4px 0 8px">
-        <input type="number" id="opp-n-input" min="1" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:'IBM Plex Sans Thai',sans-serif;outline:none" oninput="renderOpps()">
-      </div>
-      <div id="opp-filter-info" class="opp-filter-info"></div>
-
       <div id="opplist"></div>
     </div>
   </div>
@@ -3080,9 +3109,8 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <div class="pf-count" id="pf-count">0 รายการ</div>
   </div>
   <div class="pb-footer-center">
-    <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">ประหยัดได้ / ปี</div>
-    <div class="pf-yr" id="pf-yr">฿0</div>
     <div class="pf-mo" id="pf-mo">฿0 / เดือน</div>
+    <div class="pf-yr" id="pf-yr">฿0 / ปี</div>
     <div class="pf-vintage" id="pf-vintage">จากยอดซื้อ —</div>
   </div>
   <div class="pb-footer-right" style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
@@ -3760,6 +3788,11 @@ function loadFromStorage(targetId){
     D.meta.kamName=D.meta.kamName||'';
 
     if(D.alts.length&&D.skus.length)computeOPPS();
+    // Auto-restore session state: if user had verified alts + a plan, treat as active
+    if(OPPS.length>0&&D.alts.some(p=>p.confidence&&p.confidence!=='unverified')){
+      senseActivated=true;
+      if(currentPlanMode&&currentPlanMode!=='none')footerUnlocked=true;
+    }
     return true;
   }catch(e){console.warn('load failed',e);return false;}
 }
@@ -4033,17 +4066,8 @@ function processBulkAlternatives(csv){
     // Build new candidate pairs (unverified)
     const newPairs=[];
     groupMap.forEach(g=>{
-      const basis=detectPriceBasis(g.pack_size,g.unit_price,g.price);
-      const srcUnitLabel=getUnitLabel(g.pack_size,basis);
+      // Always per_kg — consistent with computeOPPS display logic
       g.alts.forEach(a=>{
-        let srcDisplayPrice,altDisplayPrice,diffDisplay;
-        if(basis==='per_kg'){
-          srcDisplayPrice=g.price;altDisplayPrice=a.catalog_price;diffDisplay=a.price_diff;
-        } else {
-          srcDisplayPrice=g.unit_price||g.price;
-          altDisplayPrice=a.catalog_unit_price||a.catalog_price;
-          diffDisplay=parseFloat((srcDisplayPrice-altDisplayPrice).toFixed(2));
-        }
         newPairs.push({
           source_item_id:parseInt(g.id),source_item_name:g.name,
           source_price:g.price,source_pack_size:g.pack_size||'',
@@ -4052,9 +4076,12 @@ function processBulkAlternatives(csv){
           pack_size:a.pack_size||'',
           confidence:'unverified',note_th:'',caveat_th:'',
           subclass:g.subclass,
-          price_basis:basis,price_unit_label:srcUnitLabel,
-          source_display_price:srcDisplayPrice,alt_display_price:altDisplayPrice,
-          price_diff_display:diffDisplay,
+          price_basis:'per_kg',price_unit_label:'กก.',
+          source_display_price:g.price,
+          alt_display_price:Math.max(0,g.price-a.price_diff),
+          price_diff_display:a.price_diff,
+          source_unit_price:g.unit_price||null,    // ฿/pack (for per-egg calc)
+          alt_unit_price:a.catalog_unit_price||0,  // ฿/pack (for per-egg calc)
           monthly_qty_commercial:g.monthly_qty||0
         });
       });
@@ -4129,40 +4156,49 @@ function computeOPPS(){
     const verifiedPairs=pairs.filter(p=>p.confidence&&(p.price_diff||0)>0);
     if(!verifiedPairs.length)return;
     const p0=verifiedPairs[0];
-    // ── Price basis (Phase 2): read from alt data, fallback per_kg ──
-    const basis=p0.price_basis||'per_kg';
-    const isPerUnit=basis==='per_unit_volume'||basis==='per_unit_count';
-    const unitLabel=p0.price_unit_label||'kg';
-    const qu=isPerUnit?`${unitLabel}/เดือน`:'kg/เดือน';
+    // ── Detect natural trade unit: per_egg (eggs), per_liter (liquids), per_kg (default) ──
+    const _displayMode=detectDisplayMode(sku.subclass||sku.d||'',p0.source_pack_size||'');
+    const unitLabel=_displayMode==='per_egg'?'ฟอง':_displayMode==='per_liter'?'ลิตร':'กก.';
+    const qu=_displayMode==='per_egg'?'ฟอง/เดือน':_displayMode==='per_liter'?'ลิตร/เดือน':'kg/เดือน';
 
     const alts=verifiedPairs.map(p=>{
-      // ── Savings calculation ──
-      let save;
-      if(isPerUnit&&p.price_diff_display!=null){
-        // per-unit: diff per unit × commercial units per month
-        // Fallback: estimate units from gmv/piece_price
-        const qty_c=p.monthly_qty_commercial||(sku.avg_piece_price>0?Math.round(sku.gmv/sku.avg_piece_price):0);
-        save=Math.round(p.price_diff_display*(qty_c||0));
+      let save,srcDisplay,altDisplay,diffDisplay,pct;
+
+      if(_displayMode==='per_egg'){
+        // Per-egg: use unit prices / egg count per pack
+        const srcEggs=extractEggCount(p.source_pack_size)||1;
+        const altEggs=extractEggCount(p.pack_size)||srcEggs;
+        const srcUP=p.source_unit_price||0;
+        const altUP=p.alt_unit_price||0;
+        if(srcUP>0&&altUP>0&&srcEggs>0&&altEggs>0){
+          srcDisplay=parseFloat((srcUP/srcEggs).toFixed(2));
+          altDisplay=parseFloat((altUP/altEggs).toFixed(2));
+          diffDisplay=parseFloat((srcDisplay-altDisplay).toFixed(2));
+          pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
+          const eggsPerMonth=(p.monthly_qty_commercial||0)*srcEggs;
+          save=Math.round(diffDisplay*eggsPerMonth);
+        } else {
+          // fallback per_kg
+          srcDisplay=p.source_price;diffDisplay=p.price_diff;
+          altDisplay=Math.max(0,srcDisplay-diffDisplay);
+          pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
+          const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
+          save=Math.round(p.price_diff*(estQty||0));
+        }
       } else {
-        // per-kg: diff per kg × kg per month
-        // Fallback: if qty_kg missing, estimate from gmv/unit_price
-        const estQty=sku.qty_kg||(sku.unit_price>0?sku.gmv/sku.unit_price:0);
+        // per_liter OR per_kg — calculation identical (Q4B uses weight, label changes for liquids)
+        srcDisplay=p.source_price;
+        diffDisplay=p.price_diff;
+        altDisplay=Math.max(0,srcDisplay-diffDisplay);
+        pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
+        const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
         save=Math.round(p.price_diff*(estQty||0));
       }
-      // ── % based on display prices (consistent basis) ──
-      const srcDisplay=p.source_display_price??p.source_price;
-      const diffDisplay=p.price_diff_display??p.price_diff;
-      // For per_kg: derive alt price from source-diff (catalog_price may be per-case, not per-kg)
-      // For per_unit: use alt_display_price directly (unit prices are comparable)
-      const altDisplay=isPerUnit
-        ?(p.alt_display_price??p.alt_price)
-        :Math.max(0,srcDisplay-(diffDisplay??0));
-      const pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
+
       return{
         altId:p.alt_item_id,altName:p.alt_item_name,
-        altSpec:p.pack_size||p.subclass||'',
-        altP:altDisplay,          // display price (per unit or per kg)
-        altU:unitLabel,
+        altSpec:p.pack_size||'',  // pack_size as context
+        altP:altDisplay,altU:unitLabel,
         save,pct,
         note:p.note_th||'',caveat:p.caveat_th||'',
         conf:p.confidence||'medium',recommended:false
@@ -4172,13 +4208,18 @@ function computeOPPS(){
     alts[0].recommended=true;
     // ── curSpec and curP use display unit ──
     const srcPack=p0.source_pack_size||'';
-    const srcDisplay=p0.source_display_price??p0.source_price;
-    const curSpec=srcPack||`฿${srcDisplay.toFixed(0)}/${unitLabel}`;
+    const curSpec=srcPack||'';  // pack_size context only
+    // curP in natural trade unit
+    let _curP=p0.source_price;
+    if(_displayMode==='per_egg'){
+      const _srcE=extractEggCount(p0.source_pack_size)||1;
+      _curP=p0.source_unit_price>0?parseFloat((p0.source_unit_price/_srcE).toFixed(2)):p0.source_price;
+    }
     newOpps.push({
       id:oppId++,cat:sku.subclass||sku.d||'สินค้า',
       curId:parseInt(sid),curName:sku.n,curSpec,
-      curP:srcDisplay,curU:unitLabel,
-      priceBasis:basis,priceUnitLabel:unitLabel,
+      curP:_curP,curU:unitLabel,
+      priceBasis:_displayMode,priceUnitLabel:unitLabel,
       monthlyGmv:sku.gmv,monthlyQty:sku.qty_kg,qu,alts
     });
   });
@@ -4743,8 +4784,9 @@ function refreshAll(){
   const freshEl=document.getElementById('data-freshness');
   if(freshEl){
     const lastMo=D.history.length?D.history[D.history.length-1].m:'';
-    freshEl.textContent=lastMo?'ข้อมูล: '+lastMo:'';
-    freshEl.style.display=lastMo?'block':'none';
+    const latestMo=(D.current_month&&D.current_month.month_label&&D.current_month.gmv_to_date>0)?D.current_month.month_label:lastMo;
+    freshEl.textContent=latestMo?'ข้อมูล: '+latestMo:'';
+    freshEl.style.display=latestMo?'block':'none';
   }
   const badge=document.getElementById('opp-nav-badge');if(badge){badge.textContent=OPPS.length;badge.style.display=senseActivated&&OPPS.length>0?'flex':'none';}
   updatePbFooter();renderOutletCard();
@@ -4807,6 +4849,8 @@ function triggerRestAI(){
     if(dialWrap)dialWrap.style.pointerEvents='';
     // ── Unlock ──
     senseActivated=true;
+    const _senseNavBtn=document.getElementById('nav-opportunities');
+    if(_senseNavBtn)_senseNavBtn.classList.add('sense-lit');
     aiCameFromPreview=true;
     _unlockScore();
     // Preview card: SKU count first, savings as footnote
@@ -5497,8 +5541,7 @@ function renderOpps(){
   } else if(aiCtx) aiCtx.style.display='none';
   // Filter info
   const gmvSum=opps.reduce((s,o)=>s+o.monthlyGmv,0);
-  const infoEl=document.getElementById('opp-filter-info');
-  if(infoEl)infoEl.textContent=`${opps.length} รายการ · ยอดซื้อปัจจุบัน ${fmt(gmvSum)}/เดือน`;
+  // filter-info now rendered inside renderPlanBuilder dynamic HTML
   // Hide legacy standalone verify banner if exists
   const vBanner=document.getElementById('opp-verify-banner');
   if(vBanner)vBanner.style.display='none';
@@ -5523,40 +5566,46 @@ function renderPlanBuilder(opps){
   const allSave=opps.reduce((s,o)=>s+getAlt(o).save,0);
   const verifyDone=allHigh.length>0;
   // Plan selector panel
-  const _planShowSel=!(senseActivated&&!footerUnlocked);
-  const isAll=_planShowSel&&currentPlanMode==='all';
-  const isHigh=_planShowSel&&currentPlanMode==='high';
-  // Right card: verify CTA (pre-verify) or สเปคใกล้เคียงเดิม (post-verify)
-  const rightCard=verifyDone
-    ?`<div class="plan-card ${isHigh?'selected':'unselected'}" onclick="smartSelect('high',event)">
-        <div class="plan-card-top"><div class="plan-card-content">
-          <div class="plan-card-title"><span class="plan-card-marker">${isHigh?'◆':'◇'}</span>สเปคใกล้เคียงเดิม</div>
-        </div></div>
-        <div class="plan-card-desc">ไม่ต้องปรับเมนู ใช้แทนได้เลย</div>
-        <div class="plan-card-nums">${allHigh.length} รายการ · <span class="plan-save">${fmt(highSave)}</span><span style="font-size:9px;opacity:.8">/เดือน</span></div>
-      </div>`
-    :`<div class="plan-verify-card" onclick="openVerifySheet()">
-        <div class="pvc-eyebrow">เพิ่มความแม่นยำ</div>
-        <div class="pvc-title">
-          <div class="pvc-star"><svg width="9" height="9" viewBox="0 0 10 10" fill="#4ddc97"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></div>
-          สเปคใกล้เคียงเดิม
-        </div>
-        <div class="pvc-desc">ให้ Sense เทียบสเปค เพื่อดูเฉพาะวัตถุดิบที่ปลอดภัยสเปคเดิม</div>
-        <div class="pvc-cta">เทียบสเปค →</div>
-      </div>`;
+  // ── PLAN TABS ──
+  const isAll=currentPlanMode==='all';
+  const isHigh=currentPlanMode==='high';
+  // Tab content panel: changes based on active plan
+  const tabPanel=isHigh
+    ?`<div class="ptc-desc">Sense คัดสเปคใกล้เคียงไว้แล้ว · ลองเทียบกับเมนูของร้านก่อนสั่ง</div>
+      <div class="ptc-nums">${allHigh.length} รายการ · <span class="plan-save">${fmt(highSave)}</span><span style="font-size:9px;opacity:.7">/เดือน</span></div>
+      <div class="ptc-rerun" onclick="openVerifySheet()">✦ เทียบสเปคเพิ่ม</div>`
+    :`<div class="ptc-desc">บางตัวควรเทสกับเมนูก่อน</div>
+      <div class="ptc-nums">${opps.length} รายการ · <span class="plan-save">${fmt(allSave)}</span><span style="font-size:9px;opacity:.7">/เดือน</span></div>`;
+  // Filter pills HTML (dynamic, replaces static HTML)
+  const _f=oppFilter||'all';
+  const _ni=typeof oppNInput!=='undefined'?oppNInput:0;
+  const _customVal=(()=>{try{return document.getElementById('opp-n-input')?.value||'';}catch(e){return'';}})();
+  const filterPillsHtml=`<div class="fpills" id="oppfilter">
+    <button class="pill ${_f==='all'?'on':''}" onclick="setOppFilter('all',this)">ทั้งหมด</button>
+    <button class="pill ${_f==='top10'?'on':''}" onclick="setOppFilter('top10',this)">Top 10</button>
+    <button class="pill ${_f==='top20'?'on':''}" onclick="setOppFilter('top20',this)">Top 20</button>
+    <button class="pill ${_f==='top50'?'on':''}" onclick="setOppFilter('top50',this)">Top 50</button>
+    <button class="pill ${_f==='custom'?'on':''}" onclick="setOppFilter('custom',this)">กำหนดเอง</button>
+  </div>
+  <div id="opp-custom-row" style="display:${_f==='custom'?'block':'none'};margin:4px 0 8px">
+    <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:'IBM Plex Sans Thai',sans-serif;outline:none" oninput="renderOpps()">
+  </div>
+  <div id="opp-filter-info" class="opp-filter-info">${opps.length} รายการ · ยอดซื้อปัจจุบัน ${fmt(opps.reduce((s,o)=>s+o.monthlyGmv,0))}/เดือน</div>`;
+
   let smartHtml=`<div class="plan-selector">
-    <div class="plan-sel-header"><div class="plan-sel-title">เลือกแผนของคุณ</div><div class="plan-sel-sub">เลือกแนวทางที่คุ้มที่สุดสำหรับร้าน แล้วปรับเพิ่มลดได้ทีละรายการ</div></div>
-    <div class="plan-toggle-row">
-      <div class="plan-card ${isAll?'selected':'unselected'}" onclick="smartSelect('all',event)">
-        <div class="plan-card-top"><div class="plan-card-content">
-          <div class="plan-card-title"><span class="plan-card-marker">${isAll?'◆':'◇'}</span>คุ้มที่สุดที่ Sense หาได้</div>
-        </div></div>
-        <div class="plan-card-desc">บางตัวควรเทสกับเมนูก่อน</div>
-        <div class="plan-card-nums">${opps.length} รายการ · <span class="plan-save">${fmt(allSave)}</span><span style="font-size:9px;opacity:.8">/เดือน</span></div>
+    <div class="plan-sel-header"><div class="plan-sel-title">เลือกแผนของคุณ</div></div>
+    <div class="plan-tabs">
+      <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
+        <div class="plan-tab-label"><span style="font-size:11px;color:${isAll?'var(--g500)':'rgba(255,255,255,.5)'}">${isAll?'◆':'◇'}</span> คุ้มที่สุดที่ Sense หาได้</div>
+        <div class="plan-tab-count">${isAll?fmt(allSave)+'/เดือน':opps.length+' รายการ'}</div>
       </div>
-      ${rightCard}
+      <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
+        <div class="plan-tab-label"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="#4ddc97"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense หาสเปคใกล้เคียง</div>
+        ${!verifyDone?`<div class="plan-tab-count" style="color:rgba(0,208,112,.7)">เทียบสเปค →</div>`:`<div class="plan-tab-count" style="color:rgba(77,220,151,.85)">${allHigh.length} รายการ ✓</div>`}
+      </div>
     </div>
-  </div>`;
+    <div class="plan-tab-panel">${tabPanel}</div>
+  </div>${filterPillsHtml}`;
 
   // Group by category
   const catGroups={};
@@ -5682,8 +5731,8 @@ function updatePbFooter(){
   if(show){
     const t=totalSel();const yr=t*12;
     document.getElementById('pf-count').textContent=sel.size+' รายการ';
-    document.getElementById('pf-yr').textContent=fmt(yr);
     document.getElementById('pf-mo').textContent=fmt(t)+' / เดือน';
+    document.getElementById('pf-yr').textContent=fmt(yr)+' / ปี';
     const lastMoF=D.history.length?D.history[D.history.length-1].m:'';
     const pfVint=document.getElementById('pf-vintage');if(pfVint)pfVint.textContent=lastMoF?`จากยอดซื้อ ${lastMoF}`:'ประมาณการจากเดือนล่าสุด';
   }
@@ -5740,13 +5789,28 @@ function renderSingleCard(o){
   const confTag=chosen.conf==='high'
     ?`<span style="color:var(--g700);font-weight:700">✓ มั่นใจสูง</span>`
     :`<span style="color:var(--amb);font-weight:700">— ทดลองก่อน</span>`;
-  return`<div style="padding:10px 13px 6px">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--n400);margin-bottom:5px">ที่ใช้อยู่</div>
-    <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><div style="font-size:13px;font-weight:600">${o.curName}</div><div style="font-size:11px;color:var(--n600);font-weight:500">${o.curSpec}</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;margin-left:auto">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div></div>
-    <div style="font-size:11px;color:var(--n600);margin-top:3px">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} kg</div>
+  const _qtyUnit=deriveQtyUnit(o.curSpec,o.priceBasis);
+  return`<div style="padding:12px 13px 8px;border-bottom:1px solid var(--n100)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:14px;font-weight:700;line-height:1.3">${o.curName}</div>
+        <div style="font-size:12px;color:var(--n500);font-weight:500;margin-top:1px">${o.curSpec}</div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;flex-shrink:0;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
+    </div>
+    <div style="font-size:12px;color:var(--n500);margin-top:5px">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} ${_qtyUnit}</div>
   </div>
-  <div class="oalt-section"><div class="oalt-label">ตัวเลือกทดแทน</div>${altRows}</div>
-  <div class="osave"><div><div class="osave-lbl">ประหยัดได้ต่อเดือน</div><div class="osave-sub" id="osave-sub-${o.id}">${o.qu} · ลด ${chosen.pct}% · ${confTag}</div></div><div><div class="osave-num" id="osave-num-${o.id}">${fmt(chosen.save)}</div><div class="osave-yr" id="osave-yr-${o.id}">${fmt(chosen.save*12)+' / ปี'}</div></div></div>
+  <div class="oalt-section" style="padding-top:12px">${altRows}</div>
+  <div class="osave">
+    <div>
+      <div class="osave-lbl">ประหยัดได้ต่อเดือน</div>
+      <div class="osave-sub" id="osave-sub-${o.id}">${o.monthlyQty||'?'} ${_qtyUnit}/เดือน · ลด ${chosen.pct}%</div>
+    </div>
+    <div>
+      <div class="osave-num" id="osave-num-${o.id}">${fmt(chosen.save)}</div>
+      <div class="osave-yr" id="osave-yr-${o.id}">${fmt(chosen.save*12)} / ปี</div>
+    </div>
+  </div>
   ${chosen.caveat?`<div class="onote" style="color:var(--amb);border-top:1px solid var(--n100);padding-top:8px">▲ ${chosen.caveat}</div>`:''}
   <div style="padding:12px 13px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px">
     <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--g50)':'var(--n0)'};color:${ck?'var(--g700)':'var(--n700)'};font-size:13px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
@@ -5771,7 +5835,7 @@ function renderOppTable(opps){
 
 function toggleExpand(id){expandedOpps.has(id)?expandedOpps.delete(id):expandedOpps.add(id);renderOpps();}
 // setOppView removed — single view
-function setOppFilter(f,btn){oppFilter=f;document.querySelectorAll('#oppfilter .pill').forEach(p=>p.classList.remove('on'));btn.classList.add('on');document.getElementById('opp-custom-row').style.display=f==='custom'?'block':'none';renderOpps();}
+function setOppFilter(f,btn){oppFilter=f;renderOpps();}
 
 function selectAlt(e,oppId,altIdx){
   e.stopPropagation();
@@ -5785,7 +5849,7 @@ function selectAlt(e,oppId,altIdx){
     sheet.querySelectorAll('.oalt-row').forEach((row,i)=>row.classList.toggle('selected',i===altIdx));
     const saveEl=document.getElementById('osave-num-'+oppId);const yrEl=document.getElementById('osave-yr-'+oppId);const subEl=document.getElementById('osave-sub-'+oppId);
     if(saveEl){saveEl.textContent=fmt(chosen.save);saveEl.style.color='';}if(yrEl)yrEl.textContent=fmt(chosen.save*12)+' / ปี';
-    if(subEl){const ct=chosen.conf==='high'?'<span style="color:var(--g700);font-weight:700">✓ มั่นใจสูง</span>':'<span style="color:var(--amb);font-weight:700">— ทดลองก่อน</span>';subEl.innerHTML=opp.qu+' · ลด '+chosen.pct+'% · '+ct;}
+    if(subEl){const qu=deriveQtyUnit(opp.curSpec,opp.priceBasis);subEl.textContent=(opp.monthlyQty||'?')+' '+qu+'/เดือน · ลด '+chosen.pct+'%';}
   } else {renderOpps();}
   updateSim();updatePbFooter();
 }
@@ -9792,7 +9856,7 @@ function updateMatcherPreStatus(){
   const vsBtn=document.getElementById('vs-run-btn');
   const vsReVerifyLink=document.getElementById('vs-reverify-link');
 
-  const iconSvg14='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg>';
+  const iconSvg14='<svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor" stroke="none"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>';
 
   // Helper to set button text + state for both contexts
   const setBtn=(text,disabled)=>{
@@ -10013,6 +10077,43 @@ function getUnitLabel(packSize, priceBasis){
   return 'ชิ้น';
 }
 
+// ── Display unit helpers (Phase 3: egg + liquid normalization) ──
+
+// Extract egg count from pack_size string (e.g. "30 egg/pack" → 30)
+function extractEggCount(packSize){
+  const m=(packSize||'').match(/(\d+)\s*eggs?[./\s]/i);
+  return m?parseInt(m[1]):0;
+}
+
+// Derive the purchase/trading unit from pack_size string
+// e.g. "12 x 800 ml./carton" → "ลัง", "1 kg/pack" → "แพ็ค"
+function deriveQtyUnit(packSize,priceBasis){
+  if(!packSize){return(priceBasis==='per_kg')?'kg':'ชิ้น';}
+  const ps=packSize.toLowerCase();
+  if(/carton/.test(ps)) return 'ลัง';
+  if(/bottle/.test(ps)) return 'ขวด';
+  if(/bag/.test(ps))    return 'ถุง';
+  if(/can/.test(ps))    return 'กระป๋อง';
+  if(/pack/.test(ps))   return 'แพ็ค';
+  if(/\bkg\b|กก\./.test(ps)) return 'kg';
+  if(priceBasis==='per_kg') return 'kg';
+  return 'ชิ้น';
+}
+
+// Detect the natural trade unit for display
+// Returns: 'per_kg' | 'per_liter' | 'per_egg'
+function detectDisplayMode(subclass,packSize){
+  const sub=(subclass||'').toUpperCase();
+  const ps=(packSize||'').toLowerCase();
+  // Eggs first
+  if(/\bEGG\b/.test(sub)||extractEggCount(packSize)>0) return 'per_egg';
+  // Liquid subclasses
+  if(/MINERAL.WATER|DRINKING.WATER|STILL.WATER|SPARKLING|COLA|SODA|SYRUP|JUICE|MIXER|BEER|WINE|SPIRIT|LIQUOR|COCKTAIL|COFFEE.DRINK|ENERGY.DRINK|TEA.DRINK/.test(sub)) return 'per_liter';
+  // Liquid by pack_size pattern (e.g. "12 x 500 ml./pack", "6 x 1.5 litres/pack")
+  if(/\d+\s*x\s*[\d.]+\s*(ml|liter|litre|l\.)/i.test(ps)||/[\d.]+\s*(ml|liter|litre)\s*[/.]\b/i.test(ps)) return 'per_liter';
+  return 'per_kg';
+}
+
 async function runMatcherInApp(vsMode=false){
   if(matcherRunning)return;
 
@@ -10077,7 +10178,7 @@ async function runMatcherInApp(vsMode=false){
     // Update live progress
     const pct=Math.round(processed/total*100);
     const fill=_g('fill');if(fill)fill.style.width=pct+'%';
-    const skuEl=_g('progSku');if(skuEl)skuEl.textContent=`SKU ${processed} / ${total}`;
+    const skuEl=_g('progSku');if(skuEl)skuEl.textContent=`ตรวจสอบ ${processed} / ${total} SKU`;
     const verifiedCount=groups.filter(x=>x.status==='done_yes'||x.status==='done_flag').reduce((s,x)=>(s+(x.result?.verified?.length||0)),0);
     const foundEl=_g('progFound');if(foundEl)foundEl.textContent=`พบ ${verifiedCount} ตัวเลือก`;
 
@@ -10092,42 +10193,26 @@ async function runMatcherInApp(vsMode=false){
   const pairs=[];
   groups.forEach(g=>{
     if(!g.result?.verified)return;
-    const basis=detectPriceBasis(g.pack_size, g.unit_price, g.price);
-    const srcUnitLabel=getUnitLabel(g.pack_size, basis);
+    // Always per_kg — aligns with computeOPPS display logic
     g.result.verified.forEach(v=>{
       if(!v.is_substitutable) return;
-      // Find original alt row to get catalog_unit_price
-      const origAlt=g.alternatives.find(a=>String(a.catalog_item_id)===String(v.catalog_item_id));
-      const catUnitPrice=origAlt?.catalog_unit_price||0;
-      // Compute display prices based on detected basis
-      let srcDisplayPrice, altDisplayPrice, diffDisplay;
-      if(basis==='per_kg'){
-        srcDisplayPrice=g.price;
-        altDisplayPrice=v.catalog_price;
-        diffDisplay=v.price_diff;
-      } else {
-        // per_unit: use actual commercial unit prices
-        srcDisplayPrice=g.unit_price||g.price;
-        altDisplayPrice=catUnitPrice||v.catalog_price;
-        diffDisplay=parseFloat(((srcDisplayPrice-altDisplayPrice)).toFixed(2));
-      }
       pairs.push({
         source_item_id:parseInt(g.id),source_item_name:g.name,
-        source_price:g.price,                      // always per-kg (for backward compat)
+        source_price:g.price,              // per_kg
         source_pack_size:g.pack_size||'',
         alt_item_id:parseInt(v.catalog_item_id),alt_item_name:v.catalog_item_name,
-        alt_price:v.catalog_price,                 // always per-kg (for backward compat)
-        price_diff:v.price_diff,                   // always per-kg (for backward compat)
+        alt_price:v.catalog_price,         // per_kg
+        price_diff:v.price_diff,           // per_kg
         pack_size:v.pack_size||'',
         confidence:v.confidence,note_th:v.note_th||'',caveat_th:v.caveat_th||'',
         subclass:g.subclass,
-        // ── Phase 1: new fields ──
-        price_basis:basis,                         // 'per_kg' | 'per_unit_volume' | 'per_unit_count'
-        price_unit_label:srcUnitLabel,             // 'kg' | 'กระป๋อง' | 'ขวด' | 'ถัง' | ...
-        source_display_price:srcDisplayPrice,      // price to show in UI
-        alt_display_price:altDisplayPrice,         // alt price to show in UI
-        price_diff_display:diffDisplay,            // diff in display unit
-        monthly_qty_commercial:g.monthly_qty||0   // commercial units/month (for savings calc)
+        price_basis:'per_kg',price_unit_label:'กก.',
+        source_display_price:g.price,      // per_kg
+        alt_display_price:Math.max(0,g.price-v.price_diff), // per_kg
+        price_diff_display:v.price_diff,   // per_kg
+        source_unit_price:g.unit_price||null,
+        alt_unit_price:(g.alternatives.find(a=>String(a.catalog_item_id)===String(v.catalog_item_id))?.catalog_unit_price)||0,
+        monthly_qty_commercial:g.monthly_qty||0
       });
     });
   });
@@ -10163,6 +10248,8 @@ async function runMatcherInApp(vsMode=false){
   };
 
   computeOPPS();saveToStorage();refreshAll();updateDataStatus();updateMatcherPreStatus();
+  // Auto-activate Sense after matcher so opportunities screen reflects new verified SKUs
+  senseActivated=true;
   matcherRunning=false;if(btn){btn.disabled=false;btn.classList.remove('running');}
   // Save to Supabase so result persists across devices
   if(currentAccountId){saveAltsToSupabase(currentAccountId,altData).then(()=>showToast('บันทึก alternatives ไว้ใน cloud แล้ว','☁'));}
@@ -10260,8 +10347,9 @@ function showMatcherResults(groups,totalPairs,vsMode=false){
 
   if(vsMode){
     // VS mode: update the pre-wired nav button label + no dl button needed
+    const _thisRunCount=withAlts.length;  // SKUs verified in THIS run
     const navLbl=document.getElementById('vs-nav-opps-label');
-    if(navLbl)navLbl.textContent=`ดูวัตถุดิบที่เจอ ${OPPS.length} รายการ →`;
+    if(navLbl)navLbl.textContent=`✦ ดูรายการทั้งหมด ${OPPS.length} รายการ →`;
     return;
   }
 
@@ -10282,11 +10370,11 @@ function showMatcherResults(groups,totalPairs,vsMode=false){
     navBtn=document.createElement('button');
     navBtn.id='gen-nav-opps-btn';
     navBtn.style.cssText='width:100%;margin-top:8px;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px';
-    navBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg> ดูวัตถุดิบที่เจอ ${OPPS.length} รายการ →`;
+    navBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg> ดูรายการทั้งหมด ${OPPS.length} รายการ →`;
     navBtn.onclick=()=>{closeDataPanel();showScreen('opportunities');};
     resultEl.appendChild(navBtn);
   } else {
-    navBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg> ดูวัตถุดิบที่เจอ ${OPPS.length} รายการ →`;
+    navBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg> ดูรายการทั้งหมด ${OPPS.length} รายการ →`;
   }
 }
 
@@ -10954,13 +11042,12 @@ function renderKamThisMonth(){
       ?`<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(240,176,0,.08);border:1px solid rgba(240,176,0,.2);border-radius:8px;margin-top:8px;font-size:10px;color:var(--amb)"><span>⚠</span><span>ข้อมูลเพียง 1 เดือน — baseline อาจคลาดเคลื่อน</span></div>`
       :sig.confidence==='medium'?`<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(255,255,255,.04);border-radius:8px;margin-top:8px;font-size:10px;color:rgba(255,255,255,.35)"><span>📅</span><span>baseline 2 เดือน · จะแม่นขึ้นเมื่อมีข้อมูล 3 เดือน</span></div>`:'';
     html+=`<div class="pace-card" style="margin-bottom:12px">
-      <div class="pace-header">
-        <span class="pace-label">Pace เดือนนี้</span>
+      <div class="pace-pct-row" style="justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div class="pace-pct-val ${sig.cls}">${sig.pct}%</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.45)">${sig.daysElapsed} / ${sig.daysInMonth} วัน</div>
+        </div>
         <span class="pace-signal-chip ${sig.cls}">${sig.label}</span>
-      </div>
-      <div class="pace-pct-row">
-        <div class="pace-pct-val ${sig.cls}">${sig.pct}%</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.45)">${sig.daysElapsed} / ${sig.daysInMonth} วัน</div>
       </div>
       <div class="pace-bar-wrap"><div class="pace-bar-fill ${sig.cls}" style="width:${barFillPct}%"></div></div>
       <div class="pace-meta-row">
@@ -10971,16 +11058,13 @@ function renderKamThisMonth(){
         <div class="pace-meta-item">
           <div class="pace-meta-label">ควรได้ถึงตอนนี้</div>
           <div class="pace-meta-val">${fmtK(sig.expected)}</div>
-          <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:3px;line-height:1.4">${methodLabel}${moRange?'<br>'+moRange:''}</div>
         </div>
         <div class="pace-meta-item">
-          <div class="pace-meta-label">Forecast</div>
-          <div class="pace-meta-val" style="color:${forecastColor}">${forecastStr}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:3px">baseline <strong style="color:rgba(255,255,255,.85)">${baselineStr}</strong></div>
+          <div class="pace-meta-label">FORECAST / BASELINE</div>
+          <div class="pace-meta-val" style="display:flex;align-items:center;gap:5px"><span style="color:${forecastColor}">${forecastStr}</span><span style="color:rgba(255,255,255,.35);font-weight:400">/</span><span style="color:rgba(255,255,255,.6);font-size:11px;font-weight:600">${baselineStr}</span><button class="pace-info-btn" title="วิธีคิด" onclick="(function(){const d=document.getElementById('tm-formula-detail');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';})()">i</button></div>
         </div>
       </div>
       ${lowConfWarn}
-      <button id="tm-formula-toggle" onclick="(function(){const d=document.getElementById('tm-formula-detail');const b=document.getElementById('tm-formula-toggle');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';b.textContent=open?'▼ ดูวิธีคิด':'▲ ซ่อนวิธีคิด';})()" style="width:100%;margin-top:8px;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.35);font-size:10px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s" onmouseover="this.style.borderColor='rgba(255,255,255,.22)';this.style.color='rgba(255,255,255,.55)'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.35)'">▼ ดูวิธีคิด</button>
       <div id="tm-formula-detail" style="display:none">
         <div class="pace-formula-row" style="margin-top:8px">
           <div class="pace-formula-label">วิธีคิด baseline</div>
@@ -11198,6 +11282,16 @@ function renderKamThisMonth(){
   html+=`<div id="dc-insight-cta" style="text-align:center;padding:16px 0 8px">
     <div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px">กด Insight เพื่อสร้าง pre-visit brief</div>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+  </div>`;
+
+  // ── CTA: Switch to restaurant view ──
+  html+=`<div style="margin:4px 0 20px;border-radius:14px;background:linear-gradient(135deg,rgba(38,96,200,.12),rgba(26,74,58,.18));border:1px solid rgba(255,255,255,.1);padding:14px 16px">
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:3px">อ่าน brief ครบแล้ว</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px">ไปดูพอร์ตร้านก่อนคุย</div>
+    <button onclick="setMode('restaurant')" style="width:100%;padding:11px 16px;border-radius:10px;background:rgba(0,208,112,.12);border:1px solid rgba(0,208,112,.3);color:rgba(190,255,220,.95);font-size:13px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s" onmouseover="this.style.background='rgba(0,208,112,.22)';this.style.borderColor='rgba(0,208,112,.55)'" onmouseout="this.style.background='rgba(0,208,112,.12)';this.style.borderColor='rgba(0,208,112,.3)'">
+      เปิดมุมมองร้าน
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
   </div>`;
 
   kamCards.innerHTML=html;
@@ -13313,7 +13407,7 @@ function renderPortviewSummary(){
         <div style="min-width:0">
           <div class="portview-tier-lbl">${lbl}</div>
           <div class="portview-tier-val" style="font-size:16px">${fmtGMV(runRate)}</div>
-          <div class="portview-tier-sub" style="color:rgba(255,255,255,.65);margin-top:2px">run rate · ${count} ร้าน</div>
+          <div class="portview-tier-sub" style="color:rgba(255,255,255,.8);margin-top:2px;font-size:11px">run rate · ${count} ร้าน</div>
         </div>
         <div style="text-align:right;flex-shrink:0;padding-top:14px">
           <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${diffColor};line-height:1.2">${diffVal>0?'-':''}${fmtGMV(diffVal)}</div>
@@ -13329,11 +13423,11 @@ function renderPortviewSummary(){
       <div>
         <div class="portview-tier-lbl">ปกติ</div>
         <div class="portview-tier-val">${fmtGMV(okRunRate)}</div>
-        <div class="portview-tier-sub" style="color:rgba(255,255,255,.65);margin-top:3px">run rate · ${ok} ร้าน</div>
+        <div class="portview-tier-sub" style="color:rgba(255,255,255,.8);margin-top:3px;font-size:11px">run rate · ${ok} ร้าน</div>
       </div>
       <div style="border-top:1px solid rgba(77,220,151,.18);padding-top:10px">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:#4ddc97;line-height:1">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:4px">เหนือ baseline</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:4px">เหนือ baseline</div>
       </div>
     </div>
     ${_warnBox}
@@ -13565,10 +13659,10 @@ function renderTeamviewKamList(){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=g.baseline>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.35);font-weight:400"> / ${fmtSF(g.baseline)}</span></span>`:'';
+    const rrStr=g.baseline>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.baseline)}</span></span>`:'';
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
-        <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.5);margin-left:5px"> · ${visited}/${g.total}</span></div>
+        <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-full-pace ${g.paceCls}">${g.pace||'—'}%</div>
       </div>
       <div class="tv-full-bar"><div class="tv-full-fill ${g.paceCls}" style="width:${Math.min(g.pace||0,100)}%"></div></div>
@@ -13585,11 +13679,11 @@ function renderTeamviewKamList(){
     const surplus=g.pace-100;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=g.baseline>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.35);font-weight:400"> / ${fmtSF(g.baseline)}</span></span>`:'';
+    const rrStr=g.baseline>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.baseline)}</span></span>`:'';
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
-          <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.5);margin-left:5px"> · ${visited}/${g.total}</span></div>
+          <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
           <span class="tv-star-badge">+${surplus}%</span>
         </div>
         <div class="tv-star-pace">${g.pace}%</div>
@@ -13608,7 +13702,7 @@ function renderTeamviewKamList(){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
-      <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:4px"> · ${visited}/${g.total}</span></div>
+      <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}</div>
       <span class="tv-chip-pace" style="margin-left:6px">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
@@ -13937,7 +14031,7 @@ function _updateRestSwipe(grp,idx){
       </div>
       <div class="gen-pre-status" id="vs-pre-status" style="margin-bottom:12px"></div>
       <button class="gen-btn" id="vs-run-btn" onclick="runMatcherFromSheet()" style="width:100%">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg>
+        <svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor" stroke="none"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>
         <span id="vs-run-label">ให้ Sense เทียบสเปค</span>
       </button>
       <div id="vs-reverify-link" style="display:none;text-align:center;margin-top:6px">
@@ -13960,9 +14054,9 @@ function _updateRestSwipe(grp,idx){
     <div id="vs-result" style="display:none;margin-top:10px">
       <div class="gen-result-summary" id="vs-result-summary"></div>
       <div class="gen-result-table" id="vs-result-table"></div>
-      <button id="vs-nav-opps-btn" onclick="closeVerifySheet();showScreen('opportunities')"
+      <button id="vs-nav-opps-btn" onclick="senseActivated=true;footerUnlocked=true;closeVerifySheet();renderOpps();showScreen('opportunities');"
         style="width:100%;margin-top:12px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:14px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg>
+        <svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor" stroke="none"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>
         <span id="vs-nav-opps-label">ดูวัตถุดิบที่เจอ →</span>
       </button>
       <button onclick="vsResetToConfig()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1.5px solid var(--n200);background:transparent;color:var(--n600);font-size:12px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer">← กลับตั้งค่า</button>
