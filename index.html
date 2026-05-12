@@ -1705,6 +1705,27 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
 .portview-header{padding:16px 16px 12px;background:linear-gradient(180deg,#0d2550 0%,#0d2550 60%,transparent 100%);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+
+/* ── Collapsible summary block ── */
+.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.6,1),opacity 220ms cubic-bezier(0.4,0,0.6,1)}
+.pv-collapsible.expanded{max-height:400px;opacity:1}
+.pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
+
+/* ── Compact strip (shown when collapsed) ── */
+.pv-compact-strip{display:flex;align-items:center;gap:0;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
+.pv-compact-strip.hidden{max-height:0;opacity:0;pointer-events:none;margin:0}
+.pv-compact-strip.visible{max-height:60px;opacity:1;margin-bottom:10px}
+.pv-cs-chip{flex:1;display:flex;flex-direction:column;align-items:flex-start;padding:7px 10px;border-radius:9px;gap:1px}
+.pv-cs-chip.ok{background:rgba(0,208,112,.07);border:1px solid rgba(0,208,112,.2)}
+.pv-cs-chip.warn{background:rgba(240,176,0,.06);border:1px solid rgba(240,176,0,.2)}
+.pv-cs-chip.danger{background:rgba(229,62,62,.07);border:1px solid rgba(229,62,62,.22)}
+.pv-cs-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;color:#fff}
+.pv-cs-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#fff;line-height:1.2}
+.pv-cs-chip.ok .pv-cs-val{color:#4ddc97}
+.pv-cs-chip.warn .pv-cs-val{color:var(--amb)}
+.pv-cs-chip.danger .pv-cs-val{color:#ff8888}
+.pv-cs-sub{font-size:9px;color:rgba(255,255,255,.45);font-family:'IBM Plex Mono',monospace}
+.pv-cs-divider{width:1px;height:32px;background:rgba(255,255,255,.08);flex-shrink:0;margin:0 2px}
 .portview-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .portview-title{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px}
 .portview-level-badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:2px 8px;border-radius:10px;background:rgba(38,96,200,.3);color:rgba(180,210,255,.9)}
@@ -3088,6 +3109,10 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         </div>
         <span class="portview-level-badge" id="portview-level-badge">KAM</span>
       </div>
+      <!-- Compact strip — visible when scrolled -->
+      <div class="pv-compact-strip hidden" id="pv-compact-strip"></div>
+      <!-- Collapsible: summary cards + AI button + search -->
+      <div class="pv-collapsible expanded" id="pv-collapsible">
       <!-- Summary stats -->
       <div id="portview-pace-bar" style="display:none;margin-bottom:12px"></div>
       <div class="portview-summary-row" id="portview-summary-row"></div>
@@ -3107,6 +3132,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         " onfocus="this.style.borderColor='rgba(38,96,200,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.12)'">
       </div>
       <!-- Filter pills -->
+      </div>
 
     </div>
     <!-- AI output outside sticky header — expands without overlaying account list -->
@@ -13354,6 +13380,48 @@ function setPvSort(mode){
   renderPortviewList();
 }
 
+// ── Portview scroll-collapse ──
+function _pvBuildCompactStrip(){
+  const strip=document.getElementById('pv-compact-strip');
+  const row=document.getElementById('portview-summary-row');
+  if(!strip||!row)return;
+  // Parse existing stat cards to build compact chips
+  const cards=row.querySelectorAll('.portview-stat,.pv-summary-card');
+  if(!cards.length){strip.innerHTML='';return;}
+  let html='';
+  cards.forEach((c,i)=>{
+    const cls=c.classList.contains('danger')?'danger':c.classList.contains('warn')?'warn':'ok';
+    const lbl=c.querySelector('.portview-stat-lbl,.pv-card-lbl')?.textContent||'';
+    const val=c.querySelector('.portview-stat-val,.pv-card-val')?.textContent||'—';
+    const sub=c.querySelector('.pv-card-sub,.portview-stat-sub')?.textContent||'';
+    if(i>0)html+=`<div class="pv-cs-divider"></div>`;
+    html+=`<div class="pv-cs-chip ${cls}"><div class="pv-cs-label">${lbl}</div><div class="pv-cs-val">${val}</div>${sub?`<div class="pv-cs-sub">${sub}</div>`:''}</div>`;
+  });
+  strip.innerHTML=html;
+}
+
+let _pvCollapseObserver=null;
+function _pvInitCollapseObserver(){
+  if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
+  const collapsible=document.getElementById('pv-collapsible');
+  const strip=document.getElementById('pv-compact-strip');
+  const listEl=document.getElementById('portview-list');
+  if(!collapsible||!strip||!listEl)return;
+  // Observe the toggle row (first child of portview-list) — when it exits top, collapse
+  const sentinel=document.createElement('div');
+  sentinel.style.cssText='height:1px;margin:0;padding:0;pointer-events:none';
+  sentinel.id='pv-collapse-sentinel';
+  listEl.insertAdjacentElement('beforebegin',sentinel);
+  _pvCollapseObserver=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      const collapsed=!e.isIntersecting&&e.boundingClientRect.top<0;
+      collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
+      strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
+    });
+  },{threshold:0,rootMargin:'-56px 0px 0px 0px'}); // 56px = portview-header height
+  _pvCollapseObserver.observe(sentinel);
+}
+
 function setPvView(mode){
   pvViewMode=mode;
   renderPortviewList();
@@ -13532,6 +13600,14 @@ function renderPortview(){
   }
   renderPortviewSummary();
   renderPortviewList();
+  // Reset collapse state + rebuild compact strip + init observer
+  const coll=document.getElementById('pv-collapsible');
+  const strip=document.getElementById('pv-compact-strip');
+  if(coll){coll.className='pv-collapsible expanded';}
+  if(strip){strip.className='pv-compact-strip hidden';}
+  // Remove old sentinel
+  const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
+  setTimeout(()=>{_pvBuildCompactStrip();_pvInitCollapseObserver();},120);
 }
 
 // ════════════════════════════════════════
