@@ -408,6 +408,12 @@ body.kam-mode #swipe-pill{display:none}
 .sp-dot.dim{opacity:.3}
 .sp-sep{width:.5px;height:10px;background:rgba(0,0,0,.15)}
 .sp-name{font-size:10px;font-weight:600;color:var(--g700,#00884a);min-width:38px;text-align:center;transition:all .2s}
+
+/* ── Persistent swipe dots (always visible on overview/portfolio) ── */
+#swipe-dots-a{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0 2px;position:sticky;top:0;z-index:10;background:transparent;pointer-events:none}
+body.kam-mode #swipe-dots-a{display:none}
+.sda-dot{width:5px;height:5px;border-radius:3px;background:rgba(0,0,0,.13);transition:width .3s cubic-bezier(.34,1.56,.64,1),background .25s}
+.sda-dot.on{width:14px;background:var(--g500)}
 @keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── UX POLISH: BUTTON PRESS FEEL ── */
@@ -1850,6 +1856,9 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .pv-toggle-btns{display:flex;align-items:center;gap:2px}
 .pv-toggle-btn{width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:rgba(255,255,255,.25);transition:color .15s}
 .pv-toggle-btn.on{color:rgba(255,255,255,.9)}
+.pv-sort-divider{width:1px;height:16px;background:rgba(255,255,255,.12);margin:0 4px}
+.pv-sort-btn{height:24px;padding:0 7px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.38);font-size:9px;font-weight:700;letter-spacing:.3px;cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.pv-sort-btn.on{background:rgba(38,96,200,.22);border-color:rgba(100,160,255,.38);color:rgba(160,200,255,.95)}
 /* star card (≥105%) */
 .tv-star-card{border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;transition:all .2s;overflow:hidden;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.4);box-shadow:0 0 18px rgba(168,85,247,.18),0 0 4px rgba(168,85,247,.1)}
 .tv-star-card:hover{box-shadow:0 0 28px rgba(168,85,247,.3),0 0 8px rgba(168,85,247,.15)}
@@ -2584,6 +2593,10 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <div id="swipe-grp-a" class="swipe-grp on">
   <!-- ══ OVERVIEW ══ -->
   <div class="scr on" id="scr-overview">
+    <div id="swipe-dots-a">
+      <div class="sda-dot on" id="sda0"></div>
+      <div class="sda-dot" id="sda1"></div>
+    </div>
     <div id="rest-overview">
     <div class="hero">
       <div class="h-sub" id="h-acct-name">บริษัท ลีฟ ทู อีท จำกัด</div>
@@ -3513,7 +3526,8 @@ let bulkKamNames={};       // Q8E v2: aid → kam_name string (for TL grouping)
 let portviewLevel='rep';  // 'rep' | 'tl' | 'rep-detail' (TL viewing specific rep)
 let teamviewKamFilter=null; // null=show all KAMs, 'email@...'=show that KAM's accounts
 let tvViewMode='full'; // 'full'|'compact' (teamview)
-let pvViewMode='compact'; // 'full'|'compact' (portview — KAM's own accounts)
+let pvViewMode='full'; // 'full'|'compact' (portview — KAM's own accounts)
+let pvSortMode='pace'; // 'pace'|'gmv'|'impact'
 let teamviewAiDone=false;
 let portviewRepEmail=null; // which rep TL is viewing
 let portviewAiDone=false;
@@ -10817,6 +10831,10 @@ function showScreen(name){
   }
   // ── No-account empty state for KAM Insight ──
   if(isKAM&&name==='overview'&&typeof _renderKamNoAcctState==='function')_renderKamNoAcctState();
+  // ── Auto-hint pill when landing on overview (restaurant mode only) ──
+  if(!isKAM&&name==='overview'){
+    setTimeout(()=>{_showPill();_hidePill(2000);},350);
+  }
 }
 
 // ════════════════════════════════════════
@@ -13300,8 +13318,27 @@ function renderPortviewList(){
   // ── View toggle row ──
   const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
   const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
+  // ── Sort ──
+  const _getImpact=a=>{const s=a.paceSignal;if(!s)return 0;const r=s.runrate||s.gmvToDate||0;const b=s.baselineGmv||0;return r-b;};
+  const _sorted=[...filtered].sort((a,b)=>{
+    if(pvSortMode==='gmv'){const ag=a.paceSignal?a.paceSignal.runrate||a.paceSignal.gmvToDate||0:0;const bg=b.paceSignal?b.paceSignal.runrate||b.paceSignal.gmvToDate||0:0;return bg-ag;}
+    if(pvSortMode==='impact'){return _getImpact(a)-_getImpact(b);} // most negative first
+    // default 'pace': danger→warn→ok→new
+    const o={danger:0,warn:1,safe:2,great:3,new:4,'':5};
+    const ac=a.paceSignal?a.paceSignal.cls:'';const bc=b.paceSignal?b.paceSignal.cls:'';
+    if(o[ac]!==o[bc])return o[ac]-o[bc];
+    return(b.paceSignal?.runrate||0)-(a.paceSignal?.runrate||0);
+  });
+
   const _toggleRow=`<div class="pv-toggle-row">
-    <span class="pv-toggle-count">${filtered.length} ร้าน</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="pv-toggle-count">${filtered.length} ร้าน</span>
+      <div class="pv-sort-divider"></div>
+      <button class="pv-sort-btn ${pvSortMode==='pace'?'on':''}" onclick="setPvSort('pace')">PACE</button>
+      <button class="pv-sort-btn ${pvSortMode==='gmv'?'on':''}" onclick="setPvSort('gmv')">GMV</button>
+      <button class="pv-sort-btn ${pvSortMode==='impact'?'on':''}" onclick="setPvSort('impact')">IMPACT</button>
+    </div>
     <div class="pv-toggle-btns">
       <button class="pv-toggle-btn ${pvViewMode==='full'?'on':''}" onclick="setPvView('full')" title="แบบเต็ม">${_iconFull}</button>
       <button class="pv-toggle-btn ${pvViewMode==='compact'?'on':''}" onclick="setPvView('compact')" title="แบบ compact">${_iconCompact}</button>
@@ -13309,7 +13346,12 @@ function renderPortviewList(){
   </div>`;
 
   const renderer=pvViewMode==='compact'?compactCard:fullCard;
-  listEl.innerHTML=_toggleRow+filtered.map(renderer).join('');
+  listEl.innerHTML=_toggleRow+_sorted.map(renderer).join('');
+}
+
+function setPvSort(mode){
+  pvSortMode=mode;
+  renderPortviewList();
 }
 
 function setPvView(mode){
@@ -13980,6 +14022,18 @@ function _updateRestSwipe(grp,idx){
   }
   addListener('a',['overview','portfolio']);
   addListener('b',['opportunities','report']);
+
+  // Sync persistent dot strip with swipe group A
+  const grpA=document.getElementById('swipe-grp-a');
+  if(grpA){
+    grpA.addEventListener('scroll',()=>{
+      const idx=Math.round(grpA.scrollLeft/grpA.offsetWidth);
+      ['sda0','sda1'].forEach((id,i)=>{
+        const d=document.getElementById(id);
+        if(d)d.className='sda-dot'+(i===idx?' on':'');
+      });
+    },{passive:true});
+  }
   // Simple port-top re-measure (no collapse behavior)
   window._expandPortTop=function(){
     const portTop=document.getElementById('port-top');
