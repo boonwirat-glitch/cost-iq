@@ -25,7 +25,8 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* ── TOPBAR ── */
 .topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
 .logo{color:#fff;font-weight:700;font-size:17px;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
-.logo-box{width:28px;height:28px;background:var(--g500);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.logo-box{width:28px;height:28px;background:var(--g500);border-radius:7px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.logo-box img{width:28px;height:28px;object-fit:cover;display:block}
 .logo em{color:var(--amb);font-style:normal}
 
 /* ── IQ BADGE (E-style with custom AI icon) ── */
@@ -181,7 +182,8 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .onboard-card{background:#fff;border-radius:24px 24px 0 0;padding:28px 22px 36px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;animation:slide-up .35s cubic-bezier(.34,1.4,.64,1)}
 @keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .onboard-logo-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.onboard-logo-box{width:36px;height:36px;background:var(--g900);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.onboard-logo-box{width:36px;height:36px;background:var(--g900);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.onboard-logo-box img{width:36px;height:36px;object-fit:cover;display:block}
 .onboard-logo-name{font-size:18px;font-weight:700;letter-spacing:-.3px}
 .onboard-logo-name em{color:var(--amb);font-style:normal}
 .onboard-tagline{font-size:15px;font-weight:700;color:var(--n900);line-height:1.5;margin-bottom:18px}
@@ -1311,7 +1313,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 
 /* ── AI CHAT ── */
 .aifab{
-  position:fixed;bottom:90px;right:16px;width:54px;height:54px;border-radius:50%;
+  position:fixed;bottom:150px;right:16px;width:54px;height:54px;border-radius:50%;
   background:linear-gradient(145deg,#0a4535 0%,#003d2e 100%);
   border:1.5px solid rgba(0,208,112,.3);
   cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -1319,7 +1321,11 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
   transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .3s;
   z-index:199;overflow:visible;
   animation:fab-sense-pulse 3.2s ease-in-out infinite;
+  touch-action:none;
 }
+.aifab.dragging{animation:none;transition:none!important;box-shadow:0 8px 26px rgba(0,60,45,.45),0 0 0 5px rgba(0,208,112,.12);}
+.aifab.moved{right:auto;bottom:auto;}
+
 .aifab:hover{transform:scale(1.08)}
 .aifab.open{
   background:linear-gradient(145deg,#1a3a2a 0%,#0a2a1e 100%);
@@ -1424,7 +1430,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 /* Header */
 .rpt2-head{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 22px 16px;background:linear-gradient(135deg,#1a4a3a,#0d3328);}
 .rpt2-brand{display:flex;align-items:center;gap:9px;}
-.rpt2-logo-box{width:34px;height:34px;background:var(--g500);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rpt2-logo-box{width:34px;height:34px;background:var(--g500);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+.rpt2-logo-box img{width:34px;height:34px;object-fit:cover;display:block;}
 .rpt2-wordmark{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;}
 .rpt2-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;font-family:'IBM Plex Mono',monospace;}
 .rpt2-info{text-align:right;}
@@ -2078,8 +2085,8 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <meta name="apple-mobile-web-app-title" content="Freshket Sense">
 <meta name="theme-color" content="#006050">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon.png">
-<link rel="icon" type="image/png" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon.png">
+<link rel="apple-touch-icon" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
+<link rel="icon" type="image/png" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
@@ -2089,7 +2096,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 
 <script>
 (function(){
-  var ic='https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon.png';
+  var ic='https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
   var m={name:"Freshket Sense",short_name:"Freshket",start_url:"/",display:"standalone",background_color:"#006050",theme_color:"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
   try{var blob=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});
   var url=URL.createObjectURL(blob);
@@ -2221,7 +2228,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <!-- Brand -->
     <div class="lgi-brand">
       <div class="lgi-logo-box">
-        <img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon.png"
+        <img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"
              width="40" height="40" alt="Freshket Sense"
              style="border-radius:8px;object-fit:cover;display:block;">
       </div>
@@ -2396,7 +2403,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <div class="topbar">
   <div class="logo">
     <div class="logo-box">
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="#006050"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm1 11.4V13h-2v.4c0 .3-.2.6-.6.6-.3 0-.6-.3-.6-.6V13H7c-.3 0-.6-.3-.6-.6 0-.3.3-.6.6-.6h.8v-3.6c0-.5.4-1 1-1h2.4c.5 0 1 .4 1 1v3.6h.8c.3 0 .6.3.6.6 0 .3-.3.6-.6.6H11zm0-5.2H9v3h2v-3z"/></svg>
+      <img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" alt="Freshket Sense">
     </div>
     freshket <span class="iq-badge"><svg class="iq-icon" viewBox="0 0 10 10" fill="#4ddc97" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>Sense</span>
   </div>
@@ -2549,7 +2556,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
       <div style="margin-bottom:16px;padding:12px 14px;background:rgba(38,96,200,.06);border:1.5px solid rgba(38,96,200,.22);border-radius:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <div>
-            <div style="font-size:12px;font-weight:700;color:rgba(38,96,200,.9)">Google Sheets</div>
+            <div style="font-size:12px;font-weight:700;color:rgba(38,96,200,.9)">Cloudflare Data</div>
             <div style="font-size:10px;color:rgba(38,96,200,.55);margin-top:2px">โหลดอัตโนมัติตอน login · กดเพื่อ refresh</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
@@ -2993,7 +3000,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         <!-- Header -->
         <div class="rpt2-head">
           <div class="rpt2-brand">
-            <div class="rpt2-logo-box"><svg width="18" height="18" viewBox="0 0 20 20" fill="#006050"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm1 11.4V13h-2v.4c0 .3-.2.6-.6.6-.3 0-.6-.3-.6-.6V13H7c-.3 0-.6-.3-.6-.6 0-.3.3-.6.6-.6h.8v-3.6c0-.5.4-1 1-1h2.4c.5 0 1 .4 1 1v3.6h.8c.3 0 .6.3.6.6 0 .3-.3.6-.6.6H11zm0-5.2H9v3h2v-3z"/></svg></div>
+            <div class="rpt2-logo-box"><img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" alt="Freshket Sense"></div>
             <div>
               <div class="rpt2-wordmark">freshket<span class="lgi-badge" style="margin-left:6px;font-size:9px;padding:1px 5px;animation:none"><svg viewBox="0 0 10 10" fill="#4ddc97" width="7" height="7"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>Sense</span></div>
               <div class="rpt2-sub">Cost Reduction Report</div>
@@ -3285,7 +3292,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   <div class="onboard-card">
     <div class="onboard-logo-row">
       <div class="onboard-logo-box">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" alt="Freshket Sense">
       </div>
       <div>
         <div class="onboard-logo-name">Freshket <em>Sense</em></div>
@@ -3431,8 +3438,8 @@ function hideLoginOverlay() {
 }
 
 function _autoRouteAfterLogin() {
-  // Auto-load data from Google Sheets (foreground 5 files block; SKU+alts background)
-  // Guard: skip if prefetch already started from login screen
+  // Auto-load core portfolio data from Cloudflare R2
+  // Guard: skip if already started
   if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
@@ -3965,6 +3972,12 @@ function switchAccount(accountId){
     if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
     closeDataPanel();
     showToast('สลับไปแล้ว','✓');
+    // Lazy-load account-level intelligence only after account is opened.
+    if(typeof ensureAccountDetailData==='function'){
+      ensureAccountDetailData(accountId).then(()=>{
+        updateDpAccountCard();renderAccountLibrary();
+      }).catch(()=>{});
+    }
     // Auto-load alternatives from Supabase if not in localStorage
     if(currentUser&&(!D.alts||!D.alts.length)){
       loadAltsFromSupabase(accountId).then(result=>{
@@ -4397,6 +4410,7 @@ function computeOPPS(){
 // ── File upload handlers (bulk only) ──
 function handleFileUpload(type,input){
   const file=input.files[0];if(!file)return;
+  const _done=(input&&typeof input._ciqDone==='function')?input._ciqDone:function(){};
   if(type==='bulk-categories'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -4427,6 +4441,7 @@ function handleFileUpload(type,input){
       }
       showToast('✓ bulk_categories: '+cnt+' accounts');
       const b=document.getElementById('badge-bulk-cats');if(b){b.textContent='✓ '+cnt;b.className='dp-slot-badge ok';}
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-skus'){
@@ -4467,6 +4482,7 @@ function handleFileUpload(type,input){
       }
       showToast('✓ bulk_skus: '+cnt+' accounts · '+lines.length+' SKU rows');
       const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+cnt;b.className='dp-slot-badge ok';}
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-data'){
@@ -4494,6 +4510,7 @@ function handleFileUpload(type,input){
       }
       showToast('✓ bulk_data.csv: '+count+' accounts โหลดแล้ว');
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='portview-bulk'){
@@ -4525,6 +4542,7 @@ function handleFileUpload(type,input){
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
       showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
       if(document.getElementById('scr-portview').classList.contains('on'))renderPortview();
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-sku-current'){
@@ -4545,6 +4563,7 @@ function handleFileUpload(type,input){
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
       if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(typeof refreshAll==='function')refreshAll();}
       showToast('✓ bulk_sku_current: '+cnt+' ร้าน · '+totalRows+' SKU rows');
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-alternatives'){
@@ -4558,6 +4577,7 @@ function handleFileUpload(type,input){
         refreshAll();updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
       }
       showToast('✓ bulk_alternatives: '+result.accounts+' ร้าน · '+result.totalPairs+' คู่');
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-outlets'){
@@ -4584,9 +4604,11 @@ function handleFileUpload(type,input){
         renderOutletCard();debouncedSave();
       }
       showToast('✓ bulk_outlets: '+cnt+' ร้าน','✓');
+      _done();
     };reader.readAsText(file);return;
   }
   // Unknown type — ignore silently
+  _done();
 }
 
 function applyMeta(){
@@ -4599,11 +4621,11 @@ function applyMeta(){
 }
 
 // ════════════════════════════════════════
-// GOOGLE SHEETS LOADER
+// CLOUDFLARE R2 DATA LOADER
 // ════════════════════════════════════════
 // ════════════════════════════════════════
-// GOOGLE SHEETS CONFIG
-// ── อัปเดต 2 ค่านี้เมื่อ Sheets เปลี่ยน ──
+// LEGACY SHEETS CONFIG (kept for backward compatibility; R2 is current source)
+// ── no longer used by Cloudflare loader ──
 // ════════════════════════════════════════
 const FRESHKET_SHEETS_ID     = '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ';
 const FRESHKET_SHEETS_SKU_ID = '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV';
@@ -4614,10 +4636,15 @@ const CLAUDE_API_KEY = 'sk-ant-api03-gM9Z75UgvUbV2NxZuliPosIu1E5xKA94z9PsGCrj2TS
 const OLIVE_AVATAR_URL='https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
 
 // Thin wrapper: CSV text → File → existing handleFileUpload (no parse logic duplication)
+// Returns a Promise so lazy loaders can wait until FileReader parsing is done.
 function ingestCSVText(type,text){
-  const blob=new Blob([text],{type:'text/csv'});
-  const file=new File([blob],type+'.csv',{type:'text/csv'});
-  handleFileUpload(type,{files:[file]});
+  return new Promise(resolve=>{
+    try{
+      const blob=new Blob([text],{type:'text/csv'});
+      const file=new File([blob],type+'.csv',{type:'text/csv'});
+      handleFileUpload(type,{files:[file],_ciqDone:()=>resolve(true)});
+    }catch(e){console.warn('[Cloudflare ingest]',type,e);resolve(false);}
+  });
 }
 
 // Background fetch flags — true once big files arrive
@@ -4671,167 +4698,177 @@ async function _csvCacheClear(){
   }catch(e){return false;}
 }
 
-async function reloadFromGoogleSheets(){
-  await _csvCacheClear();
-  sheetsLoadStarted=false;
-  // Reset pill
-  const _pill=document.getElementById('data-load-pill');
-  if(_pill){
-    _pill.style.display='';
-    _pill.classList.remove('out','ready','visible');
-    const dotsEl=document.getElementById('dlp-dots');
-    if(dotsEl){dotsEl.style.display='flex';[...dotsEl.children].forEach(d=>d.classList.remove('done'));}
-    const rdIcon=document.getElementById('dlp-ready-icon');if(rdIcon)rdIcon.style.display='none';
-    const dlpTxt=document.getElementById('dlp-text');if(dlpTxt)dlpTxt.textContent='กำลังโหลด';
-    const dlpCnt=document.getElementById('dlp-count');if(dlpCnt)dlpCnt.textContent='0/5';
-    void _pill.offsetWidth; // force reflow before re-adding visible
-    _pill.classList.add('visible');
-  }
-  loadFromGoogleSheets();
+// R2 file map — Cloudflare R2 bucket (freshket-data)
+const R2_BASE='https://pub-12078d17646340808024e8cc95504995.r2.dev';
+const R2_FILES={portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv'};
+const R2_SPECS={
+  portview:{type:'portview-bulk',tab:'portview',cache:true},
+  history:{type:'bulk-data',tab:'history',cache:true},
+  categories:{type:'bulk-categories',tab:'categories',cache:false},
+  sku_current:{type:'bulk-sku-current',tab:'sku_current',cache:false},
+  outlets:{type:'bulk-outlets',tab:'outlets',cache:false},
+  skus:{type:'bulk-skus',tab:'skus',cache:false},
+  alternatives:{type:'bulk-alternatives',tab:'alternatives',cache:false},
+};
+const _cloudLoadedTabs=new Set();
+const _cloudInFlight={};
+
+function _setDataPillText(text,count){
+  const pill=document.getElementById('data-load-pill');
+  const txt=document.getElementById('dlp-text');
+  const cnt=document.getElementById('dlp-count');
+  if(pill){pill.style.display='';pill.classList.remove('out');pill.classList.add('visible');}
+  if(txt)txt.textContent=text||'กำลังโหลด';
+  if(cnt)cnt.textContent=count||'';
+}
+function _finishDataPill(text,hideMs=1200){
+  const pill=document.getElementById('data-load-pill');
+  const txt=document.getElementById('dlp-text');
+  const icon=document.getElementById('dlp-ready-icon');
+  const dots=document.getElementById('dlp-dots');
+  const bgDots=document.getElementById('dlp-bg-dots');
+  const cnt=document.getElementById('dlp-count');
+  if(txt)txt.textContent=text||'พร้อมใช้งาน';
+  if(cnt)cnt.textContent='';
+  if(dots)dots.style.display='none';
+  if(bgDots)bgDots.style.display='none';
+  if(icon)icon.style.display='block';
+  if(pill){pill.classList.add('ready');setTimeout(()=>pill.classList.add('out'),hideMs);setTimeout(()=>{if(pill)pill.style.display='none';},hideMs+700);}
 }
 
-async function loadFromGoogleSheets(){
-  if(sheetsLoadStarted)return; // already fetching or done — skip
-  sheetsLoadStarted=true;
-  // ── Loading pill: show ──
-  const _pill=document.getElementById('data-load-pill');
-  const _dlpText=document.getElementById('dlp-text');
-  const _dlpCount=document.getElementById('dlp-count');
-  if(_pill)_pill.classList.add('visible');
-  // v109: 2-phase parallel fetch from Google Sheets pub CSV
-  //   Phase 1 (foreground, await): 5 small files → UI ready in ~2-5s
-  //   Phase 2 (background, fire-and-forget): bulk_skus (73MB) + bulk_alternatives (58MB)
-  //   Handlers (line 4138, 4233) auto-refresh UI when background data arrives.
-
-  const FOREGROUND=[
-    {type:'portview-bulk',     tab:'portview',     sheetId:FRESHKET_SHEETS_ID, useCache:true},
-    {type:'bulk-data',         tab:'history',      sheetId:FRESHKET_SHEETS_ID, useCache:true},
-    {type:'bulk-categories',   tab:'categories',   sheetId:FRESHKET_SHEETS_ID, useCache:true},
-    {type:'bulk-sku-current',  tab:'sku_current',  sheetId:FRESHKET_SHEETS_ID, useCache:true},
-    {type:'bulk-outlets',      tab:'outlets',      sheetId:FRESHKET_SHEETS_ID, useCache:true},
-  ];
-  const BACKGROUND=[
-    {type:'bulk-skus',         tab:'skus',         sheetId:FRESHKET_SHEETS_SKU_ID, flag:'skus',  useCache:true},
-    {type:'bulk-alternatives', tab:'alternatives', sheetId:FRESHKET_SHEETS_ID,     flag:'alts',  useCache:true},
-  ];
-  const ALL=[...FOREGROUND,...BACKGROUND];
-
-  const btn=document.getElementById('sheets-load-btn');
-  const counter=document.getElementById('sheets-loaded-count');
-  const progEl=document.getElementById('sheets-progress');
-  if(btn){btn.disabled=true;btn.textContent='กำลังโหลด...';}
-  if(counter){counter.style.display='inline-block';counter.textContent='0/'+ALL.length;}
-  if(progEl){
-    progEl.style.display='flex';
-    progEl.innerHTML=ALL.map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
-  }
-
-  // R2 file map — Cloudflare R2 bucket (freshket-data)
-  const R2_BASE='https://pub-12078d17646340808024e8cc95504995.r2.dev';
-  const R2_FILES={portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv'};
-
-  let loaded=0;
-  async function fetchOne({type,tab,sheetId,useCache}){
+async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
+  if(!spec||!spec.tab)return false;
+  const tab=spec.tab;
+  if(!force&&_cloudLoadedTabs.has(tab))return true;
+  if(!force&&_cloudInFlight[tab])return _cloudInFlight[tab];
+  const p=(async()=>{
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
       let text=null;
+      const useCache=(cacheOverride!==undefined)?cacheOverride:!!spec.cache;
       if(useCache){
         const cached=await _csvCacheGet(tab);
         if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL)text=cached.text;
       }
       if(!text){
         const url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
-        const resp=await fetch(url);
+        const resp=await fetch(url,{cache:'no-store'});
         if(!resp.ok)throw new Error('HTTP '+resp.status);
         text=await resp.text();
-        if(useCache)_csvCacheSet(tab,text); // fire-and-forget write
+        // Cache only small/core CSVs. Large files are intentionally not cached to reduce iOS memory pressure.
+        if(useCache)_csvCacheSet(tab,text);
       }
-      ingestCSVText(type,text);
-      if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
-      return true;
+      const ok=await ingestCSVText(spec.type,text);
+      if(ok){
+        _cloudLoadedTabs.add(tab);
+        if(tab==='skus')bulkSkusReady=true;
+        if(tab==='alternatives')bulkAltsReady=true;
+        if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
+      }
+      return !!ok;
     }catch(err){
       if(dot){dot.style.background='rgba(240,80,0,.12)';dot.style.color='var(--org)';}
-      console.warn('[Sheets]',tab,err.message);
+      console.warn('[Cloudflare R2]',tab,err.message);
       return false;
+    }finally{
+      delete _cloudInFlight[tab];
     }
+  })();
+  _cloudInFlight[tab]=p;
+  return p;
+}
+
+async function ensureCloudflareFiles(keys,{label='กำลังโหลดข้อมูล',force=false}={}){
+  const specs=keys.map(k=>R2_SPECS[k]).filter(Boolean);
+  if(!specs.length)return true;
+  let loaded=0;
+  _setDataPillText(label,'0/'+specs.length);
+  const results=[];
+  for(const spec of specs){
+    const ok=await _fetchCloudflareFile(spec,{force});
+    results.push(ok);
+    if(ok)loaded++;
+    _setDataPillText(label,loaded+'/'+specs.length);
   }
+  return results.every(Boolean);
+}
 
-  // ── Phase 1: foreground — await these 5 ──
-  const fgResults=await Promise.all(FOREGROUND.map(async(f,idx)=>{
-    const ok=await fetchOne(f);
-    if(ok){
-      loaded++;
-      // Tick pill dot
-      const dot=document.getElementById('dlp-d-'+idx);
-      if(dot){dot.classList.add('done');dot.style.animation='dlp-dot-in .3s cubic-bezier(.34,1.56,.64,1) forwards';}
-      if(_dlpCount)_dlpCount.textContent=loaded+'/5';
-    }
-    if(counter)counter.textContent=loaded+'/'+ALL.length;
-    return ok;
-  }));
-  const fgOk=fgResults.filter(x=>x).length;
-  if(btn){btn.disabled=false;btn.textContent='โหลดซ้ำ';}
-  if(fgOk>0)showToast('พร้อมใช้งาน — '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
-
-  // ── Pill: phase 1 ready → transition to background status ──
-  if(_pill){
-    const _readyIcon=document.getElementById('dlp-ready-icon');
-    const _dotsEl=document.getElementById('dlp-dots');
-    const _bgDotsEl=document.getElementById('dlp-bg-dots');
-    if(_dotsEl)_dotsEl.style.display='none';
-    if(_readyIcon)_readyIcon.style.display='block';
-    if(_dlpText)_dlpText.textContent='พร้อมใช้งาน';
-    if(_dlpCount)_dlpCount.textContent='';
-    _pill.classList.add('ready');
-
-    // After 1.4s → switch pill to background loading state
-    setTimeout(()=>{
-      if(!_pill)return;
-      _pill.classList.remove('ready');
-      if(_readyIcon)_readyIcon.style.display='none';
-      if(_bgDotsEl)_bgDotsEl.style.display='flex';
-      if(_dlpText)_dlpText.textContent='SKU + ทางเลือก';
-      if(_dlpCount)_dlpCount.textContent='';
-    },1400);
+async function loadFromCloudflareR2(){
+  if(sheetsLoadStarted)return; // core load already started or done
+  sheetsLoadStarted=true;
+  const CORE=['portview','history'];
+  const btn=document.getElementById('sheets-load-btn');
+  const counter=document.getElementById('sheets-loaded-count');
+  const progEl=document.getElementById('sheets-progress');
+  if(btn){btn.disabled=true;btn.textContent='กำลังโหลด...';}
+  if(counter){counter.style.display='inline-block';counter.textContent='0/'+CORE.length;}
+  if(progEl){
+    progEl.style.display='flex';
+    progEl.innerHTML=CORE.map(k=>R2_SPECS[k]).map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
   }
+  _setDataPillText('โหลด Portfolio','0/'+CORE.length);
+  let loaded=0;
+  for(const key of CORE){
+    const ok=await _fetchCloudflareFile(R2_SPECS[key],{force:false});
+    if(ok)loaded++;
+    if(counter)counter.textContent=loaded+'/'+CORE.length;
+    _setDataPillText('โหลด Portfolio',loaded+'/'+CORE.length);
+  }
+  if(btn){btn.disabled=false;btn.textContent='Refresh data';}
+  if(loaded>0){
+    showToast('พร้อมใช้งาน — Portfolio '+loaded+'/'+CORE.length+' ไฟล์','✓');
+    _finishDataPill('Portfolio พร้อมแล้ว',1000);
+  }else{
+    showToast('โหลด Portfolio ไม่สำเร็จ — ลอง refresh data','⚠');
+    _finishDataPill('โหลดข้อมูลไม่ได้',1800);
+  }
+  if(typeof renderPortview==='function')renderPortview();
+  if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
+}
 
-  // ── Phase 2: background — fire-and-forget ──
-  Promise.all(BACKGROUND.map(async f=>{
-    const bgDot=document.getElementById(f.flag==='skus'?'dlp-bg-skus':'dlp-bg-alts');
-    const ok=await fetchOne(f);
-    if(ok){
-      loaded++;
-      if(counter)counter.textContent=loaded+'/'+ALL.length;
-      if(f.flag==='skus'){bulkSkusReady=true;}
-      if(f.flag==='alts'){bulkAltsReady=true;}
-      if(bgDot)bgDot.classList.add('done');
-    }else{
-      // Mark failed dot red + toast with retry hint
-      if(bgDot){bgDot.style.background='rgba(240,80,0,.7)';}
-      showToast(f.tab+' โหลดไม่ได้ — กด โหลดซ้ำ เพื่อลองใหม่','⚠');
-    }
-    return ok;
-  })).then(results=>{
-    const bgOk=results.filter(x=>x).length;
-    if(!_pill)return;
-    const _bgDotsEl=document.getElementById('dlp-bg-dots');
-    const _readyIcon=document.getElementById('dlp-ready-icon');
-    if(bgOk===BACKGROUND.length){
-      // All background done → final ready state
-      if(_bgDotsEl)_bgDotsEl.style.display='none';
-      if(_readyIcon)_readyIcon.style.display='block';
-      if(_dlpText)_dlpText.textContent='ข้อมูลครบแล้ว';
-      _pill.classList.add('ready');
-      setTimeout(()=>_pill.classList.add('out'),1600);
-      setTimeout(()=>{if(_pill)_pill.style.display='none';},2200);
-    }else{
-      // Partial failure — keep pill visible with red dot as hint
-      if(_dlpText)_dlpText.textContent='บางข้อมูลโหลดไม่ได้';
-      setTimeout(()=>_pill.classList.add('out'),3000);
-      setTimeout(()=>{if(_pill)_pill.style.display='none';},3800);
-    }
-  });
+async function reloadFromCloudflareR2(){
+  await _csvCacheClear();
+  sheetsLoadStarted=false;
+  bulkSkusReady=false;bulkAltsReady=false;
+  _cloudLoadedTabs.clear();
+  return loadFromCloudflareR2();
+}
+
+// Backward-compatible aliases. Name kept so old onclick/flows do not break.
+async function reloadFromGoogleSheets(){return reloadFromCloudflareR2();}
+async function loadFromGoogleSheets(){return loadFromCloudflareR2();}
+
+async function ensureAccountDetailData(accountId){
+  if(!accountId)return false;
+  const needed=[];
+  if(!bulkCatsData[accountId])needed.push('categories');
+  if(!bulkSkuCurrentData[accountId])needed.push('sku_current');
+  if(!bulkOutletsData[accountId])needed.push('outlets');
+  if(!bulkSkusData[accountId])needed.push('skus');
+  if(!needed.length)return true;
+  showToast('กำลังโหลด account intelligence...','⟳');
+  const ok=await ensureCloudflareFiles(needed,{label:'Account intelligence'});
+  loadFromStorage(accountId);
+  refreshAll();updateDataStatus();
+  if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+  if(isKAM&&document.getElementById('scr-kam-overview')?.classList.contains('on'))renderKamOverview();
+  return ok;
+}
+
+async function ensureSenseData(accountId){
+  if(!accountId)return false;
+  const needed=[];
+  if(!bulkSkusData[accountId])needed.push('skus');
+  if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
+  if(!needed.length)return true;
+  showToast('กำลังโหลด SKU + ทางเลือก...','⟳');
+  const ok=await ensureCloudflareFiles(needed,{label:'SKU + ทางเลือก'});
+  loadFromStorage(accountId);
+  if(D.alts.length&&D.skus.length)computeOPPS();
+  refreshAll();updateDataStatus();
+  if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+  return ok;
 }
 
 // Legacy alias — existing button onclick='loadFromSupabaseStorage()' still works
@@ -4966,8 +5003,11 @@ function refreshAll(){
 }
 
 /* ── P2: Rest AI Button ── */
-function triggerRestAI(){
+async function triggerRestAI(){
   if(senseActivated)return; // already ran this session
+  if((!D.alts.length||!D.skus.length)&&typeof ensureSenseData==='function'){
+    await ensureSenseData(currentAccountId);
+  }
   const loadWrap=document.getElementById('rest-ai-load');
   const preview=document.getElementById('rest-ai-preview');
   const dialWrap=document.getElementById('dial-clickwrap');
@@ -10295,6 +10335,9 @@ function detectDisplayMode(subclass,packSize){
 
 async function runMatcherInApp(vsMode=false){
   if(matcherRunning)return;
+  if(!matcherRawCsv&&(!D.alts.length||!D.skus.length)&&typeof ensureSenseData==='function'){
+    await ensureSenseData(currentAccountId);
+  }
 
   // ── Element lookup: maps logical key → DOM id based on context ──
   const _EL={
@@ -10632,12 +10675,18 @@ function _sgSetState(state){
   }
 }
 
-function sgOrbTap(){
+async function sgOrbTap(){
   if(_sgRunning||senseActivated)return;
   if(!D.alts.length||!D.skus.length){
     const sub=document.getElementById('sg-sub');
-    if(sub){const orig=sub.textContent;sub.textContent='อัปโหลดข้อมูลร้านก่อนนะคะ';setTimeout(()=>{sub.textContent=orig;},2000);}
-    return;
+    const orig=sub?sub.textContent:'';
+    if(sub)sub.textContent='กำลังโหลด SKU + ทางเลือกของร้าน...';
+    if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId);
+    if(!D.alts.length||!D.skus.length){
+      if(sub){sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent=orig;},2200);}
+      return;
+    }
+    if(sub)sub.textContent=orig;
   }
   _sgRunning=true;
   // Hide tap affordance immediately
@@ -12356,7 +12405,7 @@ function buildChatSuggestions(){
   return suggs.slice(0,4);
 }
 
-function toggleChat(){chatOpen?closeChat():openChat();}
+function toggleChat(){if(window.__aifabDragSuppress){window.__aifabDragSuppress=false;return;}chatOpen?closeChat():openChat();}
 function openChat(){
   chatOpen=true;
   document.getElementById('aipanel').classList.add('open');
@@ -12387,6 +12436,67 @@ function openChat(){
   }
 }
 function closeChat(){chatOpen=false;document.getElementById('aipanel').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('aifab').classList.remove('open');}
+
+function initChatFabDrag(){
+  const fab=document.getElementById('aifab');
+  if(!fab||fab.dataset.dragInit==='1')return;
+  fab.dataset.dragInit='1';
+  const key='fs_aifab_pos_v1';
+  function clamp(x,y){
+    const pad=10;
+    const r=fab.getBoundingClientRect();
+    const w=r.width||54,h=r.height||54;
+    const vw=window.innerWidth||440,vh=window.innerHeight||700;
+    return {x:Math.max(pad,Math.min(x,vw-w-pad)),y:Math.max(pad,Math.min(y,vh-h-pad))};
+  }
+  function setPos(x,y,persist){
+    const p=clamp(x,y);
+    fab.style.left=p.x+'px';
+    fab.style.top=p.y+'px';
+    fab.style.right='auto';
+    fab.style.bottom='auto';
+    fab.classList.add('moved');
+    if(persist){try{localStorage.setItem(key,JSON.stringify(p));}catch(e){}}
+  }
+  try{
+    const saved=JSON.parse(localStorage.getItem(key)||'null');
+    if(saved&&Number.isFinite(saved.x)&&Number.isFinite(saved.y))setPos(saved.x,saved.y,false);
+  }catch(e){}
+  let startX=0,startY=0,origX=0,origY=0,dragging=false,moved=false,pid=null;
+  fab.addEventListener('pointerdown',e=>{
+    if(e.button!==undefined&&e.button!==0)return;
+    const r=fab.getBoundingClientRect();
+    startX=e.clientX;startY=e.clientY;origX=r.left;origY=r.top;
+    dragging=true;moved=false;pid=e.pointerId;
+    if(fab.setPointerCapture)fab.setPointerCapture(pid);
+    fab.classList.add('dragging');
+  },{passive:false});
+  fab.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-startX,dy=e.clientY-startY;
+    if(Math.abs(dx)+Math.abs(dy)>6)moved=true;
+    if(moved){e.preventDefault();setPos(origX+dx,origY+dy,false);}
+  },{passive:false});
+  function endDrag(){
+    if(!dragging)return;
+    dragging=false;fab.classList.remove('dragging');
+    try{if(fab.releasePointerCapture&&pid!==null)fab.releasePointerCapture(pid);}catch(e){}
+    if(moved){
+      const r=fab.getBoundingClientRect();
+      setPos(r.left,r.top,true);
+      window.__aifabDragSuppress=true;
+      setTimeout(()=>{window.__aifabDragSuppress=false;},260);
+    }
+  }
+  fab.addEventListener('pointerup',endDrag);
+  fab.addEventListener('pointercancel',endDrag);
+  window.addEventListener('resize',()=>{
+    if(!fab.classList.contains('moved'))return;
+    const r=fab.getBoundingClientRect();
+    setPos(r.left,r.top,true);
+  });
+}
+
 function askQ(q){document.getElementById('aiinput').value=q;sendChat();}
 function addMsg(role,txt,loading=false){const msgs=document.getElementById('aimsgs');const d=document.createElement('div');d.className=`msg ${role}`;d.innerHTML=`<div class="mb ${loading?'ld':''}">${txt}</div>`;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d;}
 
@@ -14292,8 +14402,7 @@ function initOliveAvatar(){
     const ldb=document.getElementById('local-dev-btn');
     if(ldb)ldb.style.display='block';
   }
-  // Prefetch Google Sheets data immediately — runs in background while user logs in
-  loadFromGoogleSheets();
+  // Do not prefetch bulk data before auth; mobile Safari can crash on large CSV parsing.
   // Check Supabase session first (shows/hides login overlay)
   checkSession().catch(()=>{});
   // ── Guard B: visibilitychange — silent token re-check only, NO routing ────
@@ -14321,6 +14430,7 @@ function initOliveAvatar(){
   // Restore AI provider setting
   setAiProvider(aiProvider);
   initOliveAvatar();
+  initChatFabDrag();
   if(geminiApiKey){const gk=document.getElementById('gemini-api-key');if(gk)gk.value=geminiApiKey;}
   // Restore accounts list from localStorage
   // Migrate old ciq_accounts to ciq_index (one-time migration)
