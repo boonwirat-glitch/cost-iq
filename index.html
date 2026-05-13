@@ -2199,6 +2199,20 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 }
 .lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
 .lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
+/* ── PASSWORD RECOVERY FLOW ── */
+.pw-reset-area{display:none;}
+#login-overlay.password-recovery .lgi-form-area{display:none!important;}
+#login-overlay.password-recovery .lgi-checking-msg{display:none!important;}
+#login-overlay.password-recovery .pw-reset-area{display:block;}
+.pw-reset-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:-.2px;}
+.pw-reset-sub{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:18px;}
+.pw-reset-email{font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.8);margin-bottom:14px;word-break:break-all;}
+.pw-reset-status{display:none;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;font-family:'IBM Plex Sans Thai',sans-serif;line-height:1.5;}
+.pw-reset-status.err{display:block;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#fc8181;}
+.pw-reset-status.ok{display:block;background:rgba(0,208,112,.12);border:1px solid rgba(0,208,112,.25);color:#4ddc97;}
+.lgi-err.ok{display:block;background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.25);color:#4ddc97;}
+.pw-reset-note{font-size:11px;color:rgba(255,255,255,.32);line-height:1.6;margin-top:12px;text-align:center;}
+
 </style>
 
 <!-- ── DATA LOAD PILL ── -->
@@ -2248,6 +2262,34 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <div class="lgi-checking-msg">
       <div class="lgi-chk-dots"><span></span><span></span><span></span></div>
       <span>กำลังตรวจสอบ session...</span>
+    </div>
+
+
+    <!-- Password recovery area (shown only after Supabase recovery link) -->
+    <div id="password-reset-area" class="pw-reset-area">
+      <div class="pw-reset-title">ตั้ง password ใหม่</div>
+      <div class="pw-reset-sub">ลิงก์ recovery ถูกยืนยันแล้ว กรุณาตั้ง password ใหม่ก่อนเข้า Freshket Sense</div>
+      <div id="pw-reset-email" class="pw-reset-email"></div>
+
+      <div id="pw-reset-status" class="pw-reset-status"></div>
+
+      <div class="lgi-field">
+        <label class="lgi-label">New password</label>
+        <input id="reset-password" class="lgi-input" type="password"
+          placeholder="อย่างน้อย 8 ตัวอักษร" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')document.getElementById('reset-password-confirm').focus()">
+      </div>
+      <div class="lgi-field">
+        <label class="lgi-label">Confirm password</label>
+        <input id="reset-password-confirm" class="lgi-input" type="password"
+          placeholder="พิมพ์ password อีกครั้ง" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')submitPasswordReset()">
+      </div>
+
+      <button onclick="submitPasswordReset()" id="pw-reset-btn" class="lgi-btn">
+        <span id="pw-reset-btn-text">บันทึก password ใหม่</span>
+      </button>
+      <div class="pw-reset-note">หลังบันทึกสำเร็จ ระบบจะให้ login ใหม่ด้วย password ที่เพิ่งตั้ง</div>
     </div>
 
     <!-- Form area (hidden during session check) -->
@@ -2428,7 +2470,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <div class="kambar" id="kambar" style="display:none">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
   <div class="kt" style="flex:1"><strong>โหมดเตรียมคุยลูกค้า</strong>วิเคราะห์ข้อมูลพร้อม talking points สำหรับ KAM</div>
-  <button onclick="cycleKamModel()" style="font-size:10px;font-weight:700;background:rgba(255,255,255,.12);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .2s;flex-shrink:0;white-space:nowrap" id="kam-model-topbar-btn">Haiku</button>
+  <button onclick="cycleKamModel()" style="font-size:10px;font-weight:700;background:rgba(255,255,255,.12);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .2s;flex-shrink:0;white-space:nowrap" id="kam-model-topbar-btn">Sonnet</button>
 </div>
 
 <!-- DATA PANEL -->
@@ -2535,12 +2577,12 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
       <div style="margin-top:12px;padding:12px 14px;background:rgba(26,58,107,.06);border:1px solid rgba(38,96,200,.15);border-radius:10px">
         <div style="font-size:10px;font-weight:700;color:#2660c8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">KAM Briefing Model</div>
         <div style="display:flex;gap:6px">
-          <div id="km-haiku" onclick="setKamModel('haiku')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid #2660c8;background:#1a3a6b;cursor:pointer;transition:all .15s">
-            <div style="font-size:12px;font-weight:700;color:#fff">Haiku</div>
+          <div id="km-haiku" onclick="setKamModel('haiku')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--n200);background:var(--n50);cursor:pointer;transition:all .15s">
+            <div style="font-size:12px;font-weight:700;color:var(--n700)">Haiku</div>
             <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:2px">เร็ว · แนะนำ</div>
           </div>
-          <div id="km-sonnet" onclick="setKamModel('sonnet')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--n200);background:var(--n50);cursor:pointer;transition:all .15s">
-            <div style="font-size:12px;font-weight:700;color:var(--n700)">Sonnet</div>
+          <div id="km-sonnet" onclick="setKamModel('sonnet')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid #2660c8;background:#1a3a6b;cursor:pointer;transition:all .15s">
+            <div style="font-size:12px;font-weight:700;color:#fff">Sonnet</div>
             <div style="font-size:10px;color:var(--n400);margin-top:2px">ละเอียดกว่า</div>
           </div>
         </div>
@@ -3348,6 +3390,8 @@ let currentUserProfile = null;
 
 // v149: guarded splash transition + relogin runtime cleanup
 let loginTransitionRunning = false;
+let passwordRecoveryMode = false;
+
 
 function resetRuntimeSessionState(){
   try { sheetsLoadStarted = false; } catch(e) {}
@@ -3373,8 +3417,10 @@ function resetRuntimeSessionState(){
 function _showLoginOverlayClean(){
   resetRuntimeSessionState();
   const ov = document.getElementById('login-overlay');
+  passwordRecoveryMode = false;
   if (ov) {
     ov.classList.remove('lgi-checking');
+    ov.classList.remove('password-recovery');
     ov.style.display = 'flex';
     ov.style.opacity = '1';
   }
@@ -3393,6 +3439,104 @@ function _showLoginOverlayClean(){
   const pw = document.getElementById('login-password');
   if (em) em.value = '';
   if (pw) pw.value = '';
+  const rpw = document.getElementById('reset-password');
+  const rpw2 = document.getElementById('reset-password-confirm');
+  const rst = document.getElementById('pw-reset-status');
+  if (rpw) rpw.value = '';
+  if (rpw2) rpw2.value = '';
+  if (rst) { rst.textContent = ''; rst.className = 'pw-reset-status'; }
+}
+
+
+function _urlLooksLikePasswordRecovery(){
+  const raw = String(window.location.search || '') + ' ' + String(window.location.hash || '');
+  return /(?:^|[?#&])type=recovery(?:&|$)/i.test(raw) || /password[_-]?recovery/i.test(raw);
+}
+
+function _clearPasswordRecoveryUrl(){
+  try {
+    const keep = new URLSearchParams(window.location.search);
+    ['code','token','token_hash','type','access_token','refresh_token','expires_in','expires_at'].forEach(k => keep.delete(k));
+    const qs = keep.toString();
+    const clean = window.location.pathname + (qs ? '?' + qs : '');
+    window.history.replaceState({}, document.title, clean);
+  } catch(e) {}
+}
+
+function showPasswordResetForm(){
+  passwordRecoveryMode = true;
+  loginTransitionRunning = false;
+  const ov = document.getElementById('login-overlay');
+  if (ov) {
+    ov.classList.remove('lgi-checking');
+    ov.classList.add('password-recovery');
+    ov.style.display = 'flex';
+    ov.style.opacity = '1';
+  }
+  const splash = document.getElementById('sense-splash');
+  if (splash) {
+    splash.style.display = 'none';
+    splash.style.opacity = '';
+    splash.style.transition = '';
+  }
+  const em = document.getElementById('pw-reset-email');
+  if (em) em.textContent = currentUser?.email ? currentUser.email : '';
+  const loginErr = document.getElementById('login-error');
+  if (loginErr) { loginErr.textContent = ''; loginErr.className = 'lgi-err'; loginErr.style.display = 'none'; }
+  setTimeout(() => {
+    const p = document.getElementById('reset-password');
+    if (p) p.focus();
+  }, 60);
+}
+
+function showResetStatus(msg, type){
+  const el = document.getElementById('pw-reset-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'pw-reset-status ' + (type === 'ok' ? 'ok' : 'err');
+}
+
+function showLoginInfo(msg){
+  const el = document.getElementById('login-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'lgi-err ok';
+  el.style.display = 'block';
+}
+
+async function submitPasswordReset(){
+  const p1 = document.getElementById('reset-password')?.value || '';
+  const p2 = document.getElementById('reset-password-confirm')?.value || '';
+  const btn = document.getElementById('pw-reset-btn');
+  const txt = document.getElementById('pw-reset-btn-text');
+
+  if (p1.length < 8) { showResetStatus('Password ต้องมีอย่างน้อย 8 ตัวอักษร', 'err'); return; }
+  if (p1 !== p2) { showResetStatus('Password สองช่องไม่ตรงกัน', 'err'); return; }
+
+  if (btn) btn.disabled = true;
+  if (txt) txt.textContent = 'กำลังบันทึก...';
+  try {
+    const { error } = await supa.auth.updateUser({ password: p1 });
+    if (error) {
+      console.warn('[password recovery] update failed:', error.message);
+      showResetStatus('บันทึก password ไม่สำเร็จ: ' + (error.message || 'กรุณาขอลิงก์ใหม่'), 'err');
+      return;
+    }
+    showResetStatus('ตั้ง password ใหม่สำเร็จ กำลังกลับไปหน้า login...', 'ok');
+    _clearPasswordRecoveryUrl();
+    passwordRecoveryMode = false;
+    currentUser = null;
+    currentUserProfile = null;
+    try { await supa.auth.signOut(); } catch(e) {}
+    _showLoginOverlayClean();
+    showLoginInfo('ตั้ง password ใหม่สำเร็จ กรุณาเข้าสู่ระบบด้วย password ใหม่');
+  } catch(e) {
+    console.error('[password recovery]', e);
+    showResetStatus('เกิดข้อผิดพลาด กรุณาลองใหม่ หรือขอลิงก์ reset ใหม่', 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = 'บันทึก password ใหม่';
+  }
 }
 
 // ── Reactive auth state listener ─────────────────────────────────────────────
@@ -3401,6 +3545,13 @@ function _showLoginOverlayClean(){
 // Guard D: SIGNED_OUT only triggers login UI if we were actually logged in
 //          (avoids showing login on initial page load when no session exists)
 supa.auth.onAuthStateChange((event, session) => {
+  // Recovery links create a temporary auth session first. Do not route into the app yet.
+  if (event === 'PASSWORD_RECOVERY' || passwordRecoveryMode || _urlLooksLikePasswordRecovery()) {
+    if (session?.user) currentUser = session.user;
+    showPasswordResetForm();
+    return;
+  }
+
   if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && !currentUser) {
     currentUser = session.user;
     loadUserProfile().then(() => hideLoginOverlay());
@@ -3436,6 +3587,7 @@ async function doLogin() {
 
 function showLoginError(msg) {
   const el = document.getElementById('login-error');
+  el.className = 'lgi-err';
   el.textContent = msg; el.style.display = 'block';
   el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -3604,6 +3756,17 @@ async function checkSession() {
     return;
   }
   if(window.self!==window.top){activateLocalMode();return;}
+  // Password recovery links should show reset form, not bypass login into the app.
+  if(_urlLooksLikePasswordRecovery()){
+    try {
+      const { data: { session } } = await supa.auth.getSession();
+      if (session?.user) currentUser = session.user;
+    } catch(e) {
+      console.warn('[password recovery] session check failed:', e.message);
+    }
+    showPasswordResetForm();
+    return;
+  }
   // Show "checking session" state — hides form, shows dots
   const ov = document.getElementById('login-overlay');
   if(ov) ov.classList.add('lgi-checking');
@@ -3761,7 +3924,7 @@ let D_outlets=[];let outletsExpanded=false;
 let matcherRawCsv='';let matcherRunning=false;
 let matcherProgress={current:0,total:0,found:0};
 let matcherMode='fast';let matcherScope='all';let matcherModel='haiku';
-let kamModel='haiku'; // KAM briefing model (separate from Matcher)
+let kamModel='sonnet'; // KAM briefing model (separate from Matcher) — default Sonnet
 let aiProvider=localStorage.getItem('ai_provider')||'claude'; // 'claude' | 'gemini'
 let geminiApiKey=localStorage.getItem('gemini_key')||'AIzaSyCM-BwNBrI6_eT5kMqpUl_eJYuBO3BKmBs';
 let kamStateCache={html:null,insights:null,accountId:null};
