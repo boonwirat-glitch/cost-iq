@@ -4970,12 +4970,18 @@ const R2_SPECS={
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
+let _dataPillTimers=[];
 
+function _clearDataPillTimers(){
+  _dataPillTimers.forEach(t=>clearTimeout(t));
+  _dataPillTimers=[];
+}
 function _clearCloudInFlight(){Object.keys(_cloudInFlight).forEach(k=>delete _cloudInFlight[k]);}
 function _specFetchTimeout(spec){return spec&&spec.heavy?240000:90000;}
 function _specIngestTimeout(spec){return spec&&spec.heavy?240000:90000;}
 
 function _resetDataPill(){
+  _clearDataPillTimers();
   const pill=document.getElementById('data-load-pill');
   const dots=document.getElementById('dlp-dots');
   const bgDots=document.getElementById('dlp-bg-dots');
@@ -4990,6 +4996,7 @@ function _resetDataPill(){
   if(cnt)cnt.textContent='';
 }
 function _setDataPillText(text,count){
+  _clearDataPillTimers();
   const pill=document.getElementById('data-load-pill');
   const txt=document.getElementById('dlp-text');
   const cnt=document.getElementById('dlp-count');
@@ -4998,6 +5005,7 @@ function _setDataPillText(text,count){
   if(cnt)cnt.textContent=count||'';
 }
 function _finishDataPill(text,hideMs=1200){
+  _clearDataPillTimers();
   const pill=document.getElementById('data-load-pill');
   const txt=document.getElementById('dlp-text');
   const icon=document.getElementById('dlp-ready-icon');
@@ -5009,7 +5017,11 @@ function _finishDataPill(text,hideMs=1200){
   if(dots)dots.style.display='none';
   if(bgDots)bgDots.style.display='none';
   if(icon)icon.style.display='block';
-  if(pill){pill.classList.add('ready');setTimeout(()=>pill.classList.add('out'),hideMs);setTimeout(()=>{if(pill)pill.style.display='none';},hideMs+700);}
+  if(pill){
+    pill.classList.add('ready');
+    _dataPillTimers.push(setTimeout(()=>pill.classList.add('out'),hideMs));
+    _dataPillTimers.push(setTimeout(()=>{if(pill)pill.style.display='none';},hideMs+700));
+  }
 }
 
 async function _fetchTextWithTimeout(url,timeoutMs){
@@ -5075,7 +5087,9 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
     _setDataPillText(label,done+'/'+specs.length);
     return ok;
   })));
-  return results.every(Boolean);
+  const ok=results.every(Boolean);
+  _finishDataPill(ok?(label+' พร้อมแล้ว'):(label+' โหลดไม่ครบ'),ok?900:1400);
+  return ok;
 }
 
 function _markForegroundPillDot(idx){
@@ -14938,7 +14952,7 @@ function _setRestSwipeCue(grp,idx,opts){
   _restSwipeCueState={grp:grp||'a',idx:idx||0};
   const p=document.getElementById('swipe-pill');
   if(!p)return;
-  if(typeof isKAM!=='undefined'&&isKAM){p.classList.remove('show');return;}
+  if(typeof isKAM!=='undefined'&&isKAM){p.classList.remove('show','teach','compact');return;}
   const labels={a:['ภาพรวม','พอร์ต'],b:['Sense','รายงาน']};
   const l=(labels[grp]||labels.a);
   const left=document.getElementById('sp-left-label');
@@ -14957,29 +14971,28 @@ function _setRestSwipeCue(grp,idx,opts){
     else teachCopy.textContent=idx===0?'ปัดซ้ายดูรายงาน →':'← ปัดขวากลับ Sense';
   }
   const teach=!!(opts.teach&&grp==='a'&&!_hasRestSwipeLearned());
+  const shouldShow=opts.show!==false&&(teach||opts.teach||opts.flash||opts.show);
+  clearTimeout(_pillHideTimer);
   p.classList.toggle('teach',teach);
   p.classList.toggle('compact',!teach);
+  if(!shouldShow){return;}
   p.classList.add('show');
-  clearTimeout(_pillHideTimer);
-  if(teach){
-    _pillHideTimer=setTimeout(function(){
-      p.classList.remove('teach');p.classList.add('compact','show');
-    },opts.duration||2800);
-  }
+  const hideAfter=teach?(opts.duration||2800):(opts.duration||1100);
+  _pillHideTimer=setTimeout(function(){
+    p.classList.remove('show','teach','compact');
+  },hideAfter);
 }
 function _showPill(opts){
   opts=opts||{};
-  _setRestSwipeCue(_restSwipeCueState.grp,_restSwipeCueState.idx,opts);
+  _setRestSwipeCue(_restSwipeCueState.grp,_restSwipeCueState.idx,Object.assign({show:true},opts));
 }
 function _hidePill(delay){
-  // v154 keeps the compact orientation cue visible; only teaching mode collapses back to compact.
   clearTimeout(_pillHideTimer);
   const p=document.getElementById('swipe-pill');
   if(!p)return;
   _pillHideTimer=setTimeout(function(){
-    p.classList.remove('teach');
-    p.classList.add('compact','show');
-  },delay||900);
+    p.classList.remove('show','teach','compact');
+  },delay||0);
 }
 function _handleSwipeCueTap(){
   const st=_restSwipeCueState||{grp:'a',idx:0};
@@ -15009,7 +15022,7 @@ function _updateRestSwipe(grp,idx,opts){
       if(idx===lastIdx)return;
       if(grpId==='a'&&lastIdx>=0&&idx!==lastIdx)_markRestSwipeLearned();
       lastIdx=idx;
-      _updateRestSwipe(grpId,idx,{teach:false});
+      _updateRestSwipe(grpId,idx,{teach:false,flash:true,duration:900});
       const name=screens[idx];
       const footer=document.getElementById('pb-footer');
       if(footer)footer.classList.toggle('hidden',grpId!=='b'||name==='report');
