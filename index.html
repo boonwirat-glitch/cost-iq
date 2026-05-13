@@ -14078,45 +14078,80 @@ function _pvSyncChips(){
 }
 
 function _pvInitCollapseObserver(){
+  // v153 surgical patch: use real scroll position instead of relying only on
+  // IntersectionObserver + sentinel. The old observer was fragile when the
+  // sticky header / scroll root changed, so Portfolio could stop collapsing
+  // even though the CSS and DOM were still present.
   if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
   const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
+  const screen=document.getElementById('scr-portview');
   const collapsible=document.getElementById('pv-collapsible');
   const strip=document.getElementById('pv-compact-strip');
   const listEl=document.getElementById('portview-list');
-  if(!collapsible||!strip||!listEl)return;
+  if(!screen||!collapsible||!strip||!listEl)return;
+
+  let raf=0;
+  let lastCollapsed=null;
+  const COLLAPSE_AT=42;
+  const EXPAND_AT=8;
+
+  function _scrollTop(){
+    const se=document.scrollingElement||document.documentElement;
+    return Math.max(
+      window.pageYOffset||0,
+      se?se.scrollTop||0:0,
+      document.documentElement?document.documentElement.scrollTop||0:0,
+      document.body?document.body.scrollTop||0:0,
+      screen.scrollTop||0
+    );
+  }
+  function _aiVisible(){
+    const aiOut=document.getElementById('portview-ai-output');
+    return !!(aiOut&&aiOut.style.display!=='none');
+  }
+  function _canExpand(){
+    // Keep the previous guard: filter/sort renders can shrink content and fire
+    // scroll events; do not treat that as an intentional scroll-back-to-top.
+    const msSinceRender=Date.now()-(window._pvLastRenderMs||0);
+    return msSinceRender>350&&!_aiVisible();
+  }
   function _apply(collapsed){
+    if(lastCollapsed===collapsed)return;
+    lastCollapsed=collapsed;
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
+    window._pvLastCollapseMs=collapsed?Date.now():0;
   }
-  const sentinel=document.createElement('div');
-  sentinel.style.cssText='height:1px;margin:0;padding:0;pointer-events:none';
-  sentinel.id='pv-collapse-sentinel';
-  listEl.insertAdjacentElement('beforebegin',sentinel);
-  const io=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting&&e.boundingClientRect.top<0){
-        // Sentinel scrolled above viewport → collapse
-        window._pvLastCollapseMs=Date.now();
-        _apply(true);
-      } else if(e.isIntersecting){
-        // Sentinel re-entered viewport.
-        // Only expand if: (a) never collapsed yet, OR (b) enough time has passed since
-        // the last renderPortviewList call — this distinguishes a genuine scroll-back-to-top
-        // from content shrink (filter tap) which fires the observer within milliseconds.
-        // Also: never re-expand while AI insight text is visible — user needs reading space.
-        const msSinceRender=Date.now()-(window._pvLastRenderMs||0);
-        const aiOut=document.getElementById('portview-ai-output');
-        const aiVisible=aiOut&&aiOut.style.display!=='none';
-        if(msSinceRender>350&&!aiVisible){
-          window._pvLastCollapseMs=0;
-          _apply(false);
-        }
-        // else: content-shrink or AI text visible — stay collapsed
-      }
-    });
-  },{threshold:0,rootMargin:'-56px 0px 0px 0px'});
-  io.observe(sentinel);
-  _pvCollapseObserver={disconnect:()=>{io.disconnect();}};
+  function _check(){
+    raf=0;
+    if(!screen.classList.contains('on'))return;
+    const y=_scrollTop();
+    if(y>COLLAPSE_AT){
+      _apply(true);
+    }else if(y<=EXPAND_AT&&_canExpand()){
+      _apply(false);
+    }
+  }
+  function _schedule(){
+    if(raf)return;
+    raf=requestAnimationFrame(_check);
+  }
+
+  window.addEventListener('scroll',_schedule,{passive:true});
+  document.addEventListener('scroll',_schedule,true);
+  screen.addEventListener('scroll',_schedule,{passive:true});
+  window.addEventListener('resize',_schedule,{passive:true});
+
+  // Run once after layout settles. Avoid immediate re-expand during render.
+  setTimeout(_schedule,180);
+
+  _pvCollapseObserver={disconnect:()=>{
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    window.removeEventListener('scroll',_schedule);
+    document.removeEventListener('scroll',_schedule,true);
+    screen.removeEventListener('scroll',_schedule);
+    window.removeEventListener('resize',_schedule);
+  }};
 }
 
 function setPvView(mode){
@@ -14421,38 +14456,75 @@ function _tvBuildCompactStrip(){
   const sc=document.getElementById('tv-sort-count');if(sc)sc.textContent=groups.length+' KAM';
 }
 function _tvInitCollapseObserver(){
+  // v153 surgical patch: same scroll-position based collapse as Portfolio,
+  // scoped only to TL/Admin Teamview. No data/filter/sort logic is touched.
   if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
   const oldSen=document.getElementById('tv-collapse-sentinel');if(oldSen)oldSen.remove();
+  const screen=document.getElementById('scr-teamview');
   const collapsible=document.getElementById('tv-collapsible');
   const strip=document.getElementById('tv-compact-strip');
   const listEl=document.getElementById('teamview-content');
-  if(!collapsible||!strip||!listEl)return;
+  if(!screen||!collapsible||!strip||!listEl)return;
+
+  let raf=0;
+  let lastCollapsed=null;
+  const COLLAPSE_AT=42;
+  const EXPAND_AT=8;
+
+  function _scrollTop(){
+    const se=document.scrollingElement||document.documentElement;
+    return Math.max(
+      window.pageYOffset||0,
+      se?se.scrollTop||0:0,
+      document.documentElement?document.documentElement.scrollTop||0:0,
+      document.body?document.body.scrollTop||0:0,
+      screen.scrollTop||0
+    );
+  }
+  function _aiVisible(){
+    const tvAiOut=document.getElementById('tv-ai-output');
+    return !!(tvAiOut&&tvAiOut.style.display!=='none');
+  }
+  function _canExpand(){
+    const msSinceRender=Date.now()-(window._tvLastRenderMs||0);
+    return msSinceRender>350&&!_aiVisible();
+  }
   function _apply(collapsed){
+    if(lastCollapsed===collapsed)return;
+    lastCollapsed=collapsed;
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
+    window._tvLastCollapseMs=collapsed?Date.now():0;
   }
-  const sentinel=document.createElement('div');
-  sentinel.style.cssText='height:1px;margin:0;padding:0;pointer-events:none';
-  sentinel.id='tv-collapse-sentinel';
-  listEl.insertAdjacentElement('beforebegin',sentinel);
-  const io=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting&&e.boundingClientRect.top<0){
-        window._tvLastCollapseMs=Date.now();
-        _apply(true);
-      } else if(e.isIntersecting){
-        const msSinceRender=Date.now()-(window._tvLastRenderMs||0);
-        const tvAiOut=document.getElementById('tv-ai-output');
-        const tvAiVisible=tvAiOut&&tvAiOut.style.display!=='none';
-        if(msSinceRender>350&&!tvAiVisible){
-          window._tvLastCollapseMs=0;
-          _apply(false);
-        }
-      }
-    });
-  },{threshold:0,rootMargin:'-56px 0px 0px 0px'});
-  io.observe(sentinel);
-  _tvCollapseObserver={disconnect:()=>{io.disconnect();}};
+  function _check(){
+    raf=0;
+    if(!screen.classList.contains('on'))return;
+    const y=_scrollTop();
+    if(y>COLLAPSE_AT){
+      _apply(true);
+    }else if(y<=EXPAND_AT&&_canExpand()){
+      _apply(false);
+    }
+  }
+  function _schedule(){
+    if(raf)return;
+    raf=requestAnimationFrame(_check);
+  }
+
+  window.addEventListener('scroll',_schedule,{passive:true});
+  document.addEventListener('scroll',_schedule,true);
+  screen.addEventListener('scroll',_schedule,{passive:true});
+  window.addEventListener('resize',_schedule,{passive:true});
+
+  setTimeout(_schedule,180);
+
+  _tvCollapseObserver={disconnect:()=>{
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    window.removeEventListener('scroll',_schedule);
+    document.removeEventListener('scroll',_schedule,true);
+    screen.removeEventListener('scroll',_schedule);
+    window.removeEventListener('resize',_schedule);
+  }};
 }
 
 function renderTeamviewSummary(){
