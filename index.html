@@ -1,9 +1,11 @@
 <!DOCTYPE html>
+<!-- Freshket Sense v155 Phase 1 refactor: secrets sanitized; AI proxy bridge added. -->
 <html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Freshket Sense</title>
+<!-- Phase 2 safe modular baseline: security + extracted module references. Deployable output remains monolith-compatible. -->
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -2510,6 +2512,8 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
       <!-- AI Provider -->
       <div style="margin-bottom:14px;padding:12px 14px;background:rgba(0,0,0,.03);border:1px solid var(--n200);border-radius:10px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--n500);margin-bottom:8px">AI Provider</div>
+        <div style="font-size:10px;color:var(--n600);line-height:1.5;margin-bottom:8px;background:var(--n50);border:1px solid var(--n100);border-radius:8px;padding:8px 10px">Production mode: AI calls should go through <span style="font-family:IBM Plex Mono,monospace">freshket_ai_proxy_url</span>. Browser keys are disabled by default.</div>
+        <div id="aip-proxy-status" style="font-size:10px;color:var(--n600);line-height:1.5;margin-bottom:8px;background:#fff;border:1px dashed var(--n200);border-radius:8px;padding:7px 10px">Proxy status: <span style="font-family:IBM Plex Mono,monospace">ตั้งค่าผ่าน freshket_ai_proxy_url</span></div>
         <div style="display:flex;gap:6px;margin-bottom:0" id="aip-toggle-row">
           <div id="aip-claude" onclick="setAiProvider('claude')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--g500);background:var(--g900);cursor:pointer;transition:all .15s">
             <div style="font-size:12px;font-weight:700;color:#fff">Claude</div>
@@ -2520,12 +2524,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
             <div style="font-size:10px;color:var(--n400);margin-top:1px">2.0 Flash · 1,500/day</div>
           </div>
         </div>
-        <div id="aip-gemini-key-row" style="display:none;margin-top:8px">
-          <input type="password" id="gemini-api-key" placeholder="Gemini API Key (AIza...)" autocomplete="off"
-            style="width:100%;padding:8px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s;box-sizing:border-box"
-            oninput="geminiApiKey=this.value;localStorage.setItem('gemini_key',this.value);this.style.borderColor=this.value.startsWith('AIza')?'#7c3aed':this.value?'var(--org)':'var(--n200)'">
-          <div style="font-size:10px;color:var(--n400);margin-top:5px;padding-left:4px">ขอ key ฟรีได้ที่ <span style="color:#7c3aed">aistudio.google.com</span> · ใช้แทน Claude API ได้เลย</div>
-        </div>
+        <div id="aip-gemini-key-row" style="display:none!important"></div>
       </div>
 
       <!-- Matcher (Quick access) -->
@@ -2546,12 +2545,8 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
             <div style="font-size:10px;color:var(--n400);margin-top:2px">มี note · ช้ากว่า</div>
           </div>
         </div>
-        <!-- API key -->
-        <div style="margin-bottom:10px">
-          <input type="password" id="matcher-api-key" placeholder="API Key (ถ้ารันนอก claude.ai)" autocomplete="off"
-            style="width:100%;padding:8px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s"
-            oninput="this.style.borderColor=this.value.startsWith('sk-ant-')?'var(--g500)':this.value?'var(--org)':'var(--n200)'">
-        </div>
+        <!-- API key (dev-only direct browser mode) -->
+        <div id="matcher-api-key-row" style="display:none!important"></div>
         <!-- Scope + Run -->
         <div class="ms-opts" style="margin-bottom:6px">
           <button class="ms-opt on" id="ms-all" onclick="setMatcherScope('all',this)">ทั้งหมด</button>
@@ -3937,7 +3932,7 @@ let matcherProgress={current:0,total:0,found:0};
 let matcherMode='fast';let matcherScope='all';let matcherModel='haiku';
 let kamModel='sonnet'; // KAM briefing model (separate from Matcher) — default Sonnet
 let aiProvider=localStorage.getItem('ai_provider')||'claude'; // 'claude' | 'gemini'
-let geminiApiKey=localStorage.getItem('gemini_key')||'AIzaSyCM-BwNBrI6_eT5kMqpUl_eJYuBO3BKmBs';
+let geminiApiKey=''; // Phase 2: browser-held AI keys are disabled by default; use AI proxy.
 let kamStateCache={html:null,insights:null,accountId:null};
 let skuView='gmv'; // 'gmv' | 'price' — SKU list view mode
 let priceMovFilter=null; // 'up'|'stable'|'down'|null
@@ -4878,7 +4873,7 @@ function applyMeta(){
 // ════════════════════════════════════════
 const FRESHKET_SHEETS_ID     = '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ';
 const FRESHKET_SHEETS_SKU_ID = '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV';
-const CLAUDE_API_KEY = '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';
+const CLAUDE_API_KEY = ''; // Phase 2: no production AI secret in browser. Use AI proxy.
 // ── OLIVE AVATAR ──────────────────────────────────────
 // Paste your Supabase public image URL here.
 // Leave empty ('') to keep the default star icon.
@@ -4913,48 +4908,10 @@ let _cloudLoadToken = 0;
 // ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
 const _CSV_DB='ciq-csv-v1';
 const _CSV_TTL=6*60*60*1000; // 6 hours
-function _csvOpen(){
-  return new Promise((res,rej)=>{
-    try{
-      const r=indexedDB.open(_CSV_DB,1);
-      r.onupgradeneeded=e=>e.target.result.createObjectStore('csv');
-      r.onsuccess=e=>res(e.target.result);
-      r.onerror=()=>rej(new Error('idb open failed'));
-    }catch(e){rej(e);}
-  });
-}
-async function _csvCacheGet(tab){
-  try{
-    const db=await _csvOpen();
-    return new Promise(res=>{
-      const g=db.transaction('csv','readonly').objectStore('csv').get(tab);
-      g.onsuccess=()=>res(g.result||null);
-      g.onerror=()=>res(null);
-    });
-  }catch(e){return null;}
-}
-async function _csvCacheSet(tab,text){
-  try{
-    const db=await _csvOpen();
-    return new Promise(res=>{
-      const tx=db.transaction('csv','readwrite');
-      tx.objectStore('csv').put({text,ts:Date.now()},tab);
-      tx.oncomplete=()=>res(true);
-      tx.onerror=()=>res(false);
-    });
-  }catch(e){return false;}
-}
-async function _csvCacheClear(){
-  try{
-    const db=await _csvOpen();
-    return new Promise(res=>{
-      const tx=db.transaction('csv','readwrite');
-      tx.objectStore('csv').clear();
-      tx.oncomplete=()=>res(true);
-      tx.onerror=()=>res(false);
-    });
-  }catch(e){return false;}
-}
+function _csvOpen(){return window.FreshketSenseRuntime.data.csvOpen();}
+async function _csvCacheGet(tab){return window.FreshketSenseRuntime.data.csvCacheGet(tab);}
+async function _csvCacheSet(tab,text){return window.FreshketSenseRuntime.data.csvCacheSet(tab,text);}
+async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCacheClear();}
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE='https://pub-12078d17646340808024e8cc95504995.r2.dev';
@@ -4974,67 +4931,16 @@ const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
 let _dataPillTimers=[];
 
-function _clearDataPillTimers(){
-  _dataPillTimers.forEach(t=>clearTimeout(t));
-  _dataPillTimers=[];
-}
+function _clearDataPillTimers(){return window.FreshketSenseRuntime.data.clearPillTimers();}
 function _clearCloudInFlight(){Object.keys(_cloudInFlight).forEach(k=>delete _cloudInFlight[k]);}
 function _specFetchTimeout(spec){return spec&&spec.heavy?240000:90000;}
 function _specIngestTimeout(spec){return spec&&spec.heavy?240000:90000;}
 
-function _resetDataPill(){
-  _clearDataPillTimers();
-  const pill=document.getElementById('data-load-pill');
-  const dots=document.getElementById('dlp-dots');
-  const bgDots=document.getElementById('dlp-bg-dots');
-  const icon=document.getElementById('dlp-ready-icon');
-  const txt=document.getElementById('dlp-text');
-  const cnt=document.getElementById('dlp-count');
-  if(pill){pill.style.display='';pill.classList.remove('out','ready','visible');void pill.offsetWidth;}
-  if(dots){dots.style.display='flex';[...dots.children].forEach(d=>{d.classList.remove('done');d.style.background='';});}
-  if(bgDots){bgDots.style.display='none';[...bgDots.children].forEach(d=>{d.classList.remove('done');d.style.background='';});}
-  if(icon)icon.style.display='none';
-  if(txt)txt.textContent='กำลังโหลด';
-  if(cnt)cnt.textContent='';
-}
-function _setDataPillText(text,count){
-  _clearDataPillTimers();
-  const pill=document.getElementById('data-load-pill');
-  const txt=document.getElementById('dlp-text');
-  const cnt=document.getElementById('dlp-count');
-  if(pill){pill.style.display='';pill.classList.remove('out');pill.classList.add('visible');}
-  if(txt)txt.textContent=text||'กำลังโหลด';
-  if(cnt)cnt.textContent=count||'';
-}
-function _finishDataPill(text,hideMs=1200){
-  _clearDataPillTimers();
-  const pill=document.getElementById('data-load-pill');
-  const txt=document.getElementById('dlp-text');
-  const icon=document.getElementById('dlp-ready-icon');
-  const dots=document.getElementById('dlp-dots');
-  const bgDots=document.getElementById('dlp-bg-dots');
-  const cnt=document.getElementById('dlp-count');
-  if(txt)txt.textContent=text||'พร้อมใช้งาน';
-  if(cnt)cnt.textContent='';
-  if(dots)dots.style.display='none';
-  if(bgDots)bgDots.style.display='none';
-  if(icon)icon.style.display='block';
-  if(pill){
-    pill.classList.add('ready');
-    _dataPillTimers.push(setTimeout(()=>pill.classList.add('out'),hideMs));
-    _dataPillTimers.push(setTimeout(()=>{if(pill)pill.style.display='none';},hideMs+700));
-  }
-}
+function _resetDataPill(){return window.FreshketSenseRuntime.data.resetDataPill();}
+function _setDataPillText(text,count){return window.FreshketSenseRuntime.data.setDataPillText(text,count);}
+function _finishDataPill(text,hideMs=1200){return window.FreshketSenseRuntime.data.finishDataPill(text,hideMs);}
 
-async function _fetchTextWithTimeout(url,timeoutMs){
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-  try{
-    const resp=await fetch(url,{cache:'no-store',signal:ctrl.signal});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    return await resp.text();
-  }finally{clearTimeout(timer);}
-}
+async function _fetchTextWithTimeout(url,timeoutMs){return window.FreshketSenseRuntime.data.fetchTextWithTimeout(url,timeoutMs);}
 
 async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
   if(!spec||!spec.tab)return false;
@@ -5094,19 +5000,8 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
   return ok;
 }
 
-function _markForegroundPillDot(idx){
-  const dot=document.getElementById('dlp-d-'+idx);
-  if(dot){dot.classList.add('done');dot.style.animation='dlp-dot-in .3s cubic-bezier(.34,1.56,.64,1) forwards';}
-}
-function _prepareProgressChips(keys,totalCount){
-  const counter=document.getElementById('sheets-loaded-count');
-  const progEl=document.getElementById('sheets-progress');
-  if(counter){counter.style.display='inline-block';counter.textContent='0/'+totalCount;}
-  if(progEl){
-    progEl.style.display='flex';
-    progEl.innerHTML=keys.map(k=>R2_SPECS[k]).map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
-  }
-}
+function _markForegroundPillDot(idx){return window.FreshketSenseRuntime.data.markForegroundPillDot(idx);}
+function _prepareProgressChips(keys,totalCount){return window.FreshketSenseRuntime.data.prepareProgressChips(keys,totalCount,R2_SPECS);}
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
   const BACKGROUND=['skus','alternatives'];
   if(_cloudBackgroundPromise)return _cloudBackgroundPromise;
@@ -10358,89 +10253,1254 @@ function setMatcherModel(model){
   if(hEl){hEl.style.borderColor=model==='haiku'?'var(--g500)':'var(--n200)';hEl.style.background=model==='haiku'?'var(--g900)':'var(--n50)';hEl.querySelector('div').style.color=model==='haiku'?'#fff':'var(--n700)';}
   if(sEl){sEl.style.borderColor=model==='sonnet'?'var(--g500)':'var(--n200)';sEl.style.background=model==='sonnet'?'var(--g900)':'var(--n50)';sEl.querySelector('div').style.color=model==='sonnet'?'#fff':'var(--n700)';}
 }
-// ── OLIVE BASE PROMPT ─────────────────────────────────
-// Single canonical Olive identity used by every AI call.
-// Per-call blocks (task context + output contract) are appended after this.
-const OLIVE_BASE=`You are Olive, a warm, playful, highly capable female AI co-pilot for Freshket's KAM team. Your job is to help KAMs understand what is actually happening in each account — and what to do about it. Communicate like a trusted internal intelligence partner: concise, practical, data-driven, and action-oriented. When the user writes Thai or mixed Thai-English, reply in Thai. Only reply in English if the user explicitly asks for English. Use feminine particles like "ค่ะ/นะคะ" naturally. When referring to yourself in Thai, use "หนู" or "Olive" — never "\u0e14\u0e34\u0e09\u0e31\u0e19" or "\u0e09\u0e31\u0e19". Think of yourself as a smart, personable junior colleague who happens to know everything about the data. Use gentle humor naturally, but do not use emojis at the end of sentences or responses.
+// ── PHASE 3 RUNTIME WIRING ─────────────────────────
+// Phase 3 runtime boundary for Freshket Sense.
+// This file is classic-script compatible by design because the legacy app still relies on global names.
+// It gives the monolith a real runtime module seam without forcing an ES-module migration yet.
+(function(global){
+  'use strict';
 
-Always answer first, then show key evidence, interpretation, recommendation, and next step. For summaries, identify Decision, Owner, Deadline, Next step, and Risk. Be transparent about data limitations. Never pretend data exists. Label assumptions clearly. If you make an error, admit it directly, explain the cause, correct it, and move forward.
+  const RUNTIME_VERSION = 'v155-phase5.1-audit-patch';
+  const PROXY_ONLY_PRODUCTION = true;
 
-Think like someone who deeply understands how restaurants actually work — how menus get built and changed, what creates food cost pressure, how ordering cycles behave, what makes a restaurant switch suppliers, and how prep burden, waste, and branch dynamics show up in purchasing patterns. Use this as a reasoning lens to read account signals accurately: a missing SKU might mean a menu change, not churn; a new protein alongside a dropped sauce might mean a chef change. Getting the diagnosis right changes everything about how a KAM should approach the conversation. Turn analysis into concrete actions. Classify recommendations into practical buckets.
+  // ── Olive identity source of truth ───────────────────
+  const OLIVE_BASE = `You are Olive, Freshket Sense's female-coded internal intelligence partner for Freshket's Sales and KAM teams.
 
-Thailand context: all restaurant-to-supplier and KAM-to-customer communication happens via LINE — not WhatsApp, not email. When suggesting outreach or nudges, always refer to LINE.
+Olive helps users understand what is really happening across accounts, portfolios, teams, and customer purchasing behavior — then turns that diagnosis into practical next actions.
 
-On cost-saving alternatives: the system surfaces potential substitutions from a database, but these have not been spec-verified against the customer's actual requirements. Always frame alternatives as options to explore, not confirmed recommendations — e.g. "ลองเช็คกับลูกค้าก่อนว่า..." or "น่าจะพิจารณาได้ แต่ต้องคุยก่อน" — because the customer may have brand, spec, or contract reasons for their current choice that the data doesn't show.
+Voice:
+- Smart, calm, warm, concise, practical, and lightly playful when the moment fits.
+- Friendly without being childish. Playful without being silly. Honest without sounding cold. Sharp without sounding arrogant.
+- Accuracy and usefulness matter more than sounding confident. Signature behavior: เก่งแบบไม่มั่ว.
+- Do not force jokes. Do not over-soften serious business risks.
 
-Personality: cute but not childish, smart but not arrogant, warm but honest, playful but operationally serious. Signature behavior: "เก่งแบบไม่มั่ว" — accuracy and usefulness over sounding confident. Know how to read the room — a structured briefing card calls for one sharp, decisive thought; an open conversation deserves your full thinking. Compressing when the moment demands it isn't losing your voice, it's part of being good at what you do.`;
+Thai identity and language rules:
+- If the user writes Thai or mixed Thai-English, reply in Thai. Use English only for metric names, field names, product terms, or if the user explicitly asks for English.
+- Refer to yourself only as "Olive".
+- Never use "หนู", "ฉัน", "ดิฉัน", "ผม", "เรา" as Olive's self-reference.
+- Never call the user "อาจารย์".
+- Do not use "ครับ".
+- Use feminine Thai particles like "ค่ะ/นะคะ" naturally and lightly. Do not put a particle at the end of every sentence.
 
-function oliveToneClean(t){
-  // Narrow safety net only. Do not rewrite user/customer quotes such as "ผม" or "เรา".
-  return String(t||'')
+Currency rules:
+- All monetary values in this product are Thai Baht (THB).
+- Use "บาท" or "฿" only.
+- Never use เยน, JPY, ¥, dollar, USD, or any other currency unless the user explicitly asks about foreign currency.
+
+Analysis behavior:
+- Answer first.
+- Then give key evidence, interpretation, recommendation, and next step when useful.
+- Never invent data. If the loaded context is not enough, say exactly what is missing and give the safest next step.
+- Separate facts, assumptions, and interpretation.
+- For summaries or action plans only, identify Decision, Owner, Deadline, Next step, and Risk when that structure helps.
+
+Restaurant reasoning lens:
+- Diagnose purchasing signals like someone who understands restaurant operations: menu design, ingredient specs, food cost pressure, ordering cycles, supplier switching, prep burden, waste, branch dynamics, and chef/menu changes.
+- A missing SKU may indicate menu change, ordering cycle, supplier switch, branch behavior, or prep/waste pressure — not automatically churn.
+- A new SKU may indicate menu change, chef change, spec change, promotion, or substitution.
+- Getting the diagnosis right changes how a KAM should approach the conversation.
+
+Outreach behavior:
+- When recommending customer contact, assume LINE is the default channel in Thailand. Mention LINE only when it naturally helps the action; do not force the word LINE into every recommendation.
+
+On cost-saving alternatives:
+- The system surfaces potential substitutions from a database, but these have not been spec-verified against the customer's actual requirements.
+- Frame alternatives as options to explore, not confirmed recommendations, because the customer may have brand, spec, menu, or contract reasons for their current choice that the data does not show.`;
+
+  function oliveToneClean(t){
+  // Last-mile guard for Olive's Thai voice. Keep this narrow enough to avoid rewriting business meaning.
+  let s=String(t||'');
+  s=s
     .replace(/\u0e14\u0e34\u0e09\u0e31\u0e19/g,'Olive')
-    .replace(/(^|[\n\r\t \u00A0])\u0e09\u0e31\u0e19(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ))/g,'$1Olive')
+    .replace(/(^|[\n\r\t \u00A0])\u0e09\u0e31\u0e19(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ|มอง|สรุป|เช็ค))/g,'$1Olive')
+    .replace(/(^|[\n\r\t \u00A0])หนู(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ|มอง|สรุป|เช็ค))/g,'$1Olive')
+    .replace(/(^|[\n\r\t \u00A0])ผม(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ|มอง|สรุป|เช็ค))/g,'$1Olive')
+    .replace(/(^|[\n\r\t \u00A0])เรา(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ|มอง|สรุป|เช็ค))/g,'$1Olive')
+    .replace(/อาจารย์/g,'คุณ')
+    .replace(/นะครับ/g,'นะคะ')
+    .replace(/ครับผม/g,'ค่ะ')
+    .replace(/ครับ/g,'ค่ะ')
+    .replace(/เยน|JPY|¥/gi,'บาท')
+    .replace(/ดอลลาร์|USD/gi,'บาท')
+    .replace(/ค่ะค่ะ/g,'ค่ะ')
+    .replace(/คะค่ะ/g,'ค่ะ')
+    .replace(/ค่ะนะคะ/g,'นะคะ')
+    .replace(/นะคะค่ะ/g,'นะคะ')
+    .replace(/[ \t]+\n/g,'\n')
     .trim();
-}
+  return s;
+  }
 
-// ── AI PROVIDER ROUTER ────────────────────────────────
-// Single entry point for all AI calls. modelKey: 'haiku'|'sonnet'
-// messages: Claude-format array [{role,content}]
+  // ── AI provider/runtime boundary ─────────────────────
+  function getAiProxyUrl(){
+    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem('freshket_ai_proxy_url')||'').trim();
+  }
+
+  function setAiProxyUrl(url){
+    if(url) global.localStorage?.setItem('freshket_ai_proxy_url', String(url).trim());
+    else global.localStorage?.removeItem('freshket_ai_proxy_url');
+  }
+
+  function directAiKeyModeAllowed(){
+    return false;
+  }
+
+  async function callAI(opts){
+    const {modelKey, sys, messages, maxTok, provider, geminiApiKey, claudeApiKey} = opts || {};
+    const activeProvider = provider || 'claude';
+    const proxyUrl=getAiProxyUrl();
+
+    if(proxyUrl){
+      const res=await fetch(proxyUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({provider:activeProvider,modelKey,system:sys,messages,maxTokens:maxTok})
+      });
+      if(!res.ok)throw new Error('AI proxy '+res.status+': '+await res.text());
+      const d=await res.json();
+      return d.text||'';
+    }
+
+    // Phase 5.1: production is proxy-only. No browser-held Claude/Gemini keys and no direct model endpoints.
+    throw new Error('AI proxy ยังไม่ถูกตั้งค่า — ตั้งค่า freshket_ai_proxy_url ก่อนใช้งาน Olive AI');
+  }
+
+
+  function setAiProvider(p, deps){
+    const d=deps||{};
+    d.setProvider?.(p);
+    global.localStorage?.setItem('ai_provider',p);
+
+    const cBtn=document.getElementById('aip-claude');
+    const gBtn=document.getElementById('aip-gemini');
+    const gKeyRow=document.getElementById('aip-gemini-key-row');
+    const claudeSection=document.getElementById('aip-claude-section');
+    const badge=document.getElementById('aip-badge');
+
+    if(cBtn){
+      cBtn.style.background=p==='claude'?'var(--g900)':'var(--n50)';
+      cBtn.style.borderColor=p==='claude'?'var(--g500)':'var(--n200)';
+      const label=cBtn.querySelector('div');
+      if(label) label.style.color=p==='claude'?'#fff':'var(--n700)';
+    }
+    if(gBtn){
+      gBtn.style.background=p==='gemini'?'#2d1b5e':'var(--n50)';
+      gBtn.style.borderColor=p==='gemini'?'#7c3aed':'var(--n200)';
+      const label=gBtn.querySelector('div');
+      if(label) label.style.color=p==='gemini'?'#fff':'var(--n700)';
+    }
+    if(gKeyRow)gKeyRow.style.display='none';
+    const matcherKeyRow=document.getElementById('matcher-api-key-row');
+    if(matcherKeyRow)matcherKeyRow.style.display='none';
+    if(claudeSection)claudeSection.style.opacity=p==='gemini'?'.4':'1';
+    if(claudeSection)claudeSection.style.pointerEvents=p==='gemini'?'none':'auto';
+    if(badge){
+      badge.textContent=p==='gemini'?'Gemini':'Claude';
+      badge.style.background=p==='gemini'?'rgba(124,58,237,.15)':'rgba(0,204,106,.12)';
+      badge.style.color=p==='gemini'?'#7c3aed':'var(--g700)';
+      badge.style.borderColor=p==='gemini'?'rgba(124,58,237,.3)':'rgba(0,204,106,.25)';
+    }
+  }
+
+  const previousRuntime = global.FreshketSenseRuntime || {};
+  global.FreshketSenseRuntime = Object.freeze({
+    version:RUNTIME_VERSION,
+    ai:Object.freeze({OLIVE_BASE,oliveToneClean}),
+    aiClient:Object.freeze({proxyOnlyProduction:PROXY_ONLY_PRODUCTION,getAiProxyUrl,setAiProxyUrl,directAiKeyModeAllowed,callAI,setAiProvider}),
+    data: previousRuntime.data
+  });
+})(window);
+
+// ── PHASE 3 LEGACY AI ADAPTERS ──────────────────────
+// Keep the original global names alive while delegating to FreshketSenseRuntime.
+// This lets inline handlers and legacy call sites continue to work during modular migration.
+window.FreshketSenseRuntime = window.FreshketSenseRuntime || { ai:{ OLIVE_BASE:'', oliveToneClean:function(t){return String(t||'').trim();} }, aiClient:{} };
+var OLIVE_BASE = window.FreshketSenseRuntime.ai && window.FreshketSenseRuntime.ai.OLIVE_BASE || '';
+function oliveToneClean(t){ return window.FreshketSenseRuntime.ai && window.FreshketSenseRuntime.ai.oliveToneClean ? window.FreshketSenseRuntime.ai.oliveToneClean(t) : String(t||'').trim(); }
+function getAiProxyUrl(){ return window.FreshketSenseRuntime.aiClient && window.FreshketSenseRuntime.aiClient.getAiProxyUrl ? window.FreshketSenseRuntime.aiClient.getAiProxyUrl() : ''; }
+function setAiProxyUrl(url){ return window.FreshketSenseRuntime.aiClient && window.FreshketSenseRuntime.aiClient.setAiProxyUrl ? window.FreshketSenseRuntime.aiClient.setAiProxyUrl(url) : undefined; }
+function directAiKeyModeAllowed(){ return window.FreshketSenseRuntime.aiClient && window.FreshketSenseRuntime.aiClient.directAiKeyModeAllowed ? window.FreshketSenseRuntime.aiClient.directAiKeyModeAllowed() : false; }
 async function callAI(modelKey,sys,messages,maxTok){
-  if(aiProvider==='gemini'){
-    const key=(document.getElementById('gemini-api-key')?.value||geminiApiKey||'').trim();
-    if(!key)throw new Error('ใส่ Gemini API Key ใน Settings ก่อน');
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
-    const gemMsgs=messages.map(m=>({
-      role:m.role==='assistant'?'model':'user',
-      parts:[{text:typeof m.content==='string'?m.content:JSON.stringify(m.content)}]
-    }));
-    const bodyObj={contents:gemMsgs,generationConfig:{maxOutputTokens:maxTok}};
-    if(sys)bodyObj.system_instruction={parts:[{text:sys}]};
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodyObj)});
-    if(!res.ok)throw new Error('Gemini API '+res.status+': '+await res.text());
-    const d=await res.json();
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-  } else {
-    const apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
-    const hdrs={'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
-    if(apiKey)hdrs['x-api-key']=apiKey;
-    const claudeModel=modelKey==='sonnet'?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:hdrs,body:JSON.stringify({model:claudeModel,max_tokens:maxTok,system:sys,messages})});
-    if(!res.ok)throw new Error('Claude API '+res.status+': '+await res.text());
-    const d=await res.json();
-    return d.content?.[0]?.text||'';
-  }
+  if(!window.FreshketSenseRuntime.aiClient || !window.FreshketSenseRuntime.aiClient.callAI) throw new Error('AI runtime unavailable');
+  return window.FreshketSenseRuntime.aiClient.callAI({
+    modelKey, sys, messages, maxTok,
+    provider: aiProvider,
+    geminiApiKey,
+    claudeApiKey: CLAUDE_API_KEY
+  });
 }
-
 function setAiProvider(p){
-  aiProvider=p;
-  localStorage.setItem('ai_provider',p);
-  // Update toggle UI
-  const cBtn=document.getElementById('aip-claude');
-  const gBtn=document.getElementById('aip-gemini');
-  const gKeyRow=document.getElementById('aip-gemini-key-row');
-  const claudeSection=document.getElementById('aip-claude-section');
-  const badge=document.getElementById('aip-badge');
-  if(cBtn){
-    cBtn.style.background=p==='claude'?'var(--g900)':'var(--n50)';
-    cBtn.style.borderColor=p==='claude'?'var(--g500)':'var(--n200)';
-    cBtn.querySelector('div').style.color=p==='claude'?'#fff':'var(--n700)';
-  }
-  if(gBtn){
-    gBtn.style.background=p==='gemini'?'#2d1b5e':'var(--n50)';
-    gBtn.style.borderColor=p==='gemini'?'#7c3aed':'var(--n200)';
-    gBtn.querySelector('div').style.color=p==='gemini'?'#fff':'var(--n700)';
-  }
-  if(gKeyRow)gKeyRow.style.display=p==='gemini'?'block':'none';
-  if(claudeSection)claudeSection.style.opacity=p==='gemini'?'.4':'1';
-  if(claudeSection)claudeSection.style.pointerEvents=p==='gemini'?'none':'auto';
-  if(badge){
-    badge.textContent=p==='gemini'?'Gemini':'Claude';
-    badge.style.background=p==='gemini'?'rgba(124,58,237,.15)':'rgba(0,204,106,.12)';
-    badge.style.color=p==='gemini'?'#7c3aed':'var(--g700)';
-    badge.style.borderColor=p==='gemini'?'rgba(124,58,237,.3)':'rgba(0,204,106,.25)';
-  }
+  if(!window.FreshketSenseRuntime.aiClient || !window.FreshketSenseRuntime.aiClient.setAiProvider){ aiProvider=p; localStorage.setItem('ai_provider',p); return; }
+  return window.FreshketSenseRuntime.aiClient.setAiProvider(p, {
+    setProvider: (nextProvider)=>{ aiProvider=nextProvider; }
+  });
 }
 // ─────────────────────────────────────────────────────
+
+
+// ── PHASE 5 DATA RUNTIME BOUNDARY ───────────────────
+// Phase 5 data runtime boundary for Freshket Sense.
+// This phase moves low-risk loader helpers into runtime-owned implementations:
+// IndexedDB CSV cache, fetch-with-timeout, and data-pill DOM helpers.
+// The orchestration flow still remains legacy-compatible to avoid regressions.
+(function(global){
+  'use strict';
+
+  const runtime = global.FreshketSenseRuntime || {};
+  if(!global.FreshketSenseRuntime) global.FreshketSenseRuntime = runtime;
+
+  const DATA_RUNTIME_VERSION = 'v155-phase5.1-audit-patch';
+  const FOREGROUND_KEYS = ['portview','history','categories','sku_current','outlets'];
+  const BACKGROUND_KEYS = ['skus','alternatives'];
+  const ALL_KEYS = FOREGROUND_KEYS.concat(BACKGROUND_KEYS);
+
+  const CSV_DB = 'ciq-csv-v1';
+  const CSV_TTL = 6 * 60 * 60 * 1000; // 6 hours
+  const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+  const R2_FILES = Object.freeze({
+    portview:'portview.csv',
+    history:'bulk_history.csv',
+    categories:'bulk_categories.csv',
+    sku_current:'bulk_sku_current.csv',
+    outlets:'bulk_outlets.csv',
+    skus:'bulk_skus.csv',
+    alternatives:'bulk_alternatives.csv'
+  });
+  const R2_SPECS = Object.freeze({
+    portview:{type:'portview-bulk',tab:'portview',cache:true},
+    history:{type:'bulk-data',tab:'history',cache:true},
+    categories:{type:'bulk-categories',tab:'categories',cache:true},
+    sku_current:{type:'bulk-sku-current',tab:'sku_current',cache:true},
+    outlets:{type:'bulk-outlets',tab:'outlets',cache:true},
+    skus:{type:'bulk-skus',tab:'skus',cache:false,heavy:true},
+    alternatives:{type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true},
+  });
+
+  const status = {
+    version: DATA_RUNTIME_VERSION,
+    bootedAt: Date.now(),
+    lastOperation: null,
+    lastError: null,
+    operations: [],
+    pill: { visible:false, text:'', count:'', lastFinishedAt:null },
+    panel: { open:false, lastOpenedAt:null },
+    cache: { db: CSV_DB, ttlMs: CSV_TTL, lastGet:null, lastSet:null, lastClear:null },
+    fetch: { lastUrl:null, lastMs:null, lastStatus:null },
+  };
+
+  let dataPillTimers = [];
+
+  function now(){ return Date.now(); }
+
+  function safeCall(fn, args, ctx){
+    if(typeof fn !== 'function') return undefined;
+    return fn.apply(ctx || global, args || []);
+  }
+
+  function recordOperation(name, phase, extra){
+    const evt = Object.assign({ name, phase, ts: now() }, extra || {});
+    status.lastOperation = evt;
+    status.operations.push(evt);
+    if(status.operations.length > 80) status.operations.shift();
+    return evt;
+  }
+
+  async function wrapAsync(name, original, args, ctx){
+    const start = now();
+    recordOperation(name, 'start');
+    try{
+      const result = await safeCall(original, args, ctx);
+      recordOperation(name, 'done', { ms: now() - start, ok: result !== false });
+      return result;
+    }catch(err){
+      status.lastError = { name, message: err && err.message ? err.message : String(err), ts: now() };
+      recordOperation(name, 'error', { ms: now() - start, message: status.lastError.message });
+      throw err;
+    }
+  }
+
+  function wrapSync(name, original, args, ctx){
+    const start = now();
+    recordOperation(name, 'start');
+    try{
+      const result = safeCall(original, args, ctx);
+      recordOperation(name, 'done', { ms: now() - start, ok: result !== false });
+      return result;
+    }catch(err){
+      status.lastError = { name, message: err && err.message ? err.message : String(err), ts: now() };
+      recordOperation(name, 'error', { ms: now() - start, message: status.lastError.message });
+      throw err;
+    }
+  }
+
+  function onPillText(text, count){
+    status.pill.visible = true;
+    status.pill.text = text || '';
+    status.pill.count = count || '';
+  }
+
+  function onPillReset(){
+    status.pill.visible = false;
+    status.pill.text = '';
+    status.pill.count = '';
+  }
+
+  function onPillFinish(text){
+    status.pill.text = text || status.pill.text || '';
+    status.pill.count = '';
+    status.pill.lastFinishedAt = now();
+  }
+
+  function onPanelOpen(){
+    status.panel.open = true;
+    status.panel.lastOpenedAt = now();
+  }
+
+  function onPanelClose(){
+    status.panel.open = false;
+  }
+
+  function csvOpen(){
+    return new Promise((res, rej)=>{
+      try{
+        const r = global.indexedDB.open(CSV_DB, 1);
+        r.onupgradeneeded = e => e.target.result.createObjectStore('csv');
+        r.onsuccess = e => res(e.target.result);
+        r.onerror = () => rej(new Error('idb open failed'));
+      }catch(e){ rej(e); }
+    });
+  }
+
+  async function csvCacheGet(tab){
+    const start = now();
+    try{
+      const db = await csvOpen();
+      return new Promise(res=>{
+        const g = db.transaction('csv','readonly').objectStore('csv').get(tab);
+        g.onsuccess = () => {
+          status.cache.lastGet = { tab, hit: !!g.result, ms: now() - start, ts: now() };
+          res(g.result || null);
+        };
+        g.onerror = () => {
+          status.cache.lastGet = { tab, hit:false, error:true, ms: now() - start, ts: now() };
+          res(null);
+        };
+      });
+    }catch(e){
+      status.cache.lastGet = { tab, hit:false, error:true, message:e && e.message ? e.message : String(e), ms: now() - start, ts: now() };
+      return null;
+    }
+  }
+
+  async function csvCacheSet(tab, text){
+    const start = now();
+    try{
+      const db = await csvOpen();
+      return new Promise(res=>{
+        const tx = db.transaction('csv','readwrite');
+        tx.objectStore('csv').put({ text, ts: now() }, tab);
+        tx.oncomplete = () => {
+          status.cache.lastSet = { tab, bytes: text ? text.length : 0, ok:true, ms: now() - start, ts: now() };
+          res(true);
+        };
+        tx.onerror = () => {
+          status.cache.lastSet = { tab, ok:false, error:true, ms: now() - start, ts: now() };
+          res(false);
+        };
+      });
+    }catch(e){
+      status.cache.lastSet = { tab, ok:false, error:true, message:e && e.message ? e.message : String(e), ms: now() - start, ts: now() };
+      return false;
+    }
+  }
+
+  async function csvCacheClear(){
+    const start = now();
+    try{
+      const db = await csvOpen();
+      return new Promise(res=>{
+        const tx = db.transaction('csv','readwrite');
+        tx.objectStore('csv').clear();
+        tx.oncomplete = () => {
+          status.cache.lastClear = { ok:true, ms: now() - start, ts: now() };
+          res(true);
+        };
+        tx.onerror = () => {
+          status.cache.lastClear = { ok:false, error:true, ms: now() - start, ts: now() };
+          res(false);
+        };
+      });
+    }catch(e){
+      status.cache.lastClear = { ok:false, error:true, message:e && e.message ? e.message : String(e), ms: now() - start, ts: now() };
+      return false;
+    }
+  }
+
+  async function fetchTextWithTimeout(url, timeoutMs){
+    const start = now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
+    status.fetch.lastUrl = url;
+    status.fetch.lastStatus = 'started';
+    try{
+      const resp = await fetch(url, { cache:'no-store', signal:ctrl.signal });
+      status.fetch.lastStatus = resp.status;
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const text = await resp.text();
+      status.fetch.lastMs = now() - start;
+      return text;
+    }catch(err){
+      status.fetch.lastMs = now() - start;
+      status.fetch.lastStatus = err && err.name === 'AbortError' ? 'timeout' : 'error';
+      throw err;
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
+  function clearPillTimers(){
+    dataPillTimers.forEach(t=>clearTimeout(t));
+    dataPillTimers = [];
+  }
+
+  function resetDataPill(){
+    clearPillTimers();
+    const pill = document.getElementById('data-load-pill');
+    const dots = document.getElementById('dlp-dots');
+    const bgDots = document.getElementById('dlp-bg-dots');
+    const icon = document.getElementById('dlp-ready-icon');
+    const txt = document.getElementById('dlp-text');
+    const cnt = document.getElementById('dlp-count');
+    if(pill){ pill.style.display=''; pill.classList.remove('out','ready','visible'); void pill.offsetWidth; }
+    if(dots){ dots.style.display='flex'; [...dots.children].forEach(d=>{ d.classList.remove('done'); d.style.background=''; }); }
+    if(bgDots){ bgDots.style.display='none'; [...bgDots.children].forEach(d=>{ d.classList.remove('done'); d.style.background=''; }); }
+    if(icon) icon.style.display = 'none';
+    if(txt) txt.textContent = 'กำลังโหลด';
+    if(cnt) cnt.textContent = '';
+    onPillReset();
+  }
+
+  function setDataPillText(text, count){
+    clearPillTimers();
+    const pill = document.getElementById('data-load-pill');
+    const txt = document.getElementById('dlp-text');
+    const cnt = document.getElementById('dlp-count');
+    if(pill){ pill.style.display=''; pill.classList.remove('out'); pill.classList.add('visible'); }
+    if(txt) txt.textContent = text || 'กำลังโหลด';
+    if(cnt) cnt.textContent = count || '';
+    onPillText(text, count);
+  }
+
+  function finishDataPill(text, hideMs){
+    if(hideMs === undefined) hideMs = 1200;
+    clearPillTimers();
+    const pill = document.getElementById('data-load-pill');
+    const txt = document.getElementById('dlp-text');
+    const icon = document.getElementById('dlp-ready-icon');
+    const dots = document.getElementById('dlp-dots');
+    const bgDots = document.getElementById('dlp-bg-dots');
+    const cnt = document.getElementById('dlp-count');
+    if(txt) txt.textContent = text || 'พร้อมใช้งาน';
+    if(cnt) cnt.textContent = '';
+    if(dots) dots.style.display = 'none';
+    if(bgDots) bgDots.style.display = 'none';
+    if(icon) icon.style.display = 'block';
+    if(pill){
+      pill.classList.add('ready');
+      dataPillTimers.push(setTimeout(()=>pill.classList.add('out'), hideMs));
+      dataPillTimers.push(setTimeout(()=>{ if(pill) pill.style.display = 'none'; }, hideMs + 700));
+    }
+    onPillFinish(text);
+  }
+
+  function markForegroundPillDot(idx){
+    const dot = document.getElementById('dlp-d-' + idx);
+    if(dot){
+      dot.classList.add('done');
+      dot.style.animation = 'dlp-dot-in .3s cubic-bezier(.34,1.56,.64,1) forwards';
+    }
+  }
+
+  function prepareProgressChips(keys, totalCount, specs){
+    const specMap = specs || R2_SPECS;
+    const counter = document.getElementById('sheets-loaded-count');
+    const progEl = document.getElementById('sheets-progress');
+    if(counter){ counter.style.display='inline-block'; counter.textContent='0/' + totalCount; }
+    if(progEl){
+      progEl.style.display = 'flex';
+      progEl.innerHTML = keys
+        .map(k=>specMap[k])
+        .filter(Boolean)
+        .map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`)
+        .join('');
+    }
+  }
+
+  function getSnapshot(extra){
+    const e = typeof extra === 'function' ? extra() : (extra || {});
+    return Object.assign({
+      version: DATA_RUNTIME_VERSION,
+      foregroundKeys: FOREGROUND_KEYS.slice(),
+      backgroundKeys: BACKGROUND_KEYS.slice(),
+      allKeys: ALL_KEYS.slice(),
+      cacheDb: CSV_DB,
+      cacheTtlMs: CSV_TTL,
+      r2Base: R2_BASE,
+      status: JSON.parse(JSON.stringify(status)),
+    }, e);
+  }
+
+  const dataApi = Object.freeze({
+    version: DATA_RUNTIME_VERSION,
+    foregroundKeys: FOREGROUND_KEYS.slice(),
+    backgroundKeys: BACKGROUND_KEYS.slice(),
+    allKeys: ALL_KEYS.slice(),
+    csvDb: CSV_DB,
+    csvTtlMs: CSV_TTL,
+    r2Base: R2_BASE,
+    r2Files: R2_FILES,
+    r2Specs: R2_SPECS,
+    status,
+    wrapAsync,
+    wrapSync,
+    onPillText,
+    onPillReset,
+    onPillFinish,
+    onPanelOpen,
+    onPanelClose,
+    csvOpen,
+    csvCacheGet,
+    csvCacheSet,
+    csvCacheClear,
+    fetchTextWithTimeout,
+    clearPillTimers,
+    resetDataPill,
+    setDataPillText,
+    finishDataPill,
+    markForegroundPillDot,
+    prepareProgressChips,
+    getSnapshot,
+  });
+  if(Object.isFrozen(runtime)){
+    global.FreshketSenseRuntime = Object.assign({}, runtime, { data: dataApi });
+  }else{
+    runtime.data = dataApi;
+  }
+  global.FreshketSenseDataRuntime = dataApi;
+})(window);
+
+// ─────────────────────────────────────────────────────
+
+// ── PHASE 5 DATA LEGACY ADAPTER ─────────────────────
+// ── PHASE 5 LEGACY DATA ADAPTERS ─────────────────────
+// Keep the original data-loading globals alive while routing them through
+// FreshketSenseRuntime.data for instrumentation and future extraction.
+(function(global){
+  'use strict';
+  const dataRuntime = global.FreshketSenseRuntime && global.FreshketSenseRuntime.data;
+  if(!dataRuntime){
+    global.getFreshketDataRuntimeSnapshot = function(){ return { ok:false, error:'data runtime unavailable', ts:Date.now() }; };
+    try{ console.warn('[Freshket Sense] data runtime unavailable; legacy data functions are running without instrumentation'); }catch(e){}
+    return;
+  }
+
+  const legacy = {};
+  const asyncNames = [
+    'ensureCloudflareFiles',
+    'loadFromCloudflareR2',
+    'reloadFromCloudflareR2',
+    'loadFromGoogleSheets',
+    'reloadFromGoogleSheets',
+    'ensureAccountDetailData',
+    'ensureSenseData',
+    'loadFromSupabaseStorage',
+    '_csvCacheClear',
+    '_fetchCloudflareFile'
+  ];
+  const syncNames = [
+    '_resetDataPill',
+    '_setDataPillText',
+    '_finishDataPill',
+    '_markForegroundPillDot',
+    '_prepareProgressChips',
+    '_startCloudBackgroundLoad',
+    'openDataPanel',
+    'closeDataPanel',
+    'updateDataStatus',
+    'setDpMode'
+  ];
+
+  function getGlobal(name){
+    try { return global[name]; } catch(e) { return undefined; }
+  }
+  function setGlobal(name, fn){
+    try { global[name] = fn; } catch(e) { /* ignore non-writable */ }
+  }
+
+  asyncNames.forEach(function(name){
+    const original = getGlobal(name);
+    if(typeof original !== 'function') return;
+    legacy[name] = original;
+    const wrapped = function(){
+      return dataRuntime.wrapAsync(name, original, Array.prototype.slice.call(arguments), this);
+    };
+    setGlobal(name, wrapped);
+    try { eval(name + ' = wrapped'); } catch(e) { /* global binding may not be writable in some contexts */ }
+  });
+
+  syncNames.forEach(function(name){
+    const original = getGlobal(name);
+    if(typeof original !== 'function') return;
+    legacy[name] = original;
+    const wrapped = function(){
+      const args = Array.prototype.slice.call(arguments);
+      if(name === '_setDataPillText') dataRuntime.onPillText(args[0], args[1]);
+      if(name === '_resetDataPill') dataRuntime.onPillReset();
+      if(name === '_finishDataPill') dataRuntime.onPillFinish(args[0]);
+      if(name === 'openDataPanel') dataRuntime.onPanelOpen();
+      if(name === 'closeDataPanel') dataRuntime.onPanelClose();
+      return dataRuntime.wrapSync(name, original, args, this);
+    };
+    setGlobal(name, wrapped);
+    try { eval(name + ' = wrapped'); } catch(e) { /* global binding may not be writable in some contexts */ }
+  });
+
+  global.FreshketSenseLegacyData = Object.freeze(legacy);
+  global.getFreshketDataRuntimeSnapshot = function(){
+    return dataRuntime.getSnapshot(function(){
+      return {
+        loadedTabs: (global._cloudLoadedTabs && typeof global._cloudLoadedTabs.size === 'number') ? Array.from(global._cloudLoadedTabs) : undefined,
+        bulkSkusReady: typeof global.bulkSkusReady === 'boolean' ? global.bulkSkusReady : undefined,
+        bulkAltsReady: typeof global.bulkAltsReady === 'boolean' ? global.bulkAltsReady : undefined,
+        sheetsLoadStarted: typeof global.sheetsLoadStarted === 'boolean' ? global.sheetsLoadStarted : undefined,
+      };
+    });
+  };
+})(window);
+// ─────────────────────────────────────────────────────
+
+
+// ── PHASE 6.1 LOADER ORCHESTRATION RUNTIME ─────────────────────
+// Phase 6.1 stabilized loader orchestration runtime for Freshket Sense.
+// This layer owns Cloudflare/R2 orchestration while keeping the legacy globals as adapters.
+// It intentionally reads/writes the legacy app state in the same classic-script scope.
+(function(global){
+  'use strict';
+
+  const rt = global.FreshketSenseRuntime || {};
+  const baseData = rt.data || global.FreshketSenseDataRuntime;
+  if(!baseData){
+    try{ console.warn('[Freshket Sense Phase 6.1] data runtime unavailable; loader orchestration not installed'); }catch(e){}
+    return;
+  }
+
+  const ORCH_VERSION = 'v155-phase6-1-stabilized-loader';
+  const FOREGROUND = ['portview','history','categories','sku_current','outlets'];
+  const BACKGROUND = ['skus','alternatives'];
+  const ALL = FOREGROUND.concat(BACKGROUND);
+
+  const orchStatus = {
+    version: ORCH_VERSION,
+    installedAt: Date.now(),
+    lastOperation: null,
+    lastError: null,
+    foregroundLoaded: 0,
+    backgroundLoaded: 0,
+    loadedTabs: [],
+    forceReloads: 0,
+    backgroundReleased: false,
+  };
+
+  function now(){ return Date.now(); }
+  function safeWarn(){ try{ console.warn.apply(console, arguments); }catch(e){} }
+  function safeToast(text, icon){ try{ if(typeof showToast === 'function') showToast(text, icon); }catch(e){} }
+  function getSpecs(){ try{ if(typeof R2_SPECS !== 'undefined') return R2_SPECS; }catch(e){} return baseData.r2Specs || {}; }
+  function getFiles(){ try{ if(typeof R2_FILES !== 'undefined') return R2_FILES; }catch(e){} return baseData.r2Files || {}; }
+  function getBase(){ try{ if(typeof R2_BASE !== 'undefined') return R2_BASE; }catch(e){} return baseData.r2Base || ''; }
+  function getTtl(){ try{ if(typeof _CSV_TTL !== 'undefined') return _CSV_TTL; }catch(e){} return baseData.csvTtlMs || 0; }
+  function getLoadedTabs(){ try{ if(typeof _cloudLoadedTabs !== 'undefined') return _cloudLoadedTabs; }catch(e){} return null; }
+  function getInFlight(){ try{ if(typeof _cloudInFlight !== 'undefined') return _cloudInFlight; }catch(e){} return {}; }
+
+  function record(name, phase, extra){
+    const evt = Object.assign({ name, phase, ts: now() }, extra || {});
+    orchStatus.lastOperation = evt;
+    if(baseData && baseData.status && Array.isArray(baseData.status.operations)){
+      baseData.status.lastOperation = evt;
+      baseData.status.operations.push(evt);
+      if(baseData.status.operations.length > 100) baseData.status.operations.shift();
+    }
+    return evt;
+  }
+
+  function recordError(name, err){
+    const message = err && err.message ? err.message : String(err);
+    orchStatus.lastError = { name, message, ts: now() };
+    if(baseData && baseData.status){ baseData.status.lastError = orchStatus.lastError; }
+    record(name, 'error', { message });
+  }
+
+  function markLoaded(tab){
+    const tabs = getLoadedTabs();
+    if(tabs && typeof tabs.add === 'function') tabs.add(tab);
+    orchStatus.loadedTabs = tabs && typeof tabs.forEach === 'function' ? Array.from(tabs) : orchStatus.loadedTabs;
+    try{ if(tab === 'skus') bulkSkusReady = true; }catch(e){}
+    try{ if(tab === 'alternatives') bulkAltsReady = true; }catch(e){}
+  }
+
+  function isLoaded(tab){
+    const tabs = getLoadedTabs();
+    return !!(tabs && typeof tabs.has === 'function' && tabs.has(tab));
+  }
+
+  function clearInFlight(){
+    const inFlight = getInFlight();
+    Object.keys(inFlight).forEach(function(k){ delete inFlight[k]; });
+  }
+
+  function fetchTimeout(spec){ return spec && spec.heavy ? 240000 : 90000; }
+  function ingestTimeout(spec){ return spec && spec.heavy ? 240000 : 90000; }
+
+  async function fetchCloudflareFile(spec, opts){
+    opts = opts || {};
+    const force = !!opts.force;
+    const cacheOverride = opts.cacheOverride;
+    if(!spec || !spec.tab) return false;
+    const tab = spec.tab;
+    const inFlight = getInFlight();
+
+    if(!force && isLoaded(tab)) return true;
+    if(!force && inFlight[tab]) return inFlight[tab];
+
+    const p = (async function(){
+      record('_fetchCloudflareFile', 'start', { tab, force, heavy: !!spec.heavy });
+      const dot = document.getElementById('sp-' + tab);
+      if(dot) dot.style.background = 'rgba(38,96,200,.12)';
+      try{
+        let text = null;
+        const useCache = (cacheOverride !== undefined) ? cacheOverride : !!spec.cache;
+        if(useCache){
+          const cached = await baseData.csvCacheGet(tab);
+          if(cached && cached.ts && (Date.now() - cached.ts) < getTtl()) text = cached.text;
+        }
+        if(!text){
+          const files = getFiles();
+          const url = `${getBase()}/${files[tab] || tab + '.csv'}`;
+          text = await baseData.fetchTextWithTimeout(url, fetchTimeout(spec));
+          if(useCache) baseData.csvCacheSet(tab, text);
+        }
+        const ok = await ingestCSVText(spec.type, text, { timeoutMs: ingestTimeout(spec) });
+        if(ok){
+          markLoaded(tab);
+          if(dot){ dot.style.background = 'rgba(0,208,112,.18)'; dot.style.color = 'var(--g700)'; }
+          record('_fetchCloudflareFile', 'done', { tab, ok:true });
+        }else{
+          if(dot){ dot.style.background = 'rgba(240,80,0,.12)'; dot.style.color = 'var(--org)'; }
+          record('_fetchCloudflareFile', 'done', { tab, ok:false });
+        }
+        return !!ok;
+      }catch(err){
+        if(dot){ dot.style.background = 'rgba(240,80,0,.12)'; dot.style.color = 'var(--org)'; }
+        recordError('_fetchCloudflareFile:' + tab, err);
+        safeWarn('[Cloudflare R2]', tab, err && err.message ? err.message : err);
+        return false;
+      }finally{
+        delete inFlight[tab];
+      }
+    })();
+
+    inFlight[tab] = p;
+    return p;
+  }
+
+  async function ensureCloudflareFiles(keys, opts){
+    opts = opts || {};
+    const label = opts.label || 'กำลังโหลดข้อมูล';
+    const force = !!opts.force;
+    const specs = (keys || []).map(function(k){ return getSpecs()[k]; }).filter(Boolean);
+    if(!specs.length) return true;
+    record('ensureCloudflareFiles', 'start', { keys:(keys||[]).slice(), label, force });
+    let done = 0;
+    baseData.setDataPillText(label, '0/' + specs.length);
+    const results = await Promise.all(specs.map(function(spec){
+      return fetchCloudflareFile(spec, { force, cacheOverride: spec.heavy ? false : undefined }).then(function(ok){
+        done++;
+        baseData.setDataPillText(label, done + '/' + specs.length);
+        return ok;
+      });
+    }));
+    const ok = results.every(Boolean);
+    baseData.finishDataPill(ok ? (label + ' พร้อมแล้ว') : (label + ' โหลดไม่ครบ'), ok ? 900 : 1400);
+    record('ensureCloudflareFiles', 'done', { ok, done, total: specs.length });
+    return ok;
+  }
+
+  function startCloudBackgroundLoad(opts){
+    opts = opts || {};
+    const token = opts.token;
+    const fgLoaded = opts.fgLoaded || 0;
+    const total = opts.total || 7;
+    try{ if(_cloudBackgroundPromise) return _cloudBackgroundPromise; }catch(e){}
+
+    record('_startCloudBackgroundLoad', 'start', { token, fgLoaded, total });
+    const counter = document.getElementById('sheets-loaded-count');
+    const bgDots = document.getElementById('dlp-bg-dots');
+    const readyIcon = document.getElementById('dlp-ready-icon');
+    const dots = document.getElementById('dlp-dots');
+    if(dots) dots.style.display = 'none';
+    if(readyIcon) readyIcon.style.display = 'none';
+    if(bgDots) bgDots.style.display = 'flex';
+    baseData.setDataPillText('SKU + ทางเลือก','');
+
+    let pillReleased = false;
+    let finished = false;
+    const releaseTimer = setTimeout(function(){
+      try{ if(finished || token !== _cloudLoadToken) return; }catch(e){ if(finished) return; }
+      pillReleased = true;
+      orchStatus.backgroundReleased = true;
+      baseData.finishDataPill('โหลดต่อเบื้องหลัง',1000);
+      safeToast('กำลังโหลด SKU + ทางเลือกต่อเบื้องหลัง','⟳');
+    },18000);
+
+    const specs = getSpecs();
+    const p = Promise.all(BACKGROUND.map(async function(key){
+      const spec = specs[key];
+      const bgDot = document.getElementById(key === 'skus' ? 'dlp-bg-skus' : 'dlp-bg-alts');
+      const ok = await fetchCloudflareFile(spec, { force:false, cacheOverride:false });
+      try{ if(token !== _cloudLoadToken) return ok; }catch(e){}
+      if(ok){ if(bgDot) bgDot.classList.add('done'); }
+      else { if(bgDot) bgDot.style.background = 'rgba(240,80,0,.7)'; }
+      const loadedNow = fgLoaded + BACKGROUND.filter(function(k){ return isLoaded(specs[k].tab); }).length;
+      if(counter) counter.textContent = loadedNow + '/' + total;
+      return ok;
+    })).then(function(results){
+      try{ if(token !== _cloudLoadToken) return results; }catch(e){}
+      finished = true; clearTimeout(releaseTimer);
+      const okCount = results.filter(Boolean).length;
+      orchStatus.backgroundLoaded = okCount;
+      if(okCount === BACKGROUND.length){
+        if(!pillReleased) baseData.finishDataPill('ข้อมูลครบแล้ว',1000);
+        safeToast('ข้อมูล Sense พร้อมแล้ว','✓');
+      }else{
+        if(!pillReleased) baseData.finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
+        safeToast('ข้อมูลหลักพร้อม แต่ SKU/ทางเลือกยังไม่ครบ — กด Refresh data ได้','⚠');
+      }
+      try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
+      try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+      record('_startCloudBackgroundLoad', 'done', { okCount, total: BACKGROUND.length });
+      return results;
+    }).catch(function(err){
+      try{ if(token === _cloudLoadToken){
+        finished = true; clearTimeout(releaseTimer);
+        if(!pillReleased) baseData.finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
+        safeToast('โหลด SKU/ทางเลือกไม่สำเร็จ — กด Refresh data','⚠');
+        safeWarn('[Cloudflare background]', err);
+      }}catch(e){}
+      recordError('_startCloudBackgroundLoad', err);
+      return [false,false];
+    }).finally(function(){
+      try{ if(token === _cloudLoadToken) _cloudBackgroundPromise = null; }catch(e){}
+    });
+
+    try{ _cloudBackgroundPromise = p; }catch(e){}
+    return p;
+  }
+
+  async function loadFromCloudflareR2(){
+    try{
+      if(sheetsLoadStarted && _cloudInitialPromise) return _cloudInitialPromise;
+      if(sheetsLoadStarted) return;
+      sheetsLoadStarted = true;
+    }catch(e){}
+    let token;
+    try{ token = ++_cloudLoadToken; }catch(e){ token = Date.now(); }
+
+    record('loadFromCloudflareR2', 'start', { token });
+    const btn = document.getElementById('sheets-load-btn');
+    const counter = document.getElementById('sheets-loaded-count');
+    if(btn){ btn.disabled = true; btn.textContent = 'กำลังโหลด...'; }
+    baseData.resetDataPill();
+    baseData.prepareProgressChips(ALL, ALL.length, getSpecs());
+    baseData.setDataPillText('โหลดข้อมูลหลัก','0/' + FOREGROUND.length);
+
+    const p = (async function(){
+      let loaded = 0;
+      const specs = getSpecs();
+      const fgResults = await Promise.all(FOREGROUND.map(async function(key, idx){
+        const ok = await fetchCloudflareFile(specs[key], { force:false });
+        try{ if(token !== _cloudLoadToken) return ok; }catch(e){}
+        if(ok){ loaded++; baseData.markForegroundPillDot(idx); }
+        if(counter) counter.textContent = loaded + '/' + ALL.length;
+        baseData.setDataPillText('โหลดข้อมูลหลัก', loaded + '/' + FOREGROUND.length);
+        return ok;
+      }));
+      try{ if(token !== _cloudLoadToken) return; }catch(e){}
+      const fgOk = fgResults.filter(Boolean).length;
+      orchStatus.foregroundLoaded = fgOk;
+      if(btn){ btn.disabled = false; btn.textContent = 'Refresh data'; }
+      if(fgOk > 0){
+        safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + fgOk + '/' + FOREGROUND.length + ' ไฟล์','✓');
+        try{ if(typeof renderPortview === 'function') renderPortview(); }catch(e){}
+        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+      }else{
+        safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
+      }
+      try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
+      try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+      startCloudBackgroundLoad({ token, fgLoaded:fgOk, total:ALL.length });
+      record('loadFromCloudflareR2', 'done', { foregroundOk: fgOk, totalForeground: FOREGROUND.length });
+    })().catch(function(err){
+      recordError('loadFromCloudflareR2', err);
+      safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
+      if(btn){ btn.disabled = false; btn.textContent = 'Refresh data'; }
+      throw err;
+    }).finally(function(){
+      try{ if(token === _cloudLoadToken) _cloudInitialPromise = null; }catch(e){}
+    });
+
+    try{ _cloudInitialPromise = p; }catch(e){}
+    return p;
+  }
+
+  async function reloadFromCloudflareR2(){
+    record('reloadFromCloudflareR2', 'start');
+    orchStatus.forceReloads++;
+    await baseData.csvCacheClear();
+    try{ sheetsLoadStarted = false; }catch(e){}
+    try{ bulkSkusReady = false; bulkAltsReady = false; }catch(e){}
+    const tabs = getLoadedTabs();
+    if(tabs && typeof tabs.clear === 'function') tabs.clear();
+    clearInFlight();
+    try{ _cloudInitialPromise = null; _cloudBackgroundPromise = null; _cloudLoadToken++; }catch(e){}
+    return loadFromCloudflareR2();
+  }
+
+  async function ensureAccountDetailData(accountId){
+    if(!accountId) return false;
+    const needed = [];
+    try{ if(!bulkCatsData[accountId]) needed.push('categories'); }catch(e){ needed.push('categories'); }
+    try{ if(!bulkSkuCurrentData[accountId]) needed.push('sku_current'); }catch(e){ needed.push('sku_current'); }
+    try{ if(!bulkOutletsData[accountId]) needed.push('outlets'); }catch(e){ needed.push('outlets'); }
+    try{ if(!bulkSkusData[accountId]) needed.push('skus'); }catch(e){ needed.push('skus'); }
+    if(!needed.length) return true;
+    safeToast('กำลังโหลด account intelligence...','⟳');
+    const ok = await ensureCloudflareFiles(needed, { label:'Account intelligence' });
+    try{ loadFromStorage(accountId); }catch(e){}
+    try{ refreshAll(); updateDataStatus(); }catch(e){}
+    try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+    try{ if(isKAM && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+    record('ensureAccountDetailData', 'done', { accountId, ok, needed });
+    return ok;
+  }
+
+  async function ensureSenseData(accountId){
+    if(!accountId) return false;
+    const needed = [];
+    try{ if(!bulkSkusData[accountId]) needed.push('skus'); }catch(e){ needed.push('skus'); }
+    try{ if(!bulkAltsReady && !bulkAltsUnverified[accountId]) needed.push('alternatives'); }catch(e){ needed.push('alternatives'); }
+    if(!needed.length) return true;
+    safeToast('กำลังโหลด SKU + ทางเลือก...','⟳');
+    const ok = await ensureCloudflareFiles(needed, { label:'SKU + ทางเลือก' });
+    try{ loadFromStorage(accountId); }catch(e){}
+    try{ if(D.alts.length && D.skus.length) computeOPPS(); }catch(e){}
+    try{ refreshAll(); updateDataStatus(); }catch(e){}
+    try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+    record('ensureSenseData', 'done', { accountId, ok, needed });
+    return ok;
+  }
+
+  function getOrchestrationSnapshot(){
+    const tabs = getLoadedTabs();
+    return {
+      orchestrationVersion: ORCH_VERSION,
+      status: JSON.parse(JSON.stringify(orchStatus)),
+      loadedTabs: tabs && typeof tabs.forEach === 'function' ? Array.from(tabs) : [],
+      foregroundKeys: FOREGROUND.slice(),
+      backgroundKeys: BACKGROUND.slice(),
+      allKeys: ALL.slice(),
+      sheetsLoadStarted: (function(){ try{ return sheetsLoadStarted; }catch(e){ return undefined; } })(),
+      bulkSkusReady: (function(){ try{ return bulkSkusReady; }catch(e){ return undefined; } })(),
+      bulkAltsReady: (function(){ try{ return bulkAltsReady; }catch(e){ return undefined; } })(),
+    };
+  }
+
+  const phase6Methods = {
+    version: ORCH_VERSION,
+    loaderOrchestrationVersion: ORCH_VERSION,
+    orchestrationStatus: orchStatus,
+    fetchCloudflareFile,
+    ensureCloudflareFiles,
+    startCloudBackgroundLoad,
+    loadFromCloudflareR2,
+    reloadFromCloudflareR2,
+    reloadFromGoogleSheets: reloadFromCloudflareR2,
+    loadFromGoogleSheets: loadFromCloudflareR2,
+    ensureAccountDetailData,
+    ensureSenseData,
+    loadFromSupabaseStorage: loadFromCloudflareR2,
+    getOrchestrationSnapshot,
+  };
+
+  const extendedData = Object.freeze(Object.assign({}, baseData, phase6Methods, {
+    getSnapshot: function(extra){
+      const baseSnapshot = typeof baseData.getSnapshot === 'function' ? baseData.getSnapshot(extra) : {};
+      return Object.assign({}, baseSnapshot, { version: ORCH_VERSION, orchestration: getOrchestrationSnapshot() });
+    }
+  }));
+
+  const nextRuntime = Object.freeze(Object.assign({}, rt, { data: extendedData }));
+  global.FreshketSenseRuntime = nextRuntime;
+  global.FreshketSenseDataRuntime = extendedData;
+})(window);
+
+// ─────────────────────────────────────────────────────
+
+// ── PHASE 6.1 LEGACY LOADER ADAPTER ─────────────────────
+// Phase 6.1 legacy loader adapter.
+// It replaces loader globals with runtime-owned orchestration implementations while retaining Phase 5.1 originals as fallback.
+(function(global){
+  'use strict';
+  const data = global.FreshketSenseRuntime && global.FreshketSenseRuntime.data;
+  const originals = global.FreshketSenseLegacyData || {};
+  const ADAPTED_NAMES = ['_fetchCloudflareFile','ensureCloudflareFiles','_startCloudBackgroundLoad','loadFromCloudflareR2','reloadFromCloudflareR2','loadFromGoogleSheets','reloadFromGoogleSheets','ensureAccountDetailData','ensureSenseData','loadFromSupabaseStorage'];
+  const FLAG_KEYS = ['freshket_loader_runtime_disabled','freshket_force_legacy_loader'];
+  function normalizeFlag(v){ return v === true || v === '1' || v === 'true' || v === 'yes' || v === 'legacy'; }
+  function readFlag(){
+    try{
+      const qs = new URLSearchParams(global.location && global.location.search || '');
+      if(qs.get('freshket_loader_runtime') === 'legacy') return { disabled:true, source:'query:freshket_loader_runtime=legacy' };
+      if(qs.get('freshket_loader_runtime') === 'runtime') return { disabled:false, source:'query:freshket_loader_runtime=runtime' };
+    }catch(e){}
+    try{
+      for(const k of FLAG_KEYS){
+        const v = global.localStorage && localStorage.getItem(k);
+        if(normalizeFlag(v)) return { disabled:true, source:'localStorage:' + k, value:v };
+      }
+    }catch(e){}
+    return { disabled:false, source:'default' };
+  }
+  function fallback(name){ return originals[name]; }
+  function setGlobal(name, fn){
+    try{ global[name] = fn; }catch(e){}
+    try{ eval(name + ' = fn'); }catch(e){}
+  }
+  function restoreLegacyNow(){
+    const restored = [];
+    ADAPTED_NAMES.forEach(function(name){
+      if(typeof originals[name] === 'function'){
+        setGlobal(name, originals[name]);
+        restored.push(name);
+      }
+    });
+    return restored;
+  }
+  function makeControl(statusRef){
+    return Object.freeze({
+      version: 'v155-phase6-1-stabilized-loader-control',
+      flagKeys: FLAG_KEYS.slice(),
+      status: function(){ return Object.assign({}, statusRef, { flag: readFlag() }); },
+      disableRuntime: function(reason){
+        try{ localStorage.setItem('freshket_loader_runtime_disabled','1'); }catch(e){}
+        const restored = restoreLegacyNow();
+        statusRef.mode = 'legacy';
+        statusRef.disabledByFlag = true;
+        statusRef.disabledReason = reason || 'manual-disable';
+        statusRef.restored = restored;
+        try{ console.warn('[Freshket Sense Phase 6.1] Loader runtime disabled. Refresh recommended.', statusRef); }catch(e){}
+        return statusRef;
+      },
+      enableRuntimeNextReload: function(){
+        try{ FLAG_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+        statusRef.enableRuntimeOnNextReload = true;
+        try{ console.info('[Freshket Sense Phase 6.1] Loader runtime will be enabled after refresh.'); }catch(e){}
+        return statusRef;
+      },
+      restoreLegacyNow: restoreLegacyNow,
+      refreshRecommended: true,
+    });
+  }
+  const adapterStatus = {
+    version: data && data.loaderOrchestrationVersion || 'missing-runtime',
+    installedAt: Date.now(),
+    mode: 'runtime',
+    adapted: [],
+    disabledByFlag: false,
+    disabledReason: null,
+    fallbackCount: 0,
+    lastFallback: null,
+  };
+  global.FreshketSenseLoaderControl = makeControl(adapterStatus);
+
+  if(!data || !data.loaderOrchestrationVersion){
+    adapterStatus.mode = 'legacy';
+    adapterStatus.disabledReason = 'runtime-missing';
+    global.FreshketSensePhase6LoaderAdapter = Object.freeze(adapterStatus);
+    try{ console.warn('[Freshket Sense Phase 6.1] loader orchestration runtime missing; keeping Phase 5.1 functions'); }catch(e){}
+    return;
+  }
+  const flag = readFlag();
+  if(flag.disabled){
+    adapterStatus.mode = 'legacy';
+    adapterStatus.disabledByFlag = true;
+    adapterStatus.disabledReason = flag.source;
+    adapterStatus.restored = restoreLegacyNow();
+    global.FreshketSensePhase6LoaderAdapter = Object.freeze(adapterStatus);
+    try{ console.warn('[Freshket Sense Phase 6.1] loader runtime disabled by flag; keeping legacy loader path.', adapterStatus); }catch(e){}
+    return;
+  }
+  function asyncAdapter(name, runtimeFn){
+    const original = fallback(name);
+    const fn = async function(){
+      try{ return await runtimeFn.apply(this, Array.prototype.slice.call(arguments)); }
+      catch(err){
+        adapterStatus.fallbackCount += 1;
+        adapterStatus.lastFallback = { name:name, message:err && err.message ? err.message : String(err), ts:Date.now() };
+        try{ console.warn('[Freshket Sense Phase 6.1 fallback]', name, err && err.message ? err.message : err); }catch(e){}
+        if(typeof original === 'function') return original.apply(this, Array.prototype.slice.call(arguments));
+        throw err;
+      }
+    };
+    setGlobal(name, fn);
+  }
+  function syncAdapter(name, runtimeFn){
+    const original = fallback(name);
+    const fn = function(){
+      try{ return runtimeFn.apply(this, Array.prototype.slice.call(arguments)); }
+      catch(err){
+        adapterStatus.fallbackCount += 1;
+        adapterStatus.lastFallback = { name:name, message:err && err.message ? err.message : String(err), ts:Date.now() };
+        try{ console.warn('[Freshket Sense Phase 6.1 fallback]', name, err && err.message ? err.message : err); }catch(e){}
+        if(typeof original === 'function') return original.apply(this, Array.prototype.slice.call(arguments));
+        throw err;
+      }
+    };
+    setGlobal(name, fn);
+  }
+
+  asyncAdapter('_fetchCloudflareFile', data.fetchCloudflareFile);
+  asyncAdapter('ensureCloudflareFiles', data.ensureCloudflareFiles);
+  syncAdapter('_startCloudBackgroundLoad', data.startCloudBackgroundLoad);
+  asyncAdapter('loadFromCloudflareR2', data.loadFromCloudflareR2);
+  asyncAdapter('reloadFromCloudflareR2', data.reloadFromCloudflareR2);
+  asyncAdapter('loadFromGoogleSheets', data.loadFromGoogleSheets);
+  asyncAdapter('reloadFromGoogleSheets', data.reloadFromGoogleSheets);
+  asyncAdapter('ensureAccountDetailData', data.ensureAccountDetailData);
+  asyncAdapter('ensureSenseData', data.ensureSenseData);
+  asyncAdapter('loadFromSupabaseStorage', data.loadFromSupabaseStorage);
+
+  adapterStatus.adapted = ADAPTED_NAMES.slice();
+  global.FreshketSensePhase6LoaderAdapter = Object.freeze(adapterStatus);
+})(window);
+
+// ─────────────────────────────────────────────────────
+
+// Phase 5.1 debug and staging smoke-check utilities.
+// Console usage:
+//   FreshketSenseDebug.snapshot()
+//   FreshketSenseDebug.runStaticSmokeChecklist()
+//   FreshketSenseDebug.printStaticSmokeChecklist()
+(function(global){
+  'use strict';
+
+  function hasFn(name){ return typeof global[name] === 'function'; }
+  function hasEl(id){ return !!global.document && !!document.getElementById(id); }
+  function safe(fn, fallback){ try{ return fn(); }catch(e){ return fallback; } }
+  function getDataSnapshot(){
+    return hasFn('getFreshketDataRuntimeSnapshot') ? global.getFreshketDataRuntimeSnapshot() : { ok:false, error:'getFreshketDataRuntimeSnapshot missing' };
+  }
+
+  function runStaticSmokeChecklist(){
+    const rt = global.FreshketSenseRuntime || {};
+    const aiClient = rt.aiClient || {};
+    const data = rt.data || global.FreshketSenseDataRuntime || null;
+    const checks = [
+      ['runtime object exists', !!rt.version, rt.version || 'missing'],
+      ['AI runtime exists', !!aiClient.callAI, aiClient.callAI ? 'ok' : 'missing callAI'],
+      ['production is proxy-only', aiClient.proxyOnlyProduction === true, aiClient.proxyOnlyProduction],
+      ['direct browser key mode disabled', hasFn('directAiKeyModeAllowed') ? global.directAiKeyModeAllowed() === false : aiClient.directAiKeyModeAllowed && aiClient.directAiKeyModeAllowed() === false, 'expected false'],
+      ['AI proxy configured', typeof aiClient.getAiProxyUrl === 'function' && !!aiClient.getAiProxyUrl(), typeof aiClient.getAiProxyUrl === 'function' ? (aiClient.getAiProxyUrl() || 'not set') : 'missing'],
+      ['data runtime exists', !!data, data ? data.version : 'missing'],
+      ['loader control exists', !!global.FreshketSenseLoaderControl, global.FreshketSenseLoaderControl ? 'ok' : 'missing'],
+      ['loader adapter status exists', !!global.FreshketSensePhase6LoaderAdapter, global.FreshketSensePhase6LoaderAdapter ? (global.FreshketSensePhase6LoaderAdapter.mode || 'installed') : 'missing'],
+      ['data snapshot exists', hasFn('getFreshketDataRuntimeSnapshot'), hasFn('getFreshketDataRuntimeSnapshot') ? 'ok' : 'missing'],
+      ['topbar exists', hasEl('dataBtnTop'), 'dataBtnTop'],
+      ['data panel exists', hasEl('dataPanel'), 'dataPanel'],
+      ['data pill exists', hasEl('data-load-pill'), 'data-load-pill'],
+      ['AI FAB exists', hasEl('aiFab'), 'aiFab'],
+      ['AI panel exists', hasEl('aiPanel'), 'aiPanel'],
+      ['service worker supported', !!(global.navigator && navigator.serviceWorker), 'navigator.serviceWorker'],
+      ['legacy load function exists', hasFn('loadFromCloudflareR2'), 'loadFromCloudflareR2'],
+      ['legacy ensure function exists', hasFn('ensureCloudflareFiles'), 'ensureCloudflareFiles'],
+      ['legacy data panel open exists', hasFn('openDataPanel'), 'openDataPanel'],
+    ].map(function(row){ return { name:row[0], ok:!!row[1], detail:row[2] }; });
+    return {
+      ok: checks.every(function(c){ return c.ok || c.name === 'AI proxy configured'; }),
+      note: 'AI proxy may be unset on local/staging until you configure freshket_ai_proxy_url.',
+      runtimeVersion: rt.version || null,
+      dataRuntimeVersion: data && data.version || null,
+      proxyUrl: aiClient.getAiProxyUrl ? aiClient.getAiProxyUrl() : '',
+      checks: checks,
+      dataSnapshot: getDataSnapshot(),
+      ts: new Date().toISOString()
+    };
+  }
+
+  function printStaticSmokeChecklist(){
+    const result = runStaticSmokeChecklist();
+    const rows = result.checks.map(function(c){ return { ok:c.ok ? '✅' : '❌', check:c.name, detail:String(c.detail || '') }; });
+    try{ console.table(rows); console.log('Freshket static smoke result:', result); }catch(e){}
+    return result;
+  }
+
+  function loaderDiagnostics(){
+    const rt = global.FreshketSenseRuntime || {};
+    const data = rt.data || global.FreshketSenseDataRuntime || null;
+    const adapter = global.FreshketSensePhase6LoaderAdapter || null;
+    const control = global.FreshketSenseLoaderControl || null;
+    const diag = {
+      runtimeVersion: rt.version || null,
+      dataRuntimeVersion: data && data.version || null,
+      loaderOrchestrationVersion: data && data.loaderOrchestrationVersion || null,
+      adapter: adapter,
+      control: control && control.status ? control.status() : null,
+      orchestration: data && data.getOrchestrationSnapshot ? data.getOrchestrationSnapshot() : null,
+      legacyAvailable: !!global.FreshketSenseLegacyData,
+      loaderFns: ['_fetchCloudflareFile','ensureCloudflareFiles','_startCloudBackgroundLoad','loadFromCloudflareR2','reloadFromCloudflareR2','ensureAccountDetailData','ensureSenseData'].reduce(function(acc,name){ acc[name] = typeof global[name] === 'function'; return acc; }, {}),
+      ts: new Date().toISOString()
+    };
+    return diag;
+  }
+
+  function printLoaderDiagnostics(){
+    const diag = loaderDiagnostics();
+    try{
+      console.log('Freshket loader diagnostics:', diag);
+      if(diag.orchestration && diag.orchestration.loadedTabs) console.table(diag.orchestration.loadedTabs.map(function(t){ return { loadedTab:t }; }));
+    }catch(e){}
+    return diag;
+  }
+
+  function snapshot(){
+    const rt = global.FreshketSenseRuntime || {};
+    return {
+      runtimeVersion: rt.version || null,
+      proxyOnlyProduction: !!(rt.aiClient && rt.aiClient.proxyOnlyProduction),
+      proxyUrl: rt.aiClient && rt.aiClient.getAiProxyUrl ? rt.aiClient.getAiProxyUrl() : '',
+      aiProvider: global.aiProvider,
+      currentUserEmail: global.currentUser && global.currentUser.email || null,
+      currentMode: global.mode || null,
+      currentAccountId: global.currentAccountId || null,
+      loader: loaderDiagnostics(),
+      data: getDataSnapshot(),
+      smoke: runStaticSmokeChecklist(),
+      ts: new Date().toISOString()
+    };
+  }
+
+  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics });
+  global.printFreshketLoaderDiagnostics = printLoaderDiagnostics;
+  global.runFreshketStaticSmokeChecklist = runStaticSmokeChecklist;
+})(window);
+
 
 function setMatcherMode(mode, btn){
   matcherMode=mode;
@@ -10599,7 +11659,6 @@ schema: {"pack_size_issue":false,"verified":[{"catalog_item_id":"12345","catalog
   const _matLabel=g.monthly_gmv>=20000?'สินค้าหลัก (GMV สูง)':g.monthly_gmv>=5000?'สินค้ารอง':'สินค้าย่อย';
   const userMsg=`Account item:\n- item_id: ${g.id}\n- ชื่อ: ${g.name}\n- pack: ${g.pack_size||'ไม่ระบุ'}\n- ราคา/unit: ฿${g.unit_price||'?'}\n- ราคา/kg: ฿${g.price}\n- subclass: ${g.subclass}\n- ความสำคัญ: ${_matLabel} (GMV ฿${Math.round(g.monthly_gmv||0).toLocaleString()}/เดือน)\n\nAlternatives:\n${altLines}\n\nตอบ JSON`;
 
-  const _apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
   const fetchPromise=callAI(matcherModel==='sonnet'?'sonnet':'haiku',sys,[{role:'user',content:userMsg}],maxTok);
   const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout (30s) — ลอง process ใหม่')),30000));
   const text=await Promise.race([fetchPromise,timeoutPromise]);
@@ -12789,8 +13848,16 @@ function buildChatSuggestions(){
   // From top category
   const topCat=(D.cats.length?D.cats:SAMPLE.cats)[0];
   if(topCat)suggs.push({label:`ลดต้นทุน ${topCat.n} ได้ยังไง?`,q:`หมวด ${topCat.n} ใช้จ่าย ${fmt(topCat.s)}/เดือน (${topCat.p}%) มีวิธีลดต้นทุนได้บ้างไหม?`});
-  // Mode-specific last suggestion
+  // Mode-specific suggestions: make AI Chat usable beyond the current account
+  const activeScreen=(typeof getActiveScreenName==='function')?getActiveScreenName():'';
   if(isKAM){
+    if(activeScreen==='teamview'){
+      suggs.unshift({label:'ทีมควรโฟกัสใครก่อน?',q:'จากภาพรวมทีม KAM คนไหนควรได้รับ support หรือ coaching ก่อน และเพราะอะไร?'});
+    } else if(activeScreen==='portview'){
+      suggs.unshift({label:'พอร์ตควรโทรหาใครก่อน?',q:'จากภาพรวมพอร์ต ช่วยจัดลำดับลูกค้าที่ควรติดต่อก่อนวันนี้ พร้อมเหตุผลและคำถามเปิดบทสนทนา'});
+    } else if(typeof portviewBulkData!=='undefined'&&portviewBulkData&&portviewBulkData.length){
+      suggs.push({label:'ดูภาพรวมพอร์ต',q:'สรุปภาพรวมพอร์ตตอนนี้ให้หน่อย ร้านไหนเสี่ยงสุด และควรเริ่ม follow-up ใครก่อน?'});
+    }
     suggs.push({label:'สรุปไปคุยลูกค้า',q:'สรุปประเด็นสำคัญที่ควรพูดถึงเมื่อไปเยี่ยมลูกค้ารายนี้ ให้กระชับ ใช้ข้อมูลจริง'});
   } else {
     suggs.push({label:'สรุปสั้นๆ ให้เจ้าของฟัง',q:'สรุปโอกาสลดต้นทุนของร้านให้เข้าใจง่าย ไม่ต้องมีศัพท์เทคนิค'});
@@ -12893,33 +13960,38 @@ function initChatFabDrag(){
 function askQ(q){document.getElementById('aiinput').value=q;sendChat();}
 function addMsg(role,txt,loading=false){const msgs=document.getElementById('aimsgs');const d=document.createElement('div');d.className=`msg ${role}`;d.innerHTML=`<div class="mb ${loading?'ld':''}">${txt}</div>`;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d;}
 
-async function sendChat(){
-  if(aiLoading)return;
-  const inp=document.getElementById('aiinput');const q=inp.value.trim();if(!q)return;
-  inp.value='';document.getElementById('aisugg').style.display='none';addMsg('u',q);
-  const ldEl=addMsg('a','⏳ กำลังวิเคราะห์...',true);aiLoading=true;chatHist.push({role:'user',content:q});
-  if(chatHist.length>16)chatHist=chatHist.slice(-16);
-  const isFirstTurn=chatHist.filter(m=>m.role==='user').length<=1;
+// ── AI CHAT SCOPE + CONTEXT ROUTER ───────────────────
+function getActiveScreenName(){
+  const el=document.querySelector('.scr.on');
+  return el&&el.id?el.id.replace(/^scr-/,''):'overview';
+}
+
+function detectChatScope(q){
+  const text=String(q||'').toLowerCase();
+  if(/ทีม|team|standup|สแตนด์อัพ|หัวหน้าทีม|tl|team lead|kam แต่ละคน|แต่ละ kam|เซลล์แต่ละคน|sales แต่ละคน|โค้ช|coach|support/.test(text))return 'team';
+  if(/พอร์ต|portfolio|ภาพรวมทั้งหมด|ร้านทั้งหมด|ลูกค้าทั้งหมด|บัญชีทั้งหมด|account ทั้งหมด|accounts ทั้งหมด|ใครก่อน|โทรหาใคร|priority|prioritize|จัดลำดับ|at[- ]?risk|เสี่ยงทั้งหมด/.test(text))return 'portfolio';
+  if(/ร้านนี้|บัญชีนี้|ลูกค้ารายนี้|account นี้|sku|สินค้า|ยอดซื้อ|ต้นทุน|ประหยัด|หมวด|category|สั่งซื้อ|ออเดอร์|สเปค|ราคา/.test(text))return 'account';
+  const screen=getActiveScreenName();
+  if(screen==='teamview')return 'team';
+  if(screen==='portview')return 'portfolio';
+  return 'account';
+}
+
+function fmtChatK(n){return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n).toLocaleString('th-TH');}
+
+function buildAccountChatContext(){
   const _an=D.meta.accountName||document.getElementById('acct-name-input')?.value.trim()||'ร้านอาหารของคุณ';
   const _sp=curSpend()>0?totalAll()/curSpend()*100:0;
   const _sc=Math.min(95,Math.max(50,Math.round(95-_sp*2.5)));
-  // --- full context build ---
-  const _skipData=!isFirstTurn&&chatHist.length>4;
   const _skus=D.skus.length?D.skus:SAMPLE.skus;
   const _cats=D.cats.length?D.cats:SAMPLE.cats;
   const _hist=D.history.length?D.history:SAMPLE.history;
 
-  // 1) trend 6 months
-  const _trend=_skipData?'(ข้อมูลให้ไปแล้วในข้อความก่อนหน้า)':_hist.map(h=>h.m+' '+fmt(h.s)+'('+h.orders+'ออเดอร์)').join(', ');
+  const _trend=_hist.slice(-6).map(h=>h.m+' '+fmt(h.s)+' ('+h.orders+' ออเดอร์)').join(', ');
+  const _catStr=_cats.slice(0,10).map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ');
+  const _skuTop=[..._skus].sort((a,b)=>(b.gmv||b.s)-(a.gmv||a.s)).slice(0,14);
+  const _skuStr=_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+(s.d||'-')+'] '+fmt(s.gmv||s.s)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>14?'\n(+'+(_skus.length-14)+' รายการ)':'');
 
-  // 2) category breakdown (all)
-  const _catStr=_skipData?'(ดูข้อความก่อนหน้า)':_cats.map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ');
-
-  // 3) top-20 SKU portfolio by GMV
-  const _skuTop=[..._skus].sort((a,b)=>(b.gmv||b.s)-(a.gmv||a.s)).slice(0,20);
-  const _skuStr=_skipData?'(ดูข้อความก่อนหน้า)':_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+s.d+'] '+fmt(s.gmv||s.s)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>20?'\n(+'+(_skus.length-20)+' รายการ)':'');
-
-  // 4) SKU movement from skus_monthly
   let _skuMovement='ไม่มีข้อมูล SKU trend (ใช้ skus.csv format เดิม)';
   const _skuMonths=D.skus_monthly&&Object.keys(D.skus_monthly);
   if(_skuMonths&&_skuMonths.length>=2){
@@ -12929,98 +14001,134 @@ async function sendChat(){
     const prevMonths=months.slice(1);
     const lastSet=new Set((D.skus_monthly[lastMo]||[]).map(s=>s.id));
     const prevAllIds=new Set(prevMonths.flatMap(m=>(D.skus_monthly[m]||[]).map(s=>s.id)));
-
-    // New SKUs: in last month but not in ANY prior month
-    const newSkus=(D.skus_monthly[lastMo]||[]).filter(s=>!prevAllIds.has(s.id)).slice(0,8);
-    // Dropped SKUs: in prev month but not in last month
+    const newSkus=(D.skus_monthly[lastMo]||[]).filter(s=>!prevAllIds.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,6);
     const prev1Mo=months[1];
-    const prev1Set=new Set((D.skus_monthly[prev1Mo]||[]).map(s=>s.id));
-    const droppedSkus=(D.skus_monthly[prev1Mo]||[]).filter(s=>!lastSet.has(s.id)).slice(0,8);
-
-    // Volume changes: compare last month vs avg of prev months
+    const droppedSkus=(D.skus_monthly[prev1Mo]||[]).filter(s=>!lastSet.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,6);
     const prevAvg={};
-    prevMonths.forEach(m=>{
-      (D.skus_monthly[m]||[]).forEach(s=>{
-        if(!prevAvg[s.id])prevAvg[s.id]={sum:0,cnt:0,n:s.n,d:s.d};
-        prevAvg[s.id].sum+=s.qty_kg;prevAvg[s.id].cnt++;
-      });
-    });
-    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{
-      const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;
-      const chg=avg>0?(s.qty_kg-avg)/avg*100:0;
-      return{...s,avgQty:avg,chgPct:chg};
-    }).filter(s=>Math.abs(s.chgPct)>=30).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,6);
-
-    const newStr=newSkus.length?newSkus.map(s=>'+ '+s.n+' ['+fmt(s.gmv)+'/ด.]').join('\n'):'ไม่มี';
-    const dropStr=droppedSkus.length?droppedSkus.map(s=>'- '+s.n+' ['+fmt(s.gmv)+'/ด. เดือนก่อน]').join('\n'):'ไม่มี';
-    const volStr=volChanges.length?volChanges.map(s=>(s.chgPct>0?'↑':'↓')+' '+s.n+' '+s.chgPct.toFixed(0)+'% ('+s.qty_kg.toFixed(1)+'kg vs avg '+s.avgQty.toFixed(1)+'kg)').join('\n'):'ไม่มี';
-    const moRange=months[months.length-1]+' – '+lastMo;
-    _skuMovement=`ช่วง ${moRange} (${months.length} เดือน)\nSKU เพิ่งเริ่มซื้อ (${newSkus.length} รายการ):\n${newStr}\nSKU หยุดซื้อ MoM (${droppedSkus.length} รายการ):\n${dropStr}\nVolume เปลี่ยนแปลง ≥30% (${volChanges.length} รายการ):\n${volStr}`;
+    prevMonths.forEach(m=>{(D.skus_monthly[m]||[]).forEach(s=>{if(!prevAvg[s.id])prevAvg[s.id]={sum:0,cnt:0,n:s.n,d:s.d};prevAvg[s.id].sum+=s.qty_kg;prevAvg[s.id].cnt++;});});
+    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;const chg=avg>0?(s.qty_kg-avg)/avg*100:0;return{...s,avgQty:avg,chgPct:chg};}).filter(s=>Math.abs(s.chgPct)>=30).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,5);
+    const newStr=newSkus.length?newSkus.map(s=>'+ '+s.n+' ['+fmt(s.gmv||0)+'/ด.]').join('\n'):'ไม่มี';
+    const dropStr=droppedSkus.length?droppedSkus.map(s=>'- '+s.n+' ['+fmt(s.gmv||0)+'/ด. เดือนก่อน]').join('\n'):'ไม่มี';
+    const volStr=volChanges.length?volChanges.map(s=>(s.chgPct>0?'↑':'↓')+' '+s.n+' '+s.chgPct.toFixed(0)+'% ('+(s.qty_kg||0).toFixed(1)+'kg vs avg '+s.avgQty.toFixed(1)+'kg)').join('\n'):'ไม่มี';
+    _skuMovement=`ช่วง ${months[months.length-1]} – ${lastMo} (${months.length} เดือน)\nSKU เพิ่งเริ่มซื้อ:\n${newStr}\nSKU หยุดซื้อ MoM:\n${dropStr}\nVolume เปลี่ยนแปลง ≥30%:\n${volStr}`;
   }
 
-  // 5) all opportunities
   const _ol=OPPS.length
-    ?OPPS.map((o,i)=>{const a=getAlt(o);return(i+1)+'. '+o.curName+' → '+a.altName+': '+('ประหยัด ')+fmt(a.save)+'/ด. ('+a.pct+'%, '+(a.conf==='high'?'มั่นใจสูง':'ทดลองก่อน')+')'}).join('\n')
+    ?OPPS.slice(0,18).map((o,i)=>{const a=getAlt(o);return(i+1)+'. '+o.curName+' → '+a.altName+': ประหยัด '+fmt(a.save)+'/ด. ('+a.pct+'%, '+(a.conf==='high'?'มั่นใจสูง':'ทดลองก่อน')+')'}).join('\n')+(OPPS.length>18?'\n(+'+(OPPS.length-18)+' opportunities)':'')
     :'ยังไม่มีข้อมูล alternatives';
 
-  // F3: Mode-specific persona + hard rules
-  // Detect if this turn needs deep analysis (Sonnet) vs factual answer (Haiku)
-  const _needsSonnet=!isFirstTurn&&(q.length>60||/วิเคราะห์|เปรียบเทียบ|แนะนำ|วางแผน|สรุปภาพรวม|ทำไม.*ลด|ทำไม.*เพิ่ม/.test(q));
-  const _chatModel=_needsSonnet?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
+  return `-- CHAT SCOPE --\naccount\n\n-- ACCOUNT DATA --\nชื่อ: ${_an}\nค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}\nCost IQ Score: ${_sc}/100\nเลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)\nโอกาสเต็มที่: ${fmt(totalAll())}/เดือน\n\n=== Trend 6 เดือน ===\n${_trend}\n\n=== หมวดสินค้า เดือนล่าสุด ===\n${_catStr}\n\n=== Top SKU เดือนล่าสุด ===\n${_skuStr}\n\n=== SKU Movement ===\n${_skuMovement}\n\n=== โอกาสประหยัด ===\n${_ol}`;
+}
+
+function buildPortfolioChatContext(){
+  let accounts=[];
+  try{accounts=typeof getPortviewAccounts==='function'?getPortviewAccounts():[];}catch(e){accounts=[];}
+  if(!accounts||!accounts.length){
+    return `-- CHAT SCOPE --\nportfolio\n\n-- PORTFOLIO DATA --\nยังไม่มีข้อมูลพอร์ตที่โหลดอยู่ใน session นี้ หรือผู้ใช้ไม่มีสิทธิ์เห็นพอร์ตนี้`;
+  }
+  const withPace=accounts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
+  const portfolioPace=withPace.length?Math.round(withPace.reduce((s,a)=>s+(a.paceSignal.gmvToDate||0),0)/Math.max(1,withPace.reduce((s,a)=>s+(a.paceSignal.expected||0),0))*100):0;
+  const atRisk=accounts.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn'));
+  const shortfall=atRisk.reduce((s,a)=>s+Math.max(0,(a.paceSignal.baselineGmv||a.paceSignal.expected||0)-(a.paceSignal.runrate||a.paceSignal.gmvToDate||0)),0);
+  const ranked=[...atRisk].sort((a,b)=>Math.max(0,(b.paceSignal.baselineGmv||0)-(b.paceSignal.runrate||0))-Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||0))).slice(0,12);
+  const ctxLines=ranked.map(a=>{
+    const ps=a.paceSignal||{};
+    const gap=Math.max(0,(ps.baselineGmv||ps.expected||0)-(ps.runrate||ps.gmvToDate||0));
+    const parts=[`${a.name} [${ps.cls||'n/a'}] pace ${ps.pct||0}% gap ${fmtChatK(gap)}`];
+    const cc=a._churnCounts;
+    if(cc&&cc.gone>0)parts.push(`SKU หาย ${cc.gone}`);
+    else if((a.churnedSkuCount||0)>0)parts.push(`SKU หาย ${a.churnedSkuCount}`);
+    if(a.missingCatCount>0)parts.push(`category ขาด ${(a.missingCats||'').split(' | ').filter(Boolean).slice(0,2).join(', ')}`);
+    if(a.kamName)parts.push(`KAM ${a.kamName}`);
+    return '- '+parts.join(' · ');
+  }).join('\n');
+  const healthy=accounts.filter(a=>a.paceSignal&&(a.paceSignal.cls==='safe'||a.paceSignal.cls==='great')).length;
+  return `-- CHAT SCOPE --\nportfolio\n\n-- PORTFOLIO DATA --\nจำนวนร้าน: ${accounts.length}\nPortfolio pro-rate: ${portfolioPace}%\nAt-risk: ${atRisk.length} ร้าน\nHealthy/Safe: ${healthy} ร้าน\nEstimated shortfall/run-rate gap: ${fmtChatK(shortfall)}\n\n=== At-risk accounts ranked by money impact ===\n${ctxLines||'ไม่มีร้านเสี่ยงจากข้อมูลที่โหลดอยู่'}`;
+}
+
+function buildTeamChatContext(){
+  let groups=[];
+  try{groups=typeof _buildKamGroups==='function'?_buildKamGroups():[];}catch(e){groups=[];}
+  if(!groups||!groups.length){
+    return `-- CHAT SCOPE --\nteam\n\n-- TEAM DATA --\nยังไม่มีข้อมูลทีมที่โหลดอยู่ใน session นี้ หรือ user ไม่ใช่ TL/admin`;
+  }
+  const allAccts=groups.flatMap(g=>g.accounts||[]);
+  const withPace=allAccts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
+  const teamPace=withPace.length?Math.round(withPace.reduce((s,a)=>s+(a.paceSignal.gmvToDate||0),0)/Math.max(1,withPace.reduce((s,a)=>s+(a.paceSignal.expected||0),0))*100):0;
+  const totalShortfall=groups.reduce((s,g)=>s+(g.shortfall||0),0);
+  const kamLines=groups.slice(0,16).map(g=>{
+    const atRisk=(g.accounts||[]).filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).slice(0,3).map(a=>`${a.name}(${a.paceSignal?.pct||0}%${(a.churnedSkuCount||0)>0?' +SKUหาย':''})`).join(', ');
+    return `- ${g.kamName}: ${g.total} ร้าน · pace ${g.pace}% · เสี่ยง ${g.danger+g.warn} · shortfall ${fmtChatK(g.shortfall||0)}${atRisk?' | top risk: '+atRisk:''}`;
+  }).join('\n');
+  return `-- CHAT SCOPE --\nteam\n\n-- TEAM DATA --\nจำนวน KAM: ${groups.length}\nจำนวนร้าน: ${allAccts.length}\nTeam pro-rate: ${teamPace}%\nTotal shortfall: ${fmtChatK(totalShortfall)}\n\n=== KAM groups ===\n${kamLines}`;
+}
+
+function buildChatContextByScope(scope){
+  if(scope==='team')return buildTeamChatContext();
+  if(scope==='portfolio')return buildPortfolioChatContext();
+  return buildAccountChatContext();
+}
+
+async function sendChat(){
+  if(aiLoading)return;
+  const inp=document.getElementById('aiinput');
+  const q=inp.value.trim();
+  if(!q)return;
+  inp.value='';
+  document.getElementById('aisugg').style.display='none';
+  addMsg('u',q);
+  const ldEl=addMsg('a','⏳ กำลังวิเคราะห์...',true);
+  aiLoading=true;
+  chatHist.push({role:'user',content:q});
+  if(chatHist.length>14)chatHist=chatHist.slice(-14);
+
+  const _scope=detectChatScope(q);
+  const _context=buildChatContextByScope(_scope);
   const _mustReplyThai=/[\u0E00-\u0E7F]/.test(q) && !/(answer|reply|respond)\s+in\s+english|english\s+only|ภาษาอังกฤษ/i.test(q);
   const _languageContract=_mustReplyThai
-    ? 'ผู้ใช้ถามเป็นภาษาไทยหรือไทยปนอังกฤษ: ต้องตอบเป็นภาษาไทยเท่านั้น ใช้คำอังกฤษเฉพาะชื่อ metric, field, feature หรือศัพท์ธุรกิจที่จำเป็น ห้ามสลับไปตอบอังกฤษทั้งประโยค ถ้าจำเป็นต้อง quote field/SQL ให้ quote ได้ แต่คำอธิบายต้องเป็นไทย'
+    ? 'ผู้ใช้ถามเป็นภาษาไทยหรือไทยปนอังกฤษ: ต้องตอบเป็นภาษาไทยเท่านั้น ใช้คำอังกฤษเฉพาะชื่อ metric, field, feature หรือศัพท์ธุรกิจที่จำเป็น ห้ามสลับไปตอบอังกฤษทั้งประโยค'
     : 'Mirror the user\'s requested language. If no explicit English request exists, prefer Thai.';
-  const _modeLine=isKAM
-    ?`\n\n=== บทบาทผู้ถาม ===\nKAM (Key Account Manager) วิเคราะห์บัญชีลูกค้า B2B — ตอบเหมือน senior analyst ที่รู้จักร้านนี้ดี ชี้ pattern ที่ KAM อาจมองข้าม บอกตรงๆ ว่าต้องทำอะไร`
-    :'\n\n=== บทบาทผู้ถาม ===\nเจ้าของ/ผู้จัดการร้านอาหาร — ตอบแบบที่ปรึกษาที่เข้าใจชีวิตร้านอาหารจริงๆ รู้ว่า food cost pressure หนักแค่ไหน เน้น action ที่ทำได้จริง ไม่ใช่ theory';
+  const _complex=/วิเคราะห์|เปรียบเทียบ|แนะนำ|วางแผน|สรุปภาพรวม|ทำไม.*ลด|ทำไม.*เพิ่ม|พอร์ต|portfolio|ทีม|team|root cause|priority|prioritize|diagnose|insight|strategy|แผน|ใครก่อน|โทรหาใคร/i.test(q);
+  const _needsSonnet=_scope!=='account'||q.length>60||_complex;
+  const _chatModelKey=_needsSonnet?'sonnet':'haiku';
+  const _scopeInstruction={
+    account:'Answer from the current account context. If the user asks about portfolio or team, use the portfolio/team context if available and say when it is not loaded.',
+    portfolio:'Answer as a portfolio co-pilot. Prioritize by money impact, urgency, and likely KAM action — not just percentages.',
+    team:'Answer as a Team Lead co-pilot. Distinguish support/resource problems from coaching/discipline problems.'
+  }[_scope]||'Answer from the available context.';
+
   const sys=OLIVE_BASE+`
 
--- TASK CONTEXT --
-${isKAM
-  ?`The person asking is a KAM analyzing this account. Answer like a senior analyst who knows this restaurant well — surface patterns they might have missed, be direct about what needs to happen next.`
-  :`The person asking runs this restaurant. Answer like an advisor who genuinely understands the pressure — food cost, margins, waste, cash flow. Practical over theoretical, always.`}
+-- AI CHAT TASK --
+You are answering inside Freshket Sense AI Chat. The current chat scope is: ${_scope}.
+${_scopeInstruction}
+
+Use the current context below as the source of truth for this turn. It overrides older chat context when there is a conflict.
+
+${_context}
 
 -- LANGUAGE CONTRACT --
 ${_languageContract}
 
--- ACCOUNT DATA --
-ชื่อ: ${_an}
-ค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}
-Cost IQ Score: ${_sc}/100
-เลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)
-โอกาสเต็มที่: ${fmt(totalAll())}/เดือน
-
-=== Trend 6 เดือน ===
-${_trend}
-
-=== หมวดสินค้า (เดือนล่าสุด) ===
-${_catStr}
-
-=== SKU ที่ซื้ออยู่ทั้งหมด (เดือนล่าสุด) ===
-${_skuStr}
-
-=== SKU Movement (6 เดือน) ===
-${_skuMovement}
-
-=== โอกาสประหยัด (ทั้งหมด ${OPPS.length} รายการ) ===
-${_ol}
-
 -- OUTPUT CONTRACT --
-- Answer first. Evidence second.
-- If the data has a clear answer, give it immediately.
-- If something is missing, say so — don't fill gaps with guesses.
-- No preamble. Start with the point.`;
+- Start with the answer, not a preamble.
+- Be easy to use: concise first, then explain only what is useful.
+- If the user asks for analysis, give diagnosis → why it matters → what to do next.
+- If the data is missing or the scope is not loaded, say that directly and suggest the safest next step.
+- Do not invent customer facts, SKU facts, or portfolio facts.
+- Use Thai Baht only: บาท or ฿. Never use เยน, JPY, ¥, dollar, or USD.
+- Refer to yourself only as Olive. Never use หนู, ฉัน, ดิฉัน, ผม, เรา, อาจารย์, or ครับ.`;
+
   try{
-    // F1: Add required headers for claude.ai browser context
-    const _apiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
-    // Dynamic model: Sonnet for complex turns, Haiku for simple (Claude only; Gemini uses Flash always)
-    const _chatModelKey=_needsSonnet?'sonnet':'haiku';
-    const reply=await callAI(_chatModelKey,sys,chatHist,1000);
+    const reply=await callAI(_chatModelKey,sys,chatHist.slice(-10),_needsSonnet?1400:900);
     const cleanReply=oliveToneClean(reply);
-    ldEl.querySelector('.mb').innerHTML=cleanReply.replace(/\n/g,'<br>');ldEl.querySelector('.mb').classList.remove('ld');
+    ldEl.querySelector('.mb').innerHTML=cleanReply.replace(/\n/g,'<br>');
+    ldEl.querySelector('.mb').classList.remove('ld');
     chatHist.push({role:'assistant',content:cleanReply});
-  }catch(e){ldEl.querySelector('.mb').textContent='ขออภัย เชื่อมต่อไม่ได้ขณะนี้';ldEl.querySelector('.mb').classList.remove('ld');}
+  }catch(e){
+    ldEl.querySelector('.mb').textContent='ขออภัย เชื่อมต่อไม่ได้ขณะนี้';
+    ldEl.querySelector('.mb').classList.remove('ld');
+  }
   aiLoading=false;
 }
 
@@ -13778,7 +14886,6 @@ Structure:
 Don't repeat numbers already visible in the list.
 When mentioning a SKU, use ฿ — not %.`;
   try{
-    const _pvApiKey=(document.getElementById('matcher-api-key')?.value||CLAUDE_API_KEY).trim();
     const txt=await callAI('sonnet',sysPv,[{role:'user',content:prompt}],2000);
     if(out){out.style.display='block';out.style.animation='none';out.innerHTML=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');requestAnimationFrame(()=>{out.style.animation='insightReveal 400ms ease forwards';});}
     portviewAiDone=true;
@@ -14842,7 +15949,6 @@ function initOliveAvatar(){
   setAiProvider(aiProvider);
   initOliveAvatar();
   initChatFabDrag();
-  if(geminiApiKey){const gk=document.getElementById('gemini-api-key');if(gk)gk.value=geminiApiKey;}
   // Restore accounts list from localStorage
   // Migrate old ciq_accounts to ciq_index (one-time migration)
   try{
