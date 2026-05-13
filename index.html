@@ -4795,38 +4795,69 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
 }
 
 async function loadFromCloudflareR2(){
-  if(sheetsLoadStarted)return; // core load already started or done
+  if(sheetsLoadStarted)return; // initial Cloudflare load already started or done
   sheetsLoadStarted=true;
-  const CORE=['portview','history'];
+
+  // v147 loading strategy:
+  // 1) Load the 5 lightweight operational files first so the app is useful fast.
+  // 2) Immediately continue loading the 2 heavy files in the background.
+  // 3) Heavy files are still NOT cached in IndexedDB to reduce iOS memory pressure.
+  const FOREGROUND=['portview','history','categories','sku_current','outlets'];
+  const BACKGROUND=['skus','alternatives'];
   const btn=document.getElementById('sheets-load-btn');
   const counter=document.getElementById('sheets-loaded-count');
   const progEl=document.getElementById('sheets-progress');
   if(btn){btn.disabled=true;btn.textContent='กำลังโหลด...';}
-  if(counter){counter.style.display='inline-block';counter.textContent='0/'+CORE.length;}
+  if(counter){counter.style.display='inline-block';counter.textContent='0/'+FOREGROUND.length;}
   if(progEl){
     progEl.style.display='flex';
-    progEl.innerHTML=CORE.map(k=>R2_SPECS[k]).map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
+    progEl.innerHTML=FOREGROUND.map(k=>R2_SPECS[k]).map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
   }
-  _setDataPillText('โหลด Portfolio','0/'+CORE.length);
+
+  _setDataPillText('โหลดข้อมูลหลัก','0/'+FOREGROUND.length);
   let loaded=0;
-  for(const key of CORE){
+  for(const key of FOREGROUND){
     const ok=await _fetchCloudflareFile(R2_SPECS[key],{force:false});
     if(ok)loaded++;
-    if(counter)counter.textContent=loaded+'/'+CORE.length;
-    _setDataPillText('โหลด Portfolio',loaded+'/'+CORE.length);
+    if(counter)counter.textContent=loaded+'/'+FOREGROUND.length;
+    _setDataPillText('โหลดข้อมูลหลัก',loaded+'/'+FOREGROUND.length);
   }
-  if(btn){btn.disabled=false;btn.textContent='Refresh data';}
+
+  // Render the app as soon as the first 5 files are ready enough.
   if(loaded>0){
-    showToast('พร้อมใช้งาน — Portfolio '+loaded+'/'+CORE.length+' ไฟล์','✓');
-    _finishDataPill('Portfolio พร้อมแล้ว',1000);
+    showToast('พร้อมใช้งาน — ข้อมูลหลัก '+loaded+'/'+FOREGROUND.length+' ไฟล์','✓');
   }else{
-    showToast('โหลด Portfolio ไม่สำเร็จ — ลอง refresh data','⚠');
-    _finishDataPill('โหลดข้อมูลไม่ได้',1800);
+    showToast('โหลดข้อมูลหลักไม่สำเร็จ — ลอง refresh data','⚠');
   }
   if(typeof renderPortview==='function')renderPortview();
   if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
-}
 
+  // Immediately continue with heavy files. Do not cache these; they remain session-memory only.
+  if(progEl){
+    progEl.innerHTML += BACKGROUND.map(k=>R2_SPECS[k]).map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`).join('');
+  }
+  _setDataPillText('โหลด SKU + ทางเลือก','0/'+BACKGROUND.length);
+  let bgLoaded=0;
+  for(const key of BACKGROUND){
+    const ok=await _fetchCloudflareFile(R2_SPECS[key],{force:false,cacheOverride:false});
+    if(ok)bgLoaded++;
+    _setDataPillText('โหลด SKU + ทางเลือก',bgLoaded+'/'+BACKGROUND.length);
+  }
+
+  if(btn){btn.disabled=false;btn.textContent='Refresh data';}
+  if(counter)counter.textContent=(loaded+bgLoaded)+'/'+(FOREGROUND.length+BACKGROUND.length);
+  if(bgLoaded===BACKGROUND.length){
+    showToast('ข้อมูล Sense พร้อมแล้ว','✓');
+    _finishDataPill('ข้อมูลพร้อมแล้ว',1000);
+  }else if(loaded>0){
+    showToast('ข้อมูลหลักพร้อม แต่ SKU/ทางเลือกยังไม่ครบ','⚠');
+    _finishDataPill('ข้อมูลหลักพร้อมแล้ว',1800);
+  }else{
+    _finishDataPill('โหลดข้อมูลไม่ได้',1800);
+  }
+  if(typeof updateDataStatus==='function')updateDataStatus();
+  if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+}
 async function reloadFromCloudflareR2(){
   await _csvCacheClear();
   sheetsLoadStarted=false;
