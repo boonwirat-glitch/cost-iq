@@ -3176,7 +3176,8 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
         </div>
         <span class="portview-level-badge">TL</span>
       </div>
-      <!-- Team summary stats -->\n      <div id="tv-pace-bar" style="display:none;margin-bottom:12px"></div>
+      <!-- Team summary stats -->
+      <div id="tv-pace-bar" style="display:none;margin-bottom:12px"></div>
       <!-- Compact strip — visible when scrolled (TV) -->
       <div class="pv-compact-strip hidden" id="tv-compact-strip"></div>
       <!-- Search expand (collapsed TV) -->
@@ -14435,14 +14436,13 @@ function renderTeamview(){
     if(backWrap)backWrap.style.display='none';
     renderTeamviewSummary();
     renderTeamviewKamList();
-    // Collapse infrastructure for TV
+    // v154c: Teamview must stay expanded. Do not attach the scroll-collapse behavior here.
     if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
     const tvColl=document.getElementById('tv-collapsible');
     const tvStrip=document.getElementById('tv-compact-strip');
     if(tvColl){tvColl.className='pv-collapsible expanded';}
-    if(tvStrip){tvStrip.className='pv-compact-strip hidden';}
+    if(tvStrip){tvStrip.className='pv-compact-strip hidden';tvStrip.innerHTML='';}
     const _tvSen=document.getElementById('tv-collapse-sentinel');if(_tvSen)_tvSen.remove();
-    setTimeout(()=>{_tvBuildCompactStrip();_tvInitCollapseObserver();},120);
   }
 }
 
@@ -14478,76 +14478,16 @@ function _tvBuildCompactStrip(){
   const sc=document.getElementById('tv-sort-count');if(sc)sc.textContent=groups.length+' KAM';
 }
 function _tvInitCollapseObserver(){
-  // v153 surgical patch: same scroll-position based collapse as Portfolio,
-  // scoped only to TL/Admin Teamview. No data/filter/sort logic is touched.
+  // v154c: disabled by design. Teamview should keep the full summary visible.
+  // Keep this as a safeguard because older call sites may still invoke it.
   if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
   const oldSen=document.getElementById('tv-collapse-sentinel');if(oldSen)oldSen.remove();
-  const screen=document.getElementById('scr-teamview');
   const collapsible=document.getElementById('tv-collapsible');
   const strip=document.getElementById('tv-compact-strip');
-  const listEl=document.getElementById('teamview-content');
-  if(!screen||!collapsible||!strip||!listEl)return;
-
-  let raf=0;
-  let lastCollapsed=null;
-  const COLLAPSE_AT=42;
-  const EXPAND_AT=8;
-
-  function _scrollTop(){
-    const se=document.scrollingElement||document.documentElement;
-    return Math.max(
-      window.pageYOffset||0,
-      se?se.scrollTop||0:0,
-      document.documentElement?document.documentElement.scrollTop||0:0,
-      document.body?document.body.scrollTop||0:0,
-      screen.scrollTop||0
-    );
-  }
-  function _aiVisible(){
-    const tvAiOut=document.getElementById('tv-ai-output');
-    return !!(tvAiOut&&tvAiOut.style.display!=='none');
-  }
-  function _canExpand(){
-    const msSinceRender=Date.now()-(window._tvLastRenderMs||0);
-    return msSinceRender>350&&!_aiVisible();
-  }
-  function _apply(collapsed){
-    if(lastCollapsed===collapsed)return;
-    lastCollapsed=collapsed;
-    collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
-    strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
-    window._tvLastCollapseMs=collapsed?Date.now():0;
-  }
-  function _check(){
-    raf=0;
-    if(!screen.classList.contains('on'))return;
-    const y=_scrollTop();
-    if(y>COLLAPSE_AT){
-      _apply(true);
-    }else if(y<=EXPAND_AT&&_canExpand()){
-      _apply(false);
-    }
-  }
-  function _schedule(){
-    if(raf)return;
-    raf=requestAnimationFrame(_check);
-  }
-
-  window.addEventListener('scroll',_schedule,{passive:true});
-  document.addEventListener('scroll',_schedule,true);
-  screen.addEventListener('scroll',_schedule,{passive:true});
-  window.addEventListener('resize',_schedule,{passive:true});
-
-  setTimeout(_schedule,180);
-
-  _tvCollapseObserver={disconnect:()=>{
-    if(raf){cancelAnimationFrame(raf);raf=0;}
-    window.removeEventListener('scroll',_schedule);
-    document.removeEventListener('scroll',_schedule,true);
-    screen.removeEventListener('scroll',_schedule);
-    window.removeEventListener('resize',_schedule);
-  }};
+  if(collapsible)collapsible.className='pv-collapsible expanded';
+  if(strip){strip.className='pv-compact-strip hidden';strip.innerHTML='';}
 }
+
 
 function renderTeamviewSummary(){
   const groups=_buildKamGroups();
@@ -14759,11 +14699,11 @@ When mentioning a SKU, use ฿ — not %.`;
     const txt=await callAI('sonnet',sysTv,[{role:'user',content:tvUserMsg}],1200);
     if(out){out.style.display='block';out.style.animation='none';out.innerHTML=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');requestAnimationFrame(()=>{out.style.animation='insightReveal 400ms ease forwards';});}
     teamviewAiDone=true;
-    // Auto-collapse summary cards — insight text now needs the reading space
+    // v154c: keep Teamview expanded after insight; no compact strip on Team.
     const _tvColl=document.getElementById('tv-collapsible');
     const _tvStrip=document.getElementById('tv-compact-strip');
-    if(_tvColl){_tvColl.className='pv-collapsible collapsed';window._tvLastCollapseMs=Date.now();}
-    if(_tvStrip)_tvStrip.className='pv-compact-strip visible';
+    if(_tvColl){_tvColl.className='pv-collapsible expanded';}
+    if(_tvStrip){_tvStrip.className='pv-compact-strip hidden';_tvStrip.innerHTML='';}
     if(lbl)lbl.innerHTML='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="vertical-align:-.5px"><path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="#4ddc97" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Team Insight';
     btn.classList.add('done');
     btn.classList.add('done-bounce');
