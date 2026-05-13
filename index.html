@@ -3346,6 +3346,55 @@ const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 let currentUser = null;
 let currentUserProfile = null;
 
+// v149: guarded splash transition + relogin runtime cleanup
+let loginTransitionRunning = false;
+
+function resetRuntimeSessionState(){
+  try { sheetsLoadStarted = false; } catch(e) {}
+  try { if (typeof _cloudLoadToken !== 'undefined') _cloudLoadToken++; } catch(e) {}
+  try {
+    if (typeof _cloudInFlight !== 'undefined') {
+      if (typeof _clearCloudInFlight === 'function') _clearCloudInFlight();
+      else Object.keys(_cloudInFlight).forEach(k => delete _cloudInFlight[k]);
+    }
+  } catch(e) {}
+  try {
+    if (typeof _cloudLoadedTabs !== 'undefined' && _cloudLoadedTabs && typeof _cloudLoadedTabs.clear === 'function') {
+      _cloudLoadedTabs.clear();
+    }
+  } catch(e) {}
+  try { if (typeof _cloudInitialPromise !== 'undefined') _cloudInitialPromise = null; } catch(e) {}
+  try { if (typeof _cloudBackgroundPromise !== 'undefined') _cloudBackgroundPromise = null; } catch(e) {}
+  try { bulkSkusReady = false; } catch(e) {}
+  try { bulkAltsReady = false; } catch(e) {}
+  try { loginTransitionRunning = false; } catch(e) {}
+}
+
+function _showLoginOverlayClean(){
+  resetRuntimeSessionState();
+  const ov = document.getElementById('login-overlay');
+  if (ov) {
+    ov.classList.remove('lgi-checking');
+    ov.style.display = 'flex';
+    ov.style.opacity = '1';
+  }
+  const splash = document.getElementById('sense-splash');
+  if (splash) {
+    splash.style.display = 'none';
+    splash.style.opacity = '';
+    splash.style.transition = '';
+  }
+  const bar = document.getElementById('spl-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '0';
+  }
+  const em = document.getElementById('login-email');
+  const pw = document.getElementById('login-password');
+  if (em) em.value = '';
+  if (pw) pw.value = '';
+}
+
 // ── Reactive auth state listener ─────────────────────────────────────────────
 // Guard A: only act when currentUser not yet set → prevents double-invoke
 //          if doLogin() already completed before onAuthStateChange fires
@@ -3358,13 +3407,7 @@ supa.auth.onAuthStateChange((event, session) => {
   } else if (event === 'SIGNED_OUT' && currentUser) {
     currentUser = null;
     currentUserProfile = null;
-    sheetsLoadStarted = false;
-    const ov = document.getElementById('login-overlay');
-    if(ov){ ov.classList.remove('lgi-checking'); ov.style.display='flex'; ov.style.opacity='1'; }
-    const em = document.getElementById('login-email');
-    const pw = document.getElementById('login-password');
-    if(em) em.value='';
-    if(pw) pw.value='';
+    _showLoginOverlayClean();
   }
 });
 
@@ -3432,9 +3475,43 @@ function showSenseSplash(onDone){
 }
 
 function hideLoginOverlay() {
+  if (loginTransitionRunning) return;
+  loginTransitionRunning = true;
+
   const ov = document.getElementById('login-overlay');
-  if (ov) setTimeout(() => { ov.style.display = 'none'; ov.classList.remove('lgi-checking'); }, 80);
-  _autoRouteAfterLogin();
+  let finished = false;
+  const fallbackTimer = setTimeout(() => {
+    console.warn('[login transition] splash fallback release');
+    finish();
+  }, 3200);
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(fallbackTimer);
+
+    if (ov) {
+      ov.style.display = 'none';
+      ov.classList.remove('lgi-checking');
+    }
+
+    _autoRouteAfterLogin();
+
+    setTimeout(() => {
+      loginTransitionRunning = false;
+    }, 300);
+  };
+
+  try {
+    if (typeof showSenseSplash === 'function') {
+      showSenseSplash(finish);
+    } else {
+      finish();
+    }
+  } catch(e) {
+    console.warn('[login transition] splash failed:', e);
+    finish();
+  }
 }
 
 function _autoRouteAfterLogin() {
@@ -3464,17 +3541,15 @@ async function loadUserProfile() {
 }
 
 async function doSignOut() {
-  await supa.auth.signOut();
-  // Note: onAuthStateChange(SIGNED_OUT) will fire and handle UI reset via Guard D.
-  // The explicit reset below is a safety fallback in case the event is delayed.
-  currentUser = null; currentUserProfile = null;
-  sheetsLoadStarted = false; // allow fresh fetch on next login
-  const ov = document.getElementById('login-overlay');
-  if(ov){ ov.classList.remove('lgi-checking'); ov.style.display = 'flex'; ov.style.opacity = '1'; }
-  const em = document.getElementById('login-email');
-  const pw = document.getElementById('login-password');
-  if(em) em.value = '';
-  if(pw) pw.value = '';
+  try {
+    await supa.auth.signOut();
+  } catch(e) {
+    console.warn('[signOut]', e);
+  }
+  // Note: onAuthStateChange(SIGNED_OUT) should also run. This fallback prevents stale splash/loader state.
+  currentUser = null;
+  currentUserProfile = null;
+  _showLoginOverlayClean();
 }
 
 async function saveAltsToSupabase(accountId, altData) {
