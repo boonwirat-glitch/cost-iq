@@ -10173,7 +10173,7 @@ function setMatcherModel(model){
 // ── OLIVE BASE PROMPT ─────────────────────────────────
 // Single canonical Olive identity used by every AI call.
 // Per-call blocks (task context + output contract) are appended after this.
-const OLIVE_BASE=`You are Olive, a warm, playful, highly capable female AI co-pilot for Freshket's KAM team. Your job is to help KAMs understand what is actually happening in each account — and what to do about it. Communicate like a trusted internal intelligence partner: concise, practical, data-driven, and action-oriented. Use Thai by default when the user writes Thai, with feminine particles like "ค่ะ/นะคะ." When referring to yourself in Thai, use "Olive" or omit the pronoun. Never use "ดิฉัน", "ฉัน", "ผม", or "เรา" to refer to yourself. Think of yourself as a smart, personable junior colleague who happens to know everything about the data. Use gentle humor naturally, but do not use emojis at the end of sentences or responses.
+const OLIVE_BASE=`You are Olive, a warm, playful, highly capable female AI co-pilot for Freshket's KAM team. Your job is to help KAMs understand what is actually happening in each account — and what to do about it. Communicate like a trusted internal intelligence partner: concise, practical, data-driven, and action-oriented. When the user writes Thai or mixed Thai-English, reply in Thai. Only reply in English if the user explicitly asks for English. Use feminine particles like "ค่ะ/นะคะ" naturally. When referring to yourself in Thai, use "หนู" or "Olive" — never "\u0e14\u0e34\u0e09\u0e31\u0e19" or "\u0e09\u0e31\u0e19". Think of yourself as a smart, personable junior colleague who happens to know everything about the data. Use gentle humor naturally, but do not use emojis at the end of sentences or responses.
 
 Always answer first, then show key evidence, interpretation, recommendation, and next step. For summaries, identify Decision, Owner, Deadline, Next step, and Risk. Be transparent about data limitations. Never pretend data exists. Label assumptions clearly. If you make an error, admit it directly, explain the cause, correct it, and move forward.
 
@@ -10186,11 +10186,10 @@ On cost-saving alternatives: the system surfaces potential substitutions from a 
 Personality: cute but not childish, smart but not arrogant, warm but honest, playful but operationally serious. Signature behavior: "เก่งแบบไม่มั่ว" — accuracy and usefulness over sounding confident. Know how to read the room — a structured briefing card calls for one sharp, decisive thought; an open conversation deserves your full thinking. Compressing when the moment demands it isn't losing your voice, it's part of being good at what you do.`;
 
 function oliveToneClean(t){
+  // Narrow safety net only. Do not rewrite user/customer quotes such as "ผม" or "เรา".
   return String(t||'')
-    .replace(/ดิฉัน/g,'Olive')
-    .replace(/ฉัน/g,'Olive')
-    .replace(/ผม/g,'Olive')
-    .replace(/ครับผม/g,'ค่ะ')
+    .replace(/\u0e14\u0e34\u0e09\u0e31\u0e19/g,'Olive')
+    .replace(/(^|[\n\r\t \u00A0])\u0e09\u0e31\u0e19(?=(\s|จะ|ขอ|เห็น|คิด|แนะนำ|ช่วย|พร้อม|วิเคราะห์|เป็น|คือ))/g,'$1Olive')
     .trim();
 }
 
@@ -12329,7 +12328,7 @@ Rules:
 - Every line must open a dialogue, not close it.
 - Sound like a person talking, not a sales rep reading a script.
 - Don't lead with numbers, and never say "ยอดซื้อลดลง" directly — consultative angle only.
-- Gender-neutral Thai — no ผม/ดิฉัน at the start.
+- Gender-neutral Thai — do not start with gendered first-person pronouns.
 - Situation priority:
   pace_danger → line 1 asks why volume dropped, nothing else first — ไม่ใช่ขายของ
   sku_churn → line 1 opens on menu or supplier naturally
@@ -12353,7 +12352,7 @@ Rules:
     const result=JSON.parse(txt.slice(st,en+1));
     if(body&&result.talklines){
       // Gender-neutral post-processing: remove common gendered words
-      const neutralize=t=>t.replace(/ผมจะ|ผมได้|ผมเห็น|ผมพบ|ผมแนะนำ|ดิฉันจะ|ดิฉัน/g,'').replace(/ครับผม/g,'ครับ').trim();
+      const neutralize=t=>t.replace(/^(?:ผม(?:จะ|ได้|เห็น|พบ|แนะนำ)|\u0e14\u0e34\u0e09\u0e31\u0e19(?:จะ)?)[\s:：-]*/,'').replace(/ครับผม$/,'ครับ').trim();
       body.innerHTML=result.talklines.map((t,i)=>`<div class="kam-talkline-item"><div class="kam-talkline-num">${i+1}</div><div class="kam-talkline-text">${neutralize(t)}</div></div>`).join('');
     }
     if(tlLoading)tlLoading.style.display='none';
@@ -12781,6 +12780,10 @@ async function sendChat(){
   // Detect if this turn needs deep analysis (Sonnet) vs factual answer (Haiku)
   const _needsSonnet=!isFirstTurn&&(q.length>60||/วิเคราะห์|เปรียบเทียบ|แนะนำ|วางแผน|สรุปภาพรวม|ทำไม.*ลด|ทำไม.*เพิ่ม/.test(q));
   const _chatModel=_needsSonnet?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
+  const _mustReplyThai=/[\u0E00-\u0E7F]/.test(q) && !/(answer|reply|respond)\s+in\s+english|english\s+only|ภาษาอังกฤษ/i.test(q);
+  const _languageContract=_mustReplyThai
+    ? 'ผู้ใช้ถามเป็นภาษาไทยหรือไทยปนอังกฤษ: ต้องตอบเป็นภาษาไทยเท่านั้น ใช้คำอังกฤษเฉพาะชื่อ metric, field, feature หรือศัพท์ธุรกิจที่จำเป็น ห้ามสลับไปตอบอังกฤษทั้งประโยค ถ้าจำเป็นต้อง quote field/SQL ให้ quote ได้ แต่คำอธิบายต้องเป็นไทย'
+    : 'Mirror the user\'s requested language. If no explicit English request exists, prefer Thai.';
   const _modeLine=isKAM
     ?`\n\n=== บทบาทผู้ถาม ===\nKAM (Key Account Manager) วิเคราะห์บัญชีลูกค้า B2B — ตอบเหมือน senior analyst ที่รู้จักร้านนี้ดี ชี้ pattern ที่ KAM อาจมองข้าม บอกตรงๆ ว่าต้องทำอะไร`
     :'\n\n=== บทบาทผู้ถาม ===\nเจ้าของ/ผู้จัดการร้านอาหาร — ตอบแบบที่ปรึกษาที่เข้าใจชีวิตร้านอาหารจริงๆ รู้ว่า food cost pressure หนักแค่ไหน เน้น action ที่ทำได้จริง ไม่ใช่ theory';
@@ -12790,6 +12793,9 @@ async function sendChat(){
 ${isKAM
   ?`The person asking is a KAM analyzing this account. Answer like a senior analyst who knows this restaurant well — surface patterns they might have missed, be direct about what needs to happen next.`
   :`The person asking runs this restaurant. Answer like an advisor who genuinely understands the pressure — food cost, margins, waste, cash flow. Practical over theoretical, always.`}
+
+-- LANGUAGE CONTRACT --
+${_languageContract}
 
 -- ACCOUNT DATA --
 ชื่อ: ${_an}
