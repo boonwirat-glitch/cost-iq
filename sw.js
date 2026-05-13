@@ -1,7 +1,8 @@
-// Cost IQ — Service Worker v107
-// Strategy: Network-first (app ต้องการ data สด) + offline fallback
+// Freshket Sense — Service Worker v155-phase6.1
+// Strategy: Network-first for app shell navigation + offline fallback.
+// Cache version bumped for Phase 6.1 so users do not keep stale index.html.
 
-const CACHE_NAME = 'costiq-v107';
+const CACHE_NAME = 'freshket-sense-v155-phase6-1';
 const OFFLINE_URL = '/index.html';
 
 // Install: cache shell
