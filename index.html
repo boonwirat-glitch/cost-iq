@@ -390,9 +390,9 @@ body.kam-mode .ni.nav-home.on .nwrap{background:rgba(38,96,200,.4);box-shadow:0 
 body:not(.kam-mode) .main{height:0!important;min-height:0!important;padding:0!important;overflow:visible}
 .swipe-grp{display:none}
 .swipe-grp.on{display:flex}
-body:not(.kam-mode) .swipe-grp.on{position:fixed;top:48px;bottom:60px;left:50%;transform:translateX(-50%);width:100%;max-width:440px;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+body:not(.kam-mode) .swipe-grp.on{position:fixed;top:48px;bottom:calc(104px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:100%;max-width:440px;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 body:not(.kam-mode) .swipe-grp.on::-webkit-scrollbar{display:none}
-body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;display:block!important;scroll-snap-align:start;scroll-snap-stop:always;animation:none;box-sizing:border-box;-webkit-overflow-scrolling:touch}
+body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;display:block!important;scroll-snap-align:start;scroll-snap-stop:always;animation:none;box-sizing:border-box;-webkit-overflow-scrolling:touch;padding-bottom:18px}
 /* KAM mode: swipe groups become transparent block containers */
 body.kam-mode #swipe-grp-a,body.kam-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kam-mode #swipe-grp-a .scr,body.kam-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
@@ -410,6 +410,7 @@ body:not(.kam-mode) #nav-report{display:none!important}
   box-shadow:0 8px 24px rgba(0,48,38,.22),0 0 0 1px rgba(255,255,255,.04) inset;
   opacity:0;pointer-events:none;white-space:nowrap;
   transition:opacity .28s ease,transform .32s cubic-bezier(.34,1.2,.64,1),background .22s,border-color .22s;
+  will-change:opacity,transform;
   -webkit-tap-highlight-color:transparent;
 }
 #swipe-pill.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
@@ -14880,6 +14881,7 @@ function initOliveAvatar(){
 
 // ── Restaurant swipe cue helpers (v154) ──
 var _pillHideTimer;
+var _pillCleanupTimer;
 var _restSwipeCueState={grp:'a',idx:0};
 function _hasRestSwipeLearned(){
   try{return localStorage.getItem('ciq_rest_swipe_learned')==='1';}catch(e){return false;}
@@ -14892,7 +14894,7 @@ function _setRestSwipeCue(grp,idx,opts){
   _restSwipeCueState={grp:grp||'a',idx:idx||0};
   const p=document.getElementById('swipe-pill');
   if(!p)return;
-  if(typeof isKAM!=='undefined'&&isKAM){p.classList.remove('show','teach','compact');return;}
+  if(typeof isKAM!=='undefined'&&isKAM){clearTimeout(_pillHideTimer);clearTimeout(_pillCleanupTimer);p.classList.remove('show','teach','compact');return;}
   const labels={a:['ภาพรวม','พอร์ต'],b:['Sense','รายงาน']};
   const l=(labels[grp]||labels.a);
   const left=document.getElementById('sp-left-label');
@@ -14913,13 +14915,19 @@ function _setRestSwipeCue(grp,idx,opts){
   const teach=!!(opts.teach&&grp==='a'&&!_hasRestSwipeLearned());
   const shouldShow=opts.show!==false&&(teach||opts.teach||opts.flash||opts.show);
   clearTimeout(_pillHideTimer);
+  clearTimeout(_pillCleanupTimer);
   p.classList.toggle('teach',teach);
   p.classList.toggle('compact',!teach);
   if(!shouldShow){return;}
   p.classList.add('show');
   const hideAfter=teach?(opts.duration||2800):(opts.duration||1100);
   _pillHideTimer=setTimeout(function(){
-    p.classList.remove('show','teach','compact');
+    // v154d: fade out first, then clean up mode classes after opacity transition.
+    // Removing teach/compact immediately changes content width mid-fade and causes a visible jump.
+    p.classList.remove('show');
+    _pillCleanupTimer=setTimeout(function(){
+      if(!p.classList.contains('show'))p.classList.remove('teach','compact');
+    },360);
   },hideAfter);
 }
 function _showPill(opts){
@@ -14928,10 +14936,14 @@ function _showPill(opts){
 }
 function _hidePill(delay){
   clearTimeout(_pillHideTimer);
+  clearTimeout(_pillCleanupTimer);
   const p=document.getElementById('swipe-pill');
   if(!p)return;
   _pillHideTimer=setTimeout(function(){
-    p.classList.remove('show','teach','compact');
+    p.classList.remove('show');
+    _pillCleanupTimer=setTimeout(function(){
+      if(!p.classList.contains('show'))p.classList.remove('teach','compact');
+    },360);
   },delay||0);
 }
 function _handleSwipeCueTap(){
