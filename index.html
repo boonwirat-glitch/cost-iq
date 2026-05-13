@@ -3271,7 +3271,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     <button class="aix" onclick="closeChat()">✕</button>
   </div>
   <div class="aimsgs" id="aimsgs">
-    <div class="msg a" id="chat-intro-msg"><div class="mb">สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ</div></div>
+    <div class="msg a" id="chat-intro-msg"><div class="mb">สวัสดีค่ะ <strong>Olive</strong> พร้อมช่วยวิเคราะห์บัญชีลูกค้าจาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ</div></div>
   </div>
   <div class="aisugg" id="aisugg"></div>
   <div class="aiinput-row">
@@ -6032,11 +6032,11 @@ function selectAll(){OPPS.forEach(o=>sel.add(o.id));renderOpps();updatePbFooter(
 // ONBOARDING
 // ════════════════════════════════════════
 function checkOnboarding(){
-  try{
-    if(!localStorage.getItem('ciq_visited')){
-      document.getElementById('onboard-overlay').style.display='flex';
-    }
-  }catch(e){}
+  // v143: intro/onboarding disabled. Keep this function as a safe no-op
+  // because the initial app boot still calls it when sample data is loaded.
+  try{localStorage.setItem('ciq_visited','1');}catch(e){}
+  const overlay=document.getElementById('onboard-overlay');
+  if(overlay)overlay.style.display='none';
 }
 
 function closeOnboarding(){
@@ -9926,7 +9926,7 @@ function setMatcherModel(model){
 // ── OLIVE BASE PROMPT ─────────────────────────────────
 // Single canonical Olive identity used by every AI call.
 // Per-call blocks (task context + output contract) are appended after this.
-const OLIVE_BASE=`You are Olive, a warm, playful, highly capable female AI co-pilot for Freshket's KAM team. Your job is to help KAMs understand what is actually happening in each account — and what to do about it. Communicate like a trusted internal intelligence partner: concise, practical, data-driven, and action-oriented. Use Thai by default when the user writes Thai, with feminine particles like "ค่ะ/นะคะ." When referring to yourself in Thai, use "หนู" or "Olive" — never "ฉัน." Think of yourself as a smart, personable junior colleague who happens to know everything about the data. Use gentle humor naturally, but do not use emojis at the end of sentences or responses.
+const OLIVE_BASE=`You are Olive, a warm, playful, highly capable female AI co-pilot for Freshket's KAM team. Your job is to help KAMs understand what is actually happening in each account — and what to do about it. Communicate like a trusted internal intelligence partner: concise, practical, data-driven, and action-oriented. Use Thai by default when the user writes Thai, with feminine particles like "ค่ะ/นะคะ." When referring to yourself in Thai, use "Olive" or omit the pronoun. Never use "ดิฉัน", "ฉัน", "ผม", or "เรา" to refer to yourself. Think of yourself as a smart, personable junior colleague who happens to know everything about the data. Use gentle humor naturally, but do not use emojis at the end of sentences or responses.
 
 Always answer first, then show key evidence, interpretation, recommendation, and next step. For summaries, identify Decision, Owner, Deadline, Next step, and Risk. Be transparent about data limitations. Never pretend data exists. Label assumptions clearly. If you make an error, admit it directly, explain the cause, correct it, and move forward.
 
@@ -9937,6 +9937,15 @@ Thailand context: all restaurant-to-supplier and KAM-to-customer communication h
 On cost-saving alternatives: the system surfaces potential substitutions from a database, but these have not been spec-verified against the customer's actual requirements. Always frame alternatives as options to explore, not confirmed recommendations — e.g. "ลองเช็คกับลูกค้าก่อนว่า..." or "น่าจะพิจารณาได้ แต่ต้องคุยก่อน" — because the customer may have brand, spec, or contract reasons for their current choice that the data doesn't show.
 
 Personality: cute but not childish, smart but not arrogant, warm but honest, playful but operationally serious. Signature behavior: "เก่งแบบไม่มั่ว" — accuracy and usefulness over sounding confident. Know how to read the room — a structured briefing card calls for one sharp, decisive thought; an open conversation deserves your full thinking. Compressing when the moment demands it isn't losing your voice, it's part of being good at what you do.`;
+
+function oliveToneClean(t){
+  return String(t||'')
+    .replace(/ดิฉัน/g,'Olive')
+    .replace(/ฉัน/g,'Olive')
+    .replace(/ผม/g,'Olive')
+    .replace(/ครับผม/g,'ค่ะ')
+    .trim();
+}
 
 // ── AI PROVIDER ROUTER ────────────────────────────────
 // Single entry point for all AI calls. modelKey: 'haiku'|'sonnet'
@@ -12370,10 +12379,10 @@ function openChat(){
       currentAccountId&&currentAccountId!=='default'&&!currentAccountId.startsWith('sample_'))
       ? D.meta.accountName : '';
     const txt=isKAM&&_an
-      ?`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>วันนี้มีเรื่องบัญชี <strong>${_an}</strong> ให้วิเคราะห์ หรืออยากให้ช่วยเรื่องไหนเป็นพิเศษคะ`
+      ?`สวัสดีค่ะ <strong>Olive</strong> พร้อมช่วยวิเคราะห์บัญชีลูกค้า <strong>${_an}</strong><br><br>วันนี้อยากให้ช่วยดูประเด็นไหนเป็นพิเศษคะ`
       :isKAM
-      ?`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย KAM จาก Freshket<br><br>เลือกร้านที่พอร์ตก่อน แล้ว Olive จะวิเคราะห์ให้เลยค่ะ`
-      :`สวัสดีค่ะ ดิฉัน <strong>Olive</strong> ผู้ช่วย Cost Advisor จาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ`;
+      ?`สวัสดีค่ะ <strong>Olive</strong> พร้อมช่วยวิเคราะห์บัญชีลูกค้าจาก Freshket<br><br>เลือกร้านที่พอร์ตก่อน แล้ว Olive จะวิเคราะห์ให้เลยค่ะ`
+      :`สวัสดีค่ะ <strong>Olive</strong> พร้อมช่วยวิเคราะห์ต้นทุนจาก Freshket<br><br>วิเคราะห์ข้อมูลต้นทุนร้านคุณ และช่วยวางแผนลดต้นทุนได้เลยค่ะ`;
     introMsg.querySelector('.mb').innerHTML=txt;
   }
 }
@@ -12498,8 +12507,9 @@ ${_ol}
     // Dynamic model: Sonnet for complex turns, Haiku for simple (Claude only; Gemini uses Flash always)
     const _chatModelKey=_needsSonnet?'sonnet':'haiku';
     const reply=await callAI(_chatModelKey,sys,chatHist,1000);
-    ldEl.querySelector('.mb').innerHTML=reply.replace(/\n/g,'<br>');ldEl.querySelector('.mb').classList.remove('ld');
-    chatHist.push({role:'assistant',content:reply});
+    const cleanReply=oliveToneClean(reply);
+    ldEl.querySelector('.mb').innerHTML=cleanReply.replace(/\n/g,'<br>');ldEl.querySelector('.mb').classList.remove('ld');
+    chatHist.push({role:'assistant',content:cleanReply});
   }catch(e){ldEl.querySelector('.mb').textContent='ขออภัย เชื่อมต่อไม่ได้ขณะนี้';ldEl.querySelector('.mb').classList.remove('ld');}
   aiLoading=false;
 }
