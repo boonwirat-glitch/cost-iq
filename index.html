@@ -400,22 +400,36 @@ body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:bl
 body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
 
 body:not(.kam-mode) #nav-report{display:none!important}
-/* ── Ghost swipe pill (fade only — top of screen) ── */
-#swipe-pill{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.96);border:1px solid rgba(0,204,106,.25);border-radius:30px;padding:5px 13px;display:flex;align-items:center;gap:7px;z-index:101;opacity:0;pointer-events:none;transition:opacity .3s ease;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-#swipe-pill.show{opacity:1}
+/* ── Restaurant swipe cue (v154) — replaces legacy white strip + dots ── */
+#swipe-pill{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-4px);
+  z-index:102;display:flex;align-items:center;justify-content:center;
+  border-radius:999px;border:1px solid rgba(0,208,112,.34);
+  background:rgba(0,86,64,.72);color:rgba(255,255,255,.88);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 8px 24px rgba(0,48,38,.22),0 0 0 1px rgba(255,255,255,.04) inset;
+  opacity:0;pointer-events:none;white-space:nowrap;
+  transition:opacity .28s ease,transform .32s cubic-bezier(.34,1.2,.64,1),background .22s,border-color .22s;
+  -webkit-tap-highlight-color:transparent;
+}
+#swipe-pill.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#swipe-pill.compact{padding:5px 10px}
+#swipe-pill.teach{padding:8px 16px;background:linear-gradient(135deg,rgba(0,112,80,.9),rgba(0,64,48,.86));border-color:rgba(0,208,112,.55);box-shadow:0 10px 28px rgba(0,48,38,.28),0 0 18px rgba(0,208,112,.18)}
+#swipe-pill:hover{border-color:rgba(0,208,112,.62);background:rgba(0,96,72,.82)}
 body.kam-mode #swipe-pill{display:none}
-.sp-dots{display:flex;gap:4px;align-items:center}
-.sp-dot{width:5px;height:5px;border-radius:3px;background:rgba(0,0,0,.15);transition:width .3s cubic-bezier(.34,1.56,.64,1),background .25s,opacity .25s}
-.sp-dot.on{width:13px;background:var(--g500)}
-.sp-dot.dim{opacity:.3}
-.sp-sep{width:.5px;height:10px;background:rgba(0,0,0,.15)}
-.sp-name{font-size:10px;font-weight:600;color:var(--g700,#00884a);min-width:38px;text-align:center;transition:all .2s}
-
-/* ── Persistent swipe dots (always visible on overview/portfolio) ── */
-#swipe-dots-a{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0 2px;position:sticky;top:0;z-index:10;background:transparent;pointer-events:none}
-body.kam-mode #swipe-dots-a{display:none}
-.sda-dot{width:5px;height:5px;border-radius:3px;background:rgba(0,0,0,.13);transition:width .3s cubic-bezier(.34,1.56,.64,1),background .25s}
-.sda-dot.on{width:14px;background:var(--g500)}
+.sp-compact{display:flex;align-items:center;gap:7px}
+#swipe-pill.teach .sp-compact{display:none}
+.sp-teach-text{display:none;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.1px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.18)}
+#swipe-pill.teach .sp-teach-text{display:flex}
+.sp-teach-icon{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(0,208,112,.22);color:#8dffc4;font-size:11px;flex-shrink:0}
+.sp-seg{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.48);padding:3px 8px;border-radius:999px;line-height:1.2;transition:all .2s}
+.sp-seg.on{color:#ffffff;background:rgba(0,208,112,.2);box-shadow:0 0 0 1px rgba(0,208,112,.18) inset}
+.sp-dots{display:flex;gap:4px;align-items:center;padding:0 1px}
+.sp-dot{width:5px;height:5px;border-radius:999px;background:rgba(255,255,255,.28);transition:width .26s cubic-bezier(.34,1.56,.64,1),background .2s,opacity .2s}
+.sp-dot.on{width:14px;background:var(--g500);box-shadow:0 0 8px rgba(0,208,112,.45)}
+.sp-mini-arrow{font-size:11px;color:rgba(255,255,255,.42);margin-left:-2px;transition:transform .2s,color .2s}
+#swipe-pill:hover .sp-mini-arrow{color:rgba(255,255,255,.78);transform:translateX(2px)}
+@media(max-width:360px){#swipe-pill{top:58px}.sp-seg{font-size:10px;padding:3px 6px}.sp-teach-text{font-size:11px}}
 @keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── UX POLISH: BUTTON PRESS FEEL ── */
@@ -2702,10 +2716,6 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <div id="swipe-grp-a" class="swipe-grp on">
   <!-- ══ OVERVIEW ══ -->
   <div class="scr on" id="scr-overview">
-    <div id="swipe-dots-a">
-      <div class="sda-dot on" id="sda0"></div>
-      <div class="sda-dot" id="sda1"></div>
-    </div>
     <div id="rest-overview">
     <div class="hero">
       <div class="h-sub" id="h-acct-name">บริษัท ลีฟ ทู อีท จำกัด</div>
@@ -3096,19 +3106,18 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   <div class="sku-detail-body" id="skuDetailBody"></div>
 </div>
 
-<!-- GHOST SWIPE PILL -->
-<div id="swipe-pill">
-  <div class="sp-dots">
-    <span class="sp-dot on" id="spda0"></span>
-    <span class="sp-dot" id="spda1"></span>
+<!-- RESTAURANT SWIPE CUE (v154) -->
+<div id="swipe-pill" class="compact" onclick="window._handleSwipeCueTap&&window._handleSwipeCueTap()" role="button" aria-label="Restaurant swipe navigation">
+  <div class="sp-compact">
+    <span class="sp-seg on" id="sp-left-label">ภาพรวม</span>
+    <span class="sp-dots">
+      <span class="sp-dot on" id="spda0"></span>
+      <span class="sp-dot" id="spda1"></span>
+    </span>
+    <span class="sp-seg" id="sp-right-label">พอร์ต</span>
+    <span class="sp-mini-arrow" id="sp-mini-arrow">→</span>
   </div>
-  <div class="sp-sep"></div>
-  <span class="sp-name" id="sp-name">ภาพรวม</span>
-  <div class="sp-sep"></div>
-  <div class="sp-dots">
-    <span class="sp-dot dim" id="spdb0"></span>
-    <span class="sp-dot dim" id="spdb1"></span>
-  </div>
+  <div class="sp-teach-text" id="sp-teach-text"><span class="sp-teach-icon">↔</span><span id="sp-teach-copy">ปัดซ้ายดูพอร์ตสินค้า →</span></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -11357,8 +11366,7 @@ function showScreen(name){
     const screens=inA?GRP_A:GRP_B;
     const idx=screens.indexOf(name);
     if(activeGrp) activeGrp.scrollTo({left:idx*activeGrp.offsetWidth,behavior:'instant'});
-    _updateRestSwipe(inA?'a':'b',idx);
-    _showPill();_hidePill(900);
+    _updateRestSwipe(inA?'a':'b',idx,{teach:inA,duration:2800});
     const footer=document.getElementById('pb-footer');
     if(footer)footer.classList.toggle('hidden',inA||name==='report');
     const modeToggleWrap=document.getElementById('mode-toggle-wrap');
@@ -14916,45 +14924,80 @@ function initOliveAvatar(){
   }
 })();
 
-// ── Ghost pill helpers ──
+// ── Restaurant swipe cue helpers (v154) ──
 var _pillHideTimer;
-function _showPill(){
-  clearTimeout(_pillHideTimer);
+var _restSwipeCueState={grp:'a',idx:0};
+function _hasRestSwipeLearned(){
+  try{return localStorage.getItem('ciq_rest_swipe_learned')==='1';}catch(e){return false;}
+}
+function _markRestSwipeLearned(){
+  try{localStorage.setItem('ciq_rest_swipe_learned','1');}catch(e){}
+}
+function _setRestSwipeCue(grp,idx,opts){
+  opts=opts||{};
+  _restSwipeCueState={grp:grp||'a',idx:idx||0};
   const p=document.getElementById('swipe-pill');
-  if(p)p.classList.add('show');
+  if(!p)return;
+  if(typeof isKAM!=='undefined'&&isKAM){p.classList.remove('show');return;}
+  const labels={a:['ภาพรวม','พอร์ต'],b:['Sense','รายงาน']};
+  const l=(labels[grp]||labels.a);
+  const left=document.getElementById('sp-left-label');
+  const right=document.getElementById('sp-right-label');
+  const d0=document.getElementById('spda0');
+  const d1=document.getElementById('spda1');
+  const arrow=document.getElementById('sp-mini-arrow');
+  const teachCopy=document.getElementById('sp-teach-copy');
+  if(left){left.textContent=l[0];left.classList.toggle('on',idx===0);}
+  if(right){right.textContent=l[1];right.classList.toggle('on',idx===1);}
+  if(d0)d0.className='sp-dot'+(idx===0?' on':'');
+  if(d1)d1.className='sp-dot'+(idx===1?' on':'');
+  if(arrow)arrow.textContent=idx===0?'→':'←';
+  if(teachCopy){
+    if(grp==='a')teachCopy.textContent=idx===0?'ปัดซ้ายดูพอร์ตสินค้า →':'← ปัดขวากลับหน้าภาพรวม';
+    else teachCopy.textContent=idx===0?'ปัดซ้ายดูรายงาน →':'← ปัดขวากลับ Sense';
+  }
+  const teach=!!(opts.teach&&grp==='a'&&!_hasRestSwipeLearned());
+  p.classList.toggle('teach',teach);
+  p.classList.toggle('compact',!teach);
+  p.classList.add('show');
+  clearTimeout(_pillHideTimer);
+  if(teach){
+    _pillHideTimer=setTimeout(function(){
+      p.classList.remove('teach');p.classList.add('compact','show');
+    },opts.duration||2800);
+  }
+}
+function _showPill(opts){
+  opts=opts||{};
+  _setRestSwipeCue(_restSwipeCueState.grp,_restSwipeCueState.idx,opts);
 }
 function _hidePill(delay){
+  // v154 keeps the compact orientation cue visible; only teaching mode collapses back to compact.
   clearTimeout(_pillHideTimer);
+  const p=document.getElementById('swipe-pill');
+  if(!p)return;
   _pillHideTimer=setTimeout(function(){
-    const p=document.getElementById('swipe-pill');
-    if(p)p.classList.remove('show');
+    p.classList.remove('teach');
+    p.classList.add('compact','show');
   },delay||900);
 }
+function _handleSwipeCueTap(){
+  const st=_restSwipeCueState||{grp:'a',idx:0};
+  const targets={a:['overview','portfolio'],b:['opportunities','report']};
+  const arr=targets[st.grp]||targets.a;
+  const nextIdx=st.idx===0?1:0;
+  if(st.grp==='a')_markRestSwipeLearned();
+  showScreen(arr[nextIdx]);
+}
 // ── Restaurant swipe helpers ──
-function _updateRestSwipe(grp,idx){
-  ['a','b'].forEach(g=>{
-    const isActive=g===grp;
-    const total=g==='a'?2:2;
-    for(let i=0;i<total;i++){
-      const d=document.getElementById('spd'+g+i);
-      if(!d)continue;
-      d.className='sp-dot';
-      if(isActive&&i===idx)d.classList.add('on');
-      else if(!isActive)d.classList.add('dim');
-    }
-  });
-  const nameEl=document.getElementById('sp-name');
-  if(nameEl){
-    // Show specific screen name in pill (grp a: ภาพรวม/พอร์ต, grp b: Sense/รายงาน)
-    const pillName={'a':['ภาพรวม','พอร์ต'],'b':['Sense','รายงาน']};
-    nameEl.textContent=(pillName[grp]&&pillName[grp][idx])||(grp==='a'?'ภาพรวม':'Sense');
-  }
+function _updateRestSwipe(grp,idx,opts){
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   // Map grp+idx → correct nav button (portfolio + report now have their own nav)
   const navMap={'a':['nav-overview','nav-portfolio'],'b':['nav-opportunities','nav-report']};
   const navId=navMap[grp]&&navMap[grp][idx];
   const navEl=navId?document.getElementById(navId):null;
   if(navEl)navEl.classList.add('on');
+  _setRestSwipeCue(grp,idx,opts||{});
 }
 (function initSwipe(){
   function addListener(grpId,screens){
@@ -14964,30 +15007,18 @@ function _updateRestSwipe(grp,idx){
     grp.addEventListener('scroll',()=>{
       const idx=Math.round(grp.scrollLeft/grp.offsetWidth);
       if(idx===lastIdx)return;
+      if(grpId==='a'&&lastIdx>=0&&idx!==lastIdx)_markRestSwipeLearned();
       lastIdx=idx;
-      _updateRestSwipe(grpId,idx);
-      _showPill();_hidePill(900);
+      _updateRestSwipe(grpId,idx,{teach:false});
       const name=screens[idx];
       const footer=document.getElementById('pb-footer');
       if(footer)footer.classList.toggle('hidden',grpId!=='b'||name==='report');
-      const swapS=document.querySelector('.swap-sticky');
       if(name==='report'&&typeof renderReport==='function')renderReport();
     },{passive:true});
   }
   addListener('a',['overview','portfolio']);
   addListener('b',['opportunities','report']);
 
-  // Sync persistent dot strip with swipe group A
-  const grpA=document.getElementById('swipe-grp-a');
-  if(grpA){
-    grpA.addEventListener('scroll',()=>{
-      const idx=Math.round(grpA.scrollLeft/grpA.offsetWidth);
-      ['sda0','sda1'].forEach((id,i)=>{
-        const d=document.getElementById(id);
-        if(d)d.className='sda-dot'+(i===idx?' on':'');
-      });
-    },{passive:true});
-  }
   // Simple port-top re-measure (no collapse behavior)
   window._expandPortTop=function(){
     const portTop=document.getElementById('port-top');
