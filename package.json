@@ -1,8 +1,8 @@
 {
   "name": "freshket-sense-v155-phase21-1-debug-snapshot-fix",
-  "version": "155.21.1",
+  "version": "155.21.2",
   "private": true,
-  "description": "Freshket Sense v155 Phase 21: final audit and regression package after core refactor",
+  "description": "Freshket Sense v155 Phase 21.2 dev workflow cleanup / AI handoff docs",
   "scripts": {
     "build": "node scripts/build.js",
     "check:secrets": "node scripts/check-secrets.js",

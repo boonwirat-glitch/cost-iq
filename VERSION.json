@@ -27,12 +27,15 @@
   "serviceWorkerCache": "freshket-sense-v155-phase21-1",
   "safetyAudit": "Phase 21 is a final audit/regression package. It does not intentionally change product behavior; it consolidates release docs, regression matrix, and final source/deploy rules.",
   "nextRecommendedPhase": "Browser final smoke test, then use this as the post-refactor baseline. Parked Olive Chat v2 redesign can be planned separately.",
-  "phase": "21",
+  "phase": "21.2",
   "name": "Final Audit / Regression Package",
   "baseline": "v155-phase6.2-chat-grounding",
   "notes": "No CSS rules, selectors, layout, navigation, loaders, auth, or AI behavior intentionally changed.",
   "phaseName": "Final Audit / Regression Package",
   "behaviorChanged": false,
   "description": "Finalizes the core refactor package with release checklist, regression matrix, handoff docs, source/deploy discipline, and final audit checks.",
-  "previousStablePhase": "v155-phase20-css-build-cleanup"
+  "previousStablePhase": "v155-phase20-css-build-cleanup",
+  "package": "v155-phase21.2-dev-workflow-cleanup",
+  "purpose": "Developer workflow cleanup / AI handoff docs only; no product runtime behavior change",
+  "previousPackage": "v155-phase21.1-debug-snapshot-fix"
 }

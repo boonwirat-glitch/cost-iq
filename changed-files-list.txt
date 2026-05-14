@@ -1,0 +1,8 @@
+VERSION.json
+changed-files-list.txt
+docs/workflow/ACTIVE_FILE_MAP.md
+docs/workflow/AI_HANDOFF.md
+docs/workflow/CLAUDE_CONTINUATION_PROMPT.md
+docs/workflow/DEV_WORKFLOW_CLEANUP.md
+docs/workflow/PATCH_WORKFLOW.md
+package.json
