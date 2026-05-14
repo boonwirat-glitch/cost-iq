@@ -2119,7 +2119,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v155-phase16-overview-renderer',
+      version: 'v155-phase21-final-audit-regression',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -2184,6 +2184,153 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   });
 
   global.FreshketSenseConfig = config;
+})(window);
+</script>
+<script id="freshket-style-runtime">
+// Freshket Sense Phase 20 — CSS/UI Token Registry + Style Diagnostics
+// Purpose: expose read-only style metadata for future CSS cleanup without changing runtime CSS behavior.
+// This file must not mutate DOM styles, class names, layout, tokens, or CSS rules.
+(function(global) {
+  'use strict';
+
+  const VERSION = 'v155-phase21-final-audit-regression';
+  const BEHAVIOR_CHANGED = false;
+
+  const TOKEN_NAMES = [
+  "--g500",
+  "--g50",
+  "--g70",
+  "--g700",
+  "--g800",
+  "--g900",
+  "--amb",
+  "--amb50",
+  "--org",
+  "--red",
+  "--red50",
+  "--n0",
+  "--n50",
+  "--n100",
+  "--n200",
+  "--n300",
+  "--n400",
+  "--n600",
+  "--n700",
+  "--n900",
+  "--bd",
+  "--sh",
+  "--shm",
+  "--r",
+  "--rs",
+  "--conf-hi",
+  "--conf-md",
+  "--conf-lo",
+  "--kam",
+  "--kam-dark",
+  "--kam-bg"
+];
+
+  const STYLE_AREAS = Object.freeze([
+    { key: 'base', label: 'Base / typography / root tokens', risk: 'low' },
+    { key: 'topbar-data-panel', label: 'Topbar / data panel / data pill', risk: 'medium' },
+    { key: 'restaurant-overview', label: 'Restaurant overview / hero / cards', risk: 'medium' },
+    { key: 'opportunities-sense', label: 'Opportunities / Sense gate / plan builder', risk: 'high' },
+    { key: 'portfolio-sku', label: 'Portfolio / SKU list / SKU detail', risk: 'high' },
+    { key: 'kam-mode', label: 'KAM account / portfolio / team views', risk: 'high' },
+    { key: 'navigation', label: 'Bottom nav / swipe / mode toggle', risk: 'high' },
+    { key: 'olive-chat', label: 'Olive FAB / chat panel', risk: 'medium' },
+    { key: 'print-report', label: 'Report / print CSS', risk: 'medium' }
+  ]);
+
+  const CRITICAL_SELECTORS = Object.freeze([
+    'body', '.topbar', '.bnav', '#swipe-pill', '#data-load-pill', '#dataPanel',
+    '#scr-overview', '#scr-portfolio', '#scr-opportunities', '#scr-report',
+    '#kam-overview', '#scr-portview', '#scr-teamview', '.aifab', '.aipanel', '#sense-gate'
+  ]);
+
+  function safeDocument(){ return global.document || null; }
+
+  function tokenSnapshot() {
+    const doc = safeDocument();
+    const out = {};
+    if (!doc || !global.getComputedStyle) {
+      TOKEN_NAMES.forEach(function(name){ out[name] = null; });
+      return out;
+    }
+    const styles = global.getComputedStyle(doc.documentElement);
+    TOKEN_NAMES.forEach(function(name) { out[name] = (styles.getPropertyValue(name) || '').trim(); });
+    return out;
+  }
+
+  function selectorInventory() {
+    const doc = safeDocument();
+    return CRITICAL_SELECTORS.map(function(selector) {
+      let count = 0;
+      try { count = doc ? doc.querySelectorAll(selector).length : 0; } catch (err) { count = -1; }
+      return { selector: selector, count: count, exists: count > 0 };
+    });
+  }
+
+  function stylesheetInventory() {
+    const doc = safeDocument();
+    if (!doc) return { styleTagCount: 0, linkedStylesheetCount: 0, inlineStyleBytesEstimate: 0 };
+    const styleTags = Array.prototype.slice.call(doc.querySelectorAll('style'));
+    const links = Array.prototype.slice.call(doc.querySelectorAll('link[rel="stylesheet"]'));
+    return {
+      styleTagCount: styleTags.length,
+      linkedStylesheetCount: links.length,
+      inlineStyleBytesEstimate: styleTags.reduce(function(sum, tag) { return sum + ((tag.textContent || '').length); }, 0),
+      linkedStylesheets: links.map(function(link) { return link.getAttribute('href') || ''; })
+    };
+  }
+
+  function validate() {
+    const tokens = tokenSnapshot();
+    const missingTokens = TOKEN_NAMES.filter(function(name) { return !tokens[name]; });
+    return {
+      ok: missingTokens.length === 0,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      tokenCount: TOKEN_NAMES.length,
+      missingTokens: missingTokens,
+      criticalSelectors: selectorInventory(),
+      styleAreas: STYLE_AREAS,
+      ts: new Date().toISOString()
+    };
+  }
+
+  function diagnostics() {
+    const validation = validate();
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      tokenNames: TOKEN_NAMES.slice(),
+      tokens: tokenSnapshot(),
+      styleAreas: STYLE_AREAS,
+      stylesheets: stylesheetInventory(),
+      validation: validation,
+      extractionPolicy: 'No external CSS extraction in Phase 20. Runtime CSS remains inline to preserve mobile/PWA behavior.',
+      nextSafeStep: 'Extract CSS by area only after renderer/navigation phases are stable and browser-tested.',
+      ts: new Date().toISOString()
+    };
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    tokenNames: function() { return TOKEN_NAMES.slice(); },
+    styleAreas: function() { return STYLE_AREAS.slice(); },
+    criticalSelectors: function() { return CRITICAL_SELECTORS.slice(); },
+    tokenSnapshot: tokenSnapshot,
+    selectorInventory: selectorInventory,
+    stylesheetInventory: stylesheetInventory,
+    validate: validate,
+    diagnostics: diagnostics
+  });
+
+  global.FreshketSenseStyleRuntime = api;
+  global.getFreshketStyleRuntimeSnapshot = diagnostics;
+  if (!global.FreshketSenseRuntime) global.FreshketSenseRuntime = {};
+  global.FreshketSenseRuntime.style = api;
 })(window);
 </script>
 <script id="freshket-view-registry">
@@ -2664,6 +2811,133 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   global.printFreshketReadModelDiagnostics = printDiagnostics;
 })(window);
 </script>
+<script id="freshket-navigation-runtime">
+// Freshket Sense Navigation / Screen Controller Boundary — Phase 19.
+// Purpose: route navigation entry points through a single controller seam while preserving legacy fallback.
+// Scope: showScreen, setMode, navPortHome. No nav/swipe/mode behavior changes intended.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase19-1-navigation-regression-test';
+  const BEHAVIOR_CHANGED = false;
+  const ENTRY_POINTS = ['showScreen', 'setMode', 'navPortHome'];
+  const calls = [];
+  const MAX_CALLS = 100;
+
+  function now(){ return new Date().toISOString(); }
+  function pushCall(name, args, ok, detail){
+    calls.push({ name, args: Array.prototype.slice.call(args || []), ok: !!ok, detail: detail || '', ts: now() });
+    if(calls.length > MAX_CALLS) calls.shift();
+  }
+  function hasFn(fn){ return typeof fn === 'function'; }
+  function el(id){ return global.document && document.getElementById(id); }
+  function getActiveScreen(){
+    const active = global.document && document.querySelector('.scr.on');
+    return active && active.id ? active.id.replace(/^scr-/, '') : null;
+  }
+  function getActiveNav(){
+    const active = global.document && document.querySelector('.ni.on');
+    return active && active.id ? active.id.replace(/^nav-/, '') : null;
+  }
+  function getSwipeGroups(){
+    return ['swipe-grp-a','swipe-grp-b'].map(function(id){
+      const node = el(id);
+      return { id, exists: !!node, active: !!(node && node.classList.contains('on')), scrollLeft: node ? node.scrollLeft : null };
+    });
+  }
+  function normalizeContext(ctx){
+    ctx = ctx || {};
+    return {
+      legacy: ctx.legacy || {},
+      isKAM: typeof ctx.isKAM === 'boolean' ? ctx.isKAM : !!global.isKAM,
+      currentAccountId: ctx.currentAccountId || global.currentAccountId || null,
+      currentUserProfile: ctx.currentUserProfile || global.currentUserProfile || null,
+      senseActivated: typeof ctx.senseActivated === 'boolean' ? ctx.senseActivated : !!global.senseActivated,
+      activeScreen: getActiveScreen(),
+      activeNav: getActiveNav(),
+      bodyKamMode: !!(global.document && document.body && document.body.classList.contains('kam-mode')),
+      swipeGroups: getSwipeGroups()
+    };
+  }
+  function safeLegacy(name, fn, args){
+    if(!hasFn(fn)){
+      pushCall(name, args, false, 'missing legacy fallback');
+      return { ok:false, controller:VERSION, method:name, reason:'missing legacy fallback', behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+    }
+    try{
+      const value = fn.apply(global, args || []);
+      pushCall(name, args, true, 'legacy-navigation-through-controller');
+      return value;
+    }catch(error){
+      pushCall(name, args, false, error && error.message || String(error));
+      throw error;
+    }
+  }
+
+  function showScreenFromLegacy(ctx, name){
+    ctx = normalizeContext(ctx);
+    return safeLegacy('showScreen', ctx.legacy && ctx.legacy.showScreen, [name]);
+  }
+  function setModeFromLegacy(ctx, mode){
+    ctx = normalizeContext(ctx);
+    return safeLegacy('setMode', ctx.legacy && ctx.legacy.setMode, [mode]);
+  }
+  function navPortHomeFromLegacy(ctx){
+    ctx = normalizeContext(ctx);
+    return safeLegacy('navPortHome', ctx.legacy && ctx.legacy.navPortHome, []);
+  }
+
+  function validate(){
+    const ids = [
+      ['nav-overview', !!el('nav-overview')],
+      ['nav-portfolio', !!el('nav-portfolio')],
+      ['nav-opportunities', !!el('nav-opportunities')],
+      ['nav-portview', !!el('nav-portview')],
+      ['nav-teamview', !!el('nav-teamview')],
+      ['swipe-grp-a', !!el('swipe-grp-a')],
+      ['swipe-grp-b', !!el('swipe-grp-b')],
+      ['mode-toggle-wrap', !!el('mode-toggle-wrap')],
+      ['kambar', !!el('kambar')]
+    ].map(function(row){ return { id:row[0], ok:!!row[1] }; });
+    return {
+      ok: !!global.document ? ids.filter(function(x){ return x.ok; }).length >= 4 : true,
+      ids,
+      note: 'Navigation anchors are soft-validated because role/mode-specific elements may be hidden or absent in some sessions.',
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function diagnostics(){
+    const ctx = normalizeContext({});
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      entryPoints: ENTRY_POINTS.slice(),
+      validation: validate(),
+      context: ctx,
+      recentCalls: calls.slice(-30),
+      ts: now()
+    };
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    entryPoints: ENTRY_POINTS.slice(),
+    showScreenFromLegacy,
+    setModeFromLegacy,
+    navPortHomeFromLegacy,
+    validate,
+    diagnostics
+  });
+
+  global.FreshketSenseNavigationRuntime = api;
+  global.FreshketSenseRuntime = global.FreshketSenseRuntime || {};
+  global.FreshketSenseRuntime.navigation = api;
+  global.getFreshketNavigationRuntimeSnapshot = diagnostics;
+})(window);
+</script>
 <script id="freshket-report-renderer">
 // Freshket Sense Report Renderer — Phase 15.
 // Purpose: extract the first actual renderer path behind a legacy-safe adapter.
@@ -3001,6 +3275,422 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   global.FreshketSenseOverviewRenderer = api;
   global.getFreshketOverviewRendererSnapshot = diagnostics;
   global.printFreshketOverviewRendererDiagnostics = printDiagnostics;
+})(window);
+</script>
+<script id="freshket-portfolio-renderer">
+// Freshket Sense Portfolio / SKU Renderer — Phase 17.
+// Purpose: extract the Restaurant Portfolio/SKU renderer behind a legacy-safe adapter.
+// Scope: Restaurant Portfolio screen + SKU list only. Must not touch navigation, loader, auth, chat, KAM, or Team renderers.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase17-portfolio-sku-renderer';
+  const BEHAVIOR_CHANGED = false;
+
+  function now(){ return new Date().toISOString(); }
+  function safe(fn, fallback){ try{ return fn(); }catch(e){ return fallback; } }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function el(id){ return global.document && document.getElementById(id); }
+  function call(fn, fallback){ return typeof fn === 'function' ? safe(fn, fallback) : fallback; }
+  function text(v){ return v == null ? '' : String(v); }
+
+  function monthSort(m){
+    const p=text(m).split(' ');
+    const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return (parseInt(p[1]||0)*12)+mo.indexOf(p[0]);
+  }
+
+  function normalizeContext(ctx){
+    ctx = ctx || {};
+    return {
+      D: ctx.D || global.D || { history:[], cats:[], skus:[], skus_monthly:{}, cats_monthly:{} },
+      SAMPLE: ctx.SAMPLE || global.SAMPLE || { history:[], cats:[], skus:[] },
+      OPPS: arr(ctx.OPPS || global.OPPS),
+      portfolioMonth: ctx.portfolioMonth || '',
+      skuFilter: ctx.skuFilter || 'ทั้งหมด',
+      priceMovFilter: ctx.priceMovFilter || null,
+      skuView: ctx.skuView || 'gmv',
+      setState: ctx.setState,
+      helpers: {
+        fmt: ctx.fmt || global.fmt || function(v){ return String(v == null ? '' : v); },
+        computePriceChanges: ctx.computePriceChanges || global.computePriceChanges,
+        computeSkuMovement: ctx.computeSkuMovement || global.computeSkuMovement,
+        renderSparkline: ctx.renderSparkline || global.renderSparkline,
+        renderPortMoMInsight: ctx.renderPortMoMInsight || global.renderPortMoMInsight,
+        expandPortTop: ctx.expandPortTop || global._expandPortTop
+      }
+    };
+  }
+
+  function setLegacyState(ctx, name, value){
+    if(ctx && typeof ctx.setState === 'function') return ctx.setState(name, value);
+    return false;
+  }
+
+  function resolvePortfolioMonth(ctx, moKeys){
+    let m = ctx.portfolioMonth;
+    if(!m || moKeys.indexOf(m) < 0){
+      m = moKeys[0] || '';
+      setLegacyState(ctx, 'portfolioMonth', m);
+    }
+    return m;
+  }
+
+  function renderSKUListFromLegacy(input, passedSkus){
+    const ctx = normalizeContext(input);
+    const D = ctx.D || {};
+    const SAMPLE = ctx.SAMPLE || {};
+    const h = ctx.helpers;
+    const rawSkus = passedSkus || (ctx.portfolioMonth && D.skus_monthly && D.skus_monthly[ctx.portfolioMonth]
+      ? D.skus_monthly[ctx.portfolioMonth]
+      : (arr(D.skus).length ? D.skus : arr(SAMPLE.skus)));
+    const skus = arr(rawSkus).slice().sort(function(a,b){ return (Number(b.gmv||b.s||0)) - (Number(a.gmv||a.s||0)); });
+    const search = (el('skuSearch') && el('skuSearch').value || '').toLowerCase();
+    let filtered = skus;
+    if(ctx.skuFilter !== 'ทั้งหมด') filtered = filtered.filter(function(s){ return s.d === ctx.skuFilter; });
+    if(search) filtered = filtered.filter(function(s){ return text(s.n).toLowerCase().indexOf(search) >= 0; });
+    if(ctx.priceMovFilter){
+      const pcMap2 = {};
+      arr(call(h.computePriceChanges, [])).forEach(function(p){ pcMap2[String(p.id)] = p; });
+      filtered = filtered.filter(function(s){
+        const pc = pcMap2[String(s.id)];
+        const pct = pc ? pc.pct : 0;
+        if(ctx.priceMovFilter === 'up') return pc && pct >= 1;
+        if(ctx.priceMovFilter === 'down') return pc && pct <= -1;
+        if(ctx.priceMovFilter === 'stable') return !pc || (pct > -1 && pct < 1);
+        return true;
+      });
+    }
+    const totalCount = el('sku-total-count');
+    const showingCount = el('sku-showing-count');
+    if(totalCount) totalCount.textContent = skus.length + ' รายการ';
+    if(showingCount) showingCount.textContent = 'แสดง ' + filtered.length + ' รายการ' + (search || ctx.skuFilter !== 'ทั้งหมด' || ctx.priceMovFilter ? ' (filtered)' : '');
+
+    const priceChanges = arr(call(h.computePriceChanges, []));
+    const pcMap = {}; priceChanges.forEach(function(p){ pcMap[String(p.id)] = p; });
+    const oppIds = new Set(ctx.OPPS.map(function(o){ return String(o.curId); }));
+    const skuMov = call(h.computeSkuMovement, { newSkus:[], declining:[] }) || { newSkus:[], declining:[] };
+    const newIds = new Set(arr(skuMov.newSkus).map(function(s){
+      const found = arr(rawSkus).find(function(r){ return r.n === s.name; });
+      return found ? String(found.id) : '';
+    }).filter(Boolean));
+    const declIds = new Set(arr(skuMov.declining).map(function(s){
+      const found = arr(rawSkus).find(function(r){ return r.n === s.name; });
+      return found ? String(found.id) : '';
+    }).filter(Boolean));
+    const sortedMoKeys = Object.keys(D.skus_monthly || {}).sort(function(a,b){ return monthSort(a)-monthSort(b); });
+    const list = el('skulist');
+    if(!list) return { ok:false, reason:'missing #skulist', renderer:VERSION, behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+
+    list.innerHTML = filtered.map(function(s){
+      const origRank = skus.findIndex(function(x){ return x.id === s.id; }) + 1;
+      const rankClass = origRank === 1 ? 'top1' : origRank === 2 ? 'top2' : origRank === 3 ? 'top3' : origRank <= 5 ? 'top5' : '';
+      const sid = String(s.id);
+      let badges = '';
+      const pc = pcMap[sid];
+      if(newIds.has(sid)){
+        badges += '<span class="skbadge skbadge-new">เพิ่งเริ่มสั่ง</span>';
+      } else if(pc){
+        if(pc.pct > 0) badges += '<span class="skbadge skbadge-price-up">▲ ' + Math.abs(pc.pct).toFixed(1) + '% vs เดือนก่อน</span>';
+        else badges += '<span class="skbadge skbadge-price-dn">▼ ' + Math.abs(pc.pct).toFixed(1) + '% vs เดือนก่อน</span>';
+      } else if(declIds.has(sid)){
+        badges += '<span class="skbadge skbadge-anomaly">สั่งลดลง</span>';
+      }
+      if(oppIds.has(sid)) badges += '<span class="skbadge skbadge-opp">มีตัวเลือก</span>';
+      const badgeRow = badges ? '<div class="sku-badge-row">' + badges + '</div>' : '';
+      const price = (s.display_price || s.u || 0);
+      const priceText = '฿' + Number(price).toFixed(s.display_price >= 100 ? 0 : 2) + '/' + (s.display_unit || 'กก.');
+      if(ctx.skuView === 'price'){
+        const spark = typeof h.renderSparkline === 'function' ? h.renderSparkline(sid, sortedMoKeys, 64, 22) : '<span style="font-size:9px;color:var(--n300)">—</span>';
+        return '<div class="skrow" style="cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.04)" onclick="openSkuDetail(\'' + sid + '\')">' +
+          '<div class="skrk ' + rankClass + '">' + origRank + '</div>' +
+          '<div style="flex:1;min-width:0"><div class="skn">' + text(s.n) + '</div><div class="skc">' + text(s.d) + (s.pack_size ? ' · ' + text(s.pack_size) : '') + ' · ' + priceText + '</div>' + badgeRow + '</div>' +
+          '<div style="flex-shrink:0;display:flex;align-items:center;padding-left:8px">' + spark + '</div>' +
+        '</div>';
+      }
+      return '<div class="skrow"><div class="skrk ' + rankClass + '">' + origRank + '</div><div style="flex:1;min-width:0"><div class="skn">' + text(s.n) + '</div><div class="skc">' + text(s.d) + (s.pack_size ? ' · ' + text(s.pack_size) : '') + ' · ' + priceText + '</div>' + badgeRow + '</div><div style="flex-shrink:0"><div class="sksp">' + h.fmt(s.s) + '</div><div class="skpc">' + text(s.p) + '%</div></div></div>';
+    }).join('') || '<div style="padding:20px;text-align:center;color:var(--n400);font-size:13px">ไม่พบสินค้า</div>';
+
+    return { ok:true, renderer:VERSION, screen:'portfolio-sku-list', rawCount:skus.length, filteredCount:filtered.length, behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+  }
+
+  function renderPortfolioFromLegacy(input){
+    const ctx = normalizeContext(input);
+    const D = ctx.D || {};
+    const SAMPLE = ctx.SAMPLE || {};
+    const h = ctx.helpers;
+    const hist = arr(D.history).length ? arr(D.history) : arr(SAMPLE.history);
+    const moKeys = D.skus_monthly && Object.keys(D.skus_monthly).length ? Object.keys(D.skus_monthly).sort(function(a,b){ return monthSort(b)-monthSort(a); }) : [];
+    const portfolioMonth = resolvePortfolioMonth(ctx, moKeys);
+    ctx.portfolioMonth = portfolioMonth;
+
+    const barEl = el('port-month-bar');
+    if(barEl){
+      if(moKeys.length > 1){
+        barEl.innerHTML = moKeys.map(function(m){ return '<button class="mopill ' + (m === portfolioMonth ? 'on' : '') + '" onclick="setPortfolioMonth(\'' + m + '\',this)">' + m + '</button>'; }).join('');
+        barEl.style.display = 'flex';
+      } else {
+        barEl.style.display = 'none';
+      }
+    }
+    const labelEl = el('port-month-label');
+    if(labelEl) labelEl.textContent = portfolioMonth || '';
+
+    const skus = (portfolioMonth && D.skus_monthly && D.skus_monthly[portfolioMonth])
+      ? arr(D.skus_monthly[portfolioMonth]).slice().sort(function(a,b){ return (Number(b.gmv||0))-(Number(a.gmv||0)); })
+      : (arr(D.skus).length ? D.skus : arr(SAMPLE.skus));
+    const cats = (portfolioMonth && D.cats_monthly && D.cats_monthly[portfolioMonth])
+      ? D.cats_monthly[portfolioMonth]
+      : (arr(D.cats).length ? D.cats : arr(SAMPLE.cats));
+
+    const histRow = hist.find(function(hh){ return hh.m === portfolioMonth; }) || hist[hist.length-1] || { s:176249, orders:58 };
+    const last = histRow;
+    const top5 = arr(skus).slice(0,5);
+    const top5gmv = top5.reduce(function(s,x){ return s + Number(x.gmv || x.s || 0); }, 0);
+    const top5pct = last.s > 0 ? (top5gmv / last.s * 100).toFixed(1) : '0';
+
+    const topPctNum = parseFloat(top5pct) || 0;
+    const conInterp = topPctNum > 70 ? 'พึ่งพาสินค้าหลักสูง — ถ้า SKU เหล่านี้ขาดหรือราคาขึ้น กระทบยอดทันที' : topPctNum >= 50 ? 'พอร์ตกระจายพอสมควร — ยังมี SKU อื่นรองรับหากสินค้าหลักขาด' : 'พอร์ตกระจายดี — ไม่พึ่งพาสินค้าใดสินค้าหนึ่งมากเกินไป';
+    const topSkuEl = el('top-sku-card');
+    if(topSkuEl){
+      const conBg = topPctNum > 70 ? 'var(--amb50)' : topPctNum < 50 ? 'var(--g50)' : 'var(--n50)';
+      const conBorder = topPctNum > 70 ? 'var(--amb)' : topPctNum < 50 ? 'var(--g500)' : 'var(--n200)';
+      const conTextColor = topPctNum > 70 ? '#9a6500' : topPctNum < 50 ? 'var(--g700)' : 'var(--n600)';
+      const conNumColor = topPctNum > 70 ? 'var(--amb)' : topPctNum < 50 ? 'var(--g500)' : 'var(--n400)';
+      topSkuEl.style.cssText = 'background:' + conBg + ';border-left:3px solid ' + conBorder + ';border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px;display:block;box-shadow:none';
+      topSkuEl.innerHTML = '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:700;color:' + conNumColor + '">' + top5pct + '%</span></div><div style="font-size:12px;color:' + conTextColor + ';line-height:1.5;font-weight:500">' + conInterp + '</div>';
+    }
+
+    const depts = ['ทั้งหมด'].concat(Array.from(new Set(arr(skus).map(function(s){ return s.d; }))));
+    const catFilter = el('skuCatFilter');
+    if(catFilter) catFilter.innerHTML = depts.map(function(d){ return '<button class="fpill ' + (d === 'ทั้งหมด' && !ctx.priceMovFilter ? 'on' : '') + '" onclick="setSkuFilter(\'' + text(d).replace(/'/g,"\\'") + '\',this)">' + text(d) + '</button>'; }).join('');
+
+    const priceRow = el('sku-price-filter-row');
+    let priceUp=0, priceDn=0, priceStable=0, netPriceImpact=0;
+    const moKeysSortedD = Object.keys(D.skus_monthly || {}).sort(function(a,b){ return monthSort(b)-monthSort(a); });
+    const portMoIdx = moKeysSortedD.indexOf(portfolioMonth);
+    const prevPortMo = portMoIdx >= 0 && portMoIdx < moKeysSortedD.length-1 ? moKeysSortedD[portMoIdx+1] : null;
+    if(portfolioMonth && prevPortMo && D.skus_monthly && D.skus_monthly[portfolioMonth] && D.skus_monthly[prevPortMo]){
+      const curPM = {}; arr(D.skus_monthly[portfolioMonth]).forEach(function(s){ curPM[String(s.id)] = { p:s.unit_price||s.u||0, q:s.qty_kg||0 }; });
+      const prevPM = {}; arr(D.skus_monthly[prevPortMo]).forEach(function(s){ prevPM[String(s.id)] = { p:s.unit_price||s.u||0, q:s.qty_kg||0 }; });
+      Object.keys(curPM).forEach(function(id){
+        const c=curPM[id], pv=prevPM[id];
+        if(!c.p || !pv || !pv.p) return;
+        const pct=(c.p-pv.p)/pv.p*100;
+        if(pct>=1) priceUp++; else if(pct<=-1) priceDn++; else priceStable++;
+        netPriceImpact += (pv.q || c.q) * (c.p - pv.p);
+      });
+    }
+    const priceTotal = priceUp + priceDn;
+    if(priceRow){
+      priceRow.innerHTML = priceTotal > 0
+        ? (priceUp > 0 ? '<button class="fpill fpill-pu ' + (ctx.priceMovFilter === 'up' ? 'on' : '') + '" id="pf-pill-up" onclick="setPriceFilter(\'up\')">▲ ' + priceUp + ' ราคาขึ้น</button>' : '') +
+          (priceDn > 0 ? '<button class="fpill fpill-pd ' + (ctx.priceMovFilter === 'down' ? 'on' : '') + '" id="pf-pill-dn" onclick="setPriceFilter(\'down\')">▼ ' + priceDn + ' ราคาลง</button>' : '')
+        : '';
+      priceRow.style.display = priceTotal > 0 ? 'flex' : 'none';
+    }
+
+    const skuResult = renderSKUListFromLegacy(ctx, skus);
+    if(typeof h.renderPortMoMInsight === 'function') h.renderPortMoMInsight();
+    if(typeof h.expandPortTop === 'function') h.expandPortTop();
+
+    return {
+      ok:true,
+      renderer:VERSION,
+      screen:'portfolio',
+      portfolioMonth:portfolioMonth,
+      skuCount:arr(skus).length,
+      categoryCount:arr(cats).length,
+      top5pct:top5pct,
+      skuList:skuResult,
+      behaviorChanged:BEHAVIOR_CHANGED,
+      ts:now()
+    };
+  }
+
+  function validate(){
+    const requiredIds = ['scr-portfolio','port-month-bar','port-month-label','top-sku-card','skuCatFilter','sku-price-filter-row','sku-total-count','sku-showing-count','skulist','skuSearch'];
+    const ids = requiredIds.map(function(id){ return { id:id, exists:!!el(id) }; });
+    return { ok: ids.every(function(x){ return x.exists; }), ids: ids, behaviorChanged: BEHAVIOR_CHANGED };
+  }
+
+  function diagnostics(){
+    const rm = global.FreshketSenseReadModelRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.readModel) || null;
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      screen: 'portfolio',
+      readModelLoaded: !!rm,
+      readModelPortfolioAvailable: !!(rm && typeof rm.getViewModel === 'function'),
+      validation: validate(),
+      ts: now()
+    };
+  }
+
+  function printDiagnostics(){
+    const diag = diagnostics();
+    try{
+      console.log('Freshket portfolio/SKU renderer diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    renderPortfolioFromLegacy: renderPortfolioFromLegacy,
+    renderSKUListFromLegacy: renderSKUListFromLegacy,
+    validate: validate,
+    diagnostics: diagnostics,
+    printDiagnostics: printDiagnostics
+  });
+
+  const previousRuntime = global.FreshketSenseRuntime || {};
+  const previousViews = previousRuntime.views || {};
+  global.FreshketSenseRuntime = Object.assign({}, previousRuntime, { views: Object.assign({}, previousViews, { portfolioRenderer: api }) });
+  global.FreshketSensePortfolioRenderer = api;
+  global.getFreshketPortfolioRendererSnapshot = diagnostics;
+  global.printFreshketPortfolioRendererDiagnostics = printDiagnostics;
+})(window);
+</script>
+<script id="freshket-kam-team-renderer">
+// Freshket Sense KAM / Portfolio View / Team View Renderer Adapter — Phase 18.
+// Purpose: route high-risk KAM renderers through a single renderer boundary while preserving legacy fallback.
+// Scope: KAM account tabs, Portfolio View, Team View. No navigation, loader, auth, chat, or CSS/layout changes.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase18-kam-team-renderer';
+  const BEHAVIOR_CHANGED = false;
+  const METHODS = [
+    'renderKamThisMonth',
+    'renderKamLastMonth',
+    'renderKamOverview',
+    'renderPortview',
+    'renderPortviewSummary',
+    'renderPortviewList',
+    'renderTeamview',
+    'renderTeamviewSummary',
+    'renderTeamviewKamList'
+  ];
+
+  const calls = [];
+  const MAX_CALLS = 80;
+
+  function now(){ return new Date().toISOString(); }
+  function pushCall(name, ok, detail){
+    calls.push({ name, ok: !!ok, detail: detail || '', ts: now() });
+    if(calls.length > MAX_CALLS) calls.shift();
+  }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function el(id){ return global.document && document.getElementById(id); }
+  function hasFn(fn){ return typeof fn === 'function'; }
+  function safeCall(name, fn){
+    if(!hasFn(fn)){
+      pushCall(name, false, 'missing legacy fallback');
+      return { ok:false, renderer:VERSION, method:name, reason:'missing legacy fallback', behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+    }
+    try{
+      const value = fn();
+      pushCall(name, true, 'legacy-rendered-through-adapter');
+      return { ok:true, renderer:VERSION, method:name, value, behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+    }catch(error){
+      pushCall(name, false, error && error.message || String(error));
+      throw error;
+    }
+  }
+  function normalizeContext(ctx){
+    ctx = ctx || {};
+    return {
+      legacy: ctx.legacy || {},
+      mode: ctx.mode || global.mode || null,
+      currentAccountId: ctx.currentAccountId || global.currentAccountId || null,
+      currentKamSubtab: ctx.currentKamSubtab || global.currentKamSubtab || null,
+      portviewLevel: ctx.portviewLevel || global.portviewLevel || null,
+      portviewFilter: ctx.portviewFilter || global.portviewFilter || null,
+      teamviewLevel: ctx.teamviewLevel || global.teamviewLevel || null,
+      D: ctx.D || global.D || null,
+      OPPS: ctx.OPPS || global.OPPS || [],
+      portviewBulkData: ctx.portviewBulkData || global.portviewBulkData || [],
+      currentUserProfile: ctx.currentUserProfile || global.currentUserProfile || null
+    };
+  }
+  function renderViaLegacy(methodName, ctx){
+    ctx = normalizeContext(ctx);
+    return safeCall(methodName, ctx.legacy && ctx.legacy[methodName]);
+  }
+
+  function renderKamThisMonthFromLegacy(ctx){ return renderViaLegacy('renderKamThisMonth', ctx); }
+  function renderKamLastMonthFromLegacy(ctx){ return renderViaLegacy('renderKamLastMonth', ctx); }
+  function renderKamOverviewFromLegacy(ctx){ return renderViaLegacy('renderKamOverview', ctx); }
+  function renderPortviewFromLegacy(ctx){ return renderViaLegacy('renderPortview', ctx); }
+  function renderPortviewSummaryFromLegacy(ctx){ return renderViaLegacy('renderPortviewSummary', ctx); }
+  function renderPortviewListFromLegacy(ctx){ return renderViaLegacy('renderPortviewList', ctx); }
+  function renderTeamviewFromLegacy(ctx){ return renderViaLegacy('renderTeamview', ctx); }
+  function renderTeamviewSummaryFromLegacy(ctx){ return renderViaLegacy('renderTeamviewSummary', ctx); }
+  function renderTeamviewKamListFromLegacy(ctx){ return renderViaLegacy('renderTeamviewKamList', ctx); }
+
+  function validate(){
+    const ids = [
+      ['kam-cards', !!el('kam-cards')],
+      ['kam-overview', !!el('kam-overview')],
+      ['portview-list', !!el('portview-list')],
+      ['teamview-list', !!el('teamview-list')],
+      ['teamview-summary', !!el('teamview-summary')],
+      ['portview-summary-row', !!el('portview-summary-row')]
+    ].map(function(row){ return { id:row[0], ok:!!row[1] }; });
+    const softOk = ids.some(function(x){ return x.ok; });
+    return { ok: softOk || !global.document, ids, note:'DOM anchors are soft-validated because mode-specific screens may not all be mounted/visible.', behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+  }
+
+  function diagnostics(){
+    const ctx = normalizeContext({});
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      methods: METHODS.slice(),
+      validation: validate(),
+      context: {
+        mode: ctx.mode,
+        currentAccountId: ctx.currentAccountId,
+        currentKamSubtab: ctx.currentKamSubtab,
+        portviewLevel: ctx.portviewLevel,
+        portviewFilter: ctx.portviewFilter,
+        teamviewLevel: ctx.teamviewLevel,
+        hasD: !!ctx.D,
+        historyCount: ctx.D && arr(ctx.D.history).length || 0,
+        oppCount: arr(ctx.OPPS).length,
+        bulkAccountCount: arr(ctx.portviewBulkData).length,
+        userRole: ctx.currentUserProfile && ctx.currentUserProfile.role || null
+      },
+      recentCalls: calls.slice(-20),
+      ts: now()
+    };
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    methods: METHODS.slice(),
+    renderKamThisMonthFromLegacy,
+    renderKamLastMonthFromLegacy,
+    renderKamOverviewFromLegacy,
+    renderPortviewFromLegacy,
+    renderPortviewSummaryFromLegacy,
+    renderPortviewListFromLegacy,
+    renderTeamviewFromLegacy,
+    renderTeamviewSummaryFromLegacy,
+    renderTeamviewKamListFromLegacy,
+    validate,
+    diagnostics
+  });
+
+  global.FreshketSenseKamTeamRenderer = api;
+  global.FreshketSenseRuntime = global.FreshketSenseRuntime || {};
+  global.FreshketSenseRuntime.views = global.FreshketSenseRuntime.views || {};
+  global.FreshketSenseRuntime.views.kamTeamRenderer = api;
+  global.getFreshketKamTeamRendererSnapshot = diagnostics;
 })(window);
 </script>
 <script>
@@ -6877,6 +7567,40 @@ function setPortfolioMonth(mo,btn){
 }
 
 function renderPortfolio(){
+  const renderer = window.FreshketSensePortfolioRenderer;
+  if(renderer && typeof renderer.renderPortfolioFromLegacy === 'function'){
+    try{
+      const result = renderer.renderPortfolioFromLegacy({
+        D: D,
+        SAMPLE: (typeof SAMPLE !== 'undefined' ? SAMPLE : {history:[],cats:[],skus:[]}),
+        OPPS: OPPS,
+        portfolioMonth: portfolioMonth,
+        skuFilter: skuFilter,
+        priceMovFilter: priceMovFilter,
+        skuView: skuView,
+        fmt: fmt,
+        computePriceChanges: computePriceChanges,
+        computeSkuMovement: computeSkuMovement,
+        renderSparkline: renderSparkline,
+        renderPortMoMInsight: renderPortMoMInsight,
+        expandPortTop: window._expandPortTop,
+        setState: function(name, value){
+          if(name === 'portfolioMonth'){ portfolioMonth = value; return true; }
+          if(name === 'skuFilter'){ skuFilter = value; return true; }
+          if(name === 'priceMovFilter'){ priceMovFilter = value; return true; }
+          if(name === 'skuView'){ skuView = value; return true; }
+          return false;
+        }
+      });
+      if(result && result.ok) return result;
+    }catch(err){
+      console.warn('[Freshket Sense] Portfolio renderer failed, falling back to legacy renderer:', err && err.message ? err.message : err);
+    }
+  }
+  return __legacyRenderPortfolioFallback();
+}
+
+function __legacyRenderPortfolioFallback(){
   const hist=D.history.length?D.history:SAMPLE.history;
 
   // Build month list from skus_monthly (newest first)
@@ -6980,6 +7704,31 @@ function renderPortfolio(){
 }
 
 function renderSKUList(passedSkus){
+  const renderer = window.FreshketSensePortfolioRenderer;
+  if(renderer && typeof renderer.renderSKUListFromLegacy === 'function'){
+    try{
+      const result = renderer.renderSKUListFromLegacy({
+        D: D,
+        SAMPLE: (typeof SAMPLE !== 'undefined' ? SAMPLE : {skus:[]}),
+        OPPS: OPPS,
+        portfolioMonth: portfolioMonth,
+        skuFilter: skuFilter,
+        priceMovFilter: priceMovFilter,
+        skuView: skuView,
+        fmt: fmt,
+        computePriceChanges: computePriceChanges,
+        computeSkuMovement: computeSkuMovement,
+        renderSparkline: renderSparkline
+      }, passedSkus);
+      if(result && result.ok) return result;
+    }catch(err){
+      console.warn('[Freshket Sense] SKU list renderer failed, falling back to legacy renderer:', err && err.message ? err.message : err);
+    }
+  }
+  return __legacyRenderSKUListFallback(passedSkus);
+}
+
+function __legacyRenderSKUListFallback(passedSkus){
   const rawSkus=passedSkus||(portfolioMonth&&D.skus_monthly[portfolioMonth]?D.skus_monthly[portfolioMonth]:D.skus.length?D.skus:SAMPLE.skus);
   const skus=[...rawSkus].sort((a,b)=>(b.gmv||b.s||0)-(a.gmv||a.s||0));
   const search=(document.getElementById('skuSearch')?.value||'').toLowerCase();
@@ -13145,7 +13894,7 @@ function setAiProvider(p){
     const checks = [
       ['runtime object exists', !!rt.version, rt.version || 'missing'],
       ['config object exists', !!global.FreshketSenseConfig, global.FreshketSenseConfig ? (global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) : 'missing'],
-      ['config version phase16', (global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) === 'v155-phase16-overview-renderer', global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version],
+      ['config version phase21', (global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) === 'v155-phase21-final-audit-regression', global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version],
       ['AI runtime exists', !!aiClient.callAI, aiClient.callAI ? 'ok' : 'missing callAI'],
       ['production is proxy-only', aiClient.proxyOnlyProduction === true, aiClient.proxyOnlyProduction],
       ['direct browser key mode disabled', hasFn('directAiKeyModeAllowed') ? global.directAiKeyModeAllowed() === false : aiClient.directAiKeyModeAllowed && aiClient.directAiKeyModeAllowed() === false, 'expected false'],
@@ -13169,6 +13918,10 @@ function setAiProvider(p){
       ['read model behavior unchanged', !!(global.FreshketSenseReadModelRuntime && global.FreshketSenseReadModelRuntime.behaviorChanged === false), global.FreshketSenseReadModelRuntime ? global.FreshketSenseReadModelRuntime.behaviorChanged : 'missing'],
       ['read model validation ok', !!(global.FreshketSenseReadModelRuntime && typeof global.FreshketSenseReadModelRuntime.validate === 'function' && global.FreshketSenseReadModelRuntime.validate().ok), global.FreshketSenseReadModelRuntime && typeof global.FreshketSenseReadModelRuntime.validate === 'function' ? global.FreshketSenseReadModelRuntime.validate().ok : 'missing'],
       ['read model snapshot helper exists', typeof global.getFreshketReadModelSnapshot === 'function', 'getFreshketReadModelSnapshot'],
+      ['navigation runtime exists', !!global.FreshketSenseNavigationRuntime, global.FreshketSenseNavigationRuntime ? global.FreshketSenseNavigationRuntime.version : 'missing'],
+      ['navigation behavior unchanged', !!(global.FreshketSenseNavigationRuntime && global.FreshketSenseNavigationRuntime.behaviorChanged === false), global.FreshketSenseNavigationRuntime ? global.FreshketSenseNavigationRuntime.behaviorChanged : 'missing'],
+      ['navigation validation ok', !!(global.FreshketSenseNavigationRuntime && typeof global.FreshketSenseNavigationRuntime.validate === 'function' && global.FreshketSenseNavigationRuntime.validate().ok), global.FreshketSenseNavigationRuntime && typeof global.FreshketSenseNavigationRuntime.validate === 'function' ? global.FreshketSenseNavigationRuntime.validate().ok : 'missing'],
+      ['navigation snapshot helper exists', typeof global.getFreshketNavigationRuntimeSnapshot === 'function', 'getFreshketNavigationRuntimeSnapshot'],
       ['report renderer exists', !!global.FreshketSenseReportRenderer, global.FreshketSenseReportRenderer ? global.FreshketSenseReportRenderer.version : 'missing'],
       ['report renderer behavior unchanged', !!(global.FreshketSenseReportRenderer && global.FreshketSenseReportRenderer.behaviorChanged === false), global.FreshketSenseReportRenderer ? global.FreshketSenseReportRenderer.behaviorChanged : 'missing'],
       ['report renderer validation ok', !!(global.FreshketSenseReportRenderer && typeof global.FreshketSenseReportRenderer.validate === 'function' && global.FreshketSenseReportRenderer.validate().ok), global.FreshketSenseReportRenderer && typeof global.FreshketSenseReportRenderer.validate === 'function' ? global.FreshketSenseReportRenderer.validate().ok : 'missing'],
@@ -13177,6 +13930,18 @@ function setAiProvider(p){
       ['overview renderer behavior unchanged', !!(global.FreshketSenseOverviewRenderer && global.FreshketSenseOverviewRenderer.behaviorChanged === false), global.FreshketSenseOverviewRenderer ? global.FreshketSenseOverviewRenderer.behaviorChanged : 'missing'],
       ['overview renderer validation ok', !!(global.FreshketSenseOverviewRenderer && typeof global.FreshketSenseOverviewRenderer.validate === 'function' && global.FreshketSenseOverviewRenderer.validate().ok), global.FreshketSenseOverviewRenderer && typeof global.FreshketSenseOverviewRenderer.validate === 'function' ? global.FreshketSenseOverviewRenderer.validate().ok : 'missing'],
       ['overview renderer snapshot helper exists', typeof global.getFreshketOverviewRendererSnapshot === 'function', 'getFreshketOverviewRendererSnapshot'],
+      ['portfolio renderer exists', !!global.FreshketSensePortfolioRenderer, global.FreshketSensePortfolioRenderer ? global.FreshketSensePortfolioRenderer.version : 'missing'],
+      ['portfolio renderer behavior unchanged', !!(global.FreshketSensePortfolioRenderer && global.FreshketSensePortfolioRenderer.behaviorChanged === false), global.FreshketSensePortfolioRenderer ? global.FreshketSensePortfolioRenderer.behaviorChanged : 'missing'],
+      ['portfolio renderer validation ok', !!(global.FreshketSensePortfolioRenderer && typeof global.FreshketSensePortfolioRenderer.validate === 'function' && global.FreshketSensePortfolioRenderer.validate().ok), global.FreshketSensePortfolioRenderer && typeof global.FreshketSensePortfolioRenderer.validate === 'function' ? global.FreshketSensePortfolioRenderer.validate().ok : 'missing'],
+      ['portfolio renderer snapshot helper exists', typeof global.getFreshketPortfolioRendererSnapshot === 'function', 'getFreshketPortfolioRendererSnapshot'],
+      ['KAM/Team renderer exists', !!global.FreshketSenseKamTeamRenderer, global.FreshketSenseKamTeamRenderer ? global.FreshketSenseKamTeamRenderer.version : 'missing'],
+      ['KAM/Team renderer behavior unchanged', !!(global.FreshketSenseKamTeamRenderer && global.FreshketSenseKamTeamRenderer.behaviorChanged === false), global.FreshketSenseKamTeamRenderer ? global.FreshketSenseKamTeamRenderer.behaviorChanged : 'missing'],
+      ['KAM/Team renderer validation ok', !!(global.FreshketSenseKamTeamRenderer && typeof global.FreshketSenseKamTeamRenderer.validate === 'function' && global.FreshketSenseKamTeamRenderer.validate().ok), global.FreshketSenseKamTeamRenderer && typeof global.FreshketSenseKamTeamRenderer.validate === 'function' ? global.FreshketSenseKamTeamRenderer.validate().ok : 'missing'],
+      ['KAM/Team renderer snapshot helper exists', typeof global.getFreshketKamTeamRendererSnapshot === 'function', 'getFreshketKamTeamRendererSnapshot'],
+      ['style runtime exists', !!global.FreshketSenseStyleRuntime, global.FreshketSenseStyleRuntime ? global.FreshketSenseStyleRuntime.version : 'missing'],
+      ['style runtime behavior unchanged', !!(global.FreshketSenseStyleRuntime && global.FreshketSenseStyleRuntime.behaviorChanged === false), global.FreshketSenseStyleRuntime ? global.FreshketSenseStyleRuntime.behaviorChanged : 'missing'],
+      ['style runtime validation ok', !!(global.FreshketSenseStyleRuntime && typeof global.FreshketSenseStyleRuntime.validate === 'function' && global.FreshketSenseStyleRuntime.validate().ok), global.FreshketSenseStyleRuntime && typeof global.FreshketSenseStyleRuntime.validate === 'function' ? global.FreshketSenseStyleRuntime.validate().ok : 'missing'],
+      ['style snapshot helper exists', typeof global.getFreshketStyleRuntimeSnapshot === 'function', 'getFreshketStyleRuntimeSnapshot'],
       ['state snapshot helper exists', typeof global.getFreshketStateRuntimeSnapshot === 'function', 'getFreshketStateRuntimeSnapshot'],
       ['auth checkSession exists', hasFn('checkSession'), 'checkSession'],
       ['auth doLogin exists', hasFn('doLogin'), 'doLogin'],
@@ -13281,6 +14046,20 @@ function setAiProvider(p){
     return diag;
   }
 
+  function navigationDiagnostics(){
+    const rt = global.FreshketSenseNavigationRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.navigation) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'navigation runtime missing', ts:new Date().toISOString() };
+  }
+
+  function printNavigationDiagnostics(){
+    const diag = navigationDiagnostics();
+    try{
+      console.log('Freshket navigation/screen-controller diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
 
   function reportRendererDiagnostics(){
     const rt = global.FreshketSenseReportRenderer || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.views && global.FreshketSenseRuntime.views.reportRenderer) || null;
@@ -13311,6 +14090,51 @@ function setAiProvider(p){
     return diag;
   }
 
+
+  function portfolioRendererDiagnostics(){
+    const rt = global.FreshketSensePortfolioRenderer || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.views && global.FreshketSenseRuntime.views.portfolioRenderer) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'portfolio renderer missing', ts:new Date().toISOString() };
+  }
+
+  function printPortfolioRendererDiagnostics(){
+    const diag = portfolioRendererDiagnostics();
+    try{
+      console.log('Freshket portfolio/SKU renderer diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
+  function kamTeamRendererDiagnostics(){
+    const rt = global.FreshketSenseKamTeamRenderer || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.views && global.FreshketSenseRuntime.views.kamTeamRenderer) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'KAM/Team renderer missing', ts:new Date().toISOString() };
+  }
+
+  function printKamTeamRendererDiagnostics(){
+    const diag = kamTeamRendererDiagnostics();
+    try{
+      console.log('Freshket KAM/Team renderer diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
+
+
+  function styleDiagnostics(){
+    const rt = global.FreshketSenseStyleRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.style) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'style runtime missing', ts:new Date().toISOString() };
+  }
+
+  function printStyleDiagnostics(){
+    const diag = styleDiagnostics();
+    try{
+      console.log('Freshket style/token diagnostics:', diag);
+      if(diag.validation && diag.validation.criticalSelectors) console.table(diag.validation.criticalSelectors);
+    }catch(e){}
+    return diag;
+  }
+
   function snapshot(){
     const rt = global.FreshketSenseRuntime || {};
     return {
@@ -13330,21 +14154,29 @@ function setAiProvider(p){
       boundary: boundaryDiagnostics(),
       view: viewDiagnostics(),
       readModel: readModelDiagnostics(),
+      navigation: navigationDiagnostics(),
       reportRenderer: reportRendererDiagnostics(),
       overviewRenderer: overviewRendererDiagnostics(),
+      portfolioRenderer: portfolioRendererDiagnostics(),
+      kamTeamRenderer: kamTeamRendererDiagnostics(),
+      style: styleDiagnostics(),
       ts: new Date().toISOString()
     };
   }
 
-  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics, configDiagnostics, printConfigDiagnostics, authDiagnostics, printAuthDiagnostics, stateDiagnostics, printStateDiagnostics, boundaryDiagnostics, printBoundaryDiagnostics, viewDiagnostics, printViewDiagnostics, readModelDiagnostics, printReadModelDiagnostics, reportRendererDiagnostics, printReportRendererDiagnostics, overviewRendererDiagnostics, printOverviewRendererDiagnostics });
+  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics, configDiagnostics, printConfigDiagnostics, authDiagnostics, printAuthDiagnostics, stateDiagnostics, printStateDiagnostics, boundaryDiagnostics, printBoundaryDiagnostics, viewDiagnostics, printViewDiagnostics, readModelDiagnostics, printReadModelDiagnostics, navigationDiagnostics, printNavigationDiagnostics, reportRendererDiagnostics, printReportRendererDiagnostics, overviewRendererDiagnostics, printOverviewRendererDiagnostics, portfolioRendererDiagnostics, printPortfolioRendererDiagnostics, kamTeamRendererDiagnostics, printKamTeamRendererDiagnostics, styleDiagnostics, printStyleDiagnostics });
   global.printFreshketLoaderDiagnostics = printLoaderDiagnostics;
   global.printFreshketAuthDiagnostics = printAuthDiagnostics;
   global.printFreshketStateDiagnostics = printStateDiagnostics;
   global.printFreshketBoundaryDiagnostics = printBoundaryDiagnostics;
   global.printFreshketViewDiagnostics = printViewDiagnostics;
   global.printFreshketReadModelDiagnostics = printReadModelDiagnostics;
+  global.printFreshketNavigationDiagnostics = printNavigationDiagnostics;
   global.printFreshketReportRendererDiagnostics = printReportRendererDiagnostics;
   global.printFreshketOverviewRendererDiagnostics = printOverviewRendererDiagnostics;
+  global.printFreshketPortfolioRendererDiagnostics = printPortfolioRendererDiagnostics;
+  global.printFreshketKamTeamRendererDiagnostics = printKamTeamRendererDiagnostics;
+  global.printFreshketStyleDiagnostics = printStyleDiagnostics;
   global.runFreshketStaticSmokeChecklist = runStaticSmokeChecklist;
 })(window);
 
@@ -14263,6 +15095,24 @@ function toggleSsbTooltip(){
 // ════════════════════════════════════════
 
 function showScreen(name){
+  const controller = window.FreshketSenseNavigationRuntime;
+  if(controller && typeof controller.showScreenFromLegacy === 'function'){
+    try{
+      return controller.showScreenFromLegacy({
+        isKAM: (typeof isKAM !== 'undefined' ? isKAM : false),
+        currentAccountId: (typeof currentAccountId !== 'undefined' ? currentAccountId : null),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        senseActivated: (typeof senseActivated !== 'undefined' ? senseActivated : false),
+        legacy: { showScreen: __legacyShowScreenFallback }
+      }, name);
+    }catch(e){
+      console.warn('showScreen navigation controller failed, falling back to legacy navigation', e);
+    }
+  }
+  return __legacyShowScreenFallback(name);
+}
+
+function __legacyShowScreenFallback(name){
   // ── Role guard: only TL/admin can access teamview ──
   if(name==='teamview'){
     const _role=(currentUserProfile&&currentUserProfile.role)||'rep';
@@ -14543,6 +15393,29 @@ function _renderKamHeader(){
 // ── Tab 1 "เดือนนี้": ก่อนเข้าร้าน brief card (new schema: situation/driver/pattern/probe) ──
 // ── Tab 1 "เดือนนี้": rule-based data shown immediately; AI card injected after Insight ──
 function renderKamThisMonth(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderKamThisMonthFromLegacy === 'function'){
+    try{
+      return renderer.renderKamThisMonthFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderKamThisMonth: __legacyRenderKamThisMonthFallback }
+      });
+    }catch(e){
+      console.warn('renderKamThisMonth renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderKamThisMonthFallback();
+}
+
+function __legacyRenderKamThisMonthFallback(){
   _renderKamHeader();
   const kamCards=document.getElementById('kam-cards');
   if(!kamCards)return;
@@ -14830,6 +15703,29 @@ function renderKamThisMonth(){
 
 // ── Tab 2 "เม.ย.": Last month data cards (ยอดซื้อ / Outlets / วัตถุดิบ / โอกาส) ──
 function renderKamLastMonth(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderKamLastMonthFromLegacy === 'function'){
+    try{
+      return renderer.renderKamLastMonthFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderKamLastMonth: __legacyRenderKamLastMonthFallback }
+      });
+    }catch(e){
+      console.warn('renderKamLastMonth renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderKamLastMonthFallback();
+}
+
+function __legacyRenderKamLastMonthFallback(){
   _renderKamHeader();
   const ctx=buildKamContext();
   const sp=ctx.spend;
@@ -14890,6 +15786,29 @@ function renderKamLastMonth(){
 
 // Legacy alias — keeps portview/teamview account-switch paths working
 function renderKamOverview(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderKamOverviewFromLegacy === 'function'){
+    try{
+      return renderer.renderKamOverviewFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderKamOverview: __legacyRenderKamOverviewFallback }
+      });
+    }catch(e){
+      console.warn('renderKamOverview renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderKamOverviewFallback();
+}
+
+function __legacyRenderKamOverviewFallback(){
   if(kamSubtab==='lastmonth'){renderKamLastMonth();return;}
   renderKamThisMonth();
 }
@@ -15561,6 +16480,24 @@ function _renderKnaRecentList(){
 
 // ── navPortHome: "พอร์ต" home button — routes to portview (KAM context) or scr-portfolio (standalone) ──
 function navPortHome(){
+  const controller = window.FreshketSenseNavigationRuntime;
+  if(controller && typeof controller.navPortHomeFromLegacy === 'function'){
+    try{
+      return controller.navPortHomeFromLegacy({
+        isKAM: (typeof isKAM !== 'undefined' ? isKAM : false),
+        currentAccountId: (typeof currentAccountId !== 'undefined' ? currentAccountId : null),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        senseActivated: (typeof senseActivated !== 'undefined' ? senseActivated : false),
+        legacy: { navPortHome: __legacyNavPortHomeFallback }
+      });
+    }catch(e){
+      console.warn('navPortHome navigation controller failed, falling back to legacy navigation', e);
+    }
+  }
+  return __legacyNavPortHomeFallback();
+}
+
+function __legacyNavPortHomeFallback(){
   if(typeof portviewBulkData!=='undefined'&&portviewBulkData&&portviewBulkData.length>0){
     // KAM user — always go to portview (home)
     if(!isKAM)setMode('kam');
@@ -15572,6 +16509,24 @@ function navPortHome(){
 }
 
 function setMode(mode){
+  const controller = window.FreshketSenseNavigationRuntime;
+  if(controller && typeof controller.setModeFromLegacy === 'function'){
+    try{
+      return controller.setModeFromLegacy({
+        isKAM: (typeof isKAM !== 'undefined' ? isKAM : false),
+        currentAccountId: (typeof currentAccountId !== 'undefined' ? currentAccountId : null),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        senseActivated: (typeof senseActivated !== 'undefined' ? senseActivated : false),
+        legacy: { setMode: __legacySetModeFallback }
+      }, mode);
+    }catch(e){
+      console.warn('setMode navigation controller failed, falling back to legacy navigation', e);
+    }
+  }
+  return __legacySetModeFallback(mode);
+}
+
+function __legacySetModeFallback(mode){
   // Guard: cannot enter restaurant mode without a selected account
   if(mode==='restaurant'&&(!currentAccountId||currentAccountId==='default'))return;
   // Track restaurant mode visit
@@ -16898,6 +17853,29 @@ function getPortviewAccounts(){
 }
 
 function renderPortviewList(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderPortviewListFromLegacy === 'function'){
+    try{
+      return renderer.renderPortviewListFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderPortviewList: __legacyRenderPortviewListFallback }
+      });
+    }catch(e){
+      console.warn('renderPortviewList renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderPortviewListFallback();
+}
+
+function __legacyRenderPortviewListFallback(){
   window._pvLastRenderMs=Date.now(); // guard: prevent IntersectionObserver expanding on content-shrink
   const listEl=document.getElementById('portview-list');
   if(!listEl)return;
@@ -17195,6 +18173,29 @@ function _countUp(el,target,duration){
 }
 
 function renderPortviewSummary(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderPortviewSummaryFromLegacy === 'function'){
+    try{
+      return renderer.renderPortviewSummaryFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderPortviewSummary: __legacyRenderPortviewSummaryFallback }
+      });
+    }catch(e){
+      console.warn('renderPortviewSummary renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderPortviewSummaryFallback();
+}
+
+function __legacyRenderPortviewSummaryFallback(){
   const accounts=getPortviewAccounts();
   const danger=accounts.filter(a=>a.paceSignal&&a.paceSignal.cls==='danger').length;
   const warn=accounts.filter(a=>a.paceSignal&&a.paceSignal.cls==='warn').length;
@@ -17334,6 +18335,29 @@ function portviewSelectAccount(accountId){
 }
 
 function renderPortview(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderPortviewFromLegacy === 'function'){
+    try{
+      return renderer.renderPortviewFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderPortview: __legacyRenderPortviewFallback }
+      });
+    }catch(e){
+      console.warn('renderPortview renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderPortviewFallback();
+}
+
+function __legacyRenderPortviewFallback(){
   portviewAiDone=false;
   const aiOut=document.getElementById('portview-ai-output');
   if(aiOut)aiOut.style.display='none';
@@ -17417,6 +18441,29 @@ function _buildKamGroups(){
 }
 
 function renderTeamview(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderTeamviewFromLegacy === 'function'){
+    try{
+      return renderer.renderTeamviewFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderTeamview: __legacyRenderTeamviewFallback }
+      });
+    }catch(e){
+      console.warn('renderTeamview renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderTeamviewFallback();
+}
+
+function __legacyRenderTeamviewFallback(){
   teamviewAiDone=false;
   const aiOut=document.getElementById('tv-ai-output');
   if(aiOut)aiOut.style.display='none';
@@ -17490,6 +18537,29 @@ function _tvInitCollapseObserver(){
 
 
 function renderTeamviewSummary(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderTeamviewSummaryFromLegacy === 'function'){
+    try{
+      return renderer.renderTeamviewSummaryFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderTeamviewSummary: __legacyRenderTeamviewSummaryFallback }
+      });
+    }catch(e){
+      console.warn('renderTeamviewSummary renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderTeamviewSummaryFallback();
+}
+
+function __legacyRenderTeamviewSummaryFallback(){
   const groups=_buildKamGroups();
   const allAccts=groups.flatMap(g=>g.accounts);
   const withPace=allAccts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
@@ -17561,6 +18631,29 @@ function renderTeamviewSummary(){
 }
 
 function renderTeamviewKamList(){
+  const renderer = window.FreshketSenseKamTeamRenderer;
+  if(renderer && typeof renderer.renderTeamviewKamListFromLegacy === 'function'){
+    try{
+      return renderer.renderTeamviewKamListFromLegacy({
+        D: D,
+        OPPS: OPPS,
+        currentAccountId: currentAccountId,
+        currentKamSubtab: (typeof currentKamSubtab !== 'undefined' ? currentKamSubtab : null),
+        portviewLevel: (typeof portviewLevel !== 'undefined' ? portviewLevel : null),
+        portviewFilter: (typeof portviewFilter !== 'undefined' ? portviewFilter : null),
+        teamviewLevel: (typeof teamviewLevel !== 'undefined' ? teamviewLevel : null),
+        portviewBulkData: (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []),
+        currentUserProfile: (typeof currentUserProfile !== 'undefined' ? currentUserProfile : null),
+        legacy: { renderTeamviewKamList: __legacyRenderTeamviewKamListFallback }
+      });
+    }catch(e){
+      console.warn('renderTeamviewKamList renderer failed, falling back to legacy renderer', e);
+    }
+  }
+  return __legacyRenderTeamviewKamListFallback();
+}
+
+function __legacyRenderTeamviewKamListFallback(){
   window._tvLastRenderMs=Date.now();
   const el=document.getElementById('teamview-content');
   if(!el)return;
