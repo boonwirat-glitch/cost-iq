@@ -10260,7 +10260,7 @@ function setMatcherModel(model){
 (function(global){
   'use strict';
 
-  const RUNTIME_VERSION = 'v155-phase5.1-audit-patch';
+  const RUNTIME_VERSION = 'v155-phase6.2-chat-grounding';
   const PROXY_ONLY_PRODUCTION = true;
 
   // ── Olive identity source of truth ───────────────────
@@ -10294,6 +10294,13 @@ Analysis behavior:
 - Separate facts, assumptions, and interpretation.
 - For summaries or action plans only, identify Decision, Owner, Deadline, Next step, and Risk when that structure helps.
 
+Grounded intelligence behavior:
+- Be smart and wide-ranging, but never pretend an inference is a fact.
+- Use available account, portfolio, team, SKU, category, trend, and alternative data when present.
+- When context is thin, diagnose what can be known, then suggest what KAM should ask or verify.
+- Do not overfit every answer to churn/SKU-loss. Also look for growth, wallet protection, wallet expansion, ordering-cycle, branch, spec, price, and menu-mix opportunities when the context supports it.
+- Never create week-level patterns from monthly data. Never create supplier/menu/customer-intent facts without evidence.
+
 Restaurant reasoning lens:
 - Diagnose purchasing signals like someone who understands restaurant operations: menu design, ingredient specs, food cost pressure, ordering cycles, supplier switching, prep burden, waste, branch dynamics, and chef/menu changes.
 - A missing SKU may indicate menu change, ordering cycle, supplier switch, branch behavior, or prep/waste pressure — not automatically churn.
@@ -10326,6 +10333,12 @@ On cost-saving alternatives:
     .replace(/คะค่ะ/g,'ค่ะ')
     .replace(/ค่ะนะคะ/g,'นะคะ')
     .replace(/นะคะค่ะ/g,'นะคะ')
+    .replace(/ฟอกประมาณ/g,'คิดเป็นประมาณ')
+    .replace(/ยังมีหลังคาให้ยัง/g,'ยังมี room ให้ปรับ')
+    .replace(/โทรตอบรับเสียว/g,'โทรเช็คอิน')
+    .replace(/ตอบรับเสียว/g,'เช็คอิน')
+    .replace(/ไม่ได้มีซื้อ/g,'ไม่มีการซื้อ')
+    .replace(/สัปดาห์เรียว/g,'สัปดาห์ต่อเนื่อง')
     .replace(/[ \t]+\n/g,'\n')
     .trim();
   return s;
@@ -13981,18 +13994,29 @@ function fmtChatK(n){return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?
 
 function buildAccountChatContext(){
   const _an=D.meta.accountName||document.getElementById('acct-name-input')?.value.trim()||'ร้านอาหารของคุณ';
+  // Phase 6.2: chat grounding patch. For chat, never fall back to SAMPLE data; use only loaded account data.
+  const _skus=Array.isArray(D.skus)?D.skus:[];
+  const _cats=Array.isArray(D.cats)?D.cats:[];
+  const _hist=Array.isArray(D.history)?D.history:[];
+  const _hasRealSkus=_skus.length>0;
+  const _hasRealCats=_cats.length>0;
+  const _hasRealHistory=_hist.length>0;
+  const _hasMonthlySkus=!!(D.skus_monthly&&Object.keys(D.skus_monthly).length>=2);
   const _sp=curSpend()>0?totalAll()/curSpend()*100:0;
   const _sc=Math.min(95,Math.max(50,Math.round(95-_sp*2.5)));
-  const _skus=D.skus.length?D.skus:SAMPLE.skus;
-  const _cats=D.cats.length?D.cats:SAMPLE.cats;
-  const _hist=D.history.length?D.history:SAMPLE.history;
 
-  const _trend=_hist.slice(-6).map(h=>h.m+' '+fmt(h.s)+' ('+h.orders+' ออเดอร์)').join(', ');
-  const _catStr=_cats.slice(0,10).map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ');
-  const _skuTop=[..._skus].sort((a,b)=>(b.gmv||b.s)-(a.gmv||a.s)).slice(0,14);
-  const _skuStr=_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+(s.d||'-')+'] '+fmt(s.gmv||s.s)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>14?'\n(+'+(_skus.length-14)+' รายการ)':'');
+  const _trend=_hasRealHistory
+    ?_hist.slice(-6).map(h=>h.m+' '+fmt(h.s)+' ('+h.orders+' ออเดอร์)').join(', ')
+    :'ไม่มี monthly history ที่โหลดอยู่ใน session นี้';
+  const _catStr=_hasRealCats
+    ?_cats.slice(0,10).map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ')
+    :'ไม่มี category breakdown ที่โหลดอยู่ใน session นี้';
+  const _skuTop=_hasRealSkus?[..._skus].sort((a,b)=>(b.gmv||b.s||0)-(a.gmv||a.s||0)).slice(0,14):[];
+  const _skuStr=_skuTop.length
+    ?_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+(s.d||'-')+'] '+fmt(s.gmv||s.s||0)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>14?'\n(+'+(_skus.length-14)+' รายการ)':'')
+    :'ไม่มี SKU-level data ที่โหลดอยู่ใน session นี้';
 
-  let _skuMovement='ไม่มีข้อมูล SKU trend (ใช้ skus.csv format เดิม)';
+  let _skuMovement='ไม่มี SKU monthly movement ที่โหลดอยู่ใน session นี้';
   const _skuMonths=D.skus_monthly&&Object.keys(D.skus_monthly);
   if(_skuMonths&&_skuMonths.length>=2){
     const _cSort=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
@@ -14005,19 +14029,19 @@ function buildAccountChatContext(){
     const prev1Mo=months[1];
     const droppedSkus=(D.skus_monthly[prev1Mo]||[]).filter(s=>!lastSet.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,6);
     const prevAvg={};
-    prevMonths.forEach(m=>{(D.skus_monthly[m]||[]).forEach(s=>{if(!prevAvg[s.id])prevAvg[s.id]={sum:0,cnt:0,n:s.n,d:s.d};prevAvg[s.id].sum+=s.qty_kg;prevAvg[s.id].cnt++;});});
-    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;const chg=avg>0?(s.qty_kg-avg)/avg*100:0;return{...s,avgQty:avg,chgPct:chg};}).filter(s=>Math.abs(s.chgPct)>=30).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,5);
-    const newStr=newSkus.length?newSkus.map(s=>'+ '+s.n+' ['+fmt(s.gmv||0)+'/ด.]').join('\n'):'ไม่มี';
-    const dropStr=droppedSkus.length?droppedSkus.map(s=>'- '+s.n+' ['+fmt(s.gmv||0)+'/ด. เดือนก่อน]').join('\n'):'ไม่มี';
+    prevMonths.forEach(m=>{(D.skus_monthly[m]||[]).forEach(s=>{if(!prevAvg[s.id])prevAvg[s.id]={sum:0,cnt:0,n:s.n,d:s.d};prevAvg[s.id].sum+=s.qty_kg||0;prevAvg[s.id].cnt++;});});
+    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;const chg=avg>0?((s.qty_kg||0)-avg)/avg*100:0;return{...s,avgQty:avg,chgPct:chg};}).filter(s=>Math.abs(s.chgPct)>=30).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,5);
+    const newStr=newSkus.length?newSkus.map(s=>'+ '+s.n+' ['+fmt(s.gmv||0)+'/ด. ใน '+lastMo+']').join('\n'):'ไม่มี';
+    const dropStr=droppedSkus.length?droppedSkus.map(s=>'- '+s.n+' ['+fmt(s.gmv||0)+'/ด. ใน '+prev1Mo+' แต่ไม่พบใน '+lastMo+']').join('\n'):'ไม่มี';
     const volStr=volChanges.length?volChanges.map(s=>(s.chgPct>0?'↑':'↓')+' '+s.n+' '+s.chgPct.toFixed(0)+'% ('+(s.qty_kg||0).toFixed(1)+'kg vs avg '+s.avgQty.toFixed(1)+'kg)').join('\n'):'ไม่มี';
-    _skuMovement=`ช่วง ${months[months.length-1]} – ${lastMo} (${months.length} เดือน)\nSKU เพิ่งเริ่มซื้อ:\n${newStr}\nSKU หยุดซื้อ MoM:\n${dropStr}\nVolume เปลี่ยนแปลง ≥30%:\n${volStr}`;
+    _skuMovement=`ช่วง ${months[months.length-1]} – ${lastMo} (${months.length} เดือน; monthly granularity only)\nSKU เพิ่งเริ่มซื้อในเดือนล่าสุดเทียบช่วงก่อนหน้า:\n${newStr}\nSKU ที่ไม่พบในเดือนล่าสุดเทียบเดือนก่อนหน้า:\n${dropStr}\nVolume เปลี่ยนแปลง ≥30%:\n${volStr}`;
   }
 
   const _ol=OPPS.length
     ?OPPS.slice(0,18).map((o,i)=>{const a=getAlt(o);return(i+1)+'. '+o.curName+' → '+a.altName+': ประหยัด '+fmt(a.save)+'/ด. ('+a.pct+'%, '+(a.conf==='high'?'มั่นใจสูง':'ทดลองก่อน')+')'}).join('\n')+(OPPS.length>18?'\n(+'+(OPPS.length-18)+' opportunities)':'')
-    :'ยังไม่มีข้อมูล alternatives';
+    :'ยังไม่มีข้อมูล alternatives ที่โหลดอยู่ใน session นี้';
 
-  return `-- CHAT SCOPE --\naccount\n\n-- ACCOUNT DATA --\nชื่อ: ${_an}\nค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}\nCost IQ Score: ${_sc}/100\nเลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)\nโอกาสเต็มที่: ${fmt(totalAll())}/เดือน\n\n=== Trend 6 เดือน ===\n${_trend}\n\n=== หมวดสินค้า เดือนล่าสุด ===\n${_catStr}\n\n=== Top SKU เดือนล่าสุด ===\n${_skuStr}\n\n=== SKU Movement ===\n${_skuMovement}\n\n=== โอกาสประหยัด ===\n${_ol}`;
+  return `-- CHAT SCOPE --\naccount\n\n-- DATA AVAILABILITY --\nmonthly_history: ${_hasRealHistory?'loaded':'not_loaded'}\ncategory_breakdown: ${_hasRealCats?'loaded':'not_loaded'}\nsku_detail: ${_hasRealSkus?'loaded':'not_loaded'}\nsku_monthly_movement: ${_hasMonthlySkus?'loaded':'not_loaded'}\nweekly_data: not_available\nsupplier_data: not_available\nmenu_data: not_available\ncustomer_call_notes: not_available\n\n-- ACCOUNT KNOWN FACTS --\nชื่อ: ${_an}\nค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}\nCost IQ Score: ${_sc}/100\nเลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)\nโอกาสเต็มที่จาก alternatives: ${fmt(totalAll())}/เดือน\n\n=== Monthly trend ที่มีใน context ===\n${_trend}\n\n=== หมวดสินค้า เดือนล่าสุด ===\n${_catStr}\n\n=== Top SKU เดือนล่าสุด ===\n${_skuStr}\n\n=== SKU Movement จากข้อมูลรายเดือนเท่านั้น ===\n${_skuMovement}\n\n=== Cost-saving opportunities จากฐาน alternatives ===\n${_ol}\n\n-- GROUNDING LIMITS FOR THIS ACCOUNT TURN --\n- ใช้เฉพาะข้อมูลด้านบนเป็น fact เท่านั้น\n- ห้ามอ้าง week-level pattern เช่น “15 สัปดาห์” เพราะ context นี้ไม่มี weekly data\n- ห้ามสรุปว่าลูกค้าเปลี่ยน supplier, เปลี่ยนเมนู, ทำ promotion, หรือกำลัง churn เป็น fact เพราะ context ไม่มี supplier/menu/call-note data\n- ถ้าจะพูดเรื่อง supplier/menu/promotion/churn ให้พูดเป็น hypothesis ที่ต้องถามยืนยันเท่านั้น\n- SKU ที่ไม่พบในเดือนล่าสุด = “ไม่พบในข้อมูลเดือนล่าสุด” ไม่ใช่ “หยุดใช้แน่นอน” และไม่ใช่ “เสีย account แน่นอน”`;
 }
 
 function buildPortfolioChatContext(){
@@ -14069,6 +14093,34 @@ function buildChatContextByScope(scope){
   return buildAccountChatContext();
 }
 
+function oliveChatGroundingClean(t, context, scope){
+  // Phase 6.2: narrow guard for account-chat hallucination and awkward Thai.
+  let s=String(t||'');
+  const ctx=String(context||'');
+  const noWeekly=/weekly_data:\s*not_available/i.test(ctx);
+  if(noWeekly){
+    s=s.replace(/(ลดลง|เพิ่มขึ้น|หายไป|โตขึ้น|ตกลง)\s*(\d+)\s*สัปดาห์(?:\s*ต่อเนื่อง|\s*ติด|\s*เรียว)?/g,'$1ต่อเนื่องในข้อมูลรายเดือนที่มี');
+    s=s.replace(/(\d+)\s*สัปดาห์เรียว/g,'ข้อมูลรายเดือนที่มี');
+  }
+  s=s
+    .replace(/ฟอกประมาณ/g,'คิดเป็นประมาณ')
+    .replace(/ยังมีหลังคาให้ยัง/g,'ยังมี room ให้ปรับ')
+    .replace(/โทรตอบรับเสียวตอนนี้/g,'โทรเช็คอินตอนนี้')
+    .replace(/ตอบรับเสียว/g,'เช็คอิน')
+    .replace(/ไม่ได้มีซื้อ/g,'ไม่มีการซื้อ')
+    .replace(/สัปดาห์เรียว/g,'สัปดาห์ต่อเนื่อง')
+    .replace(/ดีดตัวออกมา ค่อยๆ/g,'มีสัญญาณฟื้นตัวแบบค่อยเป็นค่อยไป')
+    .replace(/emergency/gi,'เคสเร่งด่วน')
+    .replace(/\bchurn\b/gi,'เสี่ยงหลุด')
+    .replace(/\bdrop\b/gi,'ยอดลด');
+  // soften over-certain unsupported operational diagnoses
+  s=s.replace(/ลูกค้าเปลี่ยนซัพพลายเออร์/g,'ลูกค้าอาจเปลี่ยนแหล่งซื้อ (ต้องถามยืนยัน)');
+  s=s.replace(/เปลี่ยน supplier/g,'อาจเปลี่ยน supplier (ต้องถามยืนยัน)');
+  s=s.replace(/เปลี่ยนเมนู/g,'อาจเปลี่ยนเมนู (ต้องถามยืนยัน)');
+  s=s.replace(/เตรียม promote/g,'อาจมีแผนโปรโมชัน (ต้องถามยืนยัน)');
+  return s.trim();
+}
+
 async function sendChat(){
   if(aiLoading)return;
   const inp=document.getElementById('aiinput');
@@ -14113,15 +14165,21 @@ ${_languageContract}
 -- OUTPUT CONTRACT --
 - Start with the answer, not a preamble.
 - Be easy to use: concise first, then explain only what is useful.
+- Do not force a rigid template every time. Choose the clearest structure for the user’s question.
+- Think with this contract silently: Known facts → interpretation → hypotheses/questions to verify → KAM action.
 - If the user asks for analysis, give diagnosis → why it matters → what to do next.
 - If the data is missing or the scope is not loaded, say that directly and suggest the safest next step.
-- Do not invent customer facts, SKU facts, or portfolio facts.
+- Do not invent customer facts, SKU facts, portfolio facts, dates, periods, percentages, or money values.
+- If a claim is not directly in the context but is a reasonable business explanation, label it as “สมมติฐานที่ต้องถามยืนยัน”.
+- For account-detail answers, do not convert monthly data into weekly claims. If weekly data is not available, never say “X สัปดาห์”.
+- SKU missing from latest month means “not found in latest month data”; it does not prove menu change, supplier switch, churn, or permanent stop.
+- Balance risk and upside: do not only focus on dropped stores or missing SKUs; also look for wallet protection, expansion, ordering-cycle, menu-mix, spec, price, and category opportunities when supported by context.
 - Use Thai Baht only: บาท or ฿. Never use เยน, JPY, ¥, dollar, or USD.
 - Refer to yourself only as Olive. Never use หนู, ฉัน, ดิฉัน, ผม, เรา, อาจารย์, or ครับ.`;
 
   try{
     const reply=await callAI(_chatModelKey,sys,chatHist.slice(-10),_needsSonnet?1400:900);
-    const cleanReply=oliveToneClean(reply);
+    const cleanReply=oliveChatGroundingClean(oliveToneClean(reply), _context, _scope);
     ldEl.querySelector('.mb').innerHTML=cleanReply.replace(/\n/g,'<br>');
     ldEl.querySelector('.mb').classList.remove('ld');
     chatHist.push({role:'assistant',content:cleanReply});
