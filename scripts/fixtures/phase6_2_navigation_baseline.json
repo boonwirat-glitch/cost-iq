@@ -1,0 +1,21 @@
+{
+  "sourceBaseline": "v155-phase6.2-chat-grounding/dist/index.html",
+  "note": "Normalized function hashes for navigation functions before Phase 19 wrapping. Used by Phase 19.1 to verify legacy fallbacks still match baseline behavior exactly.",
+  "functions": {
+    "showScreen": {
+      "normalizedSha256": "878be3f7b42bd7f4c5f408cf04a9c713a10a6dda6ef8c0895473267257134b66",
+      "normalizedBytes": 4436,
+      "normalizedLines": 88
+    },
+    "setMode": {
+      "normalizedSha256": "d81c1416734c2c0d007a9ce261b5eae59bd68f7a49917b1b40858f0fb59cee83",
+      "normalizedBytes": 5177,
+      "normalizedLines": 100
+    },
+    "navPortHome": {
+      "normalizedSha256": "fa5096ad13e30e4466690486775a860924de1429bba42081ead0ec8c79dcff3f",
+      "normalizedBytes": 345,
+      "normalizedLines": 11
+    }
+  }
+}

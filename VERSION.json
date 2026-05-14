@@ -1,0 +1,38 @@
+{
+  "app": "Freshket Sense",
+  "version": "v155-phase21-final-audit-regression",
+  "workingBaseline": "v155-phase6.2-chat-grounding",
+  "sourceOfTruth": [
+    "src/app/index.html",
+    "src/app/sw.js",
+    "src/config/appConfig.js",
+    "src/runtime/appStateRuntime.js",
+    "src/runtime/viewBoundaryRuntime.js",
+    "src/views/viewRegistry.js",
+    "src/runtime/readModelRuntime.js",
+    "src/views/reportRenderer.js",
+    "src/views/overviewRenderer.js",
+    "src/runtime/navigationRuntime.js",
+    "scripts/fixtures/phase6_2_navigation_baseline.json",
+    "src/styles/uiTokenRegistry.js"
+  ],
+  "generatedOutputs": [
+    "index.html",
+    "sw.js",
+    "dist/index.html",
+    "dist/sw.js"
+  ],
+  "oliveChatStatus": "known issues parked; do not redesign during core refactor",
+  "aiMode": "proxy-only production",
+  "serviceWorkerCache": "freshket-sense-v155-phase21",
+  "safetyAudit": "Phase 21 is a final audit/regression package. It does not intentionally change product behavior; it consolidates release docs, regression matrix, and final source/deploy rules.",
+  "nextRecommendedPhase": "Browser final smoke test, then use this as the post-refactor baseline. Parked Olive Chat v2 redesign can be planned separately.",
+  "phase": "21",
+  "name": "Final Audit / Regression Package",
+  "baseline": "v155-phase6.2-chat-grounding",
+  "notes": "No CSS rules, selectors, layout, navigation, loaders, auth, or AI behavior intentionally changed.",
+  "phaseName": "Final Audit / Regression Package",
+  "behaviorChanged": false,
+  "description": "Finalizes the core refactor package with release checklist, regression matrix, handoff docs, source/deploy discipline, and final audit checks.",
+  "previousStablePhase": "v155-phase20-css-build-cleanup"
+}
