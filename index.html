@@ -2104,17 +2104,99 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
 <link rel="icon" type="image/png" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
+<script id="freshket-sense-config">
+// Freshket Sense app config boundary — Phase 10.
+// Classic-script compatible on purpose: this file is inlined into index.html by scripts/build.js.
+// Public values only. Do not place Claude/Gemini secrets here.
+(function(global){
+  'use strict';
+
+  const ICON_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
+  const OLIVE_AVATAR_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
+  const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+
+  const config = Object.freeze({
+    app: Object.freeze({
+      name: 'Freshket Sense',
+      shortName: 'Freshket',
+      version: 'v155-phase10-auth-boundary',
+      workingBaseline: 'v155-phase6.2-chat-grounding',
+      themeColor: '#006050',
+      backgroundColor: '#006050',
+      serviceWorkerUrl: '/sw.js',
+      manifestStartUrl: '/',
+      manifestDisplay: 'standalone'
+    }),
+    assets: Object.freeze({
+      iconUrl: ICON_URL,
+      oliveAvatarUrl: OLIVE_AVATAR_URL
+    }),
+    supabase: Object.freeze({
+      url: 'https://menslbnyyvpxiyvjywcm.supabase.co',
+      publishableKey: 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG'
+    }),
+    ai: Object.freeze({
+      proxyStorageKey: 'freshket_ai_proxy_url',
+      providerStorageKey: 'ai_provider',
+      proxyOnlyProduction: true,
+      defaultProvider: 'claude'
+    }),
+    storage: Object.freeze({
+      chatFabPositionKey: 'fs_aifab_pos_v1',
+      loaderRuntimeDisabledKey: 'freshket_loader_runtime_disabled',
+      csvDbName: 'ciq-csv-v1',
+      csvCacheTtlMs: 6 * 60 * 60 * 1000
+    }),
+    data: Object.freeze({
+      r2Base: R2_BASE,
+      foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets']),
+      backgroundKeys: Object.freeze(['skus','alternatives']),
+      r2Files: Object.freeze({
+        portview: 'portview.csv',
+        history: 'bulk_history.csv',
+        categories: 'bulk_categories.csv',
+        sku_current: 'bulk_sku_current.csv',
+        outlets: 'bulk_outlets.csv',
+        skus: 'bulk_skus.csv',
+        alternatives: 'bulk_alternatives.csv'
+      }),
+      r2Specs: Object.freeze({
+        portview: Object.freeze({type:'portview-bulk',tab:'portview',cache:true}),
+        history: Object.freeze({type:'bulk-data',tab:'history',cache:true}),
+        categories: Object.freeze({type:'bulk-categories',tab:'categories',cache:true}),
+        sku_current: Object.freeze({type:'bulk-sku-current',tab:'sku_current',cache:true}),
+        outlets: Object.freeze({type:'bulk-outlets',tab:'outlets',cache:true}),
+        skus: Object.freeze({type:'bulk-skus',tab:'skus',cache:false,heavy:true}),
+        alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true})
+      })
+    }),
+    legacySheets: Object.freeze({
+      accountWorkbookId: '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ',
+      skuWorkbookId: '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV'
+    })
+  });
+
+  global.FreshketSenseConfig = config;
+})(window);
+</script>
 <script>
   if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+    window.addEventListener('load',()=>{
+      const cfg=window.FreshketSenseConfig||{};
+      const swUrl=(cfg.app&&cfg.app.serviceWorkerUrl)||'/sw.js';
+      navigator.serviceWorker.register(swUrl).catch(()=>{});
+    });
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
 (function(){
-  var ic='https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
-  var m={name:"Freshket Sense",short_name:"Freshket",start_url:"/",display:"standalone",background_color:"#006050",theme_color:"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
+  var cfg=window.FreshketSenseConfig||{};
+  var app=cfg.app||{};
+  var assets=cfg.assets||{};
+  var ic=assets.iconUrl||'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
+  var m={name:app.name||"Freshket Sense",short_name:app.shortName||"Freshket",start_url:app.manifestStartUrl||"/",display:app.manifestDisplay||"standalone",background_color:app.backgroundColor||"#006050",theme_color:app.themeColor||"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
   try{var blob=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});
   var url=URL.createObjectURL(blob);
   var el=document.querySelector("link[rel=manifest]");if(el)el.href=url;}catch(e){}
@@ -3387,8 +3469,9 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 // ══════════════════════════════════════════
 // SUPABASE CONFIG + AUTH
 // ══════════════════════════════════════════
-const SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
-const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
+const FRESHKET_APP_CONFIG = window.FreshketSenseConfig || {};
+const SUPA_URL = (FRESHKET_APP_CONFIG.supabase && FRESHKET_APP_CONFIG.supabase.url) || 'https://menslbnyyvpxiyvjywcm.supabase.co';
+const SUPA_KEY = (FRESHKET_APP_CONFIG.supabase && FRESHKET_APP_CONFIG.supabase.publishableKey) || 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
 const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
 let currentUser = null;
@@ -3793,6 +3876,182 @@ async function checkSession() {
   if(ov) ov.classList.remove('lgi-checking');
 }
 
+
+// Phase 10: Auth/session runtime boundary (adapter-first; no behavior change intended).
+// Freshket Sense auth/session runtime boundary — Phase 10.
+// Classic-script compatible. This runtime intentionally wraps the existing legacy
+// auth/session functions rather than changing behavior. It gives us diagnostics
+// and a kill switch before deeper auth extraction.
+(function(global){
+  'use strict';
+
+  const STORAGE_KEY = 'freshket_auth_runtime_disabled';
+  const VERSION = 'phase10-auth-session-boundary';
+  const LEGACY_FN_NAMES = [
+    'resetRuntimeSessionState',
+    '_showLoginOverlayClean',
+    '_urlLooksLikePasswordRecovery',
+    '_clearPasswordRecoveryUrl',
+    'showPasswordResetForm',
+    'showResetStatus',
+    'showLoginInfo',
+    'submitPasswordReset',
+    'doLogin',
+    'showLoginError',
+    'showSenseSplash',
+    'hideLoginOverlay',
+    '_autoRouteAfterLogin',
+    'loadUserProfile',
+    'doSignOut',
+    'activateLocalMode',
+    '_setLocalPersona',
+    'checkSession'
+  ];
+
+  const state = {
+    wrappersInstalled: false,
+    installedAt: null,
+    lastOperation: null,
+    lastOperationAt: null,
+    fallbackCount: 0,
+    wrappedFunctions: [],
+    missingFunctions: [],
+    lastError: null
+  };
+
+  const legacy = {};
+
+  function now(){ return new Date().toISOString(); }
+
+  function isDisabled(){
+    try { return global.localStorage && localStorage.getItem(STORAGE_KEY) === '1'; }
+    catch(e){ return false; }
+  }
+
+  function setLastOperation(name){
+    state.lastOperation = name;
+    state.lastOperationAt = now();
+  }
+
+  function captureLegacy(){
+    LEGACY_FN_NAMES.forEach(function(name){
+      if (typeof global[name] === 'function') legacy[name] = global[name];
+      else state.missingFunctions.push(name);
+    });
+  }
+
+  function callLegacy(name, thisArg, args){
+    const fn = legacy[name];
+    if (typeof fn !== 'function') {
+      const err = new Error('Missing legacy auth function: ' + name);
+      state.lastError = { name:name, message:err.message, at:now() };
+      throw err;
+    }
+    setLastOperation(name);
+    try {
+      return fn.apply(thisArg || global, args || []);
+    } catch (error) {
+      state.lastError = { name:name, message:error && error.message || String(error), at:now() };
+      state.fallbackCount += 1;
+      throw error;
+    }
+  }
+
+  function wrap(name){
+    if (typeof legacy[name] !== 'function') return;
+    global[name] = function(){
+      if (isDisabled()) return legacy[name].apply(this, arguments);
+      return callLegacy(name, this, Array.prototype.slice.call(arguments));
+    };
+    state.wrappedFunctions.push(name);
+  }
+
+  function installAdapters(){
+    if (state.wrappersInstalled) return status();
+    captureLegacy();
+    LEGACY_FN_NAMES.forEach(wrap);
+    state.wrappersInstalled = true;
+    state.installedAt = now();
+    return status();
+  }
+
+  function disableRuntime(reason){
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch(e) {}
+    state.lastOperation = 'disableRuntime';
+    state.lastOperationAt = now();
+    if (reason) state.lastDisableReason = String(reason);
+    return status();
+  }
+
+  function enableRuntimeNextReload(){
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    state.lastOperation = 'enableRuntimeNextReload';
+    state.lastOperationAt = now();
+    return status();
+  }
+
+  function currentAuthState(){
+    return {
+      currentUserEmail: global.currentUser && global.currentUser.email || null,
+      currentUserId: global.currentUser && global.currentUser.id || null,
+      profileRole: global.currentUserProfile && global.currentUserProfile.role || null,
+      profileEmail: global.currentUserProfile && global.currentUserProfile.email || null,
+      loginTransitionRunning: !!global.loginTransitionRunning,
+      passwordRecoveryMode: !!global.passwordRecoveryMode,
+      loginOverlayVisible: !!(global.document && document.getElementById('login-overlay') && document.getElementById('login-overlay').style.display !== 'none'),
+      splashVisible: !!(global.document && document.getElementById('sense-splash') && document.getElementById('sense-splash').style.display !== 'none')
+    };
+  }
+
+  function status(){
+    return {
+      version: VERSION,
+      disabled: isDisabled(),
+      storageKey: STORAGE_KEY,
+      wrappersInstalled: state.wrappersInstalled,
+      wrappedFunctions: state.wrappedFunctions.slice(),
+      missingFunctions: state.missingFunctions.slice(),
+      installedAt: state.installedAt,
+      lastOperation: state.lastOperation,
+      lastOperationAt: state.lastOperationAt,
+      fallbackCount: state.fallbackCount,
+      lastError: state.lastError,
+      authState: currentAuthState()
+    };
+  }
+
+  function printDiagnostics(){
+    const s = status();
+    try {
+      console.log('Freshket auth/session diagnostics:', s);
+      console.table(s.wrappedFunctions.map(function(name){ return { wrapped:name }; }));
+    } catch(e) {}
+    return s;
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    installAdapters: installAdapters,
+    status: status,
+    printDiagnostics: printDiagnostics,
+    disableRuntime: disableRuntime,
+    enableRuntimeNextReload: enableRuntimeNextReload,
+    legacy: legacy,
+    callLegacy: function(name){ return callLegacy(name, global, Array.prototype.slice.call(arguments, 1)); }
+  });
+
+  global.FreshketSenseAuthRuntime = api;
+  global.FreshketSenseAuthControl = Object.freeze({
+    status: status,
+    printDiagnostics: printDiagnostics,
+    disableRuntime: disableRuntime,
+    enableRuntimeNextReload: enableRuntimeNextReload
+  });
+
+  installAdapters();
+})(window);
+
+
 // ════════════════════════════════════════
 // SAMPLE DATA
 // ════════════════════════════════════════
@@ -3931,7 +4190,7 @@ let matcherRawCsv='';let matcherRunning=false;
 let matcherProgress={current:0,total:0,found:0};
 let matcherMode='fast';let matcherScope='all';let matcherModel='haiku';
 let kamModel='sonnet'; // KAM briefing model (separate from Matcher) — default Sonnet
-let aiProvider=localStorage.getItem('ai_provider')||'claude'; // 'claude' | 'gemini'
+let aiProvider=localStorage.getItem((FRESHKET_APP_CONFIG.ai&&FRESHKET_APP_CONFIG.ai.providerStorageKey)||'ai_provider')||((FRESHKET_APP_CONFIG.ai&&FRESHKET_APP_CONFIG.ai.defaultProvider)||'claude'); // 'claude' | 'gemini'
 let geminiApiKey=''; // Phase 2: browser-held AI keys are disabled by default; use AI proxy.
 let kamStateCache={html:null,insights:null,accountId:null};
 let skuView='gmv'; // 'gmv' | 'price' — SKU list view mode
@@ -4871,13 +5130,13 @@ function applyMeta(){
 // LEGACY SHEETS CONFIG (kept for backward compatibility; R2 is current source)
 // ── no longer used by Cloudflare loader ──
 // ════════════════════════════════════════
-const FRESHKET_SHEETS_ID     = '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ';
-const FRESHKET_SHEETS_SKU_ID = '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV';
+const FRESHKET_SHEETS_ID     = (FRESHKET_APP_CONFIG.legacySheets && FRESHKET_APP_CONFIG.legacySheets.accountWorkbookId) || '2PACX-1vRQyqbsY1hB0iTpoeqReg3079_HpQLO59T4zF0d1OZR2Tb4KQVIb7wbkbiSyQld_3EAcEmXOcD4HLEQ';
+const FRESHKET_SHEETS_SKU_ID = (FRESHKET_APP_CONFIG.legacySheets && FRESHKET_APP_CONFIG.legacySheets.skuWorkbookId) || '2PACX-1vTnQjbsX-Ff-bv2lCdqY8r6oFbTjBlwV3GPd9QJ9ngqWvi77RW8GUtUTzrmRiF87LhL3zFLPtgd4-ZV';
 const CLAUDE_API_KEY = ''; // Phase 2: no production AI secret in browser. Use AI proxy.
 // ── OLIVE AVATAR ──────────────────────────────────────
 // Paste your Supabase public image URL here.
 // Leave empty ('') to keep the default star icon.
-const OLIVE_AVATAR_URL='https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
+const OLIVE_AVATAR_URL=(FRESHKET_APP_CONFIG.assets && FRESHKET_APP_CONFIG.assets.oliveAvatarUrl) || 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
 
 // Thin wrapper: CSV text → File → existing handleFileUpload (no parse logic duplication)
 // v148: Promise-based with timeout/fail-safe so Sense gates never wait forever.
@@ -4906,17 +5165,17 @@ let _cloudBackgroundPromise = null;
 let _cloudLoadToken = 0;
 
 // ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
-const _CSV_DB='ciq-csv-v1';
-const _CSV_TTL=6*60*60*1000; // 6 hours
+const _CSV_DB=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvDbName) || 'ciq-csv-v1';
+const _CSV_TTL=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvCacheTtlMs) || 6*60*60*1000; // 6 hours
 function _csvOpen(){return window.FreshketSenseRuntime.data.csvOpen();}
 async function _csvCacheGet(tab){return window.FreshketSenseRuntime.data.csvCacheGet(tab);}
 async function _csvCacheSet(tab,text){return window.FreshketSenseRuntime.data.csvCacheSet(tab,text);}
 async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCacheClear();}
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
-const R2_BASE='https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES={portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv'};
-const R2_SPECS={
+const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv'};
+const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
   portview:{type:'portview-bulk',tab:'portview',cache:true},
   history:{type:'bulk-data',tab:'history',cache:true},
@@ -10345,13 +10604,18 @@ On cost-saving alternatives:
   }
 
   // ── AI provider/runtime boundary ─────────────────────
+  function getAiProxyStorageKey(){
+    return (global.FreshketSenseConfig && global.FreshketSenseConfig.ai && global.FreshketSenseConfig.ai.proxyStorageKey) || 'freshket_ai_proxy_url';
+  }
+
   function getAiProxyUrl(){
-    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem('freshket_ai_proxy_url')||'').trim();
+    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem(getAiProxyStorageKey())||'').trim();
   }
 
   function setAiProxyUrl(url){
-    if(url) global.localStorage?.setItem('freshket_ai_proxy_url', String(url).trim());
-    else global.localStorage?.removeItem('freshket_ai_proxy_url');
+    const key=getAiProxyStorageKey();
+    if(url) global.localStorage?.setItem(key, String(url).trim());
+    else global.localStorage?.removeItem(key);
   }
 
   function directAiKeyModeAllowed(){
@@ -10382,7 +10646,7 @@ On cost-saving alternatives:
   function setAiProvider(p, deps){
     const d=deps||{};
     d.setProvider?.(p);
-    global.localStorage?.setItem('ai_provider',p);
+    global.localStorage?.setItem((global.FreshketSenseConfig&&global.FreshketSenseConfig.ai&&global.FreshketSenseConfig.ai.providerStorageKey)||'ai_provider',p);
 
     const cBtn=document.getElementById('aip-claude');
     const gBtn=document.getElementById('aip-gemini');
@@ -10443,7 +10707,7 @@ async function callAI(modelKey,sys,messages,maxTok){
   });
 }
 function setAiProvider(p){
-  if(!window.FreshketSenseRuntime.aiClient || !window.FreshketSenseRuntime.aiClient.setAiProvider){ aiProvider=p; localStorage.setItem('ai_provider',p); return; }
+  if(!window.FreshketSenseRuntime.aiClient || !window.FreshketSenseRuntime.aiClient.setAiProvider){ aiProvider=p; localStorage.setItem((FRESHKET_APP_CONFIG.ai&&FRESHKET_APP_CONFIG.ai.providerStorageKey)||'ai_provider',p); return; }
   return window.FreshketSenseRuntime.aiClient.setAiProvider(p, {
     setProvider: (nextProvider)=>{ aiProvider=nextProvider; }
   });
@@ -10462,15 +10726,18 @@ function setAiProvider(p){
   const runtime = global.FreshketSenseRuntime || {};
   if(!global.FreshketSenseRuntime) global.FreshketSenseRuntime = runtime;
 
-  const DATA_RUNTIME_VERSION = 'v155-phase5.1-audit-patch';
-  const FOREGROUND_KEYS = ['portview','history','categories','sku_current','outlets'];
-  const BACKGROUND_KEYS = ['skus','alternatives'];
+  const DATA_RUNTIME_VERSION = 'v155-phase9-config-extraction';
+  const CFG = global.FreshketSenseConfig || {};
+  const DATA_CFG = CFG.data || {};
+  const STORAGE_CFG = CFG.storage || {};
+  const FOREGROUND_KEYS = (DATA_CFG.foregroundKeys || ['portview','history','categories','sku_current','outlets']).slice();
+  const BACKGROUND_KEYS = (DATA_CFG.backgroundKeys || ['skus','alternatives']).slice();
   const ALL_KEYS = FOREGROUND_KEYS.concat(BACKGROUND_KEYS);
 
-  const CSV_DB = 'ciq-csv-v1';
-  const CSV_TTL = 6 * 60 * 60 * 1000; // 6 hours
-  const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-  const R2_FILES = Object.freeze({
+  const CSV_DB = STORAGE_CFG.csvDbName || 'ciq-csv-v1';
+  const CSV_TTL = STORAGE_CFG.csvCacheTtlMs || 6 * 60 * 60 * 1000; // 6 hours
+  const R2_BASE = DATA_CFG.r2Base || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+  const R2_FILES = DATA_CFG.r2Files || Object.freeze({
     portview:'portview.csv',
     history:'bulk_history.csv',
     categories:'bulk_categories.csv',
@@ -10479,7 +10746,7 @@ function setAiProvider(p){
     skus:'bulk_skus.csv',
     alternatives:'bulk_alternatives.csv'
   });
-  const R2_SPECS = Object.freeze({
+  const R2_SPECS = DATA_CFG.r2Specs || Object.freeze({
     portview:{type:'portview-bulk',tab:'portview',cache:true},
     history:{type:'bulk-data',tab:'history',cache:true},
     categories:{type:'bulk-categories',tab:'categories',cache:true},
@@ -10908,8 +11175,10 @@ function setAiProvider(p){
   }
 
   const ORCH_VERSION = 'v155-phase6-1-stabilized-loader';
-  const FOREGROUND = ['portview','history','categories','sku_current','outlets'];
-  const BACKGROUND = ['skus','alternatives'];
+  const ORCH_CFG = global.FreshketSenseConfig || {};
+  const ORCH_DATA_CFG = ORCH_CFG.data || {};
+  const FOREGROUND = (ORCH_DATA_CFG.foregroundKeys || ['portview','history','categories','sku_current','outlets']).slice();
+  const BACKGROUND = (ORCH_DATA_CFG.backgroundKeys || ['skus','alternatives']).slice();
   const ALL = FOREGROUND.concat(BACKGROUND);
 
   const orchStatus = {
@@ -11411,6 +11680,7 @@ function setAiProvider(p){
 //   FreshketSenseDebug.snapshot()
 //   FreshketSenseDebug.runStaticSmokeChecklist()
 //   FreshketSenseDebug.printStaticSmokeChecklist()
+//   FreshketSenseDebug.printConfigDiagnostics()
 (function(global){
   'use strict';
 
@@ -11421,12 +11691,70 @@ function setAiProvider(p){
     return hasFn('getFreshketDataRuntimeSnapshot') ? global.getFreshketDataRuntimeSnapshot() : { ok:false, error:'getFreshketDataRuntimeSnapshot missing' };
   }
 
+  function configDiagnostics(){
+    const cfg = global.FreshketSenseConfig || {};
+    const app = cfg.app || {};
+    const ai = cfg.ai || {};
+    const data = cfg.data || {};
+    const storage = cfg.storage || {};
+    const assets = cfg.assets || {};
+    const supabase = cfg.supabase || {};
+    return {
+      exists: !!global.FreshketSenseConfig,
+      frozen: !!global.FreshketSenseConfig && Object.isFrozen(global.FreshketSenseConfig),
+      appVersion: app.version || null,
+      workingBaseline: app.workingBaseline || null,
+      serviceWorkerUrl: app.serviceWorkerUrl || null,
+      proxyOnlyProduction: ai.proxyOnlyProduction === true,
+      proxyStorageKey: ai.proxyStorageKey || null,
+      providerStorageKey: ai.providerStorageKey || null,
+      supabaseUrlPresent: !!supabase.url,
+      supabaseKeyType: supabase.publishableKey && supabase.publishableKey.indexOf('sb_publishable_') === 0 ? 'publishable' : (supabase.publishableKey ? 'unknown-present' : 'missing'),
+      r2BasePresent: !!data.r2Base,
+      foregroundKeys: Array.isArray(data.foregroundKeys) ? data.foregroundKeys.slice() : [],
+      backgroundKeys: Array.isArray(data.backgroundKeys) ? data.backgroundKeys.slice() : [],
+      csvDbName: storage.csvDbName || null,
+      chatFabPositionKey: storage.chatFabPositionKey || null,
+      iconUrlPresent: !!assets.iconUrl,
+      oliveAvatarUrlPresent: !!assets.oliveAvatarUrl,
+      ts: new Date().toISOString()
+    };
+  }
+
+  function printConfigDiagnostics(){
+    const diag = configDiagnostics();
+    try{ console.log('Freshket config diagnostics:', diag); }catch(e){}
+    return diag;
+  }
+
+  function authDiagnostics(){
+    const auth = global.FreshketSenseAuthRuntime || null;
+    const control = global.FreshketSenseAuthControl || null;
+    const diag = {
+      exists: !!auth,
+      version: auth && auth.version || null,
+      controlExists: !!control,
+      status: control && control.status ? control.status() : (auth && auth.status ? auth.status() : null),
+      legacyAuthFns: ['doLogin','checkSession','hideLoginOverlay','showSenseSplash','doSignOut','loadUserProfile'].reduce(function(acc,name){ acc[name] = typeof global[name] === 'function'; return acc; }, {}),
+      ts: new Date().toISOString()
+    };
+    return diag;
+  }
+
+  function printAuthDiagnostics(){
+    const diag = authDiagnostics();
+    try{ console.log('Freshket auth/session diagnostics:', diag); }catch(e){}
+    return diag;
+  }
+
   function runStaticSmokeChecklist(){
     const rt = global.FreshketSenseRuntime || {};
     const aiClient = rt.aiClient || {};
     const data = rt.data || global.FreshketSenseDataRuntime || null;
     const checks = [
       ['runtime object exists', !!rt.version, rt.version || 'missing'],
+      ['config object exists', !!global.FreshketSenseConfig, global.FreshketSenseConfig ? (global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) : 'missing'],
+      ['config version phase10', (global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) === 'v155-phase10-auth-boundary', global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version],
       ['AI runtime exists', !!aiClient.callAI, aiClient.callAI ? 'ok' : 'missing callAI'],
       ['production is proxy-only', aiClient.proxyOnlyProduction === true, aiClient.proxyOnlyProduction],
       ['direct browser key mode disabled', hasFn('directAiKeyModeAllowed') ? global.directAiKeyModeAllowed() === false : aiClient.directAiKeyModeAllowed && aiClient.directAiKeyModeAllowed() === false, 'expected false'],
@@ -11434,6 +11762,10 @@ function setAiProvider(p){
       ['data runtime exists', !!data, data ? data.version : 'missing'],
       ['loader control exists', !!global.FreshketSenseLoaderControl, global.FreshketSenseLoaderControl ? 'ok' : 'missing'],
       ['loader adapter status exists', !!global.FreshketSensePhase6LoaderAdapter, global.FreshketSensePhase6LoaderAdapter ? (global.FreshketSensePhase6LoaderAdapter.mode || 'installed') : 'missing'],
+      ['auth runtime exists', !!global.FreshketSenseAuthRuntime, global.FreshketSenseAuthRuntime ? global.FreshketSenseAuthRuntime.version : 'missing'],
+      ['auth control exists', !!global.FreshketSenseAuthControl, global.FreshketSenseAuthControl ? 'ok' : 'missing'],
+      ['auth checkSession exists', hasFn('checkSession'), 'checkSession'],
+      ['auth doLogin exists', hasFn('doLogin'), 'doLogin'],
       ['data snapshot exists', hasFn('getFreshketDataRuntimeSnapshot'), hasFn('getFreshketDataRuntimeSnapshot') ? 'ok' : 'missing'],
       ['topbar exists', hasEl('dataBtnTop'), 'dataBtnTop'],
       ['data panel exists', hasEl('dataPanel'), 'dataPanel'],
@@ -11505,12 +11837,15 @@ function setAiProvider(p){
       loader: loaderDiagnostics(),
       data: getDataSnapshot(),
       smoke: runStaticSmokeChecklist(),
+      config: configDiagnostics(),
+      auth: authDiagnostics(),
       ts: new Date().toISOString()
     };
   }
 
-  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics });
+  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics, configDiagnostics, printConfigDiagnostics, authDiagnostics, printAuthDiagnostics });
   global.printFreshketLoaderDiagnostics = printLoaderDiagnostics;
+  global.printFreshketAuthDiagnostics = printAuthDiagnostics;
   global.runFreshketStaticSmokeChecklist = runStaticSmokeChecklist;
 })(window);
 
@@ -13914,7 +14249,7 @@ function initChatFabDrag(){
   const fab=document.getElementById('aifab');
   if(!fab||fab.dataset.dragInit==='1')return;
   fab.dataset.dragInit='1';
-  const key='fs_aifab_pos_v1';
+  const key=(window.FreshketSenseConfig&&window.FreshketSenseConfig.storage&&window.FreshketSenseConfig.storage.chatFabPositionKey)||'fs_aifab_pos_v1';
   function clamp(x,y){
     const pad=10;
     const r=fab.getBoundingClientRect();
