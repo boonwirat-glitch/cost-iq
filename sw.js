@@ -2,7 +2,7 @@
 // Strategy: Network-first for app shell navigation + offline fallback.
 // Cache version bumped for Phase 14 so users do not keep stale index.html.
 
-const CACHE_NAME = 'freshket-sense-v155-phase21';
+const CACHE_NAME = 'freshket-sense-v155-phase21-1';
 const OFFLINE_URL = '/index.html';
 
 // Install: cache shell

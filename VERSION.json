@@ -1,6 +1,6 @@
 {
   "app": "Freshket Sense",
-  "version": "v155-phase21-final-audit-regression",
+  "version": "v155-phase21-1-debug-snapshot-fix",
   "workingBaseline": "v155-phase6.2-chat-grounding",
   "sourceOfTruth": [
     "src/app/index.html",
@@ -24,7 +24,7 @@
   ],
   "oliveChatStatus": "known issues parked; do not redesign during core refactor",
   "aiMode": "proxy-only production",
-  "serviceWorkerCache": "freshket-sense-v155-phase21",
+  "serviceWorkerCache": "freshket-sense-v155-phase21-1",
   "safetyAudit": "Phase 21 is a final audit/regression package. It does not intentionally change product behavior; it consolidates release docs, regression matrix, and final source/deploy rules.",
   "nextRecommendedPhase": "Browser final smoke test, then use this as the post-refactor baseline. Parked Olive Chat v2 redesign can be planned separately.",
   "phase": "21",

@@ -97,7 +97,7 @@
       available: !!global.localStorage,
       totalKeys: keys.length,
       accountStorageKeys: accountKeys.length,
-      knownKeys,
+      knownKeys: knownStorageKeys,
       known,
       accountIndexCount: count(getJSON(knownStorageKeys.accountIndex, [])),
       currentAccountStorageExists: !!(global.currentAccountId && getRaw(accountPrefix + global.currentAccountId)),
