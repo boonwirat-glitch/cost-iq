@@ -2105,7 +2105,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
 <link rel="apple-touch-icon" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
 <link rel="icon" type="image/png" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
 <script id="freshket-sense-config">
-// Freshket Sense app config boundary — Phase 10.
+// Freshket Sense app config boundary — Phase 14.
 // Classic-script compatible on purpose: this file is inlined into index.html by scripts/build.js.
 // Public values only. Do not place Claude/Gemini secrets here.
 (function(global){
@@ -2119,7 +2119,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v155-phase10-auth-boundary',
+      version: 'v155-phase15-report-renderer',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -2144,6 +2144,13 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
     storage: Object.freeze({
       chatFabPositionKey: 'fs_aifab_pos_v1',
       loaderRuntimeDisabledKey: 'freshket_loader_runtime_disabled',
+      authRuntimeDisabledKey: 'freshket_auth_runtime_disabled',
+      stateRuntimeDisabledKey: 'freshket_state_runtime_disabled',
+      viewRuntimeDisabledKey: 'freshket_view_runtime_disabled',
+      accountIndexKey: 'ciq_index',
+      localAccountPrefix: 'ciq_acct_',
+      visitedKey: 'ciq_visited',
+      restaurantSwipeLearnedKey: 'ciq_rest_swipe_learned',
       csvDbName: 'ciq-csv-v1',
       csvCacheTtlMs: 6 * 60 * 60 * 1000
     }),
@@ -2177,6 +2184,639 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: flex !important; }
   });
 
   global.FreshketSenseConfig = config;
+})(window);
+</script>
+<script id="freshket-view-registry">
+// Freshket Sense view registry — Phase 13.
+// Source-of-truth registry for screens, DOM anchors, renderer inventory, and extraction notes.
+// Diagnostic only: this file must not mutate app state or override render functions.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase13-view-registry-inventory';
+
+  function freezeDeep(value){
+    if(!value || typeof value !== 'object') return value;
+    Object.keys(value).forEach(function(key){ freezeDeep(value[key]); });
+    try{ return Object.freeze(value); }catch(e){ return value; }
+  }
+
+  const screens = {
+    overview: {
+      id: 'scr-overview',
+      navId: 'nav-overview',
+      group: 'restaurantA',
+      mode: 'restaurant',
+      label: 'Restaurant Overview',
+      primaryRenderers: ['renderOverview','renderHeroKAM','renderHeroMoM','renderOverviewStats','renderCatBars','renderOutletCard','renderQuickWins','renderOverviewPaceAndStrip','renderInterpretation'],
+      domAnchors: ['h-acct-name','hero-spend','cat-bars','outlet-card','overview-stats'],
+      stateReads: ['D.history','D.current_month','D.categories','D.outlets','OPPS','selectedOpps'],
+      extractionRisk: 'medium',
+      notes: 'Restaurant landing screen. Must preserve swipe behavior and fixed bottom nav spacing.'
+    },
+    portfolio: {
+      id: 'scr-portfolio',
+      navId: 'nav-portfolio',
+      group: 'restaurantA',
+      mode: 'restaurant',
+      label: 'Portfolio / SKU',
+      primaryRenderers: ['renderPortfolio','renderSKUList','filterSKUs','renderPortMoMInsight','setPortfolioMonth','setSkuFilter','setSkuView'],
+      domAnchors: ['sku-list','sku-panel','portfolio-sticky-wrap','port-top'],
+      stateReads: ['D.skus','D.history','D.current_month','skuFilter','skuView'],
+      extractionRisk: 'medium-high',
+      notes: 'SKU screen has inner scroll and filtering. Do not extract before state boundary is stable.'
+    },
+    opportunities: {
+      id: 'scr-opportunities',
+      navId: 'nav-opportunities',
+      group: 'restaurantB',
+      mode: 'restaurant',
+      label: 'Sense / Opportunities',
+      primaryRenderers: ['computeOPPS','renderOpps','renderOppCards','renderOppTable','renderPlanBuilder','getFilteredOpps','toggleOpp','setOppFilter','scheduleOppReveal'],
+      domAnchors: ['opplist','pb-groups','pb-footer','sense-gate'],
+      stateReads: ['OPPS','selectedOpps','D.alts','D.skus','D.current_month','senseScore'],
+      extractionRisk: 'high',
+      notes: 'Most coupled restaurant screen: Sense gate, plan builder, alternatives, selection state.'
+    },
+    report: {
+      id: 'scr-report',
+      navId: 'nav-report',
+      group: 'restaurantB',
+      mode: 'restaurant',
+      label: 'Report',
+      primaryRenderers: ['renderReport'],
+      domAnchors: ['rpt','report-wrap','scr-report'],
+      stateReads: ['D','OPPS','selectedOpps'],
+      extractionRisk: 'medium',
+      notes: 'Report is mostly generated output; likely safer to extract before opportunity planner internals.'
+    },
+    kamOverview: {
+      id: 'kam-overview',
+      navId: 'nav-kam-overview',
+      group: 'kam',
+      mode: 'kam',
+      label: 'KAM Account Overview',
+      primaryRenderers: ['renderKamOverview','renderKamThisMonth','renderKamLastMonth','renderKamSignalBar','renderSkuMovementHtml','renderHeroKAM','generateKamBriefing'],
+      domAnchors: ['kam-overview','kam-acct-name2','kam-this-month','kam-last-month'],
+      stateReads: ['currentUserProfile','D.history','D.skus','D.current_month','bulkHistoryData','bulkSkusData'],
+      extractionRisk: 'high',
+      notes: 'Dark KAM screen with account context and AI insight entry points. Keep after lighter renderer extraction.'
+    },
+    portview: {
+      id: 'scr-portview',
+      navId: 'nav-portview',
+      group: 'kam',
+      mode: 'kam',
+      label: 'Portfolio View',
+      primaryRenderers: ['renderPortview','renderPortviewSummary','renderPortviewList','getPortviewAccounts','setPortviewFilter','generatePortviewInsight'],
+      domAnchors: ['scr-portview','portview-list','portview-summary','pv-sort-row'],
+      stateReads: ['bulkHistoryData','currentUserProfile','portviewFilter','portviewSort','isTeamLead'],
+      extractionRisk: 'high',
+      notes: 'Portfolio-level KAM/TL intelligence. Cross-account state; extract after registry and state selectors exist.'
+    },
+    teamview: {
+      id: 'scr-teamview',
+      navId: 'nav-teamview',
+      group: 'kam',
+      mode: 'kam',
+      label: 'Team View',
+      primaryRenderers: ['renderTeamview','renderTeamviewSummary','renderTeamviewKamList','teamviewDrillKam','teamviewGoBack','generateTeamviewInsight'],
+      domAnchors: ['scr-teamview','teamview-list','teamview-summary'],
+      stateReads: ['bulkHistoryData','currentUserProfile','teamviewScope','teamviewSelectedKam'],
+      extractionRisk: 'high',
+      notes: 'Team lead screen. Do not conflate with portfolio collapse behavior.'
+    }
+  };
+
+  const groups = {
+    restaurantA: { id:'swipe-grp-a', mode:'restaurant', screens:['overview','portfolio'], behavior:'horizontal-swipe' },
+    restaurantB: { id:'swipe-grp-b', mode:'restaurant', screens:['opportunities','report'], behavior:'horizontal-swipe' },
+    kam: { id:'kam-main', mode:'kam', screens:['kamOverview','portview','teamview'], behavior:'bottom-nav' }
+  };
+
+  const extractionOrder = [
+    { phase:'view-registry', status:'done-in-phase13', screens:['all'], note:'Inventory only, no renderer rewiring.' },
+    { phase:'low-risk-renderer-extract', status:'future', screens:['report'], note:'Candidate first extraction because it is generated output with fewer user interactions.' },
+    { phase:'restaurant-overview-extract', status:'future', screens:['overview'], note:'Only after hero/category/outlet DOM anchors are protected.' },
+    { phase:'portfolio-sku-extract', status:'future', screens:['portfolio'], note:'Requires stable SKU filter/state selectors.' },
+    { phase:'opportunity-planner-extract', status:'future', screens:['opportunities'], note:'High risk due to Sense gate + selectedOpps + alternatives.' },
+    { phase:'kam-views-extract', status:'future', screens:['kamOverview','portview','teamview'], note:'High risk; wait until shared account/portfolio selectors exist.' }
+  ];
+
+  function unique(arr){ const out=[]; (arr||[]).forEach(function(v){ if(v && out.indexOf(v)<0) out.push(v); }); return out; }
+  const rendererNames = unique(Object.keys(screens).reduce(function(acc,key){ return acc.concat(screens[key].primaryRenderers || []); }, [])).sort();
+  const domAnchors = unique(Object.keys(screens).reduce(function(acc,key){ return acc.concat(screens[key].domAnchors || []); }, [])).sort();
+  const stateReads = unique(Object.keys(screens).reduce(function(acc,key){ return acc.concat(screens[key].stateReads || []); }, [])).sort();
+
+  const registry = freezeDeep({
+    version: VERSION,
+    generatedAt: 'build-time',
+    behaviorChanged: false,
+    screens: screens,
+    groups: groups,
+    rendererNames: rendererNames,
+    domAnchors: domAnchors,
+    stateReads: stateReads,
+    extractionOrder: extractionOrder
+  });
+
+  global.FreshketSenseViewRegistry = registry;
+})(window);
+</script>
+<script id="freshket-read-model">
+// Freshket Sense read model boundary — Phase 14.
+// Purpose: provide read-only selectors for future renderer extraction.
+// This file must not mutate DOM, app state, localStorage, IndexedDB, or network state.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase14-read-model-boundary';
+  const BEHAVIOR_CHANGED = false;
+
+  function now(){ return new Date().toISOString(); }
+  function safe(fn, fallback){ try{ return fn(); }catch(e){ return fallback; } }
+  function isObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+  function text(v){ return v == null ? '' : String(v); }
+  function cloneShallowArray(list, limit){ return arr(list).slice(0, limit || list.length).map(function(x){ return isObj(x) ? Object.assign({}, x) : x; }); }
+  function keys(v){ return isObj(v) ? Object.keys(v) : []; }
+  function compactObject(obj){
+    const out = {};
+    Object.keys(obj || {}).forEach(function(k){ if(obj[k] !== undefined) out[k] = obj[k]; });
+    return out;
+  }
+
+  function baseState(){
+    const D = global.D || {};
+    return {
+      D: D,
+      OPPS: arr(global.OPPS),
+      selectedOpps: global.selectedOpps || global.sel || null,
+      currentAccountId: global.currentAccountId || (D.meta && D.meta.accountId) || null,
+      currentUser: global.currentUser || null,
+      currentUserProfile: global.currentUserProfile || null,
+      mode: global.mode || (global.isKAM ? 'kam' : 'restaurant'),
+      isKAM: !!global.isKAM
+    };
+  }
+
+  function dataAvailability(){
+    const s = baseState();
+    const D = s.D || {};
+    return {
+      accountLoaded: !!(s.currentAccountId || (D.meta && D.meta.accountName)),
+      historyRows: arr(D.history).length,
+      categoryRows: arr(D.cats).length,
+      categoryMonthlyKeys: keys(D.cats_monthly).length,
+      skuRows: arr(D.skus).length,
+      skuCurrentRows: arr(D.sku_current).length,
+      skuMonthlyKeys: keys(D.skus_monthly).length,
+      alternativeRows: arr(D.alts).length,
+      opportunityRows: arr(s.OPPS).length,
+      outletMonthlyKeys: keys(D.outlets_monthly).length,
+      currentMonthLoaded: !!D.current_month,
+      bulkHistoryAccounts: keys(global.bulkHistoryData).length,
+      bulkSkuAccounts: keys(global.bulkSkusData).length,
+      bulkPortviewRows: arr(global.bulkPortviewData).length,
+      weeklyDataAvailable: false,
+      supplierDataAvailable: false,
+      menuDataAvailable: false,
+      customerCallNotesAvailable: false
+    };
+  }
+
+  function accountIdentity(){
+    const s = baseState();
+    const D = s.D || {};
+    const meta = D.meta || {};
+    return compactObject({
+      accountId: s.currentAccountId || meta.accountId || null,
+      accountName: meta.accountName || global.bulkAccountNames && global.bulkAccountNames[s.currentAccountId] || '',
+      kamName: meta.kamName || '',
+      currentMonth: D.current_month && (D.current_month.m || D.current_month.month) || D.current_month || null,
+      mode: s.mode,
+      isKAM: s.isKAM,
+      userEmail: s.currentUser && s.currentUser.email || null,
+      userRole: s.currentUserProfile && (s.currentUserProfile.role || s.currentUserProfile.user_role) || null
+    });
+  }
+
+  function historySummary(){
+    const h = arr(baseState().D.history);
+    const first = h[0] || null;
+    const last = h[h.length - 1] || null;
+    const total = h.reduce(function(sum,r){ return sum + num(r.gmv || r.gmv_ex_vat || r.sales || r.amount); }, 0);
+    return {
+      rows: h.length,
+      firstMonth: first && (first.m || first.month) || null,
+      lastMonth: last && (last.m || last.month) || null,
+      first: first ? Object.assign({}, first) : null,
+      last: last ? Object.assign({}, last) : null,
+      totalKnownGmv: total,
+      sample: cloneShallowArray(h, 6)
+    };
+  }
+
+  function categorySummary(limit){
+    const D = baseState().D || {};
+    const cats = arr(D.cats);
+    const rows = cats.length ? cats : Object.keys(D.cats_monthly || {}).reduce(function(acc,m){ return acc.concat(arr((D.cats_monthly || {})[m])); }, []);
+    return {
+      rows: rows.length,
+      top: cloneShallowArray(rows, limit || 8),
+      monthlyKeys: keys(D.cats_monthly)
+    };
+  }
+
+  function skuSummary(limit){
+    const D = baseState().D || {};
+    const skus = arr(D.skus);
+    return {
+      rows: skus.length,
+      currentRows: arr(D.sku_current).length,
+      monthlyKeys: keys(D.skus_monthly),
+      top: cloneShallowArray(skus, limit || 12),
+      currentTop: cloneShallowArray(D.sku_current, limit || 12)
+    };
+  }
+
+  function opportunitySummary(limit){
+    const opps = arr(baseState().OPPS);
+    const selected = baseState().selectedOpps;
+    let selectedCount = 0;
+    if(selected && typeof selected.size === 'number') selectedCount = selected.size;
+    else if(Array.isArray(selected)) selectedCount = selected.length;
+    return {
+      rows: opps.length,
+      selectedCount: selectedCount,
+      top: cloneShallowArray(opps, limit || 10)
+    };
+  }
+
+  function outletSummary(limit){
+    const D = baseState().D || {};
+    const monthKeys = keys(D.outlets_monthly);
+    const latestKey = monthKeys[monthKeys.length - 1] || null;
+    const rows = latestKey ? arr(D.outlets_monthly[latestKey]) : [];
+    return {
+      monthlyKeys: monthKeys,
+      latestMonth: latestKey,
+      rows: rows.length,
+      top: cloneShallowArray(rows, limit || 8)
+    };
+  }
+
+  function portfolioSummary(limit){
+    const rows = arr(global.bulkPortviewData);
+    return {
+      rows: rows.length,
+      filteredRows: arr(global.portviewAccounts || global.filteredPortviewAccounts).length || null,
+      filter: global.portviewFilter || null,
+      sort: global.portviewSort || null,
+      top: cloneShallowArray(rows, limit || 12),
+      bulkHistoryAccounts: keys(global.bulkHistoryData).length,
+      bulkCurrentMonthAccounts: keys(global.bulkCurrentMonthData).length
+    };
+  }
+
+  function teamSummary(limit){
+    return {
+      scope: global.teamviewScope || null,
+      selectedKam: global.teamviewSelectedKam || null,
+      rows: arr(global.teamviewRows || global.teamviewKamRows).length,
+      top: cloneShallowArray(global.teamviewRows || global.teamviewKamRows, limit || 12),
+      bulkHistoryAccounts: keys(global.bulkHistoryData).length,
+      currentUserProfile: isObj(global.currentUserProfile) ? Object.assign({}, global.currentUserProfile) : null
+    };
+  }
+
+  function reportModel(){
+    return {
+      screen: 'report',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      history: historySummary(),
+      categories: categorySummary(8),
+      skus: skuSummary(12),
+      opportunities: opportunitySummary(12),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function restaurantOverviewModel(){
+    return {
+      screen: 'overview',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      history: historySummary(),
+      categories: categorySummary(8),
+      outlets: outletSummary(8),
+      opportunities: opportunitySummary(5),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function portfolioModel(){
+    return {
+      screen: 'portfolio',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      history: historySummary(),
+      skus: skuSummary(20),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function opportunitiesModel(){
+    return {
+      screen: 'opportunities',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      skus: skuSummary(12),
+      opportunities: opportunitySummary(20),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function kamAccountModel(){
+    return {
+      screen: 'kamOverview',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      history: historySummary(),
+      skus: skuSummary(15),
+      opportunities: opportunitySummary(10),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function portviewModel(){
+    return {
+      screen: 'portview',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      portfolio: portfolioSummary(20),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function teamviewModel(){
+    return {
+      screen: 'teamview',
+      account: accountIdentity(),
+      availability: dataAvailability(),
+      team: teamSummary(20),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      ts: now()
+    };
+  }
+
+  function getViewModel(key){
+    const map = {
+      overview: restaurantOverviewModel,
+      portfolio: portfolioModel,
+      opportunities: opportunitiesModel,
+      report: reportModel,
+      kamOverview: kamAccountModel,
+      portview: portviewModel,
+      teamview: teamviewModel
+    };
+    const fn = map[key] || map.report;
+    return fn();
+  }
+
+  function diagnostics(){
+    const registry = global.FreshketSenseViewRegistry || null;
+    const availability = dataAvailability();
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      registryLoaded: !!registry,
+      registryVersion: registry && registry.version || null,
+      selectors: ['accountIdentity','dataAvailability','historySummary','categorySummary','skuSummary','opportunitySummary','outletSummary','portfolioSummary','teamSummary','getViewModel'],
+      availability: availability,
+      account: accountIdentity(),
+      validation: validate(),
+      ts: now()
+    };
+  }
+
+  function validate(){
+    const required = ['overview','portfolio','opportunities','report','kamOverview','portview','teamview'];
+    const models = required.map(function(key){
+      return safe(function(){
+        const model = getViewModel(key);
+        return { key:key, ok:!!model && model.screen === key && model.behaviorChanged === false, screen:model && model.screen || null };
+      }, { key:key, ok:false, screen:null });
+    });
+    return {
+      ok: models.every(function(m){ return m.ok; }),
+      behaviorChanged: BEHAVIOR_CHANGED,
+      models: models
+    };
+  }
+
+  function printDiagnostics(){
+    const diag = diagnostics();
+    try{
+      console.log('Freshket read model diagnostics:', diag);
+      console.table(diag.validation.models.map(function(m){ return { key:m.key, ok:m.ok, screen:m.screen }; }));
+    }catch(e){}
+    return diag;
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    accountIdentity: accountIdentity,
+    dataAvailability: dataAvailability,
+    historySummary: historySummary,
+    categorySummary: categorySummary,
+    skuSummary: skuSummary,
+    opportunitySummary: opportunitySummary,
+    outletSummary: outletSummary,
+    portfolioSummary: portfolioSummary,
+    teamSummary: teamSummary,
+    getViewModel: getViewModel,
+    reportModel: reportModel,
+    restaurantOverviewModel: restaurantOverviewModel,
+    portfolioModel: portfolioModel,
+    opportunitiesModel: opportunitiesModel,
+    kamAccountModel: kamAccountModel,
+    portviewModel: portviewModel,
+    teamviewModel: teamviewModel,
+    diagnostics: diagnostics,
+    validate: validate,
+    printDiagnostics: printDiagnostics
+  });
+
+  const previousRuntime = global.FreshketSenseRuntime || {};
+  global.FreshketSenseRuntime = Object.assign({}, previousRuntime, { readModel: api });
+  global.FreshketSenseReadModelRuntime = api;
+  global.getFreshketReadModelSnapshot = diagnostics;
+  global.printFreshketReadModelDiagnostics = printDiagnostics;
+})(window);
+</script>
+<script id="freshket-report-renderer">
+// Freshket Sense Report Renderer — Phase 15.
+// Purpose: extract the first actual renderer path behind a legacy-safe adapter.
+// Scope: Report screen only. Must not touch navigation, loader, auth, chat, or other renderers.
+(function(global){
+  'use strict';
+
+  const VERSION = 'phase15-report-renderer';
+  const BEHAVIOR_CHANGED = false;
+
+  function now(){ return new Date().toISOString(); }
+  function safe(fn, fallback){ try{ return fn(); }catch(e){ return fallback; } }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function isSet(v){ return !!v && typeof v.has === 'function' && typeof v.size === 'number'; }
+  function text(v){ return v == null ? '' : String(v); }
+  function el(id){ return global.document && document.getElementById(id); }
+  function setText(id, value){ const node = el(id); if(node) node.textContent = text(value); return !!node; }
+  function setHTML(id, value){ const node = el(id); if(node) node.innerHTML = text(value); return !!node; }
+  function call(fn, fallback){ return typeof fn === 'function' ? safe(fn, fallback) : fallback; }
+
+  function contextFromLegacy(ctx){
+    ctx = ctx || {};
+    return {
+      D: ctx.D || global.D || { meta:{}, history:[] },
+      SAMPLE: ctx.SAMPLE || global.SAMPLE || { history:[] },
+      OPPS: arr(ctx.OPPS || global.OPPS),
+      sel: ctx.sel || global.sel || new Set(),
+      getAlt: ctx.getAlt || global.getAlt,
+      totalSel: ctx.totalSel || global.totalSel,
+      fmt: ctx.fmt || global.fmt || function(v){ return String(v == null ? '' : v); }
+    };
+  }
+
+  function selectedItems(c){
+    const selected = c.sel;
+    return arr(c.OPPS).filter(function(o){ return isSet(selected) ? selected.has(o.id) : false; })
+      .sort(function(a,b){
+        const aa = call(function(){ return c.getAlt(a); }, {});
+        const bb = call(function(){ return c.getAlt(b); }, {});
+        return Number(bb.save || 0) - Number(aa.save || 0);
+      });
+  }
+
+  function viewModel(ctx){
+    const c = contextFromLegacy(ctx);
+    const D = c.D || {};
+    const meta = D.meta || {};
+    const hist = arr(D.history).length ? arr(D.history) : arr(c.SAMPLE.history);
+    const last = hist[hist.length - 1] || { s:0, m:'' };
+    const items = selectedItems(c);
+    const save = call(function(){ return c.totalSel(); }, 0);
+    return {
+      accountName: meta.accountName || 'ร้านอาหาร',
+      kamName: meta.kamName || '—',
+      lastMonth: last.m || '—',
+      dateStr: new Date().toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' }),
+      selectedItems: items,
+      selectedSave: save,
+      context: c,
+      ts: now()
+    };
+  }
+
+  function renderRows(model){
+    const c = model.context;
+    if(!model.selectedItems.length){
+      return '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+    }
+    return model.selectedItems.map(function(o,i){
+      const a = call(function(){ return c.getAlt(o); }, {});
+      const curPriceStr = o.curP > 0 ? c.fmt(o.curP) + '/' + o.curU : '—';
+      const altPriceStr = a.altP > 0 ? c.fmt(a.altP) + '/' + a.altU : '—';
+      const confHigh = a.conf === 'high';
+      return '<tr>'+
+        '<td class="rpt2-num">'+(i+1)+'</td>'+
+        '<td><div class="rpt2-sku-name">'+text(o.curName)+'</div><div class="rpt2-sku-meta">#'+text(o.curId)+(o.curSpec?' · '+text(o.curSpec):'')+(curPriceStr!=='—'?' · '+curPriceStr:'')+'</div></td>'+
+        '<td class="rpt2-arr">→</td>'+
+        '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">#'+text(a.altId)+(a.altSpec?' · '+text(a.altSpec):'')+(altPriceStr!=='—'?' · '+altPriceStr:'')+'</div></td>'+
+        '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</div></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderTotal(model){
+    const c = model.context;
+    if(!model.selectedItems.length) return '';
+    return '<tr class="rpt2-total-row">'+
+      '<td colspan="4"><span class="rpt2-total-label">รวม '+model.selectedItems.length+' รายการ</span></td>'+
+      '<td><div class="rpt2-total-amt">'+c.fmt(model.selectedSave)+'</div><div class="rpt2-total-yr">'+c.fmt(model.selectedSave*12)+' / ปี</div></td>'+
+    '</tr>';
+  }
+
+  function renderFromLegacy(ctx){
+    const model = viewModel(ctx);
+    const c = model.context;
+
+    setText('rpt2-acct', model.accountName);
+    setText('rpt2-date', model.dateStr);
+    setText('rpt2-kam', 'KAM: ' + model.kamName);
+    setText('rpt2-sum-label', 'Sense หาวัตถุดิบที่ราคาคุ้มกว่าได้ ' + model.selectedItems.length + ' รายการ');
+    setText('rpt2-sum-mo', c.fmt(model.selectedSave) + ' / เดือน');
+    setText('rpt2-sum-yr', c.fmt(model.selectedSave*12) + ' / ปี');
+    setHTML('rpt2-tbody', renderRows(model));
+    setHTML('rpt2-tfoot', renderTotal(model));
+    setText('rpt2-note', '* ประมาณการจากยอดซื้อและราคาสินค้า ' + model.lastMonth + ' — ตัวเลขจริงอาจต่างกันตามปริมาณและราคาที่เปลี่ยนแปลง');
+
+    return { ok:true, renderer:VERSION, selectedCount:model.selectedItems.length, selectedSave:model.selectedSave, behaviorChanged:BEHAVIOR_CHANGED, ts:now() };
+  }
+
+  function validate(){
+    const requiredIds = ['rpt2-acct','rpt2-date','rpt2-kam','rpt2-sum-label','rpt2-sum-mo','rpt2-sum-yr','rpt2-tbody','rpt2-tfoot','rpt2-note'];
+    const ids = requiredIds.map(function(id){ return { id:id, exists:!!el(id) }; });
+    return { ok: ids.every(function(x){ return x.exists; }), ids: ids, behaviorChanged: BEHAVIOR_CHANGED };
+  }
+
+  function diagnostics(){
+    const rm = global.FreshketSenseReadModelRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.readModel) || null;
+    return {
+      version: VERSION,
+      behaviorChanged: BEHAVIOR_CHANGED,
+      screen: 'report',
+      readModelLoaded: !!rm,
+      readModelReportAvailable: !!(rm && typeof rm.getViewModel === 'function'),
+      validation: validate(),
+      ts: now()
+    };
+  }
+
+  function printDiagnostics(){
+    const diag = diagnostics();
+    try{
+      console.log('Freshket report renderer diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    behaviorChanged: BEHAVIOR_CHANGED,
+    viewModel: viewModel,
+    renderFromLegacy: renderFromLegacy,
+    validate: validate,
+    diagnostics: diagnostics,
+    printDiagnostics: printDiagnostics
+  });
+
+  const previousRuntime = global.FreshketSenseRuntime || {};
+  const previousViews = previousRuntime.views || {};
+  global.FreshketSenseRuntime = Object.assign({}, previousRuntime, { views: Object.assign({}, previousViews, { reportRenderer: api }) });
+  global.FreshketSenseReportRenderer = api;
+  global.getFreshketReportRendererSnapshot = diagnostics;
+  global.printFreshketReportRendererDiagnostics = printDiagnostics;
 })(window);
 </script>
 <script>
@@ -6650,6 +7290,27 @@ function onboardSetup(){
 // RENDER — REPORT (fixed: uses totalSel, shows both plan + full potential)
 // ════════════════════════════════════════
 function renderReport(){
+  const renderer = window.FreshketSenseReportRenderer;
+  if(renderer && typeof renderer.renderFromLegacy === 'function'){
+    try{
+      const result = renderer.renderFromLegacy({
+        D: D,
+        SAMPLE: (typeof SAMPLE !== 'undefined' ? SAMPLE : {history:[]}),
+        OPPS: OPPS,
+        sel: sel,
+        getAlt: getAlt,
+        totalSel: totalSel,
+        fmt: fmt
+      });
+      if(result && result.ok) return result;
+    }catch(err){
+      console.warn('[Freshket Sense] Report renderer failed, falling back to legacy renderer:', err && err.message ? err.message : err);
+    }
+  }
+  return __legacyRenderReportFallback();
+}
+
+function __legacyRenderReportFallback(){
   const hist=D.history.length?D.history:SAMPLE.history;
   const last=hist[hist.length-1]||{s:0,m:''};
   const acctName=D.meta.accountName||'ร้านอาหาร';
@@ -11675,12 +12336,481 @@ function setAiProvider(p){
 
 // ─────────────────────────────────────────────────────
 
-// Phase 5.1 debug and staging smoke-check utilities.
+
+// ── PHASE 13 VIEW REGISTRY / RENDERER INVENTORY ─────────────────────
+// Freshket Sense view boundary runtime — Phase 13.
+// Diagnostic-first boundary: reads FreshketSenseViewRegistry and validates screen/renderer inventory without rewriting UI behavior.
+(function(global){
+  'use strict';
+
+  const CFG = global.FreshketSenseConfig || {};
+  const STORAGE_CFG = CFG.storage || {};
+  const STORAGE_KEY = STORAGE_CFG.viewRuntimeDisabledKey || 'freshket_view_runtime_disabled';
+  const VERSION = 'phase13-view-registry-inventory';
+  const REGISTRY = global.FreshketSenseViewRegistry || { screens:{}, groups:{}, rendererNames:[], domAnchors:[], stateReads:[], extractionOrder:[], behaviorChanged:false };
+  const screenRegistry = REGISTRY.screens || {};
+  const viewGroups = REGISTRY.groups || {};
+
+  const state = {
+    installedAt: new Date().toISOString(),
+    lastOperation: null,
+    lastOperationAt: null,
+    lastError: null,
+    readCount: 0
+  };
+
+  function now(){ return new Date().toISOString(); }
+  function mark(op){ state.lastOperation = op; state.lastOperationAt = now(); }
+  function keys(obj){ return Object.keys(obj || {}); }
+  function isDisabled(){
+    try { return !!global.localStorage && localStorage.getItem(STORAGE_KEY) === '1'; }
+    catch(e){ return false; }
+  }
+  function hasEl(id){ return !!(id && global.document && document.getElementById(id)); }
+  function getElClass(id){ const el = id && global.document && document.getElementById(id); return el ? String(el.className || '') : null; }
+  function hasFn(name){ return typeof global[name] === 'function'; }
+  function isVisibleByClass(id){
+    const el = id && global.document && document.getElementById(id);
+    if(!el) return false;
+    return el.classList ? el.classList.contains('on') : /\bon\b/.test(String(el.className || ''));
+  }
+  function domAnchorDiagnostics(meta){
+    return (meta.domAnchors || []).map(function(id){ return { id:id, exists:hasEl(id), className:getElClass(id) }; });
+  }
+  function rendererDiagnostics(meta){
+    return (meta.primaryRenderers || meta.renderFns || []).map(function(fn){ return { name:fn, exists:hasFn(fn) }; });
+  }
+  function getActiveScreen(){
+    mark('view.getActiveScreen'); state.readCount += 1;
+    const active = [];
+    keys(screenRegistry).forEach(function(key){
+      const meta = screenRegistry[key];
+      if(isVisibleByClass(meta.id)) active.push({ key:key, id:meta.id, label:meta.label, mode:meta.mode || null });
+    });
+    return active;
+  }
+  function getActiveNav(){
+    mark('view.getActiveNav'); state.readCount += 1;
+    const navs = [];
+    try{
+      if(global.document){
+        document.querySelectorAll('.ni.on').forEach(function(el){
+          navs.push({ id:el.id || null, label:el.textContent ? el.textContent.trim().replace(/\s+/g,' ') : '' });
+        });
+      }
+    }catch(error){ state.lastError = { op:'getActiveNav', message:error.message || String(error), at:now() }; }
+    return navs;
+  }
+  function getScreenDiagnostics(){
+    mark('view.getScreenDiagnostics'); state.readCount += 1;
+    return keys(screenRegistry).map(function(key){
+      const meta = screenRegistry[key];
+      return {
+        key:key,
+        id:meta.id,
+        label:meta.label,
+        mode:meta.mode || null,
+        group:meta.group,
+        exists:hasEl(meta.id),
+        navId:meta.navId,
+        navExists:meta.navId ? hasEl(meta.navId) : false,
+        isActive:isVisibleByClass(meta.id),
+        className:getElClass(meta.id),
+        extractionRisk:meta.extractionRisk || 'unknown',
+        renderFns:rendererDiagnostics(meta),
+        domAnchors:domAnchorDiagnostics(meta),
+        stateReads:(meta.stateReads || []).slice(),
+        notes:meta.notes || ''
+      };
+    });
+  }
+  function getGroupDiagnostics(){
+    mark('view.getGroupDiagnostics'); state.readCount += 1;
+    return keys(viewGroups).map(function(key){
+      const group = viewGroups[key];
+      return {
+        key:key,
+        id:group.id,
+        mode:group.mode || null,
+        behavior:group.behavior || null,
+        exists:hasEl(group.id),
+        className:getElClass(group.id),
+        screens:(group.screens || []).slice()
+      };
+    });
+  }
+  function getRendererInventory(){
+    mark('view.getRendererInventory'); state.readCount += 1;
+    const names = (REGISTRY.rendererNames || []).slice().sort();
+    return names.map(function(name){ return { name:name, exists:hasFn(name) }; });
+  }
+  function getDomInventory(){
+    mark('view.getDomInventory'); state.readCount += 1;
+    return (REGISTRY.domAnchors || []).slice().sort().map(function(id){ return { id:id, exists:hasEl(id) }; });
+  }
+  function getStateReadInventory(){
+    mark('view.getStateReadInventory'); state.readCount += 1;
+    return (REGISTRY.stateReads || []).slice().sort();
+  }
+  function getExtractionPlan(){
+    mark('view.getExtractionPlan'); state.readCount += 1;
+    return (REGISTRY.extractionOrder || []).map(function(item){ return Object.assign({}, item); });
+  }
+  function validate(){
+    const screens = getScreenDiagnostics();
+    const groups = getGroupDiagnostics();
+    const criticalScreens = ['overview','portfolio','opportunities','report'];
+    const missingCriticalScreens = screens.filter(function(s){ return criticalScreens.indexOf(s.key) >= 0 && !s.exists; }).map(function(s){ return s.key; });
+    const missingGroups = groups.filter(function(g){ return (g.key === 'restaurantA' || g.key === 'restaurantB') && !g.exists; }).map(function(g){ return g.key; });
+    const missingRendererNames = getRendererInventory().filter(function(r){ return !r.exists; }).map(function(r){ return r.name; });
+    const missingDomAnchors = getDomInventory().filter(function(d){ return !d.exists; }).map(function(d){ return d.id; });
+    return {
+      ok: missingCriticalScreens.length === 0 && missingGroups.length === 0,
+      registryLoaded: !!global.FreshketSenseViewRegistry,
+      registryVersion: REGISTRY.version || null,
+      behaviorChanged: !!REGISTRY.behaviorChanged,
+      missingCriticalScreens: missingCriticalScreens,
+      missingGroups: missingGroups,
+      missingRenderFns: missingRendererNames,
+      missingDomAnchors: missingDomAnchors,
+      at: now()
+    };
+  }
+  function getSnapshot(){
+    return {
+      version: VERSION,
+      registryVersion: REGISTRY.version || null,
+      disabled: isDisabled(),
+      behaviorChanged: false,
+      state: Object.assign({}, state),
+      activeScreens: getActiveScreen(),
+      activeNav: getActiveNav(),
+      screens: getScreenDiagnostics(),
+      groups: getGroupDiagnostics(),
+      renderers: getRendererInventory(),
+      domAnchors: getDomInventory(),
+      stateReads: getStateReadInventory(),
+      extractionPlan: getExtractionPlan(),
+      validation: validate(),
+      mode: global.isKAM ? 'kam' : 'restaurant',
+      currentMode: global.mode || null,
+      ts: now()
+    };
+  }
+  function printSnapshot(){
+    const snapshot = getSnapshot();
+    try{
+      console.log('Freshket view registry / renderer inventory diagnostics:', snapshot);
+      console.table(snapshot.screens.map(function(s){ return {
+        key:s.key,
+        exists:s.exists,
+        active:s.isActive,
+        nav:s.navExists,
+        risk:s.extractionRisk,
+        missingRenderFns:s.renderFns.filter(function(f){ return !f.exists; }).map(function(f){ return f.name; }).join(', '),
+        missingDom:s.domAnchors.filter(function(d){ return !d.exists; }).map(function(d){ return d.id; }).join(', ')
+      }; }));
+    }catch(e){}
+    return snapshot;
+  }
+
+  const runtime = Object.freeze({
+    version: VERSION,
+    storageKey: STORAGE_KEY,
+    registry: REGISTRY,
+    screensRegistry: screenRegistry,
+    groups: viewGroups,
+    isDisabled: isDisabled,
+    activeScreens: getActiveScreen,
+    activeNav: getActiveNav,
+    screens: getScreenDiagnostics,
+    groupsDiagnostics: getGroupDiagnostics,
+    renderers: getRendererInventory,
+    domInventory: getDomInventory,
+    stateReadInventory: getStateReadInventory,
+    extractionPlan: getExtractionPlan,
+    validate: validate,
+    getSnapshot: getSnapshot,
+    printSnapshot: printSnapshot
+  });
+
+  const control = Object.freeze({
+    version: VERSION,
+    status: function(){ return { disabled:isDisabled(), storageKey:STORAGE_KEY, validation:validate(), at:now() }; },
+    disableRuntime: function(reason){ try{ localStorage.setItem(STORAGE_KEY,'1'); }catch(e){} try{ console.warn('[Freshket Sense Phase 13] View runtime disabled flag set. Diagnostics remain safe; refresh optional.', reason || 'manual-disable'); }catch(e){} return this.status(); },
+    enableRuntimeNextReload: function(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} return this.status(); }
+  });
+
+  global.FreshketSenseViewRuntime = runtime;
+  global.FreshketSenseViewControl = control;
+  global.getFreshketViewRuntimeSnapshot = getSnapshot;
+  global.printFreshketViewDiagnostics = printSnapshot;
+})(window);
+
+// Freshket Sense legacy view adapter — Phase 13.
+// Intentionally diagnostic-only. It preserves all legacy screen/render functions and exposes a boundary for future extraction.
+(function(global){
+  'use strict';
+  const runtime = global.FreshketSenseViewRuntime || null;
+  const registry = global.FreshketSenseViewRegistry || null;
+  const status = {
+    version: 'phase13-legacy-view-adapter',
+    installedAt: new Date().toISOString(),
+    mode: runtime ? 'diagnostic-only' : 'missing-runtime',
+    registryLoaded: !!registry,
+    rewiredFunctions: [],
+    behaviorChanged: false,
+    note: 'No legacy view functions are overridden in Phase 13.'
+  };
+  global.FreshketSensePhase13ViewAdapter = Object.freeze(status);
+  global.FreshketSensePhase12ViewAdapter = global.FreshketSensePhase12ViewAdapter || Object.freeze(status);
+})(window);
+
+
+// ─────────────────────────────────────────────────────
+
+
+// ── PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION ─────────────────────
+// Freshket Sense app state/storage runtime boundary — Phase 11.1.
+// Classic-script compatible. Diagnostic-first: it does not rewrite legacy state
+// or storage behavior. It creates a safe boundary before deeper view extraction.
+(function(global){
+  'use strict';
+
+  const CFG = global.FreshketSenseConfig || {};
+  const STORAGE_CFG = CFG.storage || {};
+  const STORAGE_KEY = STORAGE_CFG.stateRuntimeDisabledKey || 'freshket_state_runtime_disabled';
+  const VERSION = 'phase11-1-state-storage-stabilization';
+
+  const knownStorageKeys = Object.freeze({
+    aiProxy: (CFG.ai && CFG.ai.proxyStorageKey) || 'freshket_ai_proxy_url',
+    aiProvider: (CFG.ai && CFG.ai.providerStorageKey) || 'ai_provider',
+    chatFabPosition: STORAGE_CFG.chatFabPositionKey || 'fs_aifab_pos_v1',
+    loaderRuntimeDisabled: STORAGE_CFG.loaderRuntimeDisabledKey || 'freshket_loader_runtime_disabled',
+    authRuntimeDisabled: STORAGE_CFG.authRuntimeDisabledKey || 'freshket_auth_runtime_disabled',
+    stateRuntimeDisabled: STORAGE_KEY,
+    accountIndex: STORAGE_CFG.accountIndexKey || 'ciq_index',
+    localAccountPrefix: STORAGE_CFG.localAccountPrefix || 'ciq_acct_',
+    visited: STORAGE_CFG.visitedKey || 'ciq_visited',
+    restaurantSwipeLearned: STORAGE_CFG.restaurantSwipeLearnedKey || 'ciq_rest_swipe_learned'
+  });
+
+  const state = {
+    installedAt: new Date().toISOString(),
+    lastOperation: null,
+    lastOperationAt: null,
+    lastError: null,
+    readCount: 0,
+    writeCount: 0,
+    removeCount: 0
+  };
+
+  function now(){ return new Date().toISOString(); }
+  function mark(op){ state.lastOperation = op; state.lastOperationAt = now(); }
+  function isDisabled(){
+    try { return !!global.localStorage && localStorage.getItem(STORAGE_KEY) === '1'; }
+    catch(e){ return false; }
+  }
+  function safeStringify(value){ try { return JSON.stringify(value); } catch(e){ return null; } }
+  function getRaw(key){
+    mark('storage.getRaw:' + key); state.readCount += 1;
+    try { return global.localStorage ? localStorage.getItem(key) : null; }
+    catch(error){ state.lastError = { op:'getRaw', key, message:error.message || String(error), at:now() }; return null; }
+  }
+  function setRaw(key, value){
+    mark('storage.setRaw:' + key); state.writeCount += 1;
+    try { if(global.localStorage) localStorage.setItem(key, String(value)); return true; }
+    catch(error){ state.lastError = { op:'setRaw', key, message:error.message || String(error), at:now() }; return false; }
+  }
+  function getJSON(key, fallback){
+    const raw = getRaw(key);
+    if(raw == null || raw === '') return fallback;
+    try { return JSON.parse(raw); }
+    catch(error){ state.lastError = { op:'getJSON', key, message:error.message || String(error), at:now() }; return fallback; }
+  }
+  function setJSON(key, value){
+    const raw = safeStringify(value);
+    if(raw == null){ state.lastError = { op:'setJSON', key, message:'JSON stringify failed', at:now() }; return false; }
+    return setRaw(key, raw);
+  }
+  function remove(key){
+    mark('storage.remove:' + key); state.removeCount += 1;
+    try { if(global.localStorage) localStorage.removeItem(key); return true; }
+    catch(error){ state.lastError = { op:'remove', key, message:error.message || String(error), at:now() }; return false; }
+  }
+  function localStorageKeys(){
+    try {
+      if(!global.localStorage) return [];
+      const keys = [];
+      for(let i=0; i<localStorage.length; i++) keys.push(localStorage.key(i));
+      return keys.filter(Boolean).sort();
+    } catch(error){
+      state.lastError = { op:'localStorageKeys', message:error.message || String(error), at:now() };
+      return [];
+    }
+  }
+  function byteLen(value){ return value == null ? 0 : String(value).length; }
+  function count(value){
+    if(Array.isArray(value)) return value.length;
+    if(value && typeof value === 'object') return Object.keys(value).length;
+    return value == null ? 0 : 1;
+  }
+  function storageSnapshot(){
+    const keys = localStorageKeys();
+    const accountPrefix = knownStorageKeys.localAccountPrefix;
+    const accountKeys = keys.filter(k => k.indexOf(accountPrefix) === 0);
+    const known = {};
+    Object.keys(knownStorageKeys).forEach(name => {
+      const key = knownStorageKeys[name];
+      if(name === 'localAccountPrefix') return;
+      const raw = getRaw(key);
+      known[name] = { key, exists: raw != null, bytes: byteLen(raw) };
+    });
+    return {
+      available: !!global.localStorage,
+      totalKeys: keys.length,
+      accountStorageKeys: accountKeys.length,
+      knownKeys,
+      known,
+      accountIndexCount: count(getJSON(knownStorageKeys.accountIndex, [])),
+      currentAccountStorageExists: !!(global.currentAccountId && getRaw(accountPrefix + global.currentAccountId)),
+      ts: now()
+    };
+  }
+  function appStateSnapshot(){
+    const D = global.D || {};
+    const fileStatus = global.fileStatus || {};
+    const sel = global.sel;
+    const OPPS = global.OPPS;
+    const pv = global.portviewBulkData;
+    const currentAccountId = global.currentAccountId || (D.meta && D.meta.accountId) || null;
+    let activeScreen = null;
+    try { activeScreen = typeof global.getActiveScreenName === 'function' ? global.getActiveScreenName() : null; } catch(e) {}
+    return {
+      mode: global.mode || null,
+      isKAM: !!global.isKAM,
+      activeScreen,
+      currentAccountId,
+      accountName: D.meta && D.meta.accountName || null,
+      kamName: D.meta && D.meta.kamName || null,
+      currentUserEmail: global.currentUser && global.currentUser.email || null,
+      profileRole: global.currentUserProfile && global.currentUserProfile.role || null,
+      currentPlanMode: global.currentPlanMode || null,
+      chatOpen: !!global.chatOpen,
+      aiProvider: global.aiProvider || null,
+      D: {
+        history: count(D.history), cats: count(D.cats), cats_monthly: count(D.cats_monthly),
+        skus: count(D.skus), skus_monthly: count(D.skus_monthly), alts: count(D.alts),
+        outlets_monthly: count(D.outlets_monthly), sku_current: count(D.sku_current), current_month_loaded: !!D.current_month
+      },
+      selection: {
+        selectedOpps: sel && typeof sel.size === 'number' ? sel.size : count(sel),
+        selectedAltCount: count(global.selAlt)
+      },
+      opportunities: count(OPPS),
+      fileStatus: Object.assign({}, fileStatus),
+      bulk: {
+        portviewRows: count(pv), historyAccounts: count(global.bulkHistoryData), categoryAccounts: count(global.bulkCategoriesData),
+        skuAccounts: count(global.bulkSkusData), alternativesAccounts: count(global.bulkAltsData || global.bulkAltsUnverified),
+        outletAccounts: count(global.bulkOutletsData), currentMonthAccounts: count(global.bulkCurrentMonthData)
+      },
+      runtimeFlags: {
+        authDisabled: getRaw(knownStorageKeys.authRuntimeDisabled) === '1',
+        loaderDisabled: getRaw(knownStorageKeys.loaderRuntimeDisabled) === '1',
+        stateDisabled: isDisabled()
+      },
+      ts: now()
+    };
+  }
+  function status(){
+    return {
+      version: VERSION,
+      disabled: isDisabled(),
+      storageKey: STORAGE_KEY,
+      installedAt: state.installedAt,
+      lastOperation: state.lastOperation,
+      lastOperationAt: state.lastOperationAt,
+      lastError: state.lastError,
+      readCount: state.readCount,
+      writeCount: state.writeCount,
+      removeCount: state.removeCount,
+      knownStorageKeys
+    };
+  }
+
+  function validateRuntime(){
+    const errors = [];
+    const methodNames = ['getRaw','setRaw','getJSON','setJSON','remove','localStorageKeys','snapshot'];
+    const storageMethods = {};
+    methodNames.forEach(function(name){ storageMethods[name] = !!(api && api.storage && typeof api.storage[name] === 'function'); });
+    let appStateOk = false;
+    let storageOk = false;
+    try { const a = appStateSnapshot(); appStateOk = !!(a && a.ts); } catch(error){ errors.push({ area:'appStateSnapshot', message:error.message || String(error) }); }
+    try { const s = storageSnapshot(); storageOk = !!(s && typeof s.totalKeys === 'number'); } catch(error){ errors.push({ area:'storageSnapshot', message:error.message || String(error) }); }
+    const knownKeysOk = !!(knownStorageKeys.aiProxy && knownStorageKeys.stateRuntimeDisabled && knownStorageKeys.accountIndex);
+    const methodsOk = Object.keys(storageMethods).every(function(name){ return storageMethods[name]; });
+    return {
+      ok: methodsOk && appStateOk && storageOk && knownKeysOk && !errors.length,
+      version: VERSION,
+      disabled: isDisabled(),
+      storageAvailable: !!global.localStorage,
+      methods: storageMethods,
+      snapshots: { appState: appStateOk, storage: storageOk },
+      knownKeysOk: knownKeysOk,
+      readOnly: true,
+      note: 'Phase 11.1 validation reads snapshots only. It does not rewrite app state or storage behavior.',
+      errors: errors,
+      ts: now()
+    };
+  }
+
+  function printDiagnostics(){
+    const diag = { status: status(), validation: validateRuntime(), appState: appStateSnapshot(), storage: storageSnapshot() };
+    try { console.log('Freshket state/storage diagnostics:', diag); } catch(e) {}
+    return diag;
+  }
+  function disableRuntime(reason){
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch(e) {}
+    mark('disableRuntime');
+    if(reason) state.lastDisableReason = String(reason);
+    return status();
+  }
+  function enableRuntimeNextReload(){
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    mark('enableRuntimeNextReload');
+    return status();
+  }
+
+  const api = Object.freeze({
+    version: VERSION,
+    status,
+    printDiagnostics,
+    disableRuntime,
+    enableRuntimeNextReload,
+    getAppStateSnapshot: appStateSnapshot,
+    getStorageSnapshot: storageSnapshot,
+    validate: validateRuntime,
+    knownStorageKeys,
+    storage: Object.freeze({ getRaw, setRaw, getJSON, setJSON, remove, localStorageKeys, snapshot: storageSnapshot })
+  });
+
+  const previousRuntime = global.FreshketSenseRuntime || {};
+  global.FreshketSenseRuntime = Object.freeze(Object.assign({}, previousRuntime, { state: api }));
+  global.FreshketSenseStateRuntime = api;
+  global.FreshketSenseStateControl = Object.freeze({ status, printDiagnostics, disableRuntime, enableRuntimeNextReload, snapshot: appStateSnapshot, storageSnapshot, validate: validateRuntime });
+  global.getFreshketStateRuntimeSnapshot = appStateSnapshot;
+  global.getFreshketStateRuntimeDiagnostics = printDiagnostics;
+})(window);
+
+// ─────────────────────────────────────────────────────
+
+// Phase 11+ debug and staging smoke-check utilities.
 // Console usage:
 //   FreshketSenseDebug.snapshot()
 //   FreshketSenseDebug.runStaticSmokeChecklist()
 //   FreshketSenseDebug.printStaticSmokeChecklist()
 //   FreshketSenseDebug.printConfigDiagnostics()
+//   FreshketSenseDebug.printBoundaryDiagnostics()
 (function(global){
   'use strict';
 
@@ -11747,6 +12877,44 @@ function setAiProvider(p){
     return diag;
   }
 
+  function stateDiagnostics(){
+    const rt = global.FreshketSenseStateRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.state) || null;
+    return {
+      exists: !!rt,
+      version: rt && rt.version || null,
+      controlExists: !!global.FreshketSenseStateControl,
+      status: rt && rt.status ? rt.status() : null,
+      appState: rt && rt.getAppStateSnapshot ? rt.getAppStateSnapshot() : null,
+      storage: rt && rt.getStorageSnapshot ? rt.getStorageSnapshot() : null,
+      ts: new Date().toISOString()
+    };
+  }
+
+  function printStateDiagnostics(){
+    const diag = stateDiagnostics();
+    try{ console.log('Freshket state/storage diagnostics:', diag); }catch(e){}
+    return diag;
+  }
+
+
+
+  function boundaryDiagnostics(){
+    return {
+      config: configDiagnostics(),
+      auth: authDiagnostics(),
+      loader: loaderDiagnostics(),
+      state: stateDiagnostics(),
+      smoke: runStaticSmokeChecklist(),
+      ts: new Date().toISOString()
+    };
+  }
+
+  function printBoundaryDiagnostics(){
+    const diag = boundaryDiagnostics();
+    try{ console.log('Freshket boundary diagnostics:', diag); }catch(e){}
+    return diag;
+  }
+
   function runStaticSmokeChecklist(){
     const rt = global.FreshketSenseRuntime || {};
     const aiClient = rt.aiClient || {};
@@ -11754,7 +12922,7 @@ function setAiProvider(p){
     const checks = [
       ['runtime object exists', !!rt.version, rt.version || 'missing'],
       ['config object exists', !!global.FreshketSenseConfig, global.FreshketSenseConfig ? (global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) : 'missing'],
-      ['config version phase10', (global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) === 'v155-phase10-auth-boundary', global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version],
+      ['config version phase15', (global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version) === 'v155-phase15-report-renderer', global.FreshketSenseConfig && global.FreshketSenseConfig.app && global.FreshketSenseConfig.app.version],
       ['AI runtime exists', !!aiClient.callAI, aiClient.callAI ? 'ok' : 'missing callAI'],
       ['production is proxy-only', aiClient.proxyOnlyProduction === true, aiClient.proxyOnlyProduction],
       ['direct browser key mode disabled', hasFn('directAiKeyModeAllowed') ? global.directAiKeyModeAllowed() === false : aiClient.directAiKeyModeAllowed && aiClient.directAiKeyModeAllowed() === false, 'expected false'],
@@ -11764,6 +12932,25 @@ function setAiProvider(p){
       ['loader adapter status exists', !!global.FreshketSensePhase6LoaderAdapter, global.FreshketSensePhase6LoaderAdapter ? (global.FreshketSensePhase6LoaderAdapter.mode || 'installed') : 'missing'],
       ['auth runtime exists', !!global.FreshketSenseAuthRuntime, global.FreshketSenseAuthRuntime ? global.FreshketSenseAuthRuntime.version : 'missing'],
       ['auth control exists', !!global.FreshketSenseAuthControl, global.FreshketSenseAuthControl ? 'ok' : 'missing'],
+      ['state runtime exists', !!global.FreshketSenseStateRuntime, global.FreshketSenseStateRuntime ? global.FreshketSenseStateRuntime.version : 'missing'],
+      ['state control exists', !!global.FreshketSenseStateControl, global.FreshketSenseStateControl ? 'ok' : 'missing'],
+      ['storage facade exists', !!(global.FreshketSenseStateRuntime && global.FreshketSenseStateRuntime.storage), global.FreshketSenseStateRuntime && global.FreshketSenseStateRuntime.storage ? 'ok' : 'missing'],
+      ['state runtime validation ok', !!(global.FreshketSenseStateRuntime && typeof global.FreshketSenseStateRuntime.validate === 'function' && global.FreshketSenseStateRuntime.validate().ok), global.FreshketSenseStateRuntime && typeof global.FreshketSenseStateRuntime.validate === 'function' ? global.FreshketSenseStateRuntime.validate().ok : 'missing'],
+      ['view registry exists', !!global.FreshketSenseViewRegistry, global.FreshketSenseViewRegistry ? global.FreshketSenseViewRegistry.version : 'missing'],
+      ['view runtime exists', !!global.FreshketSenseViewRuntime, global.FreshketSenseViewRuntime ? global.FreshketSenseViewRuntime.version : 'missing'],
+      ['view control exists', !!global.FreshketSenseViewControl, global.FreshketSenseViewControl ? 'ok' : 'missing'],
+      ['view adapter diagnostic-only', !!(global.FreshketSensePhase12ViewAdapter && global.FreshketSensePhase12ViewAdapter.behaviorChanged === false), global.FreshketSensePhase12ViewAdapter ? global.FreshketSensePhase12ViewAdapter.mode : 'missing'],
+      ['view runtime validation ok', !!(global.FreshketSenseViewRuntime && typeof global.FreshketSenseViewRuntime.validate === 'function' && global.FreshketSenseViewRuntime.validate().ok), global.FreshketSenseViewRuntime && typeof global.FreshketSenseViewRuntime.validate === 'function' ? global.FreshketSenseViewRuntime.validate().ok : 'missing'],
+      ['view snapshot helper exists', typeof global.getFreshketViewRuntimeSnapshot === 'function', 'getFreshketViewRuntimeSnapshot'],
+      ['read model runtime exists', !!global.FreshketSenseReadModelRuntime, global.FreshketSenseReadModelRuntime ? global.FreshketSenseReadModelRuntime.version : 'missing'],
+      ['read model behavior unchanged', !!(global.FreshketSenseReadModelRuntime && global.FreshketSenseReadModelRuntime.behaviorChanged === false), global.FreshketSenseReadModelRuntime ? global.FreshketSenseReadModelRuntime.behaviorChanged : 'missing'],
+      ['read model validation ok', !!(global.FreshketSenseReadModelRuntime && typeof global.FreshketSenseReadModelRuntime.validate === 'function' && global.FreshketSenseReadModelRuntime.validate().ok), global.FreshketSenseReadModelRuntime && typeof global.FreshketSenseReadModelRuntime.validate === 'function' ? global.FreshketSenseReadModelRuntime.validate().ok : 'missing'],
+      ['read model snapshot helper exists', typeof global.getFreshketReadModelSnapshot === 'function', 'getFreshketReadModelSnapshot'],
+      ['report renderer exists', !!global.FreshketSenseReportRenderer, global.FreshketSenseReportRenderer ? global.FreshketSenseReportRenderer.version : 'missing'],
+      ['report renderer behavior unchanged', !!(global.FreshketSenseReportRenderer && global.FreshketSenseReportRenderer.behaviorChanged === false), global.FreshketSenseReportRenderer ? global.FreshketSenseReportRenderer.behaviorChanged : 'missing'],
+      ['report renderer validation ok', !!(global.FreshketSenseReportRenderer && typeof global.FreshketSenseReportRenderer.validate === 'function' && global.FreshketSenseReportRenderer.validate().ok), global.FreshketSenseReportRenderer && typeof global.FreshketSenseReportRenderer.validate === 'function' ? global.FreshketSenseReportRenderer.validate().ok : 'missing'],
+      ['report renderer snapshot helper exists', typeof global.getFreshketReportRendererSnapshot === 'function', 'getFreshketReportRendererSnapshot'],
+      ['state snapshot helper exists', typeof global.getFreshketStateRuntimeSnapshot === 'function', 'getFreshketStateRuntimeSnapshot'],
       ['auth checkSession exists', hasFn('checkSession'), 'checkSession'],
       ['auth doLogin exists', hasFn('doLogin'), 'doLogin'],
       ['data snapshot exists', hasFn('getFreshketDataRuntimeSnapshot'), hasFn('getFreshketDataRuntimeSnapshot') ? 'ok' : 'missing'],
@@ -11824,6 +13011,64 @@ function setAiProvider(p){
     return diag;
   }
 
+
+
+  function viewDiagnostics(){
+    const view = global.FreshketSenseViewRuntime || null;
+    const adapter = global.FreshketSensePhase12ViewAdapter || null;
+    return {
+      runtimeVersion: view && view.version || null,
+      adapter: adapter,
+      control: global.FreshketSenseViewControl && global.FreshketSenseViewControl.status ? global.FreshketSenseViewControl.status() : null,
+      activeScreens: view && view.activeScreens ? view.activeScreens() : [],
+      activeNav: view && view.activeNav ? view.activeNav() : [],
+      screens: view && view.screens ? view.screens() : [],
+      groups: view && view.groupsDiagnostics ? view.groupsDiagnostics() : [],
+      renderers: view && view.renderers ? view.renderers() : [],
+      validation: view && view.validate ? view.validate() : { ok:false, reason:'view runtime missing' },
+      ts: new Date().toISOString()
+    };
+  }
+
+  function printViewDiagnostics(){
+    const diag = viewDiagnostics();
+    try{
+      console.log('Freshket view diagnostics:', diag);
+      if(diag.screens) console.table(diag.screens.map(function(s){ return { key:s.key, exists:s.exists, active:s.isActive, nav:s.navExists, missingRenderFns:(s.renderFns||[]).filter(function(f){ return !f.exists; }).map(function(f){ return f.name; }).join(', ') }; }));
+    }catch(e){}
+    return diag;
+  }
+
+
+  function readModelDiagnostics(){
+    const rt = global.FreshketSenseReadModelRuntime || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.readModel) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'read model runtime missing', ts:new Date().toISOString() };
+  }
+
+  function printReadModelDiagnostics(){
+    const diag = readModelDiagnostics();
+    try{
+      console.log('Freshket read model diagnostics:', diag);
+      if(diag.validation && diag.validation.models) console.table(diag.validation.models.map(function(m){ return { key:m.key, ok:m.ok, screen:m.screen }; }));
+    }catch(e){}
+    return diag;
+  }
+
+
+  function reportRendererDiagnostics(){
+    const rt = global.FreshketSenseReportRenderer || (global.FreshketSenseRuntime && global.FreshketSenseRuntime.views && global.FreshketSenseRuntime.views.reportRenderer) || null;
+    return rt && rt.diagnostics ? rt.diagnostics() : { version:null, ok:false, reason:'report renderer missing', ts:new Date().toISOString() };
+  }
+
+  function printReportRendererDiagnostics(){
+    const diag = reportRendererDiagnostics();
+    try{
+      console.log('Freshket report renderer diagnostics:', diag);
+      if(diag.validation && diag.validation.ids) console.table(diag.validation.ids);
+    }catch(e){}
+    return diag;
+  }
+
   function snapshot(){
     const rt = global.FreshketSenseRuntime || {};
     return {
@@ -11839,13 +13084,23 @@ function setAiProvider(p){
       smoke: runStaticSmokeChecklist(),
       config: configDiagnostics(),
       auth: authDiagnostics(),
+      state: stateDiagnostics(),
+      boundary: boundaryDiagnostics(),
+      view: viewDiagnostics(),
+      readModel: readModelDiagnostics(),
+      reportRenderer: reportRendererDiagnostics(),
       ts: new Date().toISOString()
     };
   }
 
-  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics, configDiagnostics, printConfigDiagnostics, authDiagnostics, printAuthDiagnostics });
+  global.FreshketSenseDebug = Object.freeze({ snapshot, runStaticSmokeChecklist, printStaticSmokeChecklist, loaderDiagnostics, printLoaderDiagnostics, configDiagnostics, printConfigDiagnostics, authDiagnostics, printAuthDiagnostics, stateDiagnostics, printStateDiagnostics, boundaryDiagnostics, printBoundaryDiagnostics, viewDiagnostics, printViewDiagnostics, readModelDiagnostics, printReadModelDiagnostics, reportRendererDiagnostics, printReportRendererDiagnostics });
   global.printFreshketLoaderDiagnostics = printLoaderDiagnostics;
   global.printFreshketAuthDiagnostics = printAuthDiagnostics;
+  global.printFreshketStateDiagnostics = printStateDiagnostics;
+  global.printFreshketBoundaryDiagnostics = printBoundaryDiagnostics;
+  global.printFreshketViewDiagnostics = printViewDiagnostics;
+  global.printFreshketReadModelDiagnostics = printReadModelDiagnostics;
+  global.printFreshketReportRendererDiagnostics = printReportRendererDiagnostics;
   global.runFreshketStaticSmokeChecklist = runStaticSmokeChecklist;
 })(window);
 

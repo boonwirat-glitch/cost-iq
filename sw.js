@@ -1,8 +1,8 @@
-// Freshket Sense — Service Worker v155-phase10
+// Freshket Sense — Service Worker v155-phase15
 // Strategy: Network-first for app shell navigation + offline fallback.
-// Cache version bumped for Phase 10 so users do not keep stale index.html.
+// Cache version bumped for Phase 14 so users do not keep stale index.html.
 
-const CACHE_NAME = 'freshket-sense-v155-phase10';
+const CACHE_NAME = 'freshket-sense-v155-phase15';
 const OFFLINE_URL = '/index.html';
 
 // Install: cache shell
