@@ -11,7 +11,10 @@
 //   window.FRESHKET_AI_PROXY_URL = 'https://...'
 //   or localStorage.setItem('freshket_ai_proxy_url','https://...')
 function getAiProxyUrl(){
-  return (window.FRESHKET_AI_PROXY_URL||localStorage.getItem('freshket_ai_proxy_url')||'').trim();
+  const cfg=window.FreshketSenseConfig&&window.FreshketSenseConfig.ai;
+  const key=(cfg&&cfg.proxyStorageKey)||'freshket_ai_proxy_url';
+  const configDefault=(cfg&&cfg.defaultProxyUrl)||'';
+  return (window.FRESHKET_AI_PROXY_URL||localStorage.getItem(key)||configDefault||'').trim();
 }
 function setAiProxyUrl(url){
   if(url) localStorage.setItem('freshket_ai_proxy_url', String(url).trim());

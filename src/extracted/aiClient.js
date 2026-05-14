@@ -2,7 +2,10 @@
 // In Phase 2, the monolith's callAI() should import this module directly.
 
 export function getAiProxyUrl() {
-  return (window.FRESHKET_AI_PROXY_URL || localStorage.getItem('freshket_ai_proxy_url') || '').trim();
+  const cfg = window.FreshketSenseConfig && window.FreshketSenseConfig.ai;
+  const key = (cfg && cfg.proxyStorageKey) || 'freshket_ai_proxy_url';
+  const configDefault = (cfg && cfg.defaultProxyUrl) || '';
+  return (window.FRESHKET_AI_PROXY_URL || localStorage.getItem(key) || configDefault || '').trim();
 }
 
 export async function callAI({ provider = 'claude', modelKey = 'haiku', system = '', messages = [], maxTokens = 2000 }) {

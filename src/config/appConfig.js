@@ -12,7 +12,7 @@
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v155-phase21-final-audit-regression',
+      version: 'v155-phase22-1-ai-proxy-default',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30,6 +30,7 @@
     }),
     ai: Object.freeze({
       proxyStorageKey: 'freshket_ai_proxy_url',
+      defaultProxyUrl: 'https://freshket-sense-ai-proxy.boonwirat-t.workers.dev',
       providerStorageKey: 'ai_provider',
       proxyOnlyProduction: true,
       defaultProvider: 'claude'

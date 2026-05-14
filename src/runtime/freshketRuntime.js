@@ -77,7 +77,9 @@ On cost-saving alternatives:
 
   // ── AI provider/runtime boundary ─────────────────────
   function getAiProxyUrl(){
-    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem('freshket_ai_proxy_url')||'').trim();
+    const cfgKey=(global.FreshketSenseConfig&&global.FreshketSenseConfig.ai&&global.FreshketSenseConfig.ai.proxyStorageKey)||'freshket_ai_proxy_url';
+    const configDefault=(global.FreshketSenseConfig&&global.FreshketSenseConfig.ai&&global.FreshketSenseConfig.ai.defaultProxyUrl)||'';
+    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem(cfgKey)||configDefault||'').trim();
   }
 
   function setAiProxyUrl(url){

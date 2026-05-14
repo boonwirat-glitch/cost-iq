@@ -1,12 +1,12 @@
 {
-  "name": "freshket-sense-v155-phase21-1-debug-snapshot-fix",
-  "version": "155.21.2",
+  "name": "freshket-sense-v155-phase22-1-ai-proxy-default",
+  "version": "155.22.1",
   "private": true,
-  "description": "Freshket Sense v155 Phase 21.2 dev workflow cleanup / AI handoff docs",
+  "description": "Freshket Sense v155 Phase 22.1: Olive Chat v2 plus default AI proxy URL for mobile/new devices",
   "scripts": {
     "build": "node scripts/build.js",
     "check:secrets": "node scripts/check-secrets.js",
-    "verify": "npm run build && npm run check:secrets && npm run audit:phase21-1",
+    "verify": "npm run build && npm run check:secrets && npm run audit:phase22-1",
     "audit:phase9": "node scripts/audit-phase9.js",
     "audit:phase9-1": "node scripts/audit-phase91.js",
     "audit:phase10": "node scripts/audit-phase10.js",
@@ -23,6 +23,8 @@
     "audit:phase19-1": "node scripts/audit-phase191.js",
     "audit:phase20": "node scripts/audit-phase20.js",
     "audit:phase21": "node scripts/audit-phase21.js",
-    "audit:phase21-1": "node scripts/audit-phase211.js"
+    "audit:phase21-1": "node scripts/audit-phase211.js",
+    "audit:phase22": "node scripts/audit-phase22.js",
+    "audit:phase22-1": "node scripts/audit-phase22-1.js"
   }
 }

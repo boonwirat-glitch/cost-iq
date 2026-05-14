@@ -10590,7 +10590,7 @@ function setMatcherModel(model){
 (function(global){
   'use strict';
 
-  const RUNTIME_VERSION = 'v155-phase6.2-chat-grounding';
+  const RUNTIME_VERSION = 'v155-phase22-olive-chat-v2';
   const PROXY_ONLY_PRODUCTION = true;
 
   // ── Olive identity source of truth ───────────────────
@@ -10603,6 +10603,7 @@ Voice:
 - Friendly without being childish. Playful without being silly. Honest without sounding cold. Sharp without sounding arrogant.
 - Accuracy and usefulness matter more than sounding confident. Signature behavior: เก่งแบบไม่มั่ว.
 - Do not force jokes. Do not over-soften serious business risks.
+- Do not use emojis in AI chat answers unless the user explicitly asks for them.
 
 Thai identity and language rules:
 - If the user writes Thai or mixed Thai-English, reply in Thai. Use English only for metric names, field names, product terms, or if the user explicitly asks for English.
@@ -10619,7 +10620,7 @@ Currency rules:
 
 Analysis behavior:
 - Answer first.
-- Then give key evidence, interpretation, recommendation, and next step when useful.
+- Then give only the evidence, interpretation, recommendation, and next step that are useful for the user’s actual question.
 - Never invent data. If the loaded context is not enough, say exactly what is missing and give the safest next step.
 - Separate facts, assumptions, and interpretation.
 - For summaries or action plans only, identify Decision, Owner, Deadline, Next step, and Risk when that structure helps.
@@ -10680,7 +10681,8 @@ On cost-saving alternatives:
   }
 
   function getAiProxyUrl(){
-    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem(getAiProxyStorageKey())||'').trim();
+    const configDefault=(global.FreshketSenseConfig&&global.FreshketSenseConfig.ai&&global.FreshketSenseConfig.ai.defaultProxyUrl)||'';
+    return (global.FRESHKET_AI_PROXY_URL||global.localStorage?.getItem(getAiProxyStorageKey())||configDefault||'').trim();
   }
 
   function setAiProxyUrl(url){
@@ -12247,6 +12249,7 @@ function setAiProvider(p){
       serviceWorkerUrl: app.serviceWorkerUrl || null,
       proxyOnlyProduction: ai.proxyOnlyProduction === true,
       proxyStorageKey: ai.proxyStorageKey || null,
+      defaultProxyUrl: ai.defaultProxyUrl || null,
       providerStorageKey: ai.providerStorageKey || null,
       supabaseUrlPresent: !!supabase.url,
       supabaseKeyType: supabase.publishableKey && supabase.publishableKey.indexOf('sb_publishable_') === 0 ? 'publishable' : (supabase.publishableKey ? 'unknown-present' : 'missing'),
@@ -15086,7 +15089,7 @@ function buildChatSuggestions(){
     }
   }
   // From top category
-  const topCat=(D.cats.length?D.cats:SAMPLE.cats)[0];
+  const topCat=(D.cats.length?D.cats:[])[0];
   if(topCat)suggs.push({label:`ลดต้นทุน ${topCat.n} ได้ยังไง?`,q:`หมวด ${topCat.n} ใช้จ่าย ${fmt(topCat.s)}/เดือน (${topCat.p}%) มีวิธีลดต้นทุนได้บ้างไหม?`});
   // Mode-specific suggestions: make AI Chat usable beyond the current account
   const activeScreen=(typeof getActiveScreenName==='function')?getActiveScreenName():'';
@@ -15206,22 +15209,57 @@ function getActiveScreenName(){
   return el&&el.id?el.id.replace(/^scr-/,''):'overview';
 }
 
+function chatHasPortfolioData(){
+  try{return !!(typeof getPortviewAccounts==='function'&&getPortviewAccounts().length>0);}catch(e){return false;}
+}
+function chatHasTeamData(){
+  try{return !!(typeof _buildKamGroups==='function'&&_buildKamGroups().length>0);}catch(e){return false;}
+}
+
+function detectChatIntent(q){
+  const text=String(q||'').toLowerCase();
+  if(/(gmv|ยอด|ยอดขาย|ยอดซื้อ|spend|sales).*(สูงสุด|เยอะสุด|มากสุด|top|อันดับ|ranking|rank)|ร้านไหน.*(gmv|ยอด|ยอดซื้อ|ยอดขาย).*(เยอะ|สูง|มาก)|top\s*account|top\s*customer/.test(text))return 'top_gmv';
+  if(/ใครก่อน|โทรหาใคร|priority|prioritize|จัดลำดับ|follow.?up|ติดต่อลูกค้า|action วันนี้|วันนี้ควร/.test(text))return 'priority';
+  if(/ทีม|team|tl|หัวหน้าทีม|coach|coaching|support|kam แต่ละคน|แต่ละ kam/.test(text))return 'team_management';
+  if(/โอกาส|opportunity|wallet|ขยาย|เพิ่มยอด|upsell|cross.?sell|category เพิ่ม|sku เพิ่ม|penetration|growth/.test(text))return 'opportunity';
+  if(/ทำไม|root cause|diagnose|วิเคราะห์|เกิดอะไร|สาเหตุ|ลด|ตก|หาย|risk|เสี่ยง/.test(text))return 'diagnosis';
+  if(/สรุป|brief|ควรรู้|overview|ภาพรวม|เล่าให้ฟัง/.test(text))return 'summary';
+  return 'general';
+}
+
 function detectChatScope(q){
   const text=String(q||'').toLowerCase();
-  if(/ทีม|team|standup|สแตนด์อัพ|หัวหน้าทีม|tl|team lead|kam แต่ละคน|แต่ละ kam|เซลล์แต่ละคน|sales แต่ละคน|โค้ช|coach|support/.test(text))return 'team';
-  if(/พอร์ต|portfolio|ภาพรวมทั้งหมด|ร้านทั้งหมด|ลูกค้าทั้งหมด|บัญชีทั้งหมด|account ทั้งหมด|accounts ทั้งหมด|ใครก่อน|โทรหาใคร|priority|prioritize|จัดลำดับ|at[- ]?risk|เสี่ยงทั้งหมด/.test(text))return 'portfolio';
-  if(/ร้านนี้|บัญชีนี้|ลูกค้ารายนี้|account นี้|sku|สินค้า|ยอดซื้อ|ต้นทุน|ประหยัด|หมวด|category|สั่งซื้อ|ออเดอร์|สเปค|ราคา/.test(text))return 'account';
+  const intent=detectChatIntent(q);
+  const hasPortfolio=chatHasPortfolioData();
+  const hasTeam=chatHasTeamData();
+
+  // Query intent should beat current screen. Chat is a co-pilot, not a screen reader.
+  if(intent==='top_gmv'&&hasPortfolio)return 'portfolio';
+  if(/ทีม|team|tl|หัวหน้าทีม|kam แต่ละคน|แต่ละ kam|เซลล์แต่ละคน|sales แต่ละคน|โค้ช|coach|support/.test(text))return hasTeam?'team':'portfolio';
+  if(/พอร์ต|portfolio|ภาพรวมทั้งหมด|ร้านทั้งหมด|ลูกค้าทั้งหมด|บัญชีทั้งหมด|account ทั้งหมด|accounts ทั้งหมด|ใครก่อน|โทรหาใคร|priority|prioritize|จัดลำดับ|at[- ]?risk|เสี่ยงทั้งหมด|ร้านไหน/.test(text))return hasPortfolio?'portfolio':'account';
+  if(/ร้านนี้|บัญชีนี้|ลูกค้ารายนี้|account นี้|sku|สินค้า|ต้นทุน|ประหยัด|หมวด|category|สั่งซื้อ|ออเดอร์|สเปค|ราคา/.test(text))return 'account';
+
   const screen=getActiveScreenName();
-  if(screen==='teamview')return 'team';
-  if(screen==='portview')return 'portfolio';
+  if(screen==='teamview'&&hasTeam)return 'team';
+  if(screen==='portview'&&hasPortfolio)return 'portfolio';
   return 'account';
 }
 
 function fmtChatK(n){return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n).toLocaleString('th-TH');}
+function pctChat(n){return Number.isFinite(n)?Math.round(n)+'%':'n/a';}
+function chatMoneyValue(a){
+  const ps=a&&a.paceSignal||{};
+  return {
+    current:Number(a&&a.gmvToDate||ps.gmvToDate||0),
+    runrate:Number(a&&a.runrate||ps.runrate||0),
+    last:Number(a&&a.lastGmv||ps.lastGmv||0),
+    baseline:Number(ps.baselineGmv||ps.expected||0)
+  };
+}
+function chatAccountName(a){return (a&&a.name)||'ไม่ทราบชื่อร้าน';}
 
 function buildAccountChatContext(){
   const _an=D.meta.accountName||document.getElementById('acct-name-input')?.value.trim()||'ร้านอาหารของคุณ';
-  // Phase 6.2: chat grounding patch. For chat, never fall back to SAMPLE data; use only loaded account data.
   const _skus=Array.isArray(D.skus)?D.skus:[];
   const _cats=Array.isArray(D.cats)?D.cats:[];
   const _hist=Array.isArray(D.history)?D.history:[];
@@ -15233,98 +15271,111 @@ function buildAccountChatContext(){
   const _sc=Math.min(95,Math.max(50,Math.round(95-_sp*2.5)));
 
   const _trend=_hasRealHistory
-    ?_hist.slice(-6).map(h=>h.m+' '+fmt(h.s)+' ('+h.orders+' ออเดอร์)').join(', ')
+    ?_hist.slice(-6).map(h=>h.m+' '+fmt(h.s)+' ('+(h.orders||0)+' ออเดอร์)').join(', ')
     :'ไม่มี monthly history ที่โหลดอยู่ใน session นี้';
   const _catStr=_hasRealCats
-    ?_cats.slice(0,10).map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ')
+    ?_cats.slice(0,8).map(c=>c.n+' '+fmt(c.s)+' ('+c.p+'%)').join(', ')
     :'ไม่มี category breakdown ที่โหลดอยู่ใน session นี้';
-  const _skuTop=_hasRealSkus?[..._skus].sort((a,b)=>(b.gmv||b.s||0)-(a.gmv||a.s||0)).slice(0,14):[];
+  const _skuTop=_hasRealSkus?[..._skus].sort((a,b)=>(b.gmv||b.s||0)-(a.gmv||a.s||0)).slice(0,10):[];
   const _skuStr=_skuTop.length
-    ?_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+(s.d||'-')+'] '+fmt(s.gmv||s.s||0)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>14?'\n(+'+(_skus.length-14)+' รายการ)':'')
+    ?_skuTop.map((s,i)=>(i+1)+'. '+s.n+' ['+(s.d||'-')+'] '+fmt(s.gmv||s.s||0)+'/ด.'+(s.unit_price?' ฿'+s.unit_price+'/kg':'')).join('\n')+(_skus.length>10?'\n(+'+(_skus.length-10)+' รายการ)':'')
     :'ไม่มี SKU-level data ที่โหลดอยู่ใน session นี้';
 
   let _skuMovement='ไม่มี SKU monthly movement ที่โหลดอยู่ใน session นี้';
   const _skuMonths=D.skus_monthly&&Object.keys(D.skus_monthly);
   if(_skuMonths&&_skuMonths.length>=2){
     const _cSort=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
-    const months=[..._skuMonths].sort((a,b)=>_cSort(b)-_cSort(a)).slice(0,6);
+    const months=[..._skuMonths].sort((a,b)=>_cSort(b)-_cSort(a)).slice(0,5);
     const lastMo=months[0];
     const prevMonths=months.slice(1);
     const lastSet=new Set((D.skus_monthly[lastMo]||[]).map(s=>s.id));
     const prevAllIds=new Set(prevMonths.flatMap(m=>(D.skus_monthly[m]||[]).map(s=>s.id)));
-    const newSkus=(D.skus_monthly[lastMo]||[]).filter(s=>!prevAllIds.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,6);
+    const newSkus=(D.skus_monthly[lastMo]||[]).filter(s=>!prevAllIds.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,4);
     const prev1Mo=months[1];
-    const droppedSkus=(D.skus_monthly[prev1Mo]||[]).filter(s=>!lastSet.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,6);
+    const droppedSkus=(D.skus_monthly[prev1Mo]||[]).filter(s=>!lastSet.has(s.id)).sort((a,b)=>(b.gmv||0)-(a.gmv||0)).slice(0,4);
     const prevAvg={};
     prevMonths.forEach(m=>{(D.skus_monthly[m]||[]).forEach(s=>{if(!prevAvg[s.id])prevAvg[s.id]={sum:0,cnt:0,n:s.n,d:s.d};prevAvg[s.id].sum+=s.qty_kg||0;prevAvg[s.id].cnt++;});});
-    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;const chg=avg>0?((s.qty_kg||0)-avg)/avg*100:0;return{...s,avgQty:avg,chgPct:chg};}).filter(s=>Math.abs(s.chgPct)>=30).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,5);
+    const volChanges=(_skus).filter(s=>prevAvg[s.id]&&prevAvg[s.id].cnt>0).map(s=>{const avg=prevAvg[s.id].sum/prevAvg[s.id].cnt;const chg=avg>0?((s.qty_kg||0)-avg)/avg*100:0;return{...s,avgQty:avg,chgPct:chg};}).filter(s=>Math.abs(s.chgPct)>=35).sort((a,b)=>Math.abs(b.chgPct)-Math.abs(a.chgPct)).slice(0,4);
     const newStr=newSkus.length?newSkus.map(s=>'+ '+s.n+' ['+fmt(s.gmv||0)+'/ด. ใน '+lastMo+']').join('\n'):'ไม่มี';
     const dropStr=droppedSkus.length?droppedSkus.map(s=>'- '+s.n+' ['+fmt(s.gmv||0)+'/ด. ใน '+prev1Mo+' แต่ไม่พบใน '+lastMo+']').join('\n'):'ไม่มี';
     const volStr=volChanges.length?volChanges.map(s=>(s.chgPct>0?'↑':'↓')+' '+s.n+' '+s.chgPct.toFixed(0)+'% ('+(s.qty_kg||0).toFixed(1)+'kg vs avg '+s.avgQty.toFixed(1)+'kg)').join('\n'):'ไม่มี';
-    _skuMovement=`ช่วง ${months[months.length-1]} – ${lastMo} (${months.length} เดือน; monthly granularity only)\nSKU เพิ่งเริ่มซื้อในเดือนล่าสุดเทียบช่วงก่อนหน้า:\n${newStr}\nSKU ที่ไม่พบในเดือนล่าสุดเทียบเดือนก่อนหน้า:\n${dropStr}\nVolume เปลี่ยนแปลง ≥30%:\n${volStr}`;
+    _skuMovement=`ช่วง ${months[months.length-1]} – ${lastMo} (${months.length} เดือน; monthly granularity only)\nSKU เพิ่งเริ่มซื้อในเดือนล่าสุดเทียบช่วงก่อนหน้า:\n${newStr}\nSKU ที่ไม่พบในเดือนล่าสุดเทียบเดือนก่อนหน้า:\n${dropStr}\nVolume เปลี่ยนแปลง ≥35%:\n${volStr}`;
   }
 
   const _ol=OPPS.length
-    ?OPPS.slice(0,18).map((o,i)=>{const a=getAlt(o);return(i+1)+'. '+o.curName+' → '+a.altName+': ประหยัด '+fmt(a.save)+'/ด. ('+a.pct+'%, '+(a.conf==='high'?'มั่นใจสูง':'ทดลองก่อน')+')'}).join('\n')+(OPPS.length>18?'\n(+'+(OPPS.length-18)+' opportunities)':'')
+    ?OPPS.slice(0,10).map((o,i)=>{const a=getAlt(o);return(i+1)+'. '+o.curName+' → '+a.altName+': ประหยัด '+fmt(a.save)+'/ด. ('+a.pct+'%, '+(a.conf==='high'?'มั่นใจสูง':'ทดลองก่อน')+')'}).join('\n')+(OPPS.length>10?'\n(+'+(OPPS.length-10)+' opportunities)':'')
     :'ยังไม่มีข้อมูล alternatives ที่โหลดอยู่ใน session นี้';
 
-  return `-- CHAT SCOPE --\naccount\n\n-- DATA AVAILABILITY --\nmonthly_history: ${_hasRealHistory?'loaded':'not_loaded'}\ncategory_breakdown: ${_hasRealCats?'loaded':'not_loaded'}\nsku_detail: ${_hasRealSkus?'loaded':'not_loaded'}\nsku_monthly_movement: ${_hasMonthlySkus?'loaded':'not_loaded'}\nweekly_data: not_available\nsupplier_data: not_available\nmenu_data: not_available\ncustomer_call_notes: not_available\n\n-- ACCOUNT KNOWN FACTS --\nชื่อ: ${_an}\nค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}\nCost IQ Score: ${_sc}/100\nเลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)\nโอกาสเต็มที่จาก alternatives: ${fmt(totalAll())}/เดือน\n\n=== Monthly trend ที่มีใน context ===\n${_trend}\n\n=== หมวดสินค้า เดือนล่าสุด ===\n${_catStr}\n\n=== Top SKU เดือนล่าสุด ===\n${_skuStr}\n\n=== SKU Movement จากข้อมูลรายเดือนเท่านั้น ===\n${_skuMovement}\n\n=== Cost-saving opportunities จากฐาน alternatives ===\n${_ol}\n\n-- GROUNDING LIMITS FOR THIS ACCOUNT TURN --\n- ใช้เฉพาะข้อมูลด้านบนเป็น fact เท่านั้น\n- ห้ามอ้าง week-level pattern เช่น “15 สัปดาห์” เพราะ context นี้ไม่มี weekly data\n- ห้ามสรุปว่าลูกค้าเปลี่ยน supplier, เปลี่ยนเมนู, ทำ promotion, หรือกำลัง churn เป็น fact เพราะ context ไม่มี supplier/menu/call-note data\n- ถ้าจะพูดเรื่อง supplier/menu/promotion/churn ให้พูดเป็น hypothesis ที่ต้องถามยืนยันเท่านั้น\n- SKU ที่ไม่พบในเดือนล่าสุด = “ไม่พบในข้อมูลเดือนล่าสุด” ไม่ใช่ “หยุดใช้แน่นอน” และไม่ใช่ “เสีย account แน่นอน”`;
+  return `-- ACCOUNT CONTEXT --\nชื่อ: ${_an}\nค่าใช้จ่ายเดือนล่าสุด: ${fmt(curSpend())}\nCost IQ Score: ${_sc}/100\nเลือกแผนแล้ว: ${fmt(totalSel())}/เดือน (${sel.size} รายการ)\nโอกาสเต็มที่จาก alternatives: ${fmt(totalAll())}/เดือน\nData: monthly_history=${_hasRealHistory?'loaded':'not_loaded'}, category=${_hasRealCats?'loaded':'not_loaded'}, sku=${_hasRealSkus?'loaded':'not_loaded'}, sku_monthly=${_hasMonthlySkus?'loaded':'not_loaded'}, weekly=not_available, supplier=not_available, menu=not_available\n\nMonthly trend:\n${_trend}\n\nCategory latest:\n${_catStr}\n\nTop SKU latest:\n${_skuStr}\n\nSKU monthly signals:\n${_skuMovement}\n\nCost-saving alternatives:\n${_ol}`;
 }
 
 function buildPortfolioChatContext(){
   let accounts=[];
   try{accounts=typeof getPortviewAccounts==='function'?getPortviewAccounts():[];}catch(e){accounts=[];}
   if(!accounts||!accounts.length){
-    return `-- CHAT SCOPE --\nportfolio\n\n-- PORTFOLIO DATA --\nยังไม่มีข้อมูลพอร์ตที่โหลดอยู่ใน session นี้ หรือผู้ใช้ไม่มีสิทธิ์เห็นพอร์ตนี้`;
+    return `-- PORTFOLIO CONTEXT --\nยังไม่มีข้อมูลพอร์ตที่โหลดอยู่ใน session นี้ หรือผู้ใช้ไม่มีสิทธิ์เห็นพอร์ตนี้`;
   }
-  const withPace=accounts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
+  const enriched=accounts.map(a=>{const v=chatMoneyValue(a);return{...a,_chatMoney:v,_currentGmv:v.current,_runrate:v.runrate,_lastGmv:v.last};});
+  const withPace=enriched.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
   const portfolioPace=withPace.length?Math.round(withPace.reduce((s,a)=>s+(a.paceSignal.gmvToDate||0),0)/Math.max(1,withPace.reduce((s,a)=>s+(a.paceSignal.expected||0),0))*100):0;
-  const atRisk=accounts.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn'));
-  const shortfall=atRisk.reduce((s,a)=>s+Math.max(0,(a.paceSignal.baselineGmv||a.paceSignal.expected||0)-(a.paceSignal.runrate||a.paceSignal.gmvToDate||0)),0);
-  const ranked=[...atRisk].sort((a,b)=>Math.max(0,(b.paceSignal.baselineGmv||0)-(b.paceSignal.runrate||0))-Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||0))).slice(0,12);
-  const ctxLines=ranked.map(a=>{
-    const ps=a.paceSignal||{};
-    const gap=Math.max(0,(ps.baselineGmv||ps.expected||0)-(ps.runrate||ps.gmvToDate||0));
-    const parts=[`${a.name} [${ps.cls||'n/a'}] pace ${ps.pct||0}% gap ${fmtChatK(gap)}`];
-    const cc=a._churnCounts;
-    if(cc&&cc.gone>0)parts.push(`SKU หาย ${cc.gone}`);
-    else if((a.churnedSkuCount||0)>0)parts.push(`SKU หาย ${a.churnedSkuCount}`);
-    if(a.missingCatCount>0)parts.push(`category ขาด ${(a.missingCats||'').split(' | ').filter(Boolean).slice(0,2).join(', ')}`);
-    if(a.kamName)parts.push(`KAM ${a.kamName}`);
-    return '- '+parts.join(' · ');
-  }).join('\n');
-  const healthy=accounts.filter(a=>a.paceSignal&&(a.paceSignal.cls==='safe'||a.paceSignal.cls==='great')).length;
-  return `-- CHAT SCOPE --\nportfolio\n\n-- PORTFOLIO DATA --\nจำนวนร้าน: ${accounts.length}\nPortfolio pro-rate: ${portfolioPace}%\nAt-risk: ${atRisk.length} ร้าน\nHealthy/Safe: ${healthy} ร้าน\nEstimated shortfall/run-rate gap: ${fmtChatK(shortfall)}\n\n=== At-risk accounts ranked by money impact ===\n${ctxLines||'ไม่มีร้านเสี่ยงจากข้อมูลที่โหลดอยู่'}`;
+  const atRisk=enriched.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn'));
+  const healthy=enriched.filter(a=>a.paceSignal&&(a.paceSignal.cls==='safe'||a.paceSignal.cls==='great')).length;
+  const topCurrent=[...enriched].sort((a,b)=>(b._currentGmv||0)-(a._currentGmv||0)).slice(0,10);
+  const topRunrate=[...enriched].sort((a,b)=>(b._runrate||0)-(a._runrate||0)).slice(0,8);
+  const rankedRisk=[...atRisk].sort((a,b)=>Math.max(0,(b.paceSignal?.baselineGmv||0)-(b.paceSignal?.runrate||0))-Math.max(0,(a.paceSignal?.baselineGmv||0)-(a.paceSignal?.runrate||0))).slice(0,8);
+  const topCurrentLines=topCurrent.map((a,i)=>`${i+1}. ${chatAccountName(a)} — current GMV-to-date ${fmtChatK(a._currentGmv||0)}, run-rate ${fmtChatK(a._runrate||0)}, last-month ${fmtChatK(a._lastGmv||0)}${a.kamName?' · KAM '+a.kamName:''}`).join('\n');
+  const topRunrateLines=topRunrate.map((a,i)=>`${i+1}. ${chatAccountName(a)} — run-rate ${fmtChatK(a._runrate||0)}, current ${fmtChatK(a._currentGmv||0)}, pace ${pctChat(a.paceSignal?.pct)}`).join('\n');
+  const riskLines=rankedRisk.map((a,i)=>{const ps=a.paceSignal||{};const gap=Math.max(0,(ps.baselineGmv||ps.expected||0)-(ps.runrate||ps.gmvToDate||0));return `${i+1}. ${chatAccountName(a)} — ${ps.cls||'n/a'} pace ${pctChat(ps.pct)} gap ${fmtChatK(gap)}${(a.churnedSkuCount||0)>0?' · SKU ไม่พบ '+a.churnedSkuCount:''}`;}).join('\n');
+  return `-- PORTFOLIO CONTEXT --\nจำนวนร้านที่เห็น: ${enriched.length}\nPortfolio pro-rate: ${portfolioPace}%\nAt-risk: ${atRisk.length} ร้าน\nHealthy/Safe: ${healthy} ร้าน\n\nTop accounts by current GMV-to-date:\n${topCurrentLines||'ไม่มีข้อมูล current GMV'}\n\nTop accounts by run-rate GMV:\n${topRunrateLines||'ไม่มีข้อมูล run-rate'}\n\nAt-risk accounts by money impact:\n${riskLines||'ไม่มีร้านเสี่ยงจากข้อมูลที่โหลดอยู่'}`;
 }
 
 function buildTeamChatContext(){
   let groups=[];
   try{groups=typeof _buildKamGroups==='function'?_buildKamGroups():[];}catch(e){groups=[];}
   if(!groups||!groups.length){
-    return `-- CHAT SCOPE --\nteam\n\n-- TEAM DATA --\nยังไม่มีข้อมูลทีมที่โหลดอยู่ใน session นี้ หรือ user ไม่ใช่ TL/admin`;
+    return `-- TEAM CONTEXT --\nยังไม่มีข้อมูลทีมที่โหลดอยู่ใน session นี้ หรือ user ไม่ใช่ TL/admin`;
   }
-  const allAccts=groups.flatMap(g=>g.accounts||[]);
+  const allAccts=groups.flatMap(g=>(g.accounts||[]).map(a=>({...a,_kamGroup:g.kamName})));
   const withPace=allAccts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
   const teamPace=withPace.length?Math.round(withPace.reduce((s,a)=>s+(a.paceSignal.gmvToDate||0),0)/Math.max(1,withPace.reduce((s,a)=>s+(a.paceSignal.expected||0),0))*100):0;
   const totalShortfall=groups.reduce((s,g)=>s+(g.shortfall||0),0);
-  const kamLines=groups.slice(0,16).map(g=>{
-    const atRisk=(g.accounts||[]).filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).slice(0,3).map(a=>`${a.name}(${a.paceSignal?.pct||0}%${(a.churnedSkuCount||0)>0?' +SKUหาย':''})`).join(', ');
-    return `- ${g.kamName}: ${g.total} ร้าน · pace ${g.pace}% · เสี่ยง ${g.danger+g.warn} · shortfall ${fmtChatK(g.shortfall||0)}${atRisk?' | top risk: '+atRisk:''}`;
-  }).join('\n');
-  return `-- CHAT SCOPE --\nteam\n\n-- TEAM DATA --\nจำนวน KAM: ${groups.length}\nจำนวนร้าน: ${allAccts.length}\nTeam pro-rate: ${teamPace}%\nTotal shortfall: ${fmtChatK(totalShortfall)}\n\n=== KAM groups ===\n${kamLines}`;
+  const kamLines=groups.slice(0,10).map(g=>`- ${g.kamName}: ${g.total} ร้าน · pace ${g.pace}% · เสี่ยง ${g.danger+g.warn} · shortfall ${fmtChatK(g.shortfall||0)}`).join('\n');
+  const topAccts=allAccts.map(a=>{const v=chatMoneyValue(a);return{...a,_currentGmv:v.current,_runrate:v.runrate,_lastGmv:v.last};}).sort((a,b)=>(b._currentGmv||0)-(a._currentGmv||0)).slice(0,8);
+  const topAcctLines=topAccts.map((a,i)=>`${i+1}. ${chatAccountName(a)} — current ${fmtChatK(a._currentGmv||0)}, run-rate ${fmtChatK(a._runrate||0)}, KAM ${a.kamName||a._kamGroup||'-'}`).join('\n');
+  return `-- TEAM CONTEXT --\nจำนวน KAM: ${groups.length}\nจำนวนร้าน: ${allAccts.length}\nTeam pro-rate: ${teamPace}%\nTotal shortfall: ${fmtChatK(totalShortfall)}\n\nKAM groups:\n${kamLines}\n\nTop accounts visible to this team by current GMV-to-date:\n${topAcctLines||'ไม่มีข้อมูล current GMV รายร้านใน team context'}`;
 }
 
-function buildChatContextByScope(scope){
-  if(scope==='team')return buildTeamChatContext();
-  if(scope==='portfolio')return buildPortfolioChatContext();
-  return buildAccountChatContext();
+function buildChatContextByScope(scope,q){
+  // Olive Chat v2: always provide a compact cross-scope packet when available.
+  // This prevents the bot from acting like a screen reader stuck on the current tab.
+  const active=getActiveScreenName();
+  const intent=detectChatIntent(q||'');
+  const sections=[`-- CHAT ROUTER --\nselected_scope: ${scope}\nquery_intent: ${intent}\nactive_screen: ${active}\nrule: answer the user’s actual question; do not say a scope is unavailable if another loaded context below contains the answer.`];
+  if(scope==='account'){
+    sections.push(buildAccountChatContext());
+    if(chatHasPortfolioData())sections.push(buildPortfolioChatContext());
+    if(chatHasTeamData())sections.push(buildTeamChatContext());
+  }else if(scope==='portfolio'){
+    sections.push(buildPortfolioChatContext());
+    sections.push(buildAccountChatContext());
+    if(chatHasTeamData())sections.push(buildTeamChatContext());
+  }else if(scope==='team'){
+    sections.push(buildTeamChatContext());
+    if(chatHasPortfolioData())sections.push(buildPortfolioChatContext());
+    sections.push(buildAccountChatContext());
+  }else{
+    sections.push(buildAccountChatContext());
+    if(chatHasPortfolioData())sections.push(buildPortfolioChatContext());
+    if(chatHasTeamData())sections.push(buildTeamChatContext());
+  }
+  return sections.join('\n\n');
 }
 
 function oliveChatGroundingClean(t, context, scope){
-  // Phase 6.2: narrow guard for account-chat hallucination and awkward Thai.
+  // Olive Chat v2: narrow last-mile cleanup only. Do not rewrite business meaning.
   let s=String(t||'');
   const ctx=String(context||'');
-  const noWeekly=/weekly_data:\s*not_available/i.test(ctx);
+  const noWeekly=/weekly=not_available|weekly_data:\s*not_available/i.test(ctx);
   if(noWeekly){
     s=s.replace(/(ลดลง|เพิ่มขึ้น|หายไป|โตขึ้น|ตกลง)\s*(\d+)\s*สัปดาห์(?:\s*ต่อเนื่อง|\s*ติด|\s*เรียว)?/g,'$1ต่อเนื่องในข้อมูลรายเดือนที่มี');
     s=s.replace(/(\d+)\s*สัปดาห์เรียว/g,'ข้อมูลรายเดือนที่มี');
@@ -15337,15 +15388,23 @@ function oliveChatGroundingClean(t, context, scope){
     .replace(/ไม่ได้มีซื้อ/g,'ไม่มีการซื้อ')
     .replace(/สัปดาห์เรียว/g,'สัปดาห์ต่อเนื่อง')
     .replace(/ดีดตัวออกมา ค่อยๆ/g,'มีสัญญาณฟื้นตัวแบบค่อยเป็นค่อยไป')
+    .replace(/ออเดอร์หลัง/g,'จำนวนออเดอร์')
+    .replace(/มีหลังคาให้ปรับ/g,'ยังมี room ให้ปรับ')
+    .replace(/เนื้อที่ซื้อ/g,'หมวดที่ซื้อ')
     .replace(/emergency/gi,'เคสเร่งด่วน')
     .replace(/\bchurn\b/gi,'เสี่ยงหลุด')
-    .replace(/\bdrop\b/gi,'ยอดลด');
+    .replace(/\bdrop\b/gi,'ยอดลด')
+    .replace(/[📊🔍⚠️✅💡🙂😀😅🚨]/g,'')
+    .replace(/ค่ะค่ะ/g,'ค่ะ')
+    .replace(/คะค่ะ/g,'ค่ะ')
+    .replace(/ค่ะนะคะ/g,'นะคะ')
+    .replace(/นะคะค่ะ/g,'นะคะ');
   // soften over-certain unsupported operational diagnoses
   s=s.replace(/ลูกค้าเปลี่ยนซัพพลายเออร์/g,'ลูกค้าอาจเปลี่ยนแหล่งซื้อ (ต้องถามยืนยัน)');
   s=s.replace(/เปลี่ยน supplier/g,'อาจเปลี่ยน supplier (ต้องถามยืนยัน)');
   s=s.replace(/เปลี่ยนเมนู/g,'อาจเปลี่ยนเมนู (ต้องถามยืนยัน)');
   s=s.replace(/เตรียม promote/g,'อาจมีแผนโปรโมชัน (ต้องถามยืนยัน)');
-  return s.trim();
+  return s.replace(/\n{3,}/g,'\n\n').trim();
 }
 
 async function sendChat(){
@@ -15359,53 +15418,55 @@ async function sendChat(){
   const ldEl=addMsg('a','⏳ กำลังวิเคราะห์...',true);
   aiLoading=true;
   chatHist.push({role:'user',content:q});
-  if(chatHist.length>14)chatHist=chatHist.slice(-14);
+  if(chatHist.length>10)chatHist=chatHist.slice(-10);
 
   const _scope=detectChatScope(q);
-  const _context=buildChatContextByScope(_scope);
+  const _context=buildChatContextByScope(_scope,q);
+  const _intent=detectChatIntent(q);
   const _mustReplyThai=/[\u0E00-\u0E7F]/.test(q) && !/(answer|reply|respond)\s+in\s+english|english\s+only|ภาษาอังกฤษ/i.test(q);
   const _languageContract=_mustReplyThai
-    ? 'ผู้ใช้ถามเป็นภาษาไทยหรือไทยปนอังกฤษ: ต้องตอบเป็นภาษาไทยเท่านั้น ใช้คำอังกฤษเฉพาะชื่อ metric, field, feature หรือศัพท์ธุรกิจที่จำเป็น ห้ามสลับไปตอบอังกฤษทั้งประโยค'
+    ? 'ผู้ใช้ถามเป็นภาษาไทยหรือไทยปนอังกฤษ: ตอบภาษาไทยเท่านั้น ใช้คำอังกฤษเฉพาะชื่อ metric/field/feature หรือศัพท์ธุรกิจที่จำเป็น'
     : 'Mirror the user\'s requested language. If no explicit English request exists, prefer Thai.';
-  const _complex=/วิเคราะห์|เปรียบเทียบ|แนะนำ|วางแผน|สรุปภาพรวม|ทำไม.*ลด|ทำไม.*เพิ่ม|พอร์ต|portfolio|ทีม|team|root cause|priority|prioritize|diagnose|insight|strategy|แผน|ใครก่อน|โทรหาใคร/i.test(q);
-  const _needsSonnet=_scope!=='account'||q.length>60||_complex;
-  const _chatModelKey=_needsSonnet?'sonnet':'haiku';
-  const _scopeInstruction={
-    account:'Answer from the current account context. If the user asks about portfolio or team, use the portfolio/team context if available and say when it is not loaded.',
-    portfolio:'Answer as a portfolio co-pilot. Prioritize by money impact, urgency, and likely KAM action — not just percentages.',
-    team:'Answer as a Team Lead co-pilot. Distinguish support/resource problems from coaching/discipline problems.'
-  }[_scope]||'Answer from the available context.';
+  const _isGreeting=/^(hi|hello|hey|สวัสดี|หวัดดี|ดีครับ|ดีค่ะ)\b/i.test(q.trim());
+  const _simple=/^(ร้านไหน|ใคร|อะไร|เท่าไหร่|กี่|top|highest|มากสุด|เยอะสุด)/i.test(q.trim())&&q.length<80;
+  const _chatModelKey=_isGreeting?'haiku':'sonnet';
+  const _maxTok=_simple?650:950;
 
   const sys=OLIVE_BASE+`
 
--- AI CHAT TASK --
-You are answering inside Freshket Sense AI Chat. The current chat scope is: ${_scope}.
-${_scopeInstruction}
+-- OLIVE CHAT V2 TASK --
+You are answering inside Freshket Sense AI Chat. You are not a screen reader. You are a KAM intelligence partner who can use all loaded context provided below.
 
-Use the current context below as the source of truth for this turn. It overrides older chat context when there is a conflict.
+selected_scope: ${_scope}
+query_intent: ${_intent}
 
 ${_context}
 
 -- LANGUAGE CONTRACT --
 ${_languageContract}
 
--- OUTPUT CONTRACT --
-- Start with the answer, not a preamble.
-- Be easy to use: concise first, then explain only what is useful.
-- Do not force a rigid template every time. Choose the clearest structure for the user’s question.
-- Think with this contract silently: Known facts → interpretation → hypotheses/questions to verify → KAM action.
-- If the user asks for analysis, give diagnosis → why it matters → what to do next.
-- If the data is missing or the scope is not loaded, say that directly and suggest the safest next step.
-- Do not invent customer facts, SKU facts, portfolio facts, dates, periods, percentages, or money values.
-- If a claim is not directly in the context but is a reasonable business explanation, label it as “สมมติฐานที่ต้องถามยืนยัน”.
-- For account-detail answers, do not convert monthly data into weekly claims. If weekly data is not available, never say “X สัปดาห์”.
-- SKU missing from latest month means “not found in latest month data”; it does not prove menu change, supplier switch, churn, or permanent stop.
-- Balance risk and upside: do not only focus on dropped stores or missing SKUs; also look for wallet protection, expansion, ordering-cycle, menu-mix, spec, price, and category opportunities when supported by context.
+-- ANSWER STYLE CONTRACT --
+- Answer the user’s question directly in the first 1–2 lines.
+- Default length: 4–8 concise lines. Do not write a full report unless the user asks for one.
+- Do not use a fixed template like “สถานะ / สัญญาณ / ควรทำ” every time. Choose the shape that fits the question.
+- No markdown tables unless the user explicitly asks for a table.
+- No emojis.
+- Be practical and KAM-native: what matters, why, what to do next.
+- If the answer is a ranking, give the ranking first, then one caveat about metric definition if needed.
+
+-- GROUNDING CONTRACT --
+- Use only the context above for numbers, dates, account names, SKU names, category names, percentages, and money values.
+- If a useful answer exists in portfolio/team context, use it even if the current screen is different.
+- Do not tell the user to open another page unless no loaded context can answer the question.
+- Distinguish: fact from data / interpretation / hypothesis to verify. But do this naturally, not as a rigid template.
+- Never invent week-level patterns. If weekly data is not available, do not mention weeks.
+- Supplier/menu/promotion/churn/customer intent can only be a hypothesis to verify unless explicitly present in context.
+- Balance risk and upside: look for growth, wallet protection, wallet expansion, category penetration, ordering-cycle, spec, price, and menu-mix opportunities when context supports them.
 - Use Thai Baht only: บาท or ฿. Never use เยน, JPY, ¥, dollar, or USD.
 - Refer to yourself only as Olive. Never use หนู, ฉัน, ดิฉัน, ผม, เรา, อาจารย์, or ครับ.`;
 
   try{
-    const reply=await callAI(_chatModelKey,sys,chatHist.slice(-10),_needsSonnet?1400:900);
+    const reply=await callAI(_chatModelKey,sys,chatHist.slice(-8),_maxTok);
     const cleanReply=oliveChatGroundingClean(oliveToneClean(reply), _context, _scope);
     ldEl.querySelector('.mb').innerHTML=cleanReply.replace(/\n/g,'<br>');
     ldEl.querySelector('.mb').classList.remove('ld');
