@@ -5163,6 +5163,13 @@ supa.auth.onAuthStateChange((event, session) => {
     currentUser = null;
     currentUserProfile = null;
     _showLoginOverlayClean();
+  } else if (event === 'TOKEN_REFRESHED' && session) {
+    // Fix v22.2: handle silent token refresh on mobile.
+    // Supabase refreshes tokens frequently on iOS PWA. Without this handler,
+    // TOKEN_REFRESHED fell through unhandled — currentUser could become stale
+    // relative to the new session, causing subsequent API calls to fail silently.
+    currentUser = session.user;
+    // No UI change needed — user stays on current screen
   }
 });
 
@@ -19022,6 +19029,30 @@ function initOliveAvatar(){
     }).catch(() => {}); // offline — stay as-is, don't disrupt user
   });
   _initFolderAutoLoad();
+  // ── Guard C: pageshow — iOS bfcache restore ───────────────────────────────
+  // Fix v22.2: iOS Safari PWA restores pages from bfcache (back-forward cache)
+  // on app resume. In this case visibilitychange may NOT fire, but pageshow
+  // fires with event.persisted = true. JS state is frozen from before suspend
+  // (currentUser may be set) but the Supabase token may have expired.
+  // Without this handler, user gets into a state where currentUser exists but
+  // API calls fail — OR the session looks valid but onAuthStateChange never fires.
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return; // Normal page load — checkSession() handles it
+    if (!currentUser) return;     // Not logged in — nothing to verify
+    // Page restored from bfcache — silently verify session is still valid
+    supa.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        // Session expired during suspend — force re-login
+        currentUser = null;
+        currentUserProfile = null;
+        sheetsLoadStarted = false;
+        _showLoginOverlayClean();
+      } else {
+        // Session valid — update currentUser with refreshed token
+        currentUser = session.user;
+      }
+    }).catch(() => {}); // offline — stay as-is
+  });
   // Restore AI provider setting
   setAiProvider(aiProvider);
   initOliveAvatar();

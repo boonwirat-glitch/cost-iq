@@ -1,13 +1,15 @@
 {
-  "package": "freshket-sense-v155-phase22-1-ai-proxy-default",
-  "version": "155.22.1",
+  "package": "freshket-sense-v155-phase22-2-auth-fix",
+  "version": "155.22.2",
   "baseline": "v155-phase22-olive-chat-v2",
   "productBaseline": "v155-phase6.2-chat-grounding",
   "notes": [
-    "Olive Chat v2 cross-scope context router",
-    "concise answer policy",
-    "portfolio/team GMV rankings exposed to chat",
-    "no runtime changes outside chat and service-worker cache bump",
-    "Default Cloudflare AI proxy URL baked into app config so mobile/new devices do not require localStorage setup"
+    "Fix: SW skipWaiting removed — prevented iOS auth interruption during SW update",
+    "Fix: pageshow handler added — iOS bfcache restore now re-validates session",
+    "Fix: TOKEN_REFRESHED handled in onAuthStateChange — currentUser stays in sync on mobile",
+    "Fix: visibilitychange 2s grace period — prevents false login flash during token refresh",
+    "Fix: loginTransitionRunning 4s safety valve — prevents hang + auto-login loop",
+    "Phase 22.1: Default Cloudflare AI proxy URL for mobile/new devices",
+    "Phase 22: Olive Chat v2 cross-scope context router"
   ]
 }

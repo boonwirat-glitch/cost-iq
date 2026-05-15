@@ -1,19 +1,25 @@
-// Freshket Sense — Service Worker v155-phase22.1
+// Freshket Sense — Service Worker v155-phase22.2
 // Strategy: Network-first for app shell navigation + offline fallback.
-// Cache version bumped for Phase 14 so users do not keep stale index.html.
+//
+// Fix v22.2: Removed skipWaiting() from install.
+// Problem: skipWaiting() caused the new SW to activate immediately and
+// clients.claim() interrupted in-flight Supabase auth on iOS PWA,
+// corrupting session state mid-checkSession() and causing login loops.
+// Solution: New SW waits for all tabs to close before activating.
+// Cache bump ensures stale index.html is cleared on next natural reload.
 
-const CACHE_NAME = 'freshket-sense-v155-phase22-1';
+const CACHE_NAME = 'freshket-sense-v155-phase22-2';
 const OFFLINE_URL = '/index.html';
 
-// Install: cache shell
+// Install: cache shell only — do NOT skipWaiting
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.add(OFFLINE_URL))
   );
-  self.skipWaiting();
+  // No skipWaiting — let active sessions finish before SW takeover
 });
 
-// Activate: clear old caches
+// Activate: clear old caches, then claim
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -24,6 +30,7 @@ self.addEventListener('activate', event => {
       )
     )
   );
+  // clients.claim() is safe here — SW only activates after all tabs close
   self.clients.claim();
 });
 
