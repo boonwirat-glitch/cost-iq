@@ -5234,6 +5234,22 @@ function hideLoginOverlay() {
   if (loginTransitionRunning) return;
   loginTransitionRunning = true;
 
+  // Safety valve v22.2: if transition never completes (e.g. concurrent auth events
+  // during splash), force-clear lock after 4s and ensure login overlay is hidden.
+  // Prevents the "hang + loop" symptom where loginTransitionRunning stays true
+  // and subsequent hideLoginOverlay() calls all return early, leaving login visible.
+  const lockSafetyTimer = setTimeout(() => {
+    if (loginTransitionRunning) {
+      loginTransitionRunning = false;
+      const _ovSafe = document.getElementById('login-overlay');
+      if (_ovSafe && currentUser) {
+        _ovSafe.style.display = 'none';
+        _ovSafe.classList.remove('lgi-checking');
+      }
+      console.warn('[login transition] safety valve triggered — forced unlock after 4s');
+    }
+  }, 4000);
+
   const ov = document.getElementById('login-overlay');
   let finished = false;
   const fallbackTimer = setTimeout(() => {
@@ -5245,6 +5261,7 @@ function hideLoginOverlay() {
     if (finished) return;
     finished = true;
     clearTimeout(fallbackTimer);
+    clearTimeout(lockSafetyTimer);
 
     if (ov) {
       ov.style.display = 'none';
@@ -18972,23 +18989,36 @@ function initOliveAvatar(){
   checkSession().catch(()=>{});
   // ── Guard B: visibilitychange — silent token re-check only, NO routing ────
   // Fires when user returns to the PWA after backgrounding it.
-  // If the session expired while suspended, show login. Otherwise do nothing.
+  // Fix v22.2: added 2s grace period before forcing re-login.
+  // Problem: getSession() can return null momentarily while Supabase silently
+  // refreshes the token in background. Immediately nulling currentUser caused
+  // login flash → onAuthStateChange(SIGNED_IN) → auto-login loop.
+  // Solution: wait 2s, re-check. Only force login if session truly gone.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !currentUser) return;
     supa.auth.getSession().then(({ data: { session } }) => {
       if (!session && currentUser) {
-        // Token truly gone (expired + silent refresh failed) — force re-login
-        currentUser = null;
-        currentUserProfile = null;
-        sheetsLoadStarted = false;
-        const ov = document.getElementById('login-overlay');
-        if(ov){ ov.classList.remove('lgi-checking'); ov.style.display='flex'; ov.style.opacity='1'; }
-        const em = document.getElementById('login-email');
-        const pw = document.getElementById('login-password');
-        if(em) em.value='';
-        if(pw) pw.value='';
+        // Session appears empty — Supabase may still be refreshing token silently.
+        // Wait 2s before forcing re-login to avoid false flash + auto-login loop.
+        setTimeout(() => {
+          supa.auth.getSession().then(({ data: { session: s2 } }) => {
+            if (!s2 && currentUser) {
+              // Confirmed: token truly gone after grace period — force re-login
+              currentUser = null;
+              currentUserProfile = null;
+              sheetsLoadStarted = false;
+              const ov = document.getElementById('login-overlay');
+              if(ov){ ov.classList.remove('lgi-checking'); ov.style.display='flex'; ov.style.opacity='1'; }
+              const em = document.getElementById('login-email');
+              const pw = document.getElementById('login-password');
+              if(em) em.value='';
+              if(pw) pw.value='';
+            }
+            // s2 exists = token refreshed silently — user stays on current screen
+          }).catch(() => {}); // offline — stay as-is
+        }, 2000);
       }
-      // Session valid (or silently refreshed): no-op — user stays on current screen
+      // Session valid on first check: no-op — user stays on current screen
     }).catch(() => {}); // offline — stay as-is, don't disrupt user
   });
   _initFolderAutoLoad();
