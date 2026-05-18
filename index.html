@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v193m: target nav fix (sync fn + Promise.then, removes async keyword) -->
+<!-- Freshket Sense v195: target nav fix (sync fn + Promise.then, removes async keyword) -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v193m.html                        ║
+║  TABLE OF CONTENTS — sense_v195.html                        ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
 ║  Jump to section with grep -n "<SECTION_NAME>" or search line number.       ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
@@ -2786,7 +2786,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Freshket Sense">
-<meta name="theme-color" content="#006050">
+<meta name="theme-color" content="#0d3328">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
 <link rel="icon" type="image/png" href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png">
@@ -4561,8 +4561,8 @@ document.body.classList.add('kam-mode');
     <div class="lgi-brand">
       <div class="lgi-logo-box">
         <img src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"
-             width="56" height="56" alt="Freshket Sense"
-             style="border-radius:12px;object-fit:cover;display:block;">
+             width="76" height="76" alt="Freshket Sense"
+             style="object-fit:cover;display:block;">
       </div>
       <div class="lgi-wordmark">
         freshket<span class="lgi-badge">
@@ -5852,6 +5852,10 @@ function resetRuntimeSessionState(){
   try { bulkSkusReady = false; } catch(e) {}
   try { bulkAltsReady = false; } catch(e) {}
   try { loginTransitionRunning = false; } catch(e) {}
+  // Fix v194: reset auth flags so stale state never blocks next login attempt
+  try { window._doLoginHandled = false; } catch(e) {}
+  try { window._sessionCheckHandling = false; } catch(e) {}
+  try { if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; } } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
@@ -5984,6 +5988,14 @@ async function submitPasswordReset(){
 //          if doLogin() already completed before onAuthStateChange fires
 // Guard D: SIGNED_OUT only triggers login UI if we were actually logged in
 //          (avoids showing login on initial page load when no session exists)
+// Fix v194: _doLoginHandled — set by doLogin() to prevent onAuthStateChange(SIGNED_IN)
+// from calling hideLoginOverlay() a second time after doLogin already handled it.
+// _sessionCheckHandling — set by checkSession() to block INITIAL_SESSION race.
+// _visibilityGraceTimer — cancellable timer for visibilitychange grace period.
+window._doLoginHandled = false;
+window._sessionCheckHandling = false;
+window._visibilityGraceTimer = null;
+
 supa.auth.onAuthStateChange((event, session) => {
   // Recovery links create a temporary auth session first. Do not route into the app yet.
   if (event === 'PASSWORD_RECOVERY' || passwordRecoveryMode || _urlLooksLikePasswordRecovery()) {
@@ -5992,20 +6004,31 @@ supa.auth.onAuthStateChange((event, session) => {
     return;
   }
 
-  if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && !currentUser) {
+  if (event === 'TOKEN_REFRESHED' && session) {
+    // Fix v22.2: handle silent token refresh on mobile.
     currentUser = session.user;
-    loadUserProfile().then(() => hideLoginOverlay());
+    // Fix v194: cancel pending visibilitychange grace timer — token refresh confirms session alive.
+    if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
+    return;
+  }
+
+  if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+    // Fix v194 Guard A: doLogin() already handled this SIGNED_IN — skip to avoid double hideLoginOverlay.
+    if (event === 'SIGNED_IN' && window._doLoginHandled) {
+      window._doLoginHandled = false;
+      return;
+    }
+    // Fix v194 Guard B: checkSession() is mid-flight handling INITIAL_SESSION — skip race.
+    if (event === 'INITIAL_SESSION' && window._sessionCheckHandling) return;
+    // Guard A (original): only proceed if no one else has set currentUser yet.
+    if (!currentUser) {
+      currentUser = session.user;
+      loadUserProfile().then(() => hideLoginOverlay());
+    }
   } else if (event === 'SIGNED_OUT' && currentUser) {
     currentUser = null;
     currentUserProfile = null;
     _showLoginOverlayClean();
-  } else if (event === 'TOKEN_REFRESHED' && session) {
-    // Fix v22.2: handle silent token refresh on mobile.
-    // Supabase refreshes tokens frequently on iOS PWA. Without this handler,
-    // TOKEN_REFRESHED fell through unhandled — currentUser could become stale
-    // relative to the new session, causing subsequent API calls to fail silently.
-    currentUser = session.user;
-    // No UI change needed — user stays on current screen
   }
 });
 
@@ -6021,10 +6044,18 @@ async function doLogin() {
   try {
     const { data, error } = await supa.auth.signInWithPassword({ email, password: pwd });
     if (error) { showLoginError('Email หรือ password ไม่ถูกต้อง'); return; }
+    // Fix v194: set flag BEFORE hideLoginOverlay so onAuthStateChange(SIGNED_IN)
+    // (which fires async from signInWithPassword) knows doLogin already handles UI.
+    window._doLoginHandled = true;
     currentUser = data.user;
+    // v195 Step 1: start R2 fetch immediately — runs in parallel with loadUserProfile
+    // so cache-warm data is already ingested by the time splash shows.
+    // sheetsLoadStarted guard prevents double-call if _autoRouteAfterLogin also fires.
+    if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
     await loadUserProfile();
     hideLoginOverlay();
   } catch(e) {
+    window._doLoginHandled = false;
     showLoginError('เกิดข้อผิดพลาด กรุณาลองใหม่');
     console.error('[login]', e);
   } finally {
@@ -6045,12 +6076,16 @@ function showSenseSplash(onDone){
   splash.style.display='flex';splash.style.opacity='1';
   const tickerEl=document.getElementById('spl-ticker');
   const bar=document.getElementById('spl-bar');
-  const MIN_SHOW=1650;
-  const MAX_SHOW=4200;
+  // v195 Step 2: if portviewBulkData already loaded from IndexedDB cache (pre-fetch
+  // started in doLogin/checkSession before splash), use fast-path timing.
+  // Falls through to normal timing if cache was cold — zero regression risk.
+  const _cacheWarm = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0;
+  const MIN_SHOW=_cacheWarm ? 0 : 1650;
+  const MAX_SHOW=_cacheWarm ? 400 : 2000; // v194: reduced from 4200ms
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
-  let dataReady=false;  // portview+history loaded
+  let dataReady=_cacheWarm; // v195: treat as ready if cache warm
 
   // ── Progress bar: data-driven (not fake) ──────────────────
   // Exported so data loaders can update it
@@ -6117,6 +6152,9 @@ function showSenseSplash(onDone){
   }
 }
 function hideLoginOverlay() {
+  // Fix v194 Fix F: safety net — ensure _doLoginHandled never stays true
+  // across multiple hideLoginOverlay calls regardless of which path triggered it.
+  window._doLoginHandled = false;
   if (loginTransitionRunning) return;
   loginTransitionRunning = true;
 
@@ -6290,14 +6328,20 @@ async function checkSession() {
   if(ov) ov.classList.add('lgi-checking');
   try {
     const { data: { session } } = await supa.auth.getSession();
-    // Guard A: only proceed if onAuthStateChange hasn't already handled this
+    // Fix v194 Guard B: set flag BEFORE await to block onAuthStateChange(INITIAL_SESSION)
+    // from racing into hideLoginOverlay() while checkSession is still handling it.
     if (session && !currentUser) {
+      window._sessionCheckHandling = true;
       currentUser = session.user;
+      // v195 Step 1: start R2 fetch in parallel with loadUserProfile (same guard applies)
+      if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
       await loadUserProfile();
+      window._sessionCheckHandling = false;
       hideLoginOverlay();
       return;
     }
   } catch(e) {
+    window._sessionCheckHandling = false;
     // Network error (offline, etc.) — fall through to show login form
     console.warn('[checkSession] network error:', e.message);
   }
@@ -8049,7 +8093,12 @@ async function loadFromCloudflareR2(){
   _cloudInitialPromise=(async()=>{
     let loaded=0;
     const fgResults=await Promise.all(FOREGROUND.map(async(key,idx)=>{
-      const ok=await _fetchCloudflareFile(R2_SPECS[key],{force:false});
+      let ok=await _fetchCloudflareFile(R2_SPECS[key],{force:false});
+      // v195 Step 3: 1 retry after 2s if fail — handles momentary R2 / network hiccup
+      if(!ok&&token===_cloudLoadToken){
+        await new Promise(r=>setTimeout(r,2000));
+        if(token===_cloudLoadToken)ok=await _fetchCloudflareFile(R2_SPECS[key],{force:true});
+      }
       if(token!==_cloudLoadToken)return ok;
       if(ok){loaded++;_markForegroundPillDot(idx);}
       if(counter)counter.textContent=loaded+'/'+ALL.length;
@@ -8070,7 +8119,19 @@ async function loadFromCloudflareR2(){
       if(typeof renderPortview==='function')renderPortview();
       if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
     }else{
+      // v195 Step 3: persistent offline banner (not just toast) when all 5 foreground files fail
       showToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
+      const _existingBanner=document.getElementById('offline-banner');
+      if(!_existingBanner){
+        const _b=document.createElement('div');
+        _b.id='offline-banner';
+        _b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:9998;background:rgba(220,60,0,.92);color:#fff;font-size:12px;font-family:"IBM Plex Sans Thai",sans-serif;text-align:center;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(8px)';
+        _b.innerHTML='<span>⚠ ไม่สามารถโหลดข้อมูลได้ — ตรวจสอบการเชื่อมต่อ</span><button onclick="document.getElementById(\x27offline-banner\x27)?.remove();reloadFromGoogleSheets();" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">Retry</button>';
+        document.body.appendChild(_b);
+        // Auto-dismiss banner when next successful load fires
+        const _origRender=typeof renderPortview==='function'?renderPortview:null;
+        if(_origRender)window._offlineBannerRenderGuard=()=>{document.getElementById('offline-banner')?.remove();window._offlineBannerRenderGuard=null;};
+      }
     }
     if(typeof updateDataStatus==='function')updateDataStatus();
     if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
@@ -21215,8 +21276,10 @@ function initOliveAvatar(){
     supa.auth.getSession().then(({ data: { session } }) => {
       if (!session && currentUser) {
         // Session appears empty — Supabase may still be refreshing token silently.
-        // Wait 2s before forcing re-login to avoid false flash + auto-login loop.
-        setTimeout(() => {
+        // Fix v194: increased grace 2000→3500ms; stored as cancellable timer.
+        // TOKEN_REFRESHED event will clear this timer before it fires if token refreshes in time.
+        window._visibilityGraceTimer = setTimeout(() => {
+          window._visibilityGraceTimer = null;
           supa.auth.getSession().then(({ data: { session: s2 } }) => {
             if (!s2 && currentUser) {
               // Confirmed: token truly gone after grace period — force re-login
@@ -21234,9 +21297,8 @@ function initOliveAvatar(){
               const _visOv = document.getElementById('login-overlay');
               if (_visOv) { _visOv.style.display = 'none'; _visOv.classList.remove('lgi-checking'); }
             }
-            // s2 exists = token refreshed silently — user stays on current screen
           }).catch(() => {}); // offline — stay as-is
-        }, 2000);
+        }, 3500);
       }
       // Session valid on first check: no-op — user stays on current screen
     }).catch(() => {}); // offline — stay as-is, don't disrupt user
@@ -21249,22 +21311,40 @@ function initOliveAvatar(){
   // (currentUser may be set) but the Supabase token may have expired.
   // Without this handler, user gets into a state where currentUser exists but
   // API calls fail — OR the session looks valid but onAuthStateChange never fires.
+  // Fix v194: _pgsGraceTimer — cancellable grace timer for pageshow bfcache restore.
+  // Mirrors _visibilityGraceTimer pattern; guards against double-fire from browser quirks.
+  window._pgsGraceTimer = null;
+
   window.addEventListener('pageshow', (event) => {
     if (!event.persisted) return; // Normal page load — checkSession() handles it
     if (!currentUser) return;     // Not logged in — nothing to verify
     // Page restored from bfcache — silently verify session is still valid
     supa.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // Session expired during suspend — force re-login
-        currentUser = null;
-        currentUserProfile = null;
-        sheetsLoadStarted = false;
-        _showLoginOverlayClean();
-      } else {
+      if (!session && currentUser) {
+        // Session appears empty — Supabase may still be hydrating after bfcache restore.
+        // Fix v194 Fix E: grace 2000ms before forcing re-login (mirrors visibilitychange pattern).
+        // Cancel any existing timer first to prevent double-fire on rapid app switch.
+        if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
+        window._pgsGraceTimer = setTimeout(() => {
+          window._pgsGraceTimer = null;
+          supa.auth.getSession().then(({ data: { session: s2 } }) => {
+            if (!s2 && currentUser) {
+              // Confirmed: token truly gone — force re-login
+              currentUser = null;
+              currentUserProfile = null;
+              sheetsLoadStarted = false;
+              _showLoginOverlayClean();
+            } else if (s2 && currentUser) {
+              currentUser = s2.user;
+              const _bfOv = document.getElementById('login-overlay');
+              if (_bfOv) { _bfOv.style.display = 'none'; _bfOv.classList.remove('lgi-checking'); }
+            }
+          }).catch(() => {}); // offline — stay as-is
+        }, 2000);
+      } else if (session) {
         // Session valid — update currentUser with refreshed token
         currentUser = session.user;
         // bfcache fix: overlay may be stuck in lgi-checking state from frozen JS
-        // Ensure it's hidden if user is logged in
         const _bfOv = document.getElementById('login-overlay');
         if (_bfOv && currentUser) {
           _bfOv.style.display = 'none';
