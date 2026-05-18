@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v155-phase22.2
+// Freshket Sense — Service Worker v195
 // Strategy: Network-first for app shell navigation + offline fallback.
 //
 // Fix v22.2: Removed skipWaiting() from install.
@@ -8,7 +8,7 @@
 // Solution: New SW waits for all tabs to close before activating.
 // Cache bump ensures stale index.html is cleared on next natural reload.
 
-const CACHE_NAME = 'freshket-sense-v155-phase22-2';
+const CACHE_NAME = 'freshket-sense-v195';
 const OFFLINE_URL = '/index.html';
 
 // Install: cache shell only — do NOT skipWaiting
