@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v199a: alternatives lazy-load — removed from BACKGROUND, now loads on first Sense Gate tap (ensureSenseData) -->
+<!-- Freshket Sense v199b: 3 fixes — (1) ensureSenseData silent flag: skip refreshAll when called from Sense Gate to prevent screen navigation; (2) kav-z2 padding-bottom 72→20px: remove dead space from hidden kav-z3; (3) ⓘ panel: NRR/baseline display ฿/วัน→฿/เดือน normalized + นิยาม collapse toggle -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v199a.html                                       ║
+║  TABLE OF CONTENTS — sense_v199b.html                                       ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
 ║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
 ║  Never rely on TOC line numbers from memory — always re-read file first.    ║
@@ -265,6 +265,14 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
+║   v199b  3 fixes:                                                            ║
+║          · ensureSenseData {silent} flag: skip refreshAll/selectMonth        ║
+║            เมื่อถูกเรียกจาก Sense Gate → ป้องกัน screen navigation กลับ      ║
+║            account view ขณะรอโหลด alternatives (lazy-load bug)               ║
+║          · kav-z2 padding-bottom 72→20px: ลบ dead space ใต้ SKU list        ║
+║            (kav-z3 ซ่อนแล้วแต่ padding ยังค้างอยู่)                          ║
+║          · ⓘ panel: เปลี่ยน display ฿/วัน → ฿/เดือน (normalized)           ║
+║            baseline + NRR rows; นิยาม Portfolio Movement collapse toggle      ║
 ║   v199a  alternatives lazy-load: ย้ายออกจาก BACKGROUND → โหลดครั้งแรก      ║
 ║          เมื่อ KAM tap Sense Gate (ensureSenseData) แทน startup preload      ║
 ║          ลด startup weight, UI messaging อัปเดต (pill/toast ลบ "ทางเลือก")  ║
@@ -633,7 +641,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 
 
 /* Zone 2: scrollable body */
-#kav-z2{padding-bottom:72px}
+#kav-z2{padding-bottom:20px} /* v199b: was 72px for kav-z3 sticky btn, now hidden */
 
 /* Zone 3: minimal sticky context strip */
 #kav-z3{
@@ -8340,7 +8348,7 @@ async function ensureAccountDetailData(accountId){
   return ok;
 }
 
-async function ensureSenseData(accountId){
+async function ensureSenseData(accountId, {silent=false}={}){
   if(!accountId)return false;
   const needed=[];
   if(!bulkSkusData[accountId])needed.push('skus');
@@ -8350,7 +8358,7 @@ async function ensureSenseData(accountId){
   const ok=await ensureCloudflareFiles(needed,{label:'SKU + ทางเลือก'});
   loadFromStorage(accountId);
   if(D.alts.length&&D.skus.length)computeOPPS();
-  refreshAll();updateDataStatus();
+  if(!silent){refreshAll();updateDataStatus();}  // v199b: skip when called from Sense Gate to avoid screen navigation
   if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
   return ok;
 }
@@ -16568,7 +16576,7 @@ async function sgOrbTap(){
     const sub=document.getElementById('sg-sub');
     const orig=sub?sub.textContent:'';
     if(sub)sub.textContent='กำลังโหลด SKU + ทางเลือกของร้าน...';
-    if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId);
+    if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
     if(!D.alts.length||!D.skus.length){
       if(sub){sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent=orig;},2200);}
       return;
