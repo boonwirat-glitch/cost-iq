@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v198f: fix bulk_price root cause — Tier 3 was missing from orchestrator _startCloudBackgroundLoad finally(); previous fixes were on legacy path that never runs -->
+<!-- Freshket Sense v198g: fix white area at bottom of KAM account view — html background was white, .kam-dc backdrop-filter sampled overscroll area -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v198b.html                                       ║
@@ -260,6 +260,8 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
+║   v198g  fix white overscroll: html.background=#080f1e เมื่อ kam-mode on     ║
+║          .kam-dc backdrop-filter สุด blur จาก html background สีขาว          ║
 ║   v198f  bulk_price root cause fix: Tier 3 เพิ่มใน orchestrator finally()   ║
 ║          legacy path ไม่เคยถูกเรียก — orchestrator ไม่มี Tier 3 เลย         ║
 ║   v198e  bulk_price fix 2: token check ลบออกจาก _startDeferredPriceLoad    ║
@@ -4505,6 +4507,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
 // Always pre-apply kam-mode before auth resolves — login overlay covers body during auth,
 // and _autoRouteAfterLogin() always lands on KAM mode regardless of role.
 document.body.classList.add('kam-mode');
+document.documentElement.style.background = '#080f1e'; // v198g: fix white overscroll — html bg was white, .kam-dc backdrop-filter sampled it
 </script>
 
 <!-- ══ LOGIN OVERLAY ══ -->
