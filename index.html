@@ -1,191 +1,196 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v198g: fix white area at bottom of KAM account view — html background was white, .kam-dc backdrop-filter sampled overscroll area -->
+<!-- Freshket Sense v199a: alternatives lazy-load — removed from BACKGROUND, now loads on first Sense Gate tap (ensureSenseData) -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v198b.html                                       ║
+║  TABLE OF CONTENTS — sense_v199a.html                                       ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
 ║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
 ║  Never rely on TOC line numbers from memory — always re-read file first.    ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
 ║  ── HTML STRUCTURE & SCRIPT TAGS ──────────────────────────────────────────  ║
-║   L238     <style>  MAIN CSS (all component styles)                          ║
-║   L1769    .tgt-mv-* CSS  (NRR movement rows: wrap/header/row/label/nrr)    ║
-║   L1780    .ai-typing CSS  (3-dot bouncing animation for AI loading state)  ║
-║   L2810    <script id="freshket-sense-config">  App config + constants       ║
+║   L309     <style>  MAIN CSS (all component styles)                          ║
+║   L1840    .tgt-mv-* CSS  (NRR movement rows: wrap/header/row/label/nrr)    ║
+║   L1851    .ai-typing CSS  (3-dot bouncing animation for AI loading state)  ║
+║   L2881    <script id="freshket-sense-config">  App config + constants       ║
 ║             └─ data.foregroundKeys: 6 files incl. 'handover' (v198)         ║
 ║             └─ data.r2Files / r2Specs: portview_handover.csv → bulk-handover║
-║   L2897    <script id="freshket-style-runtime">  Dynamic style injection     ║
-║   L3044    <script id="freshket-view-registry">  Screen/view registry        ║
-║   L3181    <script id="freshket-read-model">  Data read model                ║
-║   L3522    <script id="freshket-navigation-runtime">  Navigation logic       ║
-║   L3649    <script id="freshket-report-renderer">  Report renderer           ║
-║   L3804    <script id="freshket-overview-renderer">  Overview screen         ║
-║   L3988    <script id="freshket-portfolio-renderer">  Portfolio screen       ║
-║   L4271    <script id="freshket-kam-team-renderer">  KAM Team View           ║
-║   L4441    LOGIN OVERLAY HTML  (id="login-overlay", z-index:9999)            ║
+║   L2968    <script id="freshket-style-runtime">  Dynamic style injection     ║
+║   L3115    <script id="freshket-view-registry">  Screen/view registry        ║
+║   L3252    <script id="freshket-read-model">  Data read model                ║
+║   L3593    <script id="freshket-navigation-runtime">  Navigation logic       ║
+║   L3720    <script id="freshket-report-renderer">  Report renderer           ║
+║   L3875    <script id="freshket-overview-renderer">  Overview screen         ║
+║   L4059    <script id="freshket-portfolio-renderer">  Portfolio screen       ║
+║   L4342    <script id="freshket-kam-team-renderer">  KAM Team View           ║
+║   L4646    LOGIN OVERLAY HTML  (id="login-overlay", z-index:9999)            ║
 ║             └─ lgi-brand centered column, lgi-logo-box 76×76px squircle     ║
-║   L4672    #sense-splash CSS + HTML  (z-index:10000 — always above login)   ║
+║   L4771    #sense-splash CSS + HTML  (z-index:10000 — always above login)   ║
 ║             └─ Flash fix: splash z-index > login overlay z-index            ║
 ║             └─ Timing: tSetup=900ms | tMax=400ms(warm)/2000ms(cold)         ║
-║   L4788    Hidden file inputs  (fi-portview-bulk, fi-bulk-handover, …)      ║
-║   L4959    BULK DATA PANEL — Data tab UI                                     ║
-║             └─ L4966  slot-portview-bulk   portview.csv     Q8E             ║
-║             └─ L4973  slot-bulk-handover   portview_handover.csv  Q10 (v198)║
-║             └─ L4980  slot-bulk-sku-current  bulk_sku_current.csv  Q7B      ║
-║             └─ L4987  slot-bulk-outlets    bulk_outlets.csv  Q5B            ║
-║             └─ L5005  slot-bulk-data       bulk_history.csv  Q9             ║
-║             └─ L5012  slot-bulk-cats       bulk_categories.csv  Q2B         ║
-║             └─ L5019  slot-bulk-skus       bulk_skus.csv  Q3B               ║
-║             └─ L5029  slot-bulk-alternatives  bulk_alternatives.csv  Q4B    ║
-║             └─ L5036  slot-bulk-price      bulk_price.csv  Q6B              ║
-║   L5515    RESTAURANT SWIPE CUE HTML  (v154 — kam-nav-handle)               ║
-║   L5597    TEAMVIEW HTML  (TL/Admin team tab)                                ║
+║   L4855    Hidden file inputs  (fi-portview-bulk, fi-bulk-handover, …)      ║
+║   L5025    BULK DATA PANEL — Data tab UI                                     ║
+║             └─ L5038  slot-portview-bulk    portview.csv     Q8E            ║
+║             └─ L5045  slot-bulk-handover    portview_handover.csv  Q10      ║
+║             └─ L5052  slot-bulk-sku-current bulk_sku_current.csv  Q7B       ║
+║             └─ L5059  slot-bulk-outlets     bulk_outlets.csv  Q5B           ║
+║             └─ L5077  slot-bulk-data        bulk_history.csv  Q9            ║
+║             └─ L5084  slot-bulk-cats        bulk_categories.csv  Q2B        ║
+║             └─ L5091  slot-bulk-skus        bulk_skus.csv  Q3B              ║
+║             └─ L5101  slot-bulk-alternatives bulk_alternatives.csv  Q4B    ║
+║             └─ L5108  slot-bulk-price       bulk_price.csv  Q6B             ║
+║   L5614    RESTAURANT SWIPE CUE HTML  (kam-nav-handle)                      ║
+║   L5670    TEAMVIEW HTML  (TL/Admin team tab, id="scr-teamview")             ║
 ║                                                                              ║
 ║  ── MAIN <script> BLOCK ───────────────────────────────────────────────────  ║
-║   L5846    SUPABASE CONFIG + AUTH                                            ║
-║   L6019    Auth guard globals:                                               ║
+║   L5918    SUPABASE CONFIG + AUTH                                            ║
+║   L6088    Auth guard globals:                                               ║
 ║             · _sessionCheckHandling — blocks INITIAL_SESSION race           ║
 ║             · _visibilityGraceTimer — cancellable 3.5s re-login timer       ║
 ║             · _signedOutTimer — debounce SIGNED_OUT (v198: 600ms)           ║
-║   L6024    supa.auth.onAuthStateChange()                                     ║
+║   L6096    supa.auth.onAuthStateChange()                                     ║
 ║             · TOKEN_REFRESHED → silent update, cancel grace timer           ║
 ║             · SIGNED_IN / INITIAL_SESSION → load profile → hideLoginOverlay ║
 ║             · SIGNED_OUT → debounce 600ms before showing login (v198)       ║
 ║             · Debug log: [auth:v198] event | session | currentUser (v198)   ║
-║   L6068    doLogin()  — email/password login                                 ║
-║   L6099    showLoginError() / showLoginInfo()                                ║
-║   L6106    showSenseSplash(onDone)                                           ║
+║   L6140    doLogin()  — email/password login                                 ║
+║   L6178    showSenseSplash(onDone)                                           ║
 ║             · cache-warm path: MIN_SHOW=0ms / MAX_SHOW=400ms                ║
 ║             · cold path: MIN_SHOW=1650ms / MAX_SHOW=2000ms                  ║
 ║             · tSetup: calls onDone() at t=900ms (app routing behind splash) ║
-║   L6187    hideLoginOverlay()                                                ║
+║   L6259    hideLoginOverlay()                                                ║
 ║             · v198 flash fix: hides #login-overlay IMMEDIATELY on entry,    ║
 ║               before showSenseSplash starts (prevents fade-through flash)   ║
 ║             · loginTransitionRunning guard — prevents double-call           ║
 ║             · 4s safety valve clears lock if splash hangs                   ║
-║   L6257    _autoRouteAfterLogin()  — route to teamview / portview after login║
-║   L6277    loadUserProfile()  — Supabase profiles fetch, fallback on error  ║
-║   L6351    checkSession()  — page-load session restore                       ║
-║   L6396    Phase 10: Auth/session runtime boundary                           ║
-║   L6484    SAMPLE DATA                                                       ║
-║   L6645    STATE  (D, fileStatus, global flags)                              ║
-║             · fileStatus: history/categories/skus/outlets/alternatives/…    ║
-║   L6673    portviewBulkData  []  Q8E: all accounts bulk (col 19 = days_with_║
+║   L6329    _autoRouteAfterLogin()  — route to teamview / portview after login║
+║   L6349    loadUserProfile()  — Supabase profiles fetch, fallback on error  ║
+║   L6423    checkSession()  — page-load session restore                       ║
+║   L6468    Phase 10: Auth/session runtime boundary                           ║
+║   L6644    SAMPLE DATA                                                       ║
+║   L6745    portviewBulkData  []  Q8E: all accounts bulk (col 19 = days_with_║
 ║                                        current_kam from kam_since CTE)       ║
-║   L6679    bulkHistoryData   {}  Q9: aid → [{m, s, orders}]                 ║
-║   L6685    bulkHandoverData  {}  Q10: {byAccountId, byKamName} (v198)       ║
+║   L6751    bulkHistoryData   {}  Q9: aid → [{m, s, orders}]                 ║
+║   L6757    bulkHandoverData  {}  Q10: {byAccountId, byKamName} (v198)       ║
 ║             · byAccountId[account_id] → {prevKamName, lastMonthGmv, …}     ║
 ║             · byKamName[kam_name]     → [{accountId, lastMonthGmv, …}]      ║
-║   L6689    bulkKamNames / portviewLevel / portviewRepEmail / …              ║
-║   L6719    KAM SIGNALS  (rule-based, no AI)                                 ║
-║   L6818    UTILS                                                             ║
-║   L6851    MULTI-ACCOUNT STORAGE  (localStorage index + per-account data)   ║
-║   L7201    BULK ALTERNATIVES (Q4B) — v52                                    ║
-║   L7437    DATA LOADING  (CSV parse, handleFileUpload dispatcher)            ║
-║   L7442    handleFileUpload(type, input)  — dispatch by type:                ║
+║   L6762    portviewLevel / portviewRepEmail / bulkKamNames / …              ║
+║   L6791    KAM SIGNALS  (rule-based, no AI)                                 ║
+║   L6890    UTILS                                                             ║
+║   L6923    MULTI-ACCOUNT STORAGE  (localStorage index + per-account data)   ║
+║   L7273    BULK ALTERNATIVES (Q4B) — v52                                    ║
+║   L7509    DATA LOADING  (CSV parse, handleFileUpload dispatcher)            ║
+║   L7514    handleFileUpload(type, input)  — dispatch by type:                ║
 ║             · bulk-categories / bulk-data / portview-bulk / bulk-sku-current ║
 ║             · bulk-skus / bulk-alternatives / bulk-price / bulk-outlets     ║
 ║             · bulk-handover (v198) → parses Q10, builds bulkHandoverData    ║
-║   L7926    ingestCSVText(type, text)  — R2 text → File → handleFileUpload   ║
-║   L7910    CLOUDFLARE R2 DATA LOADER                                         ║
+║   L7998    ingestCSVText(type, text)  — R2 text → File → handleFileUpload   ║
+║   L7982    CLOUDFLARE R2 DATA LOADER                                         ║
 ║             · FOREGROUND: ['portview','history','categories','sku_current',  ║
-║                            'outlets','handover'] — 6 files (v198 added      ║
-║                            handover), cached in IndexedDB (TTL 6h)          ║
-║             · BACKGROUND: ['skus','alternatives'] — session-memory only     ║
+║                            'outlets','handover'] — 6 files, cached IndexedDB║
+║             · BACKGROUND: ['skus'] — session-memory only                    ║
+║             · ALTERNATIVES: lazy — loaded on first Sense Gate tap            ║
+║             · DEFERRED Tier 3: bulk_price — starts 3s after background done ║
 ║             · R2_FILES / R2_SPECS — key → filename / ingest type            ║
-║   L8338    RENDER — OVERVIEW                                                 ║
-║   L8900    RENDER — PORTFOLIO                                                ║
-║   L9160    RENDER — OPPORTUNITIES                                            ║
-║   L9461    DETAIL SHEET                                                      ║
-║   L9586    SCENARIO PLANNER                                                  ║
-║   L9595    ONBOARDING                                                        ║
-║   L9624    RENDER — REPORT                                                   ║
-║   L9714    BULK_SQL  — SQL query registry (copyBulkSQL key lookup)           ║
+║   L8123    _startCloudBackgroundLoad()  — Tier 2: skus only (alts lazy)      ║
+║   L8146    _loadBgSequential()  — sequential background fetch loop           ║
+║   L8210    _startDeferredPriceLoad()  — Tier 3: bulk_price silent load       ║
+║   L8416    RENDER — OVERVIEW                                                 ║
+║   L8665    renderOverview()                                                  ║
+║   L8978    RENDER — PORTFOLIO                                                ║
+║   L8990    renderPortfolio()                                                 ║
+║   L9238    RENDER — OPPORTUNITIES                                            ║
+║   L9249    renderOpps()                                                      ║
+║   L9539    DETAIL SHEET                                                      ║
+║   L9664    SCENARIO PLANNER                                                  ║
+║   L9673    ONBOARDING                                                        ║
+║   L9793    BULK_SQL  — SQL query registry (copyBulkSQL key lookup)           ║
 ║             · Q8E: portview — Pace + Churn + days_with_current_kam          ║
 ║             · Q9B: bulk_history (6mo GMV)                                   ║
 ║             · Q2B: categories / Q3B: SKUs / Q4B: alternatives               ║
 ║             · Q5B: outlets MTD / Q6B: price history / Q7B: sku_current      ║
 ║             · Q10: portview_handover — transfer out per KAM (v198)          ║
-║   L13594   copyBulkSQL(key, btn)  — copy SQL to clipboard                   ║
-║   L13927   callAI(modelKey, sys, messages, maxTok)  — AI proxy wrapper      ║
-║   L15139   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
-║   L15980   PRICE BASIS DETECTION (Phase 1)                                   ║
+║   L13675   copyBulkSQL(key, btn)  — copy SQL to clipboard                   ║
+║   L14008   callAI(modelKey, sys, messages, maxTok)  — AI proxy wrapper      ║
+║   L15226   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
+║   L16067   PRICE BASIS DETECTION (Phase 1)                                   ║
 ║             · extractRangeKgMax() / parsePackSizeUnits() / getUnitLabel()   ║
-║   L16415   SENSE GATE OVERLAY  (JS logic)                                   ║
-║   L16911   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
-║             · renderKamSignalBar() L6802                                    ║
-║             · renderKamThisMonth() L17195                                   ║
-║             · renderKamLastMonth() L17450                                   ║
-║             · renderKamOverview()  L17533                                   ║
-║             · generateKamBriefing() L17760                                  ║
-║   L18230   navPortHome()  (พอร์ต home button router)                        ║
-║   L18394   AI CHAT  (Olive chat panel + FAB)                                 ║
-║   L18529   AI CHAT SCOPE + CONTEXT ROUTER                                   ║
-║   L18816   INIT  (app bootstrap, DOMContentLoaded)                          ║
-║   L18828   GROUP A — NEW RENDER FUNCTIONS                                    ║
-║   L19299   KAM SUB-TABS                                                      ║
-║   L19360   UTILITY: getThaiMonthDays(label)                                 ║
-║   L19373   PACE SIGNAL COMPUTATION                                           ║
-║   L19444   SKU CHURN COMPUTATION                                             ║
-║   L19525   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
-║   L19559   RENDER PACE & CHURN TAB                                           ║
-║   L19589   v183 Restaurant Sheet Overlay (openRestaurantSheet / _overlayNav)║
-║   L19938   generatePortviewInsight()                                         ║
-║   L20137   renderPortviewList()                                              ║
-║   L20380   _pvBuildCompactStrip()  — compact strip renderer                 ║
-║   L20428   _pvInitCollapseObserver()  — scroll collapse logic               ║
-║   L20538   renderPortviewSummary()  — tier grid + pace bar                  ║
-║   L20727   renderPortview()                                                  ║
-║   L20783   TEAMVIEW — TL TEAM OVERVIEW                                       ║
-║   L20833   renderTeamview()                                                  ║
-║   L20938   renderTeamviewSummary()                                           ║
-║   L21173   generateTeamviewInsight()                                         ║
-║   L21231   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
-║   L21235   VISIT TRACKING (90-day rolling)                                   ║
-║   L21358   FOLDER LOAD (webkitdirectory / iframe/Claude preview)            ║
-║   L21405   Guard B: visibilitychange  — 3.5s grace, then re-login check     ║
-║   L21445   Guard C: pageshow  — iOS bfcache restore, 2s grace               ║
-║   L21609   Restaurant swipe helpers                                          ║
+║   L16998   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
+║             · renderKamSignalBar() L6877                                    ║
+║             · renderKamThisMonth() L17282                                   ║
+║             · renderKamLastMonth() L17537                                   ║
+║             · renderKamOverview()  L17620                                   ║
+║             · generateKamBriefing() L17847                                  ║
+║   L18317   navPortHome()  (พอร์ต home button router)                        ║
+║   L18481   AI CHAT  (Olive chat panel + FAB)                                 ║
+║   L18616   AI CHAT SCOPE + CONTEXT ROUTER                                   ║
+║   L18903   INIT  (app bootstrap, DOMContentLoaded)                          ║
+║   L18915   GROUP A — NEW RENDER FUNCTIONS                                    ║
+║   L19386   KAM SUB-TABS                                                      ║
+║   L19450   UTILITY: getThaiMonthDays(label)                                 ║
+║   L19460   PACE SIGNAL COMPUTATION                                           ║
+║   L19531   SKU CHURN COMPUTATION                                             ║
+║   L19612   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
+║   L19646   RENDER PACE & CHURN TAB                                           ║
+║   L19811   Restaurant Sheet Overlay (openRestaurantSheet / _overlayNav)     ║
+║   L20008   portviewGoBack()                                                  ║
+║   L20025   generatePortviewInsight()                                         ║
+║   L20117   getPortviewAccounts()                                             ║
+║   L20221   renderPortviewList()                                              ║
+║   L20457   setPvSort() / _pvBuildCompactStrip()                             ║
+║   L20512   _pvInitCollapseObserver()  — scroll collapse logic               ║
+║   L20605   setPvView()                                                       ║
+║   L20622   renderPortviewSummary()  — tier grid + pace bar                  ║
+║   L20783   portviewSelectAccount()                                           ║
+║   L20811   renderPortview()                                                  ║
+║   L20870   TEAMVIEW — TL TEAM OVERVIEW                                       ║
+║   L20871   _buildKamGroups()                                                 ║
+║   L20917   renderTeamview()                                                  ║
+║   L20979   teamviewGoBack()                                                  ║
+║   L21022   renderTeamviewSummary()                                           ║
+║   L21118   renderTeamviewKamList()                                           ║
+║   L21248   teamviewDrillKam(kamKey)                                          ║
+║   L21257   generateTeamviewInsight()                                         ║
+║   L21318   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
+║   L21322   VISIT TRACKING (90-day rolling)                                   ║
+║   L21445   FOLDER LOAD (webkitdirectory / iframe/Claude preview)            ║
+║   L21492   Guard B: visibilitychange  — silent token re-check only          ║
+║   L21532   Guard C: pageshow  — iOS bfcache restore, 2s grace               ║
+║   L21621   Restaurant swipe cue helpers (v154)                               ║
+║   L21696   Restaurant swipe helpers                                          ║
 ║                                                                              ║
 ║  ── HTML CLOSING BLOCKS ───────────────────────────────────────────────────  ║
-║   L21646   VERIFY SHEET HTML                                                 ║
-║   L21722   SENSE GATE OVERLAY HTML                                           ║
-║   L21777   TARGET MODULE HTML marker                                         ║
-║   L21870   Target Setup Sheet CSS                                            ║
-║   L22073   <script id="target-module-js">  TARGET MODULE JS                 ║
-║   L22075   TARGET MODULE — sense_v162 (JS body)                             ║
-║             └─ L22158  _tgtFmtM()  format helper                            ║
-║             └─ L22223  _tgtGet() / _tgtKamBaseline3mo() / loadTargets()     ║
-║             └─ L22228  openTargetSetup() / closeTargetSetup()               ║
-║             └─ L22595  NRR computation — v198 cohort classification:        ║
-║             └─ L22597  _tgtComputeKamNRR(kamEmail, tlEmail)                 ║
+║   L21733   VERIFY SHEET HTML                                                 ║
+║   L21809   SENSE GATE OVERLAY HTML                                           ║
+║   L21957   Target Setup Sheet CSS                                            ║
+║   L22160   <script id="target-module-js">  TARGET MODULE JS                 ║
+║   L22162   TARGET MODULE — sense_v162 (JS body)                             ║
+║             └─ L22245  _tgtFmtM()  format helper                            ║
+║             └─ L22267  loadTargets(quarter)                                  ║
+║             └─ L22310  _tgtGet() / _tgtKamBaseline3mo()                     ║
+║             └─ L22315  openTargetSetup() / closeTargetSetup() L22361        ║
+║             └─ L22684  _tgtComputeKamNRR(kamEmail, tlEmail)                 ║
 ║                         · allAccounts filtered by kamEmail OR tlEmail        ║
 ║                         · prevMonth from Q9 history (last closed month)     ║
-║                         · daysElapsed from bulkCurrentMonthData (fallback:  ║
-║                           date-computed label with CE/Thai year detect)     ║
+║                         · daysElapsed from bulkCurrentMonthData             ║
 ║                         · Cohort classification (v198):                     ║
 ║                           - Core: daysWithCurrentKam > daysElapsed          ║
 ║                           - Transfer in: new + in bulkHandoverData           ║
 ║                           - New (Sales): new + NOT in bulkHandoverData       ║
-║                         · _groupNRR(group) L22663 helper — outlet-level     ║
-║                           daily-rate NRR for any account subset              ║
-║                         · Transfer out L22713: KAM → hd.byKamName lookup;  ║
+║                         · _groupNRR(group) L22750  — outlet-level NRR      ║
+║                         · Transfer out L22804: KAM → hd.byKamName lookup;  ║
 ║                           TL → aggregate all KAMs in team                   ║
-║                         · Returns backward-compat fields + transferIn /     ║
-║                           newFromSales / transferOut objects (v198)         ║
-║             └─ L22758  renderPortviewNRRBar()  — retired stub               ║
-║             └─ L22764  renderPortviewTargetBar()  — NRR widget async fn     ║
-║                         · rep-detail fix (v198): uses _repEmail not admin   ║
-║                           email when TL/admin drills into specific KAM      ║
-║                         · movement rows (v198): Transfer in / New (Sales) / ║
-║                           Transfer out with dynamic NRR color coding        ║
-║                         · ⓘ panel: Core NRR formula + mvDefSection with    ║
-║                           cohort definitions (v198)                         ║
-║             └─ L23066  _tgtToggleDetail()  — expand/collapse ⓘ panel       ║
-║             └─ L23075  _tgtInjectTeamviewTargetRows()  — TL card rows       ║
-║             └─ L23114  _tgtGetKamsForTL() / _tgtKamBaseline3mo()            ║
-║             └─ L23126  Utility helpers + pipeline hooks                     ║
+║                         · v198c fix: debounce context-aware (_ctxKey)       ║
+║             └─ L22845  renderPortviewNRRBar()  — retired stub               ║
+║             └─ L22851  renderPortviewTargetBar()  — NRR widget async fn     ║
+║                         · v198c: debounce bypassed on portviewRepEmail change║
+║                         · movement rows: Transfer in / New (Sales) / Out    ║
+║                         · ⓘ panel: Core NRR formula + cohort definitions    ║
+║             └─ L23156  _tgtToggleDetail()  — expand/collapse ⓘ panel       ║
+║             └─ L23165  _tgtInjectTeamviewTargetRows()  — TL card rows       ║
+║             └─ L23204  _tgtGetKamsForTL() / _tgtKamBaseline3mo()            ║
+║             └─ L23263  _tgtInjectAdminBtn()                                 ║
+║             └─ L23277  _injectPortviewBarEl() + init hook                   ║
 ║                                                                              ║
 ║  ── KEY GLOBALS ──────────────────────────────────────────────────────────  ║
 ║   D                    Main data object (per-account state)                 ║
@@ -219,7 +224,7 @@
 ║   outlets      bulk_outlets.csv       Q5B    bulk-outlets                    ║
 ║   handover     portview_handover.csv  Q10    bulk-handover  ← v198          ║
 ║   skus         bulk_skus.csv          Q3B    bulk-skus  (background)         ║
-║   alternatives bulk_alternatives.csv  Q4B    bulk-alternatives (background)  ║
+║   alternatives bulk_alternatives.csv  Q4B    bulk-alternatives (lazy/Sense)  ║
 ║                                                                              ║
 ║  ── NRR COHORT LOGIC (v198) ───────────────────────────────────────────────  ║
 ║   Core NRR     daysWithCurrentKam > daysElapsed (pre-existing accounts)     ║
@@ -260,6 +265,9 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
+║   v199a  alternatives lazy-load: ย้ายออกจาก BACKGROUND → โหลดครั้งแรก      ║
+║          เมื่อ KAM tap Sense Gate (ensureSenseData) แทน startup preload      ║
+║          ลด startup weight, UI messaging อัปเดต (pill/toast ลบ "ทางเลือก")  ║
 ║   v198g  fix white overscroll: html.background=#080f1e เมื่อ kam-mode on     ║
 ║          .kam-dc backdrop-filter สุด blur จาก html background สีขาว          ║
 ║   v198f  bulk_price root cause fix: Tier 3 เพิ่มใน orchestrator finally()   ║
@@ -267,7 +275,7 @@
 ║   v198e  bulk_price fix 2: token check ลบออกจาก _startDeferredPriceLoad    ║
 ║          stale token จาก auth events ทำให้ Tier 3 ไม่รัน แม้ v198d แก้แล้ว ║
 ║   v198d  bulk_price Tier 3 fix: _startDeferredPriceLoad moved to .finally() ║
-║          → price โหลดเสมอแม้ skus/alternatives จะ fail                     ║
+║          → price โหลดเสมอแม้ skus จะ fail                                  ║
 ║   v198c  debounce context-aware fix: Transfer in/New Sales no longer stuck  ║
 ║          when TL/Admin drills into specific KAM (portviewRepEmail check)    ║
 ║   v198b (prev) TOC updated — all line numbers verified                      ║
@@ -2932,7 +2940,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     data: Object.freeze({
       r2Base: R2_BASE,
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover']),
-      backgroundKeys: Object.freeze(['skus','alternatives']),
+      backgroundKeys: Object.freeze(['skus']),  // alternatives lazy-loaded on Sense Gate tap
       r2Files: Object.freeze({
         portview: 'portview.csv',
         history: 'bulk_history.csv',
@@ -8121,7 +8129,7 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
 function _markForegroundPillDot(idx){return window.FreshketSenseRuntime.data.markForegroundPillDot(idx);}
 function _prepareProgressChips(keys,totalCount){return window.FreshketSenseRuntime.data.prepareProgressChips(keys,totalCount,R2_SPECS);}
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
-  const BACKGROUND=['skus','alternatives'];  // price is deferred (tier 3) — loaded after background completes
+  const BACKGROUND=['skus'];  // alternatives lazy-loaded on first Sense Gate tap; price is deferred (tier 3)
   if(_cloudBackgroundPromise)return _cloudBackgroundPromise;
   const counter=document.getElementById('sheets-loaded-count');
   const bgDots=document.getElementById('dlp-bg-dots');
@@ -8130,7 +8138,7 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
   if(dots)dots.style.display='none';
   if(readyIcon)readyIcon.style.display='none';
   if(bgDots)bgDots.style.display='flex';
-  _setDataPillText('SKU + ทางเลือก','');
+  _setDataPillText('SKU','');
 
   let pillReleased=false;
   let finished=false;
@@ -8138,11 +8146,10 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     if(finished||token!==_cloudLoadToken)return;
     pillReleased=true;
     _finishDataPill('โหลดต่อเบื้องหลัง',1000);
-    showToast('กำลังโหลด SKU + ทางเลือกต่อเบื้องหลัง','⟳');
+    showToast('กำลังโหลด SKU ต่อเบื้องหลัง','⟳');
   },18000);
 
-  // iOS memory fix: load skus first, then alternatives sequentially
-  // (Promise.all loads both simultaneously → peaks at ~2x memory → iOS PWA crash)
+  // iOS memory fix: sequential fetch loop (previously skus+alternatives, now skus only)
   async function _loadBgSequential(){
     const results=[];
     for(const key of BACKGROUND){
@@ -8175,10 +8182,10 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     const okCount=results.filter(Boolean).length;
     if(okCount===BACKGROUND.length){
       if(!pillReleased)_finishDataPill('ข้อมูลครบแล้ว',1000);
-      showToast('ข้อมูล Sense พร้อมแล้ว','✓');
+      showToast('ข้อมูล SKU พร้อมแล้ว','✓');
     }else{
       if(!pillReleased)_finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
-      showToast('ข้อมูลหลักพร้อม แต่ SKU/ทางเลือกยังไม่ครบ — กด Refresh data ได้','⚠');
+      showToast('ข้อมูลหลักพร้อม แต่ SKU ยังไม่ครบ — กด Refresh data ได้','⚠');
     }
     if(typeof updateDataStatus==='function')updateDataStatus();
     if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
@@ -8187,7 +8194,7 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     if(token===_cloudLoadToken){
       finished=true;clearTimeout(releaseTimer);
       if(!pillReleased)_finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
-      showToast('โหลด SKU/ทางเลือกไม่สำเร็จ — กด Refresh data','⚠');
+      showToast('โหลด SKU ไม่สำเร็จ — กด Refresh data','⚠');
       console.warn('[Cloudflare background]',err);
     }
     return [false,false];
@@ -8205,7 +8212,7 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
 }
 
 // ── Tier 3: Deferred price load — silent, after background completes ──
-// bulk_price.csv (~35-40MB) loads quietly after skus+alternatives are ready.
+// bulk_price.csv (~35-40MB) loads quietly after skus are ready.
 // Sparklines show local-normalize until this resolves, then upgrade automatically.
 async function _startDeferredPriceLoad(token){
   // v198e: token check ลบออก — stale token จาก auth events ทำให้ price ไม่โหลด
@@ -8236,10 +8243,11 @@ async function loadFromCloudflareR2(){
 
   // v157 loading strategy:
   // Tier 1 (FOREGROUND): 5 lightweight files → app usable
-  // Tier 2 (BACKGROUND): skus + alternatives → portfolio ready
+  // Tier 2 (BACKGROUND): skus only → portfolio ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
+  // alternatives: lazy-loaded on first Sense Gate tap (per-session, one-time)
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover'];
-  const BACKGROUND=['skus','alternatives'];
+  const BACKGROUND=['skus'];
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
   const counter=document.getElementById('sheets-loaded-count');
@@ -14636,7 +14644,7 @@ function setAiProvider(p){
     if(dots) dots.style.display = 'none';
     if(readyIcon) readyIcon.style.display = 'none';
     if(bgDots) bgDots.style.display = 'flex';
-    baseData.setDataPillText('SKU + ทางเลือก','');
+    baseData.setDataPillText('SKU','');
 
     let pillReleased = false;
     let finished = false;
@@ -14645,7 +14653,7 @@ function setAiProvider(p){
       pillReleased = true;
       orchStatus.backgroundReleased = true;
       baseData.finishDataPill('โหลดต่อเบื้องหลัง',1000);
-      safeToast('กำลังโหลด SKU + ทางเลือกต่อเบื้องหลัง','⟳');
+      safeToast('กำลังโหลด SKU ต่อเบื้องหลัง','⟳');
     },18000);
 
     const specs = getSpecs();
@@ -14666,10 +14674,10 @@ function setAiProvider(p){
       orchStatus.backgroundLoaded = okCount;
       if(okCount === BACKGROUND.length){
         if(!pillReleased) baseData.finishDataPill('ข้อมูลครบแล้ว',1000);
-        safeToast('ข้อมูล Sense พร้อมแล้ว','✓');
+        safeToast('ข้อมูล SKU พร้อมแล้ว','✓');
       }else{
         if(!pillReleased) baseData.finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
-        safeToast('ข้อมูลหลักพร้อม แต่ SKU/ทางเลือกยังไม่ครบ — กด Refresh data ได้','⚠');
+        safeToast('ข้อมูลหลักพร้อม แต่ SKU ยังไม่ครบ — กด Refresh data ได้','⚠');
       }
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
@@ -14679,7 +14687,7 @@ function setAiProvider(p){
       try{ if(token === _cloudLoadToken){
         finished = true; clearTimeout(releaseTimer);
         if(!pillReleased) baseData.finishDataPill('ข้อมูลหลักพร้อมแล้ว',1400);
-        safeToast('โหลด SKU/ทางเลือกไม่สำเร็จ — กด Refresh data','⚠');
+        safeToast('โหลด SKU ไม่สำเร็จ — กด Refresh data','⚠');
         safeWarn('[Cloudflare background]', err);
       }}catch(e){}
       recordError('_startCloudBackgroundLoad', err);
@@ -23011,11 +23019,11 @@ async function renderPortviewTargetBar() {
         return { m, gmv, days, daily: days>0?Math.round(gmv/days):0, outletCount };
       });
       const avgDaily = Math.round(rows3.reduce((s,r)=>s+r.daily,0)/rows3.length);
-      const fmlRows = rows3.map(r=>`<div class="tgt-fml-row"><span class="tgt-fml-mo">${r.m}</span><span class="tgt-fml-eq">${_tgtFmtM(r.gmv)} ÷ ${r.days}วัน${r.outletCount>0?' · '+r.outletCount+' outlets':''}</span><span class="tgt-fml-res">${_tgtFmtM(r.daily)}/วัน</span></div>`).join('');
+      const fmlRows = rows3.map(r=>`<div class="tgt-fml-row"><span class="tgt-fml-mo">${r.m}</span><span class="tgt-fml-eq">${_tgtFmtM(r.gmv)} ÷ ${r.days}d × ${daysInMonth}d${r.outletCount>0?' · '+r.outletCount+' outlets':''}</span><span class="tgt-fml-res">~${_tgtFmtM(Math.round(r.daily*daysInMonth))}/เดือน</span></div>`).join('');
       baselineSection = `<div class="tgt-det-section">
         <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
         ${fmlRows}
-        <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">avg ${_tgtFmtM(avgDaily)}/วัน × ${daysInMonth} วัน</span><span class="tgt-fml-total-val">= ${_tgtFmtM(target)}</span></div>
+        <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">avg ${rows3.length} เดือน (normalized)</span><span class="tgt-fml-total-val">= ${_tgtFmtM(target)}/เดือน</span></div>
       </div>`;
     }
   }
@@ -23048,22 +23056,29 @@ async function renderPortviewTargetBar() {
   if (nrrResult && nrrPct !== null) {
     const prevDaily = nrrResult.prevDays>0 ? Math.round(nrrResult.baselinePrevGmv/nrrResult.prevDays) : 0;
     const currDaily = nrrResult.daysElapsed>0 ? Math.round(nrrResult.cohortGmv/nrrResult.daysElapsed) : 0;
+    const prevNorm = Math.round(prevDaily * daysInMonth);
+    const currNorm = Math.round(currDaily * daysInMonth);
     // Movement summary for ⓘ panel
     const hasMv = nrrResult.transferIn?.count||nrrResult.newFromSales?.count||nrrResult.transferOut?.count;
     const mvDefSection = hasMv ? `<div class="tgt-det-section">
-      <div class="tgt-det-stitle">นิยาม Portfolio Movement</div>
-      <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:#4ddc97">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนต้นเดือน (daysWithKAM &gt; daysElapsed) — วัด retention จริง</span></div>
-      <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(140,180,255,.9)">Transfer in</span><span class="tgt-fml-eq" style="font-size:10px">account ที่โอนมาจาก KAM อื่นในเดือนนี้ — วัด NRR ต่อเนื่องหลังรับโอน</span></div>
-      <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(0,200,176,.9)">New (Sales)</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ Sales ปิดดีล แล้วโอนมา KAM เดือนนี้ — วัด onboarding success</span></div>
-      <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(255,140,100,.8)">Transfer out</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ออกจากพอร์ตนี้ไปเดือนนี้ — GMV เดือนก่อนของ account เหล่านั้น</span></div>
-      <div class="tgt-fml-row" style="align-items:flex-start;margin-top:4px"><span class="tgt-fml-mo" style="color:rgba(255,255,255,.3)">Graduation</span><span class="tgt-fml-eq" style="font-size:10px">Transfer in / New จะกลายเป็น Core NRR อัตโนมัติเดือนหน้า โดยใช้ GMV เต็มเดือนนี้เป็น baseline</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="tgt-det-stitle" style="margin-bottom:0">นิยาม Portfolio Movement</div>
+        <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:9px;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;padding:0;font-family:'IBM Plex Sans Thai',sans-serif">▾ ดูนิยาม</button>
+      </div>
+      <div style="display:none">
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:#4ddc97">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนต้นเดือน (daysWithKAM &gt; daysElapsed) — วัด retention จริง</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(140,180,255,.9)">Transfer in</span><span class="tgt-fml-eq" style="font-size:10px">account ที่โอนมาจาก KAM อื่นในเดือนนี้ — วัด NRR ต่อเนื่องหลังรับโอน</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(0,200,176,.9)">New (Sales)</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ Sales ปิดดีล แล้วโอนมา KAM เดือนนี้ — วัด onboarding success</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(255,140,100,.8)">Transfer out</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ออกจากพอร์ตนี้ไปเดือนนี้ — GMV เดือนก่อนของ account เหล่านั้น</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start;margin-top:4px"><span class="tgt-fml-mo" style="color:rgba(255,255,255,.3)">Graduation</span><span class="tgt-fml-eq" style="font-size:10px">Transfer in / New จะกลายเป็น Core NRR อัตโนมัติเดือนหน้า โดยใช้ GMV เต็มเดือนนี้เป็น baseline</span></div>
+      </div>
     </div>` : '';
     nrrSection = `<div class="tgt-det-section">
       <div class="tgt-det-stitle">Core NRR — วิธีคำนวณ</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">นับเฉพาะ account ที่อยู่กับ KAM นี้ก่อนต้นเดือน · outlet cohort · daily-rate normalized</div>
-      <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}วัน · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">${_tgtFmtM(prevDaily)}/วัน</span></div>
-      <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}วัน MTD · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">${_tgtFmtM(currDaily)}/วัน</span></div>
-      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">${_tgtFmtM(currDaily)} ÷ ${_tgtFmtM(prevDaily)}</span><span class="tgt-fml-total-val">= Core NRR ${nrrPct}%</span></div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">นับเฉพาะ account ที่อยู่กับ KAM นี้ก่อนต้นเดือน · outlet cohort · normalized เป็นเดือน</div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(prevNorm)}/เดือน</span></div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel} MTD</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(currNorm)}/เดือน</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${nrrPct}%</span></div>
     </div>${mvDefSection}`;
   }
 
