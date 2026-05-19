@@ -4784,6 +4784,7 @@ document.body.classList.add('kam-mode');
 <input type="file" id="fi-bulk-sku-current" accept=".csv" style="display:none" onchange="handleFileUpload('bulk-sku-current',this)">
 <input type="file" id="fi-bulk-alternatives" accept=".csv" style="display:none" onchange="handleFileUpload('bulk-alternatives',this)">
 <input type="file" id="fi-bulk-price" accept=".csv" style="display:none" onchange="handleFileUpload('bulk-price',this)">
+<input type="file" id="fi-bulk-handover" accept=".csv" style="display:none" onchange="handleFileUpload('bulk-handover',this)">
 <input type="file" id="fi-bulk-outlets" accept=".csv" style="display:none" onchange="handleFileUpload('bulk-outlets',this)">
 <!-- TOPBAR -->
 <div class="topbar">
@@ -4967,6 +4968,13 @@ document.body.classList.add('kam-mode');
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
             <button class="dp-bulk-sql-btn" id="bsql-Q8E" onclick="event.stopPropagation();copyBulkSQL('Q8E',this)">SQL</button>
             <span class="dp-slot-badge na" id="badge-portview-bulk">upload</span>
+          </div>
+        </div>
+        <div class="dp-upload-slot" id="slot-bulk-handover" onclick="document.getElementById('fi-bulk-handover').click()" style="border-color:rgba(0,208,112,.3);margin-bottom:6px">
+          <div class="dp-slot-info"><div class="dp-slot-label" style="color:var(--g700)">portview_handover.csv</div><div class="dp-slot-desc">Q10 · Transfer out per KAM</div></div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <button class="dp-bulk-sql-btn" id="bsql-Q10" onclick="event.stopPropagation();copyBulkSQL('Q10',this)">SQL</button>
+            <span class="dp-slot-badge na" id="badge-bulk-handover">upload</span>
           </div>
         </div>
         <div class="dp-upload-slot" id="slot-bulk-sku-current" onclick="document.getElementById('fi-bulk-sku-current').click()" style="border-color:rgba(0,208,112,.3)">
@@ -6182,6 +6190,16 @@ function hideLoginOverlay() {
   window._doLoginHandled = false;
   if (loginTransitionRunning) return;
   loginTransitionRunning = true;
+
+  // v198 flash fix: hide login overlay IMMEDIATELY before splash starts.
+  // Root cause: cache-warm splash fades at t=400ms but onDone() fires at t=900ms
+  // → login overlay shows through the fading splash (500ms window).
+  // Hiding here ensures login is gone before any splash animation.
+  const ovImmediate = document.getElementById('login-overlay');
+  if (ovImmediate) {
+    ovImmediate.style.display = 'none';
+    ovImmediate.classList.remove('lgi-checking');
+  }
 
   // Safety valve v22.2: if transition never completes (e.g. concurrent auth events
   // during splash), force-clear lock after 4s and ensure login overlay is hidden.
@@ -7868,6 +7886,9 @@ function handleFileUpload(type,input){
       });
       bulkHandoverData={byAccountId,byKamName};
       const cnt=Object.keys(byKamName).length;
+      const b=document.getElementById('badge-bulk-handover');
+      if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
+      const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
       showToast('✓ portview_handover: '+Object.keys(byAccountId).length+' accounts','✓');
       _done();
     };
@@ -13510,7 +13531,64 @@ SELECT
 FROM raw
 GROUP BY account_id, month_date, item_id
 ORDER BY account_id, month_date, item_id;
-`
+`,
+Q10:`-- Q10: Portview Handover — Transfer Out per KAM
+-- accounts ที่ออกจาก KAM แต่ละคนไปเดือนนี้
+-- Output: portview_handover.csv | Refresh: ทุกวัน พร้อม Q8E
+
+WITH params AS (
+  SELECT
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) AS lm_start,
+    DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY)   AS lm_end,
+    DATE_TRUNC(CURRENT_DATE(), MONTH)                              AS cm_start,
+    (SELECT MAX(delivery_date) FROM \`freshket-rn.dwh.order\`
+     WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH))    AS cm_max_date
+),
+last_month_kam AS (
+  SELECT
+    o.account_id, o.account_name, o.account_type,
+    o.ka_owner AS lm_kam_name,
+    SUM(o.gmv_ex_vat) AS last_month_gmv
+  FROM \`freshket-rn.dwh.order\` o, params p
+  WHERE o.delivery_date BETWEEN p.lm_start AND p.lm_end
+    AND o.commercial_owner = 'KAM'
+    AND o.ka_owner IS NOT NULL AND o.ka_owner != ''
+    AND o.account_type IN ('SA','MC','Chain')
+  GROUP BY o.account_id, o.account_name, o.account_type, o.ka_owner
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY SUM(o.gmv_ex_vat) DESC) = 1
+),
+cur_month AS (
+  SELECT
+    o.account_id, o.ka_owner AS cm_kam_name,
+    o.commercial_owner AS cm_owner_type,
+    SUM(o.gmv_ex_vat) AS cur_month_gmv
+  FROM \`freshket-rn.dwh.order\` o, params p
+  WHERE o.delivery_date BETWEEN p.cm_start AND p.cm_max_date
+    AND o.account_type IN ('SA','MC','Chain')
+  GROUP BY o.account_id, o.ka_owner, o.commercial_owner
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY SUM(o.gmv_ex_vat) DESC) = 1
+),
+last_known_owner AS (
+  SELECT account_id, commercial_owner AS last_owner, ka_owner AS last_ka_owner
+  FROM \`freshket-rn.dwh.order\`
+  WHERE account_type IN ('SA','MC','Chain')
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY delivery_date DESC) = 1
+)
+SELECT
+  lm.lm_kam_name AS kam_name,
+  lm.account_id, lm.account_name, lm.account_type,
+  ROUND(lm.last_month_gmv) AS last_month_gmv,
+  ROUND(COALESCE(cm.cur_month_gmv, 0)) AS cur_month_gmv,
+  COALESCE(cm.cm_owner_type, lko.last_owner, 'none') AS new_owner_type,
+  COALESCE(cm.cm_kam_name, lko.last_ka_owner, 'none') AS new_kam_name
+FROM last_month_kam lm
+LEFT JOIN cur_month cm USING (account_id)
+LEFT JOIN last_known_owner lko USING (account_id)
+WHERE
+  (cm.cm_owner_type = 'KAM' AND cm.cm_kam_name != lm.lm_kam_name)
+  OR cm.cm_owner_type IN ('SALE','PM','ADMIN')
+  OR (cm.account_id IS NULL AND lko.last_owner IN ('SALE','PM','ADMIN'))
+ORDER BY lm.lm_kam_name, lm.last_month_gmv DESC`
 };
 
 function copyBulkSQL(key, btn){
