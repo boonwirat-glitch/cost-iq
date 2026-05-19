@@ -266,16 +266,16 @@
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
 ║   v199b  4 fixes:                                                            ║
+║          · handleFileUpload alternatives: guard _sgRunning — skip            ║
+║            senseActivated=false + _sgRunning=false + refreshAll when gate    ║
+║            กำลัง lazy-load อยู่ (root cause: gate เด้งกลับหลัง download)     ║
 ║          · sgOrbTap: _sgRunning=true ก่อน await ensureSenseData             ║
 ║            ป้องกัน re-entry ระหว่างโหลด alternatives (tap-twice bug)         ║
 ║            unlock คืนถ้า load fail เพื่อให้ retry ได้                        ║
 ║          · ensureSenseData {silent} flag: skip refreshAll/selectMonth        ║
-║            เมื่อถูกเรียกจาก Sense Gate → ป้องกัน screen navigation กลับ      ║
-║            account view ขณะรอโหลด alternatives (lazy-load bug)               ║
-║          · kav-z2 padding-bottom 72→20px: ลบ dead space ใต้ SKU list        ║
-║            (kav-z3 ซ่อนแล้วแต่ padding ยังค้างอยู่)                          ║
-║          · ⓘ panel: เปลี่ยน display ฿/วัน → ฿/เดือน (normalized)           ║
-║            baseline + NRR rows; นิยาม Portfolio Movement collapse toggle      ║
+║            เมื่อถูกเรียกจาก Sense Gate → ป้องกัน screen navigation           ║
+║          · #kam-overview min-height: 100%→100dvh — navy background           ║
+║            ครอบ viewport เสมอ ไม่มีพื้นดำโผล่ใต้ content                    ║
 ║   v199a  alternatives lazy-load: ย้ายออกจาก BACKGROUND → โหลดครั้งแรก      ║
 ║          เมื่อ KAM tap Sense Gate (ensureSenseData) แทน startup preload      ║
 ║          ลด startup weight, UI messaging อัปเดต (pill/toast ลบ "ทางเลือก")  ║
@@ -822,7 +822,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:rgba(38,96,200,.4);box-shadow:0 
 /* KAM Overview dark screen */
 #kam-overview{
   background:linear-gradient(160deg,#080f1e 0%,#0d1f3c 40%,#0a1628 100%);
-  min-height:100%; /* v199b: was calc(100vh-100px) — caused black void when content taller than viewport */
+  min-height:0; /* v199b: removed min-height — background handled at .scr level */
   margin:-1px;
   padding:0;
   position:relative;
@@ -848,7 +848,7 @@ body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflo
 /* KAM mode: swipe groups become transparent block containers */
 body.kam-mode #swipe-grp-a,body.kam-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kam-mode #swipe-grp-a .scr,body.kam-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
-body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important}
+body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important;background:#0d1f3c} /* v199b: navy bg — empty space below content matches portview */
 body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
 
 body:not(.kam-mode) #nav-report{display:none!important}
@@ -2149,6 +2149,10 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:#0d1f3c}body.kam-mode #scr-portview{background:#0d1f3c}
+/* v199b: KAM account overlay — sheet body + rest-overview must be navy to match dark theme */
+body.kam-mode #rest-sheet-body{background:#0d1f3c}
+body.kam-mode #rest-overview{background:#0d1f3c}
+body.kam-mode.restaurant-sheet #swipe-grp-a .scr{background:#0d1f3c}
 body.kam-mode .bnav{background:#0d2550;border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
@@ -7915,8 +7919,12 @@ function handleFileUpload(type,input){
       if(currentAccountId&&result.accountIds.has(currentAccountId)){
         loadFromStorage(currentAccountId);if(D.alts.length&&D.skus.length)computeOPPS();
         // v191: alternatives are the core Sense data — new alternatives = new scan needed
-        senseActivated=false;_sgRunning=false;
-        refreshAll();updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+        // v199b: skip reset+refreshAll when _sgRunning=true (gate is lazy-loading this file)
+        //        to prevent gate dismissal mid-load; reset only on manual/background reload
+        if(!_sgRunning){
+          senseActivated=false;_sgRunning=false;
+          refreshAll();updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+        }
       }
       showToast('✓ bulk_alternatives: '+result.accounts+' ร้าน · '+result.totalPairs+' คู่');
       _done();
