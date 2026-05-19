@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v199c.html                                       ║
@@ -16542,6 +16542,7 @@ function downloadAlternatives(){
 // ════════════════════════════════════════
 let _sgRunning=false;
 let _sgTickerTimer=null;
+let _sgRevealTimer=null;  // v201b: storable timer so abort-on-fail can cancel reveal
 
 function openSenseGate(){
   const gate=document.getElementById('sense-gate');
@@ -16575,6 +16576,7 @@ function _sgSetState(state){
   if(state==='standby'){
     _sgRunning=false;
     if(_sgTickerTimer){clearTimeout(_sgTickerTimer);_sgTickerTimer=null;}
+    if(_sgRevealTimer){clearTimeout(_sgRevealTimer);_sgRevealTimer=null;}
     if(ringSvg)ringSvg.setAttribute('class','');
     if(ringFill){ringFill.style.opacity='0';ringFill.style.strokeDashoffset='565.2';}
     if(ringScan){ringScan.style.opacity='';ringScan.style.transition='';ringScan.style.animation='';ringScan.style.strokeDasharray='';}
@@ -16598,30 +16600,31 @@ function _sgSetState(state){
 
 async function sgOrbTap(){
   if(_sgRunning||senseActivated)return;
-  if(!D.alts.length||!D.skus.length){
-    _sgRunning=true;  // v199b: lock immediately before await — prevents re-entry during lazy load
-    console.log('[SenseGate] _sgRunning=true — lazy-load start | alts:'+D.alts.length+' skus:'+D.skus.length);
-    const sub=document.getElementById('sg-sub');
-    const orig=sub?sub.textContent:'';
-    if(sub)sub.textContent='กำลังโหลด SKU + ทางเลือกของร้าน...';
-    if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
-    console.log('[SenseGate] ensureSenseData done | alts:'+D.alts.length+' skus:'+D.skus.length+' _sgRunning:'+_sgRunning);
-    if(!D.alts.length||!D.skus.length){
-      _sgRunning=false;  // v199b: unlock on fail so user can retry
-      console.warn('[SenseGate] ❌ lazy-load failed — not enough data after ensureSenseData')
-      if(sub){sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent=orig;},2200);}
-      return;
-    }
-    if(sub)sub.textContent=orig;
-  }
   _sgRunning=true;
-  console.log('[SenseGate] _sgRunning=true — data ready, starting scan | alts:'+D.alts.length+' skus:'+D.skus.length);
-  // Hide tap affordance immediately
+  // v201b: hide tap hint + start animation IMMEDIATELY — don't wait for data load
   const tapHint=document.getElementById('sg-tap-hint');
   const beacon=document.getElementById('sg-beacon');
   if(tapHint)tapHint.classList.add('hidden');
   if(beacon)beacon.style.display='none';
-  _sgRunThinking();
+  _sgRunThinking();  // animation starts now (8-10s window = enough time to download)
+  // If data not ready, load in background while animation is already running
+  if(!D.alts.length||!D.skus.length){
+    console.log('[SenseGate] lazy-load start (animation already running) | alts:'+D.alts.length+' skus:'+D.skus.length);
+    if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
+    console.log('[SenseGate] ensureSenseData done | alts:'+D.alts.length+' skus:'+D.skus.length+' _sgRunning:'+_sgRunning);
+    if(!D.alts.length||!D.skus.length){
+      // Load failed — abort animation, reset to standby
+      console.warn('[SenseGate] ❌ lazy-load failed — aborting animation');
+      _sgSetState('standby');
+      const sub=document.getElementById('sg-sub');
+      if(sub){sub.style.opacity='1';sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent='';},2200);}
+      return;
+    }
+    console.log('[SenseGate] data ready mid-animation | alts:'+D.alts.length+' skus:'+D.skus.length);
+  } else {
+    console.log('[SenseGate] data already ready, starting scan | alts:'+D.alts.length+' skus:'+D.skus.length);
+  }
+  // _sgRevealTimer will fire in ~8-10s and call _sgRevealScore() with data ready
 }
 
 let _sgElectronRAF=null;
@@ -16740,7 +16743,7 @@ function _sgRunThinking(){
       },390);
     },start);
   });
-  setTimeout(()=>_sgRevealScore(),totalMs+600);
+  _sgRevealTimer=setTimeout(()=>{_sgRevealTimer=null;_sgRevealScore();},totalMs+600);
 }
 
 function _sgRevealScore(){
