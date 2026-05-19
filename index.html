@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v198e: fix bulk_price still not loading — stale token from auth events caused token mismatch; removed token check from _startDeferredPriceLoad, use _cloudLoadToken at finally() time -->
+<!-- Freshket Sense v198f: fix bulk_price root cause — Tier 3 was missing from orchestrator _startCloudBackgroundLoad finally(); previous fixes were on legacy path that never runs -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v198b.html                                       ║
@@ -260,6 +260,8 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
+║   v198f  bulk_price root cause fix: Tier 3 เพิ่มใน orchestrator finally()   ║
+║          legacy path ไม่เคยถูกเรียก — orchestrator ไม่มี Tier 3 เลย         ║
 ║   v198e  bulk_price fix 2: token check ลบออกจาก _startDeferredPriceLoad    ║
 ║          stale token จาก auth events ทำให้ Tier 3 ไม่รัน แม้ v198d แก้แล้ว ║
 ║   v198d  bulk_price Tier 3 fix: _startDeferredPriceLoad moved to .finally() ║
@@ -14681,6 +14683,12 @@ function setAiProvider(p){
       return [false,false];
     }).finally(function(){
       try{ if(token === _cloudLoadToken) _cloudBackgroundPromise = null; }catch(e){}
+      // ── v198f: Tier 3 deferred price load — orchestrator path ──
+      // Legacy path had this fix but orchestrator never called it
+      try{
+        const _pt = _cloudLoadToken;
+        setTimeout(function(){ _startDeferredPriceLoad(_pt); }, 3000);
+      }catch(e){}
     });
 
     try{ _cloudBackgroundPromise = p; }catch(e){}
