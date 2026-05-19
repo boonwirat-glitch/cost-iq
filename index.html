@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v198d: fix bulk_price Tier 3 never loading — moved _startDeferredPriceLoad from .then() to .finally() so it runs even when skus/alternatives fail -->
+<!-- Freshket Sense v198e: fix bulk_price still not loading — stale token from auth events caused token mismatch; removed token check from _startDeferredPriceLoad, use _cloudLoadToken at finally() time -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v198b.html                                       ║
@@ -260,6 +260,8 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
+║   v198e  bulk_price fix 2: token check ลบออกจาก _startDeferredPriceLoad    ║
+║          stale token จาก auth events ทำให้ Tier 3 ไม่รัน แม้ v198d แก้แล้ว ║
 ║   v198d  bulk_price Tier 3 fix: _startDeferredPriceLoad moved to .finally() ║
 ║          → price โหลดเสมอแม้ skus/alternatives จะ fail                     ║
 ║   v198c  debounce context-aware fix: Transfer in/New Sales no longer stuck  ║
@@ -8189,7 +8191,10 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     _cloudBackgroundPromise=null;
     // ── Tier 3: v198d fix — moved from .then() to .finally() ──
     // bulk_price โหลดเสมอ ไม่ว่า skus/alternatives จะสำเร็จหรือล้มเหลว
-    setTimeout(()=>_startDeferredPriceLoad(token),3000);
+    // v198e: ใช้ _cloudLoadToken ณ เวลา finally() รัน (ไม่ใช่ captured token)
+    // เพื่อป้องกัน stale token จาก auth events (SIGNED_OUT → token++)
+    const _priceToken = _cloudLoadToken;
+    setTimeout(()=>_startDeferredPriceLoad(_priceToken),3000);
   });
   return _cloudBackgroundPromise;
 }
@@ -8198,7 +8203,8 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
 // bulk_price.csv (~35-40MB) loads quietly after skus+alternatives are ready.
 // Sparklines show local-normalize until this resolves, then upgrade automatically.
 async function _startDeferredPriceLoad(token){
-  if(token!==_cloudLoadToken)return;
+  // v198e: token check ลบออก — stale token จาก auth events ทำให้ price ไม่โหลด
+  // _cloudLoadedTabs.has('price') + _cloudInFlight guard เพียงพอสำหรับ dedup
   if(_cloudLoadedTabs.has('price'))return; // already loaded
   const spec=R2_SPECS['price'];
   if(!spec)return;
