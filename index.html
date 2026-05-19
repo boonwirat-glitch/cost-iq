@@ -1,230 +1,295 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v198: NRR cohort classification — Core/Transfer in/New from Sales/Transfer out + Q10 pipeline -->
+<!-- Freshket Sense v198d: fix bulk_price Tier 3 never loading — moved _startDeferredPriceLoad from .then() to .finally() so it runs even when skus/alternatives fail -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v195.html                        ║
+║  TABLE OF CONTENTS — sense_v198b.html                                       ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
-║  Jump to section with grep -n "<SECTION_NAME>" or search line number.       ║
+║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
+║  Never rely on TOC line numbers from memory — always re-read file first.    ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  ── HTML / CSS BLOCKS ─────────────────────────────────────────────────────  ║
-║   L238     <style>  MAIN CSS                                                 ║
-║   L2792    <script id="freshket-sense-config">     App config + constants   ║
-║   L2877    <script id="freshket-style-runtime">    Dynamic style injection  ║
-║   L3024    <script id="freshket-view-registry">    View/screen registry     ║
-║   L3161    <script id="freshket-read-model">       Data read model          ║
-║   L3502    <script id="freshket-navigation-runtime"> Navigation logic       ║
-║   L3629    <script id="freshket-report-renderer">  Report renderer          ║
-║   L3784    <script id="freshket-overview-renderer"> Overview screen         ║
-║   L3968    <script id="freshket-portfolio-renderer"> Portfolio screen       ║
-║   L4251    <script id="freshket-kam-team-renderer"> KAM Team View           ║
-║   L4421    LOGIN OVERLAY  (CSS + HTML — lgi-* classes)                      ║
-║             └─ lgi-brand centered column (v181 session)                     ║
-║             └─ lgi-logo-box 76×76px squircle                                ║
+║  ── HTML STRUCTURE & SCRIPT TAGS ──────────────────────────────────────────  ║
+║   L238     <style>  MAIN CSS (all component styles)                          ║
+║   L1769    .tgt-mv-* CSS  (NRR movement rows: wrap/header/row/label/nrr)    ║
+║   L1780    .ai-typing CSS  (3-dot bouncing animation for AI loading state)  ║
+║   L2810    <script id="freshket-sense-config">  App config + constants       ║
+║             └─ data.foregroundKeys: 6 files incl. 'handover' (v198)         ║
+║             └─ data.r2Files / r2Specs: portview_handover.csv → bulk-handover║
+║   L2897    <script id="freshket-style-runtime">  Dynamic style injection     ║
+║   L3044    <script id="freshket-view-registry">  Screen/view registry        ║
+║   L3181    <script id="freshket-read-model">  Data read model                ║
+║   L3522    <script id="freshket-navigation-runtime">  Navigation logic       ║
+║   L3649    <script id="freshket-report-renderer">  Report renderer           ║
+║   L3804    <script id="freshket-overview-renderer">  Overview screen         ║
+║   L3988    <script id="freshket-portfolio-renderer">  Portfolio screen       ║
+║   L4271    <script id="freshket-kam-team-renderer">  KAM Team View           ║
+║   L4441    LOGIN OVERLAY HTML  (id="login-overlay", z-index:9999)            ║
+║             └─ lgi-brand centered column, lgi-logo-box 76×76px squircle     ║
+║   L4672    #sense-splash CSS + HTML  (z-index:10000 — always above login)   ║
+║             └─ Flash fix: splash z-index > login overlay z-index            ║
+║             └─ Timing: tSetup=900ms | tMax=400ms(warm)/2000ms(cold)         ║
+║   L4788    Hidden file inputs  (fi-portview-bulk, fi-bulk-handover, …)      ║
+║   L4959    BULK DATA PANEL — Data tab UI                                     ║
+║             └─ L4966  slot-portview-bulk   portview.csv     Q8E             ║
+║             └─ L4973  slot-bulk-handover   portview_handover.csv  Q10 (v198)║
+║             └─ L4980  slot-bulk-sku-current  bulk_sku_current.csv  Q7B      ║
+║             └─ L4987  slot-bulk-outlets    bulk_outlets.csv  Q5B            ║
+║             └─ L5005  slot-bulk-data       bulk_history.csv  Q9             ║
+║             └─ L5012  slot-bulk-cats       bulk_categories.csv  Q2B         ║
+║             └─ L5019  slot-bulk-skus       bulk_skus.csv  Q3B               ║
+║             └─ L5029  slot-bulk-alternatives  bulk_alternatives.csv  Q4B    ║
+║             └─ L5036  slot-bulk-price      bulk_price.csv  Q6B              ║
+║   L5515    RESTAURANT SWIPE CUE HTML  (v154 — kam-nav-handle)               ║
+║   L5597    TEAMVIEW HTML  (TL/Admin team tab)                                ║
 ║                                                                              ║
 ║  ── MAIN <script> BLOCK ───────────────────────────────────────────────────  ║
-║   L5820    SUPABASE CONFIG + AUTH                                            ║
+║   L5846    SUPABASE CONFIG + AUTH                                            ║
+║   L6019    Auth guard globals:                                               ║
+║             · _sessionCheckHandling — blocks INITIAL_SESSION race           ║
+║             · _visibilityGraceTimer — cancellable 3.5s re-login timer       ║
+║             · _signedOutTimer — debounce SIGNED_OUT (v198: 600ms)           ║
+║   L6024    supa.auth.onAuthStateChange()                                     ║
+║             · TOKEN_REFRESHED → silent update, cancel grace timer           ║
+║             · SIGNED_IN / INITIAL_SESSION → load profile → hideLoginOverlay ║
+║             · SIGNED_OUT → debounce 600ms before showing login (v198)       ║
+║             · Debug log: [auth:v198] event | session | currentUser (v198)   ║
+║   L6068    doLogin()  — email/password login                                 ║
+║   L6099    showLoginError() / showLoginInfo()                                ║
+║   L6106    showSenseSplash(onDone)                                           ║
+║             · cache-warm path: MIN_SHOW=0ms / MAX_SHOW=400ms                ║
+║             · cold path: MIN_SHOW=1650ms / MAX_SHOW=2000ms                  ║
+║             · tSetup: calls onDone() at t=900ms (app routing behind splash) ║
+║   L6187    hideLoginOverlay()                                                ║
+║             · v198 flash fix: hides #login-overlay IMMEDIATELY on entry,    ║
+║               before showSenseSplash starts (prevents fade-through flash)   ║
+║             · loginTransitionRunning guard — prevents double-call           ║
+║             · 4s safety valve clears lock if splash hangs                   ║
+║   L6257    _autoRouteAfterLogin()  — route to teamview / portview after login║
+║   L6277    loadUserProfile()  — Supabase profiles fetch, fallback on error  ║
+║   L6351    checkSession()  — page-load session restore                       ║
+║   L6396    Phase 10: Auth/session runtime boundary                           ║
 ║   L6484    SAMPLE DATA                                                       ║
-║   L6557    STATE  (D, fileStatus, globals)                                   ║
-║   L6630    KAM SIGNALS  (rule-based, no AI)                                 ║
-║   L6729    UTILS                                                             ║
-║   L6762    MULTI-ACCOUNT STORAGE                                             ║
-║   L7112    BULK ALTERNATIVES (Q4B) — v52                                    ║
-║   L7206    BUILD GROUPS FROM D.alts UNVERIFIED                               ║
-║   L7348    DATA LOADING  (CSV parse, 5-tier price, Pass1/Pass2)             ║
-║   L7787    CLOUDFLARE R2 DATA LOADER                                        ║
-║   L8138    DATA PANEL UI                                                     ║
-║   L8196    RENDER — OVERVIEW                                                 ║
-║   L8758    RENDER — PORTFOLIO                                                ║
-║   L9018    RENDER — OPPORTUNITIES                                            ║
-║   L9319    DETAIL SHEET                                                      ║
-║   L9441    RENDER — SIMULATOR                                                ║
-║   L9444    SCENARIO PLANNER                                                  ║
-║   L9453    ONBOARDING                                                        ║
-║   L9482    RENDER — REPORT                                                   ║
-║   L9565    NAVIGATION                                                        ║
-║   L9570    SQL TEMPLATES                                                     ║
-║             └─ Q8E: portview enriched — col 19 days_with_current_kam added  ║
-║                      (kam_since CTE: MIN(delivery_date) per account+ka_owner)║
-║   L13469   IN-APP MATCHER  (SKU matching + verify flow)                     ║
-║   L14939   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
-║   L15780   PRICE BASIS DETECTION (Phase 1)                                   ║
-║             └─ L15789  extractRangeKgMax()                                  ║
-║             └─ L15811  parsePackSizeUnits()  ← v160 universal unit parser   ║
-║             └─ L15876  getUnitLabel()                                       ║
-║   L16215   SENSE GATE OVERLAY                                                ║
-║   L16711   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
-║             └─ L16766  Outlet Cycle Signals                                 ║
-║             └─ L16831  SKU movement HTML builder                            ║
-║             └─ L16882  Shared header update                                 ║
-║             └─ L16913  v185: Zone 1 — status strip + stat row              ║
-║             └─ L16979  v185: Zone 3 context button                         ║
-║             └─ L16993  Tab 1 "เดือนนี้" brief card + rule-based data       ║
-║             └─ L17247  Tab 2 "เม.ย." last month data cards                 ║
-║             └─ L17364  SKU Verify for เดือนนี้ tab                         ║
-║             └─ L17474  SKU Verify for เม.ย. tab                            ║
-║   L17930   INSIGHT BUTTON LABEL HELPERS                                     ║
-║   L17963   KAM Insight — No-account empty state                              ║
-║   L18027   navPortHome  (พอร์ต home button router)                          ║
-║   L18192   AI CHAT  (Olive chat panel + FAB)                                 ║
-║   L18327   AI CHAT SCOPE + CONTEXT ROUTER                                   ║
-║   L18614   INIT  (app bootstrap, DOMContentLoaded)                          ║
-║   L18626   GROUP A — NEW RENDER FUNCTIONS                                    ║
-║   L19097   KAM SUB-TABS                                                      ║
-║   L19158   UTILITY: days in Thai-label month                                 ║
-║   L19171   PACE SIGNAL COMPUTATION                                           ║
-║   L19242   SKU CHURN COMPUTATION                                             ║
-║   L19303   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
-║   L19337   RENDER PACE & CHURN TAB                                           ║
-║   L19349   PORTVIEW — ALL-ACCOUNTS PORTFOLIO                                 ║
-║             └─ L19366  v183 Restaurant Sheet Overlay                        ║
-║             └─ L19449  KAM Sense helpers: _injectKamSenseBackBtn(),         ║
-║                         _exitKamSenseMode()                                 ║
-║             └─ L19665  Swipe right: account overview → portfolio            ║
-║             └─ L19682  Swipe up on bnav → open restaurant overlay           ║
-║             └─ L20157  _pvBuildCompactStrip()   compact strip renderer      ║
-║             └─ L20205  _pvInitCollapseObserver() scroll collapse logic      ║
-║             └─ L20315  renderPortviewSummary()  tier grid + pace bar        ║
-║             └─ L20448  portview-tier-grid HTML  (count inline v181 session) ║
-║             └─ _buildSparkline(a, cls)  5 hist + MTD charging bar           ║
-║             └─ _buildChurnBadge(a)  colored inline text + cat               ║
-║             └─ fullCard()  3-row layout: name / gmv / badge                 ║
-║   L20560   TEAMVIEW — TL TEAM OVERVIEW                                       ║
-║             └─ L20677  Teamview scroll-collapse (TL/Admin)                  ║
-║   L21008   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
-║   L21012   VISIT TRACKING (90-day rolling)                                   ║
-║   L21135   FOLDER LOAD (webkitdirectory / iframe/Claude preview)            ║
-║   L21292   RESTAURANT SWIPE CUE HELPERS  (v154)                             ║
-║   L21367   RESTAURANT SWIPE HELPERS                                          ║
+║   L6645    STATE  (D, fileStatus, global flags)                              ║
+║             · fileStatus: history/categories/skus/outlets/alternatives/…    ║
+║   L6673    portviewBulkData  []  Q8E: all accounts bulk (col 19 = days_with_║
+║                                        current_kam from kam_since CTE)       ║
+║   L6679    bulkHistoryData   {}  Q9: aid → [{m, s, orders}]                 ║
+║   L6685    bulkHandoverData  {}  Q10: {byAccountId, byKamName} (v198)       ║
+║             · byAccountId[account_id] → {prevKamName, lastMonthGmv, …}     ║
+║             · byKamName[kam_name]     → [{accountId, lastMonthGmv, …}]      ║
+║   L6689    bulkKamNames / portviewLevel / portviewRepEmail / …              ║
+║   L6719    KAM SIGNALS  (rule-based, no AI)                                 ║
+║   L6818    UTILS                                                             ║
+║   L6851    MULTI-ACCOUNT STORAGE  (localStorage index + per-account data)   ║
+║   L7201    BULK ALTERNATIVES (Q4B) — v52                                    ║
+║   L7437    DATA LOADING  (CSV parse, handleFileUpload dispatcher)            ║
+║   L7442    handleFileUpload(type, input)  — dispatch by type:                ║
+║             · bulk-categories / bulk-data / portview-bulk / bulk-sku-current ║
+║             · bulk-skus / bulk-alternatives / bulk-price / bulk-outlets     ║
+║             · bulk-handover (v198) → parses Q10, builds bulkHandoverData    ║
+║   L7926    ingestCSVText(type, text)  — R2 text → File → handleFileUpload   ║
+║   L7910    CLOUDFLARE R2 DATA LOADER                                         ║
+║             · FOREGROUND: ['portview','history','categories','sku_current',  ║
+║                            'outlets','handover'] — 6 files (v198 added      ║
+║                            handover), cached in IndexedDB (TTL 6h)          ║
+║             · BACKGROUND: ['skus','alternatives'] — session-memory only     ║
+║             · R2_FILES / R2_SPECS — key → filename / ingest type            ║
+║   L8338    RENDER — OVERVIEW                                                 ║
+║   L8900    RENDER — PORTFOLIO                                                ║
+║   L9160    RENDER — OPPORTUNITIES                                            ║
+║   L9461    DETAIL SHEET                                                      ║
+║   L9586    SCENARIO PLANNER                                                  ║
+║   L9595    ONBOARDING                                                        ║
+║   L9624    RENDER — REPORT                                                   ║
+║   L9714    BULK_SQL  — SQL query registry (copyBulkSQL key lookup)           ║
+║             · Q8E: portview — Pace + Churn + days_with_current_kam          ║
+║             · Q9B: bulk_history (6mo GMV)                                   ║
+║             · Q2B: categories / Q3B: SKUs / Q4B: alternatives               ║
+║             · Q5B: outlets MTD / Q6B: price history / Q7B: sku_current      ║
+║             · Q10: portview_handover — transfer out per KAM (v198)          ║
+║   L13594   copyBulkSQL(key, btn)  — copy SQL to clipboard                   ║
+║   L13927   callAI(modelKey, sys, messages, maxTok)  — AI proxy wrapper      ║
+║   L15139   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
+║   L15980   PRICE BASIS DETECTION (Phase 1)                                   ║
+║             · extractRangeKgMax() / parsePackSizeUnits() / getUnitLabel()   ║
+║   L16415   SENSE GATE OVERLAY  (JS logic)                                   ║
+║   L16911   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
+║             · renderKamSignalBar() L6802                                    ║
+║             · renderKamThisMonth() L17195                                   ║
+║             · renderKamLastMonth() L17450                                   ║
+║             · renderKamOverview()  L17533                                   ║
+║             · generateKamBriefing() L17760                                  ║
+║   L18230   navPortHome()  (พอร์ต home button router)                        ║
+║   L18394   AI CHAT  (Olive chat panel + FAB)                                 ║
+║   L18529   AI CHAT SCOPE + CONTEXT ROUTER                                   ║
+║   L18816   INIT  (app bootstrap, DOMContentLoaded)                          ║
+║   L18828   GROUP A — NEW RENDER FUNCTIONS                                    ║
+║   L19299   KAM SUB-TABS                                                      ║
+║   L19360   UTILITY: getThaiMonthDays(label)                                 ║
+║   L19373   PACE SIGNAL COMPUTATION                                           ║
+║   L19444   SKU CHURN COMPUTATION                                             ║
+║   L19525   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
+║   L19559   RENDER PACE & CHURN TAB                                           ║
+║   L19589   v183 Restaurant Sheet Overlay (openRestaurantSheet / _overlayNav)║
+║   L19938   generatePortviewInsight()                                         ║
+║   L20137   renderPortviewList()                                              ║
+║   L20380   _pvBuildCompactStrip()  — compact strip renderer                 ║
+║   L20428   _pvInitCollapseObserver()  — scroll collapse logic               ║
+║   L20538   renderPortviewSummary()  — tier grid + pace bar                  ║
+║   L20727   renderPortview()                                                  ║
+║   L20783   TEAMVIEW — TL TEAM OVERVIEW                                       ║
+║   L20833   renderTeamview()                                                  ║
+║   L20938   renderTeamviewSummary()                                           ║
+║   L21173   generateTeamviewInsight()                                         ║
+║   L21231   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
+║   L21235   VISIT TRACKING (90-day rolling)                                   ║
+║   L21358   FOLDER LOAD (webkitdirectory / iframe/Claude preview)            ║
+║   L21405   Guard B: visibilitychange  — 3.5s grace, then re-login check     ║
+║   L21445   Guard C: pageshow  — iOS bfcache restore, 2s grace               ║
+║   L21609   Restaurant swipe helpers                                          ║
 ║                                                                              ║
 ║  ── HTML CLOSING BLOCKS ───────────────────────────────────────────────────  ║
-║   L21404   VERIFY SHEET HTML                                                 ║
-║   L21480   SENSE GATE OVERLAY HTML                                           ║
-║                                                                              ║
-║  ── TARGET MODULE (merged inline at L21535) ──────────────────────────────  ║
-║   L21535   TARGET MODULE HTML marker                                         ║
-║   L21536   TARGET MODULE CSS — NRR widget v2 styles                         ║
-║             └─ .tgt-bar-header / .tgt-bar-left / .tgt-bar-days-inline       ║
-║             └─ .tgt-rr-label / .tgt-rr-row / .tgt-rr-target (color-coded)  ║
-║             └─ .tgt-seg-wrap / .tgt-seg.bonus                               ║
-║             └─ .tgt-overflow-badge  (+X% when pct > 100%)                  ║
-║             └─ .tgt-info-btn  (ⓘ circle expand trigger)                    ║
-║             └─ .tgt-det-section / .tgt-fml-row / .tgt-fml-total            ║
-║             └─ .tgt-color-key / .tgt-ck-swatch                             ║
-║             └─ .pv-sort-sticky  (padding 8px 0 5px, border stronger)       ║
-║             └─ Target Setup Sheet CSS                                       ║
-║   L21807   TARGET SETUP OVERLAY HTML                                         ║
-║   L21831   <script id="target-module-js">  TARGET MODULE JS                 ║
-║   L21833   TARGET MODULE — sense_v162 (JS body)                             ║
-║             └─ L21864  State                                                ║
-║             └─ L21873  Quarter helpers                                      ║
-║             └─ L21915  Format helpers                                       ║
-║             └─ L21934  Supabase load                                        ║
-║             └─ L21985  Open / Close                                         ║
-║             └─ L22353  NRR computation (Outlet-aware, Method 3)            ║
-║             └─ L22457  renderPortviewNRRBar() — retired (stub only)         ║
-║             └─ L22464  renderPortviewTargetBar() — NRR widget v2 async fn   ║
-║                         · pace bar stays visible during await loadTargets() ║
-║                         · atomic swap: hide pace bar only when tgt ready    ║
-║                         · fallback: shows #portview-pace-bar if no target   ║
-║                         · bar: min(pct,100)% fill + +X% overflow badge      ║
-║                         · segments proportional within barFill              ║
-║                         · window._tgtPortviewPct set + _pvBuildCompactStrip ║
-║                         · 3-section expand: GMV / Baseline / NRR formula   ║
-║                         · outlet count per month in Baseline section        ║
-║                         · MTD integrated in NRR formula row (not floating)  ║
-║                         · color-coded target: tgt-real/tgt-alloc/tgt-base  ║
-║                         · color key section in expand panel                 ║
-║                         · ⓘ button inline in legend row (not full-row chev)║
-║                         · ~prefix on denominator when fallback target       ║
-║             └─ L22719  _tgtToggleDetail()  expand/collapse info panel       ║
-║             └─ L22728  _tgtInjectTeamviewTargetRows()  TL card rows         ║
-║             └─ L22762  Utility helpers                                      ║
-║             └─ L22814  Hook into existing render pipeline                   ║
-║             └─ L22824  Admin button in teamview header                      ║
-║             └─ L22842  Inject target bar placeholder into portview HTML     ║
-║             └─ L22867  Init: poll for portview visibility on startup        ║
-║             └─ L22882  Patch renderPortviewList (single, guarded)           ║
+║   L21646   VERIFY SHEET HTML                                                 ║
+║   L21722   SENSE GATE OVERLAY HTML                                           ║
+║   L21777   TARGET MODULE HTML marker                                         ║
+║   L21870   Target Setup Sheet CSS                                            ║
+║   L22073   <script id="target-module-js">  TARGET MODULE JS                 ║
+║   L22075   TARGET MODULE — sense_v162 (JS body)                             ║
+║             └─ L22158  _tgtFmtM()  format helper                            ║
+║             └─ L22223  _tgtGet() / _tgtKamBaseline3mo() / loadTargets()     ║
+║             └─ L22228  openTargetSetup() / closeTargetSetup()               ║
+║             └─ L22595  NRR computation — v198 cohort classification:        ║
+║             └─ L22597  _tgtComputeKamNRR(kamEmail, tlEmail)                 ║
+║                         · allAccounts filtered by kamEmail OR tlEmail        ║
+║                         · prevMonth from Q9 history (last closed month)     ║
+║                         · daysElapsed from bulkCurrentMonthData (fallback:  ║
+║                           date-computed label with CE/Thai year detect)     ║
+║                         · Cohort classification (v198):                     ║
+║                           - Core: daysWithCurrentKam > daysElapsed          ║
+║                           - Transfer in: new + in bulkHandoverData           ║
+║                           - New (Sales): new + NOT in bulkHandoverData       ║
+║                         · _groupNRR(group) L22663 helper — outlet-level     ║
+║                           daily-rate NRR for any account subset              ║
+║                         · Transfer out L22713: KAM → hd.byKamName lookup;  ║
+║                           TL → aggregate all KAMs in team                   ║
+║                         · Returns backward-compat fields + transferIn /     ║
+║                           newFromSales / transferOut objects (v198)         ║
+║             └─ L22758  renderPortviewNRRBar()  — retired stub               ║
+║             └─ L22764  renderPortviewTargetBar()  — NRR widget async fn     ║
+║                         · rep-detail fix (v198): uses _repEmail not admin   ║
+║                           email when TL/admin drills into specific KAM      ║
+║                         · movement rows (v198): Transfer in / New (Sales) / ║
+║                           Transfer out with dynamic NRR color coding        ║
+║                         · ⓘ panel: Core NRR formula + mvDefSection with    ║
+║                           cohort definitions (v198)                         ║
+║             └─ L23066  _tgtToggleDetail()  — expand/collapse ⓘ panel       ║
+║             └─ L23075  _tgtInjectTeamviewTargetRows()  — TL card rows       ║
+║             └─ L23114  _tgtGetKamsForTL() / _tgtKamBaseline3mo()            ║
+║             └─ L23126  Utility helpers + pipeline hooks                     ║
 ║                                                                              ║
 ║  ── KEY GLOBALS ──────────────────────────────────────────────────────────  ║
-║   D                 Main data object (per-account state)                    ║
-║   portviewBulkData  All-accounts portfolio bulk data                        ║
-║                     col 19: days_with_current_kam (from Q8E kam_since CTE)  ║
-║   bulkHistoryData   Monthly GMV history (Q9) — aid → [{m, s, orders}]      ║
-║   bulkCurrentMonthData  Current month transactions (Q8E)                    ║
-║   bulkAccountNames  Account name map                                        ║
-║   bulkCatsData      Category data (Q2B)                                     ║
-║   bulkSkusData      SKU data (Q3B)                                          ║
-║   bulkOutletsData   Outlet data (Q5B)                                       ║
-║   bulkAltsUnverified  Unverified alt candidates (Q4B)                       ║
-║   bulkPriceData     Price history 6mo (Q6B) — sparkline baseline            ║
-║   bulkSkuCurrentData  SKU current MTD (Q7B)                                 ║
-║   window._tgtPortviewPct  Shared pace% between widget and compact strip     ║
+║   D                    Main data object (per-account state)                 ║
+║   portviewBulkData     All-accounts portfolio (Q8E)                         ║
+║                         col 19: days_with_current_kam (kam_since CTE)       ║
+║   bulkHistoryData      Monthly GMV history Q9 — aid → [{m,s,orders}]       ║
+║   bulkCurrentMonthData Current month Q8E — aid → {gmv_to_date, days_elapsed}║
+║   bulkHandoverData     Transfer-out Q10 (v198):                             ║
+║                         .byAccountId[id] → {prevKamName, lastMonthGmv, …}  ║
+║                         .byKamName[name] → [{accountId, lastMonthGmv, …}]  ║
+║   bulkAccountNames     Account name map (aid → string)                      ║
+║   bulkCatsData         Category data Q2B (aid → {month → [{n,s,p,c}]})     ║
+║   bulkSkusData         SKU data Q3B                                         ║
+║   bulkOutletsData      Outlet data Q5B (aid → {month → [outlets]})         ║
+║   bulkAltsUnverified   Unverified alt candidates Q4B                        ║
+║   bulkPriceData        Price history 6mo Q6B (sparkline baseline)           ║
+║   bulkSkuCurrentData   SKU current MTD Q7B                                  ║
+║   bulkKamNames         aid → kam_name string (TL grouping)                  ║
+║   portviewLevel        'rep' | 'tl' | 'rep-detail'                          ║
+║   portviewRepEmail     KAM email being viewed in rep-detail mode            ║
+║   window._tgtPortviewPct  Shared pace% (widget ↔ compact strip)            ║
+║   loginTransitionRunning  Lock: prevents double hideLoginOverlay call       ║
+║   window._signedOutTimer  Debounce: SIGNED_OUT → delayed login show (v198) ║
 ║                                                                              ║
-║  ── v160 PRICE DISPLAY LOGIC (5-tier, in _parseSKULine L7397) ────────────  ║
-║   Tier 1: Weight group              → ฿/กก.   (unit_price as-is)           ║
-║   Tier 2: range_kg_max              → ฿/กก.   (avg_piece_price ÷ max)      ║
-║   Tier 3a: pack_size kg/g/กก./กรัม  → ฿/กก.   (unit_price ÷ total_kg)     ║
-║   Tier 3b: pack_size L/ml/cc/ลิตร   → ฿/ลิตร  (unit_price ÷ total_liter)  ║
-║   Tier 3c/3d: แกลลอน/ปี๊บ           → ฿/ลิตร  (÷ ea_val × 3.785 or 16)   ║
-║   Tier 4: ea count (ไข่/ผลไม้/ถุง)  → ฿/[unit] (leave as-is)              ║
-║   Tier 5: fallback                  → ฿/กก.                                ║
+║  ── R2 FILE PIPELINE (foreground = cached IndexedDB TTL 6h) ───────────────  ║
+║   Key          File                   Query  Type                            ║
+║   portview     portview.csv           Q8E    portview-bulk                   ║
+║   history      bulk_history.csv       Q9     bulk-data                       ║
+║   categories   bulk_categories.csv    Q2B    bulk-categories                 ║
+║   sku_current  bulk_sku_current.csv   Q7B    bulk-sku-current                ║
+║   outlets      bulk_outlets.csv       Q5B    bulk-outlets                    ║
+║   handover     portview_handover.csv  Q10    bulk-handover  ← v198          ║
+║   skus         bulk_skus.csv          Q3B    bulk-skus  (background)         ║
+║   alternatives bulk_alternatives.csv  Q4B    bulk-alternatives (background)  ║
+║                                                                              ║
+║  ── NRR COHORT LOGIC (v198) ───────────────────────────────────────────────  ║
+║   Core NRR     daysWithCurrentKam > daysElapsed (pre-existing accounts)     ║
+║   Transfer in  daysWithCurrentKam ≤ daysElapsed + in bulkHandoverData       ║
+║   New (Sales)  daysWithCurrentKam ≤ daysElapsed + NOT in bulkHandoverData   ║
+║   Transfer out from bulkHandoverData.byKamName[kamName] (Q10 source)        ║
+║   Graduation   Transfer in/New → Core automatically next month              ║
+║   NRR formula  daily-rate normalized: (currGMV÷daysElapsed)÷(prevGMV÷days) ║
+║                computed separately for each cohort via _groupNRR()          ║
+║                                                                              ║
+║  ── LOGIN FLASH FIX SUMMARY (v198) ────────────────────────────────────────  ║
+║   Root cause: cache-warm splash fades t=400ms, onDone() fires t=900ms       ║
+║              → 500ms window where login overlay visible through fading splash║
+║   Fix A: hideLoginOverlay() hides overlay IMMEDIATELY on entry (L6187)      ║
+║   Fix B: SIGNED_OUT debounce 600ms before showing login (L6024)             ║
+║   Z-index: login=9999, splash=10000 (splash always on top)                  ║
+║                                                                              ║
+║  ── v160 PRICE DISPLAY LOGIC (5-tier, in _parseSKULine ~L7397) ────────────  ║
+║   Tier 1: Weight group             → ฿/กก.  (unit_price as-is)             ║
+║   Tier 2: range_kg_max             → ฿/กก.  (avg_piece_price ÷ max)        ║
+║   Tier 3a: pack_size kg/g          → ฿/กก.  (unit_price ÷ total_kg)        ║
+║   Tier 3b: pack_size L/ml/cc       → ฿/ลิตร (unit_price ÷ total_liter)     ║
+║   Tier 3c/3d: แกลลอน/ปี๊บ          → ฿/ลิตร (÷ ea_val × 3.785 or 16)      ║
+║   Tier 4: ea count (ไข่/ผลไม้/ถุง) → ฿/[unit] (as-is)                      ║
+║   Tier 5: fallback                 → ฿/กก.                                 ║
 ║                                                                              ║
 ║  ── AI PROMPT CALL SITES ─────────────────────────────────────────────────  ║
-║   L17558+  KAM Account Brief (generateKamBriefing)                          ║
-║   L19715+  Portfolio Insight (generatePortviewInsight)                     ║
-║   L18192+  Olive Chat (AI CHAT section / FAB)                               ║
-║   L13629+  In-app Matcher / Verify (callAI in matcher)                     ║
-║   L20950+  Portview TL Team Insight (generateTeamviewInsight)               ║
+║   L17760+  generateKamBriefing()    KAM Account Brief                       ║
+║   L19938+  generatePortviewInsight()  Portfolio Insight (Olive)             ║
+║   L18394+  Olive Chat  (AI CHAT section / FAB)                              ║
+║   L13927+  callAI()  — all AI calls route through this wrapper              ║
+║   L21173+  generateTeamviewInsight()  TL Team Insight                       ║
 ║                                                                              ║
-║  ── PACE BAR OWNERSHIP (v190) ─────────────────────────────────────────────  ║
-║   #portview-pace-bar   Legacy pace bar — rendered by renderPortviewSummary  ║
-║                         Shows immediately (data ready). Stays visible while ║
-║                         renderPortviewTargetBar() awaits loadTargets().     ║
-║   #tgt-portview-bar    NRR widget — rendered by renderPortviewTargetBar()   ║
-║                         Atomic swap: pace bar hidden, tgt bar shown in same ║
-║                         JS frame. Fallback: shows pace bar if target = 0.  ║
-║   Rule: exactly ONE bar visible at any time, in all entry scenarios.        ║
+║  ── PACE BAR OWNERSHIP ────────────────────────────────────────────────────  ║
+║   #portview-pace-bar   Legacy — renderPortviewSummary(), shows immediately  ║
+║   #tgt-portview-bar    NRR widget — renderPortviewTargetBar(), async        ║
+║   Rule: exactly ONE visible at any time. Atomic swap when tgt ready.        ║
+║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
-║   v190  (this file) KAM pill nav + single pace bar + KAM Sense:             ║
-║          · KAM pill nav: floating pill bnav in KAM mode                     ║
-║          · Pace bar flash fix — single panel, no duplicate render:          ║
-║            - renderPortviewSummary shows #portview-pace-bar immediately     ║
-║            - renderPortviewTargetBar does atomic swap after loadTargets()   ║
-║            - Fallback: if target=0, pace bar stays (no blank state)         ║
-║            - Removed double-patch on renderPortviewList (Patch 1 deleted)   ║
-║            - Removed dead sense:screenchange listener (never dispatched)    ║
-║            - Removed unused _origShowScreen declaration                     ║
-║            - Removed duplicate _injectPortviewBarEl() call in Patch 2       ║
-║            - Removed fade-out animation on pace bar (was 250ms setTimeout)  ║
-║   v185  KAM Account View — 3-Zone Layout:                                   ║
-║          · Zone 1: status strip + stat row (pace, GMV, outlet count)        ║
-║          · Zone 3: context button (opens restaurant sheet / brief)          ║
-║          · Tab 1: insight hint + อ่าน brief card removed from tab body      ║
-║          · dept·KAM label: nickname only (Chain · KAM: Bookbig)             ║
-║   v184  KAM Account Overview — 3-Zone Layout intro                          ║
-║          · #kam-acct-sticky removed; replaced by #kav-z1                    ║
-║   v183  Nav redesign + Restaurant Overlay:                                   ║
-║          · KAM bnav: Insight | ร้าน | Sense (was: Insight | พอร์ต)          ║
-║          · #nav-portview hidden from bnav; #nav-opportunities visible       ║
-║          · Restaurant sheet overlay: openRestaurantSheet() /                ║
-║            closeRestaurantSheet() / _overlayNav()                           ║
-║          · _updateKamNavDisabled(): bnav disabled state on no-account       ║
-║          · Team button moved to portview header (#portview-team-btn)        ║
-║   v182  Bug fixes: TL NRR filter, shortfall baselineGmv                     ║
-║          · Login: lgi-brand centered column; logo 76×76px squircle          ║
-║          · Portview card: 3-row layout (name / GMV / badge)                 ║
-║          · Q8E: kam_since CTE — col 19 days_with_current_kam                ║
-║   v181  Fix fade-in: void offsetHeight forces reflow before opacity         ║
-║          transition (sense gate / overlay animation fix)                    ║
-║   v165b Proportional tier grid: flex layout, ปกติ col width clamped        ║
-║          45-70% based on ok/total ratio. At-risk mini cards compact         ║
-║   v165  NRR widget v2 (full redesign — see earlier entries)                 ║
-║   v164  Fix _tgtKamBaseline3mo, NRR standalone bar, loading UX             ║
-║   v163  KAM mapping updated — 623 accounts, 15 KAMs, 2 TL teams           ║
-║   v162  Target Module extracted to target_module_v1.html                   ║
-║   v161  Q4B v3 — per_liter alternative path                                ║
+║   v198d  bulk_price Tier 3 fix: _startDeferredPriceLoad moved to .finally() ║
+║          → price โหลดเสมอแม้ skus/alternatives จะ fail                     ║
+║   v198c  debounce context-aware fix: Transfer in/New Sales no longer stuck  ║
+║          when TL/Admin drills into specific KAM (portviewRepEmail check)    ║
+║   v198b (prev) TOC updated — all line numbers verified                      ║
+║   v198  NRR cohort classification + Q10 pipeline + login flash fixes:       ║
+║          · _tgtComputeKamNRR refactored: Core / Transfer in / New / Out     ║
+║          · _groupNRR() helper for per-cohort outlet-level NRR               ║
+║          · bulkHandoverData global + bulk-handover parser (Q10)             ║
+║          · portview_handover.csv: config / R2_FILES / FOREGROUND (3 places) ║
+║          · portview_handover slot in Data Panel UI                          ║
+║          · BULK_SQL Q10 — transfer out per KAM SQL                          ║
+║          · Movement rows in tgt bar: header + Transfer in/New/Out           ║
+║          · NRR color dynamic: green≥100% / amber≥90% / red<90% / grey null ║
+║          · Core NRR label + cohort definition docs in ⓘ panel              ║
+║          · rep-detail NRR fix: uses _repEmail not admin email               ║
+║          · TL transfer-out: aggregate all KAMs in team                      ║
+║          · currentMonthLabel fallback: date-computed, CE/Thai detect        ║
+║          · hideLoginOverlay: immediate overlay hide (flash fix)             ║
+║          · SIGNED_OUT debounce 600ms (flash fix)                            ║
+║          · .ai-typing CSS: 3-dot bouncing indicator                         ║
+║          · placeholder: ถามได้เลยค่ะ / ยอดลด badge / SVG trend-down icon   ║
+║   v196  AI proxy fix: iframe path checked before proxyUrl; sonnet model     ║
+║          string updated to claude-sonnet-4-6                                ║
+║   v190  KAM pill nav + single pace bar + atomic bar swap                    ║
+║   v185  KAM 3-Zone layout (Zone 1 status strip / Zone 3 context btn)        ║
+║   v183  Nav redesign + Restaurant Sheet overlay                             ║
+║   v182  TL NRR filter fix + Q8E days_with_current_kam col                  ║
+║   v165  NRR widget v2 full redesign                                         ║
+║   v162  Target Module extracted (now merged inline)                         ║
 ║   v160  Price display 5-tier logic + universal unit parser                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 -->
@@ -247,7 +312,7 @@
   --kam:#2660c8;--kam-dark:#1a3a6b;--kam-bg:#0d1f3c;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow-x:hidden}
+html,body{height:100%}html{overflow-x:clip}
 body{font-family:'IBM Plex Sans Thai',sans-serif;background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
 .mono{font-family:'IBM Plex Mono',monospace}
@@ -695,7 +760,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .kam-opp-conf.unv{background:rgba(160,160,160,.15);color:var(--n600)}
 
 /* ── BOTTOM NAV ── */
-.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:100;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+.bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:100;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .2s}
 .ni svg{width:22px;height:22px;color:var(--n400);transition:color .2s}
 .ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s}
@@ -2058,7 +2123,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 .outlet-pct{font-size:10px;color:var(--n400);text-align:right;width:36px;flex-shrink:0}
 
 /* ══ KAM MODE — DARK THEME ══ */
-body.kam-mode{background:#0d1f3c}
+body.kam-mode{background:#0d1f3c}body.kam-mode #scr-portview{background:#0d1f3c}
 body.kam-mode .bnav{background:#0d2550;border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
@@ -2391,7 +2456,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: none !important; }
 /* ── v190 KAM pill nav ── */
 body.kam-mode .bnav #nav-opportunities{display:flex!important;}
 body.kam-mode #nav-portview{display:none!important;}
-body.kam-mode .bnav{background:rgba(14,24,45,.82);border:1px solid rgba(255,255,255,.1);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(20px + env(safe-area-inset-bottom));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);}
+body.kam-mode .bnav{background:rgba(14,24,45,.52);border:1px solid rgba(255,255,255,.18);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.35);}
 body.kam-mode .bnav .ni{flex:1;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;}
 body.kam-mode .bnav .ni .lb{display:block!important;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.2px;transition:color .18s,font-weight .18s;}
 body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
@@ -2620,7 +2685,7 @@ body.kam-sense-active #swipe-grp-b{
   background:var(--n50);
 }
 body.kam-sense-active #swipe-grp-b .scr{display:none!important;}
-body.kam-sense-active #swipe-grp-b .scr.on{display:block!important;min-height:100%;padding-bottom:120px;}
+body.kam-sense-active #swipe-grp-b .scr.on{display:block!important;min-height:100%;padding-bottom:120px;}body.kam-sense-active #scr-opportunities .sec{padding-bottom:100px}
 /* ════ SENSE DARK THEME TOKENS — body.kam-sense-active ════
    Design system: Sense forest dark (#0b1c14)
    Intent: deep forest = Sense territory (distinct from KAM navy)
@@ -2692,7 +2757,7 @@ body.kam-sense-active.sense-plan-expanded #sense-plan-section{display:flex;align
 .sps-cta:active{transform:scale(.92);opacity:.85;}
 .sps-cta:active{opacity:.78;}
 /* Pill nav base */
-body.kam-sense-active.kam-mode .bnav{background:rgba(var(--n0-rgb,.18,.30,.22),.72)!important;border-color:rgba(0,208,112,.22)!important;backdrop-filter:blur(22px)!important;-webkit-backdrop-filter:blur(22px)!important;box-shadow:0 -6px 24px rgba(0,0,0,.18),0 -1px 0 rgba(255,255,255,.06)!important;}
+body.kam-sense-active.kam-mode .bnav{background:rgba(6,20,16,.55)!important;border-color:rgba(0,208,112,.22)!important;backdrop-filter:blur(22px)!important;-webkit-backdrop-filter:blur(22px)!important;box-shadow:0 -6px 24px rgba(0,0,0,.18),0 -1px 0 rgba(255,255,255,.06)!important;}
 /* Pill expands when plan active */
 body.kam-sense-active.sense-plan-expanded.kam-mode .bnav{flex-wrap:wrap!important;border-radius:20px!important;padding:10px 14px calc(12px + env(safe-area-inset-bottom))!important;box-shadow:0 -8px 28px rgba(0,0,0,.22),0 -1px 0 rgba(255,255,255,.06)!important;}
 /* Light theme SPS colors */
@@ -2713,17 +2778,17 @@ body.kam-sense-active .topbar{background:#1a1e26!important;transition:background
 body.sdt-a.kam-sense-active{--n0:#1e1e1e;--n50:#252525}
 body.sdt-a.kam-sense-active #swipe-grp-b{background:#141414}
 body.sdt-a.kam-sense-active .topbar{background:#1e1e1e!important}
-body.sdt-a.kam-sense-active.kam-mode .bnav{background:rgba(30,30,30,.72)!important;}
+body.sdt-a.kam-sense-active.kam-mode .bnav{background:rgba(30,30,30,.52)!important;}
 /* ── Theme B overrides ── */
 body.sdt-b.kam-sense-active{--n0:#131d2e;--n50:#1a2640}
 body.sdt-b.kam-sense-active #swipe-grp-b{background:#0c1220}
 body.sdt-b.kam-sense-active .topbar{background:#131d2e!important}
-body.sdt-b.kam-sense-active.kam-mode .bnav{background:rgba(19,29,46,.72)!important;}
+body.sdt-b.kam-sense-active.kam-mode .bnav{background:rgba(19,29,46,.52)!important;}
 /* ── Theme C explicit (= default, for clarity) ── */
 body.sdt-c.kam-sense-active{--n0:#1a1e26;--n50:#20252f}
 body.sdt-c.kam-sense-active #swipe-grp-b{background:#13161c}
 body.sdt-c.kam-sense-active .topbar{background:#1a1e26!important}
-body.sdt-c.kam-sense-active.kam-mode .bnav{background:rgba(26,30,38,.72)!important;}
+body.sdt-c.kam-sense-active.kam-mode .bnav{background:rgba(26,30,38,.52)!important;}
 /* ── Prices: white (remove green overload) ── */
 body.kam-sense-active .pb-save-amt{color:rgba(255,255,255,.92)}
 body.kam-sense-active .osave-num{color:rgba(255,255,255,.92)}
@@ -2782,7 +2847,7 @@ body.sdt-light.kam-sense-active .pct-badge-sm{background:var(--g50);color:var(--
 body.sdt-light.kam-sense-active .pct-badge-sm.med{background:var(--amb50);color:#9a6500}
 body.sdt-light.kam-sense-active .pb-cat-group{box-shadow:var(--sh)}
 body.sdt-light.kam-sense-active .pb-footer{background:#0d2318!important;border-top:1px solid rgba(0,208,112,.22);box-shadow:none}
-body.sdt-light.kam-sense-active.kam-mode .bnav{background:rgba(230,252,240,.72)!important;border-color:rgba(0,160,80,.18)!important;backdrop-filter:blur(22px)!important;-webkit-backdrop-filter:blur(22px)!important;box-shadow:0 -6px 24px rgba(0,80,40,.1),0 -1px 0 rgba(255,255,255,.7)!important;}
+body.sdt-light.kam-sense-active.kam-mode .bnav{background:rgba(230,252,240,.52)!important;border-color:rgba(0,160,80,.18)!important;backdrop-filter:blur(22px)!important;-webkit-backdrop-filter:blur(22px)!important;box-shadow:0 -6px 24px rgba(0,80,40,.1),0 -1px 0 rgba(255,255,255,.7)!important;}
 body.sdt-light.kam-sense-active.kam-mode .bnav .ni svg{stroke:rgba(0,0,0,.38)!important;color:rgba(0,0,0,.38)!important;filter:none!important}
 body.sdt-light.kam-sense-active.kam-mode .bnav .ni .lb{color:rgba(0,0,0,.38)!important}
 body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on svg{stroke:var(--g500)!important;color:var(--g500)!important}
@@ -8110,8 +8175,6 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     }
     if(typeof updateDataStatus==='function')updateDataStatus();
     if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
-    // ── Tier 3: deferred price load — starts after background, silent ──
-    setTimeout(()=>_startDeferredPriceLoad(token),3000);
     return results;
   }).catch(err=>{
     if(token===_cloudLoadToken){
@@ -8122,7 +8185,11 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
     }
     return [false,false];
   }).finally(()=>{
-    if(token===_cloudLoadToken)_cloudBackgroundPromise=null;
+    if(token!==_cloudLoadToken)return;
+    _cloudBackgroundPromise=null;
+    // ── Tier 3: v198d fix — moved from .then() to .finally() ──
+    // bulk_price โหลดเสมอ ไม่ว่า skus/alternatives จะสำเร็จหรือล้มเหลว
+    setTimeout(()=>_startDeferredPriceLoad(token),3000);
   });
   return _cloudBackgroundPromise;
 }
@@ -22764,10 +22831,13 @@ function renderPortviewNRRBar() {
 async function renderPortviewTargetBar() {
   const bar = document.getElementById('tgt-portview-bar');
   if (!bar) return;
-  // Debounce: skip if rendered within last 300ms (prevents flicker from multiple callers)
+  // Debounce: skip if rendered within last 300ms AND same KAM context (prevents flicker)
+  // v198c: bypass debounce when portviewLevel/portviewRepEmail changes — fixes TL/Admin stuck transfer data
   const _now = Date.now();
-  if (bar._lastRenderMs && _now - bar._lastRenderMs < 300) return;
+  const _ctxKey = `${(typeof portviewLevel!=='undefined'?portviewLevel:'')}|${(typeof portviewRepEmail!=='undefined'?portviewRepEmail:'')}`;
+  if (bar._lastRenderMs && _now - bar._lastRenderMs < 300 && bar._lastCtxKey === _ctxKey) return;
   bar._lastRenderMs = _now;
+  bar._lastCtxKey = _ctxKey;
 
   const role  = (currentUserProfile && currentUserProfile.role)  || 'rep';
   const email = (currentUserProfile && currentUserProfile.email) || '';
@@ -22843,7 +22913,10 @@ async function renderPortviewTargetBar() {
 
   // ── NRR computation ──────────────────────────────────────────
   // v182: pass tlEmail as second arg for TL so NRR is scoped to team only
-  const nrrResult = _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null);
+  // rep-detail: admin/TL viewing a specific KAM → use that KAM's email, not admin email
+  const nrrResult = _repDetail
+    ? _tgtComputeKamNRR(_repEmail, null)
+    : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null);
   let nrrPct=null, cohortGmv=0, cbGmv=0, exGmv=0;
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
 
