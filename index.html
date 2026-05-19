@@ -265,7 +265,10 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
-║   v199b  3 fixes:                                                            ║
+║   v199b  4 fixes:                                                            ║
+║          · sgOrbTap: _sgRunning=true ก่อน await ensureSenseData             ║
+║            ป้องกัน re-entry ระหว่างโหลด alternatives (tap-twice bug)         ║
+║            unlock คืนถ้า load fail เพื่อให้ retry ได้                        ║
 ║          · ensureSenseData {silent} flag: skip refreshAll/selectMonth        ║
 ║            เมื่อถูกเรียกจาก Sense Gate → ป้องกัน screen navigation กลับ      ║
 ║            account view ขณะรอโหลด alternatives (lazy-load bug)               ║
@@ -819,7 +822,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:rgba(38,96,200,.4);box-shadow:0 
 /* KAM Overview dark screen */
 #kam-overview{
   background:linear-gradient(160deg,#080f1e 0%,#0d1f3c 40%,#0a1628 100%);
-  min-height:calc(100vh - 100px);
+  min-height:100%; /* v199b: was calc(100vh-100px) — caused black void when content taller than viewport */
   margin:-1px;
   padding:0;
   position:relative;
@@ -16573,11 +16576,13 @@ function _sgSetState(state){
 async function sgOrbTap(){
   if(_sgRunning||senseActivated)return;
   if(!D.alts.length||!D.skus.length){
+    _sgRunning=true;  // v199b: lock immediately before await — prevents re-entry during lazy load
     const sub=document.getElementById('sg-sub');
     const orig=sub?sub.textContent:'';
     if(sub)sub.textContent='กำลังโหลด SKU + ทางเลือกของร้าน...';
     if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
     if(!D.alts.length||!D.skus.length){
+      _sgRunning=false;  // v199b: unlock on fail so user can retry
       if(sub){sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent=orig;},2200);}
       return;
     }
