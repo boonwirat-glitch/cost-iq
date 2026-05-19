@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v199b: 3 fixes — (1) ensureSenseData silent flag: skip refreshAll when called from Sense Gate to prevent screen navigation; (2) kav-z2 padding-bottom 72→20px: remove dead space from hidden kav-z3; (3) ⓘ panel: NRR/baseline display ฿/วัน→฿/เดือน normalized + นิยาม collapse toggle -->
+<!-- Freshket Sense v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v199b.html                                       ║
+║  TABLE OF CONTENTS — sense_v199c.html                                       ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
 ║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
 ║  Never rely on TOC line numbers from memory — always re-read file first.    ║
@@ -265,7 +265,11 @@
 ║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
-║   v199b  4 fixes:                                                            ║
+║   v199c  revert + fix account view background:                               ║
+║          · revert body.kam-mode .scr.on{background} — broke sense/opps       ║
+║          · targeted: body.kam-mode #scr-overview{background:#0d1f3c}         ║
+║          · kam-overview min-height: calc(100dvh-104px) — covers viewport     ║
+║            minus nav without over-extending past content                     ║
 ║          · handleFileUpload alternatives: guard _sgRunning — skip            ║
 ║            senseActivated=false + _sgRunning=false + refreshAll when gate    ║
 ║            กำลัง lazy-load อยู่ (root cause: gate เด้งกลับหลัง download)     ║
@@ -821,8 +825,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:rgba(38,96,200,.4);box-shadow:0 
 .main{padding-bottom:148px;min-height:calc(100vh - 48px)}
 /* KAM Overview dark screen */
 #kam-overview{
-  background:linear-gradient(160deg,#080f1e 0%,#0d1f3c 40%,#0a1628 100%);
-  min-height:0; /* v199b: removed min-height — background handled at .scr level */
+  background:linear-gradient(160deg,#080f1e 0%,#0d1f3c 60%,#0d1f3c 100%);
   margin:-1px;
   padding:0;
   position:relative;
@@ -848,7 +851,7 @@ body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflo
 /* KAM mode: swipe groups become transparent block containers */
 body.kam-mode #swipe-grp-a,body.kam-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kam-mode #swipe-grp-a .scr,body.kam-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
-body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important;background:#0d1f3c} /* v199b: navy bg — empty space below content matches portview */
+body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important}
 body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
 
 body:not(.kam-mode) #nav-report{display:none!important}
@@ -2149,10 +2152,10 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(0,208,112,.15)!important;tr
 
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:#0d1f3c}body.kam-mode #scr-portview{background:#0d1f3c}
-/* v199b: KAM account overlay — sheet body + rest-overview must be navy to match dark theme */
+/* v199c: targeted navy bg — account view + overlay panel */
+body.kam-mode #scr-overview{background:#0d1f3c}
+body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:#0d1f3c}
-body.kam-mode #rest-overview{background:#0d1f3c}
-body.kam-mode.restaurant-sheet #swipe-grp-a .scr{background:#0d1f3c}
 body.kam-mode .bnav{background:#0d2550;border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
@@ -3938,6 +3941,12 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
   }
 
   function resetSenseUi(ctx){
+    // v201: guard — don't reset if Sense Gate is mid lazy-load
+    if(getFlag(ctx, 'sgRunning', false)){
+      console.log('[SenseGate debug] resetSenseUi: skipped — _sgRunning=true (gate lazy-loading)');
+      return;
+    }
+    console.warn('[SenseGate debug] resetSenseUi: RUNNING (_sgRunning=false) — gate+senseActivated will be reset');
     const raBtn = el('rest-ai-btn');
     const raLoad = el('rest-ai-load');
     const raPreview = el('rest-ai-preview');
@@ -6117,7 +6126,7 @@ window._sessionCheckHandling = false;
 window._visibilityGraceTimer = null;
 
 supa.auth.onAuthStateChange((event, session) => {
-  console.log('[auth:v198]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
+  console.log('[auth:v201a]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
   // Recovery links create a temporary auth session first. Do not route into the app yet.
   if (event === 'PASSWORD_RECOVERY' || passwordRecoveryMode || _urlLooksLikePasswordRecovery()) {
     if (session?.user) currentUser = session.user;
@@ -7686,7 +7695,13 @@ function handleFileUpload(type,input){
           const _ms=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
           const mk=Object.keys(D.skus_monthly).sort((a,b)=>_ms(b)-_ms(a));
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
-          if(D.alts.length&&D.skus.length)computeOPPS();refreshAll();
+          if(D.alts.length&&D.skus.length)computeOPPS();
+          if(!_sgRunning){
+            console.log('[SenseGate debug] bulk-skus Pass1: refreshAll running (_sgRunning=false)');
+            refreshAll();
+          }else{
+            console.log('[SenseGate debug] bulk-skus Pass1: skipping refreshAll — gate lazy-loading (_sgRunning=true)');
+          }
         }
       }else{
         // no currentAccountId (TL view) — all lines go to remaining
@@ -16585,18 +16600,22 @@ async function sgOrbTap(){
   if(_sgRunning||senseActivated)return;
   if(!D.alts.length||!D.skus.length){
     _sgRunning=true;  // v199b: lock immediately before await — prevents re-entry during lazy load
+    console.log('[SenseGate] _sgRunning=true — lazy-load start | alts:'+D.alts.length+' skus:'+D.skus.length);
     const sub=document.getElementById('sg-sub');
     const orig=sub?sub.textContent:'';
     if(sub)sub.textContent='กำลังโหลด SKU + ทางเลือกของร้าน...';
     if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
+    console.log('[SenseGate] ensureSenseData done | alts:'+D.alts.length+' skus:'+D.skus.length+' _sgRunning:'+_sgRunning);
     if(!D.alts.length||!D.skus.length){
       _sgRunning=false;  // v199b: unlock on fail so user can retry
+      console.warn('[SenseGate] ❌ lazy-load failed — not enough data after ensureSenseData')
       if(sub){sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent=orig;},2200);}
       return;
     }
     if(sub)sub.textContent=orig;
   }
   _sgRunning=true;
+  console.log('[SenseGate] _sgRunning=true — data ready, starting scan | alts:'+D.alts.length+' skus:'+D.skus.length);
   // Hide tap affordance immediately
   const tapHint=document.getElementById('sg-tap-hint');
   const beacon=document.getElementById('sg-beacon');
@@ -23359,7 +23378,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v162');
+console.log('[Target Module v1] loaded — sense_v201a');
 </script>
 
 
