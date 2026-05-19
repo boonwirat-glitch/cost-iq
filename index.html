@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v199c.html                                       ║
@@ -8162,8 +8162,8 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
 
 function _markForegroundPillDot(idx){return window.FreshketSenseRuntime.data.markForegroundPillDot(idx);}
 function _prepareProgressChips(keys,totalCount){return window.FreshketSenseRuntime.data.prepareProgressChips(keys,totalCount,R2_SPECS);}
-function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
-  const BACKGROUND=['skus'];  // alternatives lazy-loaded on first Sense Gate tap; price is deferred (tier 3)
+function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
+  const BACKGROUND=['skus','alternatives'];  // v201c: alternatives moved Tier 2 sequential (iPhone 14+, iOS memory safe)
   if(_cloudBackgroundPromise)return _cloudBackgroundPromise;
   const counter=document.getElementById('sheets-loaded-count');
   const bgDots=document.getElementById('dlp-bg-dots');
@@ -8206,7 +8206,12 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=7}={}){
       if(counter)counter.textContent=loadedNow+'/'+total;
       results.push(ok);
       // Brief yield between large files — lets iOS GC run before next file
-      if(key==='skus')await new Promise(r=>setTimeout(r,500));
+      if(key==='skus'){
+        // cold start (no IndexedDB cache) → yield longer for GC before alternatives
+        const _isCached=await _csvCacheGet('alternatives').catch(()=>null);
+        const _yieldMs=(_isCached&&_isCached.ts&&(Date.now()-_isCached.ts)<_CSV_TTL)?500:2000;
+        await new Promise(r=>setTimeout(r,_yieldMs));
+      }
     }
     return results;
   }
@@ -8275,13 +8280,12 @@ async function loadFromCloudflareR2(){
   sheetsLoadStarted=true;
   const token=++_cloudLoadToken;
 
-  // v157 loading strategy:
-  // Tier 1 (FOREGROUND): 5 lightweight files → app usable
-  // Tier 2 (BACKGROUND): skus only → portfolio ready
+  // v201c loading strategy:
+  // Tier 1 (FOREGROUND): 6 lightweight files → app usable
+  // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  // alternatives: lazy-loaded on first Sense Gate tap (per-session, one-time)
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover'];
-  const BACKGROUND=['skus'];
+  const BACKGROUND=['skus','alternatives'];
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
   const counter=document.getElementById('sheets-loaded-count');
@@ -8380,6 +8384,8 @@ async function ensureSenseData(accountId, {silent=false}={}){
   if(!bulkSkusData[accountId])needed.push('skus');
   if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
   if(!needed.length)return true;
+  // v201c: Tier 2 may already be fetching these — ensureCloudflareFiles deduplicates via _cloudInFlight
+  // so this just awaits the in-flight promise rather than starting a new fetch
   showToast('กำลังโหลด SKU + ทางเลือก...','⟳');
   const ok=await ensureCloudflareFiles(needed,{label:'SKU + ทางเลือก'});
   loadFromStorage(accountId);
@@ -16543,6 +16549,7 @@ function downloadAlternatives(){
 let _sgRunning=false;
 let _sgTickerTimer=null;
 let _sgRevealTimer=null;  // v201b: storable timer so abort-on-fail can cancel reveal
+let _sgRevealPending=false;  // v201c: set when reveal timer fires before data ready — sgOrbTap triggers reveal on data arrival
 
 function openSenseGate(){
   const gate=document.getElementById('sense-gate');
@@ -16577,6 +16584,7 @@ function _sgSetState(state){
     _sgRunning=false;
     if(_sgTickerTimer){clearTimeout(_sgTickerTimer);_sgTickerTimer=null;}
     if(_sgRevealTimer){clearTimeout(_sgRevealTimer);_sgRevealTimer=null;}
+    _sgRevealPending=false;
     if(ringSvg)ringSvg.setAttribute('class','');
     if(ringFill){ringFill.style.opacity='0';ringFill.style.strokeDashoffset='565.2';}
     if(ringScan){ringScan.style.opacity='';ringScan.style.transition='';ringScan.style.animation='';ringScan.style.strokeDasharray='';}
@@ -16621,6 +16629,12 @@ async function sgOrbTap(){
       return;
     }
     console.log('[SenseGate] data ready mid-animation | alts:'+D.alts.length+' skus:'+D.skus.length);
+    // reveal timer may have fired while waiting — trigger now if pending
+    if(_sgRevealPending&&_sgRunning&&!senseActivated){
+      console.log('[SenseGate] _sgRevealPending=true — triggering delayed reveal now');
+      _sgRevealPending=false;
+      _sgRevealScore();
+    }
   } else {
     console.log('[SenseGate] data already ready, starting scan | alts:'+D.alts.length+' skus:'+D.skus.length);
   }
@@ -16743,7 +16757,16 @@ function _sgRunThinking(){
       },390);
     },start);
   });
-  _sgRevealTimer=setTimeout(()=>{_sgRevealTimer=null;_sgRevealScore();},totalMs+600);
+  _sgRevealTimer=setTimeout(()=>{
+    _sgRevealTimer=null;
+    if(!D.alts.length||!D.skus.length){
+      // data not ready yet (Tier 2 still loading) — hold reveal until sgOrbTap gets data
+      console.log('[SenseGate] reveal timer fired but data not ready — setting _sgRevealPending');
+      _sgRevealPending=true;
+      return;
+    }
+    _sgRevealScore();
+  },totalMs+600);
 }
 
 function _sgRevealScore(){
