@@ -3975,7 +3975,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
       const hMLbl = el('hMonthLabel');
       const hOrd = el('hOrders');
       const momEl = el('hero-mom');
-      if(hSpend) call(ctx.helpers.animN, function(){ hSpend.textContent = String(Math.round(currentMonth.gmv_to_date || 0)); }) && ctx.helpers.animN(hSpend, currentMonth.gmv_to_date, 1200);
+      if(hSpend){ if(typeof ctx.helpers.animN==='function') ctx.helpers.animN(hSpend,currentMonth.gmv_to_date,1200); else hSpend.textContent=String(Math.round(currentMonth.gmv_to_date||0)); }
       if(hMLbl) hMLbl.textContent = currentMonth.month_label || '';
       if(hOrd){ hOrd.textContent=''; hOrd.style.display='none'; }
       if(momEl) momEl.style.display='none';
@@ -20789,7 +20789,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v203');
+console.log('[Target Module v1] loaded');
 </script>
 
 
