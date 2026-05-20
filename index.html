@@ -7907,7 +7907,8 @@ function handleFileUpload(type,input){
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
         fileStatus['current-month']=true;
         if(typeof updateKamSubtabVisibility==='function')updateKamSubtabVisibility();
-        if(typeof refreshAll==='function')refreshAll();
+        // v203: skip refreshAll if restaurant sheet is open — avoids D.current_month bleed when portview reloads mid-browse
+        if(typeof refreshAll==='function'&&!document.body.classList.contains('restaurant-sheet'))refreshAll();
       }
       const atRisk=portviewBulkData.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).length;
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
@@ -16661,7 +16662,10 @@ function openSkuDetail(sid){
       }
       return{mo:p.mo,price};
     });
-  const priceData=[...q6bExtra,...q3bPriceData].sort((a,b)=>_moSortAsc(a.mo)-_moSortAsc(b.mo));
+  // Dedup by month (last-write wins = latest price per month)
+  const _pdMap=new Map();
+  [...q6bExtra,...q3bPriceData].sort((a,b)=>_moSortAsc(a.mo)-_moSortAsc(b.mo)).forEach(d=>_pdMap.set(d.mo,d));
+  const priceData=Array.from(_pdMap.values());
   const catEl=document.getElementById('skuDetailCat');
   const titleEl=document.getElementById('skuDetailTitle');
   const body=document.getElementById('skuDetailBody');
@@ -16733,9 +16737,12 @@ function renderSkuDetailContent(sku,priceData){
     return`<text x="${p.x.toFixed(1)}" y="${H-4}" text-anchor="${anchor}" font-family="IBM Plex Sans Thai,sans-serif" font-size="8" fill="var(--n400)">${mo}</text>`;
   }).join('');
 
-  // Dots
+  // Dots — thin out for many points (show first/last/min/max only if >6 pts)
   const dotsSvg=pts.map((p,i)=>{
-    const r=i===0||i===pts.length-1?3.5:2.5;
+    const isEndpt=i===0||i===pts.length-1;
+    const isExtr=p.price===mn||p.price===mx;
+    if(pts.length>6&&!isEndpt&&!isExtr)return'';
+    const r=isEndpt?3.5:2.5;
     return`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" fill="${lc}" stroke="var(--n0)" stroke-width="1.5"/>`;
   }).join('');
 
@@ -16758,7 +16765,7 @@ function renderSkuDetailContent(sku,priceData){
       <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:'IBM Plex Sans Thai',sans-serif">/${sku.display_unit||'กก.'}</span></div>
         ${sku.pack_size?`<div style="font-size:10px;color:var(--n400);margin-top:2px">${sku.pack_size}</div>`:''}</div>
-      <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">เปลี่ยน ${priceData.length} เดือน</div>
+      <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${first.mo} – ${last.mo}</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
     </div>
   </div>
@@ -19476,6 +19483,18 @@ function _updateRestSwipe(grp,idx,opts){
 .tgt-alloc-fill {
   height:100%;border-radius:99px;transition:width .3s ease;
 }
+/* Per-month allocation grid (TL view) */
+.tgt-alloc-mo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tgt-alloc-mo-col{display:flex;flex-direction:column;gap:2px}
+.tgt-alloc-mo-label{font-size:11px;color:rgba(255,255,255,.45);font-weight:600;margin-bottom:2px}
+.tgt-alloc-mo-vp{font-size:13px;color:rgba(255,255,255,.75);font-weight:700;font-family:'IBM Plex Mono',monospace}
+.tgt-alloc-mo-vp.dim{color:rgba(255,255,255,.22);font-weight:400}
+.tgt-alloc-mo-alloc{font-size:11px;color:rgba(255,255,255,.5);font-family:'IBM Plex Mono',monospace;min-height:14px}
+.tgt-alloc-mo-diff{font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;min-height:14px}
+.tgt-alloc-mo-diff.warn{color:var(--amb,#f0b000)}
+.tgt-alloc-mo-diff.ok{color:#4ddc97}
+.tgt-alloc-mo-diff.over{color:rgba(255,255,255,.3);font-weight:400}
+.tgt-alloc-mo-diff.none{color:rgba(255,255,255,.18);font-weight:400}
 /* NRR threshold block (admin) */
 .tgt-nrr-config {
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
@@ -19893,33 +19912,44 @@ function _renderTLKamBlocks(months, moLabels) {
 
   let html = '';
 
-  // Team target reference banner
-  if (teamTotal > 0) {
-    const allocNow = () => {
+  // Per-month allocation banner
+  if (teamTargets.some(v => v > 0)) {
+    const allocByMonth = months.map(m => {
       let sum = 0;
       kams.forEach(k => {
-        months.forEach(m => {
-          const key = `${m}|kam|${k.email}`;
-          const pending = _tgtPendingEdits[key];
-          sum += pending !== undefined ? pending : _tgtGet(m, 'kam', k.email);
-        });
+        const key = `${m}|kam|${k.email}`;
+        const pending = _tgtPendingEdits[key];
+        sum += pending !== undefined ? pending : _tgtGet(m, 'kam', k.email);
       });
       return sum;
-    };
-    const alloc = allocNow();
-    const allocPct = teamTotal > 0 ? Math.min(100, Math.round(alloc / teamTotal * 100)) : 0;
-    const allocCls = allocPct >= 100 ? 'ok' : allocPct >= 85 ? 'warn' : 'warn';
+    });
     html += `<div class="tgt-alloc-bar" id="tgt-alloc-bar">
-      <div class="tgt-alloc-header">
-        <span>Team Target (Admin ตั้ง)</span>
-        <span>Allocated</span>
-      </div>
-      <div class="tgt-alloc-header" style="margin-bottom:5px">
-        <span class="tgt-alloc-num">${_tgtFmtM(teamTotal)} / Q</span>
-        <span class="tgt-alloc-num ${allocCls}" id="tgt-alloc-num">${_tgtFmtM(alloc)} (${allocPct}%)</span>
-      </div>
-      <div class="tgt-alloc-track">
-        <div class="tgt-alloc-fill" id="tgt-alloc-fill" style="width:${allocPct}%;background:${allocPct>=100?'#4ddc97':'var(--amb,#f0b000)'}"></div>
+      <div class="tgt-alloc-mo-grid">
+        ${months.map((m, i) => {
+          const vp = teamTargets[i];
+          const alloc = allocByMonth[i];
+          const diff = alloc - vp;
+          const pct = vp > 0 ? Math.min(110, Math.round(alloc / vp * 100)) : 0;
+          const barPct = Math.min(100, pct);
+          const barCls = pct >= 100 ? 'great' : 'warn';
+          let diffText = '', diffCls = '';
+          if (vp <= 0)         { diffText = 'VP ยังไม่ตั้ง'; diffCls = 'none'; }
+          else if (alloc === 0){ diffText = 'ยังไม่แบ่ง';    diffCls = 'warn'; }
+          else if (diff < 0)   { diffText = 'ขาด ' + _tgtFmtM(-diff); diffCls = 'warn'; }
+          else if (diff === 0) { diffText = 'ครบแล้ว';        diffCls = 'ok'; }
+          else                 { diffText = '+' + _tgtFmtM(diff);       diffCls = 'over'; }
+          return '<div class="tgt-alloc-mo-col" id="tgt-alloc-mo-' + m + '">'
+            + '<div class="tgt-alloc-mo-label">' + moLabels[i] + '</div>'
+            + (vp > 0
+              ? '<div class="tgt-alloc-mo-vp">VP ' + _tgtFmtM(vp) + '</div>'
+              : '<div class="tgt-alloc-mo-vp dim">–</div>')
+            + '<div class="tgt-alloc-track" style="margin:4px 0 2px">'
+            +   '<div class="tgt-alloc-fill kav-ss-bar-fill ' + barCls + '" style="width:' + barPct + '%"></div>'
+            + '</div>'
+            + '<div class="tgt-alloc-mo-alloc">' + (vp > 0 && alloc > 0 ? _tgtFmtM(alloc) : '') + '</div>'
+            + '<div class="tgt-alloc-mo-diff ' + diffCls + '">' + diffText + '</div>'
+            + '</div>';
+        }).join('')}
       </div>
     </div>`;
   }
@@ -20005,26 +20035,34 @@ function _tgtRefreshAllocBar() {
   const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
   const months = _tgtQuarterMonths(_tgtActiveQuarter);
   const kams = _tgtGetKamsForTL(tlEmail);
-  const teamTotal = months.reduce((s, m) => s + _tgtGet(m, 'team', tlEmail), 0);
-  if (!teamTotal) return;
-  let alloc = 0;
-  kams.forEach(k => {
-    months.forEach(m => {
-      const key = `${m}|kam|${k.email}`;
+  months.forEach(m => {
+    const col = document.getElementById('tgt-alloc-mo-' + m);
+    if (!col) return;
+    const vp = _tgtGet(m, 'team', tlEmail);
+    if (!vp) return;
+    let alloc = 0;
+    kams.forEach(k => {
+      const key = m + '|kam|' + k.email;
       alloc += _tgtPendingEdits[key] !== undefined ? _tgtPendingEdits[key] : _tgtGet(m, 'kam', k.email);
     });
+    const diff = alloc - vp;
+    const pct = Math.min(110, Math.round(alloc / vp * 100));
+    const barPct = Math.min(100, pct);
+    const fill = col.querySelector('.tgt-alloc-fill');
+    if (fill) {
+      fill.className = 'tgt-alloc-fill kav-ss-bar-fill ' + (pct >= 100 ? 'great' : 'warn');
+      fill.style.width = barPct + '%';
+    }
+    const allocEl = col.querySelector('.tgt-alloc-mo-alloc');
+    if (allocEl) allocEl.textContent = alloc > 0 ? _tgtFmtM(alloc) : '';
+    const diffEl = col.querySelector('.tgt-alloc-mo-diff');
+    if (diffEl) {
+      if (alloc === 0)     { diffEl.textContent = 'ยังไม่แบ่ง';         diffEl.className = 'tgt-alloc-mo-diff warn'; }
+      else if (diff < 0)   { diffEl.textContent = 'ขาด ' + _tgtFmtM(-diff); diffEl.className = 'tgt-alloc-mo-diff warn'; }
+      else if (diff === 0) { diffEl.textContent = 'ครบแล้ว';             diffEl.className = 'tgt-alloc-mo-diff ok'; }
+      else                 { diffEl.textContent = '+' + _tgtFmtM(diff);  diffEl.className = 'tgt-alloc-mo-diff over'; }
+    }
   });
-  const pct = Math.min(100, Math.round(alloc / teamTotal * 100));
-  const numEl = document.getElementById('tgt-alloc-num');
-  const fillEl = document.getElementById('tgt-alloc-fill');
-  if (numEl) {
-    numEl.textContent = `${_tgtFmtM(alloc)} (${pct}%)`;
-    numEl.className = `tgt-alloc-num ${pct >= 100 ? 'ok' : 'warn'}`;
-  }
-  if (fillEl) {
-    fillEl.style.width = pct + '%';
-    fillEl.style.background = pct >= 100 ? '#4ddc97' : 'var(--amb,#f0b000)';
-  }
 }
 
 // ── Save ────────────────────────────────────────────────────────
