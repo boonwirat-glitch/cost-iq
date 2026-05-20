@@ -6962,8 +6962,11 @@ const curSpend=()=>D.history.length?D.history[D.history.length-1].s:176249;
 function animN(el,to,dur){
   if(!el)return;
   if(window._suppressAnimN){el.textContent=fmt(Math.round(to));return;}
+  el._animNId=(el._animNId||0)+1;
+  const myId=el._animNId;
   const start=Date.now();
   (function tick(){
+    if(el._animNId!==myId)return;
     const t=Math.min((Date.now()-start)/dur,1);
     const e=1-Math.pow(1-t,3);
     el.textContent=fmt(Math.round(to*e));
@@ -20786,7 +20789,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v202d');
+console.log('[Target Module v1] loaded — sense_v203');
 </script>
 
 
