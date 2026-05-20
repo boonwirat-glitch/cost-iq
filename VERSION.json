@@ -1,23 +1,19 @@
 {
-  "package": "freshket-sense-v195",
-  "version": "195.0.0",
-  "baseline": "v195-data-loading-fast-path",
+  "package": "freshket-sense-v202",
+  "version": "202.0.0",
+  "baseline": "v202-per-kam-bundle",
   "productBaseline": "v194-auth-fix",
   "notes": [
-    "v195: Pre-fetch R2 data immediately after login/checkSession (saves ~900ms)",
-    "v195: Splash fast-path when IndexedDB cache warm (MIN_SHOW=0, MAX_SHOW=400ms)",
-    "v195: Foreground file retry — 1 auto-retry after 2s on network fail",
-    "v195: Offline banner (persistent) when all 5 foreground files fail",
-    "v194: _doLoginHandled flag — prevents double hideLoginOverlay from doLogin + onAuthStateChange",
-    "v194: _sessionCheckHandling flag — prevents INITIAL_SESSION race with checkSession",
-    "v194: visibilitychange grace 2000→3500ms + cancel on TOKEN_REFRESHED",
-    "v194: pageshow grace 2000ms + _pgsGraceTimer (bfcache restore fix)",
-    "v194: _doLoginHandled reset in hideLoginOverlay as safety net",
-    "v194: resetRuntimeSessionState resets all v194 auth flags",
-    "v194: Splash MAX_SHOW 4200→2000ms",
-    "v193m: Default theme changed Slate→Light",
-    "v193m: Login icon sizing fixed (56→76px, box clips border-radius)",
-    "v193m: theme-color meta #006050→#0d3328 (removes blue bar on iOS)",
-    "v193m: SKU signal type slow (↘ ยอดต่ำ) with guard: days>15, days>avgInterval, gmv≥3000, gap≥30%"
+    "v202: Per-KAM bundle architecture — load sense_skus/alts_[email].csv (~4MB) instead of bulk 120MB",
+    "v202: KAM role pre-loads own bundle silently on login",
+    "v202: TL pre-warms bundle when drilling into KAM (teamviewDrillKam)",
+    "v202: ensureSenseData: bundle-first path with 10s timeout, fallback to bulk",
+    "v202: IndexedDB cache for bundles (bundle-skus/alts-[safeKey], 6h TTL)",
+    "v202: _kamBundleLoaded Set + _kamBundleInFlight dedup (concurrent fetch safe)",
+    "v202: reloadFromCloudflareR2 clears bundle state on explicit refresh",
+    "v201f: Dynamic KAM mapping in all 8 SQLs (replaces hardcoded 623-row list)",
+    "v201e: Fix Q10 portview_handover cur_month QUALIFY bug (double-transfer)",
+    "v201d: Alternatives moved to Tier 2 background sequential",
+    "v201c: Sense Gate animation starts immediately on tap"
   ]
 }
