@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v202d: _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v202e: fix double-ingest — remove skus+alts from Tier 2 BACKGROUND (bundle handles them, bulk caused 2x duplicates) | v202d: _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v202.html                                        ║
@@ -8304,7 +8304,9 @@ async function _fetchKamBundle(kamEmail){
 }
 
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
-  const BACKGROUND=['skus','alternatives'];  // v201c: alternatives moved Tier 2 sequential (iPhone 14+, iOS memory safe)
+  // v202e: skus+alternatives removed from Tier 2 — bundle handles them, bulk would double-ingest
+  // ensureSenseData handles on-demand fallback to bulk if bundle fails
+  const BACKGROUND=[];
   // v202: KAM role — fire per-KAM bundle in parallel (silent, no pill, no toast)
   const _bgRole=currentUserProfile&&currentUserProfile.role||'rep';
   if(_bgRole!=='tl'&&_bgRole!=='admin'&&currentUser&&currentUser.email){
@@ -20765,7 +20767,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v202d');
+console.log('[Target Module v1] loaded — sense_v202e');
 </script>
 
 
