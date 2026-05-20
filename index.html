@@ -5994,6 +5994,9 @@ function resetRuntimeSessionState(){
   try { window._doLoginHandled = false; } catch(e) {}
   try { window._sessionCheckHandling = false; } catch(e) {}
   try { if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; } } catch(e) {}
+  // v202: clear Sense badge + senseActivated so TL login doesn't inherit previous KAM session state
+  try { senseActivated=false; } catch(e) {}
+  try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
@@ -6373,9 +6376,19 @@ function _autoRouteAfterLogin() {
   if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
+  console.log('[v202 debug] _autoRouteAfterLogin: role=',role,'email=',currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
   if(role!=='tl'&&role!=='admin'&&currentUser&&currentUser.email){
     _fetchKamBundle(currentUser.email).catch(()=>{});
+  }
+  // v202 Fix C: TL/Admin — pre-warm all team bundles 5s after login
+  // (delay 5s so foreground files finish first, then silently load 15×4MB bundles)
+  if((role==='tl'||role==='admin')&&typeof _kamList!=='undefined'){
+    setTimeout(()=>{
+      const emails=[...new Set(portviewBulkData.map(r=>r.kamEmail).filter(Boolean))];
+      console.log('%c[v202 bundle] TL pre-warming bundles:','color:#00d070',emails);
+      emails.forEach(e=>_fetchKamBundle(e).catch(()=>{}));
+    },5000);
   }
   if (role === 'tl' || role === 'admin') {
     setMode('kam');
@@ -7097,6 +7110,8 @@ function loadFromStorage(targetId){
 
 function switchAccount(accountId){
   if(accountId===currentAccountId){closeDataPanel();return;}
+  const _swKam=_getKamEmailForAccount&&_getKamEmailForAccount(accountId);
+  console.log('[v202 debug] switchAccount:',accountId,'| KAM:',_swKam||'(unknown)');
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
   churnExpanded=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
@@ -7873,6 +7888,8 @@ function handleFileUpload(type,input){
     const reader=new FileReader();
     reader.onload=e=>{
       portviewBulkData=parsePortviewBulk(e.target.result);
+      const _pvSample=portviewBulkData.length?portviewBulkData[0].kamEmail:'(none)';
+      console.log('%c[v202 debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
       const b=document.getElementById('badge-portview-bulk');
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
@@ -8190,9 +8207,15 @@ function _kamSafeKey(email){
 
 // Lookup kamEmail for an accountId from portviewBulkData (col 17, camelCase)
 function _getKamEmailForAccount(accountId){
-  if(!accountId||!portviewBulkData||!portviewBulkData.length)return null;
+  if(!accountId)return null;
+  if(!portviewBulkData||!portviewBulkData.length){
+    console.warn('[v202 debug] _getKamEmailForAccount: portviewBulkData not loaded yet for',accountId);
+    return null;
+  }
   const row=portviewBulkData.find(r=>r.id===accountId);
-  return(row&&row.kamEmail)||null;
+  const email=(row&&row.kamEmail)||null;
+  if(!email)console.warn('[v202 debug] _getKamEmailForAccount: no kamEmail for account',accountId,'(row found:',!!row,')');
+  return email;
 }
 
 // Fetch one bundle file: IndexedDB cache (6h TTL) → R2 → ingest
@@ -8200,18 +8223,26 @@ async function _fetchKamFile({url,type,tab}){
   try{
     const cached=await _csvCacheGet(tab);
     if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
+      const ageMin=Math.round((Date.now()-cached.ts)/60000);
+      console.log('%c[v202 bundle] 💾 IndexedDB cache hit:','color:#adf',tab,'age:',ageMin,'min');
       const ok=await ingestCSVText(type,cached.text,{timeoutMs:90000});
       if(ok)return true;
+      console.warn('[v202 bundle] cache ingest failed, retrying from R2:',tab);
     }
   }catch(e){}
   try{
+    const _t0=Date.now();
     const text=await _fetchTextWithTimeout(url,90000);
-    if(!text)return false;
+    if(!text){console.warn('[v202 bundle] empty response:',url);return false;}
+    const _kb=Math.round(text.length/1024);
+    const _ms=Date.now()-_t0;
+    console.log('%c[v202 bundle] 🌐 R2 fetch OK:','color:#00d070',tab,_kb+'KB in '+_ms+'ms');
     await _csvCacheSet(tab,text);
     const ok=await ingestCSVText(type,text,{timeoutMs:90000});
+    if(!ok)console.warn('[v202 bundle] ingest failed after fetch:',tab);
     return!!ok;
   }catch(e){
-    console.warn('[KAM bundle] fetch failed:',tab,e&&e.message?e.message:e);
+    console.warn('%c[v202 bundle] ❌ fetch error:','color:red',url,e&&e.message?e.message:e);
     return false;
   }
 }
@@ -8480,7 +8511,17 @@ async function ensureSenseData(accountId, {silent=false}={}){
   const needed=[];
   if(!bulkSkusData[accountId])needed.push('skus');
   if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
-  if(!needed.length)return true;
+  // v202 debug: full state snapshot on every Sense Gate tap
+  console.log('%c[v202 debug] ensureSenseData entry:','color:#6cf',{
+    accountId, needed,
+    pvReady: portviewBulkData&&portviewBulkData.length>0,
+    pvCount: portviewBulkData?portviewBulkData.length:0,
+    bundleLoaded: [..._kamBundleLoaded],
+    inFlight: Object.keys(_kamBundleInFlight),
+    role: currentUserProfile&&currentUserProfile.role,
+    userEmail: currentUser&&currentUser.email
+  });
+  if(!needed.length){console.log('[v202 debug] ensureSenseData: data already in memory — instant');return true;}
   // v202: try per-KAM bundle first (~4MB) before falling back to bulk (~120MB)
   // Fix 2: if portviewBulkData not loaded yet, use currentUser.email for KAM role
   const _role=currentUserProfile&&currentUserProfile.role||'rep';
@@ -8493,16 +8534,18 @@ async function ensureSenseData(accountId, {silent=false}={}){
       _bundleOk=true; // already in memory
       console.log('%c[v202 bundle] ✅ SERVED FROM MEMORY (cache hit):', 'color:#00d070', _kamEmail);
     }else if(_kamBundleInFlight[_safeKey]){
-      // await in-flight with 10s timeout — animation covers the wait
+      // await in-flight — bundle ~4MB completes well within 30s
       _bundleOk=await Promise.race([
         _kamBundleInFlight[_safeKey],
-        new Promise(r=>setTimeout(()=>r(false),10000))
+        new Promise(r=>setTimeout(()=>r(false),30000))
       ]);
     }else{
-      // not started yet (edge case: TL direct nav) — trigger + 10s timeout
+      // cold fetch — not pre-warmed yet (TL direct nav)
+      // bundle ~4MB << bulk 135MB: even cold fetch beats bulk load time
+      console.log('%c[v202 bundle] cold fetch for TL:', 'color:#f0b000', _kamEmail);
       _bundleOk=await Promise.race([
         _fetchKamBundle(_kamEmail),
-        new Promise(r=>setTimeout(()=>r(false),10000))
+        new Promise(r=>setTimeout(()=>r(false),30000))
       ]);
     }
     if(_bundleOk){
