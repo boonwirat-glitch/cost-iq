@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v202.html                                        ║
@@ -5995,6 +5995,8 @@ function resetRuntimeSessionState(){
   try { window._sessionCheckHandling = false; } catch(e) {}
   try { if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; } } catch(e) {}
   // v202: clear ALL Sense + UI state so next login never inherits previous session
+  try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
+  try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
   try { senseActivated=false; } catch(e) {}
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
   try { _sgRevealPending=false; } catch(e) {}
@@ -14187,12 +14189,13 @@ function sgCommit(){
   }
   setTimeout(()=>{
     if(gate)gate.classList.add('sg-exit');
-    // v202a: mute opplist BEFORE showScreen so user never sees unlocked state
-    const _oppListEl=document.getElementById('opplist');
-    if(_oppListEl&&!footerUnlocked)_oppListEl.classList.add('opplist-muted');
     showScreen('opportunities');
     // Render opportunities with senseActivated=true so compact header shows
     renderOpps();
+    // v202b: mute AFTER renderOpps (element now exists) and SYNCHRONOUSLY
+    // so browser never paints an un-muted frame
+    const _oppListEl=document.getElementById('opplist');
+    if(_oppListEl&&!footerUnlocked)_oppListEl.classList.add('opplist-muted');
     _scheduleOppReveal();
     // Pulse plan selector to guide user's next action
     setTimeout(()=>{
@@ -14203,7 +14206,7 @@ function sgCommit(){
           if(e.animationName==='plan-sel-pulse')planSel.classList.remove('plan-pulse');
         },{once:true});
       }
-      // Re-apply mute (renderOpps may have re-rendered the list)
+      // Re-assert mute after plan-pulse (belt-and-suspenders)
       const oppList=document.getElementById('opplist');
       if(oppList&&!footerUnlocked)oppList.classList.add('opplist-muted');
     },420);
@@ -20750,7 +20753,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v202b');
+console.log('[Target Module v1] loaded — sense_v202c');
 </script>
 
 
