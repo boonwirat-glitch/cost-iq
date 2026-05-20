@@ -8112,7 +8112,7 @@ const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || '
 const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv'};
 const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
-  portview:{type:'portview-bulk',tab:'portview',cache:true},
+  portview:{type:'portview-bulk',tab:'portview',cache:false}, // Level 3: always fetch — changes daily
   history:{type:'bulk-data',tab:'history',cache:true},
   categories:{type:'bulk-categories',tab:'categories',cache:true},
   sku_current:{type:'bulk-sku-current',tab:'sku_current',cache:true},
@@ -8153,7 +8153,16 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
       const useCache=(cacheOverride!==undefined)?cacheOverride:!!spec.cache;
       if(useCache){
         const cached=await _csvCacheGet(tab);
-        if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL)text=cached.text;
+        if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
+          // Level 2: HEAD check — auto-detect when team uploads new file to R2
+          try{
+            const _url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
+            const _head=await fetch(_url,{method:'HEAD'});
+            const _lm=_head.headers.get('Last-Modified');
+            if(!_lm||new Date(_lm).getTime()<=cached.ts)text=cached.text;
+            // else: R2 file newer than cache → re-fetch below
+          }catch(e){text=cached.text;}
+        }
       }
       if(!text){
         const url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
@@ -10114,6 +10123,7 @@ last_month AS (
   SELECT
     o.account_id,
     MAX(o.account_name)       AS account_name,
+    MAX(o.res_name)           AS res_name,
     ROUND(SUM(i.gmv_ex_vat), 0) AS last_month_gmv,
     MAX(o.account_type)       AS account_type,
     COUNT(DISTINCT i.item_id) AS last_month_sku_count
@@ -10253,6 +10263,11 @@ LEFT JOIN cat_gap_summary cg ON lm.account_id = cg.account_id
 LEFT JOIN kam_since ks      ON lm.account_id = ks.account_id AND ks.ka_owner = km.kam_name
 CROSS JOIN params_derived p
 
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY km.kam_name, lm.res_name
+  ORDER BY COALESCE(cm.gmv_to_date, 0) DESC, lm.last_month_gmv DESC
+) = 1
+
 ORDER BY km.kam_name, COALESCE(cm.gmv_to_date, 0) / NULLIF(lm.last_month_gmv * p.days_elapsed / p.days_in_month, 0) ASC;
 `,
 Q9B:`-- ════════════════════════════════════════════════════════════
@@ -10300,9 +10315,30 @@ kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
   FROM kam_map_src
   QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+),
+
+-- res_primary: for each (KAM, res_name), find the primary account_id
+-- Primary = account with most recent order → ensures migrated accounts collapse to new ID
+res_last_order AS (
+  SELECT
+    km.kam_name,
+    o.res_name,
+    o.account_id,
+    MAX(o.delivery_date) AS last_order_date
+  FROM \`freshket-rn.dwh.order\` o
+  INNER JOIN kam_map km ON o.account_id = km.account_id
+  WHERE o.res_name IS NOT NULL
+    AND o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
+  GROUP BY 1, 2, 3
+),
+res_primary AS (
+  SELECT kam_name, res_name, account_id AS primary_account_id
+  FROM res_last_order
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY kam_name, res_name ORDER BY last_order_date DESC) = 1
 )
+
 SELECT
-  o.account_id,
+  COALESCE(rp.primary_account_id, o.account_id) AS account_id,
   MAX(o.account_name) AS account_name,
   CASE EXTRACT(MONTH FROM DATE_TRUNC(o.delivery_date, MONTH))
     WHEN 1  THEN 'ม.ค.'  WHEN 2  THEN 'ก.พ.'  WHEN 3  THEN 'มี.ค.'
@@ -10315,6 +10351,7 @@ SELECT
 
 FROM \`dwh.order\` o, UNNEST(o.item) AS i
 INNER JOIN kam_map km ON o.account_id = km.account_id
+LEFT JOIN res_primary rp ON km.kam_name = rp.kam_name AND o.res_name = rp.res_name
 
 WHERE o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
   AND o.delivery_date <  DATE_TRUNC(CURRENT_DATE(), MONTH)
