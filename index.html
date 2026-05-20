@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║  TABLE OF CONTENTS — sense_v199c.html                                       ║
+║  TABLE OF CONTENTS — sense_v202.html                                        ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
 ║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
 ║  Never rely on TOC line numbers from memory — always re-read file first.    ║
@@ -88,14 +88,23 @@
 ║   L7982    CLOUDFLARE R2 DATA LOADER                                         ║
 ║             · FOREGROUND: ['portview','history','categories','sku_current',  ║
 ║                            'outlets','handover'] — 6 files, cached IndexedDB║
-║             · BACKGROUND: ['skus'] — session-memory only                    ║
+║             · BACKGROUND: ['skus','alternatives'] — session-memory only     ║
 ║             · ALTERNATIVES: lazy — loaded on first Sense Gate tap            ║
 ║             · DEFERRED Tier 3: bulk_price — starts 3s after background done ║
 ║             · R2_FILES / R2_SPECS — key → filename / ingest type            ║
-║   L8123    _startCloudBackgroundLoad()  — Tier 2: skus only (alts lazy)      ║
-║   L8146    _loadBgSequential()  — sequential background fetch loop           ║
-║   L8210    _startDeferredPriceLoad()  — Tier 3: bulk_price silent load       ║
-║   L8416    RENDER — OVERVIEW                                                 ║
+║   L8063    _kamBundleLoaded (Set) / _kamBundleInFlight ({})  v202 globals   ║
+║   L8173    v202: PER-KAM BUNDLE LOADER                                      ║
+║             · _kamSafeKey(email) L8173 — email → safe filename key          ║
+║             · _getKamEmailForAccount(accountId) L8179 — portviewBulkData    ║
+║             · _fetchKamFile({url,type,tab}) L8186 — IndexedDB→R2→ingest    ║
+║             · _fetchKamBundle(kamEmail) L8208 — parallel 2 files + dedup   ║
+║             Triggers: KAM login (L8246), TL pre-warm (teamviewDrillKam)    ║
+║             Fallback: 404/10s timeout → ensureCloudflareFiles bulk          ║
+║   L8239    _startCloudBackgroundLoad()  — Tier 2 + v202 KAM bundle trigger  ║
+║   L8262    _loadBgSequential()  — sequential background fetch loop          ║
+║   L8427    reloadFromCloudflareR2()  — clears bundle state (v202)           ║
+║   L8463    ensureSenseData()  — bundle-first path (v202), bulk fallback     ║
+║   L8530    RENDER — OVERVIEW                                                ║
 ║   L8665    renderOverview()                                                  ║
 ║   L8978    RENDER — PORTFOLIO                                                ║
 ║   L8990    renderPortfolio()                                                 ║
@@ -6126,7 +6135,7 @@ window._sessionCheckHandling = false;
 window._visibilityGraceTimer = null;
 
 supa.auth.onAuthStateChange((event, session) => {
-  console.log('[auth:v201a]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
+  console.log('[auth:v202]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
   // Recovery links create a temporary auth session first. Do not route into the app yet.
   if (event === 'PASSWORD_RECOVERY' || passwordRecoveryMode || _urlLooksLikePasswordRecovery()) {
     if (session?.user) currentUser = session.user;
@@ -7697,10 +7706,10 @@ function handleFileUpload(type,input){
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
           if(D.alts.length&&D.skus.length)computeOPPS();
           if(!_sgRunning){
-            console.log('[SenseGate debug] bulk-skus Pass1: refreshAll running (_sgRunning=false)');
+            
             refreshAll();
           }else{
-            console.log('[SenseGate debug] bulk-skus Pass1: skipping refreshAll — gate lazy-loading (_sgRunning=true)');
+            
           }
         }
       }else{
@@ -8060,6 +8069,8 @@ let sheetsLoadStarted = false; // guard: prevent double-fetch if login completes
 let _cloudInitialPromise = null;
 let _cloudBackgroundPromise = null;
 let _cloudLoadToken = 0;
+const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded to memory
+const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
 // ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
 const _CSV_DB=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvDbName) || 'ciq-csv-v1';
@@ -8162,8 +8173,87 @@ async function ensureCloudflareFiles(keys,{label='กำลังโหลดข
 
 function _markForegroundPillDot(idx){return window.FreshketSenseRuntime.data.markForegroundPillDot(idx);}
 function _prepareProgressChips(keys,totalCount){return window.FreshketSenseRuntime.data.prepareProgressChips(keys,totalCount,R2_SPECS);}
+
+// ════════════════════════════════════════
+// v202: PER-KAM BUNDLE LOADER
+// ════════════════════════════════════════
+// Derive safe filename key from KAM email
+// e.g. duangruedee.bu@freshket.co → duangruedee_bu_freshket_co
+function _kamSafeKey(email){
+  if(!email)return'';
+  return email.toLowerCase().replace(/[^a-z0-9]/g,'_');
+}
+
+// Lookup kamEmail for an accountId from portviewBulkData (col 17, camelCase)
+function _getKamEmailForAccount(accountId){
+  if(!accountId||!portviewBulkData||!portviewBulkData.length)return null;
+  const row=portviewBulkData.find(r=>r.id===accountId);
+  return(row&&row.kamEmail)||null;
+}
+
+// Fetch one bundle file: IndexedDB cache (6h TTL) → R2 → ingest
+async function _fetchKamFile({url,type,tab}){
+  try{
+    const cached=await _csvCacheGet(tab);
+    if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
+      const ok=await ingestCSVText(type,cached.text,{timeoutMs:90000});
+      if(ok)return true;
+    }
+  }catch(e){}
+  try{
+    const text=await _fetchTextWithTimeout(url,90000);
+    if(!text)return false;
+    await _csvCacheSet(tab,text);
+    const ok=await ingestCSVText(type,text,{timeoutMs:90000});
+    return!!ok;
+  }catch(e){
+    console.warn('[KAM bundle] fetch failed:',tab,e&&e.message?e.message:e);
+    return false;
+  }
+}
+
+// Fetch both bundle files for a KAM (parallel, dedup via _kamBundleInFlight)
+// Silent: no pill, no toast — caller never awaits unless it needs the data
+async function _fetchKamBundle(kamEmail){
+  if(!kamEmail)return false;
+  const safeKey=_kamSafeKey(kamEmail);
+  if(_kamBundleLoaded.has(safeKey))return true;
+  if(_kamBundleInFlight[safeKey])return _kamBundleInFlight[safeKey];
+  const p=(async()=>{
+    try{
+      const skusUrl=`${R2_BASE}/sense_skus_${safeKey}.csv`;
+      const altsUrl=`${R2_BASE}/sense_alts_${safeKey}.csv`;
+      console.log('%c[v202 bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
+      console.log('%c[v202 bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
+      const[okSkus,okAlts]=await Promise.all([
+        _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
+        _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
+      ]);
+      if(okSkus&&okAlts){
+        _kamBundleLoaded.add(safeKey);
+        console.log('%c[v202 bundle] ✅ LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold;font-size:13px', kamEmail);
+      }else{
+        console.warn('[v202 bundle] ⚠️ incomplete:', kamEmail, 'skus:', okSkus, 'alts:', okAlts);
+      }
+      return okSkus&&okAlts;
+    }catch(e){
+      console.warn('[v202 bundle] ❌ error:', kamEmail, e&&e.message?e.message:e);
+      return false;
+    }finally{
+      delete _kamBundleInFlight[safeKey];
+    }
+  })();
+  _kamBundleInFlight[safeKey]=p;
+  return p;
+}
+
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
   const BACKGROUND=['skus','alternatives'];  // v201c: alternatives moved Tier 2 sequential (iPhone 14+, iOS memory safe)
+  // v202: KAM role — fire per-KAM bundle in parallel (silent, no pill, no toast)
+  const _bgRole=currentUserProfile&&currentUserProfile.role||'rep';
+  if(_bgRole!=='tl'&&_bgRole!=='admin'&&currentUser&&currentUser.email){
+    _fetchKamBundle(currentUser.email).catch(()=>{});
+  }
   if(_cloudBackgroundPromise)return _cloudBackgroundPromise;
   const counter=document.getElementById('sheets-loaded-count');
   const bgDots=document.getElementById('dlp-bg-dots');
@@ -8354,6 +8444,9 @@ async function reloadFromCloudflareR2(){
   _cloudInitialPromise=null;
   _cloudBackgroundPromise=null;
   _cloudLoadToken++;
+  // v202: clear per-KAM bundle state so reload fetches fresh bundles
+  _kamBundleLoaded.clear();
+  Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]);
   return loadFromCloudflareR2();
 }
 
@@ -8384,13 +8477,43 @@ async function ensureSenseData(accountId, {silent=false}={}){
   if(!bulkSkusData[accountId])needed.push('skus');
   if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
   if(!needed.length)return true;
-  // v201c: Tier 2 may already be fetching these — ensureCloudflareFiles deduplicates via _cloudInFlight
-  // so this just awaits the in-flight promise rather than starting a new fetch
+  // v202: try per-KAM bundle first (~4MB) before falling back to bulk (~120MB)
+  const _kamEmail=_getKamEmailForAccount(accountId);
+  if(_kamEmail){
+    const _safeKey=_kamSafeKey(_kamEmail);
+    let _bundleOk=false;
+    if(_kamBundleLoaded.has(_safeKey)){
+      _bundleOk=true; // already in memory
+      console.log('%c[v202 bundle] ✅ SERVED FROM MEMORY (cache hit):', 'color:#00d070', _kamEmail);
+    }else if(_kamBundleInFlight[_safeKey]){
+      // await in-flight with 10s timeout — animation covers the wait
+      _bundleOk=await Promise.race([
+        _kamBundleInFlight[_safeKey],
+        new Promise(r=>setTimeout(()=>r(false),10000))
+      ]);
+    }else{
+      // not started yet (edge case: TL direct nav) — trigger + 10s timeout
+      _bundleOk=await Promise.race([
+        _fetchKamBundle(_kamEmail),
+        new Promise(r=>setTimeout(()=>r(false),10000))
+      ]);
+    }
+    if(_bundleOk){
+      loadFromStorage(accountId);
+      if(D.alts.length&&D.skus.length)computeOPPS();
+      if(!silent){refreshAll();updateDataStatus();}
+      if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+      return true;
+    }
+    // bundle 404 / timeout → fall through to bulk
+    console.warn('%c[v202 bundle] ⚠️ FALLBACK → loading bulk (bundle 404/timeout) for:', 'color:#f0b000;font-weight:bold', _kamEmail);
+  }
+  // Bulk fallback: v201c path — deduplicates via _cloudInFlight
   showToast('กำลังโหลด SKU + ทางเลือก...','⟳');
   const ok=await ensureCloudflareFiles(needed,{label:'SKU + ทางเลือก'});
   loadFromStorage(accountId);
   if(D.alts.length&&D.skus.length)computeOPPS();
-  if(!silent){refreshAll();updateDataStatus();}  // v199b: skip when called from Sense Gate to avoid screen navigation
+  if(!silent){refreshAll();updateDataStatus();}
   if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
   return ok;
 }
@@ -18482,6 +18605,8 @@ function setTvView(mode){
 
 function teamviewDrillKam(kamKey){
   portviewRepEmail=kamKey;
+  // v202: pre-warm KAM bundle when TL drills into a rep (silent, fire-and-forget)
+  if(kamKey)_fetchKamBundle(kamKey).catch(()=>{});
   portviewLevel='rep-detail';
   portviewAiDone=false;
   window._portviewFromTeamview=true;
@@ -20565,7 +20690,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v201a');
+console.log('[Target Module v1] loaded — sense_v202');
 </script>
 
 
