@@ -7007,7 +7007,7 @@ function saveToStorage(){
     const smallD={
       alts:D.alts.filter(p=>p.confidence&&p.confidence!=='unverified'), // verified only
       alts_meta:D.alts_meta,
-      current_month:D.current_month,
+      // v203: current_month excluded — always sourced from portview (bulkCurrentMonthData), never localStorage
       meta:D.meta,
       sku_current:[]  // per-account churn; skip — regenerated from bulk
     };
@@ -7033,7 +7033,7 @@ function loadFromStorage(targetId){
       if(d){
         D.alts=d.alts||[];         // verified alts (user work)
         D.alts_meta=d.alts_meta||D.alts_meta;
-        D.current_month=d.current_month||null;
+        // v203: current_month intentionally NOT loaded from localStorage — always sourced from portview
         D.meta=d.meta||D.meta;
         D.sku_current=d.sku_current||[];
       }
@@ -7043,6 +7043,10 @@ function loadFromStorage(targetId){
       if(sp)currentPlanMode=sp;
       const updEl=document.getElementById('dp-updated-time');
       if(updEl&&ts)updEl.textContent='โหลดครั้งล่าสุด: '+new Date(ts).toLocaleString('th-TH');
+      // v203: one-time migration — remove stale current_month from existing localStorage entries
+      if(d&&d.current_month!==undefined){
+        try{const _raw=JSON.parse(s);if(_raw.D)delete _raw.D.current_month;localStorage.setItem(_acctKey(),JSON.stringify(_raw));}catch(e){}
+      }
     }
 
     // ── Step 2: Inject bulk ops data from in-memory globals ──
