@@ -1,210 +1,206 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v202f: fix duplicate SKUs — clear bulkSkusData+bulkAltsUnverified in reloadFromCloudflareR2 and resetRuntimeSessionState (ingest push() on stale data caused 2x rows) | v202e: fix double-ingest — remove skus+alts from Tier 2 BACKGROUND (bundle handles them, bulk caused 2x duplicates) | v202d: _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v202d: _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v202.html                                        ║
 ║  ⚠️  AI INSTRUCTION: Read this block FIRST before any edit.                 ║
-║  Grep section: grep -n "SECTION_NAME" file | head -5                        ║
-║  Never rely on TOC line numbers from memory — always re-read file first.    ║
+║  Grep section: grep -n "MARKER" file | head -5  (use exact comment text)    ║
+║  NEVER trust TOC line numbers from memory — always grep the live file.      ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  ── HTML STRUCTURE & SCRIPT TAGS ──────────────────────────────────────────  ║
-║   L309     <style>  MAIN CSS (all component styles)                          ║
-║   L1840    .tgt-mv-* CSS  (NRR movement rows: wrap/header/row/label/nrr)    ║
-║   L1851    .ai-typing CSS  (3-dot bouncing animation for AI loading state)  ║
-║   L2881    <script id="freshket-sense-config">  App config + constants       ║
-║             └─ data.foregroundKeys: 6 files incl. 'handover' (v198)         ║
-║             └─ data.r2Files / r2Specs: portview_handover.csv → bulk-handover║
-║   L2968    <script id="freshket-style-runtime">  Dynamic style injection     ║
-║   L3115    <script id="freshket-view-registry">  Screen/view registry        ║
-║   L3252    <script id="freshket-read-model">  Data read model                ║
-║   L3593    <script id="freshket-navigation-runtime">  Navigation logic       ║
-║   L3720    <script id="freshket-report-renderer">  Report renderer           ║
-║   L3875    <script id="freshket-overview-renderer">  Overview screen         ║
-║   L4059    <script id="freshket-portfolio-renderer">  Portfolio screen       ║
-║   L4342    <script id="freshket-kam-team-renderer">  KAM Team View           ║
-║   L4646    LOGIN OVERLAY HTML  (id="login-overlay", z-index:9999)            ║
-║             └─ lgi-brand centered column, lgi-logo-box 76×76px squircle     ║
-║   L4771    #sense-splash CSS + HTML  (z-index:10000 — always above login)   ║
-║             └─ Flash fix: splash z-index > login overlay z-index            ║
-║             └─ Timing: tSetup=900ms | tMax=400ms(warm)/2000ms(cold)         ║
-║   L4855    Hidden file inputs  (fi-portview-bulk, fi-bulk-handover, …)      ║
-║   L5025    BULK DATA PANEL — Data tab UI                                     ║
-║             └─ L5038  slot-portview-bulk    portview.csv     Q8E            ║
-║             └─ L5045  slot-bulk-handover    portview_handover.csv  Q10      ║
-║             └─ L5052  slot-bulk-sku-current bulk_sku_current.csv  Q7B       ║
-║             └─ L5059  slot-bulk-outlets     bulk_outlets.csv  Q5B           ║
-║             └─ L5077  slot-bulk-data        bulk_history.csv  Q9            ║
-║             └─ L5084  slot-bulk-cats        bulk_categories.csv  Q2B        ║
-║             └─ L5091  slot-bulk-skus        bulk_skus.csv  Q3B              ║
-║             └─ L5101  slot-bulk-alternatives bulk_alternatives.csv  Q4B    ║
-║             └─ L5108  slot-bulk-price       bulk_price.csv  Q6B             ║
-║   L5614    RESTAURANT SWIPE CUE HTML  (kam-nav-handle)                      ║
-║   L5670    TEAMVIEW HTML  (TL/Admin team tab, id="scr-teamview")             ║
+║  DIRECTORY (verified against sense_v202.html — 20,745 lines total)          ║
+║  Format:  Lnnnnn  section name / function()                                  ║
 ║                                                                              ║
-║  ── MAIN <script> BLOCK ───────────────────────────────────────────────────  ║
-║   L5918    SUPABASE CONFIG + AUTH                                            ║
-║   L6088    Auth guard globals:                                               ║
+║  ── HTML STRUCTURE & MODULAR SCRIPT TAGS ─────────────────────────────────  ║
+║   L313     <style>  MAIN CSS (all component styles)                          ║
+║   L1843    .tgt-mv-* CSS  (NRR movement rows: wrap/header/row/label/nrr)    ║
+║   L1854    .ai-typing CSS  (3-dot bouncing animation for AI loading state)  ║
+║   L2888    <script id="freshket-sense-config">  App config + constants       ║
+║             └─ foregroundKeys: 6 files incl. 'handover'                     ║
+║             └─ r2Files / r2Specs: portview_handover.csv → bulk-handover     ║
+║   L2975    <script id="freshket-style-runtime">  Dynamic style injection     ║
+║   L3122    <script id="freshket-view-registry">  Screen/view registry        ║
+║   L3259    <script id="freshket-read-model">  Data read model                ║
+║   L3600    <script id="freshket-navigation-runtime">  Navigation logic       ║
+║   L3727    <script id="freshket-report-renderer">  Report renderer           ║
+║   L3882    <script id="freshket-overview-renderer">  Overview screen         ║
+║   L4072    <script id="freshket-portfolio-renderer">  Portfolio screen       ║
+║   L4355    <script id="freshket-kam-team-renderer">  KAM Team View           ║
+║   L4526    <!-- ══ LOGIN OVERLAY ══ -->  comment anchor                      ║
+║   L4659    <div id="login-overlay">  (z-index:9999 — always below splash)   ║
+║             └─ lgi-brand centered column, lgi-logo-box 76×76px squircle     ║
+║   L4757    #sense-splash CSS / L4784 HTML  (z-index:10000 — above login)   ║
+║             └─ Timing: tSetup=900ms | tMax=400ms(warm)/2000ms(cold)         ║
+║   L4868    Hidden file inputs  (fi-portview-bulk, fi-bulk-handover, …)      ║
+║   L5019    BULK DATA PANEL  <div id="dp-bulk">  (Data tab UI)               ║
+║             └─ L5051  slot-portview-bulk    portview.csv     Q8E            ║
+║             └─ L5058  slot-bulk-handover    portview_handover.csv  Q10      ║
+║             └─ L5065  slot-bulk-sku-current bulk_sku_current.csv  Q7B       ║
+║             └─ L5072  slot-bulk-outlets     bulk_outlets.csv  Q5B           ║
+║             └─ L5090  slot-bulk-data        bulk_history.csv  Q9            ║
+║             └─ L5097  slot-bulk-cats        bulk_categories.csv  Q2B        ║
+║             └─ L5104  slot-bulk-skus        bulk_skus.csv  Q3B              ║
+║             └─ L5114  slot-bulk-alternatives bulk_alternatives.csv  Q4B    ║
+║             └─ L5121  slot-bulk-price       bulk_price.csv  Q6B             ║
+║   L5135    KAM BRIEFING SECTION HTML                                         ║
+║   L5586    SKU PRICE DETAIL SHEET HTML                                       ║
+║   L5600    RESTAURANT SWIPE CUE HTML  (<!-- RESTAURANT SWIPE CUE -->)       ║
+║   L5682    TEAMVIEW HTML  (TL/Admin team tab, id="scr-teamview")             ║
+║                                                                              ║
+║  ── MAIN <script> BLOCK  (L5929 open) ────────────────────────────────────  ║
+║   L5931    SUPABASE CONFIG + AUTH  (SUPA_URL / SUPA_KEY / supa client)      ║
+║   L6108    Reactive auth state listener comment block                        ║
+║   L6117    Auth guard globals:                                               ║
+║             · _doLoginHandled       — prevents double hideLoginOverlay       ║
 ║             · _sessionCheckHandling — blocks INITIAL_SESSION race           ║
 ║             · _visibilityGraceTimer — cancellable 3.5s re-login timer       ║
-║             · _signedOutTimer — debounce SIGNED_OUT (v198: 600ms)           ║
-║   L6096    supa.auth.onAuthStateChange()                                     ║
+║   L6121    supa.auth.onAuthStateChange()                                     ║
 ║             · TOKEN_REFRESHED → silent update, cancel grace timer           ║
-║             · SIGNED_IN / INITIAL_SESSION → load profile → hideLoginOverlay ║
-║             · SIGNED_OUT → debounce 600ms before showing login (v198)       ║
-║             · Debug log: [auth:v198] event | session | currentUser (v198)   ║
-║   L6140    doLogin()  — email/password login                                 ║
-║   L6178    showSenseSplash(onDone)                                           ║
-║             · cache-warm path: MIN_SHOW=0ms / MAX_SHOW=400ms                ║
-║             · cold path: MIN_SHOW=1650ms / MAX_SHOW=2000ms                  ║
-║             · tSetup: calls onDone() at t=900ms (app routing behind splash) ║
-║   L6259    hideLoginOverlay()                                                ║
-║             · v198 flash fix: hides #login-overlay IMMEDIATELY on entry,    ║
-║               before showSenseSplash starts (prevents fade-through flash)   ║
+║             · SIGNED_IN / INITIAL_SESSION → loadProfile → hideLoginOverlay  ║
+║             · SIGNED_OUT → debounce 600ms before showing login              ║
+║             · Debug log: [auth:v202] event | session | currentUser          ║
+║   L6165    doLogin()  — email/password login                                 ║
+║   L6203    showSenseSplash(onDone)                                           ║
+║             · cache-warm: MIN_SHOW=0ms / MAX_SHOW=400ms                     ║
+║             · cold: MIN_SHOW=1650ms / MAX_SHOW=2000ms                       ║
+║             · tSetup: calls onDone() at t=900ms (routing behind splash)     ║
+║   L6287    hideLoginOverlay()                                                ║
+║             · hides #login-overlay IMMEDIATELY on entry (flash fix)         ║
 ║             · loginTransitionRunning guard — prevents double-call           ║
 ║             · 4s safety valve clears lock if splash hangs                   ║
-║   L6329    _autoRouteAfterLogin()  — route to teamview / portview after login║
-║   L6349    loadUserProfile()  — Supabase profiles fetch, fallback on error  ║
-║   L6423    checkSession()  — page-load session restore                       ║
-║   L6468    Phase 10: Auth/session runtime boundary                           ║
-║   L6644    SAMPLE DATA                                                       ║
-║   L6745    portviewBulkData  []  Q8E: all accounts bulk (col 19 = days_with_║
-║                                        current_kam from kam_since CTE)       ║
-║   L6751    bulkHistoryData   {}  Q9: aid → [{m, s, orders}]                 ║
-║   L6757    bulkHandoverData  {}  Q10: {byAccountId, byKamName} (v198)       ║
-║             · byAccountId[account_id] → {prevKamName, lastMonthGmv, …}     ║
-║             · byKamName[kam_name]     → [{accountId, lastMonthGmv, …}]      ║
-║   L6762    portviewLevel / portviewRepEmail / bulkKamNames / …              ║
-║   L6791    KAM SIGNALS  (rule-based, no AI)                                 ║
-║   L6890    UTILS                                                             ║
-║   L6923    MULTI-ACCOUNT STORAGE  (localStorage index + per-account data)   ║
-║   L7273    BULK ALTERNATIVES (Q4B) — v52                                    ║
-║   L7509    DATA LOADING  (CSV parse, handleFileUpload dispatcher)            ║
-║   L7514    handleFileUpload(type, input)  — dispatch by type:                ║
-║             · bulk-categories / bulk-data / portview-bulk / bulk-sku-current ║
-║             · bulk-skus / bulk-alternatives / bulk-price / bulk-outlets     ║
-║             · bulk-handover (v198) → parses Q10, builds bulkHandoverData    ║
-║   L7998    ingestCSVText(type, text)  — R2 text → File → handleFileUpload   ║
-║   L7982    CLOUDFLARE R2 DATA LOADER                                         ║
-║             · FOREGROUND: ['portview','history','categories','sku_current',  ║
-║                            'outlets','handover'] — 6 files, cached IndexedDB║
-║             · BACKGROUND: ['skus','alternatives'] — session-memory only     ║
-║             · ALTERNATIVES: lazy — loaded on first Sense Gate tap            ║
+║   L6366    _autoRouteAfterLogin()  — route to teamview/portview after login  ║
+║   L6400    loadUserProfile()  — Supabase profiles fetch, fallback on error  ║
+║   L6474    checkSession()  — page-load session restore                       ║
+║   L6519    Phase 10: Auth/session runtime boundary                           ║
+║   L6695    SAMPLE DATA                                                       ║
+║   L6796    Global data vars declaration block:                               ║
+║             · portviewBulkData []  Q8E — col 19 = days_with_current_kam     ║
+║             · bulkHistoryData  {}  Q9: aid → [{m, s, orders}]               ║
+║             · bulkCurrentMonthData {}  Q8E: aid → {gmv_to_date, ...}        ║
+║             · bulkHandoverData {byAccountId, byKamName}  Q10 (v198)         ║
+║             · bulkCatsData / bulkSkusData / bulkPriceData / bulkOutletsData ║
+║             · bulkSkuCurrentData / bulkAltsUnverified / bulkAccountNames    ║
+║   L6842    KAM SIGNALS  (rule-based, no AI)                                 ║
+║   L6925    renderKamSignalBar()                                              ║
+║   L6941    UTILS                                                             ║
+║   L6974    MULTI-ACCOUNT STORAGE  (localStorage index + per-account data)   ║
+║   L7326    BULK ALTERNATIVES (Q4B) — v52                                    ║
+║   L7562    DATA LOADING  (CSV parse, handleFileUpload dispatcher)            ║
+║   L7567    handleFileUpload(type, input)  — dispatch by type:                ║
+║             · portview-bulk / bulk-handover / bulk-sku-current / bulk-data  ║
+║             · bulk-cats / bulk-skus / bulk-alternatives / bulk-price        ║
+║             · bulk-outlets                                                  ║
+║   L8047    CLOUDFLARE R2 DATA LOADER                                         ║
+║   L8063    ingestCSVText(type, text)  — R2 text → File → handleFileUpload   ║
+║             · FOREGROUND: portview/history/categories/sku_current/           ║
+║                           outlets/handover — 6 files, IndexedDB 6h TTL      ║
+║             · BACKGROUND: skus/alternatives — Tier 2 sequential             ║
 ║             · DEFERRED Tier 3: bulk_price — starts 3s after background done ║
-║             · R2_FILES / R2_SPECS — key → filename / ingest type            ║
-║   L8063    _kamBundleLoaded (Set) / _kamBundleInFlight ({})  v202 globals   ║
-║   L8173    v202: PER-KAM BUNDLE LOADER                                      ║
-║             · _kamSafeKey(email) L8173 — email → safe filename key          ║
-║             · _getKamEmailForAccount(accountId) L8179 — portviewBulkData    ║
-║             · _fetchKamFile({url,type,tab}) L8186 — IndexedDB→R2→ingest    ║
-║             · _fetchKamBundle(kamEmail) L8208 — parallel 2 files + dedup   ║
-║             Triggers: KAM login (L8246), TL pre-warm (teamviewDrillKam)    ║
-║             Fallback: 404/10s timeout → ensureCloudflareFiles bulk          ║
-║   L8239    _startCloudBackgroundLoad()  — Tier 2 + v202 KAM bundle trigger  ║
-║   L8262    _loadBgSequential()  — sequential background fetch loop          ║
-║   L8427    reloadFromCloudflareR2()  — clears bundle state (v202)           ║
-║   L8463    ensureSenseData()  — bundle-first path (v202), bulk fallback     ║
-║   L8530    RENDER — OVERVIEW                                                ║
-║   L8665    renderOverview()                                                  ║
-║   L8978    RENDER — PORTFOLIO                                                ║
-║   L8990    renderPortfolio()                                                 ║
-║   L9238    RENDER — OPPORTUNITIES                                            ║
-║   L9249    renderOpps()                                                      ║
-║   L9539    DETAIL SHEET                                                      ║
-║   L9664    SCENARIO PLANNER                                                  ║
-║   L9673    ONBOARDING                                                        ║
-║   L9793    BULK_SQL  — SQL query registry (copyBulkSQL key lookup)           ║
-║             · Q8E: portview — Pace + Churn + days_with_current_kam          ║
-║             · Q9B: bulk_history (6mo GMV)                                   ║
-║             · Q2B: categories / Q3B: SKUs / Q4B: alternatives               ║
-║             · Q5B: outlets MTD / Q6B: price history / Q7B: sku_current      ║
-║             · Q10: portview_handover — transfer out per KAM (v198)          ║
-║   L13675   copyBulkSQL(key, btn)  — copy SQL to clipboard                   ║
-║   L14008   callAI(modelKey, sys, messages, maxTok)  — AI proxy wrapper      ║
-║   L15226   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
-║   L16067   PRICE BASIS DETECTION (Phase 1)                                   ║
+║   L8086    _kamBundleLoaded (Set) / _kamBundleInFlight ({})  v202 globals   ║
+║   L8192    v202: PER-KAM BUNDLE LOADER                                      ║
+║             · L8196  _kamSafeKey(email) — email → safe filename key         ║
+║             · L8202  _getKamEmailForAccount(accountId)                      ║
+║             · L8215  _fetchKamFile({url,type,tab}) — IndexedDB→R2→ingest   ║
+║             · L8245  _fetchKamBundle(kamEmail) — 2 files parallel + dedup  ║
+║             Triggers: KAM login silent, TL pre-warm on teamviewDrillKam     ║
+║             Fallback: 404/10s timeout → ensureSenseData bulk path           ║
+║   L8278    _startCloudBackgroundLoad()  — Tier 2 + v202 KAM bundle trigger  ║
+║   L8305    _loadBgSequential()  — sequential background fetch loop          ║
+║   L8466    reloadFromCloudflareR2()  — clears bundle state + reloads        ║
+║   L8502    ensureSenseData()  — bundle-first path (v202), bulk fallback     ║
+║   L8630    RENDER — OVERVIEW                                                ║
+║   L8879    renderOverview()                                                  ║
+║   L9192    RENDER — PORTFOLIO                                                ║
+║   L9204    renderPortfolio()                                                 ║
+║   L9452    RENDER — OPPORTUNITIES                                            ║
+║   L9463    renderOpps()                                                      ║
+║   L9753    DETAIL SHEET                                                      ║
+║   L9875    RENDER — SIMULATOR                                                ║
+║   L9878    SCENARIO PLANNER                                                  ║
+║   L9887    ONBOARDING                                                        ║
+║   L10004   SQL TEMPLATES                                                     ║
+║   L10006   const BULK_SQL  — SQL query registry (key → BigQuery SQL)        ║
+║             Queries: Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B/Q10                  ║
+║   L11047   copyBulkSQL(key, btn)  — copy SQL to clipboard                   ║
+║   L11169   PHASE 3 RUNTIME WIRING                                            ║
+║   L11281   callAI(opts)  — runtime AI call (internal, proxied)              ║
+║   L11371   PHASE 3 LEGACY AI ADAPTERS                                        ║
+║   L11380   callAI(modelKey, sys, messages, maxTok)  — legacy adapter        ║
+║   L11398   PHASE 5 DATA RUNTIME BOUNDARY                                     ║
+║   L11754   PHASE 5 DATA LEGACY ADAPTER                                       ║
+║   L12598   PHASE 11.1 APP STATE/STORAGE SAFETY STABILIZATION                ║
+║   L13439   PRICE BASIS DETECTION (Phase 1)                                   ║
 ║             · extractRangeKgMax() / parsePackSizeUnits() / getUnitLabel()   ║
-║   L16998   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
-║             · renderKamSignalBar() L6877                                    ║
-║             · renderKamThisMonth() L17282                                   ║
-║             · renderKamLastMonth() L17537                                   ║
-║             · renderKamOverview()  L17620                                   ║
-║             · generateKamBriefing() L17847                                  ║
-║   L18317   navPortHome()  (พอร์ต home button router)                        ║
-║   L18481   AI CHAT  (Olive chat panel + FAB)                                 ║
-║   L18616   AI CHAT SCOPE + CONTEXT ROUTER                                   ║
-║   L18903   INIT  (app bootstrap, DOMContentLoaded)                          ║
-║   L18915   GROUP A — NEW RENDER FUNCTIONS                                    ║
-║   L19386   KAM SUB-TABS                                                      ║
-║   L19450   UTILITY: getThaiMonthDays(label)                                 ║
-║   L19460   PACE SIGNAL COMPUTATION                                           ║
-║   L19531   SKU CHURN COMPUTATION                                             ║
-║   L19612   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
-║   L19646   RENDER PACE & CHURN TAB                                           ║
-║   L19811   Restaurant Sheet Overlay (openRestaurantSheet / _overlayNav)     ║
-║   L20008   portviewGoBack()                                                  ║
-║   L20025   generatePortviewInsight()                                         ║
-║   L20117   getPortviewAccounts()                                             ║
-║   L20221   renderPortviewList()                                              ║
-║   L20457   setPvSort() / _pvBuildCompactStrip()                             ║
-║   L20512   _pvInitCollapseObserver()  — scroll collapse logic               ║
-║   L20605   setPvView()                                                       ║
-║   L20622   renderPortviewSummary()  — tier grid + pace bar                  ║
-║   L20783   portviewSelectAccount()                                           ║
-║   L20811   renderPortview()                                                  ║
-║   L20870   TEAMVIEW — TL TEAM OVERVIEW                                       ║
-║   L20871   _buildKamGroups()                                                 ║
-║   L20917   renderTeamview()                                                  ║
-║   L20979   teamviewGoBack()                                                  ║
-║   L21022   renderTeamviewSummary()                                           ║
-║   L21118   renderTeamviewKamList()                                           ║
-║   L21248   teamviewDrillKam(kamKey)                                          ║
-║   L21257   generateTeamviewInsight()                                         ║
-║   L21318   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
-║   L21322   VISIT TRACKING (90-day rolling)                                   ║
-║   L21445   FOLDER LOAD (webkitdirectory / iframe/Claude preview)            ║
-║   L21492   Guard B: visibilitychange  — silent token re-check only          ║
-║   L21532   Guard C: pageshow  — iOS bfcache restore, 2s grace               ║
-║   L21621   Restaurant swipe cue helpers (v154)                               ║
-║   L21696   Restaurant swipe helpers                                          ║
+║   L13874   SENSE GATE OVERLAY  (JS logic — _sg* vars + sgOrbTap)            ║
+║   L14400   KAM MODE — MODEL + ACCOUNT SUMMARY                               ║
+║   L14684   renderKamThisMonth()                                              ║
+║   L14939   renderKamLastMonth()                                              ║
+║   L15022   renderKamOverview()                                               ║
+║   L15249   generateKamBriefing()  — Olive AI account brief                  ║
+║   L15719   navPortHome()  — "พอร์ต" home button router                      ║
+║   L15883   AI CHAT  (Olive chat panel + FAB)                                 ║
+║   L16018   AI CHAT SCOPE + CONTEXT ROUTER                                    ║
+║   L16305   INIT  (app bootstrap, DOMContentLoaded)                          ║
+║   L16317   GROUP A — NEW RENDER FUNCTIONS                                    ║
+║   L16788   KAM SUB-TABS                                                      ║
+║   L16849   UTILITY: getThaiMonthDays(label)                                 ║
+║   L16862   PACE SIGNAL COMPUTATION                                           ║
+║   L16933   SKU CHURN COMPUTATION                                             ║
+║   L17014   INTERVAL-AWARE CHURN FOR PORTVIEW                                 ║
+║   L17048   RENDER PACE & CHURN TAB                                           ║
+║   L17078   Restaurant Sheet Overlay (v183) — section start                  ║
+║   L17213   openRestaurantSheet()                                             ║
+║   L17410   portviewGoBack()                                                  ║
+║   L17427   generatePortviewInsight()  — Olive portfolio AI                  ║
+║   L17522   getPortviewAccounts()                                             ║
+║   L17626   renderPortviewList()                                              ║
+║   L17862   setPvSort() / _pvBuildCompactStrip()                             ║
+║   L17917   _pvInitCollapseObserver()  — scroll collapse logic               ║
+║   L18010   setPvView()                                                       ║
+║   L18027   renderPortviewSummary()  — tier grid + pace bar                  ║
+║   L18188   portviewSelectAccount()                                           ║
+║   L18216   renderPortview()                                                  ║
+║   L18272   TEAMVIEW — TL TEAM OVERVIEW                                       ║
+║   L18276   _buildKamGroups()                                                 ║
+║   L18322   renderTeamview()                                                  ║
+║   L18384   teamviewGoBack()                                                  ║
+║   L18427   renderTeamviewSummary()                                           ║
+║   L18523   renderTeamviewKamList()                                           ║
+║   L18653   teamviewDrillKam(kamKey)                                          ║
+║   L18664   generateTeamviewInsight()  — Olive team AI                       ║
+║   L18722   SQL TEMPLATES — ADD Q6 AND Q7                                     ║
+║   L18726   VISIT TRACKING  (90-day rolling, localStorage + Supabase)        ║
+║   L18849   FOLDER LOAD  (webkitdirectory / iframe/Claude preview)           ║
+║   L18896   Guard B: visibilitychange  — silent token re-check only          ║
+║   L18936   Guard C: pageshow  — iOS bfcache restore, 2s grace               ║
+║   L19025   Restaurant swipe cue helpers (v154)                               ║
+║   L19100   Restaurant swipe helpers                                          ║
 ║                                                                              ║
 ║  ── HTML CLOSING BLOCKS ───────────────────────────────────────────────────  ║
-║   L21733   VERIFY SHEET HTML                                                 ║
-║   L21809   SENSE GATE OVERLAY HTML                                           ║
-║   L21957   Target Setup Sheet CSS                                            ║
-║   L22160   <script id="target-module-js">  TARGET MODULE JS                 ║
-║   L22162   TARGET MODULE — sense_v162 (JS body)                             ║
-║             └─ L22245  _tgtFmtM()  format helper                            ║
-║             └─ L22267  loadTargets(quarter)                                  ║
-║             └─ L22310  _tgtGet() / _tgtKamBaseline3mo()                     ║
-║             └─ L22315  openTargetSetup() / closeTargetSetup() L22361        ║
-║             └─ L22684  _tgtComputeKamNRR(kamEmail, tlEmail)                 ║
-║                         · allAccounts filtered by kamEmail OR tlEmail        ║
-║                         · prevMonth from Q9 history (last closed month)     ║
-║                         · daysElapsed from bulkCurrentMonthData             ║
-║                         · Cohort classification (v198):                     ║
-║                           - Core: daysWithCurrentKam > daysElapsed          ║
-║                           - Transfer in: new + in bulkHandoverData           ║
-║                           - New (Sales): new + NOT in bulkHandoverData       ║
-║                         · _groupNRR(group) L22750  — outlet-level NRR      ║
-║                         · Transfer out L22804: KAM → hd.byKamName lookup;  ║
-║                           TL → aggregate all KAMs in team                   ║
-║                         · v198c fix: debounce context-aware (_ctxKey)       ║
-║             └─ L22845  renderPortviewNRRBar()  — retired stub               ║
-║             └─ L22851  renderPortviewTargetBar()  — NRR widget async fn     ║
-║                         · v198c: debounce bypassed on portviewRepEmail change║
-║                         · movement rows: Transfer in / New (Sales) / Out    ║
-║                         · ⓘ panel: Core NRR formula + cohort definitions    ║
-║             └─ L23156  _tgtToggleDetail()  — expand/collapse ⓘ panel       ║
-║             └─ L23165  _tgtInjectTeamviewTargetRows()  — TL card rows       ║
-║             └─ L23204  _tgtGetKamsForTL() / _tgtKamBaseline3mo()            ║
-║             └─ L23263  _tgtInjectAdminBtn()                                 ║
-║             └─ L23277  _injectPortviewBarEl() + init hook                   ║
+║   L19137   VERIFY SHEET HTML  (<!-- ══ VERIFY SHEET ══ -->)                  ║
+║   L19213   SENSE GATE OVERLAY HTML  (<!-- ══ SENSE GATE OVERLAY ══ -->)      ║
+║   L19361   Target Setup Sheet CSS                                            ║
+║   L19564   <script id="target-module-js">  TARGET MODULE JS                 ║
+║   L19566   // TARGET MODULE — sense_v162  (JS body start)                   ║
+║             └─ L19607  _tgtCurrentQuarter()                                  ║
+║             └─ L19649  _tgtFmtM()  format helper                            ║
+║             └─ L19671  loadTargets(quarter)                                  ║
+║             └─ L19714  _tgtGet(period, level, email)                         ║
+║             └─ L19719  openTargetSetup(mode)                                 ║
+║             └─ L19765  closeTargetSetup()                                    ║
+║             └─ L20088  _tgtComputeKamNRR(kamEmail, tlEmail)                 ║
+║             └─ L20249  renderPortviewNRRBar()  — retired stub               ║
+║             └─ L20255  renderPortviewTargetBar()  — NRR widget async fn     ║
+║             └─ L20567  _tgtToggleDetail()  — expand/collapse ⓘ panel       ║
+║             └─ L20576  _tgtInjectTeamviewTargetRows()  — TL card rows       ║
+║             └─ L20615  _tgtGetKamsForTL()                                    ║
+║             └─ L20627  _tgtKamBaseline3mo(kamEmail, tlEmail, mode)          ║
+║             └─ L20674  _tgtInjectAdminBtn()                                  ║
+║             └─ L20691  _injectPortviewBarEl() + init hook                   ║
 ║                                                                              ║
 ║  ── KEY GLOBALS ──────────────────────────────────────────────────────────  ║
 ║   D                    Main data object (per-account state)                 ║
-║   portviewBulkData     All-accounts portfolio (Q8E)                         ║
-║                         col 19: days_with_current_kam (kam_since CTE)       ║
+║   portviewBulkData     All-accounts portfolio Q8E  (col 19 = kam days)      ║
 ║   bulkHistoryData      Monthly GMV history Q9 — aid → [{m,s,orders}]       ║
 ║   bulkCurrentMonthData Current month Q8E — aid → {gmv_to_date, days_elapsed}║
 ║   bulkHandoverData     Transfer-out Q10 (v198):                             ║
@@ -222,18 +218,23 @@
 ║   portviewRepEmail     KAM email being viewed in rep-detail mode            ║
 ║   window._tgtPortviewPct  Shared pace% (widget ↔ compact strip)            ║
 ║   loginTransitionRunning  Lock: prevents double hideLoginOverlay call       ║
-║   window._signedOutTimer  Debounce: SIGNED_OUT → delayed login show (v198) ║
+║   window._signedOutTimer  Debounce: SIGNED_OUT → delayed login show        ║
+║   _kamBundleLoaded     Set<safeEmail> — v202 bundle cache tracking          ║
+║   _kamBundleInFlight   {} safeEmail → Promise — v202 dedup concurrent      ║
 ║                                                                              ║
-║  ── R2 FILE PIPELINE (foreground = cached IndexedDB TTL 6h) ───────────────  ║
-║   Key          File                   Query  Type                            ║
-║   portview     portview.csv           Q8E    portview-bulk                   ║
-║   history      bulk_history.csv       Q9     bulk-data                       ║
-║   categories   bulk_categories.csv    Q2B    bulk-categories                 ║
-║   sku_current  bulk_sku_current.csv   Q7B    bulk-sku-current                ║
-║   outlets      bulk_outlets.csv       Q5B    bulk-outlets                    ║
-║   handover     portview_handover.csv  Q10    bulk-handover  ← v198          ║
-║   skus         bulk_skus.csv          Q3B    bulk-skus  (background)         ║
-║   alternatives bulk_alternatives.csv  Q4B    bulk-alternatives (lazy/Sense)  ║
+║  ── R2 FILE PIPELINE ──────────────────────────────────────────────────────  ║
+║   Key          File                   Query  Tier                            ║
+║   portview     portview.csv           Q8E    FOREGROUND (IndexedDB 6h)       ║
+║   history      bulk_history.csv       Q9     FOREGROUND                      ║
+║   categories   bulk_categories.csv    Q2B    FOREGROUND                      ║
+║   sku_current  bulk_sku_current.csv   Q7B    FOREGROUND                      ║
+║   outlets      bulk_outlets.csv       Q5B    FOREGROUND                      ║
+║   handover     portview_handover.csv  Q10    FOREGROUND ← v198              ║
+║   skus         bulk_skus.csv          Q3B    BACKGROUND Tier 2              ║
+║   alternatives bulk_alternatives.csv  Q4B    BACKGROUND Tier 2 / lazy       ║
+║   bulk_price   bulk_price.csv         Q6B    DEFERRED Tier 3                ║
+║   sense_skus   sense_skus_[email].csv Q3B    KAM BUNDLE v202               ║
+║   sense_alts   sense_alts_[email].csv Q4B    KAM BUNDLE v202               ║
 ║                                                                              ║
 ║  ── NRR COHORT LOGIC (v198) ───────────────────────────────────────────────  ║
 ║   Core NRR     daysWithCurrentKam > daysElapsed (pre-existing accounts)     ║
@@ -242,16 +243,23 @@
 ║   Transfer out from bulkHandoverData.byKamName[kamName] (Q10 source)        ║
 ║   Graduation   Transfer in/New → Core automatically next month              ║
 ║   NRR formula  daily-rate normalized: (currGMV÷daysElapsed)÷(prevGMV÷days) ║
-║                computed separately for each cohort via _groupNRR()          ║
+║                computed separately for each cohort via _tgtComputeKamNRR()  ║
 ║                                                                              ║
-║  ── LOGIN FLASH FIX SUMMARY (v198) ────────────────────────────────────────  ║
-║   Root cause: cache-warm splash fades t=400ms, onDone() fires t=900ms       ║
-║              → 500ms window where login overlay visible through fading splash║
-║   Fix A: hideLoginOverlay() hides overlay IMMEDIATELY on entry (L6187)      ║
-║   Fix B: SIGNED_OUT debounce 600ms before showing login (L6024)             ║
-║   Z-index: login=9999, splash=10000 (splash always on top)                  ║
+║  ── AI PROMPT CALL SITES ─────────────────────────────────────────────────  ║
+║   L15249   generateKamBriefing()    KAM Account Brief (Olive)               ║
+║   L17427   generatePortviewInsight()  Portfolio Insight (Olive)             ║
+║   L18664   generateTeamviewInsight()  TL Team Insight (Olive)               ║
+║   L15883   AI CHAT section — Olive chat panel + FAB                         ║
+║   L11380   callAI() legacy adapter — all AI calls route here                ║
+║   L11281   callAI() runtime — proxied to Anthropic API                      ║
 ║                                                                              ║
-║  ── v160 PRICE DISPLAY LOGIC (5-tier, in _parseSKULine ~L7397) ────────────  ║
+║  ── PACE BAR OWNERSHIP ────────────────────────────────────────────────────  ║
+║   #portview-pace-bar   Legacy — renderPortviewSummary(), renders first      ║
+║   #tgt-portview-bar    NRR widget — renderPortviewTargetBar(), async swap   ║
+║   Rule: exactly ONE visible at any time. Atomic swap when tgt ready.        ║
+║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
+║                                                                              ║
+║  ── v160 PRICE DISPLAY LOGIC (5-tier, _parseSKULine) ─────────────────────  ║
 ║   Tier 1: Weight group             → ฿/กก.  (unit_price as-is)             ║
 ║   Tier 2: range_kg_max             → ฿/กก.  (avg_piece_price ÷ max)        ║
 ║   Tier 3a: pack_size kg/g          → ฿/กก.  (unit_price ÷ total_kg)        ║
@@ -260,75 +268,39 @@
 ║   Tier 4: ea count (ไข่/ผลไม้/ถุง) → ฿/[unit] (as-is)                      ║
 ║   Tier 5: fallback                 → ฿/กก.                                 ║
 ║                                                                              ║
-║  ── AI PROMPT CALL SITES ─────────────────────────────────────────────────  ║
-║   L17760+  generateKamBriefing()    KAM Account Brief                       ║
-║   L19938+  generatePortviewInsight()  Portfolio Insight (Olive)             ║
-║   L18394+  Olive Chat  (AI CHAT section / FAB)                              ║
-║   L13927+  callAI()  — all AI calls route through this wrapper              ║
-║   L21173+  generateTeamviewInsight()  TL Team Insight                       ║
-║                                                                              ║
-║  ── PACE BAR OWNERSHIP ────────────────────────────────────────────────────  ║
-║   #portview-pace-bar   Legacy — renderPortviewSummary(), shows immediately  ║
-║   #tgt-portview-bar    NRR widget — renderPortviewTargetBar(), async        ║
-║   Rule: exactly ONE visible at any time. Atomic swap when tgt ready.        ║
-║   Fallback: pace bar stays if target = 0 (no blank state).                  ║
+║  ── LOGIN FLASH FIX SUMMARY (v198) ────────────────────────────────────────  ║
+║   Root cause: cache-warm splash fades t=400ms, onDone() fires t=900ms       ║
+║              → 500ms window where login overlay shows through fading splash  ║
+║   Fix A: hideLoginOverlay() hides overlay IMMEDIATELY on entry (L6287)      ║
+║   Fix B: SIGNED_OUT debounce 600ms before showing login (L6121)             ║
+║   Z-index: login=9999, splash=10000 (splash always on top)                  ║
 ║                                                                              ║
 ║  ── VERSION HISTORY ───────────────────────────────────────────────────────  ║
-║   v199c  revert + fix account view background:                               ║
-║          · revert body.kam-mode .scr.on{background} — broke sense/opps       ║
-║          · targeted: body.kam-mode #scr-overview{background:#0d1f3c}         ║
-║          · kam-overview min-height: calc(100dvh-104px) — covers viewport     ║
-║            minus nav without over-extending past content                     ║
-║          · handleFileUpload alternatives: guard _sgRunning — skip            ║
-║            senseActivated=false + _sgRunning=false + refreshAll when gate    ║
-║            กำลัง lazy-load อยู่ (root cause: gate เด้งกลับหลัง download)     ║
-║          · sgOrbTap: _sgRunning=true ก่อน await ensureSenseData             ║
-║            ป้องกัน re-entry ระหว่างโหลด alternatives (tap-twice bug)         ║
-║            unlock คืนถ้า load fail เพื่อให้ retry ได้                        ║
-║          · ensureSenseData {silent} flag: skip refreshAll/selectMonth        ║
-║            เมื่อถูกเรียกจาก Sense Gate → ป้องกัน screen navigation           ║
-║          · #kam-overview min-height: 100%→100dvh — navy background           ║
-║            ครอบ viewport เสมอ ไม่มีพื้นดำโผล่ใต้ content                    ║
-║   v199a  alternatives lazy-load: ย้ายออกจาก BACKGROUND → โหลดครั้งแรก      ║
-║          เมื่อ KAM tap Sense Gate (ensureSenseData) แทน startup preload      ║
-║          ลด startup weight, UI messaging อัปเดต (pill/toast ลบ "ทางเลือก")  ║
-║   v198g  fix white overscroll: html.background=#080f1e เมื่อ kam-mode on     ║
-║          .kam-dc backdrop-filter สุด blur จาก html background สีขาว          ║
-║   v198f  bulk_price root cause fix: Tier 3 เพิ่มใน orchestrator finally()   ║
-║          legacy path ไม่เคยถูกเรียก — orchestrator ไม่มี Tier 3 เลย         ║
-║   v198e  bulk_price fix 2: token check ลบออกจาก _startDeferredPriceLoad    ║
-║          stale token จาก auth events ทำให้ Tier 3 ไม่รัน แม้ v198d แก้แล้ว ║
-║   v198d  bulk_price Tier 3 fix: _startDeferredPriceLoad moved to .finally() ║
-║          → price โหลดเสมอแม้ skus จะ fail                                  ║
-║   v198c  debounce context-aware fix: Transfer in/New Sales no longer stuck  ║
-║          when TL/Admin drills into specific KAM (portviewRepEmail check)    ║
-║   v198b (prev) TOC updated — all line numbers verified                      ║
-║   v198  NRR cohort classification + Q10 pipeline + login flash fixes:       ║
-║          · _tgtComputeKamNRR refactored: Core / Transfer in / New / Out     ║
-║          · _groupNRR() helper for per-cohort outlet-level NRR               ║
-║          · bulkHandoverData global + bulk-handover parser (Q10)             ║
-║          · portview_handover.csv: config / R2_FILES / FOREGROUND (3 places) ║
-║          · portview_handover slot in Data Panel UI                          ║
-║          · BULK_SQL Q10 — transfer out per KAM SQL                          ║
-║          · Movement rows in tgt bar: header + Transfer in/New/Out           ║
-║          · NRR color dynamic: green≥100% / amber≥90% / red<90% / grey null ║
-║          · Core NRR label + cohort definition docs in ⓘ panel              ║
-║          · rep-detail NRR fix: uses _repEmail not admin email               ║
-║          · TL transfer-out: aggregate all KAMs in team                      ║
-║          · currentMonthLabel fallback: date-computed, CE/Thai detect        ║
-║          · hideLoginOverlay: immediate overlay hide (flash fix)             ║
-║          · SIGNED_OUT debounce 600ms (flash fix)                            ║
-║          · .ai-typing CSS: 3-dot bouncing indicator                         ║
-║          · placeholder: ถามได้เลยค่ะ / ยอดลด badge / SVG trend-down icon   ║
-║   v196  AI proxy fix: iframe path checked before proxyUrl; sonnet model     ║
-║          string updated to claude-sonnet-4-6                                ║
-║   v190  KAM pill nav + single pace bar + atomic bar swap                    ║
-║   v185  KAM 3-Zone layout (Zone 1 status strip / Zone 3 context btn)        ║
-║   v183  Nav redesign + Restaurant Sheet overlay                             ║
-║   v182  TL NRR filter fix + Q8E days_with_current_kam col                  ║
-║   v165  NRR widget v2 full redesign                                         ║
-║   v162  Target Module extracted (now merged inline)                         ║
-║   v160  Price display 5-tier logic + universal unit parser                  ║
+║   v202d  _splashPreFade hook — force correct screen before splash fade      ║
+║   v202c  fix login flash (clear portviewBulkData+currentAccountId on logout)║
+║          + fix opplist-muted timing (sync after renderOpps)                 ║
+║   v202b  resetRuntimeSessionState: add footerUnlocked, setMode(kam),        ║
+║          bundle clear — eliminates all session-bleed bugs                   ║
+║   v202a  fix opplist-muted applied before showScreen                        ║
+║   v202   per-KAM bundle architecture (~4MB/KAM vs 120MB bulk)               ║
+║          IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL                  ║
+║          _kamBundleLoaded Set + _kamBundleInFlight dedup                    ║
+║   v201f  replace hardcoded 623-row kam_map in 8 SQLs with dynamic UNION     ║
+║   v201e  fix Q10 portview_handover cur_month QUALIFY (MAX delivery_date)    ║
+║   v201d  alternatives to Tier 2 background; _sgRevealPending guard          ║
+║   v201c  fix Sense Gate animation — _sgRunThinking starts on tap            ║
+║   v201   fix Sense Gate bounce-back during alternatives lazy-load           ║
+║   v199c  revert + fix account view background + sgOrbTap re-entry guard     ║
+║   v199a  alternatives lazy-load moved to first Sense Gate tap               ║
+║   v198   NRR cohort classification + Q10 pipeline + login flash fixes       ║
+║   v196   AI proxy fix; claude-sonnet-4-6 model string                       ║
+║   v190   KAM pill nav + single pace bar + atomic bar swap                   ║
+║   v185   KAM 3-Zone layout                                                  ║
+║   v183   Nav redesign + Restaurant Sheet overlay                            ║
+║   v182   TL NRR filter fix + Q8E days_with_current_kam col                  ║
+║   v165   NRR widget v2 full redesign                                         ║
+║   v162   Target Module extracted (now merged inline)                         ║
+║   v160   Price display 5-tier logic + universal unit parser                  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 -->
 <html lang="th">
@@ -5997,8 +5969,6 @@ function resetRuntimeSessionState(){
   // v202: clear ALL Sense + UI state so next login never inherits previous session
   try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
   try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
-  try { bulkSkusData={}; } catch(e) {}          // prevent stale SKU data from causing duplicates on next session
-  try { bulkAltsUnverified={}; } catch(e) {}
   try { senseActivated=false; } catch(e) {}
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
   try { _sgRevealPending=false; } catch(e) {}
@@ -6834,6 +6804,7 @@ let bulkCurrentMonthData={};  // Q8E: aid → {month_label,gmv_to_date,days_elap
 let bulkAccountNames={};  // merged from Q8E+Q9: aid → account name string
 let bulkCatsData={};       // Q2B: aid → {month_label → [{n,s,p,c}]}
 let bulkSkusData={};       // Q3B: aid → {month_label → [sku objects]}
+const _bulkSkusSeen={};   // v202 dedup: aid → mo → Set<itemId> — prevents double-push when bundle+bulk both load
 let bulkPriceData={};      // Q6B: aid → {item_id → [{mo, unit_price, avg_piece_price}]} (6-month price history for sparkline)
 let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover.csv — transfer out per KAM
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
@@ -7736,7 +7707,9 @@ function handleFileUpload(type,input){
             if(r){
               if(!bulkSkusData[r.aid])bulkSkusData[r.aid]={};
               if(!bulkSkusData[r.aid][r.mo])bulkSkusData[r.aid][r.mo]=[];
-              bulkSkusData[r.aid][r.mo].push(r.row);
+              if(!_bulkSkusSeen[r.aid])_bulkSkusSeen[r.aid]={};
+              if(!_bulkSkusSeen[r.aid][r.mo])_bulkSkusSeen[r.aid][r.mo]=new Set();
+              if(!_bulkSkusSeen[r.aid][r.mo].has(r.row.id)){_bulkSkusSeen[r.aid][r.mo].add(r.row.id);bulkSkusData[r.aid][r.mo].push(r.row);}
             }
           }else{remaining.push(l);}
         });
@@ -7774,7 +7747,9 @@ function handleFileUpload(type,input){
             if(r){
               if(!bulkSkusData[r.aid])bulkSkusData[r.aid]={};
               if(!bulkSkusData[r.aid][r.mo])bulkSkusData[r.aid][r.mo]=[];
-              bulkSkusData[r.aid][r.mo].push(r.row);
+              if(!_bulkSkusSeen[r.aid])_bulkSkusSeen[r.aid]={};
+              if(!_bulkSkusSeen[r.aid][r.mo])_bulkSkusSeen[r.aid][r.mo]=new Set();
+              if(!_bulkSkusSeen[r.aid][r.mo].has(r.row.id)){_bulkSkusSeen[r.aid][r.mo].add(r.row.id);bulkSkusData[r.aid][r.mo].push(r.row);}
             }
           }
           idx=end;
@@ -8306,9 +8281,7 @@ async function _fetchKamBundle(kamEmail){
 }
 
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
-  // v202e: skus+alternatives removed from Tier 2 — bundle handles them, bulk would double-ingest
-  // ensureSenseData handles on-demand fallback to bulk if bundle fails
-  const BACKGROUND=[];
+  const BACKGROUND=['skus','alternatives'];  // v201c: alternatives moved Tier 2 sequential (iPhone 14+, iOS memory safe)
   // v202: KAM role — fire per-KAM bundle in parallel (silent, no pill, no toast)
   const _bgRole=currentUserProfile&&currentUserProfile.role||'rep';
   if(_bgRole!=='tl'&&_bgRole!=='admin'&&currentUser&&currentUser.email){
@@ -8504,12 +8477,11 @@ async function reloadFromCloudflareR2(){
   _cloudInitialPromise=null;
   _cloudBackgroundPromise=null;
   _cloudLoadToken++;
-  // v202f: clear in-memory bulk data — bundle ingest uses push() so stale data causes 2x duplicates
-  bulkSkusData={};
-  bulkAltsUnverified={};
   // v202: clear per-KAM bundle state so reload fetches fresh bundles
   _kamBundleLoaded.clear();
   Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]);
+  // v203: clear SKU dedup guard so fresh reload doesn't hit false "already seen"
+  Object.keys(_bulkSkusSeen).forEach(k=>delete _bulkSkusSeen[k]);
   return loadFromCloudflareR2();
 }
 
@@ -20772,7 +20744,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
-console.log('[Target Module v1] loaded — sense_v202f');
+console.log('[Target Module v1] loaded — sense_v202d');
 </script>
 
 
