@@ -6373,6 +6373,10 @@ function _autoRouteAfterLogin() {
   if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
+  // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
+  if(role!=='tl'&&role!=='admin'&&currentUser&&currentUser.email){
+    _fetchKamBundle(currentUser.email).catch(()=>{});
+  }
   if (role === 'tl' || role === 'admin') {
     setMode('kam');
     showScreen('teamview');
@@ -8478,7 +8482,10 @@ async function ensureSenseData(accountId, {silent=false}={}){
   if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
   if(!needed.length)return true;
   // v202: try per-KAM bundle first (~4MB) before falling back to bulk (~120MB)
-  const _kamEmail=_getKamEmailForAccount(accountId);
+  // Fix 2: if portviewBulkData not loaded yet, use currentUser.email for KAM role
+  const _role=currentUserProfile&&currentUserProfile.role||'rep';
+  const _kamEmail=_getKamEmailForAccount(accountId)||
+    (_role!=='tl'&&_role!=='admin'&&currentUser&&currentUser.email?currentUser.email:null);
   if(_kamEmail){
     const _safeKey=_kamSafeKey(_kamEmail);
     let _bundleOk=false;
