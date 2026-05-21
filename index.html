@@ -197,6 +197,32 @@
   </div>
 </div>
 
+
+<div id="commission-cockpit-overlay" class="comm-overlay" onclick="if(event.target===this)closeCommissionCockpit()">
+  <div class="comm-sheet">
+    <div class="comm-drag"></div>
+    <div class="comm-head">
+      <div>
+        <div class="comm-title">Commission Cockpit</div>
+        <div class="comm-sub">ตั้ง policy, assign plan, review payout, lock snapshot ใน flow เดียว</div>
+      </div>
+      <button class="comm-close" onclick="closeCommissionCockpit()">×</button>
+    </div>
+    <div class="comm-steps">
+      <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
+      <button class="comm-step" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">2 Assignment</button>
+      <button class="comm-step" id="comm-step-rules" onclick="switchCommissionStep('rules')">3 Rules</button>
+      <button class="comm-step" id="comm-step-exceptions" onclick="switchCommissionStep('exceptions')">4 Exceptions</button>
+      <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">5 Preview<br>& Lock</button>
+    </div>
+    <div class="comm-body" id="commission-cockpit-body"></div>
+    <div class="comm-footer">
+      <button class="comm-secondary" onclick="closeCommissionCockpit()">Close</button>
+      <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <script id="target-module-js">  TARGET MODULE JS                 ║
 ║             └─ L19677  _tgtCurrentQuarter()                                  ║
 ║             └─ L19719  _tgtFmtM()  format helper                            ║
@@ -6257,6 +6283,10 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
             style="display:none;align-items:center;gap:4px;background:rgba(0,208,112,.12);border:1px solid rgba(0,208,112,.25);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(0,208,112,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/></svg>
             Target
+          </button>
+          <button id="tv-commission-btn" class="comm-btn" onclick="openCommissionCockpit()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Commission
           </button>
           <button id="tv-portfolio-btn" onclick="showScreen('portview')"
             style="display:none;align-items:center;gap:5px;background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.45);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
@@ -19818,6 +19848,8 @@ function __legacyRenderTeamviewFallback(){
     _tvTgtBtn.style.display=_isTLAdmin?'flex':'none';
     window._tgtAdminMode=(currentUserProfile&&currentUserProfile.role==='admin')?'admin':'tl';
   }
+  const _tvCommBtn=document.getElementById('tv-commission-btn');
+  if(_tvCommBtn) _tvCommBtn.style.display=_isTLAdmin?'flex':'none';
   const titleEl=document.getElementById('tv-title');
   const backWrap=document.getElementById('tv-back-wrap');
   if(!portviewBulkData||!portviewBulkData.length){
@@ -20052,9 +20084,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
-    const nrrPill=nrrPct!==null?`<span style="display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.22)':'rgba(240,176,0,.22)'};background:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.12)':'rgba(240,176,0,.12)'};color:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'#4ddc97':'#f6ad55'};font-size:9px;font-weight:700">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
-    const exclBtn=`<button class="tgt-excl-request-btn" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
+    const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -20077,9 +20109,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
-    const nrrPill=nrrPct!==null?`<span style="display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.22)':'rgba(240,176,0,.22)'};background:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.12)':'rgba(240,176,0,.12)'};color:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'#4ddc97':'#f6ad55'};font-size:9px;font-weight:700">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
-    const exclBtn=`<button class="tgt-excl-request-btn" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
+    const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
@@ -21098,6 +21130,291 @@ function _updateRestSwipe(grp,idx,opts){
   max-width:320px;
 }
 
+
+/* v209 Commission Cockpit UX Redesign */
+.comm-btn{
+  display:none;align-items:center;gap:5px;background:rgba(188,215,255,.12);
+  border:1px solid rgba(188,215,255,.24);border-radius:8px;padding:5px 10px;
+  font-size:11px;font-weight:800;color:#bcd7ff;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+}
+.comm-overlay{
+  position:fixed;inset:0;background:rgba(3,8,18,.72);z-index:10040;
+  display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px);
+}
+.comm-overlay.open{display:flex}
+.comm-sheet{
+  width:100%;max-width:560px;height:min(88vh,820px);background:#0f1828;color:#fff;
+  border-radius:24px 24px 0 0;border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 -24px 70px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;
+}
+.comm-drag{width:42px;height:4px;border-radius:999px;background:rgba(255,255,255,.24);margin:10px auto 4px;flex-shrink:0}
+.comm-head{padding:12px 18px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-shrink:0}
+.comm-title{font-size:18px;font-weight:850;letter-spacing:-.02em;color:#fff}
+.comm-sub{font-size:11px;color:rgba(255,255,255,.45);line-height:1.45;margin-top:3px}
+.comm-close{width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.75);font-size:18px;cursor:pointer}
+.comm-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+.comm-step{
+  border:none;background:transparent;color:rgba(255,255,255,.48);font-size:10px;font-weight:800;
+  font-family:'IBM Plex Sans Thai',sans-serif;padding:10px 4px 9px;cursor:pointer;position:relative;line-height:1.25
+}
+.comm-step.active{color:#4ddc97}
+.comm-step.active:after{content:'';position:absolute;left:14px;right:14px;bottom:0;height:2px;border-radius:2px;background:#4ddc97}
+.comm-body{padding:14px 16px 96px;overflow:auto;flex:1}
+.comm-footer{
+  position:absolute;left:0;right:0;bottom:0;padding:10px 16px 16px;
+  background:linear-gradient(180deg,rgba(15,24,40,0),#0f1828 22%,#0f1828);
+  display:flex;gap:8px;align-items:center
+}
+.comm-save{
+  flex:1;border:none;border-radius:13px;padding:13px 14px;background:linear-gradient(135deg,rgba(0,208,112,.96),rgba(0,180,90,.88));
+  color:#07111d;font-weight:900;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.comm-secondary{
+  border:1px solid rgba(255,255,255,.10);border-radius:13px;padding:13px 14px;background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.74);font-weight:800;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.comm-hero{
+  background:linear-gradient(135deg,rgba(23,53,101,.96),rgba(10,24,50,.95));
+  border:1px solid rgba(100,170,255,.18);border-radius:17px;padding:14px;margin-bottom:12px;
+  box-shadow:0 16px 30px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.04)
+}
+.comm-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.comm-hero-title{font-size:14px;font-weight:850;color:#fff;display:flex;align-items:center;gap:7px}
+.comm-hero-sub{font-size:10px;color:rgba(255,255,255,.47);line-height:1.45;margin-top:4px}
+.comm-total{text-align:right}
+.comm-total-lbl{font-size:9px;text-transform:uppercase;color:rgba(255,255,255,.45);font-weight:800}
+.comm-total-val{font-family:'IBM Plex Mono',monospace;font-size:23px;font-weight:850;color:#bcd7ff;margin-top:3px}
+.comm-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.comm-kpi{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075);border-radius:12px;padding:10px}
+.comm-kpi-lbl{font-size:9px;text-transform:uppercase;color:rgba(255,255,255,.45);font-weight:800;line-height:1.25}
+.comm-kpi-val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:850;color:#fff;margin-top:5px}
+.comm-section-title{font-size:12px;font-weight:850;color:rgba(255,255,255,.72);margin:14px 2px 8px;display:flex;align-items:center;justify-content:space-between}
+.comm-card{
+  background:rgba(255,255,255,.042);border:1px solid rgba(255,255,255,.075);border-radius:14px;padding:12px;margin-bottom:9px
+}
+.comm-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.comm-name{font-size:13px;font-weight:850;color:#fff;line-height:1.35}
+.comm-meta{font-size:9px;color:rgba(255,255,255,.4);line-height:1.45;margin-top:3px}
+.comm-badge{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.68);font-size:9px;font-weight:850}
+.comm-badge.ok{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.comm-badge.warn{background:rgba(240,176,0,.12);border-color:rgba(240,176,0,.22);color:#f6ad55}
+.comm-badge.blue{background:rgba(100,170,255,.12);border-color:rgba(100,170,255,.22);color:#bcd7ff}
+.comm-chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.comm-select,.comm-input{
+  width:100%;padding:10px 11px;border-radius:11px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;outline:none;
+  font-family:'IBM Plex Sans Thai',sans-serif
+}
+.comm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
+.comm-field label{font-size:10px;font-weight:850;color:rgba(255,255,255,.5);display:block;margin-bottom:5px}
+.comm-team-card{border-left:2px solid rgba(100,170,255,.42)}
+.comm-team-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.comm-team-total{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:850;color:#bcd7ff}
+.comm-person-row{
+  display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid rgba(255,255,255,.06)
+}
+.comm-person-row:first-of-type{border-top:none}
+.comm-person-name{font-size:12px;font-weight:800;color:#fff}
+.comm-person-sub{font-size:9px;color:rgba(255,255,255,.38);margin-top:2px}
+.comm-person-payout{font-family:'IBM Plex Mono',monospace;font-weight:850;color:#bcd7ff}
+.comm-table-lite{display:flex;flex-direction:column;gap:7px}
+.comm-tier-row{display:grid;grid-template-columns:.8fr .8fr 1fr 1fr 28px;gap:6px;align-items:center}
+.comm-tier-row.head{font-size:9px;text-transform:uppercase;color:rgba(255,255,255,.38);font-weight:850}
+.comm-del{width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);cursor:pointer}
+.comm-add{width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px dashed rgba(0,208,112,.35);background:rgba(0,208,112,.08);color:#4ddc97;font-weight:850;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer}
+.comm-empty{padding:24px 14px;text-align:center;color:rgba(255,255,255,.42);font-size:12px;background:rgba(255,255,255,.035);border-radius:14px;border:1px solid rgba(255,255,255,.06)}
+.comm-lock-list{display:flex;flex-direction:column;gap:8px}
+.comm-lock-row{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:10px}
+.comm-role-dot{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;background:rgba(100,170,255,.12);color:#bcd7ff;border:1px solid rgba(100,170,255,.22)}
+.comm-role-dot.kam{background:rgba(0,208,112,.10);color:#4ddc97;border-color:rgba(0,208,112,.20)}
+.comm-row-money{font-family:'IBM Plex Mono',monospace;font-weight:850;color:#bcd7ff}
+@media (max-width:430px){
+  .comm-sheet{height:90vh}
+  .comm-step{font-size:9px}
+  .comm-kpis{grid-template-columns:repeat(3,1fr)}
+  .comm-kpi{padding:9px 7px}
+  .comm-kpi-val{font-size:14px}
+  .comm-tier-row{grid-template-columns:.75fr .75fr .9fr 1fr 24px;gap:5px}
+}
+
+
+/* v209b Team View Signal Redesign */
+#tv-summary-row.portview-summary-row{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px !important;
+  align-items:stretch;
+  margin-bottom:12px;
+}
+#tv-summary-row .tv-gov-card{
+  grid-column:1 / -1;
+  padding:0 !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  min-width:0 !important;
+}
+.tv-signal-wrap{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  width:100%;
+}
+.tv-signal-card{
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:14px;
+  padding:10px 11px;
+  min-width:0;
+}
+.tv-signal-card.ok{
+  background:linear-gradient(180deg,rgba(0,208,112,.105),rgba(0,208,112,.045));
+  border-color:rgba(0,208,112,.20);
+}
+.tv-signal-card.warn{
+  background:linear-gradient(180deg,rgba(240,176,0,.12),rgba(240,176,0,.045));
+  border-color:rgba(240,176,0,.22);
+}
+.tv-signal-card.info{
+  background:linear-gradient(180deg,rgba(100,170,255,.12),rgba(100,170,255,.045));
+  border-color:rgba(100,170,255,.20);
+}
+.tv-signal-label{
+  font-size:9px;
+  font-weight:850;
+  color:rgba(255,255,255,.48);
+  text-transform:uppercase;
+  letter-spacing:.02em;
+  line-height:1.2;
+}
+.tv-signal-value{
+  margin-top:5px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:18px;
+  font-weight:850;
+  color:#fff;
+  line-height:1.05;
+}
+.tv-signal-value.ok{color:#4ddc97}
+.tv-signal-value.warn{color:#f6ad55}
+.tv-signal-meta{
+  margin-top:4px;
+  font-size:9px;
+  color:rgba(255,255,255,.44);
+  line-height:1.3;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.tv-action-strip{
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 11px;
+  border-radius:13px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);
+}
+.tv-action-strip.ok{
+  background:rgba(0,208,112,.055);
+  border-color:rgba(0,208,112,.14);
+}
+.tv-action-strip.warn{
+  background:rgba(240,176,0,.075);
+  border-color:rgba(240,176,0,.16);
+}
+.tv-action-text{
+  min-width:0;
+  font-size:10px;
+  color:rgba(255,255,255,.62);
+  line-height:1.35;
+}
+.tv-action-text strong{
+  color:#fff;
+  font-size:11px;
+}
+.tv-action-btn{
+  flex-shrink:0;
+  border:1px solid rgba(100,170,255,.24);
+  background:rgba(100,170,255,.12);
+  color:#bcd7ff;
+  border-radius:999px;
+  padding:6px 9px;
+  font-size:10px;
+  font-weight:850;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  cursor:pointer;
+}
+
+/* Supporting metrics stay secondary */
+#tv-summary-row .portview-stat{
+  min-width:0 !important;
+  width:auto !important;
+  padding:10px 6px !important;
+  opacity:.92;
+}
+#tv-summary-row .portview-stat-val{font-size:18px !important}
+#tv-summary-row .portview-stat-lbl{font-size:8.5px !important}
+
+/* KAM cards: compact signal, no primary exclusion CTA */
+.tv-full-card,
+.tv-star-card{
+  padding:12px 13px !important;
+}
+.tv-full-top{gap:8px}
+.tv-full-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.tv-full-meta{
+  align-items:center;
+  gap:8px;
+}
+.tv-risk-chips{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.tv-payout-pill{
+  margin-left:0 !important;
+  white-space:nowrap;
+  background:rgba(100,170,255,.10) !important;
+  border-color:rgba(100,170,255,.18) !important;
+  color:#bcd7ff !important;
+}
+.tv-nrr-pill{
+  display:inline-flex;
+  align-items:center;
+  padding:3px 7px;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:850;
+  white-space:nowrap;
+}
+.tv-nrr-pill.ok{background:rgba(0,208,112,.11);border:1px solid rgba(0,208,112,.20);color:#4ddc97}
+.tv-nrr-pill.warn{background:rgba(240,176,0,.11);border:1px solid rgba(240,176,0,.20);color:#f6ad55}
+
+/* Hide default exclusion CTA from KAM overview. Exception is account-level / cockpit action. */
+.tgt-excl-request-btn.tv-card-exclude{
+  display:none !important;
+}
+
+@media(max-width:430px){
+  .tv-signal-wrap{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .tv-signal-card{padding:9px 8px;border-radius:12px}
+  .tv-signal-value{font-size:16px}
+  .tv-signal-label{font-size:8.3px}
+  .tv-signal-meta{font-size:8.3px}
+  .tv-action-strip{padding:8px 9px}
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -21195,6 +21512,8 @@ let _nrrExclusions = [];       // loaded/requested NRR exclusions
 let _nrrExclusionDraft = null;
 let _nrrExclusionView = 'pending';
 let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supabase
+let _commCockpitStep = 'policy';
+let _commAssignmentPending = {}; // period|scope|assignee -> plan_code
 
 // ── Quarter helpers ─────────────────────────────────────────────
 function _tgtCurrentQuarter() {
@@ -21330,42 +21649,44 @@ function _tgtGetVisibleTeamNrrResult() {
 function _tgtRenderTeamGovCard() {
   const policy = _nrrGovResolveForVisibleScope();
   const gov = _nrrGovernanceForVisibleTeam();
-  const nrrPct = gov.rawPct;
   const threshold = _tgtSettings.nrr_threshold || 98;
-  const governedPct = gov.governedPct !== null ? gov.governedPct : nrrPct;
-  const badgeCls = governedPct === null ? '' : (governedPct >= threshold ? 'ok' : 'warn');
+  const rawPct = gov.rawPct;
+  const governedPct = gov.governedPct !== null ? gov.governedPct : rawPct;
+  const nrrOk = governedPct !== null && governedPct >= threshold;
   const baseTxt = policy.base_mode === 'fixed_month'
-    ? `fixed · ${_nrrGovMonthLabel(policy.base_month)}`
-    : 'rolling MoM';
-  const statusLabel = policy.status === 'published' ? 'Published' : 'Draft';
+    ? `${_nrrGovMonthLabel(policy.base_month)} fixed`
+    : 'Rolling MoM';
+  const model = _commBuildPreviewModel();
+  const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  const policyPublished = policy.status === 'published';
+  const ready = policyPublished && pending === 0;
+  const actionCls = ready ? 'ok' : 'warn';
+  const actionTitle = ready ? 'All clear' : 'Action needed';
+  const actionMsg = ready
+    ? 'Policy published · no pending exceptions'
+    : `${!policyPublished ? 'Policy still draft' : ''}${(!policyPublished && pending) ? ' · ' : ''}${pending ? pending + ' pending exception' + (pending>1?'s':'') : ''}`;
   return `<div class="tv-gov-card">
-    <div class="tv-gov-top">
-      <div>
-        <div class="tv-gov-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(100,170,255,.8)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2l2.2 4.8L19 9l-4.8 2.2L12 16l-2.2-4.8L5 9l4.8-2.2L12 2z"/></svg>Commission / NRR</div>
-        <div class="tv-gov-sub">foundation view · policy visible for TL + admin</div>
+    <div class="tv-signal-wrap">
+      <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
+        <div class="tv-signal-label">NRR</div>
+        <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${governedPct !== null ? governedPct + '%' : '—'}</div>
+        <div class="tv-signal-meta">${baseTxt}</div>
       </div>
-      <span class="tv-gov-badge ${policy.status === 'published' ? 'ok' : 'warn'}">${statusLabel}</span>
-    </div>
-    <div class="tv-gov-badges">
-      <span class="tv-gov-badge">${baseTxt}</span>
-      <span class="tv-gov-badge">warn &lt; ${threshold}%</span>
-      <span class="tv-gov-badge">all teams</span>
-    </div>
-    <div class="tv-gov-grid">
-      <div class="tv-gov-metric">
-        <div class="tv-gov-metric-label">Raw NRR</div>
-        <div class="tv-gov-metric-value">${nrrPct !== null ? nrrPct + '%' : '—'}</div>
-        <div class="tv-gov-metric-meta">before approved exclusion</div>
+      <div class="tv-signal-card info">
+        <div class="tv-signal-label">Commission</div>
+        <div class="tv-signal-value">${_commFmtPayout(model.totalExposure)}</div>
+        <div class="tv-signal-meta">TL ${_commFmtPayout(model.tlPayout)} · KAM ${_commFmtPayout(model.kamTotal)}</div>
       </div>
-      <div class="tv-gov-metric">
-        <div class="tv-gov-metric-label">Governed NRR</div>
-        <div class="tv-gov-metric-value" style="color:${badgeCls === 'ok' ? '#4ddc97' : (badgeCls === 'warn' ? '#f6ad55' : '#fff')}">${governedPct !== null ? governedPct + '%' : '—'}</div>
-        <div class="tv-gov-metric-meta">after approved exclusion</div>
+      <div class="tv-signal-card ${pending ? 'warn' : 'ok'}">
+        <div class="tv-signal-label">Exceptions</div>
+        <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
+        <div class="tv-signal-meta">${policyPublished ? 'Published' : 'Draft policy'}</div>
+      </div>
+      <div class="tv-action-strip ${actionCls}">
+        <div class="tv-action-text"><strong>${actionTitle}</strong><br>${actionMsg}</div>
+        <button class="tv-action-btn" onclick="event.stopPropagation();openCommissionCockpit('${ready ? 'lock' : 'exceptions'}')">${ready ? 'Open Commission' : 'Review now'}</button>
       </div>
     </div>
-    ${governedPct !== null ? (()=>{ const m=_commBuildPreviewModel(); return `<div class="tv-gov-payout"><div><div class="tv-gov-payout-lbl">Payout exposure</div><div class="tv-gov-metric-meta">TL ${_commFmtPayout(m.tlPayout)} · KAM ${_commFmtPayout(m.kamTotal)}</div></div><div class="tv-gov-payout-val">${_commFmtPayout(m.totalExposure)}</div></div>`; })() : ''}
-    ${gov.excludedBase>0?`<div class="tv-gov-adjust">Approved exclusion base: ${_tgtFmtM(gov.excludedBase)} · Raw ${nrrPct}% → Governed ${governedPct}%</div>`:''}
-    <div class="tv-gov-footer">preview only · final after lock</div>
   </div>`;
 }
 
@@ -21796,7 +22117,18 @@ async function loadTargets(quarter) {
         });
       }
     }
-    _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap };
+    let assignments = [];
+    try {
+      const { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
+        .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_code')
+        .in('period_month', months);
+      if (asgErr) throw new Error(asgErr.message);
+      assignments = asg || [];
+    } catch(asgEx) {
+      console.warn('[Commission assignments] load failed:', asgEx.message);
+      assignments = [];
+    }
+    _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap, assignments };
   } catch (e) {
     console.warn('[Commission rules] load failed (tables may not exist yet):', e.message);
     _commRuleConfig = { plans: {}, rules: {}, tiers: {} };
@@ -21832,6 +22164,11 @@ async function openTargetSetup(mode) {
   if (title) title.textContent = mode === 'admin' ? 'ตั้ง Target ทีม' : 'ตั้ง Target KAM';
   const tabRow = document.getElementById('tgt-tab-row');
   if (tabRow) tabRow.style.display = mode === 'admin' ? 'flex' : 'none';
+  // v209: Target sheet is for target/settings only. Commission governance moved to Commission Cockpit.
+  ['policy','rules','preview','exclusions','lock'].forEach(k=>{
+    const b=document.getElementById('tgt-tab-'+k);
+    if(b) b.style.display='none';
+  });
   const saveBtn = document.getElementById('tgt-save-btn');
   if (saveBtn) saveBtn.disabled = true;
   _tgtShowSkeleton();
@@ -22165,6 +22502,270 @@ function renderNrrPolicyTab() {
 
 
 
+
+
+
+function openCommissionCockpit(step) {
+  _commCockpitStep = step || 'policy';
+  const ov = document.getElementById('commission-cockpit-overlay');
+  if (ov) ov.classList.add('open');
+  renderCommissionCockpit();
+}
+function closeCommissionCockpit() {
+  const ov = document.getElementById('commission-cockpit-overlay');
+  if (ov) ov.classList.remove('open');
+}
+function switchCommissionStep(step) {
+  _commCockpitStep = step;
+  renderCommissionCockpit();
+}
+function _commPlanOptionsFor(role) {
+  const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {}).filter(p => p.beneficiary_role === role);
+  const codes = new Set(plans.map(p => p.plan_code));
+  if (!codes.has(_commPlanCode(role))) plans.unshift({plan_code:_commPlanCode(role), plan_name:_commPlanName(role), beneficiary_role:role});
+  return plans;
+}
+function _commAssignmentKey(period, scope, assignee) {
+  return `${period}|${scope}|${assignee}`;
+}
+function _commGetAssignmentPlan(period, scope, assignee, role) {
+  const key = _commAssignmentKey(period, scope, assignee);
+  if (_commAssignmentPending[key]) return _commAssignmentPending[key];
+  const found = ((_commRuleConfig && _commRuleConfig.assignments) || []).find(a => a.period_month === period && a.assignment_scope === scope && a.assignee_key === assignee);
+  return found ? found.plan_code : _commPlanCode(role);
+}
+function _commSetAssignment(period, scope, assignee, planCode) {
+  _commAssignmentPending[_commAssignmentKey(period, scope, assignee)] = planCode;
+}
+function _commPlanNameByCode(code, role) {
+  const p = ((_commRuleConfig && _commRuleConfig.plans) || {})[code];
+  return p ? p.plan_name : (code || _commPlanName(role));
+}
+function _commBuildTeamPreviewGroups() {
+  const model = _commBuildPreviewModel();
+  const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+  const tlMap = {};
+  groups.forEach(g => {
+    const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || 'unassigned';
+    const tlName = (g.accounts && g.accounts[0] && g.accounts[0].tlName) || tlEmail;
+    if (!tlMap[tlEmail]) tlMap[tlEmail] = { tlEmail, tlName, kamRows: [], kamTotal:0, tlPayout:0, teamNrr:null, total:0 };
+    const row = model.kamRows.find(r => r.kamEmail === g.kamEmail) || {};
+    tlMap[tlEmail].kamRows.push(row);
+    tlMap[tlEmail].kamTotal += Number(row.payout || 0);
+  });
+  Object.values(tlMap).forEach(t => {
+    const raw = t.tlEmail === 'unassigned' ? null : _tgtComputeKamNRR(null, t.tlEmail);
+    const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
+    t.teamNrr = pct;
+    t.tlPayout = _commPayoutForPct('tl', pct);
+    t.total = t.tlPayout + t.kamTotal;
+  });
+  return Object.values(tlMap).sort((a,b)=>b.total-a.total);
+}
+function renderCommissionCockpit() {
+  document.querySelectorAll('.comm-step').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById('comm-step-' + _commCockpitStep);
+  if (btn) btn.classList.add('active');
+  const body = document.getElementById('commission-cockpit-body');
+  if (!body) return;
+  if (_commCockpitStep === 'policy') return renderCommPolicyStep(body);
+  if (_commCockpitStep === 'assignment') return renderCommAssignmentStep(body);
+  if (_commCockpitStep === 'rules') return renderCommRulesStep(body);
+  if (_commCockpitStep === 'exceptions') return renderCommExceptionsStep(body);
+  return renderCommLockStep(body);
+}
+function renderCommPolicyStep(body) {
+  const now = new Date();
+  const q = _tgtActiveQuarter || _tgtCurrentQuarter();
+  const months = _tgtQuarterMonths(q);
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div>
+          <div class="comm-hero-title">1. Period & NRR Base Policy</div>
+          <div class="comm-hero-sub">เริ่มจากกำหนดก่อนว่าเดือนนี้ใช้ฐาน NRR แบบไหน ทุก payout จะ follow policy นี้</div>
+        </div>
+        <span class="comm-badge blue">${_tgtQuarterLabel(q)}</span>
+      </div>
+    </div>
+    ${months.map(m=>{
+      const p = _nrrGovGetPending(m,'all','all');
+      const opts = _nrrGovBaseMonthOptions(m);
+      return `<div class="comm-card">
+        <div class="comm-card-top"><div><div class="comm-name">${_nrrGovMonthLabel(m)}</div><div class="comm-meta">Admin policy · applies to all teams in this foundation</div></div><span class="comm-badge ${p.status==='published'?'ok':'warn'}">${p.status||'draft'}</span></div>
+        <div class="comm-grid2">
+          <div class="comm-field"><label>Base mode</label><select class="comm-select" onchange="onNrrPolicyChange('${m}','base_mode',this.value);renderCommissionCockpit()">
+            <option value="rolling_mom" ${p.base_mode==='rolling_mom'?'selected':''}>Rolling MoM</option>
+            <option value="fixed_month" ${p.base_mode==='fixed_month'?'selected':''}>Fixed base month</option>
+          </select></div>
+          <div class="comm-field"><label>Base month</label><select class="comm-select" ${p.base_mode==='fixed_month'?'':'disabled'} onchange="onNrrPolicyChange('${m}','base_month',this.value)">
+            ${opts.map(o=>`<option value="${o}" ${p.base_month===o?'selected':''}>${_nrrGovMonthLabel(o)}</option>`).join('')}
+          </select></div>
+          <div class="comm-field"><label>Status</label><select class="comm-select" onchange="onNrrPolicyChange('${m}','status',this.value)">
+            <option value="draft" ${p.status==='draft'?'selected':''}>Draft</option>
+            <option value="published" ${p.status==='published'?'selected':''}>Published</option>
+          </select></div>
+          <div class="comm-field"><label>Scope</label><input class="comm-input" value="All teams" disabled></div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+function renderCommAssignmentStep(body) {
+  const period = _nrrExclusionCurrentPeriod();
+  const tls = _commGetTlListFromPortview();
+  const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+  const tlPlans = _commPlanOptionsFor('tl');
+  const kamPlans = _commPlanOptionsFor('kam');
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div><div class="comm-hero-title">2. Assign Plans</div><div class="comm-hero-sub">นี่คือหน้าที่บอกว่า TL/KAM คนไหนใช้ NRR criteria ชุดไหน</div></div>
+        <span class="comm-badge blue">${_nrrGovMonthLabel(period)}</span>
+      </div>
+    </div>
+    <div class="comm-section-title">Team Lead plans</div>
+    ${tls.map(t=>`<div class="comm-card">
+      <div class="comm-card-top"><div><div class="comm-name">${t.name||t.email}</div><div class="comm-meta">${t.email}</div></div><span class="comm-badge blue">TL</span></div>
+      <div class="comm-field" style="margin-top:10px"><label>Assigned TL plan</label><select class="comm-select" onchange="_commSetAssignment('${period}','tl','${t.email}',this.value)">
+        ${tlPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'tl',t.email,'tl')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
+      </select></div>
+    </div>`).join('') || `<div class="comm-empty">ไม่พบ TL</div>`}
+    <div class="comm-section-title">KAM plans by team</div>
+    ${tls.map(t=>{
+      const kams = groups.filter(g => (g.accounts||[]).some(a=>a.tlEmail===t.email));
+      return `<div class="comm-card comm-team-card">
+        <div class="comm-team-header"><div><div class="comm-name">${t.name||t.email}</div><div class="comm-meta">${kams.length} KAM under team</div></div></div>
+        ${kams.map(g=>`<div class="comm-person-row">
+          <div><div class="comm-person-name">${g.kamName||g.kamEmail}</div><div class="comm-person-sub">${g.kamEmail}</div></div>
+          <select class="comm-select" style="width:190px" onchange="_commSetAssignment('${period}','kam','${g.kamEmail}',this.value)">
+            ${kamPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'kam',g.kamEmail,'kam')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
+          </select>
+        </div>`).join('') || `<div class="comm-empty">ไม่มี KAM ใต้ทีมนี้</div>`}
+      </div>`;
+    }).join('')}`;
+}
+function renderCommRulesStep(body) {
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div><div class="comm-hero-title">3. Edit Plan Rules</div><div class="comm-hero-sub">แก้ threshold/payout ของ plan ไม่ใช่แก้รายคนโดยตรง รายคนจะเลือกใช้ plan ใน Assignment</div></div>
+      </div>
+    </div>
+    ${['tl','kam'].map(role=>_renderCommRuleEditor(role)).join('')}`;
+}
+function _renderCommRuleEditor(role) {
+  const d = _commGetDraft(role);
+  const title = role==='tl' ? 'TL NRR Plan' : 'KAM NRR Plan';
+  return `<div class="comm-card">
+    <div class="comm-card-top"><div><div class="comm-name">${title}</div><div class="comm-meta">${d.plan_code} · ${d.measurement_scope || 'governed_nrr'}</div></div><span class="comm-badge ok">Governed NRR</span></div>
+    <div class="comm-grid2">
+      <div class="comm-field"><label>Plan name</label><input class="comm-input" value="${d.plan_name||''}" oninput="onPayoutRuleHeader('${role}','plan_name',this.value)"></div>
+      <div class="comm-field"><label>Payout type</label><select class="comm-select" onchange="onPayoutRuleHeader('${role}','payout_type',this.value)">
+        <option value="flat_amount" ${d.payout_type==='flat_amount'?'selected':''}>Flat amount</option>
+        <option value="bonus_amount" ${d.payout_type==='bonus_amount'?'selected':''}>Bonus amount</option>
+      </select></div>
+    </div>
+    <div class="comm-table-lite" style="margin-top:12px">
+      <div class="comm-tier-row head"><div>Min</div><div>Max</div><div>Payout</div><div>Label</div><div></div></div>
+      ${(d.tiers||[]).map((t,i)=>`<div class="comm-tier-row">
+        <input class="comm-input" value="${t.min_value ?? ''}" placeholder="-" oninput="onPayoutTierInput('${role}',${i},'min_value',this.value)">
+        <input class="comm-input" value="${t.max_value ?? ''}" placeholder="∞" oninput="onPayoutTierInput('${role}',${i},'max_value',this.value)">
+        <input class="comm-input" value="${t.payout_value ?? 0}" oninput="onPayoutTierInput('${role}',${i},'payout_value',this.value)">
+        <input class="comm-input" value="${t.payout_label || ''}" oninput="onPayoutTierInput('${role}',${i},'payout_label',this.value)">
+        <button class="comm-del" onclick="removePayoutTier('${role}',${i});renderCommissionCockpit()">×</button>
+      </div>`).join('')}
+    </div>
+    <button class="comm-add" onclick="addPayoutTier('${role}');renderCommissionCockpit()">+ เพิ่ม tier</button>
+  </div>`;
+}
+function renderCommExceptionsStep(body) {
+  _nrrExclusionView = _nrrExclusionView || 'pending';
+  const savedBody = document.getElementById('tgt-sheet-body');
+  // Render a clean, embedded copy instead of reusing the old target body.
+  const current = _nrrExclusionCurrentPeriod();
+  const rows = (_nrrExclusions || []).filter(r => r.period_month === current);
+  const pending = rows.filter(r => r.status === 'submitted' || r.status === 'pending');
+  const approved = rows.filter(r => r.status === 'approved');
+  body.innerHTML = `
+    <div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">4. Review Exceptions</div><div class="comm-hero-sub">Approved เท่านั้นที่กระทบ Governed NRR และ payout preview</div></div><span class="comm-badge ${pending.length?'warn':'ok'}">${pending.length} pending</span></div>
+    <div class="comm-kpis"><div class="comm-kpi"><div class="comm-kpi-lbl">Pending</div><div class="comm-kpi-val">${pending.length}</div></div><div class="comm-kpi"><div class="comm-kpi-lbl">Approved</div><div class="comm-kpi-val">${approved.length}</div></div><div class="comm-kpi"><div class="comm-kpi-lbl">Base impact</div><div class="comm-kpi-val">${_tgtFmtM(approved.reduce((s,r)=>s+Number(r.base_gmv||r.estimated_base_gmv||0),0))}</div></div></div></div>
+    ${rows.length ? rows.map(r=>_renderNrrExclusionCard(r,(currentUserProfile&&currentUserProfile.role)==='admin')).join('') : `<div class="comm-empty">ยังไม่มี exception request</div>`}`;
+}
+function renderCommLockStep(body) {
+  const model = _commBuildPreviewModel();
+  const teams = _commBuildTeamPreviewGroups();
+  const rows = _commBuildSnapshotRows();
+  const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div><div class="comm-hero-title">5. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
+        <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(model.totalExposure)}</div></div>
+      </div>
+      <div class="comm-kpis">
+        <div class="comm-kpi"><div class="comm-kpi-lbl">Team NRR</div><div class="comm-kpi-val">${model.teamPct!==null?model.teamPct+'%':'—'}</div></div>
+        <div class="comm-kpi"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(model.tlPayout)}</div></div>
+        <div class="comm-kpi"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(model.kamTotal)}</div></div>
+      </div>
+      ${pending?`<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ</div>`:''}
+      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
+    </div>
+    <div class="comm-section-title">By Team Lead</div>
+    ${teams.map(t=>`<div class="comm-card comm-team-card">
+      <div class="comm-team-header"><div><div class="comm-name">${t.tlName||t.tlEmail}</div><div class="comm-meta">Team NRR ${t.teamNrr!==null?t.teamNrr+'%':'—'} · TL payout ${_commFmtPayout(t.tlPayout)}</div></div><div class="comm-team-total">${_commFmtPayout(t.total)}</div></div>
+      ${t.kamRows.slice(0,5).map(k=>`<div class="comm-person-row"><div><div class="comm-person-name">${k.kamName||k.kamEmail}</div><div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · ${k.tierLabel||'—'}</div></div><div class="comm-person-payout">${_commFmtPayout(k.payout)}</div></div>`).join('')}
+      ${t.kamRows.length>5?`<div class="comm-meta" style="margin-top:8px">+${t.kamRows.length-5} more KAM in CSV/export</div>`:''}
+    </div>`).join('') || `<div class="comm-empty">ยังไม่มีทีมให้ preview</div>`}
+    <div class="comm-section-title">Snapshot rows</div>
+    <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email}</div><div class="comm-person-sub">Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
+}
+async function saveCommissionCockpit() {
+  const previousTab = _tgtActiveTab;
+  try {
+    await saveTargets();
+  } catch(e) {
+    console.warn('[Commission cockpit] saveTargets failed', e);
+  }
+  await saveCommissionAssignments();
+  _tgtActiveTab = previousTab;
+}
+async function saveCommissionAssignments() {
+  const entries = Object.entries(_commAssignmentPending || {});
+  if (!entries.length) return;
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  const rows = entries.map(([key, planCode]) => {
+    const [period, scope, assignee] = key.split('|');
+    const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode] || {};
+    return {
+      period_month: period,
+      plan_id: plan.id,
+      plan_code: planCode,
+      assignment_scope: scope,
+      assignee_key: assignee,
+      team_lead_email: scope === 'tl' ? assignee : null,
+      created_by: actor,
+      updated_by: actor,
+      updated_at: new Date().toISOString()
+    };
+  });
+  try {
+    // v209 uses plan_code column added by patch. If missing, SQL patch is required.
+    const { error } = await supa.from('commission_plan_assignments').upsert(rows, { onConflict:'period_month,assignment_scope,assignee_key' });
+    if (error) throw new Error(error.message);
+    _commRuleConfig.assignments = [
+      ...(((_commRuleConfig && _commRuleConfig.assignments) || []).filter(a => !entries.some(([key]) => {
+        const [p,s,k] = key.split('|'); return a.period_month===p && a.assignment_scope===s && a.assignee_key===k;
+      }))),
+      ...rows
+    ];
+    _commAssignmentPending = {};
+    if (typeof showToast === 'function') showToast('บันทึก Commission Cockpit สำเร็จ', 'ok');
+    renderCommissionCockpit();
+  } catch(e) {
+    console.error('[Commission assignments] save failed', e);
+    if (typeof showToast === 'function') showToast('บันทึก assignment ไม่สำเร็จ: ' + (e.message || ''), '!');
+  }
+}
 
 
 function renderCommissionLockTab() {
