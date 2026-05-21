@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v207b: Sense flow stability + mobile UX polish (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -2950,7 +2950,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v207b-sense-flow-stability',
+      version: 'v207c-sense-flow-stability',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -4673,6 +4673,68 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
   color:rgba(0,0,0,.72)!important;stroke:currentColor!important;opacity:1!important;
 }
 #vs-nav-opps-label::first-letter{ }
+</style>
+
+
+<style id="freshket-v207c-sense-nav-css">
+/* v207c: restore compact floating Sense nav/tray and avoid desktop reload-loop UI side effects */
+:root{--sense-bottom-nav-h:82px;--sense-plan-tray-h:150px;}
+body.kam-sense-active #swipe-grp-b{
+  top:var(--sense-topbar-h,calc(54px + env(safe-area-inset-top)))!important;
+  bottom:0!important;
+  background:#fff!important;
+}
+body.kam-sense-active #swipe-grp-b .scr.on{
+  padding-bottom:calc(104px + env(safe-area-inset-bottom))!important;
+}
+body.kam-sense-active.sense-plan-expanded #swipe-grp-b .scr.on{
+  padding-bottom:calc(174px + env(safe-area-inset-bottom))!important;
+}
+body.kam-sense-active #scr-opportunities .sec{padding-bottom:104px!important;}
+body.kam-sense-active.sense-plan-expanded #scr-opportunities .sec{padding-bottom:174px!important;}
+body.kam-sense-active.kam-mode .bnav{
+  left:50%!important;right:auto!important;transform:translateX(-50%)!important;
+  width:calc(100% - 32px)!important;max-width:408px!important;
+  bottom:calc(10px + env(safe-area-inset-bottom))!important;
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:1fr!important;
+  height:72px!important;min-height:0!important;
+  padding:8px 12px!important;box-sizing:border-box!important;
+  border-radius:30px!important;overflow:hidden!important;
+}
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav{
+  height:150px!important;min-height:0!important;
+  grid-template-rows:minmax(0,74px) 56px!important;
+  padding:12px 14px 10px!important;
+}
+body.kam-sense-active.kam-mode .bnav .ni{
+  width:100%!important;min-width:0!important;height:56px!important;min-height:0!important;
+  padding:2px 0!important;align-self:center!important;justify-content:center!important;
+}
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav .ni{grid-row:2!important;height:52px!important;}
+body.kam-sense-active.kam-mode .bnav .ni .nwrap{margin:0 auto!important;}
+#sense-plan-section{display:none!important;}
+body.kam-sense-active.sense-plan-expanded #sense-plan-section{
+  grid-column:1 / -1!important;grid-row:1!important;
+  display:grid!important;grid-template-columns:minmax(0,1fr) 52px!important;
+  align-items:center!important;gap:12px!important;width:100%!important;
+  min-height:0!important;max-height:74px!important;
+  padding:0 0 10px 0!important;margin:0!important;
+  border-bottom:1px solid rgba(0,160,80,.16)!important;
+}
+body.kam-sense-active.sense-plan-expanded .sps-info{min-width:0!important;padding-left:0!important;}
+body.kam-sense-active.sense-plan-expanded .sps-label,
+body.kam-sense-active.sense-plan-expanded .sps-sub{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+body.kam-sense-active.sense-plan-expanded .sps-amt{font-size:26px!important;line-height:1.05!important;}
+body.kam-sense-active.sense-plan-expanded .sps-cta{width:48px!important;height:48px!important;margin:0!important;align-self:center!important;}
+body.sdt-light.kam-sense-active.kam-mode .bnav{
+  background:linear-gradient(180deg,rgba(232,250,242,.9),rgba(218,240,228,.97))!important;
+  border:1px solid rgba(0,160,80,.16)!important;
+  box-shadow:0 10px 34px rgba(0,90,48,.16),0 0 0 1px rgba(255,255,255,.65) inset!important;
+}
+body.sdt-light.kam-sense-active.kam-mode .bnav .ni svg{stroke:rgba(0,0,0,.36)!important;color:rgba(0,0,0,.36)!important;}
+body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on svg{stroke:var(--g500)!important;color:var(--g500)!important;}
+body.sdt-light.kam-sense-active.kam-mode .bnav .ni .lb{color:rgba(0,0,0,.42)!important;}
+body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .lb{color:var(--g700)!important;font-weight:700!important;}
 </style>
 
 </head>
@@ -22063,9 +22125,14 @@ console.log('[Target Module v1] loaded');
     try{
       const cfg=global.FreshketSenseConfig||{};
       const v=cfg.app&&cfg.app.version;
-      if(v&&String(v).includes('v206f'))return 'v206f';
+      const m=String(v||'').match(/v\d+[a-z]?/i);
+      if(m) return m[0].toLowerCase();
     }catch(e){}
-    return 'v206f';
+    try{
+      const c=(document.documentElement&&document.documentElement.innerHTML||'').match(/Freshket Sense\s+v(\d+[a-z]?)/i);
+      if(c) return ('v'+c[1]).toLowerCase();
+    }catch(e){}
+    return 'v207c';
   }
 
   function markBuild(){
@@ -22114,6 +22181,15 @@ console.log('[Target Module v1] loaded');
   installServiceWorkerUpdateGuard();
 
   async function checkRemoteBuild(reason){
+    // v207c: live reload is useful for installed PWA, but harmful on desktop while testing/Sense flow.
+    // Desktop can refresh manually; avoid forced reload/login loops caused by stale build token mismatch.
+    if(!isStandalonePwa()) return currentBuild();
+    try{
+      if(global._senseFlowHeavyActive===true || document.body.classList.contains('kam-sense-active')){
+        log('build-check deferred during Sense flow', reason);
+        return currentBuild();
+      }
+    }catch(e){}
     if(buildCheckInFlight) return buildCheckInFlight;
     buildCheckInFlight = (async function(){
       try{
@@ -22635,7 +22711,7 @@ console.log('[Target Module v1] loaded');
 <script id="freshket-v207b-sense-flow-stability-js">
 (function(global){
   'use strict';
-  const VERSION='v207b-sense-flow-stability';
+  const VERSION='v207c-sense-flow-stability';
   const DEBUG_KEY='senseDebug';
   const isDebug=()=>{try{return localStorage.getItem(DEBUG_KEY)==='1';}catch(e){return false;}};
   const log=(...a)=>{if(isDebug())try{console.log.apply(console,a);}catch(e){}};
