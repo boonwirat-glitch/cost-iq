@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -2901,7 +2901,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v206c-portview-smooth-render',
+      version: 'v206d-flicker-prewarm-throttle',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -6393,7 +6393,7 @@ function hideLoginOverlay() {
   window._splashPreFade = () => {
     try{
       const _pf_role = currentUserProfile?.role || 'rep';
-      console.log('[v202 debug] _splashPreFade: forcing screen for role=', _pf_role);
+      _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
       if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
@@ -6416,32 +6416,20 @@ function _autoRouteAfterLogin() {
   if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
 
   const role = currentUserProfile?.role || 'rep';
-  console.log('[v202 debug] _autoRouteAfterLogin: role=',role,'email=',currentUser&&currentUser.email);
+  _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
   if(role!=='tl'&&role!=='admin'&&currentUser&&currentUser.email){
     _bundlePreWarming=true;
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
       _bundlePreWarming=false;
-      refreshAll(); // ONE render after KAM bundle fully loaded
+      // v206d: avoid a full portfolio repaint if user is already on portfolio.
+      if(typeof _senseHydrateVisiblePortfolio==='function'&&_senseHydrateVisiblePortfolio('rep-bundle',{delay:260}))return;
+      refreshAll();
     });
   }
-  // v204: TL/Admin — pre-warm bundles sequentially, suppress renders until done
-  if(role==='tl'||role==='admin'){
-    setTimeout(async()=>{
-      const emails=[...new Set(portviewBulkData.map(r=>r.kamEmail).filter(Boolean))];
-      console.log('%c[v202 bundle] TL pre-warming bundles (sequential):','color:#00d070',emails.length,'KAMs');
-      _bundlePreWarming=true;
-      for(const e of emails){
-        await _fetchKamBundle(e).catch(()=>{});
-        await new Promise(r=>setTimeout(r,100));
-      }
-      _bundlePreWarming=false;
-      // ONE render after all bundles loaded
-      if(typeof renderTeamviewKamList==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamviewKamList();
-      else if(typeof renderPortviewList==='function'&&document.getElementById('scr-portview')?.classList.contains('on'))renderPortviewList();
-      console.log('%c[v202 bundle] pre-warm complete','color:#00d070');
-    },5000);
-  }
+  // v206d: TL/Admin pre-warm is deliberately throttled and capped.
+  // Old behavior fetched every KAM bundle sequentially after 5s, causing console noise + memory/CPU pressure.
+  if(role==='tl'||role==='admin')_startTlBundlePrewarm();
   if (role === 'tl' || role === 'admin') {
     setMode('kam');
     showScreen('teamview');
@@ -7867,8 +7855,11 @@ function handleFileUpload(type,input){
           const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+totalAccounts;b.className='dp-slot-badge ok';}
           // toast removed v205a — bulk ingest noise
           if(!_bundlePreWarming){
-            if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
-            if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+            if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('bulk-skus-ready',{delay:420});
+            else {
+              if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
+              if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+            }
           }
           _done();
         }
@@ -7996,7 +7987,7 @@ function handleFileUpload(type,input){
     reader.onload=e=>{
       portviewBulkData=parsePortviewBulk(e.target.result);
       const _pvSample=portviewBulkData.length?portviewBulkData[0].kamEmail:'(none)';
-      console.log('%c[v202 debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
+      _senseLog('%c[v206d debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
       const b=document.getElementById('badge-portview-bulk');
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
@@ -8021,7 +8012,7 @@ function handleFileUpload(type,input){
       }
       const atRisk=portviewBulkData.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).length;
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
-      showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
+      if(_senseDebugOn())showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
       // v205b: portviewBulkData now has tlEmail — re-render target bar so Case B can use real tlEmail
       // (init check at t=1500ms may have run before portview was ready → accounts=[] → Case B failed → baseline)
       if(typeof renderPortviewTargetBar==='function'){setTimeout(()=>renderPortviewTargetBar(),150);}
@@ -8205,6 +8196,68 @@ const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded
 let _bundlePreWarming = false;         // v204: true during TL pre-warm → suppress re-renders
 const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
+// v206d: performance guardrails for mobile/PWA.
+// Default console is quiet; turn on with localStorage.setItem('senseDebug','1').
+function _senseDebugOn(){
+  try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshket_debug')==='1';}catch(e){return false;}
+}
+function _senseLog(){try{if(_senseDebugOn())console.log.apply(console,arguments);}catch(e){}}
+function _senseInfo(){try{if(_senseDebugOn())console.info.apply(console,arguments);}catch(e){}}
+function _senseSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+let _senseUserActiveUntil=0;
+let _tlPrewarmTimer=null;
+let _tlPrewarmRunId=0;
+function _senseMarkUserActive(){_senseUserActiveUntil=Date.now()+1800;}
+function _senseIsUserActive(){return Date.now()<_senseUserActiveUntil;}
+try{
+  ['scroll','touchstart','pointerdown','keydown','input'].forEach(evt=>{
+    window.addEventListener(evt,_senseMarkUserActive,{passive:true,capture:true});
+  });
+}catch(e){}
+function _senseGetTlPrewarmEmails(maxCount){
+  maxCount=maxCount||5;
+  const role=(currentUserProfile&&currentUserProfile.role)||'rep';
+  if(role!=='tl'&&role!=='admin')return[];
+  const myEmail=(currentUserProfile&&currentUserProfile.email)||'';
+  let rows=(portviewBulkData||[]).filter(r=>r&&r.kamEmail);
+  if(myEmail&&rows.some(r=>r.tlEmail===myEmail))rows=rows.filter(r=>r.tlEmail===myEmail);
+  const agg={};
+  rows.forEach(r=>{
+    const email=r.kamEmail;if(!email)return;
+    const safe=_kamSafeKey(email);
+    if(_kamBundleLoaded.has(safe)||_kamBundleInFlight[safe])return;
+    if(!agg[email])agg[email]={email,gmv:0,n:0};
+    const ps=r.paceSignal||{};
+    agg[email].gmv+=Number(ps.runrate||r.runrate||r.gmvToDate||0);
+    agg[email].n++;
+  });
+  return Object.values(agg).sort((a,b)=>b.gmv-a.gmv||b.n-a.n).slice(0,maxCount).map(x=>x.email);
+}
+function _startTlBundlePrewarm(){
+  const role=(currentUserProfile&&currentUserProfile.role)||'rep';
+  if(role!=='tl'&&role!=='admin')return;
+  if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
+  const runId=++_tlPrewarmRunId;
+  _tlPrewarmTimer=setTimeout(async()=>{
+    const emails=_senseGetTlPrewarmEmails(5);
+    if(!emails.length)return;
+    _senseLog('%c[v206d bundle] TL prewarm throttled:', 'color:#00d070', emails.length, 'KAMs', emails);
+    _bundlePreWarming=true;
+    for(const e of emails){
+      if(runId!==_tlPrewarmRunId)break;
+      // Do not compete with the first user interactions after boot/search/scroll.
+      let waitLoops=0;
+      while(_senseIsUserActive()&&waitLoops<8){await _senseSleep(900);waitLoops++;}
+      await _fetchKamBundle(e).catch(()=>{});
+      await _senseSleep(950);
+    }
+    _bundlePreWarming=false;
+    if(runId!==_tlPrewarmRunId)return;
+    if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('tl-prewarm',{delay:420});
+    _senseLog('%c[v206d bundle] TL prewarm complete/throttled','color:#00d070');
+  },9000);
+}
+
 // ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
 const _CSV_DB=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvDbName) || 'ciq-csv-v1';
 const _CSV_TTL=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvCacheTtlMs) || 6*60*60*1000; // 6 hours
@@ -8359,7 +8412,7 @@ async function _fetchKamFile({url,type,tab}){
     const cached=await _csvCacheGet(tab);
     if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
       const ageMin=Math.round((Date.now()-cached.ts)/60000);
-      console.log('%c[v202 bundle] 💾 IndexedDB cache hit:','color:#adf',tab,'age:',ageMin,'min');
+      _senseLog('%c[v206d bundle] IndexedDB cache hit:','color:#adf',tab,'age:',ageMin,'min');
       const ok=await ingestCSVText(type,cached.text,{timeoutMs:90000});
       if(ok)return true;
       console.warn('[v202 bundle] cache ingest failed, retrying from R2:',tab);
@@ -8371,7 +8424,7 @@ async function _fetchKamFile({url,type,tab}){
     if(!text){console.warn('[v202 bundle] empty response:',url);return false;}
     const _kb=Math.round(text.length/1024);
     const _ms=Date.now()-_t0;
-    console.log('%c[v202 bundle] 🌐 R2 fetch OK:','color:#00d070',tab,_kb+'KB in '+_ms+'ms');
+    _senseLog('%c[v206d bundle] R2 fetch OK:','color:#00d070',tab,_kb+'KB in '+_ms+'ms');
     await _csvCacheSet(tab,text);
     const ok=await ingestCSVText(type,text,{timeoutMs:90000});
     if(!ok)console.warn('[v202 bundle] ingest failed after fetch:',tab);
@@ -8393,15 +8446,15 @@ async function _fetchKamBundle(kamEmail){
     try{
       const skusUrl=`${R2_BASE}/sense_skus_${safeKey}.csv`;
       const altsUrl=`${R2_BASE}/sense_alts_${safeKey}.csv`;
-      console.log('%c[v202 bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
-      console.log('%c[v202 bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
+      _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
+      _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
       const[okSkus,okAlts]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
       ]);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
-        console.log('%c[v202 bundle] ✅ LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold;font-size:13px', kamEmail);
+        _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
       }else{
         console.warn('[v202 bundle] ⚠️ incomplete:', kamEmail, 'skus:', okSkus, 'alts:', okAlts);
       }
@@ -8669,7 +8722,7 @@ async function ensureSenseData(accountId, {silent=false}={}){
     let _bundleOk=false;
     if(_kamBundleLoaded.has(_safeKey)){
       _bundleOk=true; // already in memory
-      console.log('%c[v202 bundle] ✅ SERVED FROM MEMORY (cache hit):', 'color:#00d070', _kamEmail);
+      _senseLog('%c[v206d bundle] SERVED FROM MEMORY:', 'color:#00d070', _kamEmail);
     }else if(_kamBundleInFlight[_safeKey]){
       // await in-flight — bundle ~4MB completes well within 30s
       _bundleOk=await Promise.race([
@@ -8679,7 +8732,7 @@ async function ensureSenseData(accountId, {silent=false}={}){
     }else{
       // cold fetch — not pre-warmed yet (TL direct nav)
       // bundle ~4MB << bulk 135MB: even cold fetch beats bulk load time
-      console.log('%c[v202 bundle] cold fetch for TL:', 'color:#f0b000', _kamEmail);
+      _senseLog('%c[v206d bundle] cold fetch for TL:', 'color:#f0b000', _kamEmail);
       _bundleOk=await Promise.race([
         _fetchKamBundle(_kamEmail),
         new Promise(r=>setTimeout(()=>r(false),30000))
@@ -12130,7 +12183,7 @@ function setAiProvider(p){
     return;
   }
 
-  const ORCH_VERSION = 'v206b-loader-critical-path';
+  const ORCH_VERSION = 'v206d-loader-silent-hydrate';
   const ORCH_CFG = global.FreshketSenseConfig || {};
   const ORCH_DATA_CFG = ORCH_CFG.data || {};
   const FOREGROUND = (ORCH_DATA_CFG.foregroundKeys || ['portview','history','categories','sku_current','outlets','handover']).slice();
@@ -12304,8 +12357,14 @@ function setAiProvider(p){
       orchStatus.foregroundLoaded = criticalLoaded + okCount;
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
-      try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
-      try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+      // v206d: hydrate visible portfolio/team lists instead of full re-rendering the screen.
+      try{
+        if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('enhancement-ready',{delay:360});
+        else {
+          if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview();
+          if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview();
+        }
+      }catch(e){}
       record('startCloudEnhancementLoad','done',{ okCount, total:keys.length });
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded + okCount, total:ALL.length });
       return results;
@@ -12429,9 +12488,12 @@ function setAiProvider(p){
       if(criticalOk > 0){
         safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + criticalOk + '/' + CRITICAL.length + ' ไฟล์','✓');
         baseData.setDataPillText('พร้อมใช้งาน','เติมรายละเอียดต่อเบื้องหลัง');
-        try{ if(typeof renderPortview === 'function') renderPortview(); }catch(e){}
-        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
-        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 250);
+        try{
+          if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('critical-ready',{full:true,delay:140});
+          else if(typeof renderPortview === 'function') renderPortview();
+        }catch(e){}
+        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !(typeof _senseHydrateVisiblePortfolio === 'function')) renderTeamview(); }catch(e){}
+        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 450);
       }else{
         safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
         nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:0 }); }, 500);
@@ -17874,6 +17936,32 @@ function schedulePortviewListRender(delay){
   clearTimeout(_pvRenderTimer);
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
+function _senseHydrateVisiblePortfolio(reason,opts){
+  opts=opts||{};
+  const delay=opts.delay==null?260:opts.delay;
+  let did=false;
+  const onPv=!!document.getElementById('scr-portview')?.classList.contains('on');
+  const onTv=!!document.getElementById('scr-teamview')?.classList.contains('on');
+  try{ if(typeof _pvClearAccountCache==='function')_pvClearAccountCache(); }catch(e){}
+  if(onPv){
+    const recent=Date.now()-(window._pvLastRenderMs||0)<850;
+    if(opts.full&&!recent&&typeof renderPortview==='function'){
+      renderPortview();
+    }else{
+      try{ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); }catch(e){}
+      try{ if(typeof schedulePortviewListRender==='function')schedulePortviewListRender(delay); else if(typeof renderPortviewList==='function')renderPortviewList(); }catch(e){}
+      try{ setTimeout(()=>{if(typeof _pvBuildCompactStrip==='function')_pvBuildCompactStrip();},Math.max(120,delay)); }catch(e){}
+    }
+    did=true;
+  }
+  if(onTv){
+    try{ if(typeof renderTeamviewSummary==='function')renderTeamviewSummary(); }catch(e){}
+    try{ setTimeout(()=>{if(typeof renderTeamviewKamList==='function')renderTeamviewKamList();},delay); }catch(e){}
+    did=true;
+  }
+  _senseLog('[v206d hydrate]',reason,{onPv,onTv,delay,full:!!opts.full});
+  return did;
+}
 function getPortviewAccounts(){
   if(portviewBulkData&&portviewBulkData.length>0){
     const _ck=_pvAccountCacheKey();
@@ -21394,7 +21482,7 @@ const _origRenderTeamviewKamList = typeof renderTeamviewKamList === 'function' ?
 if (_origRenderTeamviewKamList) {
   window.renderTeamviewKamList = function() {
     _origRenderTeamviewKamList.apply(this, arguments);
-    setTimeout(() => _tgtInjectTeamviewTargetRows(), 80);
+    requestAnimationFrame(()=>setTimeout(() => _tgtInjectTeamviewTargetRows(), 120));
   };
 }
 
@@ -21469,6 +21557,302 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 console.log('[Target Module v1] loaded');
 </script>
 
+
+
+<script id="freshket-v206e-bundle-micro-patch">
+// v206e: TL/KAM account-level bundle micro-state.
+// Goal: account page opens immediately; SKU/Sense sections clearly show loading/retry
+// when a TL opens an account before that KAM bundle is ready. Avoid silent heavy bulk
+// fallback for TL/Admin/PWA unless the user explicitly retries through app logic later.
+(function(global){
+  'use strict';
+  if(global._v206eBundleMicroPatchInstalled) return;
+  global._v206eBundleMicroPatchInstalled = true;
+
+  const VERSION = 'v206e-bundle-demand-state';
+  const TIMEOUT_MS = 30000;
+  const state = {
+    failures: {},          // safeKey -> {ts, message}
+    loadingAccounts: {},   // accountId -> true
+    lastPaintedAccountId: null,
+    installedAt: Date.now(),
+  };
+
+  function debug(){
+    try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshket_debug')==='1';}
+    catch(e){return false;}
+  }
+  function log(){try{if(debug())console.log.apply(console,arguments);}catch(e){}}
+  function warn(){try{if(debug())console.warn.apply(console,arguments);}catch(e){}}
+  function role(){try{return (currentUserProfile&&currentUserProfile.role)||'rep';}catch(e){return 'rep';}}
+  function isStandalonePwa(){
+    try{return (global.matchMedia&&global.matchMedia('(display-mode: standalone)').matches)||global.navigator.standalone===true;}
+    catch(e){return false;}
+  }
+  function toast(msg,icon){try{if(typeof showToast==='function')showToast(msg,icon||'⟳');}catch(e){}}
+  function aidOf(accountId){
+    try{return String(accountId || currentAccountId || (D&&D.meta&&D.meta.accountId) || '');}
+    catch(e){return String(accountId||'');}
+  }
+  function safeKey(email){
+    try{if(typeof _kamSafeKey==='function')return _kamSafeKey(email);}
+    catch(e){}
+    return (email||'').toLowerCase().replace(/[^a-z0-9]/g,'_');
+  }
+  function getKamEmail(accountId){
+    const aid = aidOf(accountId);
+    if(!aid) return null;
+    try{
+      if(typeof _getKamEmailForAccount==='function'){
+        const e = _getKamEmailForAccount(aid);
+        if(e) return e;
+      }
+    }catch(e){}
+    try{
+      const row = (portviewBulkData||[]).find(r=>String(r.id)===String(aid));
+      if(row && row.kamEmail) return row.kamEmail;
+    }catch(e){}
+    try{
+      if(role()!=='tl'&&role()!=='admin'&&currentUser&&currentUser.email) return currentUser.email;
+    }catch(e){}
+    return null;
+  }
+  function accountHasSkuData(accountId){
+    const aid = aidOf(accountId);
+    if(!aid) return false;
+    let hasSkus=false, hasAlts=false;
+    try{hasSkus = !!(bulkSkusData && bulkSkusData[aid]);}catch(e){}
+    try{hasAlts = !!(bulkAltsReady || (bulkAltsUnverified && bulkAltsUnverified[aid]));}catch(e){}
+    return !!(hasSkus && hasAlts);
+  }
+  function getBundleState(accountId){
+    const aid = aidOf(accountId);
+    const kamEmail = getKamEmail(aid);
+    const sk = safeKey(kamEmail||'');
+    let loaded=false, inflight=false;
+    try{loaded = !!(sk && _kamBundleLoaded && _kamBundleLoaded.has(sk));}catch(e){}
+    try{inflight = !!(sk && _kamBundleInFlight && _kamBundleInFlight[sk]);}catch(e){}
+    const ready = accountHasSkuData(aid);
+    const loading = !!(state.loadingAccounts[aid] || inflight);
+    const failed = !!(sk && state.failures[sk]);
+    const status = ready ? 'ready' : loading ? 'loading' : failed ? 'failed' : 'pending';
+    return { aid, kamEmail, safeKey:sk, ready, loaded, loading, failed, status, failure:sk?state.failures[sk]:null };
+  }
+  function cardHtml(st){
+    const isFail = st.status === 'failed';
+    const isPending = st.status === 'pending';
+    const title = isFail ? 'โหลด SKU detail ไม่สำเร็จ' : isPending ? 'SKU intelligence ยังไม่พร้อม' : 'กำลังโหลด SKU intelligence...';
+    const body = isFail
+      ? 'เปิดหน้า account ได้ปกติ แต่ Sense / SKU Verify ต้องใช้ bundle ของ KAM นี้ก่อน ระบบยังไม่โหลด bulk ใหญ่เพื่อกัน PWA หน่วง'
+      : isPending
+        ? 'หน้า account เปิดได้ก่อน ส่วน SKU Signals / Sense / SKU Verify จะโหลดตาม demand เมื่อเริ่มใช้งาน'
+        : 'เปิดหน้า account ได้ก่อน กำลังเติม SKU Signals / Sense / SKU Verify เฉพาะ KAM นี้อยู่เบื้องหลัง';
+    const icon = isFail ? '⚠' : '⟳';
+    const color = isFail ? 'rgba(240,176,0,.9)' : 'rgba(120,180,255,.95)';
+    const border = isFail ? 'rgba(240,176,0,.28)' : 'rgba(100,170,255,.24)';
+    const bg = isFail ? 'rgba(240,176,0,.07)' : 'rgba(38,96,200,.10)';
+    const retry = isFail || isPending ? `<button type="button" onclick="window._v206eRetryCurrentBundle && window._v206eRetryCurrentBundle()" style="margin-top:9px;padding:7px 12px;border-radius:9px;border:1px solid ${border};background:rgba(255,255,255,.06);color:${color};font-family:'IBM Plex Sans Thai',sans-serif;font-size:11px;font-weight:700;cursor:pointer">${isFail?'Retry SKU intelligence':'โหลดตอนนี้'}</button>` : '';
+    return `<div id="kam-bundle-state-card" class="kam-dc" style="margin-bottom:12px;border-color:${border};background:${bg}">
+      <div class="kam-dc-head" style="border-bottom-color:rgba(255,255,255,.06)"><span class="kam-dc-head-label" style="color:${color}">${icon} ${title}</span></div>
+      <div class="kam-dc-body" style="font-size:12px;color:rgba(220,235,255,.82);line-height:1.65">${body}${retry}</div>
+    </div>`;
+  }
+  function updateDeepButtons(st){
+    try{
+      const ready = st && st.ready;
+      ['sku-verify-tm-btn','sku-verify-lm-btn'].forEach(id=>{
+        const b=document.getElementById(id);
+        if(!b) return;
+        if(ready){
+          b.disabled=false;
+          b.style.opacity='';
+          b.title='';
+          return;
+        }
+        b.disabled = st.status === 'loading';
+        b.style.opacity = st.status === 'loading' ? '.62' : '.86';
+        b.title = st.status === 'failed' ? 'Retry ผ่านการ์ด SKU intelligence ด้านบน' : 'กำลังโหลด SKU intelligence ของ KAM นี้';
+        if(st.status === 'loading'){
+          b.className='sku-verify-btn loading';
+          b.innerHTML='<svg class="svb-icon" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>โหลด SKU...';
+        }
+      });
+    }catch(e){}
+  }
+  function paint(accountId){
+    const aid = aidOf(accountId);
+    if(!aid) return;
+    const st = getBundleState(aid);
+    state.lastPaintedAccountId = aid;
+    const cards = document.getElementById('kam-cards');
+    if(!cards) return;
+    const old = document.getElementById('kam-bundle-state-card');
+    if(st.ready){
+      if(old) old.remove();
+      updateDeepButtons(st);
+      return;
+    }
+    const html = cardHtml(st);
+    if(old) old.outerHTML = html;
+    else cards.insertAdjacentHTML('afterbegin', html);
+    updateDeepButtons(st);
+  }
+  async function fetchAccountBundle(accountId, opts){
+    opts = opts || {};
+    const aid = aidOf(accountId);
+    if(!aid) return false;
+    if(accountHasSkuData(aid)) { paint(aid); return true; }
+    const st = getBundleState(aid);
+    if(!st.kamEmail){
+      warn('[v206e] no kamEmail for account bundle', aid);
+      return false;
+    }
+    try{ delete state.failures[st.safeKey]; }catch(e){}
+    state.loadingAccounts[aid] = true;
+    paint(aid);
+    let ok = false;
+    try{
+      const p = (typeof _kamBundleInFlight !== 'undefined' && _kamBundleInFlight[st.safeKey])
+        ? _kamBundleInFlight[st.safeKey]
+        : (typeof _fetchKamBundle === 'function' ? _fetchKamBundle(st.kamEmail) : Promise.resolve(false));
+      ok = await Promise.race([p, new Promise(r=>setTimeout(()=>r(false), opts.timeoutMs || TIMEOUT_MS))]);
+    }catch(e){
+      ok = false;
+      state.failures[st.safeKey] = { ts:Date.now(), message:e&&e.message?e.message:String(e) };
+    }finally{
+      delete state.loadingAccounts[aid];
+    }
+    if(ok){
+      try{ delete state.failures[st.safeKey]; }catch(e){}
+      try{
+        if(String(currentAccountId||'')===String(aid)){
+          if(typeof loadFromStorage==='function') loadFromStorage(aid);
+          if(D&&D.alts&&D.alts.length&&D.skus&&D.skus.length&&typeof computeOPPS==='function') computeOPPS();
+        }
+      }catch(e){}
+      paint(aid);
+      if(String(currentAccountId||'')===String(aid) && opts.rerender!==false){
+        setTimeout(()=>{
+          try{
+            if(typeof currentKamSubtab !== 'undefined' && currentKamSubtab === 'lastmonth' && typeof renderKamLastMonth==='function') renderKamLastMonth();
+            else if(typeof renderKamThisMonth==='function') renderKamThisMonth();
+          }catch(e){}
+        }, opts.renderDelay || 260);
+      }
+      log('[v206e] bundle ready for account', aid, st.kamEmail);
+      return true;
+    }
+    state.failures[st.safeKey] = state.failures[st.safeKey] || { ts:Date.now(), message:'bundle fetch failed or timed out' };
+    paint(aid);
+    log('[v206e] bundle failed for account', aid, st.kamEmail);
+    return false;
+  }
+  async function ensureForDeepFlow(label){
+    const aid = aidOf();
+    if(!aid) return false;
+    if(accountHasSkuData(aid)) return true;
+    toast('กำลังโหลด SKU intelligence ของ KAM นี้...','⟳');
+    const ok = await fetchAccountBundle(aid, { reason:label, rerender:true });
+    if(!ok){
+      toast('โหลด SKU detail ไม่สำเร็จ — กด Retry ได้ในการ์ดด้านบน','⚠');
+      return false;
+    }
+    return true;
+  }
+
+  global._v206eRetryCurrentBundle = function(){
+    const aid = aidOf();
+    if(!aid) return;
+    try{
+      const st = getBundleState(aid);
+      if(st.safeKey) delete state.failures[st.safeKey];
+    }catch(e){}
+    fetchAccountBundle(aid, { reason:'manual-retry', rerender:true });
+  };
+  global.getFreshketV206eBundleState = function(accountId){ return Object.assign({ version:VERSION }, getBundleState(accountId)); };
+
+  const origEnsure = global.ensureSenseData;
+  global.ensureSenseData = async function(accountId, opts){
+    const aid = aidOf(accountId);
+    const options = opts || {};
+    if(!aid) return false;
+    if(accountHasSkuData(aid)) return true;
+    const st = getBundleState(aid);
+    if(st.kamEmail){
+      const ok = await fetchAccountBundle(aid, { reason:'ensureSenseData', rerender:!options.silent });
+      if(ok){
+        try{ if(!options.silent && typeof refreshAll==='function'){ refreshAll(); if(typeof updateDataStatus==='function') updateDataStatus(); } }catch(e){}
+        try{ if(typeof updateMatcherPreStatus==='function') updateMatcherPreStatus(); }catch(e){}
+        return true;
+      }
+      // For TL/Admin and installed/mobile PWA, avoid silently pulling the heavy bulk files.
+      if(role()==='tl' || role()==='admin' || isStandalonePwa()) return false;
+    }
+    if(typeof origEnsure === 'function') return origEnsure.apply(this, arguments);
+    return false;
+  };
+  try{ ensureSenseData = global.ensureSenseData; }catch(e){}
+
+  const origPortviewSelect = global.portviewSelectAccount;
+  if(typeof origPortviewSelect === 'function'){
+    global.portviewSelectAccount = function(accountId){
+      const aid = aidOf(accountId);
+      try{ fetchAccountBundle(aid, { reason:'account-enter-prefetch', rerender:false }); }catch(e){}
+      const ret = origPortviewSelect.apply(this, arguments);
+      setTimeout(()=>paint(aid), 380);
+      setTimeout(()=>paint(aid), 900);
+      return ret;
+    };
+    try{ portviewSelectAccount = global.portviewSelectAccount; }catch(e){}
+  }
+
+  const origRenderThis = global.renderKamThisMonth;
+  if(typeof origRenderThis === 'function'){
+    global.renderKamThisMonth = function(){
+      const ret = origRenderThis.apply(this, arguments);
+      setTimeout(()=>paint(), 0);
+      return ret;
+    };
+    try{ renderKamThisMonth = global.renderKamThisMonth; }catch(e){}
+  }
+  const origRenderLast = global.renderKamLastMonth;
+  if(typeof origRenderLast === 'function'){
+    global.renderKamLastMonth = function(){
+      const ret = origRenderLast.apply(this, arguments);
+      setTimeout(()=>paint(), 0);
+      return ret;
+    };
+    try{ renderKamLastMonth = global.renderKamLastMonth; }catch(e){}
+  }
+  const origRenderOverview = global.renderKamOverview;
+  if(typeof origRenderOverview === 'function'){
+    global.renderKamOverview = function(){
+      const ret = origRenderOverview.apply(this, arguments);
+      setTimeout(()=>paint(), 30);
+      return ret;
+    };
+    try{ renderKamOverview = global.renderKamOverview; }catch(e){}
+  }
+
+  function wrapDeepAction(name, label){
+    const orig = global[name];
+    if(typeof orig !== 'function') return;
+    global[name] = async function(){
+      const ok = await ensureForDeepFlow(label || name);
+      if(!ok) return;
+      return orig.apply(this, arguments);
+    };
+    try{ eval(name + ' = global[name]'); }catch(e){}
+  }
+  wrapDeepAction('triggerSkuVerifyFromThisMonth','SKU Verify');
+  wrapDeepAction('triggerSkuVerifyLastMonth','SKU Verify');
+  wrapDeepAction('generateKamBriefing','Brief');
+
+  // Paint once after late target/hydration hooks settle.
+  setTimeout(()=>paint(), 1200);
+  log('[v206e] bundle micro patch installed');
+})(window);
+</script>
 
 <!-- NCS cohort drill-down sheet (v206) — pre-injected for position:fixed reliability -->
 <div id="ncs-overlay" class="ncs-overlay" onclick="_ncsClose()"></div>
