@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -19546,6 +19546,64 @@ function _updateRestSwipe(grp,idx,opts){
 .tgt-det-lbl{font-size:12px;color:rgba(255,255,255,.85);flex:1;font-weight:500;}
 .tgt-det-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;}
 .tgt-det-count{font-size:10px;color:rgba(255,255,255,.6);font-family:'IBM Plex Mono',monospace;}
+/* ── NRR Cohort Drill-down Sheet (v206) ── */
+.ncs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;opacity:0;pointer-events:none;transition:opacity .28s}
+.ncs-overlay.on{opacity:1;pointer-events:all}
+.ncs-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:#0b1c14;border-radius:20px 20px 0 0;z-index:501;transition:transform .38s cubic-bezier(.34,1.2,.64,1);max-height:88dvh;display:flex;flex-direction:column}
+.ncs-sheet.on{transform:translateX(-50%) translateY(0)}
+.ncs-handle{display:flex;justify-content:center;padding:10px 0 4px;flex-shrink:0}
+.ncs-handle div{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.18)}
+.ncs-header{padding:0 16px 12px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
+.ncs-title{font-size:14px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:12px}
+.ncs-tabs{display:flex;gap:3px;background:rgba(0,0,0,.35);border-radius:10px;padding:3px}
+.ncs-tab{flex:1;font-size:10px;font-weight:700;padding:7px 4px;border-radius:8px;text-align:center;cursor:pointer;color:rgba(255,255,255,.35);line-height:1.3;transition:all .18s;border:none;background:none;font-family:'IBM Plex Sans Thai',sans-serif}
+.ncs-tab.on{background:rgba(255,255,255,.1);color:rgba(255,255,255,.9)}
+.ncs-tab.on.t-nrr{color:#1AE87B}
+.ncs-tab.on.t-cb{color:#64a0ff}
+.ncs-tab.on.t-ex{color:#00c8b0}
+.ncs-meta{display:flex;align-items:center;gap:8px;padding:7px 16px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.ncs-meta{display:flex;align-items:center;gap:8px;padding:7px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.ncs-meta-text{font-size:12px;color:rgba(255,255,255,.75);flex:1;line-height:1.4}
+.ncs-sort-btn{font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap}
+.ncs-tbl-head{display:grid;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0}
+.ncs-tbl-head.nrr-cols{grid-template-columns:minmax(0,1fr) 54px 60px 54px}
+.ncs-tbl-head.simple-cols{grid-template-columns:minmax(0,1fr) 88px}
+.ncs-th{font-size:10px;font-weight:700;letter-spacing:.05em;color:rgba(255,255,255,.55);text-transform:uppercase}
+.ncs-th.r{text-align:right}
+.ncs-chip{display:flex;align-items:center;gap:8px;padding:5px 14px;background:rgba(255,255,255,.055);border-top:1px solid rgba(255,255,255,.09);border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;user-select:none}
+.ncs-chip-chev{font-size:10px;color:rgba(255,255,255,.3);transition:transform .15s;flex-shrink:0;width:10px}
+.ncs-chip.open .ncs-chip-chev{transform:rotate(90deg)}
+.ncs-chip-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.6);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;letter-spacing:.01em}
+.ncs-chip-rr{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:rgba(26,232,123,.7);flex-shrink:0}
+.ncs-outlet-rows{display:none}
+.ncs-outlet-rows.open{display:block}
+.ncs-outlet-row{display:grid;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center}
+.ncs-outlet-row.nrr-cols{grid-template-columns:minmax(0,1fr) 54px 60px 54px}
+.ncs-outlet-row.simple-cols{grid-template-columns:minmax(0,1fr) 88px}
+.ncs-outlet-name{font-size:12px;font-weight:500;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ncs-gmv{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;text-align:right}
+.ncs-gmv.base{color:rgba(255,255,255,.72)}
+.ncs-gmv.rr-up{color:#1AE87B}
+.ncs-gmv.rr-dn{color:rgba(255,150,70,.9)}
+.ncs-gmv.mtd{color:rgba(255,255,255,.42)}
+.ncs-gmv.cb-cur{color:#64a0ff}
+.ncs-gmv.ex-cur{color:#00c8b0}
+.ncs-total{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(0,0,0,.28);border-top:1px solid rgba(255,255,255,.1);flex-shrink:0}
+.ncs-total-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em}
+.ncs-total-val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700}
+.ncs-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.ncs-footer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.22);flex-shrink:0;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.ncs-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;font-family:'IBM Plex Sans Thai',sans-serif;transition:opacity .15s;white-space:nowrap}
+.ncs-btn:active{opacity:.7}
+.ncs-btn.primary{flex:1;background:rgba(0,204,106,.1);border-color:rgba(0,204,106,.3);color:#00CC6A}
+.ncs-btn.secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.55)}
+.ncs-btn.email-future{background:rgba(100,160,255,.08);border-color:rgba(100,160,255,.2);color:rgba(100,160,255,.7)}
+.tgt-det-row.tappable{cursor:pointer;border-radius:6px;padding:3px 6px;margin:-3px -6px 3px;transition:background .12s;-webkit-tap-highlight-color:transparent}
+.tgt-det-row.tappable:last-child{margin-bottom:-3px}
+.tgt-det-row.tappable:active{background:rgba(255,255,255,.07)}
+.ncs-chevron-hint{font-size:10px;color:rgba(255,255,255,.18);margin-left:4px}
+.ncs-row-btn{font-size:10px;font-weight:700;color:#00CC6A;border:1px solid rgba(0,204,106,.3);border-radius:5px;padding:2px 8px;margin-left:auto;flex-shrink:0;background:rgba(0,204,106,.08);font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap}
+.ncs-empty{text-align:center;padding:32px 16px;font-size:12px;color:rgba(255,255,255,.3)}
 .tgt-color-key{display:flex;gap:12px;flex-wrap:wrap;padding:5px 0 2px;}
 .tgt-ck-item{display:inline-flex;align-items:center;gap:4px;font-size:10px;}
 .tgt-ck-swatch{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
@@ -20406,7 +20464,10 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   function _groupNRR(group) {
     if (!group.length) return null;
     let prevGmvByOutlet={}, currGmvByOutlet={}, everSeen=new Set();
+    // v206: track outlet→account mapping for drill-down detail
+    const outletToAcct={}, outletName={};
     group.forEach(a => {
+      const acctName=(typeof bulkAccountNames!=='undefined'&&bulkAccountNames[a.id])||a.name||a.id;
       const outletMonths = hasOutlets ? bulkOutletsData[a.id] : null;
       if (outletMonths && typeof outletMonths === 'object' && !Array.isArray(outletMonths)) {
         Object.entries(outletMonths).forEach(([mLabel,entries]) => {
@@ -20415,19 +20476,35 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0) prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
+          if(oid && o.gmv>0){
+            prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
+            outletToAcct[oid]={acctId:a.id,acctName};
+            if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
+          }
         });
         (outletMonths[currentMonthLabel]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0) currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
+          if(oid && o.gmv>0){
+            currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
+            if(!outletToAcct[oid])outletToAcct[oid]={acctId:a.id,acctName};
+            if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
+          }
         });
       } else {
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
-        if(prevRow&&(prevRow.gmv||prevRow.s||0)>0) prevGmvByOutlet[a.id]=prevRow.gmv||prevRow.s||0;
+        if(prevRow&&(prevRow.gmv||prevRow.s||0)>0){
+          prevGmvByOutlet[a.id]=prevRow.gmv||prevRow.s||0;
+          outletToAcct[a.id]={acctId:a.id,acctName};
+          outletName[a.id]=acctName;
+        }
         const cm=hasCM?bulkCurrentMonthData[a.id]:null;
-        if(cm&&cm.gmv_to_date>0) currGmvByOutlet[a.id]=cm.gmv_to_date;
+        if(cm&&cm.gmv_to_date>0){
+          currGmvByOutlet[a.id]=cm.gmv_to_date;
+          if(!outletToAcct[a.id])outletToAcct[a.id]={acctId:a.id,acctName};
+          if(!outletName[a.id])outletName[a.id]=acctName;
+        }
       }
     });
     const cohort=Object.keys(prevGmvByOutlet);
@@ -20440,12 +20517,37 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     const nonCohortIds=Object.keys(currGmvByOutlet).filter(id=>!prevGmvByOutlet[id]);
     const comebackIds=nonCohortIds.filter(id=>everSeen.has(id));
     const expansionIds=nonCohortIds.filter(id=>!everSeen.has(id));
+    // ── v206: build grouped detail arrays ────────────────────────
+    function _buildDetail(ids,type){
+      // group by account, sort each account's outlets by delta (NRR) or currGmv (CB/EX)
+      const byAcct={};
+      ids.forEach(oid=>{
+        const info=outletToAcct[oid]||{acctId:oid,acctName:oid};
+        if(!byAcct[info.acctId])byAcct[info.acctId]={acctId:info.acctId,acctName:info.acctName,outlets:[],prevTotal:0,currTotal:0};
+        const prev=prevGmvByOutlet[oid]||0;
+        const curr=currGmvByOutlet[oid]||0;
+        const delta=prev>0?Math.round((curr-prev)/prev*100):null;
+        byAcct[info.acctId].outlets.push({outletId:oid,outletName:outletName[oid]||oid,prevGmv:prev,currGmv:curr,delta});
+        byAcct[info.acctId].prevTotal+=prev;
+        byAcct[info.acctId].currTotal+=curr;
+      });
+      return Object.values(byAcct).map(g=>{
+        // sort outlets: NRR → delta% asc (worst first); CB/EX → currGmv desc
+        g.outlets.sort((a,b)=>type==='nrr'?(a.delta??0)-(b.delta??0):b.currGmv-a.currGmv);
+        g.delta=g.prevTotal>0?Math.round((g.currTotal-g.prevTotal)/g.prevTotal*100):null;
+        return g;
+      }).sort((a,b)=>type==='nrr'?(a.delta??0)-(b.delta??0):b.currTotal-a.currTotal);
+    }
+    const cohortDetail=_buildDetail(cohort,'nrr');
+    const comebackDetail=_buildDetail(comebackIds,'cb');
+    const expansionDetail=_buildDetail(expansionIds,'ex');
     return {
       nrr, cohortCount:cohort.length, cohortGmv:baseCurrGmv, baselinePrevGmv,
       comebackGmv:comebackIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
       comebackCount:comebackIds.length,
       expansionGmv:expansionIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
-      expansionCount:expansionIds.length
+      expansionCount:expansionIds.length,
+      cohortDetail, comebackDetail, expansionDetail
     };
   }
 
@@ -20478,6 +20580,10 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     comebackCount: core.comebackCount || 0,
     expansionGmv:  core.expansionGmv  || 0,
     expansionCount:core.expansionCount|| 0,
+    // v206: drill-down detail arrays (account-grouped, sorted)
+    cohortDetail:    core.cohortDetail    || [],
+    comebackDetail:  core.comebackDetail  || [],
+    expansionDetail: core.expansionDetail || [],
     // Movement groups (v198)
     transferIn: {
       count: transferInAccounts.length,
@@ -20494,6 +20600,234 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       gmv:   transferOutGmv
     }
   };
+}
+
+
+// ── NRR Cohort Drill-down Sheet (v206) ──────────────────────────
+// _tgtShowCohortSheet(tab, kamLabel)
+// tab: 'nrr' | 'cb' | 'ex'
+// reads window._ncsLastNrrResult set by renderPortviewTargetBar
+function _tgtShowCohortSheet(tab) {
+  const nr = window._ncsLastNrrResult;
+  const kamLabel = window._ncsKamLabel || '';
+  if (!nr) {
+    if (typeof showToast === 'function') showToast('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 NRR \u2014 \u0e42\u0e2b\u0e25\u0e14 portview.csv \u0e01\u0e48\u0e2d\u0e19', '!');
+    return;
+  }
+
+  // ── Formatting helpers ─────────────────────────────────────────
+  const _fmtK = function(v) {
+    if (!v) return '\u0e3f0';
+    const av = Math.abs(v);
+    if (av >= 1000000) return '\u0e3f' + (v / 1000000).toFixed(1) + 'M';
+    if (av >= 1000)    return '\u0e3f' + Math.round(v / 1000) + 'K';
+    return '\u0e3f' + Math.round(v);
+  };
+
+  // ── Days in current month (for run-rate) ─────────────────────
+  const _moNames = ['\u0e21.\u0e04.','\u0e01.\u0e1e.','\u0e21\u0e35.\u0e04.','\u0e40\u0e21.\u0e22.','\u0e1e.\u0e04.','\u0e21\u0e34.\u0e22.','\u0e01.\u0e04.','\u0e2a.\u0e04.','\u0e01.\u0e22.','\u0e15.\u0e04.','\u0e1e.\u0e22.','\u0e18.\u0e04.'];
+  const _cp = (nr.currentMonthLabel || '').split(' ');
+  const _mi = _moNames.indexOf(_cp[0]);
+  const _yr = parseInt(_cp[1] || '0') - 543;
+  const daysInCurrMonth = (_mi >= 0 && _yr > 1900) ? new Date(_yr, _mi + 1, 0).getDate() : 30;
+  const _rr = function(v) { return nr.daysElapsed > 0 ? Math.round(v / nr.daysElapsed * daysInCurrMonth) : v; };
+
+  // ── Ensure overlay + sheet DOM ─────────────────────────────────
+  let overlay = document.getElementById('ncs-overlay');
+  let sheet   = document.getElementById('ncs-sheet');
+  if (!overlay) { overlay = document.createElement('div'); overlay.id = 'ncs-overlay'; overlay.className = 'ncs-overlay'; overlay.setAttribute('onclick', '_ncsClose()'); document.body.appendChild(overlay); }
+  if (!sheet)   { sheet   = document.createElement('div'); sheet.id = 'ncs-sheet'; sheet.className = 'ncs-sheet'; document.body.appendChild(sheet); }
+
+  // ── State ──────────────────────────────────────────────────────
+  let activeTab = tab || 'nrr';
+  const tabs = [
+    {key:'nrr', label:'NRR',       count:nr.cohortCount,    gmv:nr.cohortGmv,    data:nr.cohortDetail,    color:'#1AE87B'},
+    {key:'cb',  label:'Comeback',  count:nr.comebackCount,  gmv:nr.comebackGmv,  data:nr.comebackDetail,  color:'#64a0ff'},
+    {key:'ex',  label:'Expansion', count:nr.expansionCount, gmv:nr.expansionGmv, data:nr.expansionDetail, color:'#00c8b0'}
+  ];
+
+  // ── Tab meta line ─────────────────────────────────────────────
+  function _tabMeta(t) {
+    if (t.key === 'nrr') return t.count + ' outlets \u00b7 ' + _fmtK(t.gmv) + ' MTD \u00b7 \u0e10\u0e32\u0e19 ' + nr.prevMonth;
+    if (t.key === 'cb')  return t.count + ' outlets \u0e01\u0e25\u0e31\u0e1a\u0e21\u0e32\u0e0b\u0e37\u0e49\u0e2d \u00b7 \u0e44\u0e21\u0e48\u0e21\u0e35\u0e22\u0e2d\u0e14 ' + nr.prevMonth;
+    return t.count + ' outlets \u0e43\u0e2b\u0e21\u0e48 \u00b7 \u0e44\u0e21\u0e48\u0e40\u0e04\u0e22\u0e0b\u0e37\u0e49\u0e2d\u0e21\u0e32\u0e01\u0e48\u0e2d\u0e19';
+  }
+
+  // ── Render account groups (Option B: chip separator + flat outlet rows) ───
+  function _renderRows(t) {
+    if (!t.data || !t.data.length) return '<div class="ncs-empty">\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25</div>';
+    const isNrr = t.key === 'nrr';
+    const colCls = isNrr ? 'nrr-cols' : 'simple-cols';
+    const cbColor = t.key === 'cb' ? '#64a0ff' : '#00c8b0';
+
+    return t.data.map(function(g, gi) {
+      const autoOpen = gi < 4;
+      // ── Chip row ────────────────────────────────────────────────
+      const chipRR = isNrr ? _fmtK(_rr(g.currTotal)) : _fmtK(g.currTotal);
+      const chipColor = isNrr ? 'rgba(26,232,123,.7)' : (t.key === 'cb' ? 'rgba(100,160,255,.8)' : 'rgba(0,200,176,.8)');
+      const chip = '<div class="ncs-chip' + (autoOpen ? ' open' : '') + '" onclick="_ncsChipToggle(this)">'
+        + '<span class="ncs-chip-chev">&#8250;</span>'
+        + '<span class="ncs-chip-name">' + g.acctName + '</span>'
+        + '<span class="ncs-chip-rr" style="color:' + chipColor + '">' + chipRR + '</span>'
+        + '</div>';
+
+      // ── Outlet rows ─────────────────────────────────────────────
+      const outletRows = g.outlets.map(function(o) {
+        const nameStr = (o.outletName || '\u2014').slice(0, 38);
+        if (isNrr) {
+          const rrVal = _rr(o.currGmv);
+          const rrCls = rrVal >= o.prevGmv ? 'ncs-gmv rr-up' : 'ncs-gmv rr-dn';
+          return '<div class="ncs-outlet-row nrr-cols">'
+            + '<div class="ncs-outlet-name">' + nameStr + '</div>'
+            + '<div class="ncs-gmv base">' + (o.prevGmv > 0 ? _fmtK(o.prevGmv) : '\u2014') + '</div>'
+            + '<div class="' + rrCls + '">' + _fmtK(rrVal) + '</div>'
+            + '<div class="ncs-gmv mtd">' + _fmtK(o.currGmv) + '</div>'
+            + '</div>';
+        } else {
+          return '<div class="ncs-outlet-row simple-cols">'
+            + '<div class="ncs-outlet-name">' + nameStr + '</div>'
+            + '<div class="ncs-gmv" style="text-align:right;color:' + cbColor + '">' + _fmtK(o.currGmv) + '</div>'
+            + '</div>';
+        }
+      }).join('');
+
+      return chip + '<div class="ncs-outlet-rows' + (autoOpen ? ' open' : '') + '">' + outletRows + '</div>';
+    }).join('');
+  }
+
+  // ── Main render ───────────────────────────────────────────────
+  function _render() {
+    const t = tabs.find(function(x) { return x.key === activeTab; }) || tabs[0];
+    const isNrr = t.key === 'nrr';
+
+    const tabStrip = tabs.map(function(x) {
+      return '<button class="ncs-tab t-' + x.key + (x.key === activeTab ? ' on' : '') + '" onclick="_ncsSetTab(\'' + x.key + '\')">'
+        + x.label + '<br><span style="font-size:9px;opacity:.7">' + x.count + ' outlets</span></button>';
+    }).join('');
+
+    const thRow = isNrr
+      ? '<div class="ncs-th">Outlet</div>'
+        + '<div class="ncs-th r">\u0e10\u0e32\u0e19</div>'
+        + '<div class="ncs-th r" style="color:rgba(26,232,123,.65)">Run Rate</div>'
+        + '<div class="ncs-th r">MTD</div>'
+      : '<div class="ncs-th">Outlet / Account</div>'
+        + '<div class="ncs-th r">MTD</div>';
+
+    const colCls = isNrr ? 'nrr-cols' : 'simple-cols';
+    const totalColor = t.key === 'nrr' ? '#1AE87B' : t.key === 'cb' ? '#64a0ff' : '#00c8b0';
+    const totalPrefix = t.key === 'nrr' ? '' : '+';
+
+    sheet.innerHTML =
+      '<div class="ncs-handle"><div></div></div>'
+      + '<div class="ncs-header">'
+        + '<div class="ncs-title">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14 GMV \u2014 ' + kamLabel + '</div>'
+        + '<div class="ncs-tabs">' + tabStrip + '</div>'
+      + '</div>'
+      + '<div class="ncs-meta">'
+        + '<span class="ncs-meta-text">' + _tabMeta(t) + '</span>'
+        + '<button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">\u0e22\u0e48\u0e2d\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14</button>'
+      + '</div>'
+      + '<div class="ncs-tbl-head ' + colCls + '">' + thRow + '</div>'
+      + '<div class="ncs-body" id="ncs-body">' + _renderRows(t) + '</div>'
+      + '<div class="ncs-total">'
+        + '<span class="ncs-total-lbl">\u0e23\u0e27\u0e21 ' + t.label + '</span>'
+        + '<span class="ncs-total-val" style="color:' + totalColor + '">' + totalPrefix + _fmtK(t.gmv) + '</span>'
+      + '</div>'
+      + '<div class="ncs-footer">'
+        + '<button class="ncs-btn primary" onclick="_ncsExportCSV()">&#8595; \u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 CSV</button>'
+        + '<button class="ncs-btn secondary" onclick="_ncsCopyTSV()">&#9112; Copy TSV</button>'
+      + '</div>';
+  }
+
+  // ── Chip toggle (single account group) ───────────────────────
+  window._ncsChipToggle = function(chip) {
+    chip.classList.toggle('open');
+    var r = chip.nextElementSibling;
+    if (r) r.classList.toggle('open');
+  };
+
+  // ── Toggle all expand / collapse ─────────────────────────────
+  window._ncsToggleAll = function() {
+    var body = document.getElementById('ncs-body');
+    if (!body) return;
+    var chips   = Array.from(body.querySelectorAll('.ncs-chip'));
+    var outlets = Array.from(body.querySelectorAll('.ncs-outlet-rows'));
+    var anyOpen = outlets.some(function(r) { return r.classList.contains('open'); });
+    chips.forEach(function(r)   { r.classList.toggle('open', !anyOpen); });
+    outlets.forEach(function(r) { r.classList.toggle('open', !anyOpen); });
+    var btn = document.getElementById('ncs-toggle-btn');
+    if (btn) btn.textContent = anyOpen ? '\u0e02\u0e22\u0e32\u0e22\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14' : '\u0e22\u0e48\u0e2d\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14';
+  };
+
+  // ── Tab switch ───────────────────────────────────────────────
+  window._ncsSetTab = function(key) {
+    activeTab = key;
+    _render();
+    var body = document.getElementById('ncs-body');
+    if (body) body.scrollTop = 0;
+  };
+
+  // ── Export helpers ────────────────────────────────────────────
+  function _buildRows(t) {
+    const isNrr = t.key === 'nrr';
+    const rows = [];
+    const hdr = isNrr
+      ? ['Account', 'Outlet', 'GMV \u0e10\u0e32\u0e19 (' + nr.prevMonth + ')', 'Run Rate', 'GMV MTD']
+      : ['Account', 'Outlet', 'GMV MTD'];
+    rows.push(hdr);
+    (t.data || []).forEach(function(g) {
+      g.outlets.forEach(function(o) {
+        if (isNrr) rows.push([g.acctName, o.outletName || o.outletId, Math.round(o.prevGmv), Math.round(_rr(o.currGmv)), Math.round(o.currGmv)]);
+        else       rows.push([g.acctName, o.outletName || o.outletId, Math.round(o.currGmv)]);
+      });
+    });
+    return rows;
+  }
+
+  window._ncsExportCSV = function() {
+    var t = tabs.find(function(x) { return x.key === activeTab; }) || tabs[0];
+    var rows = _buildRows(t);
+    var csv = rows.map(function(r) { return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var mo = (nr.currentMonthLabel || '').replace(/\s/g, '_');
+    a.href = url; a.download = 'freshket_' + t.label + '_' + kamLabel + '_' + mo + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+    if (typeof showToast === 'function') showToast('\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 CSV \u0e41\u0e25\u0e49\u0e27', '\u2193');
+  };
+
+  window._ncsCopyTSV = function() {
+    var t = tabs.find(function(x) { return x.key === activeTab; }) || tabs[0];
+    var rows = _buildRows(t);
+    var tsv = rows.map(function(r) { return r.join('\t'); }).join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsv).then(function() {
+        if (typeof showToast === 'function') showToast('Copy \u0e41\u0e25\u0e49\u0e27 \u2014 paste \u0e25\u0e07 Sheets \u0e44\u0e14\u0e49\u0e40\u0e25\u0e22', '\u2713');
+      }).catch(function() {
+        if (typeof showToast === 'function') showToast('Copy \u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 \u2014 \u0e25\u0e2d\u0e07 CSV \u0e41\u0e17\u0e19', '!');
+      });
+    }
+  };
+
+  window._ncsClose = function() {
+    var o = document.getElementById('ncs-overlay');
+    var s = document.getElementById('ncs-sheet');
+    if (o) o.classList.remove('on');
+    if (s) s.classList.remove('on');
+  };
+
+  // ── Show ──────────────────────────────────────────────────────
+  try {
+    _render();
+    overlay.classList.remove('on'); sheet.classList.remove('on');
+    void overlay.offsetHeight;
+    overlay.classList.add('on');
+    sheet.classList.add('on');
+  } catch(err) {
+    if (typeof showToast === 'function') showToast('Sheet error: ' + err.message, '!');
+    console.error('[NCS]', err);
+  }
 }
 
 
@@ -20657,12 +20991,15 @@ async function renderPortviewTargetBar() {
   const setupBtn = ''; // removed — Target button now in portview/teamview header
 
   // ── GMV detail section ────────────────────────────────────────
+  window._ncsLastNrrResult = nrrResult;
+  window._ncsKamLabel = _repDetail ? (_repEmail||'').split('@')[0] : (isTL ? (accounts[0]?.kamName||'ทีม') : email.split('@')[0]);
   const gmvSection = nrrResult ? `
     <div class="tgt-det-section">
       <div class="tgt-det-stitle">GMV รายประเภท</div>
-      <div class="tgt-det-row"><div class="tgt-det-dot" style="background:#4ddc97"></div><span class="tgt-det-lbl">NRR</span><span class="tgt-det-val" style="color:#4ddc97">${_tgtFmtM(cohortGmv)}</span><span class="tgt-det-count">${cohortCount} outlets</span></div>
-      ${cbGmv>0?`<div class="tgt-det-row"><div class="tgt-det-dot" style="background:#64a0ff"></div><span class="tgt-det-lbl">Comeback</span><span class="tgt-det-val" style="color:#64a0ff">+${_tgtFmtM(cbGmv)}</span><span class="tgt-det-count">${cbCount} outlets</span></div>`:''}
-      ${exGmv>0?`<div class="tgt-det-row"><div class="tgt-det-dot" style="background:#00c8b0"></div><span class="tgt-det-lbl">Expansion</span><span class="tgt-det-val" style="color:#00c8b0">+${_tgtFmtM(exGmv)}</span><span class="tgt-det-count">${exCount} outlets</span></div>`:''}
+      <div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('nrr')">
+        <div class="tgt-det-dot" style="background:#4ddc97"></div><span class="tgt-det-lbl">NRR</span><span class="tgt-det-val" style="color:#4ddc97">${_tgtFmtM(cohortGmv)}</span><span class="tgt-det-count">${cohortCount} outlets</span><span class="ncs-row-btn">ดู ›</span></div>
+      ${cbGmv>0?`<div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('cb')"><div class="tgt-det-dot" style="background:#64a0ff"></div><span class="tgt-det-lbl">Comeback</span><span class="tgt-det-val" style="color:#64a0ff">+${_tgtFmtM(cbGmv)}</span><span class="tgt-det-count">${cbCount} outlets</span><span class="ncs-row-btn" style="color:#64a0ff;border-color:rgba(100,160,255,.3)">ดู ›</span></div>`:''}
+      ${exGmv>0?`<div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('ex')"><div class="tgt-det-dot" style="background:#00c8b0"></div><span class="tgt-det-lbl">Expansion</span><span class="tgt-det-val" style="color:#00c8b0">+${_tgtFmtM(exGmv)}</span><span class="tgt-det-count">${exCount} outlets</span><span class="ncs-row-btn" style="color:#00c8b0;border-color:rgba(0,200,176,.3)">ดู ›</span></div>`:''}
     </div>` : '';
 
   // ── Baseline formula section ──────────────────────────────────
@@ -21026,5 +21363,8 @@ console.log('[Target Module v1] loaded');
 </script>
 
 
+<!-- NCS cohort drill-down sheet (v206) — pre-injected for position:fixed reliability -->
+<div id="ncs-overlay" class="ncs-overlay" onclick="_ncsClose()"></div>
+<div id="ncs-sheet" class="ncs-sheet"></div>
 </body>
 </html>
