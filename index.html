@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v205b: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -7774,7 +7774,7 @@ function handleFileUpload(type,input){
         }else{
           // all done — refresh portview badges now that bulkSkusData is fully populated
           const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+totalAccounts;b.className='dp-slot-badge ok';}
-          showToast('✓ bulk_skus: '+totalAccounts+' accounts · '+totalLines+' SKU rows');
+          // toast removed v205a — bulk ingest noise
           if(!_bundlePreWarming){
             if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
             if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
@@ -7787,7 +7787,7 @@ function handleFileUpload(type,input){
       if(remaining.length>0){idle(processChunk);}
       else{
         const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+totalAccounts;b.className='dp-slot-badge ok';}
-        showToast('✓ bulk_skus: '+totalAccounts+' accounts · '+totalLines+' SKU rows');
+        // toast removed v205a — bulk ingest noise
         if(!_bundlePreWarming){
           if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
           if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
@@ -7967,7 +7967,7 @@ function handleFileUpload(type,input){
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
       if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(typeof refreshAll==='function')refreshAll();}
-      showToast('✓ bulk_sku_current: '+cnt+' ร้าน · '+totalRows+' SKU rows');
+      // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
     };reader.readAsText(file);return;
@@ -7988,7 +7988,7 @@ function handleFileUpload(type,input){
           refreshAll();updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
         }
       }
-      showToast('✓ bulk_alternatives: '+result.accounts+' ร้าน · '+result.totalPairs+' คู่');
+      // toast removed v205a — bulk ingest noise
       _done();
     };reader.readAsText(file);return;
   }
@@ -19778,13 +19778,18 @@ async function loadTargets(quarter) {
   _tgtCache    = {};
   _tgtSettings = { nrr_threshold: 98 };
   try {
-    const { data: rows } = await supa.from('targets')
+    const { data: rows, error: rowsErr } = await supa.from('targets')
       .select('period,level,for_email,gmv_target')
       .in('period', months);
+    // v205b: debug — log raw Supabase result to diagnose empty target issue
+    console.log('[Target v205b] loadTargets quarter='+quarter+' months='+JSON.stringify(months));
+    console.log('[Target v205b] rows='+JSON.stringify(rows)+(rowsErr?' error='+rowsErr.message:''));
+    if (rowsErr) throw new Error(rowsErr.message);
     (rows || []).forEach(r => {
       const key = `${r.period}|${r.level}|${r.for_email}`;
       _tgtCache[key] = r.gmv_target;
     });
+    console.log('[Target v205b] _tgtCache after load:', JSON.stringify(_tgtCache));
     const { data: sets } = await supa.from('target_settings')
       .select('key,value')
       .eq('key', 'nrr_threshold')
@@ -19800,6 +19805,7 @@ async function loadTargets(quarter) {
     _tgtLoaded = true;
   } catch (e) {
     console.warn('[Target] load failed (tables may not exist yet):', e.message);
+    console.warn('[Target v205b] → _tgtCache will be empty, all targets fall to baseline');
     _tgtLoaded = true;
   }
 }
