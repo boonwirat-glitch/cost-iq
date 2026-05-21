@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v205b: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -7615,7 +7615,7 @@ function handleFileUpload(type,input){
         const mk=Object.keys(D.cats_monthly).sort((a,b)=>moSort(b)-moSort(a));
         D.cats=mk.length?D.cats_monthly[mk[0]]:[];fileStatus.categories=true;refreshAll();
       }
-      showToast('✓ bulk_categories: '+cnt+' accounts');
+      // toast removed v205b — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(30,'กำลังโหลดหมวดหมู่...');
       const b=document.getElementById('badge-bulk-cats');if(b){b.textContent='✓ '+cnt;b.className='dp-slot-badge ok';}
       _done();
@@ -7852,7 +7852,7 @@ function handleFileUpload(type,input){
         else{
           const accounts=Object.keys(bulkPriceData).length;
           const b=document.getElementById('badge-bulk-price');if(b){b.textContent='✓ '+accounts;b.className='dp-slot-badge ok';}
-          showToast('✓ bulk_price: '+accounts+' accounts · '+totalLines+' rows');
+          // toast removed v205b — bulk ingest noise
           _done();
         }
       }
@@ -7861,7 +7861,7 @@ function handleFileUpload(type,input){
       else{
         const accounts=Object.keys(bulkPriceData).length;
         const b=document.getElementById('badge-bulk-price');if(b){b.textContent='✓ '+accounts;b.className='dp-slot-badge ok';}
-        showToast('✓ bulk_price: '+accounts+' accounts · '+totalLines+' rows');
+        // toast removed v205b — bulk ingest noise
         _done();
       }
     };reader.readAsText(file);return;
@@ -7889,7 +7889,7 @@ function handleFileUpload(type,input){
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
         fileStatus.history=true;refreshAll();
       }
-      showToast('✓ bulk_data.csv: '+count+' accounts โหลดแล้ว');
+      // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
       if(typeof window._splashProgress==='function')
@@ -7931,6 +7931,9 @@ function handleFileUpload(type,input){
       const atRisk=portviewBulkData.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).length;
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
       showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
+      // v205b: portviewBulkData now has tlEmail — re-render target bar so Case B can use real tlEmail
+      // (init check at t=1500ms may have run before portview was ready → accounts=[] → Case B failed → baseline)
+      if(typeof renderPortviewTargetBar==='function'){setTimeout(()=>renderPortviewTargetBar(),150);}
       // ── Smart Splash: drive progress bar (portview = 45%) ──────────────
       if(typeof window._splashProgress==='function')
         window._splashProgress(45,'คำนวณ baseline 3 เดือน...');
@@ -8015,7 +8018,7 @@ function handleFileUpload(type,input){
         D_outlets=(D.outlets_monthly[moKeys[0]]||[]).map(o=>({...o}));
         renderOutletCard();debouncedSave();
       }
-      showToast('✓ bulk_outlets: '+cnt+' ร้าน','✓');
+      // toast removed v205b — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(65,'กำลังโหลด outlet...');
       _done();
     };reader.readAsText(file);return;
@@ -8050,7 +8053,7 @@ function handleFileUpload(type,input){
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
-      showToast('✓ portview_handover: '+Object.keys(byAccountId).length+' accounts','✓');
+      // toast removed v205b — bulk ingest noise
       _done();
     };
     reader.readAsText(file);return;
@@ -20432,7 +20435,23 @@ async function renderPortviewTargetBar() {
   let fbMode = null;
 
   if (!target && (!isTL || _repDetail)) {
-    const tlEmail = accounts.length ? (accounts[0].tlEmail||'') : '';
+    // Primary: tlEmail from portview CSV col 18
+    let tlEmail = accounts.length ? (accounts[0].tlEmail||'') : '';
+    // v205b fallback: if CSV missing tl_email col, scan _tgtCache for any team-level entry
+    // that belongs to a TL whose accounts overlap with this KAM's accounts
+    if (!tlEmail) {
+      const kamAccountIds = new Set(accounts.map(a => a.id));
+      const allPvData = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      // Find a row from same squad where tlEmail is known
+      const sameSqRow = allPvData.find(a => a.tlEmail && accounts.some(b => b.kamEmail === a.kamEmail));
+      if (sameSqRow) tlEmail = sameSqRow.tlEmail;
+      // Final fallback: pick first team-level entry in _tgtCache for current period
+      if (!tlEmail) {
+        const teamKey = Object.keys(_tgtCache).find(k => k.startsWith(period + '|team|'));
+        if (teamKey) tlEmail = teamKey.split('|')[2] || '';
+      }
+      if (tlEmail) console.log('[Target v205b] tlEmail fallback resolved:', tlEmail, 'for KAM:', _targetEmail);
+    }
     const tlTarget = tlEmail ? _tgtGet(period, 'team', tlEmail) : 0;
     if (tlTarget > 0) {
       const kamBaseline  = _tgtKamBaseline3mo(_targetEmail, null, 'kam');
