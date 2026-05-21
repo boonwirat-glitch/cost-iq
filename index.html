@@ -21574,6 +21574,17 @@ function _updateRestSwipe(grp,idx,opts){
   .tv-chip-comm{width:70px !important;min-width:70px !important;max-width:70px !important}
 }
 
+
+/* v209e dynamic commission overlay safety */
+#commission-cockpit-overlay.comm-overlay{
+  position:fixed !important;
+  inset:0 !important;
+  z-index:10080 !important;
+}
+#commission-cockpit-overlay.comm-overlay.open{
+  display:flex !important;
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -22664,20 +22675,58 @@ function renderNrrPolicyTab() {
 
 
 
+function ensureCommissionCockpitOverlay() {
+  let ov = document.getElementById('commission-cockpit-overlay');
+  if (ov) return ov;
+
+  ov = document.createElement('div');
+  ov.id = 'commission-cockpit-overlay';
+  ov.className = 'comm-overlay';
+  ov.setAttribute('onclick', 'if(event.target===this)closeCommissionCockpit()');
+  ov.innerHTML = `
+    <div class="comm-sheet">
+      <div class="comm-drag"></div>
+      <div class="comm-head">
+        <div>
+          <div class="comm-title">Commission Cockpit</div>
+          <div class="comm-sub">ตั้ง policy, assign plan, review payout, lock snapshot ใน flow เดียว</div>
+        </div>
+        <button class="comm-close" onclick="closeCommissionCockpit()">×</button>
+      </div>
+      <div class="comm-steps">
+        <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
+        <button class="comm-step" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">2 Assignment</button>
+        <button class="comm-step" id="comm-step-rules" onclick="switchCommissionStep('rules')">3 Rules</button>
+        <button class="comm-step" id="comm-step-exceptions" onclick="switchCommissionStep('exceptions')">4 Exceptions</button>
+        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">5 Preview<br>& Lock</button>
+      </div>
+      <div class="comm-body" id="commission-cockpit-body"></div>
+      <div class="comm-footer">
+        <button class="comm-secondary" onclick="closeCommissionCockpit()">Close</button>
+        <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  return ov;
+}
+
 function openCommissionCockpit(step) {
   _commCockpitStep = step || 'policy';
-  const ov = document.getElementById('commission-cockpit-overlay');
+  const ov = ensureCommissionCockpitOverlay();
   if (ov) {
-    if (ov.parentElement !== document.body) document.body.appendChild(ov);
     ov.classList.add('open');
     ov.style.display = 'flex';
     ov.style.pointerEvents = 'auto';
     ov.style.zIndex = '10080';
-  } else {
-    console.warn('[Commission Cockpit] overlay not found');
   }
-  try { renderCommissionCockpit(); } catch(e) { console.error('[Commission Cockpit] render failed', e); }
-  const body=document.getElementById('commission-cockpit-body'); if(body) body.scrollTop=0;
+  try {
+    renderCommissionCockpit();
+  } catch(e) {
+    console.error('[Commission Cockpit] render failed', e);
+  }
+  const body=document.getElementById('commission-cockpit-body'); 
+  if(body) body.scrollTop=0;
 }
 window.openCommissionCockpit = openCommissionCockpit;
 
