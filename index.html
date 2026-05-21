@@ -3971,12 +3971,13 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
       var _rrGap = _rrH - _actH;
       var _lbl = String(currentMonth.month_label || '').split(' ')[0];
       if (_showGhost) {
-        var _rrLbl = _rrGap >= 13 ? '<span style="position:absolute;top:2px;left:0;right:0;text-align:center;font-size:6.5px;font-family:monospace;color:rgba(0,204,106,0.8);line-height:1">'+fmtK(_rr)+'</span>' : '';
+        // v205c: run rate ON TOP outside (.tba), actual value INSIDE solid bar
+        var _actInner = _actH >= 16 ? '<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">'+fmtK(currentMonth.gmv_to_date)+'</span>' : '';
         currentBar = '<div class="tbw" id="bar-cm" style="cursor:default">'
-          + '<span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span>'
+          + '<span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">'+fmtK(_rr)+'</span>'
           + '<div style="position:relative;height:'+_rrH+'px;width:100%;flex-shrink:0">'
-          + '<div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box">'+_rrLbl+'</div>'
-          + '<div style="position:absolute;bottom:0;left:0;right:0;height:'+_actH+'px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0"></div>'
+          + '<div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div>'
+          + '<div style="position:absolute;bottom:0;left:0;right:0;height:'+_actH+'px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">'+_actInner+'</div>'
           + '</div>'
           + '<span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
       } else {
@@ -5090,11 +5091,18 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
             <span class="dp-slot-badge na" id="badge-bulk-sku-current">upload</span>
           </div>
         </div>
-        <div class="dp-upload-slot" id="slot-bulk-outlets" onclick="document.getElementById('fi-bulk-outlets').click()" style="border-color:rgba(0,208,112,.3)">
+        <div class="dp-upload-slot" id="slot-bulk-outlets" onclick="document.getElementById('fi-bulk-outlets').click()" style="border-color:rgba(0,208,112,.3);margin-bottom:6px">
           <div class="dp-slot-info"><div class="dp-slot-label" style="color:var(--g700)">bulk_outlets.csv</div><div class="dp-slot-desc">Q5B · outlet breakdown + เดือนนี้ (MTD)</div></div>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
             <button class="dp-bulk-sql-btn" id="bsql-Q5B" onclick="event.stopPropagation();copyBulkSQL('Q5B',this)">SQL</button>
             <span class="dp-slot-badge na" id="badge-bulk-outlets">upload</span>
+          </div>
+        </div>
+        <div class="dp-upload-slot" id="slot-bulk-cats" onclick="document.getElementById('fi-bulk-cats').click()" style="border-color:rgba(0,208,112,.3)">
+          <div class="dp-slot-info"><div class="dp-slot-label" style="color:var(--g700)">bulk_categories.csv</div><div class="dp-slot-desc">Q2B · หมวดหมู่ทุกร้าน + เดือนนี้ MTD</div></div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <button class="dp-bulk-sql-btn" id="bsql-Q2B" onclick="event.stopPropagation();copyBulkSQL('Q2B',this)">SQL</button>
+            <span class="dp-slot-badge na" id="badge-bulk-cats">upload</span>
           </div>
         </div>
       </div>
@@ -5115,13 +5123,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
             <span class="dp-slot-badge na" id="badge-bulk-data">upload</span>
           </div>
         </div>
-        <div class="dp-upload-slot" id="slot-bulk-cats" onclick="document.getElementById('fi-bulk-cats').click()" style="border-color:rgba(0,208,112,.25);margin-bottom:6px">
-          <div class="dp-slot-info"><div class="dp-slot-label" style="color:var(--g700)">bulk_categories.csv</div><div class="dp-slot-desc">Q2B · หมวดหมู่ทุกร้าน</div></div>
-          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-            <button class="dp-bulk-sql-btn" id="bsql-Q2B" onclick="event.stopPropagation();copyBulkSQL('Q2B',this)">SQL</button>
-            <span class="dp-slot-badge na" id="badge-bulk-cats">upload</span>
-          </div>
-        </div>
+
         <div class="dp-upload-slot" id="slot-bulk-skus" onclick="document.getElementById('fi-bulk-skus').click()" style="border-color:rgba(0,208,112,.25);margin-bottom:6px">
           <div class="dp-slot-info">
             <div class="dp-slot-label" style="color:var(--g700)">bulk_skus.csv</div>
@@ -9008,7 +9010,8 @@ function __legacyRenderOverviewFallback(){
   const _showGhost=_cm&&_rr>_cm.gmv_to_date*1.05&&_actH>0;
   const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
   const _rrGap=_rrH-_actH;
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">${fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box">${_rrGap>=13?`<span style="position:absolute;top:2px;left:0;right:0;text-align:center;font-size:6.5px;font-family:'IBM Plex Mono',monospace;color:rgba(0,204,106,0.8);line-height:1">${fmtK(_rr)}</span>`:''}</div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0"></div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">${fmtK(_cm.gmv_to_date)}</span>`:'';
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
 
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
@@ -10476,10 +10479,10 @@ GROUP BY account_id, item_id
 ORDER BY account_id, gmv_mtd DESC;
 `,
 Q2B:`-- ════════════════════════════════════════════════════════════
--- Q2B v2: Bulk Categories — KAM accounts × 6 months
+-- Q2B v3: Bulk Categories — KAM accounts × 6 months + current month MTD
 -- ════════════════════════════════════════════════════════════
 -- Output: bulk_categories.csv
--- Refresh: Weekly (จันทร์ 6:00 AM)
+-- Refresh: Daily (7:00 AM)
 
 WITH kam_list AS (
   SELECT kam_name, kam_email, tl_email FROM UNNEST([
@@ -10520,7 +10523,13 @@ kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
   FROM kam_map_src
   QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+),
+-- v3: max_date caps current month at latest pipeline data (avoids 1-day lag overcounting)
+params AS (
+  SELECT (SELECT MAX(delivery_date) FROM \`dwh.order\`
+          WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)) AS max_date
 )
+
 SELECT
   o.account_id,
   CASE EXTRACT(MONTH FROM DATE_TRUNC(o.delivery_date, MONTH))
@@ -10533,15 +10542,15 @@ SELECT
   ROUND(SUM(i.gmv_ex_vat), 0) AS gmv
 
 FROM \`dwh.order\` o, UNNEST(o.item) AS i
+CROSS JOIN params p
 INNER JOIN kam_map km ON o.account_id = km.account_id
 
 WHERE o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
-  AND o.delivery_date <  DATE_TRUNC(CURRENT_DATE(), MONTH)
+  AND o.delivery_date <= p.max_date  -- v3: include current month MTD (raw GMV, not run rate)
   AND i.gmv_ex_vat > 0
 
 GROUP BY 1, 2, 3
-ORDER BY 1, 2, gmv DESC;
-`,
+ORDER BY 1, 2, gmv DESC;`,
 Q3B:`-- ════════════════════════════════════════════════════════════════════════════
 -- Q3B v3 — Bulk SKU Monthly (KAM Cost IQ · pack_size + outlet_count_sku + bi_source unit)
 -- Columns (18): account_id, month_label, item_id, item_name_th, dept,
