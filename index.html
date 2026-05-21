@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v210e: Commission Cockpit UX/UI polish — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
+<!-- Freshket Sense v210g: Commission role/payout consistency patch — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
 <!-- Freshket Sense v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -5238,6 +5238,30 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
   body.sdt-light.kam-sense-active.kam-mode .bnav{background:rgba(232,250,242,.86)!important;}
 }
+</style>
+
+
+<style id="freshket-v210g-commission-role-fix-css">
+/* v210g: commission role clarity + payout consistency polish */
+#tv-commission-btn[style*="none"]{pointer-events:none!important}
+.tv-signal-card.commission .tv-signal-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.portview-stat.warn{border-color:rgba(240,176,0,.42)!important;background:linear-gradient(135deg,rgba(240,176,0,.14),rgba(240,176,0,.05))!important;box-shadow:inset 0 0 0 1px rgba(240,176,0,.08);}
+.portview-stat.danger{border-color:rgba(255,100,120,.42)!important;background:linear-gradient(135deg,rgba(229,62,62,.15),rgba(120,50,90,.08))!important;box-shadow:inset 0 0 0 1px rgba(229,62,62,.08);}
+.portview-stat.warn .portview-stat-val{color:#f0b000!important;text-shadow:0 0 16px rgba(240,176,0,.16);}
+.portview-stat.danger .portview-stat-val{color:#ff7f8a!important;text-shadow:0 0 16px rgba(255,100,120,.16);}
+.pv-comm-card{margin:0 0 12px;border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:12px;align-items:start;background:linear-gradient(135deg,rgba(255,224,138,.12),rgba(100,170,255,.08));border:1px solid rgba(255,224,138,.26);box-shadow:0 10px 24px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.04);}
+.pv-comm-card.hit{background:linear-gradient(135deg,rgba(255,224,138,.16),rgba(0,208,112,.08));border-color:rgba(255,224,138,.38);}
+.pv-comm-card.miss{background:linear-gradient(135deg,rgba(188,215,255,.10),rgba(255,255,255,.035));border-color:rgba(188,215,255,.16);}
+.pv-comm-eyebrow{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,224,138,.70);margin-bottom:5px;}
+.pv-comm-main{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:950;line-height:1;color:#ffe08a;text-shadow:0 0 18px rgba(255,224,138,.12);}
+.pv-comm-card.miss .pv-comm-main{color:#bcd7ff;text-shadow:none;}
+.pv-comm-sub{font-size:10.5px;color:rgba(225,238,255,.56);line-height:1.45;margin-top:6px;}
+.pv-comm-info{margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);font-size:10.5px;font-weight:750;color:rgba(225,238,255,.76);line-height:1.45;}
+.pv-comm-i{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(225,238,255,.65);font-family:Georgia,serif;font-size:12px;font-weight:800;cursor:pointer;transition:background .16s,border-color .16s,transform .08s;}
+.pv-comm-i:hover{background:rgba(255,255,255,.10);border-color:rgba(255,224,138,.35);color:#ffe08a;}
+.pv-comm-i:active{transform:scale(.94);}
+.comm-total .comm-total-val{font-variant-numeric:tabular-nums;}
+.comm-kpi-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 </style>
 
 </head>
@@ -19695,7 +19719,8 @@ function __legacyRenderPortviewSummaryFallback(){
   };
   const _warnBox=_tierBox('warn',_pfWarn,'MONITOR',warnRunRate,warn,warnShortfall,'ต่ำกว่า baseline','rgba(240,176,0,.9)',warn===0);
   const _dangerBox=_tierBox('danger',_pfDanger,'AT RISK',dangerRunRate,danger,dangerShortfall,'กำลังหาย','rgba(255,136,136,.9)',danger===0);
-  el.innerHTML=`<div class="portview-tier-grid">
+  const _kamCommissionCard = _commBuildKamSelfCard();
+  el.innerHTML=`${_kamCommissionCard}<div class="portview-tier-grid">
     <div class="portview-tier-col-ok" style="width:${okColW}%">
       <div class="portview-tier-box safe${_pfOk}" data-pf="ok" onclick="setPortviewFilter('ok')">
         <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:4px">
@@ -19991,7 +20016,8 @@ function __legacyRenderTeamviewFallback(){
     window._tgtAdminMode=(currentUserProfile&&currentUserProfile.role==='admin')?'admin':'tl';
   }
   const _tvCommBtn=document.getElementById('tv-commission-btn');
-  if(_tvCommBtn) _tvCommBtn.style.display=_isTLAdmin?'flex':'none';
+  // v210g: Commission Cockpit is admin-only. TL can see commission scorecard but cannot open governance cockpit.
+  if(_tvCommBtn) _tvCommBtn.style.display=(currentUserProfile&&currentUserProfile.role==='admin')?'flex':'none';
   const titleEl=document.getElementById('tv-title');
   const backWrap=document.getElementById('tv-back-wrap');
   if(!portviewBulkData||!portviewBulkData.length){
@@ -20158,8 +20184,8 @@ function __legacyRenderTeamviewSummaryFallback(){
     sumEl.innerHTML=`${govCard}
     <div class="portview-stat"><div class="portview-stat-val" style="color:#fff;font-size:20px">${allAccts.length}</div><div class="portview-stat-lbl" style="font-size:9px">${groups.length} KAM</div></div>
     <div class="portview-stat ok"><div class="portview-stat-val" style="color:#4ddc97;font-size:20px">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#4ddc97;margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
-    <div class="portview-stat ${totalWarn>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
-    <div class="portview-stat ${totalDanger>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
+    <div class="portview-stat ${warnAccts.length>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
+    <div class="portview-stat ${dangerAccts.length>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
   }
 }
 
@@ -20226,7 +20252,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPctByCode(kamPlanCode,'kam', nrrPct))}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -20251,7 +20278,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPctByCode(kamPlanCode,'kam', nrrPct))}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -20277,6 +20305,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -20284,7 +20313,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
         </div>
       </div>
-      ${nrrPct!==null?`<span class="tv-chip-comm">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'<span class="tv-chip-comm">—</span>'}
+      ${nrrPct!==null?`<span class="tv-chip-comm">${_commFmtPayout(_commPayoutForPctByCode(kamPlanCode,'kam', nrrPct))}</span>`:'<span class="tv-chip-comm">—</span>'}
       <span class="tv-chip-pace">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
@@ -22486,7 +22515,8 @@ function _tgtRenderTeamGovCard() {
   const baseTxt = policy.base_mode === 'fixed_month'
     ? `${_nrrGovMonthLabel(policy.base_month)} fixed`
     : 'Rolling MoM';
-  const model = _commBuildPreviewModel();
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const summary = _commBuildPayoutSummary(role === 'tl' ? 'tl' : undefined);
   const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
   const policyPublished = policy.status === 'published';
   const ready = policyPublished && pending === 0;
@@ -22495,6 +22525,11 @@ function _tgtRenderTeamGovCard() {
   const actionMsg = ready
     ? 'Policy published · no pending exceptions'
     : `${!policyPublished ? 'Policy still draft' : ''}${(!policyPublished && pending) ? ' · ' : ''}${pending ? pending + ' pending exception' + (pending>1?'s':'') : ''}`;
+  const isAdmin = role === 'admin';
+  const commissionMain = role === 'tl' ? summary.tlPayout : summary.total;
+  const commissionMeta = role === 'tl'
+    ? `KAM team ${_commFmtPayout(summary.kamPayout)}`
+    : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
   return `<div class="tv-gov-card">
     <div class="tv-signal-wrap">
       <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
@@ -22504,22 +22539,21 @@ function _tgtRenderTeamGovCard() {
       </div>
       <div class="tv-signal-card commission">
         <div class="tv-signal-label">Commission</div>
-        <div class="tv-signal-value">${_commFmtPayout(model.totalExposure)}</div>
-        <div class="tv-signal-meta">TL ${_commFmtPayout(model.tlPayout)} · KAM ${_commFmtPayout(model.kamTotal)}</div>
+        <div class="tv-signal-value">${_commFmtPayout(commissionMain)}</div>
+        <div class="tv-signal-meta">${commissionMeta}</div>
       </div>
       <div class="tv-signal-card ${pending ? 'warn' : 'ok'}">
         <div class="tv-signal-label">Exceptions</div>
         <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
         <div class="tv-signal-meta">${policyPublished ? 'Published' : 'Draft policy'}</div>
       </div>
-      ${ready ? '' : `<div class="tv-action-strip ${actionCls}">
+      ${(!ready && isAdmin) ? `<div class="tv-action-strip ${actionCls}">
         <div class="tv-action-text"><strong>${actionTitle}</strong><br>${actionMsg}</div>
         <button class="tv-action-btn commission-open" onclick="event.stopPropagation();openCommissionCockpit('exceptions')">Review now</button>
-      </div>`}
+      </div>` : ''}
     </div>
   </div>`;
 }
-
 
 function _commDefaultTiers(role) {
   if (role === 'tl') {
@@ -22967,6 +23001,59 @@ function _commBuildSnapshotRows() {
   });
 
   return rows;
+}
+
+// v210g: one source of truth for scorecard/preview totals.
+// Uses the same snapshot rows used by Lock/CSV, so Admin/TL/KAM totals cannot drift from Preview.
+function _commBuildPayoutSummary(scope) {
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const email = (currentUserProfile && currentUserProfile.email) || '';
+  const rows = _commBuildSnapshotRows();
+  let scoped = rows;
+  if (scope === 'kam' || role === 'kam') {
+    scoped = rows.filter(r => r.beneficiary_role === 'kam' && r.beneficiary_email === email);
+  } else if (scope === 'tl' || role === 'tl') {
+    scoped = rows.filter(r => r.team_lead_email === email || r.beneficiary_email === email);
+  }
+  const tlRows = scoped.filter(r => r.beneficiary_role === 'tl');
+  const kamRows = scoped.filter(r => r.beneficiary_role === 'kam');
+  const sum = arr => arr.reduce((s,r)=>s+Number(r.payout_amount||0),0);
+  return {
+    rows: scoped,
+    tlRows,
+    kamRows,
+    tlPayout: sum(tlRows),
+    kamPayout: sum(kamRows),
+    total: sum(scoped),
+    hitKams: kamRows.filter(r=>Number(r.payout_amount||0)>0).length,
+    kamCount: kamRows.length,
+    teamCount: Array.from(new Set(scoped.map(r=>r.team_lead_email).filter(Boolean))).length
+  };
+}
+
+function _commBuildKamSelfCard() {
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const email = (currentUserProfile && currentUserProfile.email) || '';
+  if (role !== 'kam' || !email || portviewLevel === 'rep-detail') return '';
+  const period = _nrrExclusionCurrentPeriod();
+  const pct = _commKamNrrPct(email);
+  const planCode = _commGetAssignmentPlan(period, 'kam', email, 'kam');
+  const payout = _commPayoutForPctByCode(planCode, 'kam', pct);
+  const tier = _commMatchTierByCode(planCode, 'kam', pct);
+  const ruleName = _commPlanNameByCode(planCode, 'kam');
+  const tiers = (_commGetDraftByCode(planCode, 'kam').tiers || []).slice().sort((a,b)=>Number(a.min_value ?? -Infinity)-Number(b.min_value ?? -Infinity));
+  const next = pct === null ? null : tiers.find(t => Number(t.payout_value||0) > Number(payout||0) && t.min_value !== null && Number(t.min_value) > pct);
+  const nextText = next ? `อีก ${Math.max(0, Number(next.min_value)-pct).toFixed(1).replace('.0','')} pts ถึง ${_commFmtPayout(next.payout_value)} (${_commEscapeHtml(next.payout_label||'next tier')})` : (payout>0 ? 'รักษา NRR ให้ไม่หลุด tier นี้จนจบเดือน' : 'ดัน NRR ให้ถึง threshold เพื่อเริ่มรับ payout');
+  const explain = `Governed NRR ${pct!==null?pct+'%':'—'} · ${_commEscapeHtml(ruleName)}${tier&&tier.payout_label?' · '+_commEscapeHtml(tier.payout_label):''}`;
+  return `<div class="pv-comm-card ${payout>0?'hit':'miss'}">
+    <div class="pv-comm-copy">
+      <div class="pv-comm-eyebrow">Commission this month</div>
+      <div class="pv-comm-main">${_commFmtPayout(payout)}</div>
+      <div class="pv-comm-sub">${explain}</div>
+      <div id="pv-comm-info" class="pv-comm-info" style="display:none">${nextText}</div>
+    </div>
+    <button class="pv-comm-i" onclick="event.stopPropagation();const d=document.getElementById('pv-comm-info');if(d)d.style.display=d.style.display==='none'?'block':'none';">i</button>
+  </div>`;
 }
 function _commSnapshotCsv(rows) {
   const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','rule_name','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
@@ -23608,6 +23695,11 @@ function ensureCommissionCockpitOverlay() {
 }
 
 function openCommissionCockpit(step) {
+  // v210g: governance cockpit is admin-only. TL/KAM get read-only commission scorecards only.
+  if (!currentUserProfile || currentUserProfile.role !== 'admin') {
+    if (typeof showToast === 'function') showToast('Commission Cockpit เปิดได้เฉพาะ Admin', '!');
+    return;
+  }
   _commCockpitStep = step || 'policy';
   const ov = ensureCommissionCockpitOverlay();
   if (ov) {
@@ -24064,6 +24156,7 @@ function renderCommLockStep(body) {
   const model = _commBuildPreviewModel();
   const teams = _commBuildTeamPreviewGroups();
   const rows = _commBuildSnapshotRows();
+  const summary = _commBuildPayoutSummary((currentUserProfile&&currentUserProfile.role)==='tl'?'tl':undefined);
   const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
   const threshold = Number(_tgtSettings.nrr_threshold || 98);
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
@@ -24072,12 +24165,12 @@ function renderCommLockStep(body) {
     <div class="comm-hero">
       <div class="comm-hero-top">
         <div><div class="comm-hero-title">5. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
-        <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(model.totalExposure)}</div></div>
+        <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(summary.total)}</div></div>
       </div>
       <div class="comm-kpis">
-        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">Team NRR</div><div class="comm-kpi-val">${model.teamPct!==null?model.teamPct+'%':'—'}</div><div class="comm-kpi-sub">Target ${threshold}%</div></div>
-        <div class="comm-kpi ${model.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(model.tlPayout)}</div><div class="comm-kpi-sub">${_commEscapeHtml(model.tlPlanName || 'TL NRR Standard')}</div></div>
-        <div class="comm-kpi ${model.kamTotal>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(model.kamTotal)}</div><div class="comm-kpi-sub">${model.kamRows.filter(r=>r.payout>0).length}/${model.kamRows.length} KAM hit payout</div></div>
+        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:(model.teamPct!==null?model.teamPct+'%':'—')}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
+        <div class="comm-kpi ${summary.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.tlPayout)}</div><div class="comm-kpi-sub">${summary.tlRows.length} TL rows</div></div>
+        <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?`ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ`:'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
       <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
@@ -24191,6 +24284,10 @@ async function saveCommissionRules() {
 }
 
 async function saveCommissionCockpit() {
+  if (!currentUserProfile || currentUserProfile.role !== 'admin') {
+    if (typeof showToast === 'function') showToast('Commission settings บันทึกได้เฉพาะ Admin', '!');
+    return;
+  }
   const btn = document.querySelector('#commission-cockpit-overlay .comm-save');
   if (!_commHasPendingChanges()) {
     if (typeof showToast === 'function') showToast('ยังไม่มี change ใหม่ให้บันทึก', 'ok');
