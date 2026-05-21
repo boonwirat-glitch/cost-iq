@@ -9054,30 +9054,37 @@ function __legacyRenderOverviewFallback(){
 }
 
 function selectCurrentMonth(){
-  // Restore current month view: clear bar highlights, show current month cats
+  // Restore current month view — called when user taps ghost bar (พ.ค.)
   const hist=D.history.length?D.history:SAMPLE.history;
+  // 1. Reset all history bars to gray
   hist.forEach((_,i)=>{
     const bar=document.getElementById('tb-'+i);
     const wrap=document.getElementById('bar-'+i);
     if(bar)bar.style.background='var(--n200)';
     if(wrap)wrap.classList.remove('active');
   });
-  // Highlight ghost bar visually
-  const ghostWrap=document.getElementById('bar-cm');
-  if(ghostWrap)ghostWrap.classList.add('active');
-  // Hide chart-sel-info
+  // 2. chart-sel-info: UPDATE to show current month (don't hide!)
   const _csi=document.getElementById('chart-sel-info');
-  if(_csi)_csi.style.display='none';
-  // Show current month category if available
+  if(_csi&&D.current_month&&D.current_month.gmv_to_date>0){
+    _csi.style.display='flex';
+    const _cnEl=document.getElementById('chartMonthName');
+    const _caEl=document.getElementById('chartMonthAmt');
+    if(_cnEl)_cnEl.textContent=D.current_month.month_label||'';
+    if(_caEl)_caEl.textContent=fmt(D.current_month.gmv_to_date);
+  }else if(_csi){_csi.style.display='none';}
+  // 3. Category: show current month if available
   const _curCatLbl=D.current_month&&D.current_month.month_label;
   if(_curCatLbl&&D.cats_monthly&&D.cats_monthly[_curCatLbl]){
     const catbarsEl=document.getElementById('catbars');
     const catSec=document.getElementById('overview-cats-sec');
     const catHead=catSec?catSec.querySelector('.ct'):null;
-    if(catbarsEl){catbarsEl.innerHTML=renderCatBars(D.cats_monthly[_curCatLbl],3);}
+    if(catbarsEl)catbarsEl.innerHTML=renderCatBars(D.cats_monthly[_curCatLbl],3);
     if(catSec)catSec.style.display='';
     if(catHead)catHead.textContent='หมวดหมู่ · '+_curCatLbl+' MTD';
   }
+  // 4. Score cards: use current month data (pass sentinel -1)
+  renderOverviewStats(-1);
+  renderInterpretation(hist.length-1);
   heroLockedToCurrent=true;
 }
 
@@ -9251,9 +9258,18 @@ function renderOverviewStats(idx){
   const el=document.getElementById('overview-stats');if(!el)return;
   const hist=D.history.length?D.history:SAMPLE.history;
   if(!hist.length){el.innerHTML='';return;}
-  const safeIdx=Math.max(0,Math.min(idx||0,hist.length-1));
-  const h=hist[safeIdx];if(!h){el.innerHTML='';return;}
-  const mo=h.m;
+  // v205c: idx=-1 → use current month data for score cards
+  const _useCurMonth = idx===-1 && D.current_month && D.current_month.gmv_to_date>0;
+  let h, mo;
+  if(_useCurMonth){
+    const cm=D.current_month;
+    mo=cm.month_label||'';
+    h={m:mo, s:cm.gmv_to_date, orders:Math.max(cm.orders_to_date||1,1)};
+  }else{
+    const safeIdx=Math.max(0,Math.min(idx||0,hist.length-1));
+    h=hist[safeIdx];if(!h){el.innerHTML='';return;}
+    mo=h.m;
+  }
   const ords=Math.max(h.orders,1);
   const ordPerDay=ords/30;
 
