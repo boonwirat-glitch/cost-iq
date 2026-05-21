@@ -21032,6 +21032,72 @@ function _updateRestSwipe(grp,idx,opts){
   transition:background .15s;margin-bottom:10px;
 }
 .tgt-admin-btn:hover { background:rgba(0,208,112,.18); }
+
+/* v208e-fix2: Teamview governance card layout repair */
+#tv-summary-row.portview-summary-row{
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  align-items:stretch;
+  overflow:visible;
+}
+#tv-summary-row .tv-gov-card{
+  grid-column:1 / -1;
+  width:100%;
+  min-width:0 !important;
+  flex:none !important;
+  box-sizing:border-box;
+  padding:12px;
+}
+#tv-summary-row .portview-stat{
+  min-width:0 !important;
+  width:auto !important;
+  flex:none !important;
+}
+#tv-summary-row .tv-gov-top{margin-bottom:8px}
+#tv-summary-row .tv-gov-badges{margin-bottom:8px;gap:5px}
+#tv-summary-row .tv-gov-badge{font-size:8.5px;padding:3px 6px}
+#tv-summary-row .tv-gov-grid{grid-template-columns:1fr 1fr;gap:8px}
+#tv-summary-row .tv-gov-metric{padding:8px}
+#tv-summary-row .tv-gov-metric-value{font-size:16px}
+#tv-summary-row .tv-gov-payout{margin-top:8px;padding:8px}
+#tv-summary-row .tv-gov-footer,
+#tv-summary-row .tv-gov-adjust{font-size:8.5px;line-height:1.35}
+
+@media (max-width: 430px){
+  #tv-summary-row.portview-summary-row{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:8px;
+  }
+  #tv-summary-row .tv-gov-card{padding:11px}
+  #tv-summary-row .tv-gov-grid{grid-template-columns:1fr 1fr}
+  #tv-summary-row .portview-stat{padding:10px 6px}
+  #tv-summary-row .portview-stat-val{font-size:18px !important}
+}
+
+/* v208e-fix2: keep KAM card payout/exclusion controls from stretching the row */
+.tv-risk-chips{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.tv-payout-pill{
+  margin-left:0 !important;
+  white-space:nowrap;
+}
+.tgt-excl-request-btn{
+  margin-left:auto;
+  flex-shrink:0;
+}
+
+/* v208e-fix2: splash loading alignment safety */
+#splash-screen .splash-status,
+#splash-screen [id*="status"],
+#splash-screen [class*="status"]{
+  max-width:320px;
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -21283,23 +21349,23 @@ function _tgtRenderTeamGovCard() {
     <div class="tv-gov-badges">
       <span class="tv-gov-badge">${baseTxt}</span>
       <span class="tv-gov-badge">warn &lt; ${threshold}%</span>
-      <span class="tv-gov-badge">scope: all teams</span>
+      <span class="tv-gov-badge">all teams</span>
     </div>
     <div class="tv-gov-grid">
       <div class="tv-gov-metric">
         <div class="tv-gov-metric-label">Raw NRR</div>
         <div class="tv-gov-metric-value">${nrrPct !== null ? nrrPct + '%' : '—'}</div>
-        <div class="tv-gov-metric-meta">ก่อน apply exclusion / override</div>
+        <div class="tv-gov-metric-meta">before approved exclusion</div>
       </div>
       <div class="tv-gov-metric">
         <div class="tv-gov-metric-label">Governed NRR</div>
         <div class="tv-gov-metric-value" style="color:${badgeCls === 'ok' ? '#4ddc97' : (badgeCls === 'warn' ? '#f6ad55' : '#fff')}">${governedPct !== null ? governedPct + '%' : '—'}</div>
-        <div class="tv-gov-metric-meta">v208 foundation: ยังเท่ากับ raw</div>
+        <div class="tv-gov-metric-meta">after approved exclusion</div>
       </div>
     </div>
-    ${governedPct !== null ? (()=>{ const m=_commBuildPreviewModel(); return `<div class="tv-gov-payout"><div><div class="tv-gov-payout-lbl">Estimated payout exposure</div><div class="tv-gov-metric-meta">TL ${_commFmtPayout(m.tlPayout)} · KAM ${_commFmtPayout(m.kamTotal)}</div></div><div class="tv-gov-payout-val">${_commFmtPayout(m.totalExposure)}</div></div>`; })() : ''}
+    ${governedPct !== null ? (()=>{ const m=_commBuildPreviewModel(); return `<div class="tv-gov-payout"><div><div class="tv-gov-payout-lbl">Payout exposure</div><div class="tv-gov-metric-meta">TL ${_commFmtPayout(m.tlPayout)} · KAM ${_commFmtPayout(m.kamTotal)}</div></div><div class="tv-gov-payout-val">${_commFmtPayout(m.totalExposure)}</div></div>`; })() : ''}
     ${gov.excludedBase>0?`<div class="tv-gov-adjust">Approved exclusion base: ${_tgtFmtM(gov.excludedBase)} · Raw ${nrrPct}% → Governed ${governedPct}%</div>`:''}
-    <div class="tv-gov-footer">v208d: approved exclusions affect governed preview · final payout still needs lock snapshot</div>
+    <div class="tv-gov-footer">preview only · final after lock</div>
   </div>`;
 }
 
