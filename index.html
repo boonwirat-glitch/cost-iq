@@ -22631,13 +22631,33 @@ async function loadTargets(quarter) {
   }
 
   try {
-    const { data: plans, error: planErr } = await supa.from('commission_plans')
+    // v210c: load the full Rule Library, not only the two standard plans.
+    let { data: plans, error: planErr } = await supa.from('commission_plans')
       .select('id,plan_code,plan_name,beneficiary_role,status')
-      .in('plan_code', ['TL_NRR_STD','KAM_NRR_STD']);
+      .in('beneficiary_role', ['tl','kam'])
+      .neq('status', 'inactive')
+      .order('created_at', { ascending:true });
+    if (planErr && /created_at/.test(planErr.message || '')) {
+      const fb = await supa.from('commission_plans')
+        .select('id,plan_code,plan_name,beneficiary_role,status')
+        .in('beneficiary_role', ['tl','kam'])
+        .neq('status', 'inactive');
+      plans = fb.data; planErr = fb.error;
+    }
     if (planErr) throw new Error(planErr.message);
+
     const planMap = {};
     const planIds = [];
-    (plans || []).forEach(p => { planMap[p.plan_code] = p; planIds.push(p.id); });
+    (plans || []).forEach(p => {
+      if (!p || !p.plan_code) return;
+      planMap[p.plan_code] = p;
+      planIds.push(p.id);
+    });
+
+    // Ensure standard placeholders exist in memory even if DB seed failed.
+    if (!planMap.TL_NRR_STD) planMap.TL_NRR_STD = { plan_code:'TL_NRR_STD', plan_name:'TL NRR Standard', beneficiary_role:'tl', status:'active' };
+    if (!planMap.KAM_NRR_STD) planMap.KAM_NRR_STD = { plan_code:'KAM_NRR_STD', plan_name:'KAM NRR Standard', beneficiary_role:'kam', status:'active' };
+
     let ruleMap = {}, tierMap = {};
     if (planIds.length) {
       const { data: rules, error: ruleErr } = await supa.from('commission_rules')
@@ -22659,21 +22679,32 @@ async function loadTargets(quarter) {
         });
       }
     }
+
     let assignments = [];
     try {
-      const { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
-        .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id')
+      let { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
+        .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id,plan_code')
         .in('period_month', months);
+      if (asgErr && /plan_code/.test(asgErr.message || '')) {
+        const fb = await supa.from('commission_plan_assignments')
+          .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id')
+          .in('period_month', months);
+        asg = fb.data; asgErr = fb.error;
+      }
       if (asgErr) throw new Error(asgErr.message);
-      assignments = (asg || []).map(r => ({ ...r, plan_code: Object.values(planMap).find(p => p.id === r.plan_id)?.plan_code || null }));
+      assignments = (asg || []).map(r => ({
+        ...r,
+        plan_code: r.plan_code || Object.values(planMap).find(p => p.id === r.plan_id)?.plan_code || null
+      }));
     } catch(asgEx) {
       console.warn('[Commission assignments] load failed:', asgEx.message);
       assignments = [];
     }
+
     _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap, assignments };
   } catch (e) {
     console.warn('[Commission rules] load failed (tables may not exist yet):', e.message);
-    _commRuleConfig = { plans: {}, rules: {}, tiers: {} };
+    _commRuleConfig = { plans: {}, rules: {}, tiers: {}, assignments: [] };
   }
 
   _tgtQuarterCache[quarter] = {
@@ -23224,6 +23255,15 @@ function _commBuildTeamPreviewGroups() {
   });
   return Object.values(tlMap).sort((a,b)=>b.total-a.total);
 }
+
+window.debugCommissionRules = function(){
+  const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {});
+  const assignments = ((_commRuleConfig && _commRuleConfig.assignments) || []);
+  console.table(plans.map(p=>({plan_code:p.plan_code, name:p.plan_name, role:p.beneficiary_role, id:p.id, status:p.status})));
+  console.log('assignments', assignments);
+  return { plans, assignments, pending:_commRulePending };
+};
+
 function renderCommissionCockpit() {
   document.querySelectorAll('.comm-step').forEach(b=>b.classList.remove('active'));
   const btn = document.getElementById('comm-step-' + _commCockpitStep);
@@ -23522,6 +23562,16 @@ async function saveCommissionRules() {
 
   _commRulePending = {};
   if (_tgtActiveQuarter) delete _tgtQuarterCache[_tgtActiveQuarter];
+
+  // Reload from Supabase to verify persistence and prevent in-memory-only success.
+  try {
+    const q = _tgtActiveQuarter || _tgtCurrentQuarter();
+    delete _tgtQuarterCache[q];
+    _tgtLoaded = false;
+    await loadTargetsForQuarter(q);
+  } catch (reloadErr) {
+    console.warn('[Commission rules] saved but reload check failed:', reloadErr.message || reloadErr);
+  }
 }
 
 async function saveCommissionCockpit() {
@@ -23590,8 +23640,12 @@ async function saveCommissionAssignments() {
     };
   }).filter(r => r.plan_id);
   try {
-    const writeRows = rows.map(({ plan_code, ...r }) => r);
-    const { error } = await supa.from('commission_plan_assignments').upsert(writeRows, { onConflict:'period_month,assignment_scope,assignee_key' });
+    let { error } = await supa.from('commission_plan_assignments').upsert(rows, { onConflict:'period_month,assignment_scope,assignee_key' });
+    if (error && /plan_code/.test(error.message || '')) {
+      const writeRows = rows.map(({ plan_code, ...r }) => r);
+      const fb = await supa.from('commission_plan_assignments').upsert(writeRows, { onConflict:'period_month,assignment_scope,assignee_key' });
+      error = fb.error;
+    }
     if (error) throw new Error(error.message);
     _commRuleConfig.assignments = [
       ...(((_commRuleConfig && _commRuleConfig.assignments) || []).filter(a => !entries.some(([key]) => {
