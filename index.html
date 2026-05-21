@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font rgba(.55) 11px; (4) ghost bar in modular renderer renderTrendBars (monospace fix); (5) remove v205b debug logs | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -8141,7 +8141,7 @@ const _CSV_DB=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvDbN
 const _CSV_TTL=(FRESHKET_APP_CONFIG.storage && FRESHKET_APP_CONFIG.storage.csvCacheTtlMs) || 6*60*60*1000; // 6 hours
 function _csvOpen(){return window.FreshketSenseRuntime.data.csvOpen();}
 async function _csvCacheGet(tab){return window.FreshketSenseRuntime.data.csvCacheGet(tab);}
-async function _csvCacheSet(tab,text){return window.FreshketSenseRuntime.data.csvCacheSet(tab,text);}
+async function _csvCacheSet(tab,text,etag){return window.FreshketSenseRuntime.data.csvCacheSet(tab,text,etag);}
 async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCacheClear();}
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
@@ -8191,21 +8191,35 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
       if(useCache){
         const cached=await _csvCacheGet(tab);
         if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
-          // Level 2: HEAD check — auto-detect when team uploads new file to R2
+          // v205c: Conditional GET (ETag-based) — replaces HEAD+GET double-trip
+          // R2 returns 304 Not Modified if file unchanged → use cache; 200 → fresh data
           try{
             const _url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
-            const _head=await fetch(_url,{method:'HEAD'});
-            const _lm=_head.headers.get('Last-Modified');
-            if(!_lm||new Date(_lm).getTime()<=cached.ts)text=cached.text;
-            // else: R2 file newer than cache → re-fetch below
-          }catch(e){text=cached.text;}
+            const _res=await window.FreshketSenseRuntime.data.fetchWithEtag(_url,cached.etag||null,_specFetchTimeout(spec));
+            if(_res.notModified){
+              text=cached.text;  // 304: file unchanged, extend cache life
+              _csvCacheSet(tab,text,_res.etag);
+            } else if(_res.text){
+              text=_res.text;    // 200: new file → store below with new ETag
+              _csvCacheSet(tab,text,_res.etag);
+            }
+            // else: fetch threw → fall through to re-fetch (handled by catch below)
+          }catch(e){
+            // Network error: use cache as offline fallback (better than nothing)
+            if(cached.text){text=cached.text;console.warn('[cache] conditional GET failed, using cache:',tab,e&&e.message);}
+          }
         }
       }
       if(!text){
         const url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
-        text=await _fetchTextWithTimeout(url,_specFetchTimeout(spec));
-        // Cache only the 5 lightweight/core CSVs. Heavy files are intentionally not cached.
-        if(useCache)_csvCacheSet(tab,text);
+        const _fr=await window.FreshketSenseRuntime.data.fetchWithEtag(url,null,_specFetchTimeout(spec)).catch(async()=>{
+          // fetchWithEtag failed → fallback to plain fetch (handles edge cases)
+          const t=await _fetchTextWithTimeout(url,_specFetchTimeout(spec));
+          return{text:t,etag:null,notModified:false};
+        });
+        text=_fr.text;
+        // Cache only the lightweight/core CSVs. Heavy files are intentionally not cached.
+        if(useCache&&text)_csvCacheSet(tab,text,_fr.etag);
       }
       const ok=await ingestCSVText(spec.type,text,{timeoutMs:_specIngestTimeout(spec)});
       if(ok){
@@ -9066,14 +9080,18 @@ function selectMonth(idx,init){
   if(_csi)_csi.style.display=(heroLockedToCurrent||idx<hist.length-1)?'flex':'none';
   document.getElementById('chartMonthName').textContent=h.m;
   document.getElementById('chartMonthAmt').textContent=fmt(h.s);
-  const monthCats=D.cats_monthly&&D.cats_monthly[h.m]?D.cats_monthly[h.m]:null;
+  // v205c: when hero locked to current month AND init=true, prefer current month cats
+  const _curCatLbl=D.current_month&&D.current_month.month_label;
+  const _useCurCat=init&&heroLockedToCurrent&&_curCatLbl&&D.cats_monthly&&D.cats_monthly[_curCatLbl];
+  const _catMonth=_useCurCat?_curCatLbl:h.m;
+  const monthCats=D.cats_monthly&&D.cats_monthly[_catMonth]?D.cats_monthly[_catMonth]:null;
   const catbarsEl=document.getElementById('catbars');
   const _catSecSel=document.getElementById('overview-cats-sec');
   const _catHead=_catSecSel?_catSecSel.querySelector('.ct'):null;
   if(monthCats&&monthCats.length){
     if(catbarsEl)catbarsEl.innerHTML=renderCatBars(monthCats,3);
     if(_catSecSel)_catSecSel.style.display='';
-    if(_catHead)_catHead.textContent=heroLockedToCurrent?'หมวดหมู่ · '+h.m:'หมวดหมู่';
+    if(_catHead)_catHead.textContent=_useCurCat?'หมวดหมู่ · '+_catMonth+' MTD':(heroLockedToCurrent?'หมวดหมู่ · '+h.m:'หมวดหมู่');
   } else {
     if(_catSecSel)_catSecSel.style.display='none';
   }
@@ -11654,13 +11672,13 @@ function setAiProvider(p){
     }
   }
 
-  async function csvCacheSet(tab, text){
+  async function csvCacheSet(tab, text, etag){
     const start = now();
     try{
       const db = await csvOpen();
       return new Promise(res=>{
         const tx = db.transaction('csv','readwrite');
-        tx.objectStore('csv').put({ text, ts: now() }, tab);
+        tx.objectStore('csv').put({ text, ts: now(), etag: etag || null }, tab);
         tx.oncomplete = () => {
           status.cache.lastSet = { tab, bytes: text ? text.length : 0, ok:true, ms: now() - start, ts: now() };
           res(true);
@@ -11714,6 +11732,36 @@ function setAiProvider(p){
     }catch(err){
       status.fetch.lastMs = now() - start;
       status.fetch.lastStatus = err && err.name === 'AbortError' ? 'timeout' : 'error';
+      throw err;
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
+  // v205c: Conditional GET — uses If-None-Match for ETag-based cache validation
+  // Returns {text, etag} on 200, or {text:null, etag:cachedEtag, notModified:true} on 304
+  async function fetchWithEtag(url, cachedEtag, timeoutMs){
+    const start = now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), timeoutMs||90000);
+    const headers = {};
+    if(cachedEtag) headers['If-None-Match'] = cachedEtag;
+    try{
+      const resp = await fetch(url, { cache:'no-cache', signal:ctrl.signal, headers });
+      if(resp.status===304){
+        status.fetch.lastStatus = 304;
+        status.fetch.lastMs = now()-start;
+        return {text:null, etag:cachedEtag, notModified:true};
+      }
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      const etag = resp.headers.get('ETag');
+      const text = await resp.text();
+      status.fetch.lastStatus = resp.status;
+      status.fetch.lastMs = now()-start;
+      return {text, etag, notModified:false};
+    }catch(err){
+      status.fetch.lastMs = now()-start;
+      status.fetch.lastStatus = err&&err.name==='AbortError'?'timeout':'error';
       throw err;
     }finally{
       clearTimeout(timer);
@@ -11877,6 +11925,7 @@ function setAiProvider(p){
     'ensureSenseData',
     'loadFromSupabaseStorage',
     '_csvCacheClear',
+    'fetchWithEtag',
     '_fetchCloudflareFile'
   ];
   const syncNames = [
