@@ -21838,6 +21838,52 @@ function _updateRestSwipe(grp,idx,opts){
   100%{box-shadow:0 0 0 0 rgba(255,198,56,0)}
 }
 
+
+/* v210b Rule save + Team View space optimization */
+#tv-summary-row .tv-action-strip.all-clear{
+  display:none !important;
+}
+#tv-collapsible.expanded{
+  margin-bottom:8px !important;
+}
+#teamview-content{
+  padding-top:0 !important;
+}
+#tv-ai-btn{
+  margin-bottom:0 !important;
+}
+.comm-rule-item{
+  position:relative;
+}
+.comm-rule-item.active::after{
+  content:'';
+  position:absolute;
+  left:10px;
+  right:10px;
+  bottom:-1px;
+  height:2px;
+  border-radius:2px;
+  background:linear-gradient(90deg,rgba(255,198,56,.95),rgba(77,220,151,.85));
+}
+.comm-create-rule-btn:active,
+.comm-mini-btn:active,
+.comm-save:active,
+.comm-close:active{
+  transform:scale(.98);
+}
+.comm-save.saving::after{
+  content:'';
+  display:inline-block;
+  width:10px;
+  height:10px;
+  margin-left:8px;
+  border-radius:50%;
+  border:2px solid rgba(7,17,29,.35);
+  border-top-color:#07111d;
+  animation:commSpin .7s linear infinite;
+}
+@keyframes commSpin{to{transform:rotate(360deg)}}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -22106,10 +22152,10 @@ function _tgtRenderTeamGovCard() {
         <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
         <div class="tv-signal-meta">${policyPublished ? 'Published' : 'Draft policy'}</div>
       </div>
-      <div class="tv-action-strip ${actionCls}">
+      ${ready ? '' : `<div class="tv-action-strip ${actionCls}">
         <div class="tv-action-text"><strong>${actionTitle}</strong><br>${actionMsg}</div>
-        <button class="tv-action-btn commission-open" onclick="event.stopPropagation();openCommissionCockpit('${ready ? 'lock' : 'exceptions'}')">${ready ? 'Open Commission' : 'Review now'}</button>
-      </div>
+        <button class="tv-action-btn commission-open" onclick="event.stopPropagation();openCommissionCockpit('exceptions')">Review now</button>
+      </div>`}
     </div>
   </div>`;
 }
@@ -23389,21 +23435,111 @@ function renderCommLockStep(body) {
     <div class="comm-section-title">Snapshot rows</div>
     <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email}</div><div class="comm-person-sub">Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
 }
+
+async function saveCommissionRules() {
+  const drafts = Object.values(_commRulePending || {});
+  if (!drafts.length) return;
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+
+  for (const draft of drafts) {
+    const planPayload = {
+      plan_code: draft.plan_code,
+      plan_name: draft.plan_name || _commPlanName(draft.role),
+      beneficiary_role: draft.beneficiary_role || draft.role,
+      status: 'active',
+      updated_by: actor,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: savedPlan, error: planErr } = await supa.from('commission_plans')
+      .upsert(planPayload, { onConflict: 'plan_code' })
+      .select('id,plan_code,plan_name,beneficiary_role,status')
+      .single();
+    if (planErr) throw new Error(planErr.message);
+
+    let ruleId = null;
+    const { data: existingRules, error: exRuleErr } = await supa.from('commission_rules')
+      .select('id')
+      .eq('plan_id', savedPlan.id)
+      .eq('metric_code', 'nrr')
+      .limit(1);
+    if (exRuleErr) throw new Error(exRuleErr.message);
+
+    ruleId = existingRules && existingRules[0] && existingRules[0].id;
+    if (ruleId) {
+      const { error: updRuleErr } = await supa.from('commission_rules').update({
+        measurement_scope: draft.measurement_scope || 'governed_nrr',
+        payout_type: draft.payout_type || 'flat_amount',
+        stacking_mode: 'best_match',
+        active: true,
+        updated_at: new Date().toISOString()
+      }).eq('id', ruleId);
+      if (updRuleErr) throw new Error(updRuleErr.message);
+    } else {
+      const { data: ruleRow, error: insRuleErr } = await supa.from('commission_rules').insert({
+        plan_id: savedPlan.id,
+        metric_code: 'nrr',
+        measurement_scope: draft.measurement_scope || 'governed_nrr',
+        payout_type: draft.payout_type || 'flat_amount',
+        stacking_mode: 'best_match',
+        active: true
+      }).select('id').single();
+      if (insRuleErr) throw new Error(insRuleErr.message);
+      ruleId = ruleRow.id;
+    }
+
+    const { error: delTierErr } = await supa.from('commission_rule_tiers').delete().eq('rule_id', ruleId);
+    if (delTierErr) throw new Error(delTierErr.message);
+
+    const tierRows = (draft.tiers || []).map((t, idx) => ({
+      rule_id: ruleId,
+      tier_order: idx + 1,
+      min_value: t.min_value === '' ? null : t.min_value,
+      max_value: t.max_value === '' ? null : t.max_value,
+      payout_value: Number(t.payout_value || 0),
+      payout_label: t.payout_label || ''
+    }));
+    if (tierRows.length) {
+      const { error: tierErr } = await supa.from('commission_rule_tiers').insert(tierRows);
+      if (tierErr) throw new Error(tierErr.message);
+    }
+
+    if (!_commRuleConfig.plans) _commRuleConfig.plans = {};
+    if (!_commRuleConfig.rules) _commRuleConfig.rules = {};
+    if (!_commRuleConfig.tiers) _commRuleConfig.tiers = {};
+    _commRuleConfig.plans[draft.plan_code] = savedPlan;
+    _commRuleConfig.rules[savedPlan.id] = {
+      id: ruleId,
+      plan_id: savedPlan.id,
+      metric_code: 'nrr',
+      measurement_scope: draft.measurement_scope || 'governed_nrr',
+      payout_type: draft.payout_type || 'flat_amount',
+      stacking_mode: 'best_match',
+      active: true
+    };
+    _commRuleConfig.tiers[ruleId] = tierRows.map((t, idx) => ({ ...t, id: `local-${ruleId}-${idx}` }));
+  }
+
+  _commRulePending = {};
+  if (_tgtActiveQuarter) delete _tgtQuarterCache[_tgtActiveQuarter];
+}
+
 async function saveCommissionCockpit() {
   const btn = document.querySelector('#commission-cockpit-overlay .comm-save');
-  if (btn) { btn.classList.add('saving'); btn.textContent = 'Saving...'; }
-  const previousTab = _tgtActiveTab;
+  if (btn) { btn.classList.add('saving'); btn.textContent = 'Saving'; }
   try {
-    await saveTargets();
+    await saveCommissionRules();
     await saveCommissionAssignments();
     if (btn) { btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = 'Saved'; }
+    if (typeof showToast === 'function') showToast('บันทึก Commission สำเร็จ', 'ok');
+    renderCommissionCockpit();
+    try { renderTeamviewSummary(); renderTeamviewKamList(); } catch(e) {}
     setTimeout(()=>{ if(btn){ btn.classList.remove('saved'); btn.textContent='Save changes'; } }, 1000);
   } catch(e) {
     console.error('[Commission cockpit] save failed', e);
     if (typeof showToast === 'function') showToast('Save ไม่สำเร็จ: ' + (e.message || ''), '!');
     if (btn) { btn.classList.remove('saving'); btn.textContent = 'Save changes'; }
   }
-  _tgtActiveTab = previousTab;
 }
 async function saveCommissionAssignments() {
   const entries = Object.entries(_commAssignmentPending || {});
