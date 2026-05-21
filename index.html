@@ -298,7 +298,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Freshket Sense</title>
 <!-- Phase 2 safe modular baseline: security + extracted module references. Deployable output remains monolith-compatible. -->
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2901,7 +2901,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v155-phase22-1-ai-proxy-default',
+      version: 'v206c-portview-smooth-render',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -2940,6 +2940,9 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     data: Object.freeze({
       r2Base: R2_BASE,
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover']),
+      // v206b: critical path shows portfolio as soon as portview+history are ready; details hydrate after first paint.
+      criticalKeys: Object.freeze(['portview','history']),
+      enhancementKeys: Object.freeze(['categories','sku_current','outlets','handover']),
       backgroundKeys: Object.freeze(['skus']),  // alternatives lazy-loaded on Sense Gate tap
       r2Files: Object.freeze({
         portview: 'portview.csv',
@@ -4514,13 +4517,27 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
 })(window);
 </script>
 <script>
-  if('serviceWorker' in navigator){
+  // v206a: PWA lifecycle diagnostics. Keep registration non-blocking, but never fail silently.
+  (function(){
+    if(!('serviceWorker' in navigator))return;
     window.addEventListener('load',()=>{
       const cfg=window.FreshketSenseConfig||{};
       const swUrl=(cfg.app&&cfg.app.serviceWorkerUrl)||'/sw.js';
-      navigator.serviceWorker.register(swUrl).catch(()=>{});
+      navigator.serviceWorker.register(swUrl,{updateViaCache:'none'})
+        .then(reg=>{
+          window._freshketSwRegistration=reg;
+          try{reg.update&&reg.update();}catch(e){}
+          console.info('[pwa:v206a] service worker registered',swUrl);
+        })
+        .catch(err=>{
+          window._freshketSwError={url:swUrl,message:err&&err.message||String(err),ts:Date.now()};
+          console.warn('[pwa:v206a] service worker registration failed',swUrl,err);
+        });
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        console.info('[pwa:v206a] service worker controller changed');
+      });
     });
-  }
+  })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
@@ -5790,7 +5807,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
       <div class="pv-compact-strip hidden" id="pv-compact-strip"></div>
       <!-- Search expand (shown when search icon tapped while collapsed) -->
       <div class="pv-sort-search-expand" id="pv-sort-search-expand">
-        <input type="text" id="pv-search-collapsed" placeholder="ค้นหาชื่อร้าน..." oninput="document.getElementById('portview-search').value=this.value;renderPortviewList()">
+        <input type="text" id="pv-search-collapsed" placeholder="ค้นหาชื่อร้าน..." oninput="document.getElementById('portview-search').value=this.value;schedulePortviewListRender()">
       </div>
       <!-- Collapsible: summary cards + AI button + search -->
       <div class="pv-collapsible expanded" id="pv-collapsible">
@@ -5805,7 +5822,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
       <!-- AI output area — outside sticky header so it doesn't overlay account list -->
       <!-- Search box — hidden: auto-opens in compact strip when scrolled -->
       <div style="display:none">
-        <input type="text" id="portview-search" placeholder="ค้นหาชื่อร้าน..." oninput="renderPortviewList()" style="width:100%">
+        <input type="text" id="portview-search" placeholder="ค้นหาชื่อร้าน..." oninput="schedulePortviewListRender()" style="width:100%">
       </div>
       </div>
       <!-- Filter pills area removed — compact strip handles filtering -->
@@ -5987,7 +6004,9 @@ function resetRuntimeSessionState(){
   // Fix v194: reset auth flags so stale state never blocks next login attempt
   try { window._doLoginHandled = false; } catch(e) {}
   try { window._sessionCheckHandling = false; } catch(e) {}
+  try { if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; } } catch(e) {}
   try { if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; } } catch(e) {}
+  try { window._pwaResumeCheckInFlight = null; } catch(e) {}
   // v202: clear ALL Sense + UI state so next login never inherits previous session
   try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
   try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
@@ -6139,6 +6158,7 @@ async function submitPasswordReset(){
 window._doLoginHandled = false;
 window._sessionCheckHandling = false;
 window._visibilityGraceTimer = null;
+window._pwaResumeCheckInFlight = null;
 
 supa.auth.onAuthStateChange((event, session) => {
   console.log('[auth:v202]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
@@ -6152,12 +6172,17 @@ supa.auth.onAuthStateChange((event, session) => {
   if (event === 'TOKEN_REFRESHED' && session) {
     // Fix v22.2: handle silent token refresh on mobile.
     currentUser = session.user;
-    // Fix v194: cancel pending visibilitychange grace timer — token refresh confirms session alive.
+    // v206a: cancel all PWA resume grace timers — token refresh confirms session alive.
     if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
+    if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
     return;
   }
 
   if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+    // v206a: auth recovered; cancel delayed signed-out/login UI from mobile token churn.
+    if (window._signedOutTimer) { clearTimeout(window._signedOutTimer); window._signedOutTimer = null; }
+    if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
+    if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
     // Fix v194 Guard A: doLogin() already handled this SIGNED_IN — skip to avoid double hideLoginOverlay.
     if (event === 'SIGNED_IN' && window._doLoginHandled) {
       window._doLoginHandled = false;
@@ -6549,6 +6574,50 @@ async function checkSession() {
   if(ov) ov.classList.remove('lgi-checking');
 }
 
+
+
+// v206a: shared PWA resume session verifier.
+// Goal: Home Screen app resume should verify silently and keep the current screen when the session is alive.
+async function _pwaSilentSessionCheck(reason, graceMs){
+  if(passwordRecoveryMode)return true;
+  if(window._pwaResumeCheckInFlight)return window._pwaResumeCheckInFlight;
+  window._pwaResumeCheckInFlight=(async()=>{
+    try{
+      const first=await supa.auth.getSession();
+      let session=first&&first.data&&first.data.session;
+      if(session&&session.user){
+        currentUser=session.user;
+        const ov=document.getElementById('login-overlay');
+        if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
+        return true;
+      }
+      await new Promise(r=>setTimeout(r,graceMs||2500));
+      const second=await supa.auth.getSession();
+      session=second&&second.data&&second.data.session;
+      if(session&&session.user){
+        currentUser=session.user;
+        const ov=document.getElementById('login-overlay');
+        if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
+        return true;
+      }
+      if(currentUser){
+        console.warn('[pwa:v206a] confirmed session lost after resume',reason);
+        currentUser=null;
+        currentUserProfile=null;
+        sheetsLoadStarted=false;
+        _showLoginOverlayClean();
+      }
+      return false;
+    }catch(e){
+      // Offline / flaky mobile network: do not disrupt the current screen.
+      console.warn('[pwa:v206a] resume session check skipped',reason,e&&e.message?e.message:e);
+      return true;
+    }finally{
+      window._pwaResumeCheckInFlight=null;
+    }
+  })();
+  return window._pwaResumeCheckInFlight;
+}
 
 // Phase 10: Auth/session runtime boundary (adapter-first; no behavior change intended).
 // Freshket Sense auth/session runtime boundary — Phase 10.
@@ -12061,10 +12130,12 @@ function setAiProvider(p){
     return;
   }
 
-  const ORCH_VERSION = 'v155-phase6-1-stabilized-loader';
+  const ORCH_VERSION = 'v206b-loader-critical-path';
   const ORCH_CFG = global.FreshketSenseConfig || {};
   const ORCH_DATA_CFG = ORCH_CFG.data || {};
   const FOREGROUND = (ORCH_DATA_CFG.foregroundKeys || ['portview','history','categories','sku_current','outlets','handover']).slice();
+  const CRITICAL = (ORCH_DATA_CFG.criticalKeys || ['portview','history']).slice();
+  const ENHANCEMENT = (ORCH_DATA_CFG.enhancementKeys || FOREGROUND.filter(function(k){return CRITICAL.indexOf(k)<0;})).slice();
   const BACKGROUND = (ORCH_DATA_CFG.backgroundKeys || ['skus','alternatives']).slice();
   const ALL = FOREGROUND.concat(BACKGROUND);
 
@@ -12203,6 +12274,49 @@ function setAiProvider(p){
     return ok;
   }
 
+  function nextIdle(fn, delay){
+    delay = delay == null ? 0 : delay;
+    if(global.requestIdleCallback){ return global.requestIdleCallback(function(){ fn(); }, { timeout: Math.max(800, delay + 800) }); }
+    return setTimeout(fn, delay);
+  }
+
+  function startCloudEnhancementLoad(opts){
+    opts = opts || {};
+    const token = opts.token;
+    const criticalLoaded = opts.criticalLoaded || 0;
+    const specs = getSpecs();
+    const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
+    if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
+    record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
+    baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
+    let done = 0;
+    const p = Promise.all(keys.map(function(key){
+      const spec = specs[key];
+      return fetchCloudflareFile(spec,{ force:false }).then(function(ok){
+        done++;
+        try{ if(token !== _cloudLoadToken) return ok; }catch(e){}
+        baseData.setDataPillText('เติมรายละเอียด',done + '/' + keys.length);
+        return ok;
+      });
+    })).then(function(results){
+      try{ if(token !== _cloudLoadToken) return results; }catch(e){}
+      const okCount = results.filter(Boolean).length;
+      orchStatus.foregroundLoaded = criticalLoaded + okCount;
+      try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
+      try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+      try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
+      try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+      record('startCloudEnhancementLoad','done',{ okCount, total:keys.length });
+      startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded + okCount, total:ALL.length });
+      return results;
+    }).catch(function(err){
+      recordError('startCloudEnhancementLoad',err);
+      startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length });
+      return [];
+    });
+    return p;
+  }
+
   function startCloudBackgroundLoad(opts){
     opts = opts || {};
     const token = opts.token;
@@ -12289,40 +12403,42 @@ function setAiProvider(p){
     let token;
     try{ token = ++_cloudLoadToken; }catch(e){ token = Date.now(); }
 
-    record('loadFromCloudflareR2', 'start', { token });
+    record('loadFromCloudflareR2', 'start', { token, critical:CRITICAL.slice(), enhancement:ENHANCEMENT.slice() });
     const btn = document.getElementById('sheets-load-btn');
     const counter = document.getElementById('sheets-loaded-count');
     if(btn){ btn.disabled = true; btn.textContent = 'กำลังโหลด...'; }
     baseData.resetDataPill();
     baseData.prepareProgressChips(ALL, ALL.length, getSpecs());
-    baseData.setDataPillText('โหลดข้อมูลหลัก','0/' + FOREGROUND.length);
+    baseData.setDataPillText('โหลดข้อมูลหลัก','0/' + CRITICAL.length);
 
     const p = (async function(){
       let loaded = 0;
       const specs = getSpecs();
-      const fgResults = await Promise.all(FOREGROUND.map(async function(key, idx){
+      const criticalResults = await Promise.all(CRITICAL.map(async function(key, idx){
         const ok = await fetchCloudflareFile(specs[key], { force:false });
         try{ if(token !== _cloudLoadToken) return ok; }catch(e){}
         if(ok){ loaded++; baseData.markForegroundPillDot(idx); }
         if(counter) counter.textContent = loaded + '/' + ALL.length;
-        baseData.setDataPillText('โหลดข้อมูลหลัก', loaded + '/' + FOREGROUND.length);
+        baseData.setDataPillText('โหลดข้อมูลหลัก', loaded + '/' + CRITICAL.length);
         return ok;
       }));
       try{ if(token !== _cloudLoadToken) return; }catch(e){}
-      const fgOk = fgResults.filter(Boolean).length;
-      orchStatus.foregroundLoaded = fgOk;
+      const criticalOk = criticalResults.filter(Boolean).length;
+      orchStatus.foregroundLoaded = criticalOk;
       if(btn){ btn.disabled = false; btn.textContent = 'Refresh data'; }
-      if(fgOk > 0){
-        safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + fgOk + '/' + FOREGROUND.length + ' ไฟล์','✓');
+      if(criticalOk > 0){
+        safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + criticalOk + '/' + CRITICAL.length + ' ไฟล์','✓');
+        baseData.setDataPillText('พร้อมใช้งาน','เติมรายละเอียดต่อเบื้องหลัง');
         try{ if(typeof renderPortview === 'function') renderPortview(); }catch(e){}
         try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 250);
       }else{
         safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
+        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:0 }); }, 500);
       }
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
-      startCloudBackgroundLoad({ token, fgLoaded:fgOk, total:ALL.length });
-      record('loadFromCloudflareR2', 'done', { foregroundOk: fgOk, totalForeground: FOREGROUND.length });
+      record('loadFromCloudflareR2', 'done', { criticalOk: criticalOk, totalCritical: CRITICAL.length, enhancementQueued: ENHANCEMENT.length });
     })().catch(function(err){
       recordError('loadFromCloudflareR2', err);
       safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
@@ -12390,6 +12506,8 @@ function setAiProvider(p){
       status: JSON.parse(JSON.stringify(orchStatus)),
       loadedTabs: tabs && typeof tabs.forEach === 'function' ? Array.from(tabs) : [],
       foregroundKeys: FOREGROUND.slice(),
+      criticalKeys: CRITICAL.slice(),
+      enhancementKeys: ENHANCEMENT.slice(),
       backgroundKeys: BACKGROUND.slice(),
       allKeys: ALL.slice(),
       sheetsLoadStarted: (function(){ try{ return sheetsLoadStarted; }catch(e){ return undefined; } })(),
@@ -17737,8 +17855,29 @@ When mentioning a SKU, use ฿ — not %.`;
   }
 }
 
+// v206c: Portview render discipline — short-lived account memo + debounced search.
+let _pvAcctCacheKey='';
+let _pvAcctCacheTs=0;
+let _pvAcctCacheResult=null;
+let _pvRenderTimer=null;
+function _pvAccountCacheKey(){
+  const p=currentUserProfile||{};
+  const histN=bulkHistoryData?Object.keys(bulkHistoryData).length:0;
+  const cmN=bulkCurrentMonthData?Object.keys(bulkCurrentMonthData).length:0;
+  const skuN=bulkSkusData?Object.keys(bulkSkusData).length:0;
+  const curSkuN=bulkSkuCurrentData?Object.keys(bulkSkuCurrentData).length:0;
+  const pvN=portviewBulkData?portviewBulkData.length:0;
+  return [p.email||'',p.role||'',portviewLevel||'',portviewRepEmail||'',pvN,histN,cmN,skuN,curSkuN].join('|');
+}
+function _pvClearAccountCache(){_pvAcctCacheKey='';_pvAcctCacheTs=0;_pvAcctCacheResult=null;}
+function schedulePortviewListRender(delay){
+  clearTimeout(_pvRenderTimer);
+  _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
+}
 function getPortviewAccounts(){
   if(portviewBulkData&&portviewBulkData.length>0){
+    const _ck=_pvAccountCacheKey();
+    if(_pvAcctCacheResult&&_pvAcctCacheKey===_ck&&(Date.now()-_pvAcctCacheTs)<1200)return _pvAcctCacheResult;
     const userEmail=(currentUserProfile&&currentUserProfile.email)||'';
     const role=(currentUserProfile&&currentUserProfile.role)||'rep';
     const isTL=(role==='tl'||role==='admin');
@@ -17776,13 +17915,15 @@ function getPortviewAccounts(){
     }
 
     // ── Enrich: recompute paceSignal with 3-month normalized baseline when bulk history available ──
-    return result.map(a=>{
+    const _out = result.map(a=>{
       const cm=bulkCurrentMonthData[a.id];
       const hist=bulkHistoryData[a.id];
       const _moSrt=m=>{const p=(m||'').split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
       const enriched=cm&&hist&&hist.length>0?{...a,paceSignal:computePaceSignal(cm,hist.slice().sort((a,b)=>_moSrt(a.m)-_moSrt(b.m)))}:a;
       return{...enriched,_churnCounts:computeChurnCountsForAccount(a.id)};
     });
+    _pvAcctCacheKey=_ck;_pvAcctCacheTs=Date.now();_pvAcctCacheResult=_out;
+    return _out;
   }
   // Otherwise build from localStorage (single-account local mode)
   // Guard: if R2 is actively loading (sheetsLoadStarted=true) and bulk data not yet ready,
@@ -18067,7 +18208,26 @@ function __legacyRenderPortviewListFallback(){
   </div>`;
 
   const renderer=pvViewMode==='compact'?compactCard:fullCard;
-  listEl.innerHTML=_sorted.map((a,i)=>renderer(a,i)).join('');
+  const _initialLimit=80;
+  const _batchSize=60;
+  if(_sorted.length>_initialLimit){
+    listEl.innerHTML=_sorted.slice(0,_initialLimit).map((a,i)=>renderer(a,i)).join('');
+    let _idx=_initialLimit;
+    const _appendBatch=()=>{
+      if(_idx>=_sorted.length)return;
+      const _next=_sorted.slice(_idx,_idx+_batchSize).map((a,i)=>renderer(a,_idx+i)).join('');
+      listEl.insertAdjacentHTML('beforeend',_next);
+      _idx+=_batchSize;
+      if(_idx<_sorted.length){
+        if(window.requestIdleCallback)requestIdleCallback(_appendBatch,{timeout:700});
+        else setTimeout(_appendBatch,16);
+      }
+    };
+    if(window.requestIdleCallback)requestIdleCallback(_appendBatch,{timeout:700});
+    else setTimeout(_appendBatch,16);
+  }else{
+    listEl.innerHTML=_sorted.map((a,i)=>renderer(a,i)).join('');
+  }
   // Sync sticky sort row in portview-header
   const _sc=document.getElementById('pv-sort-count');if(_sc)_sc.textContent=filtered.length+' ร้าน';
   const _arrow=pvSortDir===1?'↓':'↑';
@@ -19121,35 +19281,11 @@ function initOliveAvatar(){
   // Solution: wait 2s, re-check. Only force login if session truly gone.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !currentUser) return;
-    supa.auth.getSession().then(({ data: { session } }) => {
-      if (!session && currentUser) {
-        // Session appears empty — Supabase may still be refreshing token silently.
-        // Fix v194: increased grace 2000→3500ms; stored as cancellable timer.
-        // TOKEN_REFRESHED event will clear this timer before it fires if token refreshes in time.
-        window._visibilityGraceTimer = setTimeout(() => {
-          window._visibilityGraceTimer = null;
-          supa.auth.getSession().then(({ data: { session: s2 } }) => {
-            if (!s2 && currentUser) {
-              // Confirmed: token truly gone after grace period — force re-login
-              currentUser = null;
-              currentUserProfile = null;
-              sheetsLoadStarted = false;
-              const ov = document.getElementById('login-overlay');
-              if(ov){ ov.classList.remove('lgi-checking'); ov.style.display='flex'; ov.style.opacity='1'; }
-              const em = document.getElementById('login-email');
-              const pw = document.getElementById('login-password');
-              if(em) em.value='';
-              if(pw) pw.value='';
-            } else if (s2 && currentUser) {
-              // Token refreshed silently — ensure overlay stays hidden (bfcache guard)
-              const _visOv = document.getElementById('login-overlay');
-              if (_visOv) { _visOv.style.display = 'none'; _visOv.classList.remove('lgi-checking'); }
-            }
-          }).catch(() => {}); // offline — stay as-is
-        }, 3500);
-      }
-      // Session valid on first check: no-op — user stays on current screen
-    }).catch(() => {}); // offline — stay as-is, don't disrupt user
+    if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
+    window._visibilityGraceTimer = setTimeout(() => {
+      window._visibilityGraceTimer = null;
+      _pwaSilentSessionCheck('visibilitychange',3500);
+    }, 150);
   });
   _initFolderAutoLoad();
   // ── Guard C: pageshow — iOS bfcache restore ───────────────────────────────
@@ -19166,40 +19302,11 @@ function initOliveAvatar(){
   window.addEventListener('pageshow', (event) => {
     if (!event.persisted) return; // Normal page load — checkSession() handles it
     if (!currentUser) return;     // Not logged in — nothing to verify
-    // Page restored from bfcache — silently verify session is still valid
-    supa.auth.getSession().then(({ data: { session } }) => {
-      if (!session && currentUser) {
-        // Session appears empty — Supabase may still be hydrating after bfcache restore.
-        // Fix v194 Fix E: grace 2000ms before forcing re-login (mirrors visibilitychange pattern).
-        // Cancel any existing timer first to prevent double-fire on rapid app switch.
-        if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
-        window._pgsGraceTimer = setTimeout(() => {
-          window._pgsGraceTimer = null;
-          supa.auth.getSession().then(({ data: { session: s2 } }) => {
-            if (!s2 && currentUser) {
-              // Confirmed: token truly gone — force re-login
-              currentUser = null;
-              currentUserProfile = null;
-              sheetsLoadStarted = false;
-              _showLoginOverlayClean();
-            } else if (s2 && currentUser) {
-              currentUser = s2.user;
-              const _bfOv = document.getElementById('login-overlay');
-              if (_bfOv) { _bfOv.style.display = 'none'; _bfOv.classList.remove('lgi-checking'); }
-            }
-          }).catch(() => {}); // offline — stay as-is
-        }, 2000);
-      } else if (session) {
-        // Session valid — update currentUser with refreshed token
-        currentUser = session.user;
-        // bfcache fix: overlay may be stuck in lgi-checking state from frozen JS
-        const _bfOv = document.getElementById('login-overlay');
-        if (_bfOv && currentUser) {
-          _bfOv.style.display = 'none';
-          _bfOv.classList.remove('lgi-checking');
-        }
-      }
-    }).catch(() => {}); // offline — stay as-is
+    if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
+    window._pgsGraceTimer = setTimeout(() => {
+      window._pgsGraceTimer = null;
+      _pwaSilentSessionCheck('pageshow-bfcache',2500);
+    }, 150);
   });
   // Restore AI provider setting
   setAiProvider(aiProvider);
