@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font rgba(.55) 11px; (4) ghost bar in modular renderer renderTrendBars (monospace fix); (5) remove v205b debug logs | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -3959,10 +3959,30 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
   function renderTrendBars(ctx, hist, currentMonth){
     const tbars = el('tbars');
     if(!tbars) return false;
-    const maxValue = Math.max.apply(Math, hist.map(function(h){ return Number(h.s || 0); }).concat([currentMonth ? Number(currentMonth.gmv_to_date || 0) : 0, 1]));
-    const currentBar = currentMonth && currentMonth.gmv_to_date > 0
-      ? '<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span><div class="tb" style="--bh:'+Math.round((currentMonth.gmv_to_date/maxValue)*50)+'px;--bar-i:'+hist.length+';height:'+Math.round((currentMonth.gmv_to_date/maxValue)*50)+'px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div><span class="tbl" style="color:var(--g700);font-weight:700">'+String(currentMonth.month_label||'').split(' ')[0]+'</span></div>'
-      : '';
+    var _rr = currentMonth ? Number(currentMonth.runrate_gmv || 0) : 0;
+    const maxValue = Math.max.apply(Math, hist.map(function(h){ return Number(h.s || 0); }).concat([
+      currentMonth ? Number(currentMonth.gmv_to_date || 0) : 0, _rr, 1
+    ]));
+    var currentBar = '';
+    if (currentMonth && currentMonth.gmv_to_date > 0) {
+      var _actH = Math.round((currentMonth.gmv_to_date / maxValue) * 50);
+      var _showGhost = _rr > currentMonth.gmv_to_date * 1.05 && _actH > 0;
+      var _rrH = _showGhost ? Math.min(Math.round((_rr / maxValue) * 50), 52) : _actH;
+      var _rrGap = _rrH - _actH;
+      var _lbl = String(currentMonth.month_label || '').split(' ')[0];
+      if (_showGhost) {
+        var _rrLbl = _rrGap >= 13 ? '<span style="position:absolute;top:2px;left:0;right:0;text-align:center;font-size:6.5px;font-family:monospace;color:rgba(0,204,106,0.8);line-height:1">'+fmtK(_rr)+'</span>' : '';
+        currentBar = '<div class="tbw" id="bar-cm" style="cursor:default">'
+          + '<span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span>'
+          + '<div style="position:relative;height:'+_rrH+'px;width:100%;flex-shrink:0">'
+          + '<div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box">'+_rrLbl+'</div>'
+          + '<div style="position:absolute;bottom:0;left:0;right:0;height:'+_actH+'px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0"></div>'
+          + '</div>'
+          + '<span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
+      } else {
+        currentBar = '<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span><div class="tb" style="--bh:'+_actH+'px;--bar-i:'+hist.length+';height:'+_actH+'px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div><span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
+      }
+    }
     tbars.innerHTML = hist.map(function(h,i){
       return '<div class="tbw" id="bar-'+i+'" onclick="selectMonth('+i+')"><span class="tba" id="tba-'+i+'">'+fmtK(h.s)+'</span><div class="tb" id="tb-'+i+'" style="--bh:'+Math.round((h.s/maxValue)*50)+'px;--bar-i:'+i+';height:'+Math.round((h.s/maxValue)*50)+'px;background:var(--n200)"></div><span class="tbl">'+String(h.m||'').split(' ')[0]+'</span></div>';
     }).join('') + currentBar;
@@ -6827,8 +6847,8 @@ let portviewLevel='rep';  // 'rep' | 'tl' | 'rep-detail' (TL viewing specific re
 let teamviewKamFilter=null; // null=show all KAMs, 'email@...'=show that KAM's accounts
 let tvViewMode='full'; // 'full'|'compact' (teamview)
 let pvViewMode='full'; // 'full'|'compact' (portview — KAM's own accounts)
-let pvSortMode='pace'; // 'pace'|'gmv'|'impact'
-let pvSortDir=1;       // 1=default direction, -1=reversed
+let pvSortMode='impact'; // v205c default: positive impact highest first (green accounts)
+let pvSortDir=-1;        // -1=descending (runrate > baseline first)
 let teamviewAiDone=false;
 let portviewRepEmail=null; // which rep TL is viewing
 let portviewAiDone=false;
@@ -10285,7 +10305,7 @@ LEFT JOIN kam_since ks      ON lm.account_id = ks.account_id AND ks.ka_owner = k
 CROSS JOIN params_derived p
 
 QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY km.kam_name, lm.res_name
+  PARTITION BY km.kam_name, COALESCE(lm.res_name, lm.account_id)
   ORDER BY COALESCE(cm.gmv_to_date, 0) DESC, lm.last_month_gmv DESC
 ) = 1
 
@@ -18393,7 +18413,8 @@ function _buildKamGroups(){
     const ok=accts.length-danger-warn;
     const shortfall=accts.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).reduce((s,a)=>s+Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||0)),0);
     const runRate=withPace.reduce((s,a)=>s+(a.paceSignal.runrate||0),0);
-    const baseline=withPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0);
+    // v205c: use _tgtKamBaseline3mo for consistent 3-month baseline
+    const baseline=typeof _tgtKamBaseline3mo==='function'?(_tgtKamBaseline3mo(g.kamEmail,null,'kam')||withPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0)):(withPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0));
     const worstCls=danger>0?'danger':warn>0?'warn':'ok';
     const paceCls=pace>=105?'star':pace>=100?'great':pace>=95?'safe':pace>=90?'warn':'danger';
     return{...g,pace,paceCls,danger,warn,ok,shortfall,runRate,baseline,worstCls,total:accts.length};
@@ -19392,8 +19413,8 @@ function _updateRestSwipe(grp,idx,opts){
 .tgt-pl-item{display:inline-flex;align-items:baseline;gap:4px;}
 .tgt-pl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;vertical-align:middle;}
 .tgt-pl-dot.nrr{background:#4ddc97;}.tgt-pl-dot.comeback{background:#64a0ff;}.tgt-pl-dot.expansion{background:#00c8b0;}
-.tgt-pl-lbl{font-size:10px;color:rgba(255,255,255,.55);vertical-align:baseline;}
-.tgt-pl-val{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;vertical-align:baseline;}
+.tgt-pl-lbl{font-size:12px;color:rgba(255,255,255,.6);vertical-align:baseline;}
+.tgt-pl-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;vertical-align:baseline;}
 .tgt-pl-val.nrr{color:#4ddc97;}.tgt-pl-val.comeback{color:#64a0ff;}.tgt-pl-val.expansion{color:#00c8b0;}
 /* ⓘ info button — replaces full-width expand row */
 .tgt-info-btn{width:18px;height:18px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;color:rgba(255,255,255,.45);font-size:10px;font-weight:700;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;margin-left:auto;padding:0;line-height:1;}
@@ -19785,14 +19806,11 @@ async function loadTargets(quarter) {
       .select('period,level,for_email,gmv_target')
       .in('period', months);
     // v205b: debug — log raw Supabase result to diagnose empty target issue
-    console.log('[Target v205b] loadTargets quarter='+quarter+' months='+JSON.stringify(months));
-    console.log('[Target v205b] rows='+JSON.stringify(rows)+(rowsErr?' error='+rowsErr.message:''));
     if (rowsErr) throw new Error(rowsErr.message);
     (rows || []).forEach(r => {
       const key = `${r.period}|${r.level}|${r.for_email}`;
       _tgtCache[key] = r.gmv_target;
     });
-    console.log('[Target v205b] _tgtCache after load:', JSON.stringify(_tgtCache));
     const { data: sets } = await supa.from('target_settings')
       .select('key,value')
       .eq('key', 'nrr_threshold')
@@ -19808,7 +19826,6 @@ async function loadTargets(quarter) {
     _tgtLoaded = true;
   } catch (e) {
     console.warn('[Target] load failed (tables may not exist yet):', e.message);
-    console.warn('[Target v205b] → _tgtCache will be empty, all targets fall to baseline');
     _tgtLoaded = true;
   }
 }
@@ -20017,7 +20034,7 @@ function _renderTLKamBlocks(months, moLabels) {
           return '<div class="tgt-alloc-mo-col" id="tgt-alloc-mo-' + m + '">'
             + '<div class="tgt-alloc-mo-label">' + moLabels[i] + '</div>'
             + (vp > 0
-              ? '<div class="tgt-alloc-mo-vp">VP ' + _tgtFmtM(vp) + '</div>'
+              ? '<div class="tgt-alloc-mo-vp">' + _tgtFmtM(vp) + '</div>'
               : '<div class="tgt-alloc-mo-vp dim">–</div>')
             + '<div class="tgt-alloc-track" style="margin:4px 0 2px">'
             +   '<div class="tgt-alloc-fill kav-ss-bar-fill ' + barCls + '" style="width:' + barPct + '%"></div>'
@@ -20450,7 +20467,6 @@ async function renderPortviewTargetBar() {
         const teamKey = Object.keys(_tgtCache).find(k => k.startsWith(period + '|team|'));
         if (teamKey) tlEmail = teamKey.split('|')[2] || '';
       }
-      if (tlEmail) console.log('[Target v205b] tlEmail fallback resolved:', tlEmail, 'for KAM:', _targetEmail);
     }
     const tlTarget = tlEmail ? _tgtGet(period, 'team', tlEmail) : 0;
     if (tlTarget > 0) {
@@ -20614,7 +20630,8 @@ async function renderPortviewTargetBar() {
     </div>` : '';
     nrrSection = `<div class="tgt-det-section">
       <div class="tgt-det-stitle">Core NRR — วิธีคำนวณ</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">นับเฉพาะ account ที่อยู่กับ KAM นี้ก่อนต้นเดือน · outlet cohort · normalized เป็นเดือน</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:8px;line-height:1.5">NRR วัดว่าร้านเดิมยังซื้ออยู่มากน้อยแค่ไหนเทียบกับเดือนก่อน — โดยประมาณจากยอด MTD × ${daysInMonth} วัน</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">เฉพาะร้านที่อยู่ในพอร์ตมาตั้งแต่เดือนก่อน</div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(prevNorm)}/เดือน</span></div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel} MTD</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(currNorm)}/เดือน</span></div>
       <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${nrrPct}%</span></div>
@@ -20668,7 +20685,7 @@ async function renderPortviewTargetBar() {
           <span class="tgt-rr-actual">${_tgtFmtM(runRate)}</span>
           <span class="tgt-rr-sep">/</span>
           <span class="tgt-rr-target ${targetCls}">${denomTilde}${_tgtFmtM(target)}</span>
-          ${(fbMode!=='base'&&_baseline3mo>0&&Math.abs(_baseline3mo-target)/Math.max(target,1)>0.02)?`<span style="font-size:10px;color:rgba(255,255,255,.28);margin-left:2px">(${_tgtFmtM(_baseline3mo)})</span>`:``}
+          ${(fbMode!=='base'&&_baseline3mo>0)?`<span style="font-size:11px;color:rgba(255,255,255,.55);margin-left:3px">(${_tgtFmtM(_baseline3mo)})</span>`:``}
         </div>
       </div>
     </div>
@@ -20685,7 +20702,7 @@ async function renderPortviewTargetBar() {
     </div>
     ${mvSection}
     <div class="tgt-detail-panel" id="${detPanelId}">
-      ${gmvSection}${baselineSection}${nrrSection}${colorKeySection}
+      ${gmvSection}${nrrSection}${baselineSection}${colorKeySection}
     </div>`;
 
   // ── Micro-interactions: animate numbers in after render ──
@@ -20779,7 +20796,13 @@ function _tgtKamBaseline3mo(kamEmail, tlEmail, mode) {
   const moSort = m => { const p = (m||'').split(' '); return (parseInt(p[1]||0)*12) + mo.indexOf(p[0]); };
   const allMonths = new Set();
   accounts.forEach(a => (bulkHistoryData[a.id] || []).forEach(h => { if (h.m) allMonths.add(h.m); }));
-  const last3 = Array.from(allMonths).sort((a,b) => moSort(a)-moSort(b)).slice(-3);
+  // v205c: exclude current month (MTD partial data skews daily rate down)
+  const _now3mo = new Date();
+  const _curMonthLabel3mo = mo[_now3mo.getMonth()] + ' ' + (_now3mo.getFullYear() + 543);
+  const last3 = Array.from(allMonths)
+    .filter(m => m !== _curMonthLabel3mo)
+    .sort((a,b) => moSort(a)-moSort(b))
+    .slice(-3);
   if (!last3.length) return 0;
   // Sum GMV per month, normalize by days in that month → get avg daily rate
   const dailyRates = last3.map(m => {
