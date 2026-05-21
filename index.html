@@ -6284,7 +6284,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/></svg>
             Target
           </button>
-          <button id="tv-commission-btn" class="comm-btn" onclick="openCommissionCockpit()">
+          <button id="tv-commission-btn" class="comm-btn" onclick="openCommissionCockpit('lock')" title="Open Commission Cockpit">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
             Commission
           </button>
@@ -20136,9 +20136,14 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
-      <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}${nrrPct!==null?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-left:2px">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:''}</div>
-      <span class="tv-chip-pace" style="margin-left:6px">${g.pace||'—'}%</span>
+      <div class="tv-chip-main">
+        <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+        <div class="tv-chip-bottom">
+          <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
+          ${nrrPct!==null?`<span class="tv-chip-comm">${String(_commFmtPayout(_commPayoutForPct('kam', nrrPct))).replace('฿','')}</span>`:''}
+        </div>
+      </div>
+      <span class="tv-chip-pace">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
   }
@@ -21415,6 +21420,68 @@ function _updateRestSwipe(grp,idx,opts){
   .tv-action-strip{padding:8px 9px}
 }
 
+
+/* v209c Commission emphasis + alignment */
+#tv-action-btns{gap:8px !important}
+#tv-action-btns > button{
+  min-height:34px;
+  padding:6px 12px !important;
+  border-radius:10px !important;
+  font-size:11px !important;
+  font-weight:800 !important;
+  line-height:1;
+}
+#tv-target-btn,#tv-portfolio-btn,#tv-commission-btn{display:inline-flex !important;align-items:center;justify-content:center}
+#tv-commission-btn.comm-btn{
+  position:relative;
+  background:linear-gradient(135deg,rgba(255,198,56,.16),rgba(100,170,255,.14));
+  border:1px solid rgba(255,198,56,.35);
+  color:#ffe08a;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 6px 14px rgba(0,0,0,.12);
+}
+#tv-commission-btn.comm-btn:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 18px rgba(0,0,0,.18)}
+#tv-commission-btn.comm-btn::after{
+  content:'';position:absolute;top:6px;right:7px;width:6px;height:6px;border-radius:50%;
+  background:#4ddc97;box-shadow:0 0 0 0 rgba(77,220,151,.55);animation:tvCommPulse 1.9s infinite;
+}
+@keyframes tvCommPulse{0%{box-shadow:0 0 0 0 rgba(77,220,151,.55)}70%{box-shadow:0 0 0 7px rgba(77,220,151,0)}100%{box-shadow:0 0 0 0 rgba(77,220,151,0)}}
+.tv-signal-card.commission{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(255,198,56,.14),rgba(65,117,219,.20));
+  border-color:rgba(255,198,56,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.10);
+}
+.tv-signal-card.commission::before{
+  content:'฿';position:absolute;right:12px;top:10px;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:rgba(255,224,138,.30);
+}
+.tv-signal-card.commission .tv-signal-label{color:rgba(255,224,138,.72)}
+.tv-signal-card.commission .tv-signal-value{color:#fff3ca}
+.tv-signal-card.commission .tv-signal-meta{color:rgba(255,244,214,.60)}
+.tv-action-btn.commission-open{
+  border-color:rgba(255,198,56,.22);
+  background:linear-gradient(135deg,rgba(255,198,56,.18),rgba(100,170,255,.14));
+  color:#ffe08a;
+}
+.tv-payout-pill{
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  min-width:62px;height:24px;padding:0 8px !important;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:850;font-variant-numeric:tabular-nums;
+  background:linear-gradient(135deg,rgba(255,198,56,.15),rgba(100,170,255,.12)) !important;
+  border:1px solid rgba(255,198,56,.22) !important;
+  color:#ffe08a !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tv-payout-pill::before{content:'฿';font-size:9px;line-height:1;opacity:.8}
+.tv-chip{display:grid !important;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px}
+.tv-chip-main{min-width:0;display:flex;flex-direction:column;gap:4px}
+.tv-chip-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.tv-chip-risk{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
+.tv-chip-risk .tv-chip-nrr{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.58);white-space:nowrap}
+.tv-chip-comm{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:72px;height:24px;padding:0 8px;border-radius:999px;background:linear-gradient(135deg,rgba(255,198,56,.15),rgba(100,170,255,.12));border:1px solid rgba(255,198,56,.22);color:#ffe08a;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:850;font-variant-numeric:tabular-nums;}
+.tv-chip-comm::before{content:'฿';font-size:9px;margin-right:4px;opacity:.8}
+.tv-chip .tv-chip-pace{margin-left:0 !important;min-width:38px;text-align:right}
+@media(max-width:430px){.tv-chip{gap:6px}.tv-chip-comm{min-width:68px}}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -21672,7 +21739,7 @@ function _tgtRenderTeamGovCard() {
         <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${governedPct !== null ? governedPct + '%' : '—'}</div>
         <div class="tv-signal-meta">${baseTxt}</div>
       </div>
-      <div class="tv-signal-card info">
+      <div class="tv-signal-card commission">
         <div class="tv-signal-label">Commission</div>
         <div class="tv-signal-value">${_commFmtPayout(model.totalExposure)}</div>
         <div class="tv-signal-meta">TL ${_commFmtPayout(model.tlPayout)} · KAM ${_commFmtPayout(model.kamTotal)}</div>
@@ -21684,7 +21751,7 @@ function _tgtRenderTeamGovCard() {
       </div>
       <div class="tv-action-strip ${actionCls}">
         <div class="tv-action-text"><strong>${actionTitle}</strong><br>${actionMsg}</div>
-        <button class="tv-action-btn" onclick="event.stopPropagation();openCommissionCockpit('${ready ? 'lock' : 'exceptions'}')">${ready ? 'Open Commission' : 'Review now'}</button>
+        <button class="tv-action-btn commission-open" onclick="event.stopPropagation();openCommissionCockpit('${ready ? 'lock' : 'exceptions'}')">${ready ? 'Open Commission' : 'Review now'}</button>
       </div>
     </div>
   </div>`;
@@ -22119,9 +22186,16 @@ async function loadTargets(quarter) {
     }
     let assignments = [];
     try {
-      const { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
+      let { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
         .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_code')
         .in('period_month', months);
+      if (asgErr && /plan_code/.test(asgErr.message||'')) {
+        const fb = await supa.from('commission_plan_assignments')
+          .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id')
+          .in('period_month', months);
+        asgErr = fb.error;
+        asg = (fb.data||[]).map(r=>({ ...r, plan_code: Object.values(planMap).find(p=>p.id===r.plan_id)?.plan_code || null }));
+      }
       if (asgErr) throw new Error(asgErr.message);
       assignments = asg || [];
     } catch(asgEx) {
@@ -22508,8 +22582,9 @@ function renderNrrPolicyTab() {
 function openCommissionCockpit(step) {
   _commCockpitStep = step || 'policy';
   const ov = document.getElementById('commission-cockpit-overlay');
-  if (ov) ov.classList.add('open');
+  if (ov) { ov.classList.add('open'); ov.style.display='flex'; ov.style.pointerEvents='auto'; }
   renderCommissionCockpit();
+  const body=document.getElementById('commission-cockpit-body'); if(body) body.scrollTop=0;
 }
 function closeCommissionCockpit() {
   const ov = document.getElementById('commission-cockpit-overlay');
@@ -22532,7 +22607,7 @@ function _commGetAssignmentPlan(period, scope, assignee, role) {
   const key = _commAssignmentKey(period, scope, assignee);
   if (_commAssignmentPending[key]) return _commAssignmentPending[key];
   const found = ((_commRuleConfig && _commRuleConfig.assignments) || []).find(a => a.period_month === period && a.assignment_scope === scope && a.assignee_key === assignee);
-  return found ? found.plan_code : _commPlanCode(role);
+  return found ? (found.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===found.plan_id)?.plan_code || _commPlanCode(role)) : _commPlanCode(role);
 }
 function _commSetAssignment(period, scope, assignee, planCode) {
   _commAssignmentPending[_commAssignmentKey(period, scope, assignee)] = planCode;
@@ -22749,8 +22824,12 @@ async function saveCommissionAssignments() {
     };
   });
   try {
-    // v209 uses plan_code column added by patch. If missing, SQL patch is required.
-    const { error } = await supa.from('commission_plan_assignments').upsert(rows, { onConflict:'period_month,assignment_scope,assignee_key' });
+    let { error } = await supa.from('commission_plan_assignments').upsert(rows, { onConflict:'period_month,assignment_scope,assignee_key' });
+    if (error && /plan_code/.test(error.message||'')) {
+      const fallbackRows = rows.map(({plan_code, ...r}) => r);
+      const fb = await supa.from('commission_plan_assignments').upsert(fallbackRows, { onConflict:'period_month,assignment_scope,assignee_key' });
+      error = fb.error;
+    }
     if (error) throw new Error(error.message);
     _commRuleConfig.assignments = [
       ...(((_commRuleConfig && _commRuleConfig.assignments) || []).filter(a => !entries.some(([key]) => {
