@@ -20140,9 +20140,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-chip-bottom">
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
-          ${nrrPct!==null?`<span class="tv-chip-comm">${String(_commFmtPayout(_commPayoutForPct('kam', nrrPct))).replace('฿','')}</span>`:''}
         </div>
       </div>
+      ${nrrPct!==null?`<span class="tv-chip-comm">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'<span class="tv-chip-comm">—</span>'}
       <span class="tv-chip-pace">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
@@ -21482,6 +21482,98 @@ function _updateRestSwipe(grp,idx,opts){
 .tv-chip .tv-chip-pace{margin-left:0 !important;min-width:38px;text-align:right}
 @media(max-width:430px){.tv-chip{gap:6px}.tv-chip-comm{min-width:68px}}
 
+
+/* v209d final polish: commission UX + compact row + danger colors */
+#tv-sort-sticky{display:none !important}
+#tv-summary-row .portview-stat.danger .portview-stat-val,
+#tv-summary-row .portview-stat.danger .portview-stat-val *{color:#ff8888 !important}
+#tv-summary-row .portview-stat.warn .portview-stat-val,
+#tv-summary-row .portview-stat.warn .portview-stat-val *{color:#f6ad55 !important}
+#tv-commission-btn.comm-btn::after{display:none !important;content:none !important}
+#tv-commission-btn.comm-btn svg{color:#ffe08a}
+#tv-commission-btn.comm-btn{
+  background:linear-gradient(135deg,rgba(255,198,56,.14),rgba(71,119,214,.16)) !important;
+  border-color:rgba(255,198,56,.28) !important;
+  color:#ffe08a !important;
+}
+.tv-action-btn.commission-open{
+  background:linear-gradient(135deg,rgba(255,198,56,.16),rgba(71,119,214,.12)) !important;
+  border-color:rgba(255,198,56,.24) !important;
+  color:#ffe08a !important;
+}
+.tv-payout-pill::before{content:none !important}
+.tv-chip-comm::before{content:none !important}
+.tv-chip{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 74px 40px 12px !important;
+  gap:7px !important;
+  align-items:center !important;
+}
+.tv-chip-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.tv-chip-main{
+  min-width:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:4px !important;
+}
+.tv-chip-bottom{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:6px !important;
+  min-width:0 !important;
+}
+.tv-chip-risk{
+  min-width:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:4px !important;
+  overflow:hidden !important;
+  white-space:nowrap !important;
+}
+.tv-chip-nrr{
+  font-family:'IBM Plex Mono',monospace !important;
+  font-size:10px !important;
+  color:rgba(255,255,255,.58) !important;
+  white-space:nowrap !important;
+}
+.tv-chip-comm{
+  width:74px !important;
+  min-width:74px !important;
+  max-width:74px !important;
+  height:22px !important;
+  padding:0 !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  border-radius:999px !important;
+  font-family:'IBM Plex Mono',monospace !important;
+  font-size:10px !important;
+  font-weight:850 !important;
+  font-variant-numeric:tabular-nums !important;
+  background:linear-gradient(135deg,rgba(255,198,56,.16),rgba(100,170,255,.10)) !important;
+  border:1px solid rgba(255,198,56,.22) !important;
+  color:#ffe08a !important;
+  box-sizing:border-box !important;
+  line-height:1 !important;
+}
+.tv-chip-pace{
+  margin-left:0 !important;
+  min-width:40px !important;
+  width:40px !important;
+  text-align:right !important;
+}
+.tv-chip-arrow{width:12px;text-align:right}
+@media(max-width:430px){
+  .tv-chip{grid-template-columns:minmax(0,1fr) 70px 38px 10px !important;gap:6px !important}
+  .tv-chip-comm{width:70px !important;min-width:70px !important;max-width:70px !important}
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -22186,18 +22278,11 @@ async function loadTargets(quarter) {
     }
     let assignments = [];
     try {
-      let { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
-        .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_code')
+      const { data: asg, error: asgErr } = await supa.from('commission_plan_assignments')
+        .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id')
         .in('period_month', months);
-      if (asgErr && /plan_code/.test(asgErr.message||'')) {
-        const fb = await supa.from('commission_plan_assignments')
-          .select('period_month,assignment_scope,assignee_key,team_lead_email,plan_id')
-          .in('period_month', months);
-        asgErr = fb.error;
-        asg = (fb.data||[]).map(r=>({ ...r, plan_code: Object.values(planMap).find(p=>p.id===r.plan_id)?.plan_code || null }));
-      }
       if (asgErr) throw new Error(asgErr.message);
-      assignments = asg || [];
+      assignments = (asg || []).map(r => ({ ...r, plan_code: Object.values(planMap).find(p => p.id === r.plan_id)?.plan_code || null }));
     } catch(asgEx) {
       console.warn('[Commission assignments] load failed:', asgEx.message);
       assignments = [];
@@ -22582,10 +22667,33 @@ function renderNrrPolicyTab() {
 function openCommissionCockpit(step) {
   _commCockpitStep = step || 'policy';
   const ov = document.getElementById('commission-cockpit-overlay');
-  if (ov) { ov.classList.add('open'); ov.style.display='flex'; ov.style.pointerEvents='auto'; }
-  renderCommissionCockpit();
+  if (ov) {
+    if (ov.parentElement !== document.body) document.body.appendChild(ov);
+    ov.classList.add('open');
+    ov.style.display = 'flex';
+    ov.style.pointerEvents = 'auto';
+    ov.style.zIndex = '10080';
+  } else {
+    console.warn('[Commission Cockpit] overlay not found');
+  }
+  try { renderCommissionCockpit(); } catch(e) { console.error('[Commission Cockpit] render failed', e); }
   const body=document.getElementById('commission-cockpit-body'); if(body) body.scrollTop=0;
 }
+window.openCommissionCockpit = openCommissionCockpit;
+
+(function(){
+  if (window.__commCockpitClickBound) return;
+  window.__commCockpitClickBound = true;
+  document.addEventListener('click', function(e){
+    const btn = e.target && e.target.closest && e.target.closest('#tv-commission-btn,.commission-open');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const step = btn.classList.contains('commission-open') ? (btn.textContent && btn.textContent.includes('Review') ? 'exceptions' : 'lock') : 'lock';
+    if (typeof window.openCommissionCockpit === 'function') window.openCommissionCockpit(step);
+  }, true);
+})();
+
 function closeCommissionCockpit() {
   const ov = document.getElementById('commission-cockpit-overlay');
   if (ov) ov.classList.remove('open');
@@ -22824,12 +22932,8 @@ async function saveCommissionAssignments() {
     };
   });
   try {
-    let { error } = await supa.from('commission_plan_assignments').upsert(rows, { onConflict:'period_month,assignment_scope,assignee_key' });
-    if (error && /plan_code/.test(error.message||'')) {
-      const fallbackRows = rows.map(({plan_code, ...r}) => r);
-      const fb = await supa.from('commission_plan_assignments').upsert(fallbackRows, { onConflict:'period_month,assignment_scope,assignee_key' });
-      error = fb.error;
-    }
+    const writeRows = rows.map(({ plan_code, ...r }) => r);
+    const { error } = await supa.from('commission_plan_assignments').upsert(writeRows, { onConflict:'period_month,assignment_scope,assignee_key' });
     if (error) throw new Error(error.message);
     _commRuleConfig.assignments = [
       ...(((_commRuleConfig && _commRuleConfig.assignments) || []).filter(a => !entries.some(([key]) => {
