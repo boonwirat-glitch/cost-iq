@@ -9057,7 +9057,12 @@ function selectMonth(idx,init){
   const hist=D.history.length?D.history:SAMPLE.history;
   if(idx<0||idx>=hist.length)return;
   activeMonth=idx;const h=hist[idx];
-  hist.forEach((_,i)=>{const bar=document.getElementById('tb-'+i);const wrap=document.getElementById('bar-'+i);if(!bar)return;bar.style.background=i===idx?'var(--g500)':'var(--n200)';wrap.classList.toggle('active',i===idx);});
+  // v205c: when hero locked to current month + initial render, don't highlight the April bar
+  if(!(init && heroLockedToCurrent)){
+    hist.forEach((_,i)=>{const bar=document.getElementById('tb-'+i);const wrap=document.getElementById('bar-'+i);if(!bar)return;bar.style.background=i===idx?'var(--g500)':'var(--n200)';wrap.classList.toggle('active',i===idx);});
+  } else {
+    hist.forEach((_,i)=>{const bar=document.getElementById('tb-'+i);const wrap=document.getElementById('bar-'+i);if(!bar)return;bar.style.background='var(--n200)';wrap.classList.remove('active');});
+  }
   // ── Hero: only update when NOT locked to current month ──
   if(!heroLockedToCurrent){
     const _momEl=document.getElementById('hero-mom');
@@ -9077,9 +9082,16 @@ function selectMonth(idx,init){
   }
   // chart-sel-info: show when hero is locked (bar selected ≠ hero month) or past month
   const _csi=document.getElementById('chart-sel-info');
-  if(_csi)_csi.style.display=(heroLockedToCurrent||idx<hist.length-1)?'flex':'none';
-  document.getElementById('chartMonthName').textContent=h.m;
-  document.getElementById('chartMonthAmt').textContent=fmt(h.s);
+  // v205c: when hero locked + init → show current month in chart-sel-info, not selected bar
+  if(init&&heroLockedToCurrent&&D.current_month&&D.current_month.gmv_to_date>0){
+    if(_csi)_csi.style.display='flex';
+    document.getElementById('chartMonthName').textContent=D.current_month.month_label||'';
+    document.getElementById('chartMonthAmt').textContent=fmt(D.current_month.gmv_to_date);
+  }else{
+    if(_csi)_csi.style.display=(heroLockedToCurrent||idx<hist.length-1)?'flex':'none';
+    document.getElementById('chartMonthName').textContent=h.m;
+    document.getElementById('chartMonthAmt').textContent=fmt(h.s);
+  }
   // v205c: when hero locked to current month AND init=true, prefer current month cats
   const _curCatLbl=D.current_month&&D.current_month.month_label;
   const _useCurCat=init&&heroLockedToCurrent&&_curCatLbl&&D.cats_monthly&&D.cats_monthly[_curCatLbl];
@@ -17405,7 +17417,7 @@ function openRestaurantSheet() {
   renderOverview();
   activeMonth = D.history.length - 1;
   window._suppressAnimN = true;
-  selectMonth(activeMonth, false);
+  selectMonth(activeMonth, true);  // v205c: init=true so heroLockedToCurrent logic fires
   window._suppressAnimN = false;
   const restOv = document.getElementById('rest-overview');
   const kamOv  = document.getElementById('kam-overview');
@@ -20616,11 +20628,16 @@ async function renderPortviewTargetBar() {
     const _ms2 = m => { const p=(m||'').split(' '); return (parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]); };
     const allM2 = new Set();
     accounts.forEach(a => (bulkHistoryData[a.id]||[]).forEach(h => { if(h.m) allM2.add(h.m); }));
-    const last3m = Array.from(allM2).sort((a,b)=>_ms2(a)-_ms2(b)).slice(-3);
+    // v205c: exclude current month from baseline (same as _tgtKamBaseline3mo — avoids partial MTD skew)
+    const _nowBS = new Date();
+    const _curMoBS = _mo2[_nowBS.getMonth()] + ' ' + (_nowBS.getFullYear() + 543);
+    const last3m = Array.from(allM2).filter(m => m !== _curMoBS).sort((a,b)=>_ms2(a)-_ms2(b)).slice(-3);
     const hasOutlets2 = typeof bulkOutletsData !== 'undefined' && bulkOutletsData;
     if (last3m.length) {
+      // v205c: dedup accounts by id — prevents double-counting if portview.csv has duplicate rows
+      const _dedupAccts = Array.from(new Map(accounts.map(a=>[a.id,a])).values());
       const rows3 = last3m.map(m => {
-        const gmv = accounts.reduce((s,a) => { const r=(bulkHistoryData[a.id]||[]).find(h=>h.m===m); return s+(r?(r.gmv||r.s||0):0); }, 0);
+        const gmv = _dedupAccts.reduce((s,a) => { const r=(bulkHistoryData[a.id]||[]).find(h=>h.m===m); return s+(r?(r.gmv||r.s||0):0); }, 0);
         const days = getThaiMonthDays(m);
         // Count unique outlets that month
         let outletCount = 0;
@@ -20636,7 +20653,7 @@ async function renderPortviewTargetBar() {
       baselineSection = `<div class="tgt-det-section">
         <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
         ${fmlRows}
-        <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">avg ${rows3.length} เดือน (normalized)</span><span class="tgt-fml-total-val">= ${_tgtFmtM(target)}/เดือน</span></div>
+        <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">avg ${rows3.length} เดือน (normalized)</span><span class="tgt-fml-total-val">= ${_tgtFmtM(avgDaily*daysInMonth)}/เดือน</span></div>
       </div>`;
     }
   }
