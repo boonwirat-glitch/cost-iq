@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v210e: Commission Cockpit UX/UI polish — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
+<!-- Freshket Sense v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -21773,6 +21774,56 @@ function _updateRestSwipe(grp,idx,opts){
   background:linear-gradient(135deg,rgba(255,198,56,.12),rgba(100,170,255,.10));
   border-color:rgba(255,198,56,.24);
 }
+.comm-rule-item.archived{
+  opacity:.58;
+  border-style:dashed;
+}
+.comm-rule-item-right{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.comm-used-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:44px;
+  padding:3px 7px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.055);
+  color:rgba(255,255,255,.62);
+  font-size:8px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.comm-used-pill.used{
+  border-color:rgba(255,198,56,.22);
+  background:rgba(255,198,56,.10);
+  color:#ffe08a;
+}
+.comm-archive-rule-btn{
+  border:1px solid rgba(255,120,100,.20);
+  background:rgba(255,120,100,.075);
+  color:#ffb199;
+  border-radius:10px;
+  padding:7px 9px;
+  font-size:10px;
+  font-weight:900;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  cursor:pointer;
+}
+.comm-archive-rule-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+.comm-rule-editor-actions{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  justify-content:flex-end;
+  margin-top:10px;
+}
 .comm-rule-item-name{
   font-size:12px;
   font-weight:850;
@@ -21884,6 +21935,170 @@ function _updateRestSwipe(grp,idx,opts){
 }
 @keyframes commSpin{to{transform:rotate(360deg)}}
 
+
+/* v210e Commission Cockpit UX/UI Polish — surgical, no schema/calculation change */
+#commission-cockpit-overlay.comm-overlay{
+  opacity:0;
+  background:radial-gradient(ellipse at 50% 18%,rgba(77,220,151,.08),transparent 34%),rgba(3,8,18,.76) !important;
+  transition:opacity .22s ease,backdrop-filter .22s ease !important;
+}
+#commission-cockpit-overlay.comm-overlay.open{opacity:1;}
+#commission-cockpit-overlay .comm-sheet{
+  background:linear-gradient(180deg,#111d31 0%,#0d1728 52%,#0b1423 100%) !important;
+  border:1px solid rgba(255,255,255,.11) !important;
+  box-shadow:0 28px 80px rgba(0,0,0,.52),0 0 0 1px rgba(77,220,151,.035) inset !important;
+}
+#commission-cockpit-overlay .comm-drag{
+  width:46px !important;height:4px !important;background:rgba(255,255,255,.20) !important;
+  box-shadow:0 0 18px rgba(77,220,151,.18);
+}
+#commission-cockpit-overlay .comm-title{letter-spacing:-.035em !important;}
+#commission-cockpit-overlay .comm-sub{color:rgba(225,238,255,.54) !important;}
+#commission-cockpit-overlay .comm-close{
+  background:rgba(255,255,255,.07) !important;
+  transition:background .16s ease,transform .12s ease,color .16s ease !important;
+}
+#commission-cockpit-overlay .comm-close:hover{background:rgba(255,255,255,.13) !important;color:#fff !important;}
+#commission-cockpit-overlay .comm-steps{
+  background:rgba(255,255,255,.025);
+  border-top:1px solid rgba(255,255,255,.06) !important;
+  border-bottom:1px solid rgba(255,255,255,.07) !important;
+}
+#commission-cockpit-overlay .comm-step{
+  min-height:43px;
+  color:rgba(225,238,255,.44) !important;
+  transition:color .16s ease,background .16s ease,transform .1s ease !important;
+}
+#commission-cockpit-overlay .comm-step:hover{background:rgba(255,255,255,.035);color:rgba(225,238,255,.72) !important;}
+#commission-cockpit-overlay .comm-step.active{
+  color:#4ddc97 !important;
+  background:linear-gradient(180deg,rgba(77,220,151,.08),rgba(77,220,151,.018));
+}
+#commission-cockpit-overlay .comm-step.active:after{
+  height:3px !important;
+  background:linear-gradient(90deg,#4ddc97,#ffe08a) !important;
+  box-shadow:0 0 14px rgba(77,220,151,.42);
+}
+#commission-cockpit-overlay .comm-body{scroll-behavior:smooth;}
+#commission-cockpit-overlay .comm-body.comm-body-in{animation:commBodyIn .18s ease both;}
+@keyframes commBodyIn{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+#commission-cockpit-overlay .comm-hero,
+#commission-cockpit-overlay .comm-card{
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .18s ease !important;
+}
+#commission-cockpit-overlay .comm-card:hover{
+  transform:translateY(-1px);
+  border-color:rgba(188,215,255,.15) !important;
+  background:rgba(255,255,255,.052) !important;
+}
+#commission-cockpit-overlay .comm-hero-title:before{
+  content:'';width:7px;height:7px;border-radius:999px;background:#4ddc97;display:inline-block;
+  box-shadow:0 0 12px rgba(77,220,151,.65);
+}
+#commission-cockpit-overlay .comm-badge{letter-spacing:.015em;}
+#commission-cockpit-overlay .comm-badge.dirty,
+.comm-unsaved{
+  background:rgba(255,198,56,.13) !important;
+  border:1px solid rgba(255,198,56,.22) !important;
+  color:#ffe08a !important;
+  box-shadow:0 0 0 0 rgba(255,198,56,.25);
+  animation:commUnsavedPulse 2.4s ease-in-out infinite;
+}
+@keyframes commUnsavedPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,198,56,0)}50%{box-shadow:0 0 0 4px rgba(255,198,56,.045)}}
+#commission-cockpit-overlay .comm-field{position:relative;}
+#commission-cockpit-overlay .comm-field label{color:rgba(225,238,255,.54) !important;}
+#commission-cockpit-overlay .comm-select,
+#commission-cockpit-overlay .comm-input{
+  border-color:rgba(225,238,255,.13) !important;
+  background:rgba(255,255,255,.065) !important;
+  transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .1s ease !important;
+  font-variant-numeric:tabular-nums;
+}
+#commission-cockpit-overlay .comm-select:focus,
+#commission-cockpit-overlay .comm-input:focus{
+  border-color:rgba(77,220,151,.62) !important;
+  box-shadow:0 0 0 3px rgba(77,220,151,.10),0 0 20px rgba(77,220,151,.06) !important;
+  background:rgba(255,255,255,.085) !important;
+}
+#commission-cockpit-overlay .comm-input.invalid,
+#commission-cockpit-overlay .comm-select.invalid{
+  border-color:rgba(255,120,100,.72) !important;
+  background:rgba(255,120,100,.07) !important;
+  box-shadow:0 0 0 3px rgba(255,120,100,.10) !important;
+  animation:commInvalidShake .28s ease both;
+}
+@keyframes commInvalidShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.comm-inline-error{
+  margin-top:5px;font-size:9px;font-weight:800;line-height:1.35;color:#ffb199;
+  display:flex;align-items:center;gap:5px;
+}
+.comm-inline-error:before{content:'!';width:13px;height:13px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,120,100,.16);border:1px solid rgba(255,120,100,.25);font-size:8px;}
+.comm-save{transition:filter .16s ease,transform .12s ease,background .18s ease,opacity .16s ease !important;}
+.comm-save.has-changes{
+  box-shadow:0 0 0 1px rgba(77,220,151,.22) inset,0 8px 24px rgba(0,208,112,.18);
+}
+.comm-save.no-changes,
+.comm-save:disabled{
+  opacity:.46 !important;
+  cursor:not-allowed !important;
+  filter:saturate(.55) !important;
+  box-shadow:none !important;
+}
+.comm-save.saved{animation:commSavedPop .54s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes commSavedPop{0%{transform:scale(.98)}50%{transform:scale(1.035)}100%{transform:scale(1)}}
+.comm-secondary{transition:background .16s ease,border-color .16s ease,color .16s ease,transform .12s ease !important;}
+.comm-secondary:hover{background:rgba(255,255,255,.10) !important;border-color:rgba(255,255,255,.17) !important;color:#fff !important;}
+.comm-create-rule-btn,.comm-mini-btn,.comm-add,.comm-archive-rule-btn,.tgt-lock-btn{
+  transition:transform .12s ease,filter .16s ease,border-color .16s ease,background .16s ease !important;
+}
+.comm-create-rule-btn:hover,.comm-mini-btn:hover,.comm-add:hover{filter:brightness(1.08);border-color:rgba(77,220,151,.48) !important;}
+.comm-archive-rule-btn:hover:not(:disabled){filter:brightness(1.12);border-color:rgba(255,120,100,.42) !important;background:rgba(255,120,100,.11) !important;}
+.comm-kpi{position:relative;overflow:hidden;}
+.comm-kpi-sub{font-size:9px;line-height:1.25;color:rgba(225,238,255,.42);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.comm-kpi.hit{
+  background:linear-gradient(180deg,rgba(77,220,151,.13),rgba(77,220,151,.045)) !important;
+  border-color:rgba(77,220,151,.22) !important;
+}
+.comm-kpi.hit .comm-kpi-val{color:#4ddc97 !important;}
+.comm-kpi.miss{
+  background:linear-gradient(180deg,rgba(240,176,0,.11),rgba(240,176,0,.035)) !important;
+  border-color:rgba(240,176,0,.18) !important;
+}
+.comm-kpi.payout-hit:after{
+  content:'';position:absolute;inset:auto -40% -52% -40%;height:58%;
+  background:radial-gradient(ellipse at center,rgba(255,224,138,.16),transparent 62%);
+  pointer-events:none;
+}
+.comm-readiness-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:12px;padding:9px 10px;border-radius:12px;font-size:10px;font-weight:850;line-height:1.35;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.045);color:rgba(225,238,255,.72);
+}
+.comm-readiness-bar.ready{border-color:rgba(77,220,151,.22);background:rgba(77,220,151,.075);color:#b9ffd8;}
+.comm-readiness-bar.warn{border-color:rgba(240,176,0,.22);background:rgba(240,176,0,.075);color:#ffe08a;}
+.comm-readiness-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:currentColor;box-shadow:0 0 14px currentColor;}
+.comm-readiness-copy{flex:1;min-width:0;}
+.comm-policy-card.dirty,.comm-card.dirty{
+  border-color:rgba(255,198,56,.23) !important;
+  background:linear-gradient(180deg,rgba(255,198,56,.055),rgba(255,255,255,.035)) !important;
+}
+.comm-rule-item:hover{background:rgba(255,255,255,.065) !important;border-color:rgba(188,215,255,.16) !important;}
+.comm-rule-item.active{box-shadow:0 0 0 1px rgba(255,198,56,.08) inset;}
+.comm-rule-item-name{letter-spacing:-.01em;}
+.comm-rule-editor-actions{border-top:1px solid rgba(255,255,255,.06);padding-top:10px;}
+.comm-tier-row.rule-tier-invalid{border-radius:10px;background:rgba(255,120,100,.035);padding:5px;}
+.comm-lock-row{transition:transform .14s ease,border-color .14s ease,background .14s ease;}
+.comm-lock-row:hover{transform:translateY(-1px);border-color:rgba(188,215,255,.15) !important;background:rgba(255,255,255,.055) !important;}
+.comm-row-money.hit{color:#ffe08a !important;text-shadow:0 0 16px rgba(255,224,138,.22);}
+.comm-assignment-summary{color:rgba(188,215,255,.84) !important;}
+@media (prefers-reduced-motion: reduce){
+  #commission-cockpit-overlay *,#commission-cockpit-overlay *:before,#commission-cockpit-overlay *:after{animation:none !important;transition:none !important;}
+}
+@media(max-width:430px){
+  .comm-readiness-bar{align-items:flex-start;}
+  #commission-cockpit-overlay .comm-step{min-height:42px;}
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -21984,6 +22199,9 @@ let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supa
 let _commCockpitStep = 'policy';
 let _commAssignmentPending = {}; // period|scope|assignee -> plan_code
 let _commSelectedRuleCode = null; // active rule editor in Rule Library
+let _commValidationErrors = {}; // v210e validation map by plan_code
+let _commSaveStateTimer = null;
+let _commSuppressCloseGuard = false;
 
 // ── Quarter helpers ─────────────────────────────────────────────
 function _tgtCurrentQuarter() {
@@ -22259,19 +22477,57 @@ function _commCreateRule(role) {
   _commSelectedRuleCode = code;
   renderCommissionCockpit();
 }
-function _commRulesForRole(role) {
+function _commPlanStatus(p) {
+  return String((p && p.status) || 'active').toLowerCase();
+}
+function _commIsActivePlan(p) {
+  const st = _commPlanStatus(p);
+  return st !== 'inactive' && st !== 'archived';
+}
+function _commIsPlanCodeActive(planCode, role) {
+  const code = planCode || _commPlanCode(role);
+  if (code === _commPlanCode(role)) return true;
+  const pending = (_commRulePending || {})[code];
+  if (pending) return _commIsActivePlan(pending);
+  const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[code];
+  return !!(plan && _commIsActivePlan(plan));
+}
+function _commActivePlanCode(planCode, role) {
+  const code = planCode || _commPlanCode(role);
+  return _commIsPlanCodeActive(code, role) ? code : _commPlanCode(role);
+}
+function _commRuleUsageCount(planCode, period) {
+  if (!planCode) return 0;
+  const per = period || _nrrExclusionCurrentPeriod();
+  const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode] || {};
+  const keys = new Set();
+  ((_commRuleConfig && _commRuleConfig.assignments) || []).forEach(a => {
+    if (!a || a.period_month !== per) return;
+    const matchCode = a.plan_code === planCode;
+    const matchId = plan.id && a.plan_id === plan.id;
+    if (matchCode || matchId) keys.add(_commAssignmentKey(a.period_month, a.assignment_scope, a.assignee_key));
+  });
+  Object.entries(_commAssignmentPending || {}).forEach(([key, code]) => {
+    const [p] = key.split('|');
+    if (p === per && code === planCode) keys.add(key);
+  });
+  return keys.size;
+}
+function _commRulesForRole(role, opts) {
+  const options = opts || {};
   const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {}).filter(p => p.beneficiary_role === role);
   const pending = Object.values(_commRulePending || {}).filter(d => (d.beneficiary_role || d.role) === role)
-    .map(d => ({ plan_code:d.plan_code, plan_name:d.plan_name, beneficiary_role:role, status:'active' }));
+    .map(d => ({ plan_code:d.plan_code, plan_name:d.plan_name, beneficiary_role:role, status:d.status || 'active' }));
   const byCode = {};
   [...plans, ...pending].forEach(p => { if (p && p.plan_code) byCode[p.plan_code] = p; });
   const base = _commPlanCode(role);
   if (!byCode[base]) byCode[base] = { plan_code:base, plan_name:_commPlanName(role), beneficiary_role:role, status:'active' };
-  return Object.values(byCode);
+  return Object.values(byCode).filter(p => !options.activeOnly || _commIsActivePlan(p));
 }
 function _commMatchTierByCode(planCode, role, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
-  const d = _commGetDraftByCode(planCode || _commPlanCode(role), role);
+  const effectiveCode = _commActivePlanCode(planCode || _commPlanCode(role), role);
+  const d = _commGetDraftByCode(effectiveCode, role);
   const tiers = (d.tiers || []).slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
   for (const t of tiers) {
     const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
@@ -22288,6 +22544,81 @@ function _commFmtPayout(n) {
   n = Number(n || 0);
   if (!n) return '฿0';
   return '฿' + Math.round(n).toLocaleString('en-US');
+}
+
+function _commEscapeHtml(v) {
+  return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+function _commPendingCount() {
+  return Object.keys(_commRulePending || {}).length + Object.keys(_commAssignmentPending || {}).length + Object.keys(_nrrGovPending || {}).length;
+}
+function _commHasPendingChanges() {
+  return _commPendingCount() > 0;
+}
+function _commUpdateSaveButtonState() {
+  const btn = document.querySelector('#commission-cockpit-overlay .comm-save');
+  if (!btn || btn.classList.contains('saving') || btn.classList.contains('saved')) return;
+  const count = _commPendingCount();
+  btn.disabled = count === 0;
+  btn.classList.toggle('has-changes', count > 0);
+  btn.classList.toggle('no-changes', count === 0);
+  btn.textContent = count > 0 ? `Save changes (${count})` : 'No changes';
+}
+function _commMarkChanged() {
+  if (_commSaveStateTimer) clearTimeout(_commSaveStateTimer);
+  _commSaveStateTimer = setTimeout(_commUpdateSaveButtonState, 0);
+}
+function _commClearValidationForPlan(planCode) {
+  if (_commValidationErrors && _commValidationErrors[planCode]) delete _commValidationErrors[planCode];
+}
+function _commValidateDrafts() {
+  const errors = {};
+  const drafts = Object.values(_commRulePending || {});
+  drafts.forEach(d => {
+    const code = d.plan_code;
+    const e = { tiers:{} };
+    if (!String(d.plan_name || '').trim()) e.name = 'กรุณาใส่ชื่อ rule เพื่อให้ audit ได้ว่าใช้ criteria ชุดไหน';
+    const tiers = Array.isArray(d.tiers) ? d.tiers : [];
+    if (!tiers.length) e.general = 'ต้องมีอย่างน้อย 1 tier';
+    tiers.forEach((t, i) => {
+      const te = {};
+      const minEmpty = t.min_value === null || t.min_value === '' || t.min_value === undefined;
+      const maxEmpty = t.max_value === null || t.max_value === '' || t.max_value === undefined;
+      const min = minEmpty ? null : Number(t.min_value);
+      const max = maxEmpty ? null : Number(t.max_value);
+      const payout = Number(t.payout_value);
+      if ((!minEmpty && !Number.isFinite(min)) || (!maxEmpty && !Number.isFinite(max))) te.range = 'Min/Max ต้องเป็นตัวเลข หรือเว้นว่างได้';
+      if (Number.isFinite(min) && Number.isFinite(max) && min >= max) te.range = 'Min ต้องน้อยกว่า Max';
+      if (!Number.isFinite(payout) || payout < 0) te.payout = 'Payout ต้องเป็นตัวเลข 0 ขึ้นไป';
+      if (Object.keys(te).length) e.tiers[i] = te;
+    });
+    if (e.name || e.general || Object.keys(e.tiers).length) errors[code] = e;
+  });
+  _commValidationErrors = errors;
+  return errors;
+}
+function _commFirstValidationPlan(errors) {
+  const keys = Object.keys(errors || {});
+  return keys.length ? keys[0] : null;
+}
+async function saveCommissionPoliciesFromCockpit() {
+  const rows = Object.values(_nrrGovPending || {});
+  if (!rows.length) return;
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  const payload = rows.map(p => ({
+    period_month: p.period_month,
+    scope_type: p.scope_type || 'all',
+    scope_key: p.scope_key || 'all',
+    base_mode: p.base_mode || 'rolling_mom',
+    base_month: p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
+    status: p.status || 'draft',
+    updated_by: actor,
+    updated_at: new Date().toISOString()
+  }));
+  const { error } = await supa.from('nrr_policies').upsert(payload, { onConflict:'period_month,scope_type,scope_key' });
+  if (error) throw new Error(error.message);
+  payload.forEach(r => { _nrrGovPolicies[_nrrGovKey(r.period_month, r.scope_type, r.scope_key)] = { ...r }; });
+  _nrrGovPending = {};
 }
 function _commMatchTier(role, pct) {
   return _commMatchTierByCode(_commPlanCode(role), role, pct);
@@ -22313,8 +22644,9 @@ function _commTeamNrrPct() {
 function _commBuildPreviewModel() {
   const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
   const teamPct = _commTeamNrrPct();
-  const tlPayout = _commPayoutForPct('tl', teamPct);
   const period = _nrrExclusionCurrentPeriod();
+  const tlPlanCode = _commActivePlanCode(_commPlanCode('tl'), 'tl');
+  const tlPayout = _commPayoutForPctByCode(tlPlanCode, 'tl', teamPct);
   const kamRows = groups.map(g => {
     const pct = _commKamNrrPct(g.kamEmail);
     const planCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
@@ -22326,6 +22658,7 @@ function _commBuildPreviewModel() {
       pct,
       payout,
       planCode,
+      planName: _commPlanNameByCode(planCode, 'kam'),
       tierLabel: tier ? (tier.payout_label || '') : '',
       accounts: g.total || (g.accounts ? g.accounts.length : 0),
       pace: g.pace || null,
@@ -22335,6 +22668,8 @@ function _commBuildPreviewModel() {
   const kamTotal = kamRows.reduce((s,r)=>s+(r.payout||0),0);
   return {
     teamPct,
+    tlPlanCode,
+    tlPlanName: _commPlanNameByCode(tlPlanCode, 'tl'),
     tlPayout,
     kamRows,
     kamTotal,
@@ -22431,7 +22766,8 @@ function _commBuildSnapshotRows() {
         excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email),
         base_gmv: raw ? raw.baselinePrevGmv : 0,
         current_gmv: raw ? raw.cohortGmv : 0,
-        payout_source: planCode
+        payout_source: planCode,
+        rule_name: _commPlanNameByCode(planCode, 'tl')
       },
       created_by: actor,
       updated_by: actor
@@ -22467,7 +22803,8 @@ function _commBuildSnapshotRows() {
         base_gmv: raw ? raw.baselinePrevGmv : 0,
         current_gmv: raw ? raw.cohortGmv : 0,
         account_count: g.total || ((g.accounts || []).length),
-        payout_source: planCode
+        payout_source: planCode,
+        rule_name: _commPlanNameByCode(planCode, 'kam')
       },
       created_by: actor,
       updated_by: actor
@@ -22477,9 +22814,10 @@ function _commBuildSnapshotRows() {
   return rows;
 }
 function _commSnapshotCsv(rows) {
-  const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
+  const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','rule_name','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
   const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
-  return [headers.join(',')].concat(rows.map(r => headers.map(h => esc(r[h])).join(','))).join('\n');
+  const getVal = (r,h) => h === 'rule_name' ? (r.breakdown && r.breakdown.rule_name) : r[h];
+  return [headers.join(',')].concat(rows.map(r => headers.map(h => esc(getVal(r,h))).join(','))).join('\n');
 }
 function exportCommissionSnapshotCsv() {
   const rows = _commBuildSnapshotRows();
@@ -23147,11 +23485,15 @@ window.openCommissionCockpit = openCommissionCockpit;
 })();
 
 function closeCommissionCockpit() {
+  if (!_commSuppressCloseGuard && _commHasPendingChanges()) {
+    const ok = window.confirm('ยังมี changes ที่ยังไม่ได้ save ต้องการปิด Commission Cockpit โดยไม่บันทึกหรือไม่?');
+    if (!ok) return;
+  }
   const ov = document.getElementById('commission-cockpit-overlay');
   if (ov) {
     ov.classList.remove('open');
-    ov.style.display = 'none';
     ov.style.pointerEvents = 'none';
+    setTimeout(()=>{ if (!ov.classList.contains('open')) ov.style.display = 'none'; }, 180);
   }
 }
 window.closeCommissionCockpit = closeCommissionCockpit;
@@ -23171,14 +23513,27 @@ window.closeCommissionCockpit = closeCommissionCockpit;
   }, true);
 })();
 
+(function(){
+  if (window.__commEscBound) return;
+  window.__commEscBound = true;
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    const ov = document.getElementById('commission-cockpit-overlay');
+    if (ov && ov.classList.contains('open')) {
+      e.preventDefault();
+      if (typeof window.closeCommissionCockpit === 'function') window.closeCommissionCockpit();
+    }
+  });
+})();
+
 function switchCommissionStep(step) {
   _commCockpitStep = step;
   renderCommissionCockpit();
 }
 function _commPlanOptionsFor(role) {
-  const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {}).filter(p => p.beneficiary_role === role);
+  const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {}).filter(p => p.beneficiary_role === role && _commIsActivePlan(p));
   const codes = new Set(plans.map(p => p.plan_code));
-  if (!codes.has(_commPlanCode(role))) plans.unshift({plan_code:_commPlanCode(role), plan_name:_commPlanName(role), beneficiary_role:role});
+  if (!codes.has(_commPlanCode(role))) plans.unshift({plan_code:_commPlanCode(role), plan_name:_commPlanName(role), beneficiary_role:role, status:'active'});
   return plans;
 }
 function _commAssignmentKey(period, scope, assignee) {
@@ -23186,12 +23541,15 @@ function _commAssignmentKey(period, scope, assignee) {
 }
 function _commGetAssignmentPlan(period, scope, assignee, role) {
   const key = _commAssignmentKey(period, scope, assignee);
-  if (_commAssignmentPending[key]) return _commAssignmentPending[key];
+  if (_commAssignmentPending[key]) return _commActivePlanCode(_commAssignmentPending[key], role);
   const found = ((_commRuleConfig && _commRuleConfig.assignments) || []).find(a => a.period_month === period && a.assignment_scope === scope && a.assignee_key === assignee);
-  return found ? (found.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===found.plan_id)?.plan_code || _commPlanCode(role)) : _commPlanCode(role);
+  if (!found) return _commPlanCode(role);
+  const rawCode = found.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===found.plan_id)?.plan_code || _commPlanCode(role);
+  return _commActivePlanCode(rawCode, role);
 }
 function _commSetAssignment(period, scope, assignee, planCode) {
   _commAssignmentPending[_commAssignmentKey(period, scope, assignee)] = planCode;
+  _commMarkChanged();
 }
 
 function _commCloneLocalPlan(role, baseCode, ownerLabel) {
@@ -23250,6 +23608,7 @@ function _commBuildTeamPreviewGroups() {
     const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
     t.teamNrr = pct;
     t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
+    t.tlPlanName = _commPlanNameByCode(t.tlPlanCode, 'tl');
     t.tlPayout = _commPayoutForPctByCode(t.tlPlanCode, 'tl', pct);
     t.total = t.tlPayout + t.kamTotal;
   });
@@ -23270,33 +23629,42 @@ function renderCommissionCockpit() {
   if (btn) btn.classList.add('active');
   const body = document.getElementById('commission-cockpit-body');
   if (!body) return;
-  if (_commCockpitStep === 'policy') return renderCommPolicyStep(body);
-  if (_commCockpitStep === 'assignment') return renderCommAssignmentStep(body);
-  if (_commCockpitStep === 'rules') return renderCommRulesStep(body);
-  if (_commCockpitStep === 'exceptions') return renderCommExceptionsStep(body);
-  return renderCommLockStep(body);
+  body.classList.remove('comm-body-in');
+  void body.offsetWidth;
+  body.classList.add('comm-body-in');
+  let out;
+  if (_commCockpitStep === 'policy') out = renderCommPolicyStep(body);
+  else if (_commCockpitStep === 'assignment') out = renderCommAssignmentStep(body);
+  else if (_commCockpitStep === 'rules') out = renderCommRulesStep(body);
+  else if (_commCockpitStep === 'exceptions') out = renderCommExceptionsStep(body);
+  else out = renderCommLockStep(body);
+  _commUpdateSaveButtonState();
+  return out;
 }
 function renderCommPolicyStep(body) {
-  const now = new Date();
   const q = _tgtActiveQuarter || _tgtCurrentQuarter();
   const months = _tgtQuarterMonths(q);
+  const pendingPolicy = Object.keys(_nrrGovPending || {}).length;
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
         <div>
           <div class="comm-hero-title">1. Period & NRR Base Policy</div>
-          <div class="comm-hero-sub">เริ่มจากกำหนดก่อนว่าเดือนนี้ใช้ฐาน NRR แบบไหน ทุก payout จะ follow policy นี้</div>
+          <div class="comm-hero-sub">กำหนดฐาน NRR ก่อน payout ทุกคนจะยึด policy ชุดนี้เป็น source of truth</div>
         </div>
-        <span class="comm-badge blue">${_tgtQuarterLabel(q)}</span>
+        <span class="comm-badge ${pendingPolicy?'dirty':'blue'}">${pendingPolicy?pendingPolicy+' unsaved':_tgtQuarterLabel(q)}</span>
       </div>
+      <div class="comm-readiness-bar ${pendingPolicy?'warn':'ready'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${pendingPolicy?'มี policy change ที่ยังไม่ได้ save':'Policy state พร้อมใช้งานจากข้อมูลล่าสุด'}</div></div>
     </div>
     ${months.map(m=>{
+      const key = _nrrGovKey(m,'all','all');
+      const dirty = !!(_nrrGovPending || {})[key];
       const p = _nrrGovGetPending(m,'all','all');
       const opts = _nrrGovBaseMonthOptions(m);
-      return `<div class="comm-card">
-        <div class="comm-card-top"><div><div class="comm-name">${_nrrGovMonthLabel(m)}</div><div class="comm-meta">Admin policy · applies to all teams in this foundation</div></div><span class="comm-badge ${p.status==='published'?'ok':'warn'}">${p.status||'draft'}</span></div>
+      return `<div class="comm-card comm-policy-card ${dirty?'dirty':''}">
+        <div class="comm-card-top"><div><div class="comm-name">${_nrrGovMonthLabel(m)}${dirty?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">Admin policy · applies to all teams in this foundation</div></div><span class="comm-badge ${p.status==='published'?'ok':'warn'}">${p.status||'draft'}</span></div>
         <div class="comm-grid2">
-          <div class="comm-field"><label>Base mode</label><select class="comm-select" onchange="onNrrPolicyChange('${m}','base_mode',this.value);renderCommissionCockpit()">
+          <div class="comm-field"><label>Base mode</label><select class="comm-select" onchange="onNrrPolicyChange('${m}','base_mode',this.value)">
             <option value="rolling_mom" ${p.base_mode==='rolling_mom'?'selected':''}>Rolling MoM</option>
             <option value="fixed_month" ${p.base_mode==='fixed_month'?'selected':''}>Fixed base month</option>
           </select></div>
@@ -23316,15 +23684,16 @@ function renderCommAssignmentStep(body) {
   const period = _nrrExclusionCurrentPeriod();
   const tls = _commGetTlListFromPortview();
   const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-  const tlPlans = _commRulesForRole('tl');
-  const kamPlans = _commRulesForRole('kam');
+  const tlPlans = _commRulesForRole('tl', { activeOnly:true });
+  const kamPlans = _commRulesForRole('kam', { activeOnly:true });
   const isUnsaved = (scope, assignee) => !!_commAssignmentPending[_commAssignmentKey(period, scope, assignee)];
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
         <div><div class="comm-hero-title">2. Assign Rules</div><div class="comm-hero-sub">เลือกว่าคนไหนใช้ NRR criteria ชุดไหน Rules ถูกสร้าง/แก้ใน Step 3</div></div>
-        <span class="comm-badge blue">${_nrrGovMonthLabel(period)}</span>
+        <span class="comm-badge ${Object.keys(_commAssignmentPending||{}).length?'dirty':'blue'}">${Object.keys(_commAssignmentPending||{}).length?Object.keys(_commAssignmentPending||{}).length+' unsaved':_nrrGovMonthLabel(period)}</span>
       </div>
+      <div class="comm-readiness-bar ${Object.keys(_commAssignmentPending||{}).length?'warn':'ready'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${Object.keys(_commAssignmentPending||{}).length?'มี assignment change ที่ยังไม่ได้ save':'Assignments ใช้ active rules เท่านั้น · inactive rules ถูกซ่อนแล้ว'}</div></div>
     </div>
     <div class="comm-section-title">Team Lead rules</div>
     ${tls.map(t=>`<div class="comm-card">
@@ -23350,9 +23719,9 @@ function renderCommAssignmentStep(body) {
 }
 
 function renderCommRulesStep(body) {
-  const tlRules = _commRulesForRole('tl');
-  const kamRules = _commRulesForRole('kam');
-  if (!_commSelectedRuleCode) _commSelectedRuleCode = (tlRules[0] && tlRules[0].plan_code) || _commPlanCode('tl');
+  const tlRules = _commRulesForRole('tl', { activeOnly:true });
+  const kamRules = _commRulesForRole('kam', { activeOnly:true });
+  if (!_commSelectedRuleCode || ![...tlRules, ...kamRules].some(p => p.plan_code === _commSelectedRuleCode)) _commSelectedRuleCode = (tlRules[0] && tlRules[0].plan_code) || _commPlanCode('tl');
   const selected = [...tlRules, ...kamRules].find(p => p.plan_code === _commSelectedRuleCode) || tlRules[0] || kamRules[0];
   const role = selected?.beneficiary_role || 'tl';
   body.innerHTML = `
@@ -23376,20 +23745,30 @@ function renderCommRulesStep(body) {
 function _renderRuleLibraryItem(p) {
   const active = p.plan_code === _commSelectedRuleCode;
   const pending = !!_commRulePending[p.plan_code];
-  return `<div class="comm-rule-item ${active?'active':''}" onclick="_commSelectedRuleCode='${p.plan_code}';renderCommissionCockpit()">
+  const used = _commRuleUsageCount(p.plan_code);
+  const isActive = _commIsActivePlan(p);
+  return `<div class="comm-rule-item ${active?'active':''} ${isActive?'':'archived'}" onclick="_commSelectedRuleCode='${p.plan_code}';renderCommissionCockpit()">
     <div>
       <div class="comm-rule-item-name">${p.plan_name || p.plan_code}${pending?'<span class="comm-unsaved">Unsaved</span>':''}</div>
       <div class="comm-rule-item-meta">${p.plan_code} · ${(p.beneficiary_role||'').toUpperCase()} · ${p.status || 'active'}</div>
     </div>
-    <span class="comm-badge ${p.beneficiary_role==='tl'?'blue':'ok'}">${(p.beneficiary_role||'').toUpperCase()}</span>
+    <div class="comm-rule-item-right">
+      <span class="comm-used-pill ${used?'used':''}">Used ${used}</span>
+      <span class="comm-badge ${p.beneficiary_role==='tl'?'blue':'ok'}">${(p.beneficiary_role||'').toUpperCase()}</span>
+    </div>
   </div>`;
 }
 function _renderCommRuleEditorByCode(planCode, role) {
   const d = _commGetDraftByCode(planCode, role);
-  return `<div class="comm-card">
-    <div class="comm-rule-editor-head"><div><div class="comm-name">${d.plan_name || planCode}</div><div class="comm-meta">${d.plan_code} · ${d.measurement_scope || 'governed_nrr'}</div></div><span class="comm-badge ok">Governed NRR</span></div>
+  const used = _commRuleUsageCount(planCode);
+  const isStandard = planCode === _commPlanCode(role);
+  const err = (_commValidationErrors || {})[planCode] || {};
+  const generalErr = err.general ? `<div class="comm-inline-error">${_commEscapeHtml(err.general)}</div>` : '';
+  return `<div class="comm-card ${Object.keys(err).length?'dirty':''}">
+    <div class="comm-rule-editor-head"><div><div class="comm-name">${_commEscapeHtml(d.plan_name || planCode)}${_commRulePending[planCode]?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">${_commEscapeHtml(d.plan_code)} · ${_commEscapeHtml(d.measurement_scope || 'governed_nrr')} · Used by ${used}</div></div><span class="comm-badge ok">Governed NRR</span></div>
+    ${generalErr}
     <div class="comm-grid2">
-      <div class="comm-field"><label>Rule name</label><input class="comm-input" value="${d.plan_name||''}" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)"></div>
+      <div class="comm-field"><label>Rule name</label><input class="comm-input ${err.name?'invalid':''}" value="${_commEscapeHtml(d.plan_name||'')}" placeholder="เช่น KAM NRR Stretch Q3" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">${err.name?`<div class="comm-inline-error">${_commEscapeHtml(err.name)}</div>`:''}</div>
       <div class="comm-field"><label>Payout type</label><select class="comm-select" onchange="onRuleHeaderInput('${planCode}','payout_type',this.value)">
         <option value="flat_amount" ${d.payout_type==='flat_amount'?'selected':''}>Flat amount</option>
         <option value="bonus_amount" ${d.payout_type==='bonus_amount'?'selected':''}>Bonus amount</option>
@@ -23397,41 +23776,101 @@ function _renderCommRuleEditorByCode(planCode, role) {
     </div>
     <div class="comm-table-lite" style="margin-top:12px">
       <div class="comm-tier-row head"><div>Min</div><div>Max</div><div>Payout</div><div>Label</div><div></div></div>
-      ${(d.tiers||[]).map((t,i)=>`<div class="comm-tier-row">
-        <input class="comm-input" value="${t.min_value ?? ''}" placeholder="-" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)">
-        <input class="comm-input" value="${t.max_value ?? ''}" placeholder="∞" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">
-        <input class="comm-input" value="${t.payout_value ?? 0}" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
-        <input class="comm-input" value="${t.payout_label || ''}" oninput="onRuleTierInput('${planCode}',${i},'payout_label',this.value)">
-        <button class="comm-del" onclick="removeRuleTier('${planCode}',${i})">×</button>
-      </div>`).join('')}
+      ${(d.tiers||[]).map((t,i)=>{
+        const te = (err.tiers || {})[i] || {};
+        return `<div class="comm-tier-row ${Object.keys(te).length?'rule-tier-invalid':''}">
+          <input class="comm-input ${te.range?'invalid':''}" value="${t.min_value ?? ''}" placeholder="-" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)">
+          <input class="comm-input ${te.range?'invalid':''}" value="${t.max_value ?? ''}" placeholder="∞" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">
+          <input class="comm-input ${te.payout?'invalid':''}" value="${t.payout_value ?? 0}" placeholder="0" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
+          <input class="comm-input" value="${_commEscapeHtml(t.payout_label || '')}" placeholder="Label" oninput="onRuleTierInput('${planCode}',${i},'payout_label',this.value)">
+          <button class="comm-del" onclick="removeRuleTier('${planCode}',${i})">×</button>
+          ${(te.range||te.payout)?`<div class="comm-inline-error" style="grid-column:1 / -1">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
+        </div>`;
+      }).join('')}
     </div>
     <button class="comm-add" onclick="addRuleTier('${planCode}')">+ เพิ่ม tier</button>
-    <div class="comm-plan-note">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ rule นี้ใน Step 2</div>
+    <div class="comm-rule-editor-actions">
+      <button class="comm-archive-rule-btn" ${isStandard?'disabled title="Standard rule cannot be archived"':''} onclick="archiveCommissionRule('${planCode}')">Archive rule</button>
+    </div>
+    <div class="comm-plan-note">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ rule นี้ใน Step 2 · Archive จะเปลี่ยน status เป็น inactive ไม่ลบข้อมูลย้อนหลัง</div>
   </div>`;
 }
 function onRuleHeaderInput(planCode, field, value) {
   const d = _commGetDraftByCode(planCode);
   d[field] = value;
+  _commClearValidationForPlan(planCode);
   _commSetDraftByCode(planCode, d);
   if (field === 'plan_name' && _commRuleConfig.plans && _commRuleConfig.plans[planCode]) _commRuleConfig.plans[planCode].plan_name = value;
+  _commMarkChanged();
 }
 function onRuleTierInput(planCode, idx, field, value) {
   const d = _commGetDraftByCode(planCode);
   if (!d.tiers[idx]) return;
   d.tiers[idx][field] = field === 'payout_label' ? value : (value === '' ? null : Number(value));
+  _commClearValidationForPlan(planCode);
   _commSetDraftByCode(planCode, d);
+  _commMarkChanged();
 }
 function addRuleTier(planCode) {
   const d = _commGetDraftByCode(planCode);
   d.tiers.push({min_value:null,max_value:null,payout_value:0,payout_label:'New tier'});
+  _commClearValidationForPlan(planCode);
   _commSetDraftByCode(planCode, d);
+  _commMarkChanged();
   renderCommissionCockpit();
 }
 function removeRuleTier(planCode, idx) {
   const d = _commGetDraftByCode(planCode);
   d.tiers.splice(idx,1);
+  _commClearValidationForPlan(planCode);
   _commSetDraftByCode(planCode,d);
+  _commMarkChanged();
   renderCommissionCockpit();
+}
+
+async function archiveCommissionRule(planCode) {
+  const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode];
+  const role = (plan && plan.beneficiary_role) || (planCode && planCode.startsWith('TL_') ? 'tl' : 'kam');
+  if (planCode === _commPlanCode(role)) {
+    if (typeof showToast === 'function') showToast('Standard rule archive ไม่ได้', '!');
+    return;
+  }
+  const used = _commRuleUsageCount(planCode);
+  if (used > 0) {
+    const ok = window.confirm(`Rule นี้ถูก assign อยู่ ${used} รายการในเดือนนี้
+
+Archive ต่อหรือไม่? หลัง archive rule นี้จะไม่ถูกใช้ใน Assignment/Preview ใหม่ และจะ fallback ไป Standard rule`);
+    if (!ok) return;
+  } else {
+    const ok = window.confirm('Archive rule นี้หรือไม่? Rule จะถูกซ่อนจาก Assignment และ Rule Library active list แต่ไม่ถูก hard delete');
+    if (!ok) return;
+  }
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  try {
+    if (plan && plan.id) {
+      const { error } = await supa.from('commission_plans').update({
+        status:'inactive',
+        updated_by: actor,
+        updated_at: new Date().toISOString()
+      }).eq('id', plan.id);
+      if (error) throw new Error(error.message);
+    }
+    if (_commRulePending && _commRulePending[planCode]) delete _commRulePending[planCode];
+    if (_commRuleConfig && _commRuleConfig.plans && _commRuleConfig.plans[planCode]) {
+      _commRuleConfig.plans[planCode].status = 'inactive';
+    }
+    Object.keys(_commAssignmentPending || {}).forEach(k => {
+      if (_commAssignmentPending[k] === planCode) delete _commAssignmentPending[k];
+    });
+    const activeRules = _commRulesForRole(role, { activeOnly:true });
+    _commSelectedRuleCode = (activeRules[0] && activeRules[0].plan_code) || _commPlanCode(role);
+    if (_tgtActiveQuarter) delete _tgtQuarterCache[_tgtActiveQuarter];
+    if (typeof showToast === 'function') showToast('Archive rule สำเร็จ', 'ok');
+    renderCommissionCockpit();
+  } catch(e) {
+    console.error('[Commission rules] archive failed', e);
+    if (typeof showToast === 'function') showToast('Archive ไม่สำเร็จ: ' + (e.message || ''), '!');
+  }
 }
 
 function renderCommExceptionsStep(body) {
@@ -23452,6 +23891,9 @@ function renderCommLockStep(body) {
   const teams = _commBuildTeamPreviewGroups();
   const rows = _commBuildSnapshotRows();
   const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  const threshold = Number(_tgtSettings.nrr_threshold || 98);
+  const teamHit = model.teamPct !== null && model.teamPct >= threshold;
+  const ready = rows.length > 0 && pending === 0;
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
@@ -23459,22 +23901,23 @@ function renderCommLockStep(body) {
         <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(model.totalExposure)}</div></div>
       </div>
       <div class="comm-kpis">
-        <div class="comm-kpi"><div class="comm-kpi-lbl">Team NRR</div><div class="comm-kpi-val">${model.teamPct!==null?model.teamPct+'%':'—'}</div></div>
-        <div class="comm-kpi"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(model.tlPayout)}</div></div>
-        <div class="comm-kpi"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(model.kamTotal)}</div></div>
+        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">Team NRR</div><div class="comm-kpi-val">${model.teamPct!==null?model.teamPct+'%':'—'}</div><div class="comm-kpi-sub">Target ${threshold}%</div></div>
+        <div class="comm-kpi ${model.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(model.tlPayout)}</div><div class="comm-kpi-sub">${_commEscapeHtml(model.tlPlanName || 'TL NRR Standard')}</div></div>
+        <div class="comm-kpi ${model.kamTotal>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(model.kamTotal)}</div><div class="comm-kpi-sub">${model.kamRows.filter(r=>r.payout>0).length}/${model.kamRows.length} KAM hit payout</div></div>
       </div>
-      ${pending?`<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ</div>`:''}
+      <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?`ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ`:'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
       <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
     </div>
     <div class="comm-section-title">By Team Lead</div>
     ${teams.map(t=>`<div class="comm-card comm-team-card">
-      <div class="comm-team-header"><div><div class="comm-name">${t.tlName||t.tlEmail}</div><div class="comm-meta">Team NRR ${t.teamNrr!==null?t.teamNrr+'%':'—'} · TL payout ${_commFmtPayout(t.tlPayout)}</div></div><div class="comm-team-total">${_commFmtPayout(t.total)}</div></div>
-      ${t.kamRows.slice(0,5).map(k=>`<div class="comm-person-row"><div><div class="comm-person-name">${k.kamName||k.kamEmail}</div><div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · ${k.tierLabel||'—'}</div></div><div class="comm-person-payout">${_commFmtPayout(k.payout)}</div></div>`).join('')}
+      <div class="comm-team-header"><div><div class="comm-name">${_commEscapeHtml(t.tlName||t.tlEmail)}</div><div class="comm-meta">Team NRR ${t.teamNrr!==null?t.teamNrr+'%':'—'} · TL rule: ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))} · TL payout ${_commFmtPayout(t.tlPayout)}</div></div><div class="comm-team-total">${_commFmtPayout(t.total)}</div></div>
+      ${t.kamRows.slice(0,5).map(k=>`<div class="comm-person-row"><div><div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div><div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · Rule: ${_commEscapeHtml(k.planName || _commPlanNameByCode(k.planCode,'kam'))} · ${_commEscapeHtml(k.tierLabel||'—')}</div></div><div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div></div>`).join('')}
       ${t.kamRows.length>5?`<div class="comm-meta" style="margin-top:8px">+${t.kamRows.length-5} more KAM in CSV/export</div>`:''}
     </div>`).join('') || `<div class="comm-empty">ยังไม่มีทีมให้ preview</div>`}
     <div class="comm-section-title">Snapshot rows</div>
-    <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email}</div><div class="comm-person-sub">Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
+    <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${_commEscapeHtml(r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email)}</div><div class="comm-person-sub">${_commEscapeHtml(r.breakdown?.rule_name || _commPlanNameByCode(r.breakdown?.payout_source, r.beneficiary_role))} · Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money ${Number(r.payout_amount||0)>0?'hit':''}">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
 }
+
 
 async function saveCommissionRules() {
   const drafts = Object.values(_commRulePending || {});
@@ -23576,19 +24019,42 @@ async function saveCommissionRules() {
 
 async function saveCommissionCockpit() {
   const btn = document.querySelector('#commission-cockpit-overlay .comm-save');
-  if (btn) { btn.classList.add('saving'); btn.textContent = 'Saving'; }
+  if (!_commHasPendingChanges()) {
+    if (typeof showToast === 'function') showToast('ยังไม่มี change ใหม่ให้บันทึก', 'ok');
+    _commUpdateSaveButtonState();
+    return;
+  }
+  const validation = _commValidateDrafts();
+  const firstInvalid = _commFirstValidationPlan(validation);
+  if (firstInvalid) {
+    _commSelectedRuleCode = firstInvalid;
+    _commCockpitStep = 'rules';
+    renderCommissionCockpit();
+    if (typeof showToast === 'function') showToast('กรุณาแก้ rule ที่ยังไม่ครบก่อน save', '!');
+    setTimeout(()=>{
+      const el = document.querySelector('#commission-cockpit-overlay .comm-input.invalid, #commission-cockpit-overlay .comm-select.invalid');
+      if (el) el.focus({preventScroll:false});
+    }, 80);
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.classList.add('saving'); btn.classList.remove('no-changes','has-changes'); btn.textContent = 'Saving'; }
   try {
+    await saveCommissionPoliciesFromCockpit();
     await saveCommissionRules();
     await saveCommissionAssignments();
+    _commValidationErrors = {};
     if (btn) { btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = 'Saved'; }
     if (typeof showToast === 'function') showToast('บันทึก Commission สำเร็จ', 'ok');
-    renderCommissionCockpit();
     try { renderTeamviewSummary(); renderTeamviewKamList(); } catch(e) {}
-    setTimeout(()=>{ if(btn){ btn.classList.remove('saved'); btn.textContent='Save changes'; } }, 1000);
+    setTimeout(()=>{
+      if(btn){ btn.classList.remove('saved'); }
+      renderCommissionCockpit();
+    }, 520);
   } catch(e) {
     console.error('[Commission cockpit] save failed', e);
     if (typeof showToast === 'function') showToast('Save ไม่สำเร็จ: ' + (e.message || ''), '!');
-    if (btn) { btn.classList.remove('saving'); btn.textContent = 'Save changes'; }
+    if (btn) { btn.classList.remove('saving'); btn.textContent = 'Save changes'; btn.disabled = false; }
+    _commUpdateSaveButtonState();
   }
 }
 async function saveCommissionAssignments() {
@@ -24017,7 +24483,13 @@ function onNrrPolicyChange(periodMonth, field, value) {
   const next = { ...current, [field]: value };
   if (field === 'base_mode' && value === 'rolling_mom') next.base_month = _nrrGovPrevMonth(periodMonth);
   _nrrGovPending[key] = next;
-  if (field === 'base_mode') renderNrrPolicyTab();
+  _commMarkChanged();
+  const commOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+  if (field === 'base_mode') {
+    if (commOpen) renderCommissionCockpit(); else renderNrrPolicyTab();
+  } else if (commOpen) {
+    _commUpdateSaveButtonState();
+  }
 }
 
 function _tgtRefreshAllocBar() {
