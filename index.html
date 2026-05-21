@@ -21718,6 +21718,126 @@ function _updateRestSwipe(grp,idx,opts){
   }
 }
 
+
+/* v210 Rule Library + Assignment redesign */
+#commission-cockpit-overlay.comm-overlay{
+  transition:opacity .18s ease, backdrop-filter .18s ease;
+}
+#commission-cockpit-overlay .comm-sheet{
+  transform:translateY(10px);
+  opacity:.98;
+  animation:commSheetIn .22s cubic-bezier(.2,.9,.25,1) both;
+}
+@keyframes commSheetIn{
+  from{transform:translateY(28px) scale(.985);opacity:0}
+  to{transform:translateY(0) scale(1);opacity:1}
+}
+.comm-body{
+  transition:opacity .14s ease, transform .14s ease;
+}
+.comm-save.saving{
+  opacity:.8;
+  pointer-events:none;
+}
+.comm-save.saved{
+  background:linear-gradient(135deg,rgba(77,220,151,.95),rgba(20,180,96,.9)) !important;
+}
+.comm-rule-library{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:12px;
+}
+.comm-rule-group-title{
+  margin:10px 2px 6px;
+  font-size:10px;
+  font-weight:900;
+  color:rgba(255,255,255,.42);
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.comm-rule-item{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  gap:8px;
+  padding:10px 11px;
+  border-radius:13px;
+  border:1px solid rgba(255,255,255,.075);
+  background:rgba(255,255,255,.04);
+  cursor:pointer;
+  transition:transform .12s ease, background .12s ease, border-color .12s ease;
+}
+.comm-rule-item:active{transform:scale(.99)}
+.comm-rule-item.active{
+  background:linear-gradient(135deg,rgba(255,198,56,.12),rgba(100,170,255,.10));
+  border-color:rgba(255,198,56,.24);
+}
+.comm-rule-item-name{
+  font-size:12px;
+  font-weight:850;
+  color:#fff;
+  line-height:1.3;
+}
+.comm-rule-item-meta{
+  margin-top:2px;
+  font-size:9px;
+  color:rgba(255,255,255,.40);
+  line-height:1.35;
+}
+.comm-rule-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:10px 0 12px;
+}
+.comm-create-rule-btn{
+  border:1px solid rgba(0,208,112,.24);
+  background:rgba(0,208,112,.09);
+  color:#4ddc97;
+  border-radius:12px;
+  padding:10px 9px;
+  font-size:11px;
+  font-weight:900;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  cursor:pointer;
+}
+.comm-rule-editor-head{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  align-items:flex-start;
+  margin-bottom:10px;
+}
+.comm-assignment-summary{
+  margin-top:7px;
+  padding:7px 8px;
+  border-radius:10px;
+  background:rgba(100,170,255,.07);
+  border:1px solid rgba(100,170,255,.12);
+  font-size:9px;
+  color:rgba(188,215,255,.78);
+}
+.comm-unsaved{
+  display:inline-flex;
+  padding:2px 6px;
+  border-radius:999px;
+  background:rgba(240,176,0,.12);
+  border:1px solid rgba(240,176,0,.20);
+  color:#f6ad55;
+  font-size:8px;
+  font-weight:900;
+  margin-left:5px;
+}
+.comm-select.flash, .comm-card.flash{
+  animation:commFlash .45s ease;
+}
+@keyframes commFlash{
+  0%{box-shadow:0 0 0 0 rgba(255,198,56,.45)}
+  70%{box-shadow:0 0 0 8px rgba(255,198,56,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,198,56,0)}
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -21817,6 +21937,7 @@ let _nrrExclusionView = 'pending';
 let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supabase
 let _commCockpitStep = 'policy';
 let _commAssignmentPending = {}; // period|scope|assignee -> plan_code
+let _commSelectedRuleCode = null; // active rule editor in Rule Library
 
 // ── Quarter helpers ─────────────────────────────────────────────
 function _tgtCurrentQuarter() {
@@ -22041,14 +22162,70 @@ function _commGetDraft(role) {
 function _commSetDraft(role, draft) {
   _commRulePending[_commPlanCode(role)] = JSON.parse(JSON.stringify(draft));
 }
-function _commFmtPayout(n) {
-  n = Number(n || 0);
-  if (!n) return '฿0';
-  return '฿' + Math.round(n).toLocaleString('en-US');
+
+function _commGetDraftByCode(planCode, roleHint) {
+  const role = roleHint || (planCode && planCode.startsWith('TL_') ? 'tl' : 'kam');
+  if (!planCode) return _commGetDraft(role);
+  if (_commRulePending[planCode]) return JSON.parse(JSON.stringify(_commRulePending[planCode]));
+  const plan = (_commRuleConfig.plans && _commRuleConfig.plans[planCode]) || null;
+  const rule = plan && _commRuleConfig.rules ? _commRuleConfig.rules[plan.id] : null;
+  const tiers = rule && _commRuleConfig.tiers ? (_commRuleConfig.tiers[rule.id] || []) : [];
+  return {
+    role,
+    plan_code: planCode,
+    plan_name: plan?.plan_name || _commPlanName(role),
+    beneficiary_role: plan?.beneficiary_role || role,
+    payout_type: rule?.payout_type || 'flat_amount',
+    measurement_scope: rule?.measurement_scope || 'governed_nrr',
+    tiers: tiers.length ? tiers.map(t => ({
+      min_value: t.min_value,
+      max_value: t.max_value,
+      payout_value: t.payout_value,
+      payout_label: t.payout_label || ''
+    })) : _commDefaultTiers(role)
+  };
 }
-function _commMatchTier(role, pct) {
+function _commSetDraftByCode(planCode, draft) {
+  _commRulePending[planCode] = JSON.parse(JSON.stringify(draft));
+  if (!_commRuleConfig.plans) _commRuleConfig.plans = {};
+  _commRuleConfig.plans[planCode] = {
+    ...((_commRuleConfig.plans && _commRuleConfig.plans[planCode]) || {}),
+    plan_code: planCode,
+    plan_name: draft.plan_name || planCode,
+    beneficiary_role: draft.beneficiary_role || draft.role,
+    status: 'active'
+  };
+}
+function _commCreateRule(role) {
+  const prefix = role === 'tl' ? 'TL_NRR_RULE' : 'KAM_NRR_RULE';
+  const code = `${prefix}_${Date.now().toString().slice(-6)}`;
+  const name = role === 'tl' ? 'New TL NRR Rule' : 'New KAM NRR Rule';
+  const draft = {
+    role,
+    plan_code: code,
+    plan_name: name,
+    beneficiary_role: role,
+    payout_type:'flat_amount',
+    measurement_scope:'governed_nrr',
+    tiers:_commDefaultTiers(role)
+  };
+  _commSetDraftByCode(code, draft);
+  _commSelectedRuleCode = code;
+  renderCommissionCockpit();
+}
+function _commRulesForRole(role) {
+  const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {}).filter(p => p.beneficiary_role === role);
+  const pending = Object.values(_commRulePending || {}).filter(d => (d.beneficiary_role || d.role) === role)
+    .map(d => ({ plan_code:d.plan_code, plan_name:d.plan_name, beneficiary_role:role, status:'active' }));
+  const byCode = {};
+  [...plans, ...pending].forEach(p => { if (p && p.plan_code) byCode[p.plan_code] = p; });
+  const base = _commPlanCode(role);
+  if (!byCode[base]) byCode[base] = { plan_code:base, plan_name:_commPlanName(role), beneficiary_role:role, status:'active' };
+  return Object.values(byCode);
+}
+function _commMatchTierByCode(planCode, role, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
-  const d = _commGetDraft(role);
+  const d = _commGetDraftByCode(planCode || _commPlanCode(role), role);
   const tiers = (d.tiers || []).slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
   for (const t of tiers) {
     const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
@@ -22057,9 +22234,20 @@ function _commMatchTier(role, pct) {
   }
   return null;
 }
-function _commPayoutForPct(role, pct) {
-  const t = _commMatchTier(role, pct);
+function _commPayoutForPctByCode(planCode, role, pct) {
+  const t = _commMatchTierByCode(planCode || _commPlanCode(role), role, pct);
   return t ? Number(t.payout_value || 0) : 0;
+}
+function _commFmtPayout(n) {
+  n = Number(n || 0);
+  if (!n) return '฿0';
+  return '฿' + Math.round(n).toLocaleString('en-US');
+}
+function _commMatchTier(role, pct) {
+  return _commMatchTierByCode(_commPlanCode(role), role, pct);
+}
+function _commPayoutForPct(role, pct) {
+  return _commPayoutForPctByCode(_commPlanCode(role), role, pct);
 }
 
 function _commVisibleTeamScope() {
@@ -22080,15 +22268,18 @@ function _commBuildPreviewModel() {
   const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
   const teamPct = _commTeamNrrPct();
   const tlPayout = _commPayoutForPct('tl', teamPct);
+  const period = _nrrExclusionCurrentPeriod();
   const kamRows = groups.map(g => {
     const pct = _commKamNrrPct(g.kamEmail);
-    const payout = _commPayoutForPct('kam', pct);
-    const tier = _commMatchTier('kam', pct);
+    const planCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
+    const payout = _commPayoutForPctByCode(planCode, 'kam', pct);
+    const tier = _commMatchTierByCode(planCode, 'kam', pct);
     return {
       kamEmail: g.kamEmail,
       kamName: g.kamName,
       pct,
       payout,
+      planCode,
       tierLabel: tier ? (tier.payout_label || '') : '',
       accounts: g.total || (g.accounts ? g.accounts.length : 0),
       pace: g.pace || null,
@@ -22174,7 +22365,8 @@ function _commBuildSnapshotRows() {
     const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tl.email);
     const pct = governedPct !== null ? governedPct : rawPct;
-    const payout = _commPayoutForPct('tl', pct);
+    const planCode = _commGetAssignmentPlan(period, 'tl', tl.email, 'tl');
+    const payout = _commPayoutForPctByCode(planCode, 'tl', pct);
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
@@ -22193,7 +22385,7 @@ function _commBuildSnapshotRows() {
         excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email),
         base_gmv: raw ? raw.baselinePrevGmv : 0,
         current_gmv: raw ? raw.cohortGmv : 0,
-        payout_source: 'TL_NRR_STD'
+        payout_source: planCode
       },
       created_by: actor,
       updated_by: actor
@@ -22207,7 +22399,8 @@ function _commBuildSnapshotRows() {
     const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, g.kamEmail, null);
     const pct = governedPct !== null ? governedPct : rawPct;
-    const payout = _commPayoutForPct('kam', pct);
+    const planCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
+    const payout = _commPayoutForPctByCode(planCode, 'kam', pct);
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
     rows.push({
       period_month: period,
@@ -22228,7 +22421,7 @@ function _commBuildSnapshotRows() {
         base_gmv: raw ? raw.baselinePrevGmv : 0,
         current_gmv: raw ? raw.cohortGmv : 0,
         account_count: g.total || ((g.accounts || []).length),
-        payout_source: 'KAM_NRR_STD'
+        payout_source: planCode
       },
       created_by: actor,
       updated_by: actor
@@ -22979,7 +23172,8 @@ function _commBuildTeamPreviewGroups() {
     const raw = t.tlEmail === 'unassigned' ? null : _tgtComputeKamNRR(null, t.tlEmail);
     const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
     t.teamNrr = pct;
-    t.tlPayout = _commPayoutForPct('tl', pct);
+    t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
+    t.tlPayout = _commPayoutForPctByCode(t.tlPlanCode, 'tl', pct);
     t.total = t.tlPayout + t.kamTotal;
   });
   return Object.values(tlMap).sort((a,b)=>b.total-a.total);
@@ -23036,58 +23230,81 @@ function renderCommAssignmentStep(body) {
   const period = _nrrExclusionCurrentPeriod();
   const tls = _commGetTlListFromPortview();
   const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-  const tlPlans = _commPlanOptionsFor('tl');
-  const kamPlans = _commPlanOptionsFor('kam');
+  const tlPlans = _commRulesForRole('tl');
+  const kamPlans = _commRulesForRole('kam');
+  const isUnsaved = (scope, assignee) => !!_commAssignmentPending[_commAssignmentKey(period, scope, assignee)];
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">2. Assign Plans</div><div class="comm-hero-sub">นี่คือหน้าที่บอกว่า TL/KAM คนไหนใช้ NRR criteria ชุดไหน</div></div>
+        <div><div class="comm-hero-title">2. Assign Rules</div><div class="comm-hero-sub">เลือกว่าคนไหนใช้ NRR criteria ชุดไหน Rules ถูกสร้าง/แก้ใน Step 3</div></div>
         <span class="comm-badge blue">${_nrrGovMonthLabel(period)}</span>
       </div>
     </div>
-    <div class="comm-section-title">Team Lead plans</div>
+    <div class="comm-section-title">Team Lead rules</div>
     ${tls.map(t=>`<div class="comm-card">
-      <div class="comm-card-top"><div><div class="comm-name">${t.name||t.email}</div><div class="comm-meta">${t.email}</div></div><span class="comm-badge blue">TL</span></div>
-      <div class="comm-field" style="margin-top:10px"><label>Assigned TL plan</label><select class="comm-select" onchange="_commSetAssignment('${period}','tl','${t.email}',this.value)">
+      <div class="comm-card-top"><div><div class="comm-name">${t.name||t.email}${isUnsaved('tl',t.email)?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">${t.email}</div></div><span class="comm-badge blue">TL</span></div>
+      <div class="comm-field" style="margin-top:10px"><label>Assigned TL rule</label><select class="comm-select" onchange="_commSetAssignment('${period}','tl','${t.email}',this.value);this.classList.add('flash')">
         ${tlPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'tl',t.email,'tl')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
       </select></div>
-      <div class="comm-plan-tools"><button class="comm-mini-btn" onclick="cloneTlPlanForAssignment('${t.email}','${(t.name||t.email).replace(/'/g,'')}')">Clone custom TL plan</button></div>
-      <div class="comm-plan-note">ใช้เมื่อต้องการ criteria/payout ของ TL คนนี้ต่างจากคนอื่น</div>
+      <div class="comm-assignment-summary">ถ้าต้องการ criteria ใหม่ ให้ไป Step 3 Rules → Create TL Rule แล้วกลับมาเลือกที่นี่</div>
     </div>`).join('') || `<div class="comm-empty">ไม่พบ TL</div>`}
-    <div class="comm-section-title">KAM plans by team</div>
+    <div class="comm-section-title">KAM rules by team</div>
     ${tls.map(t=>{
       const kams = groups.filter(g => (g.accounts||[]).some(a=>a.tlEmail===t.email));
       return `<div class="comm-card comm-team-card">
         <div class="comm-team-header"><div><div class="comm-name">${t.name||t.email}</div><div class="comm-meta">${kams.length} KAM under team</div></div></div>
         ${kams.map(g=>`<div class="comm-person-row">
-          <div><div class="comm-person-name">${g.kamName||g.kamEmail}</div><div class="comm-person-sub">${g.kamEmail}</div></div>
-          <div>
-            <select class="comm-select" onchange="_commSetAssignment('${period}','kam','${g.kamEmail}',this.value)">
-              ${kamPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'kam',g.kamEmail,'kam')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
-            </select>
-            <div class="comm-plan-tools"><button class="comm-mini-btn" onclick="cloneKamPlanForAssignment('${g.kamEmail}','${(g.kamName||g.kamEmail).replace(/'/g,'')}')">Clone custom KAM plan</button></div>
-          </div>
+          <div><div class="comm-person-name">${g.kamName||g.kamEmail}${isUnsaved('kam',g.kamEmail)?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-person-sub">${g.kamEmail}</div></div>
+          <select class="comm-select" onchange="_commSetAssignment('${period}','kam','${g.kamEmail}',this.value);this.classList.add('flash')">
+            ${kamPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'kam',g.kamEmail,'kam')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
+          </select>
         </div>`).join('') || `<div class="comm-empty">ไม่มี KAM ใต้ทีมนี้</div>`}
       </div>`;
     }).join('')}`;
 }
+
 function renderCommRulesStep(body) {
+  const tlRules = _commRulesForRole('tl');
+  const kamRules = _commRulesForRole('kam');
+  if (!_commSelectedRuleCode) _commSelectedRuleCode = (tlRules[0] && tlRules[0].plan_code) || _commPlanCode('tl');
+  const selected = [...tlRules, ...kamRules].find(p => p.plan_code === _commSelectedRuleCode) || tlRules[0] || kamRules[0];
+  const role = selected?.beneficiary_role || 'tl';
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">3. Edit Plan Rules</div><div class="comm-hero-sub">แก้ threshold/payout ของ plan ไม่ใช่แก้รายคนโดยตรง รายคนจะเลือกใช้ plan ใน Assignment</div></div>
+        <div><div class="comm-hero-title">3. Rule Library</div><div class="comm-hero-sub">สร้าง rule หลายชุด แล้วนำไป assign ให้ TL/KAM ใน Step 2</div></div>
       </div>
     </div>
-    ${['tl','kam'].map(role=>_renderCommRuleEditor(role)).join('')}`;
+    <div class="comm-rule-actions">
+      <button class="comm-create-rule-btn" onclick="_commCreateRule('tl')">+ Create TL Rule</button>
+      <button class="comm-create-rule-btn" onclick="_commCreateRule('kam')">+ Create KAM Rule</button>
+    </div>
+    <div class="comm-rule-group-title">TL Rules</div>
+    <div class="comm-rule-library">${tlRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
+    <div class="comm-rule-group-title">KAM Rules</div>
+    <div class="comm-rule-library">${kamRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
+    <div class="comm-section-title">Edit selected rule</div>
+    ${selected ? _renderCommRuleEditorByCode(selected.plan_code, role) : `<div class="comm-empty">ยังไม่มี rule ให้แก้</div>`}
+  `;
 }
-function _renderCommRuleEditor(role) {
-  const d = _commGetDraft(role);
-  const title = role==='tl' ? 'TL NRR Plan' : 'KAM NRR Plan';
+function _renderRuleLibraryItem(p) {
+  const active = p.plan_code === _commSelectedRuleCode;
+  const pending = !!_commRulePending[p.plan_code];
+  return `<div class="comm-rule-item ${active?'active':''}" onclick="_commSelectedRuleCode='${p.plan_code}';renderCommissionCockpit()">
+    <div>
+      <div class="comm-rule-item-name">${p.plan_name || p.plan_code}${pending?'<span class="comm-unsaved">Unsaved</span>':''}</div>
+      <div class="comm-rule-item-meta">${p.plan_code} · ${(p.beneficiary_role||'').toUpperCase()} · ${p.status || 'active'}</div>
+    </div>
+    <span class="comm-badge ${p.beneficiary_role==='tl'?'blue':'ok'}">${(p.beneficiary_role||'').toUpperCase()}</span>
+  </div>`;
+}
+function _renderCommRuleEditorByCode(planCode, role) {
+  const d = _commGetDraftByCode(planCode, role);
   return `<div class="comm-card">
-    <div class="comm-card-top"><div><div class="comm-name">${title}</div><div class="comm-meta">${d.plan_code} · ${d.measurement_scope || 'governed_nrr'}</div></div><span class="comm-badge ok">Governed NRR</span></div>
+    <div class="comm-rule-editor-head"><div><div class="comm-name">${d.plan_name || planCode}</div><div class="comm-meta">${d.plan_code} · ${d.measurement_scope || 'governed_nrr'}</div></div><span class="comm-badge ok">Governed NRR</span></div>
     <div class="comm-grid2">
-      <div class="comm-field"><label>Plan name</label><input class="comm-input" value="${d.plan_name||''}" oninput="onPayoutRuleHeader('${role}','plan_name',this.value)"></div>
-      <div class="comm-field"><label>Payout type</label><select class="comm-select" onchange="onPayoutRuleHeader('${role}','payout_type',this.value)">
+      <div class="comm-field"><label>Rule name</label><input class="comm-input" value="${d.plan_name||''}" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)"></div>
+      <div class="comm-field"><label>Payout type</label><select class="comm-select" onchange="onRuleHeaderInput('${planCode}','payout_type',this.value)">
         <option value="flat_amount" ${d.payout_type==='flat_amount'?'selected':''}>Flat amount</option>
         <option value="bonus_amount" ${d.payout_type==='bonus_amount'?'selected':''}>Bonus amount</option>
       </select></div>
@@ -23095,16 +23312,42 @@ function _renderCommRuleEditor(role) {
     <div class="comm-table-lite" style="margin-top:12px">
       <div class="comm-tier-row head"><div>Min</div><div>Max</div><div>Payout</div><div>Label</div><div></div></div>
       ${(d.tiers||[]).map((t,i)=>`<div class="comm-tier-row">
-        <input class="comm-input" value="${t.min_value ?? ''}" placeholder="-" oninput="onPayoutTierInput('${role}',${i},'min_value',this.value)">
-        <input class="comm-input" value="${t.max_value ?? ''}" placeholder="∞" oninput="onPayoutTierInput('${role}',${i},'max_value',this.value)">
-        <input class="comm-input" value="${t.payout_value ?? 0}" oninput="onPayoutTierInput('${role}',${i},'payout_value',this.value)">
-        <input class="comm-input" value="${t.payout_label || ''}" oninput="onPayoutTierInput('${role}',${i},'payout_label',this.value)">
-        <button class="comm-del" onclick="removePayoutTier('${role}',${i});renderCommissionCockpit()">×</button>
+        <input class="comm-input" value="${t.min_value ?? ''}" placeholder="-" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)">
+        <input class="comm-input" value="${t.max_value ?? ''}" placeholder="∞" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">
+        <input class="comm-input" value="${t.payout_value ?? 0}" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
+        <input class="comm-input" value="${t.payout_label || ''}" oninput="onRuleTierInput('${planCode}',${i},'payout_label',this.value)">
+        <button class="comm-del" onclick="removeRuleTier('${planCode}',${i})">×</button>
       </div>`).join('')}
     </div>
-    <button class="comm-add" onclick="addPayoutTier('${role}');renderCommissionCockpit()">+ เพิ่ม tier</button>
+    <button class="comm-add" onclick="addRuleTier('${planCode}')">+ เพิ่ม tier</button>
+    <div class="comm-plan-note">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ rule นี้ใน Step 2</div>
   </div>`;
 }
+function onRuleHeaderInput(planCode, field, value) {
+  const d = _commGetDraftByCode(planCode);
+  d[field] = value;
+  _commSetDraftByCode(planCode, d);
+  if (field === 'plan_name' && _commRuleConfig.plans && _commRuleConfig.plans[planCode]) _commRuleConfig.plans[planCode].plan_name = value;
+}
+function onRuleTierInput(planCode, idx, field, value) {
+  const d = _commGetDraftByCode(planCode);
+  if (!d.tiers[idx]) return;
+  d.tiers[idx][field] = field === 'payout_label' ? value : (value === '' ? null : Number(value));
+  _commSetDraftByCode(planCode, d);
+}
+function addRuleTier(planCode) {
+  const d = _commGetDraftByCode(planCode);
+  d.tiers.push({min_value:null,max_value:null,payout_value:0,payout_label:'New tier'});
+  _commSetDraftByCode(planCode, d);
+  renderCommissionCockpit();
+}
+function removeRuleTier(planCode, idx) {
+  const d = _commGetDraftByCode(planCode);
+  d.tiers.splice(idx,1);
+  _commSetDraftByCode(planCode,d);
+  renderCommissionCockpit();
+}
+
 function renderCommExceptionsStep(body) {
   _nrrExclusionView = _nrrExclusionView || 'pending';
   const savedBody = document.getElementById('tgt-sheet-body');
@@ -23147,13 +23390,19 @@ function renderCommLockStep(body) {
     <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email}</div><div class="comm-person-sub">Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
 }
 async function saveCommissionCockpit() {
+  const btn = document.querySelector('#commission-cockpit-overlay .comm-save');
+  if (btn) { btn.classList.add('saving'); btn.textContent = 'Saving...'; }
   const previousTab = _tgtActiveTab;
   try {
     await saveTargets();
+    await saveCommissionAssignments();
+    if (btn) { btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = 'Saved'; }
+    setTimeout(()=>{ if(btn){ btn.classList.remove('saved'); btn.textContent='Save changes'; } }, 1000);
   } catch(e) {
-    console.warn('[Commission cockpit] saveTargets failed', e);
+    console.error('[Commission cockpit] save failed', e);
+    if (typeof showToast === 'function') showToast('Save ไม่สำเร็จ: ' + (e.message || ''), '!');
+    if (btn) { btn.classList.remove('saving'); btn.textContent = 'Save changes'; }
   }
-  await saveCommissionAssignments();
   _tgtActiveTab = previousTab;
 }
 async function saveCommissionAssignments() {
