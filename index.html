@@ -167,7 +167,37 @@
 ║   L19195   VERIFY SHEET HTML  (id="verifySheet")                             ║
 ║   L19271   SENSE GATE OVERLAY HTML  (id="sense-gate-overlay")                ║
 ║   L19419   Target Setup Sheet CSS                                            ║
-║   L19622   <script id="target-module-js">  TARGET MODULE JS                 ║
+║   L19622   
+<div id="nrr-excl-overlay" class="tgt-excl-sheet-overlay" onclick="if(event.target===this)closeNrrExclusionSheet()">
+  <div class="tgt-excl-sheet">
+    <div class="tgt-excl-sheet-title" id="nrr-excl-title">Request NRR exclusion</div>
+    <div class="tgt-excl-sheet-sub" id="nrr-excl-sub">ใช้เฉพาะกรณีที่ควรตัดออกจากฐาน NRR สำหรับ commission เท่านั้น</div>
+    <div class="tgt-excl-field">
+      <label>Account</label>
+      <input class="tgt-excl-input" id="nrr-excl-account" disabled>
+    </div>
+    <div class="tgt-excl-field">
+      <label>Reason</label>
+      <select class="tgt-excl-select" id="nrr-excl-reason">
+        <option value="closed_business">ร้านปิดกิจการ</option>
+        <option value="bad_debt">ติดหนี้ / credit hold</option>
+        <option value="force_majeure">Force majeure / unavoidable churn</option>
+        <option value="fraud">Fraud / data issue</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="tgt-excl-field">
+      <label>Note / evidence</label>
+      <textarea class="tgt-excl-textarea" id="nrr-excl-note" placeholder="สรุปเหตุผลสั้น ๆ เพื่อให้ admin audit ได้"></textarea>
+    </div>
+    <div class="tgt-excl-sheet-actions">
+      <button class="tgt-excl-cancel" onclick="closeNrrExclusionSheet()">ยกเลิก</button>
+      <button class="tgt-excl-save" onclick="submitNrrExclusionRequest()">Submit request</button>
+    </div>
+  </div>
+</div>
+
+<script id="target-module-js">  TARGET MODULE JS                 ║
 ║             └─ L19677  _tgtCurrentQuarter()                                  ║
 ║             └─ L19719  _tgtFmtM()  format helper                            ║
 ║             └─ L19784  _tgtGet(period, level, email)                         ║
@@ -2925,6 +2955,268 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
   stroke:currentColor!important;
   opacity:1!important;
 }
+
+
+/* NRR governance / commission policy */
+.tgt-policy-block {
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:14px 14px 12px;margin-bottom:14px;
+}
+.tgt-policy-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tgt-policy-title{font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px}
+.tgt-policy-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px;line-height:1.45}
+.tgt-policy-status{padding:4px 8px;border-radius:999px;font-size:10px;font-weight:700;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7)}
+.tgt-policy-status.published{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tgt-policy-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tgt-policy-field{display:flex;flex-direction:column;gap:5px}
+.tgt-policy-field label{font-size:10px;font-weight:700;color:rgba(255,255,255,.55)}
+.tgt-policy-select,.tgt-policy-input{
+  width:100%;padding:10px 11px;border-radius:10px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;outline:none;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+}
+.tgt-policy-note{font-size:10px;color:rgba(255,255,255,.35);line-height:1.5;margin-top:10px}
+.tgt-policy-empty{padding:18px 12px;text-align:center;font-size:12px;color:rgba(255,255,255,.42)}
+.tv-gov-card{
+  min-width:170px;flex:1.35;background:linear-gradient(180deg,rgba(23,53,101,.92),rgba(14,35,70,.92));
+  border:1px solid rgba(100,170,255,.18);border-radius:14px;padding:12px 12px 10px;
+  box-shadow:0 12px 24px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tv-gov-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tv-gov-title{font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px}
+.tv-gov-sub{font-size:9px;color:rgba(255,255,255,.48);margin-top:2px;line-height:1.45}
+.tv-gov-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tv-gov-badge{padding:3px 7px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.72)}
+.tv-gov-badge.ok{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tv-gov-badge.warn{background:rgba(240,176,0,.12);border-color:rgba(240,176,0,.2);color:#f6ad55}
+.tv-gov-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tv-gov-metric{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:9px 10px}
+.tv-gov-metric-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.02em}
+.tv-gov-metric-value{margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:#fff}
+.tv-gov-metric-meta{margin-top:3px;font-size:9px;color:rgba(255,255,255,.42);line-height:1.4}
+.tv-gov-footer{margin-top:9px;font-size:9px;color:rgba(255,255,255,.38);line-height:1.45}
+
+
+/* v208b Admin payout rule builder */
+.tgt-rule-block{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:14px;margin-bottom:14px;
+}
+.tgt-rule-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.tgt-rule-title{font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px}
+.tgt-rule-sub{font-size:10px;color:rgba(255,255,255,.42);margin-top:2px;line-height:1.45}
+.tgt-rule-pill{padding:4px 8px;border-radius:999px;border:1px solid rgba(0,208,112,.22);background:rgba(0,208,112,.10);font-size:10px;font-weight:700;color:#4ddc97;white-space:nowrap}
+.tgt-rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.tgt-rule-field{display:flex;flex-direction:column;gap:5px}
+.tgt-rule-field label{font-size:10px;font-weight:700;color:rgba(255,255,255,.55)}
+.tgt-rule-input,.tgt-rule-select{
+  width:100%;padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;outline:none;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+}
+.tgt-rule-table{width:100%;border-collapse:separate;border-spacing:0 6px;margin-top:10px}
+.tgt-rule-table th{font-size:9px;font-weight:700;color:rgba(255,255,255,.35);text-align:left;padding:0 5px;text-transform:uppercase}
+.tgt-rule-table td{padding:0 4px;vertical-align:middle}
+.tgt-rule-tier-input{
+  width:100%;padding:8px 8px;border-radius:8px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);color:#fff;font-size:11px;font-weight:700;
+  font-family:'IBM Plex Mono',monospace;outline:none;
+}
+.tgt-rule-tier-label{
+  width:100%;padding:8px 8px;border-radius:8px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);color:#fff;font-size:11px;font-weight:600;
+  font-family:'IBM Plex Sans Thai',sans-serif;outline:none;
+}
+.tgt-rule-del{
+  width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.45);font-weight:700;cursor:pointer;
+}
+.tgt-rule-del:hover{background:rgba(255,80,80,.12);color:#ff8888;border-color:rgba(255,80,80,.22)}
+.tgt-rule-add{
+  margin-top:8px;border:1px dashed rgba(0,208,112,.35);background:rgba(0,208,112,.08);
+  color:#4ddc97;border-radius:10px;padding:9px 12px;font-family:'IBM Plex Sans Thai',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;width:100%;
+}
+.tgt-rule-note{font-size:10px;color:rgba(255,255,255,.34);line-height:1.5;margin-top:10px}
+.tgt-rule-empty{padding:18px 12px;text-align:center;color:rgba(255,255,255,.42);font-size:12px}
+.tv-payout-mini{
+  margin-left:6px;display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;
+  background:rgba(100,170,255,.12);border:1px solid rgba(100,170,255,.20);
+  color:rgba(190,220,255,.9);font-size:9px;font-weight:700;
+}
+.tv-gov-payout{
+  margin-top:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.tv-gov-payout-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase}
+.tv-gov-payout-val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:#bcd7ff}
+
+
+/* v208c Commission preview / simulator */
+.tgt-preview-hero{
+  background:linear-gradient(135deg,rgba(23,53,101,.95),rgba(10,24,50,.95));
+  border:1px solid rgba(100,170,255,.18);border-radius:16px;padding:15px;margin-bottom:14px;
+  box-shadow:0 14px 28px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tgt-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.tgt-preview-title{font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:7px}
+.tgt-preview-sub{font-size:10px;color:rgba(255,255,255,.48);line-height:1.45;margin-top:3px}
+.tgt-preview-total{text-align:right}
+.tgt-preview-total-label{font-size:9px;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,.45)}
+.tgt-preview-total-val{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700;color:#bcd7ff;line-height:1.1;margin-top:3px}
+.tgt-preview-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tgt-preview-kpi{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075);border-radius:11px;padding:10px}
+.tgt-preview-kpi-label{font-size:9px;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,.45);line-height:1.25}
+.tgt-preview-kpi-val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:#fff;margin-top:5px}
+.tgt-preview-section-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.62);margin:14px 2px 8px;display:flex;align-items:center;justify-content:space-between}
+.tgt-preview-row{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.075);
+  border-radius:12px;padding:11px 12px;margin-bottom:8px;
+}
+.tgt-preview-row-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tgt-preview-name{font-size:12px;font-weight:700;color:#fff;line-height:1.35}
+.tgt-preview-meta{font-size:9px;color:rgba(255,255,255,.38);margin-top:2px}
+.tgt-preview-payout{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#bcd7ff;white-space:nowrap}
+.tgt-preview-row-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.tgt-preview-chip{padding:3px 7px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.68)}
+.tgt-preview-chip.ok{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tgt-preview-chip.warn{background:rgba(240,176,0,.12);border-color:rgba(240,176,0,.22);color:#f6ad55}
+.tgt-preview-empty{padding:24px 14px;text-align:center;color:rgba(255,255,255,.42);font-size:12px;background:rgba(255,255,255,.035);border-radius:14px;border:1px solid rgba(255,255,255,.06)}
+.tv-payout-pill{
+  display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;
+  border:1px solid rgba(100,170,255,.22);background:rgba(100,170,255,.12);
+  color:#bcd7ff;font-size:9px;font-weight:700;margin-left:6px;
+}
+
+
+/* v208d NRR exclusion request / approval */
+.tgt-excl-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px
+}
+.tgt-excl-title{font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:7px}
+.tgt-excl-sub{font-size:10px;color:rgba(255,255,255,.45);line-height:1.45;margin-top:3px}
+.tgt-excl-tabs{display:flex;gap:6px;margin:0 0 12px}
+.tgt-excl-tab{
+  flex:1;border:none;border-radius:10px;padding:9px 10px;background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.62);font-weight:700;font-size:11px;
+  font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.tgt-excl-tab.active{background:rgba(100,170,255,.14);border-color:rgba(100,170,255,.25);color:#bcd7ff}
+.tgt-excl-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.075);
+  border-radius:13px;padding:12px;margin-bottom:9px
+}
+.tgt-excl-card.pending{border-color:rgba(240,176,0,.20);background:rgba(240,176,0,.055)}
+.tgt-excl-card.approved{border-color:rgba(0,208,112,.20);background:rgba(0,208,112,.045)}
+.tgt-excl-card.rejected{border-color:rgba(255,80,80,.20);background:rgba(255,80,80,.045)}
+.tgt-excl-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tgt-excl-name{font-size:12px;font-weight:700;color:#fff;line-height:1.35}
+.tgt-excl-meta{font-size:9px;color:rgba(255,255,255,.38);line-height:1.45;margin-top:2px}
+.tgt-excl-status{
+  padding:3px 7px;border-radius:999px;font-size:9px;font-weight:700;
+  border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.055);color:rgba(255,255,255,.62)
+}
+.tgt-excl-status.pending{background:rgba(240,176,0,.12);border-color:rgba(240,176,0,.22);color:#f6ad55}
+.tgt-excl-status.approved{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tgt-excl-status.rejected{background:rgba(255,80,80,.12);border-color:rgba(255,80,80,.22);color:#ff8888}
+.tgt-excl-impact{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.tgt-excl-chip{
+  padding:4px 8px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.68)
+}
+.tgt-excl-chip.good{background:rgba(0,208,112,.11);border-color:rgba(0,208,112,.20);color:#4ddc97}
+.tgt-excl-chip.money{background:rgba(100,170,255,.11);border-color:rgba(100,170,255,.20);color:#bcd7ff}
+.tgt-excl-actions{display:flex;gap:7px;margin-top:10px}
+.tgt-excl-action{
+  flex:1;border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:8px 10px;
+  background:rgba(255,255,255,.055);color:rgba(255,255,255,.72);font-size:11px;font-weight:700;
+  font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.tgt-excl-action.approve{background:rgba(0,208,112,.10);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tgt-excl-action.reject{background:rgba(255,80,80,.10);border-color:rgba(255,80,80,.22);color:#ff8888}
+.tgt-excl-request-btn{
+  border:none;border-radius:9px;padding:7px 9px;background:rgba(240,176,0,.12);
+  border:1px solid rgba(240,176,0,.22);color:#f6ad55;font-size:10px;font-weight:700;
+  font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;white-space:nowrap
+}
+.tgt-excl-sheet-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10050;display:none;
+  align-items:flex-end;justify-content:center
+}
+.tgt-excl-sheet-overlay.open{display:flex}
+.tgt-excl-sheet{
+  width:100%;max-width:520px;background:#10264a;border-radius:22px 22px 0 0;
+  border:1px solid rgba(255,255,255,.10);box-shadow:0 -18px 50px rgba(0,0,0,.35);
+  padding:18px 16px 16px;color:#fff
+}
+.tgt-excl-sheet-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.tgt-excl-sheet-sub{font-size:11px;color:rgba(255,255,255,.45);line-height:1.45;margin-bottom:12px}
+.tgt-excl-field{margin-bottom:10px}
+.tgt-excl-field label{display:block;font-size:10px;color:rgba(255,255,255,.55);font-weight:700;margin-bottom:5px}
+.tgt-excl-input,.tgt-excl-select,.tgt-excl-textarea{
+  width:100%;padding:10px;border-radius:10px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);color:#fff;outline:none;
+  font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px
+}
+.tgt-excl-textarea{min-height:72px;resize:vertical}
+.tgt-excl-sheet-actions{display:flex;gap:8px;margin-top:12px}
+.tgt-excl-save{
+  flex:1;border:none;border-radius:12px;padding:12px;background:linear-gradient(135deg,rgba(0,208,112,.9),rgba(0,180,90,.85));
+  color:#0d1117;font-weight:800;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.tgt-excl-cancel{
+  border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.78);font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.tv-gov-adjust{
+  margin-top:8px;font-size:9px;color:rgba(255,255,255,.42);line-height:1.45
+}
+
+
+/* v208e Period lock / payout snapshot */
+.tgt-lock-hero{
+  background:linear-gradient(135deg,rgba(16,42,82,.96),rgba(8,22,46,.96));
+  border:1px solid rgba(188,215,255,.18);border-radius:16px;padding:15px;margin-bottom:14px;
+  box-shadow:0 14px 28px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.tgt-lock-title{font-size:14px;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px}
+.tgt-lock-sub{font-size:10px;color:rgba(255,255,255,.46);line-height:1.45;margin-top:4px}
+.tgt-lock-status{
+  display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:5px 9px;border-radius:999px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:10px;font-weight:800;color:rgba(255,255,255,.72)
+}
+.tgt-lock-status.final{background:rgba(0,208,112,.12);border-color:rgba(0,208,112,.22);color:#4ddc97}
+.tgt-lock-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tgt-lock-btn{
+  border:none;border-radius:12px;padding:12px 10px;font-size:12px;font-weight:800;
+  font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+}
+.tgt-lock-btn.primary{background:linear-gradient(135deg,rgba(0,208,112,.92),rgba(0,180,90,.86));color:#0d1117}
+.tgt-lock-btn.secondary{background:rgba(100,170,255,.13);border:1px solid rgba(100,170,255,.24);color:#bcd7ff}
+.tgt-lock-btn:disabled{opacity:.45;cursor:not-allowed}
+.tgt-lock-warning{
+  margin-top:10px;padding:10px 11px;border-radius:11px;background:rgba(240,176,0,.10);
+  border:1px solid rgba(240,176,0,.20);font-size:10px;color:#f6ad55;line-height:1.45
+}
+.tgt-snap-table-wrap{overflow:auto;border-radius:13px;border:1px solid rgba(255,255,255,.07)}
+.tgt-snap-table{width:100%;border-collapse:collapse;min-width:640px;background:rgba(255,255,255,.035)}
+.tgt-snap-table th{
+  text-align:left;padding:9px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.02em;
+  color:rgba(255,255,255,.42);border-bottom:1px solid rgba(255,255,255,.07);font-weight:800
+}
+.tgt-snap-table td{
+  padding:10px;border-bottom:1px solid rgba(255,255,255,.055);font-size:11px;color:rgba(255,255,255,.74)
+}
+.tgt-snap-table tr:last-child td{border-bottom:none}
+.tgt-snap-name{font-weight:800;color:#fff}
+.tgt-snap-mono{font-family:'IBM Plex Mono',monospace;font-weight:800;color:#fff}
+.tgt-snap-role{
+  display:inline-flex;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.68)
+}
+.tgt-snap-role.tl{background:rgba(100,170,255,.11);border-color:rgba(100,170,255,.20);color:#bcd7ff}
+.tgt-snap-role.kam{background:rgba(0,208,112,.10);border-color:rgba(0,208,112,.18);color:#4ddc97}
+.tgt-lock-empty{padding:24px 14px;text-align:center;color:rgba(255,255,255,.42);font-size:12px;background:rgba(255,255,255,.035);border-radius:14px;border:1px solid rgba(255,255,255,.06)}
 
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -19680,11 +19972,14 @@ function __legacyRenderTeamviewSummaryFallback(){
   const _amt=(n,pos)=>pos?(n>0?'+฿'+fmtSF(n):''):('-฿'+fmtSF(n));
 
   const sumEl=document.getElementById('tv-summary-row');
-  if(sumEl)sumEl.innerHTML=`
+  if(sumEl){
+    const govCard = _tgtRenderTeamGovCard();
+    sumEl.innerHTML=`${govCard}
     <div class="portview-stat"><div class="portview-stat-val" style="color:#fff;font-size:20px">${allAccts.length}</div><div class="portview-stat-lbl" style="font-size:9px">${groups.length} KAM</div></div>
     <div class="portview-stat ok"><div class="portview-stat-val" style="color:#4ddc97;font-size:20px">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#4ddc97;margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
     <div class="portview-stat ${totalWarn>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
     <div class="portview-stat ${totalDanger>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
+  }
 }
 
 function renderTeamviewKamList(){
@@ -19748,6 +20043,11 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    const nrrPill=nrrPct!==null?`<span style="display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.22)':'rgba(240,176,0,.22)'};background:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.12)':'rgba(240,176,0,.12)'};color:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'#4ddc97':'#f6ad55'};font-size:9px;font-weight:700">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
+    const exclBtn=`<button class="tgt-excl-request-btn" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -19755,8 +20055,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       </div>
       <div class="tv-full-bar"><div class="tv-full-fill ${g.paceCls}" style="width:${Math.min(g.pace||0,100)}%"></div></div>
       <div class="tv-full-meta">
-        <div class="tv-risk-chips">${chips}</div>
-        ${rrStr}
+        <div class="tv-risk-chips">${chips}${nrrPill}</div>
+        ${rrStr}${exclBtn}
       </div>
     </div>`;
   }
@@ -19768,6 +20068,11 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:'IBM Plex Sans Thai',sans-serif;margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    const nrrPill=nrrPct!==null?`<span style="display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.22)':'rgba(240,176,0,.22)'};background:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'rgba(0,208,112,.12)':'rgba(240,176,0,.12)'};color:${nrrPct>=(_tgtSettings.nrr_threshold||98)?'#4ddc97':'#f6ad55'};font-size:9px;font-weight:700">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:'';
+    const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
+    const exclBtn=`<button class="tgt-excl-request-btn" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
@@ -19778,8 +20083,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       </div>
       <div class="tv-star-bar"><div class="tv-star-fill" style="width:${Math.min(g.pace,100)}%"></div></div>
       <div class="tv-full-meta">
-        <div class="tv-risk-chips">${chips}</div>
-        ${rrStr}
+        <div class="tv-risk-chips">${chips}${nrrPill}</div>
+        ${rrStr}${exclBtn}
       </div>
     </div>`;
   }
@@ -19789,9 +20094,11 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
+    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}${nrrPct!==null?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-left:2px">NRR ${nrrPct}%</span>${nrrPct!==null?`<span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:''}</div>
       <span class="tv-chip-pace" style="margin-left:6px">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
@@ -20732,6 +21039,11 @@ function _updateRestSwipe(grp,idx,opts){
     <div class="tgt-tab-row" id="tgt-tab-row" style="display:none">
       <button class="tgt-tab-btn active" id="tgt-tab-team" onclick="switchTargetTab('team')">Target ทีม</button>
       <button class="tgt-tab-btn" id="tgt-tab-settings" onclick="switchTargetTab('settings')">Settings</button>
+      <button class="tgt-tab-btn" id="tgt-tab-policy" onclick="switchTargetTab('policy')">NRR Policy</button>
+      <button class="tgt-tab-btn" id="tgt-tab-rules" onclick="switchTargetTab('rules')">Payout Rules</button>
+      <button class="tgt-tab-btn" id="tgt-tab-preview" onclick="switchTargetTab('preview')">Preview</button>
+      <button class="tgt-tab-btn" id="tgt-tab-exclusions" onclick="switchTargetTab('exclusions')">Exclusions</button>
+      <button class="tgt-tab-btn" id="tgt-tab-lock" onclick="switchTargetTab('lock')">Lock</button>
     </div>
     <div class="tgt-sheet-body" id="tgt-sheet-body">
       <div id="tgt-loading" style="text-align:center;padding:32px;color:rgba(255,255,255,.4);font-size:13px">กำลังโหลด...</div>
@@ -20776,6 +21088,22 @@ function _updateRestSwipe(grp,idx,opts){
 // CREATE POLICY "auth users read" ON target_settings FOR SELECT USING (auth.role() = 'authenticated');
 // CREATE POLICY "admin write" ON target_settings FOR ALL USING (auth.role() = 'authenticated');
 // INSERT INTO target_settings (key, value) VALUES ('nrr_threshold', '98');
+//
+// CREATE TABLE nrr_policies (
+//   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//   period_month text NOT NULL,                -- "2026-07"
+//   scope_type text NOT NULL DEFAULT 'all',    -- 'all' | 'team' | 'kam'
+//   scope_key text NOT NULL DEFAULT 'all',     -- 'all' or email
+//   base_mode text NOT NULL DEFAULT 'rolling_mom', -- 'rolling_mom' | 'fixed_month'
+//   base_month text,                           -- "2026-06" when fixed
+//   status text NOT NULL DEFAULT 'draft',      -- 'draft' | 'published'
+//   updated_by text,
+//   updated_at timestamptz DEFAULT now(),
+//   UNIQUE(period_month, scope_type, scope_key)
+// );
+// ALTER TABLE nrr_policies ENABLE ROW LEVEL SECURITY;
+// CREATE POLICY "auth users read" ON nrr_policies FOR SELECT USING (auth.role() = 'authenticated');
+// CREATE POLICY "admin write" ON nrr_policies FOR ALL USING (auth.role() = 'authenticated');
 // ══════════════════════════════════════════════════════════════
 
 // ── State ──────────────────────────────────────────────────────
@@ -20786,6 +21114,14 @@ let _tgtActiveTab = 'team';
 let _tgtActiveQuarter = null; // "2026-Q3"
 let _tgtPendingEdits = {};    // { "2026-06|kam|ning@f.co": 3200000 }
 let _tgtMode = null;          // "admin" | "tl"
+let _nrrGovPolicies = {};     // { "2026-07|all|all": {...} }
+let _nrrGovPending = {};      // { "2026-07|all|all": {...draft...} }
+let _commRuleConfig = {};     // { plans:{}, rules:{}, tiers:{} }
+let _commRulePending = {};    // editable payout rule draft by plan code
+let _nrrExclusions = [];       // loaded/requested NRR exclusions
+let _nrrExclusionDraft = null;
+let _nrrExclusionView = 'pending';
+let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supabase
 
 // ── Quarter helpers ─────────────────────────────────────────────
 function _tgtCurrentQuarter() {
@@ -20848,6 +21184,429 @@ function _tgtFmtInput(n) {
   return Math.round(n / 1000) * 1000 === n ? (n / 1000000 >= 1 ? (n / 1000000).toFixed(1) + 'M' : Math.round(n / 1000) + 'K') : String(n);
 }
 
+function _nrrGovKey(periodMonth, scopeType, scopeKey) {
+  return `${periodMonth}|${scopeType || 'all'}|${scopeKey || 'all'}`;
+}
+function _nrrGovDefaultPolicy(periodMonth) {
+  return {
+    period_month: periodMonth,
+    scope_type: 'all',
+    scope_key: 'all',
+    base_mode: 'rolling_mom',
+    base_month: _nrrGovPrevMonth(periodMonth),
+    status: 'draft',
+    updated_by: '',
+    updated_at: null
+  };
+}
+function _nrrGovPrevMonth(periodMonth) {
+  if (!periodMonth) return null;
+  const [y, m] = periodMonth.split('-').map(v => parseInt(v, 10));
+  const d = new Date(y, (m || 1) - 1, 1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function _nrrGovMonthLabel(periodMonth) {
+  if (!periodMonth) return '—';
+  const mo = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const [y, m] = periodMonth.split('-');
+  return `${mo[(parseInt(m, 10) || 1) - 1]} ${parseInt(y, 10) + 543}`;
+}
+function _nrrGovBaseMonthOptions(periodMonth) {
+  if (!periodMonth) return [];
+  const [y, m] = periodMonth.split('-').map(v => parseInt(v, 10));
+  const start = new Date(y, (m || 1) - 1, 1);
+  const out = [];
+  for (let i = 1; i <= 12; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), 1);
+    d.setMonth(d.getMonth() - i);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+function _nrrGovGet(periodMonth, scopeType, scopeKey) {
+  const direct = _nrrGovPolicies[_nrrGovKey(periodMonth, scopeType, scopeKey)];
+  if (direct) return { ...direct };
+  const fallback = _nrrGovPolicies[_nrrGovKey(periodMonth, 'all', 'all')];
+  return fallback ? { ...fallback } : _nrrGovDefaultPolicy(periodMonth);
+}
+function _nrrGovGetPending(periodMonth, scopeType, scopeKey) {
+  const key = _nrrGovKey(periodMonth, scopeType, scopeKey);
+  if (_nrrGovPending[key]) return { ..._nrrGovPending[key] };
+  return _nrrGovGet(periodMonth, scopeType, scopeKey);
+}
+function _nrrGovResolveForVisibleScope() {
+  const periodMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })();
+  return _nrrGovGet(periodMonth, 'all', 'all');
+}
+function _nrrGovPolicySummary(policy) {
+  if (!policy) return 'Rolling MoM';
+  if (policy.base_mode === 'fixed_month') return `Fixed base: ${_nrrGovMonthLabel(policy.base_month)}`;
+  return 'Rolling MoM';
+}
+function _tgtGetVisibleTeamNrrResult() {
+  const email = (currentUserProfile && currentUserProfile.email) || '';
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const tlMatch = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []).some(a => a.tlEmail === email);
+  const showAll = role === 'admin' && !tlMatch;
+  return _tgtComputeKamNRR(null, showAll ? null : email);
+}
+function _tgtRenderTeamGovCard() {
+  const policy = _nrrGovResolveForVisibleScope();
+  const gov = _nrrGovernanceForVisibleTeam();
+  const nrrPct = gov.rawPct;
+  const threshold = _tgtSettings.nrr_threshold || 98;
+  const governedPct = gov.governedPct !== null ? gov.governedPct : nrrPct;
+  const badgeCls = governedPct === null ? '' : (governedPct >= threshold ? 'ok' : 'warn');
+  const baseTxt = policy.base_mode === 'fixed_month'
+    ? `fixed · ${_nrrGovMonthLabel(policy.base_month)}`
+    : 'rolling MoM';
+  const statusLabel = policy.status === 'published' ? 'Published' : 'Draft';
+  return `<div class="tv-gov-card">
+    <div class="tv-gov-top">
+      <div>
+        <div class="tv-gov-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(100,170,255,.8)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2l2.2 4.8L19 9l-4.8 2.2L12 16l-2.2-4.8L5 9l4.8-2.2L12 2z"/></svg>Commission / NRR</div>
+        <div class="tv-gov-sub">foundation view · policy visible for TL + admin</div>
+      </div>
+      <span class="tv-gov-badge ${policy.status === 'published' ? 'ok' : 'warn'}">${statusLabel}</span>
+    </div>
+    <div class="tv-gov-badges">
+      <span class="tv-gov-badge">${baseTxt}</span>
+      <span class="tv-gov-badge">warn &lt; ${threshold}%</span>
+      <span class="tv-gov-badge">scope: all teams</span>
+    </div>
+    <div class="tv-gov-grid">
+      <div class="tv-gov-metric">
+        <div class="tv-gov-metric-label">Raw NRR</div>
+        <div class="tv-gov-metric-value">${nrrPct !== null ? nrrPct + '%' : '—'}</div>
+        <div class="tv-gov-metric-meta">ก่อน apply exclusion / override</div>
+      </div>
+      <div class="tv-gov-metric">
+        <div class="tv-gov-metric-label">Governed NRR</div>
+        <div class="tv-gov-metric-value" style="color:${badgeCls === 'ok' ? '#4ddc97' : (badgeCls === 'warn' ? '#f6ad55' : '#fff')}">${governedPct !== null ? governedPct + '%' : '—'}</div>
+        <div class="tv-gov-metric-meta">v208 foundation: ยังเท่ากับ raw</div>
+      </div>
+    </div>
+    ${governedPct !== null ? (()=>{ const m=_commBuildPreviewModel(); return `<div class="tv-gov-payout"><div><div class="tv-gov-payout-lbl">Estimated payout exposure</div><div class="tv-gov-metric-meta">TL ${_commFmtPayout(m.tlPayout)} · KAM ${_commFmtPayout(m.kamTotal)}</div></div><div class="tv-gov-payout-val">${_commFmtPayout(m.totalExposure)}</div></div>`; })() : ''}
+    ${gov.excludedBase>0?`<div class="tv-gov-adjust">Approved exclusion base: ${_tgtFmtM(gov.excludedBase)} · Raw ${nrrPct}% → Governed ${governedPct}%</div>`:''}
+    <div class="tv-gov-footer">v208d: approved exclusions affect governed preview · final payout still needs lock snapshot</div>
+  </div>`;
+}
+
+
+function _commDefaultTiers(role) {
+  if (role === 'tl') {
+    return [
+      {min_value:null, max_value:98.5, payout_value:0, payout_label:'Below threshold'},
+      {min_value:98.5, max_value:99.0, payout_value:5000, payout_label:'Tier 2'},
+      {min_value:99.0, max_value:100.0, payout_value:8000, payout_label:'Tier 3'},
+      {min_value:100.0, max_value:102.0, payout_value:12000, payout_label:'Tier 4'},
+      {min_value:102.0, max_value:103.0, payout_value:30000, payout_label:'Tier 5'},
+      {min_value:103.0, max_value:null, payout_value:50000, payout_label:'Tier 6'}
+    ];
+  }
+  return [
+    {min_value:null, max_value:99.0, payout_value:0, payout_label:'Below threshold'},
+    {min_value:99.0, max_value:102.0, payout_value:5000, payout_label:'Base NRR'},
+    {min_value:102.0, max_value:null, payout_value:7500, payout_label:'Bonus NRR'}
+  ];
+}
+function _commPlanCode(role) {
+  return role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
+}
+function _commPlanName(role) {
+  return role === 'tl' ? 'TL NRR Standard' : 'KAM NRR Standard';
+}
+function _commGetDraft(role) {
+  const code = _commPlanCode(role);
+  if (_commRulePending[code]) return JSON.parse(JSON.stringify(_commRulePending[code]));
+  const plan = (_commRuleConfig.plans && _commRuleConfig.plans[code]) || null;
+  const rule = plan && _commRuleConfig.rules ? _commRuleConfig.rules[plan.id] : null;
+  const tiers = rule && _commRuleConfig.tiers ? (_commRuleConfig.tiers[rule.id] || []) : [];
+  return {
+    role,
+    plan_code: code,
+    plan_name: plan?.plan_name || _commPlanName(role),
+    beneficiary_role: role,
+    payout_type: rule?.payout_type || 'flat_amount',
+    measurement_scope: rule?.measurement_scope || 'governed_nrr',
+    tiers: tiers.length ? tiers.map(t => ({
+      min_value: t.min_value,
+      max_value: t.max_value,
+      payout_value: t.payout_value,
+      payout_label: t.payout_label || ''
+    })) : _commDefaultTiers(role)
+  };
+}
+function _commSetDraft(role, draft) {
+  _commRulePending[_commPlanCode(role)] = JSON.parse(JSON.stringify(draft));
+}
+function _commFmtPayout(n) {
+  n = Number(n || 0);
+  if (!n) return '฿0';
+  return '฿' + Math.round(n).toLocaleString('en-US');
+}
+function _commMatchTier(role, pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return null;
+  const d = _commGetDraft(role);
+  const tiers = (d.tiers || []).slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
+  for (const t of tiers) {
+    const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
+    const maxOk = (t.max_value === null || t.max_value === '' || pct < Number(t.max_value));
+    if (minOk && maxOk) return t;
+  }
+  return null;
+}
+function _commPayoutForPct(role, pct) {
+  const t = _commMatchTier(role, pct);
+  return t ? Number(t.payout_value || 0) : 0;
+}
+
+function _commVisibleTeamScope() {
+  const email = (currentUserProfile && currentUserProfile.email) || '';
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const tlMatch = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []).some(a => a.tlEmail === email);
+  return { email, role, showAll: role === 'admin' && !tlMatch, tlEmail: (role === 'admin' && !tlMatch) ? null : email };
+}
+function _commKamNrrPct(kamEmail) {
+  const g = _nrrGovernanceForKam(kamEmail);
+  return g.governedPct !== null ? g.governedPct : g.rawPct;
+}
+function _commTeamNrrPct() {
+  const g = _nrrGovernanceForVisibleTeam();
+  return g.governedPct !== null ? g.governedPct : g.rawPct;
+}
+function _commBuildPreviewModel() {
+  const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+  const teamPct = _commTeamNrrPct();
+  const tlPayout = _commPayoutForPct('tl', teamPct);
+  const kamRows = groups.map(g => {
+    const pct = _commKamNrrPct(g.kamEmail);
+    const payout = _commPayoutForPct('kam', pct);
+    const tier = _commMatchTier('kam', pct);
+    return {
+      kamEmail: g.kamEmail,
+      kamName: g.kamName,
+      pct,
+      payout,
+      tierLabel: tier ? (tier.payout_label || '') : '',
+      accounts: g.total || (g.accounts ? g.accounts.length : 0),
+      pace: g.pace || null,
+      paceCls: g.paceCls || ''
+    };
+  }).sort((a,b)=>(b.payout-a.payout)||((a.pct??-1)-(b.pct??-1)));
+  const kamTotal = kamRows.reduce((s,r)=>s+(r.payout||0),0);
+  return {
+    teamPct,
+    tlPayout,
+    kamRows,
+    kamTotal,
+    totalExposure: tlPayout + kamTotal
+  };
+}
+
+function _nrrExclusionCurrentPeriod() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+function _nrrExclusionRowKey(r) {
+  return `${r.period_month}|${r.account_id || ''}|${r.outlet_id || ''}|${r.target_kam_email || ''}|${r.status || ''}`;
+}
+function _nrrExclusionApprovedForScope(kamEmail, tlEmail) {
+  return (_nrrExclusions || []).filter(x =>
+    x.status === 'approved' &&
+    (!x.target_kam_email || !kamEmail || x.target_kam_email === kamEmail) &&
+    (!x.target_tl_email || !tlEmail || x.target_tl_email === tlEmail)
+  );
+}
+function _nrrExclusionBaseImpact(kamEmail, tlEmail) {
+  const approved = _nrrExclusionApprovedForScope(kamEmail, tlEmail);
+  return approved.reduce((s,x)=>s + Number(x.base_gmv || x.estimated_base_gmv || 0), 0);
+}
+function _nrrGovernedPct(rawResult, kamEmail, tlEmail) {
+  if (!rawResult || rawResult.nrr === null) return null;
+  const base = Number(rawResult.baselinePrevGmv || 0);
+  const curr = Number(rawResult.cohortGmv || 0);
+  const excludedBase = Math.min(base, _nrrExclusionBaseImpact(kamEmail, tlEmail));
+  if (base <= 0 || excludedBase <= 0) return Math.round(rawResult.nrr * 100);
+  const eligibleBase = Math.max(1, base - excludedBase);
+  return Math.round(curr / eligibleBase * 100);
+}
+function _nrrGovernanceForVisibleTeam() {
+  const scope = _commVisibleTeamScope();
+  const raw = _tgtGetVisibleTeamNrrResult();
+  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+  const governedPct = _nrrGovernedPct(raw, null, scope.tlEmail);
+  const exclBase = _nrrExclusionBaseImpact(null, scope.tlEmail);
+  return { raw, rawPct, governedPct, excludedBase: exclBase };
+}
+function _nrrGovernanceForKam(kamEmail) {
+  const raw = _tgtComputeKamNRR(kamEmail, null);
+  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+  const governedPct = _nrrGovernedPct(raw, kamEmail, null);
+  const exclBase = _nrrExclusionBaseImpact(kamEmail, null);
+  return { raw, rawPct, governedPct, excludedBase: exclBase };
+}
+
+function _commGetTlListFromPortview() {
+  const map = {};
+  const rows = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []);
+  rows.forEach(r => {
+    const email = r.tlEmail || '';
+    if (!email) return;
+    if (!map[email]) map[email] = { email, name: r.tlName || email };
+  });
+  return Object.values(map);
+}
+function _commBuildSnapshotRows() {
+  const period = _nrrExclusionCurrentPeriod();
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const rows = [];
+  const allGroups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+  const visibleTlEmail = role === 'admin'
+    ? null
+    : ((currentUserProfile && currentUserProfile.email) || '');
+  const tls = role === 'admin' ? _commGetTlListFromPortview() : [{ email: visibleTlEmail, name: (currentUserProfile && currentUserProfile.full_name) || visibleTlEmail }];
+
+  tls.filter(t => t.email).forEach(tl => {
+    const raw = _tgtComputeKamNRR(null, tl.email);
+    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const governedPct = _nrrGovernedPct(raw, null, tl.email);
+    const pct = governedPct !== null ? governedPct : rawPct;
+    const payout = _commPayoutForPct('tl', pct);
+    rows.push({
+      period_month: period,
+      beneficiary_role: 'tl',
+      beneficiary_email: tl.email,
+      team_lead_email: tl.email,
+      raw_nrr_pct: rawPct,
+      governed_nrr_pct: pct,
+      payout_amount: payout,
+      snapshot_status: 'final',
+      breakdown: {
+        type: 'tl_nrr',
+        role: 'tl',
+        team_lead_name: tl.name || tl.email,
+        raw_nrr_pct: rawPct,
+        governed_nrr_pct: pct,
+        excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email),
+        base_gmv: raw ? raw.baselinePrevGmv : 0,
+        current_gmv: raw ? raw.cohortGmv : 0,
+        payout_source: 'TL_NRR_STD'
+      },
+      created_by: actor,
+      updated_by: actor
+    });
+  });
+
+  const groups = role === 'admin' ? allGroups : allGroups.filter(g => (g.accounts || []).some(a => a.tlEmail === visibleTlEmail));
+  groups.forEach(g => {
+    if (!g.kamEmail) return;
+    const raw = _tgtComputeKamNRR(g.kamEmail, null);
+    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const governedPct = _nrrGovernedPct(raw, g.kamEmail, null);
+    const pct = governedPct !== null ? governedPct : rawPct;
+    const payout = _commPayoutForPct('kam', pct);
+    const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
+    rows.push({
+      period_month: period,
+      beneficiary_role: 'kam',
+      beneficiary_email: g.kamEmail,
+      team_lead_email: tlEmail,
+      raw_nrr_pct: rawPct,
+      governed_nrr_pct: pct,
+      payout_amount: payout,
+      snapshot_status: 'final',
+      breakdown: {
+        type: 'kam_nrr',
+        role: 'kam',
+        kam_name: g.kamName || g.kamEmail,
+        raw_nrr_pct: rawPct,
+        governed_nrr_pct: pct,
+        excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
+        base_gmv: raw ? raw.baselinePrevGmv : 0,
+        current_gmv: raw ? raw.cohortGmv : 0,
+        account_count: g.total || ((g.accounts || []).length),
+        payout_source: 'KAM_NRR_STD'
+      },
+      created_by: actor,
+      updated_by: actor
+    });
+  });
+
+  return rows;
+}
+function _commSnapshotCsv(rows) {
+  const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
+  const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  return [headers.join(',')].concat(rows.map(r => headers.map(h => esc(r[h])).join(','))).join('\n');
+}
+function exportCommissionSnapshotCsv() {
+  const rows = _commBuildSnapshotRows();
+  if (!rows.length) {
+    if (typeof showToast === 'function') showToast('ยังไม่มีข้อมูล snapshot ให้ export', '!');
+    return;
+  }
+  const csv = _commSnapshotCsv(rows);
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `freshket_commission_snapshot_${_nrrExclusionCurrentPeriod()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+async function lockCommissionSnapshot() {
+  const rows = _commBuildSnapshotRows();
+  if (!rows.length) {
+    if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ lock', '!');
+    return;
+  }
+  const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  if (pending > 0 && !confirm(`ยังมี exclusion pending ${pending} รายการ ต้องการ lock ต่อเลยหรือไม่?`)) return;
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  try {
+    const payload = rows.map(r => ({
+      ...r,
+      breakdown: r.breakdown || {},
+      updated_at: new Date().toISOString(),
+      updated_by: actor,
+      created_by: r.created_by || actor,
+      locked_at: new Date().toISOString(),
+      locked_by: actor
+    }));
+    const { data, error } = await supa.from('commission_payout_snapshots')
+      .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
+      .select('*');
+    if (error) throw new Error(error.message);
+    _commissionSnapshots = data || payload;
+    if (typeof showToast === 'function') showToast('Lock commission snapshot สำเร็จ', 'ok');
+    renderCommissionLockTab();
+  } catch (e) {
+    console.error('[Commission lock] failed:', e);
+    if (typeof showToast === 'function') showToast('Lock ไม่สำเร็จ: ' + (e.message || ''), '!');
+  }
+}
+function _nrrExclusionStatusLabel(s) {
+  return s === 'approved' ? 'Approved' : s === 'rejected' ? 'Rejected' : s === 'submitted' ? 'Pending' : (s || 'Draft');
+}
+function _nrrReasonLabel(code) {
+  const m = {
+    closed_business:'ร้านปิดกิจการ',
+    bad_debt:'ติดหนี้ / credit hold',
+    force_majeure:'Force majeure',
+    fraud:'Fraud / data issue',
+    other:'Other'
+  };
+  return m[code] || code || '—';
+}
+
 // ── Supabase load ───────────────────────────────────────────────
 let _tgtQuarterCache = {}; // per-quarter cache {quarter: {cache, settings, ts}}
 const _TGT_CACHE_TTL = 5 * 60 * 1000; // 5 min TTL — fresh enough for a session
@@ -20856,45 +21615,130 @@ async function loadTargets(quarter) {
   if (!quarter) quarter = _tgtCurrentQuarter();
   const months = _tgtQuarterMonths(quarter);
 
-  // ── Cache hit: skip Supabase if this quarter was loaded recently ──
   const hit = _tgtQuarterCache[quarter];
   if (hit && (Date.now() - hit.ts) < _TGT_CACHE_TTL) {
-    _tgtCache    = { ...hit.cache };
+    _tgtCache = { ...hit.cache };
     _tgtSettings = { ...hit.settings };
-    _tgtLoaded   = true;
+    _nrrGovPolicies = { ...(hit.nrrPolicies || {}) };
+    _commRuleConfig = JSON.parse(JSON.stringify(hit.commRules || {plans:{},rules:{},tiers:{}}));
+    _nrrExclusions = JSON.parse(JSON.stringify(hit.nrrExclusions || []));
+    _commissionSnapshots = JSON.parse(JSON.stringify(hit.commissionSnapshots || []));
+    _tgtLoaded = true;
     return;
   }
 
-  // ── Cache miss: fetch from Supabase ──
-  _tgtCache    = {};
+  _tgtCache = {};
   _tgtSettings = { nrr_threshold: 98 };
+  _nrrGovPolicies = {};
+  _commRuleConfig = { plans:{}, rules:{}, tiers:{} };
+  _nrrExclusions = [];
+  _commissionSnapshots = [];
   try {
     const { data: rows, error: rowsErr } = await supa.from('targets')
       .select('period,level,for_email,gmv_target')
       .in('period', months);
-    // v205b: debug — log raw Supabase result to diagnose empty target issue
     if (rowsErr) throw new Error(rowsErr.message);
     (rows || []).forEach(r => {
       const key = `${r.period}|${r.level}|${r.for_email}`;
       _tgtCache[key] = r.gmv_target;
     });
-    const { data: sets } = await supa.from('target_settings')
+  } catch (e) {
+    console.warn('[Target] target load failed:', e.message);
+  }
+
+  try {
+    const { data: sets, error: setsErr } = await supa.from('target_settings')
       .select('key,value')
       .eq('key', 'nrr_threshold')
       .single();
+    if (setsErr && setsErr.code !== 'PGRST116') throw new Error(setsErr.message);
     if (sets) _tgtSettings.nrr_threshold = parseFloat(sets.value) || 98;
-
-    // Save to per-quarter cache
-    _tgtQuarterCache[quarter] = {
-      cache:    { ..._tgtCache },
-      settings: { ..._tgtSettings },
-      ts:       Date.now()
-    };
-    _tgtLoaded = true;
   } catch (e) {
-    console.warn('[Target] load failed (tables may not exist yet):', e.message);
-    _tgtLoaded = true;
+    console.warn('[Target] settings load failed:', e.message);
   }
+
+  try {
+    const { data: policies, error: polErr } = await supa.from('nrr_policies')
+      .select('period_month,scope_type,scope_key,base_mode,base_month,status,updated_by,updated_at')
+      .in('period_month', months);
+    if (polErr) throw new Error(polErr.message);
+    (policies || []).forEach(p => {
+      _nrrGovPolicies[_nrrGovKey(p.period_month, p.scope_type, p.scope_key)] = { ...p };
+    });
+  } catch (e) {
+    console.warn('[NRR governance] load failed (table may not exist yet):', e.message);
+  }
+
+
+
+  try {
+    const { data: excl, error: exclErr } = await supa.from('nrr_exclusions')
+      .select('id,period_month,account_id,outlet_id,applies_to,target_kam_email,target_tl_email,reason_code,reason_text,status,requested_by,requested_at,reviewed_by,reviewed_at,review_note,base_gmv,estimated_base_gmv')
+      .in('period_month', months);
+    if (exclErr) throw new Error(exclErr.message);
+    _nrrExclusions = excl || [];
+  } catch (e) {
+    console.warn('[NRR exclusions] load failed (table may not have v208d columns yet):', e.message);
+    _nrrExclusions = [];
+  }
+
+
+  try {
+    const { data: snaps, error: snapErr } = await supa.from('commission_payout_snapshots')
+      .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at,updated_by')
+      .in('period_month', months);
+    if (snapErr) throw new Error(snapErr.message);
+    _commissionSnapshots = snaps || [];
+  } catch (e) {
+    console.warn('[Commission snapshots] load failed:', e.message);
+    _commissionSnapshots = [];
+  }
+
+  try {
+    const { data: plans, error: planErr } = await supa.from('commission_plans')
+      .select('id,plan_code,plan_name,beneficiary_role,status')
+      .in('plan_code', ['TL_NRR_STD','KAM_NRR_STD']);
+    if (planErr) throw new Error(planErr.message);
+    const planMap = {};
+    const planIds = [];
+    (plans || []).forEach(p => { planMap[p.plan_code] = p; planIds.push(p.id); });
+    let ruleMap = {}, tierMap = {};
+    if (planIds.length) {
+      const { data: rules, error: ruleErr } = await supa.from('commission_rules')
+        .select('id,plan_id,metric_code,measurement_scope,payout_type,stacking_mode,active')
+        .in('plan_id', planIds)
+        .eq('metric_code', 'nrr');
+      if (ruleErr) throw new Error(ruleErr.message);
+      const ruleIds = [];
+      (rules || []).forEach(r => { ruleMap[r.plan_id] = r; ruleIds.push(r.id); });
+      if (ruleIds.length) {
+        const { data: tiers, error: tierErr } = await supa.from('commission_rule_tiers')
+          .select('id,rule_id,tier_order,min_value,max_value,payout_value,payout_label')
+          .in('rule_id', ruleIds)
+          .order('tier_order', { ascending:true });
+        if (tierErr) throw new Error(tierErr.message);
+        (tiers || []).forEach(t => {
+          if (!tierMap[t.rule_id]) tierMap[t.rule_id] = [];
+          tierMap[t.rule_id].push(t);
+        });
+      }
+    }
+    _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap };
+  } catch (e) {
+    console.warn('[Commission rules] load failed (tables may not exist yet):', e.message);
+    _commRuleConfig = { plans: {}, rules: {}, tiers: {} };
+  }
+
+  _tgtQuarterCache[quarter] = {
+    cache: { ..._tgtCache },
+    settings: { ..._tgtSettings },
+    nrrPolicies: { ..._nrrGovPolicies },
+    commRules: JSON.parse(JSON.stringify(_commRuleConfig || {})),
+    nrrExclusions: JSON.parse(JSON.stringify(_nrrExclusions || [])),
+    commissionSnapshots: JSON.parse(JSON.stringify(_commissionSnapshots || [])),
+    ts: Date.now()
+  };
+  _tgtLoaded = true;
 }
 
 function _tgtGet(period, level, email) {
@@ -20906,6 +21750,8 @@ async function openTargetSetup(mode) {
   _tgtMode = mode || 'tl';
   _tgtActiveTab = 'team';
   _tgtPendingEdits = {};
+  _nrrGovPending = {};
+  _commRulePending = {};
   if (!_tgtActiveQuarter) _tgtActiveQuarter = _tgtCurrentQuarter();
   const overlay = document.getElementById('target-setup-overlay');
   if (overlay) overlay.classList.add('open');
@@ -20952,6 +21798,8 @@ function closeTargetSetup() {
   const overlay = document.getElementById('target-setup-overlay');
   if (overlay) overlay.classList.remove('open');
   _tgtPendingEdits = {};
+  _nrrGovPending = {};
+  _commRulePending = {};
   // Refresh target-dependent views after save
   setTimeout(() => {
     try{ renderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
@@ -20992,11 +21840,30 @@ function renderTargetSheetBody() {
     renderTargetSettingsTab();
     return;
   }
+  if (_tgtActiveTab === 'policy' && _tgtMode === 'admin') {
+    renderNrrPolicyTab();
+    return;
+  }
+  if (_tgtActiveTab === 'rules' && _tgtMode === 'admin') {
+    renderPayoutRulesTab();
+    return;
+  }
+  if (_tgtActiveTab === 'preview' && _tgtMode === 'admin') {
+    renderCommissionPreviewTab();
+    return;
+  }
+  if (_tgtActiveTab === 'exclusions') {
+    renderNrrExclusionsTab();
+    return;
+  }
+  if (_tgtActiveTab === 'lock' && _tgtMode === 'admin') {
+    renderCommissionLockTab();
+    return;
+  }
   const months = _tgtQuarterMonths(_tgtActiveQuarter);
   const moLabels = months.map(_tgtMonthLabel);
   let html = '';
 
-  // Quarter nav
   html += `<div class="tgt-quarter-nav">
     <button onclick="tgtNavQuarter(-1)">‹</button>
     <div class="tgt-quarter-label">${_tgtQuarterLabel(_tgtActiveQuarter)}</div>
@@ -21015,7 +21882,6 @@ function renderTargetSheetBody() {
 
 // Admin: ตั้ง target per TL team
 function _renderAdminTLBlocks(months, moLabels) {
-  // Collect unique TLs from portviewBulkData
   const tlMap = {};
   if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
     portviewBulkData.forEach(r => {
@@ -21024,7 +21890,6 @@ function _renderAdminTLBlocks(months, moLabels) {
       if (email && !tlMap[email]) tlMap[email] = { email, name };
     });
   }
-  // Fallback: show current user as only TL if no data
   const tls = Object.values(tlMap);
   if (!tls.length && currentUserProfile) {
     tls.push({ email: currentUserProfile.email, name: currentUserProfile.full_name || currentUserProfile.email });
@@ -21046,8 +21911,7 @@ function _renderAdminTLBlocks(months, moLabels) {
           <input class="tgt-month-input" id="tgt-inp-team-${_tgtSafeId(tl.email)}-${m}"
             value="${vals[i] ? _tgtFmtInput(vals[i]) : ''}"
             placeholder="฿"
-            oninput="onTgtInput('team','${tl.email}','${m}',this.value)"
-          >
+            oninput="onTgtInput('team','${tl.email}','${m}',this.value)">
         </div>`).join('')}
       </div>
       ${anchor > 0 ? `<div class="tgt-person-anchor">Avg 3mo ทีม: <span>${_tgtFmtM(anchor)}</span></div>` : ''}
@@ -21059,11 +21923,7 @@ function _renderAdminTLBlocks(months, moLabels) {
 // TL: ตั้ง target per KAM
 function _renderTLKamBlocks(months, moLabels) {
   const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
-  // Team target (from admin) — show as reference
   const teamTargets = months.map(m => _tgtGet(m, 'team', tlEmail));
-  const teamTotal = teamTargets.reduce((s, v) => s + (v || 0), 0);
-
-  // Collect KAMs under this TL
   const kamMap = {};
   if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
     portviewBulkData.filter(r => !tlEmail || r.tlEmail === tlEmail).forEach(r => {
@@ -21073,10 +21933,8 @@ function _renderTLKamBlocks(months, moLabels) {
     });
   }
   const kams = Object.values(kamMap);
-
   let html = '';
 
-  // Per-month allocation banner
   if (teamTargets.some(v => v > 0)) {
     const allocByMonth = months.map(m => {
       let sum = 0;
@@ -21132,8 +21990,7 @@ function _renderTLKamBlocks(months, moLabels) {
           <input class="tgt-month-input" id="tgt-inp-kam-${_tgtSafeId(kam.email)}-${m}"
             value="${vals[i] ? _tgtFmtInput(vals[i]) : ''}"
             placeholder="฿"
-            oninput="onTgtInput('kam','${kam.email}','${m}',this.value)"
-          >
+            oninput="onTgtInput('kam','${kam.email}','${m}',this.value)">
         </div>`).join('')}
       </div>
       ${anchor > 0 ? `<div class="tgt-person-anchor">Avg 3mo (baseline): <span>${_tgtFmtM(anchor)}</span></div>` : ''}
@@ -21146,7 +22003,6 @@ function _renderTLKamBlocks(months, moLabels) {
   return html;
 }
 
-// Admin settings tab (NRR threshold)
 function renderTargetSettingsTab() {
   const threshold = _tgtSettings.nrr_threshold || 98;
   const body = document.getElementById('tgt-sheet-body');
@@ -21167,24 +22023,415 @@ function renderTargetSettingsTab() {
         </div>
       </div>
       <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:8px">
-        ค่าเริ่มต้น: 98% · ใช้กับทุก KAM ในทีม
+        ค่าเริ่มต้น: 98% · ใช้กับ signal ปัจจุบันของทุก KAM / TL
       </div>
     </div>
     <div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 2px">
-      การตั้ง threshold ที่นี่จะมีผลกับ NRR signal ที่แสดงในหน้า Portview ของ KAM ทุกคน
+      threshold นี้มีผลกับสี warning ในมุมมอง NRR ตอนนี้ ส่วน payout rule builder จะต่อยอดบน policy tab
     </div>`;
 }
 
-// ── Input handlers ──────────────────────────────────────────────
+function renderNrrPolicyTab() {
+  const months = _tgtQuarterMonths(_tgtActiveQuarter);
+  const body = document.getElementById('tgt-sheet-body');
+  if (!body) return;
+  if (!months.length) {
+    body.innerHTML = '<div class="tgt-policy-empty">ไม่พบช่วงเวลา</div>';
+    return;
+  }
+  body.innerHTML = `
+    <div class="tgt-quarter-nav">
+      <button onclick="tgtNavQuarter(-1)">‹</button>
+      <div class="tgt-quarter-label">Policy · ${_tgtQuarterLabel(_tgtActiveQuarter)}</div>
+      <button onclick="tgtNavQuarter(1)">›</button>
+    </div>
+    ${months.map(periodMonth => {
+      const policy = _nrrGovGetPending(periodMonth, 'all', 'all');
+      const options = _nrrGovBaseMonthOptions(periodMonth);
+      return `<div class="tgt-policy-block">
+        <div class="tgt-policy-head">
+          <div>
+            <div class="tgt-policy-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(100,170,255,.8)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2l2.2 4.8L19 9l-4.8 2.2L12 16l-2.2-4.8L5 9l4.8-2.2L12 2z"/></svg>
+              ${_nrrGovMonthLabel(periodMonth)}
+            </div>
+            <div class="tgt-policy-sub">ตั้ง logic base ของ NRR เพื่อให้ TL/KAM ใช้ commission policy เดียวกันในเดือนนั้น</div>
+          </div>
+          <span class="tgt-policy-status ${policy.status === 'published' ? 'published' : ''}">${policy.status === 'published' ? 'Published' : 'Draft'}</span>
+        </div>
+        <div class="tgt-policy-grid">
+          <div class="tgt-policy-field">
+            <label>Base mode</label>
+            <select class="tgt-policy-select" onchange="onNrrPolicyChange('${periodMonth}','base_mode',this.value)">
+              <option value="rolling_mom" ${policy.base_mode === 'rolling_mom' ? 'selected' : ''}>Rolling MoM</option>
+              <option value="fixed_month" ${policy.base_mode === 'fixed_month' ? 'selected' : ''}>Fixed base month</option>
+            </select>
+          </div>
+          <div class="tgt-policy-field">
+            <label>Base month</label>
+            <select class="tgt-policy-select" onchange="onNrrPolicyChange('${periodMonth}','base_month',this.value)" ${policy.base_mode === 'fixed_month' ? '' : 'disabled'}>
+              ${options.map(opt => `<option value="${opt}" ${policy.base_month === opt ? 'selected' : ''}>${_nrrGovMonthLabel(opt)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="tgt-policy-field">
+            <label>Status</label>
+            <select class="tgt-policy-select" onchange="onNrrPolicyChange('${periodMonth}','status',this.value)">
+              <option value="draft" ${policy.status === 'draft' ? 'selected' : ''}>Draft</option>
+              <option value="published" ${policy.status === 'published' ? 'selected' : ''}>Published</option>
+            </select>
+          </div>
+          <div class="tgt-policy-field">
+            <label>Apply to</label>
+            <input class="tgt-policy-input" value="All teams (v208 foundation)" disabled>
+          </div>
+        </div>
+        <div class="tgt-policy-note">รองรับ use case เช่น Q2 ใช้ Apr เป็น base สำหรับ May/Jun หรือ Q3 ใช้ Jun เป็น base สำหรับ Jul/Aug/Sep ได้แล้วในระดับ policy. การตั้ง per TL / per KAM จะต่อใน phase ถัดไปบน data model เดียวกัน</div>
+      </div>`;
+    }).join('')}`;
+}
+
+
+
+
+
+function renderCommissionLockTab() {
+  const body = document.getElementById('tgt-sheet-body');
+  if (!body) return;
+  const period = _nrrExclusionCurrentPeriod();
+  const rows = _commBuildSnapshotRows();
+  const finalRows = (_commissionSnapshots || []).filter(r => r.period_month === period && r.snapshot_status === 'final');
+  const pending = (_nrrExclusions || []).filter(r => r.period_month === period && (r.status === 'submitted' || r.status === 'pending')).length;
+  const total = rows.reduce((s,r)=>s+Number(r.payout_amount || 0),0);
+  const finalTotal = finalRows.reduce((s,r)=>s+Number(r.payout_amount || 0),0);
+  const isLocked = finalRows.length > 0;
+  body.innerHTML = `
+    <div class="tgt-lock-hero">
+      <div class="tgt-lock-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(188,215,255,.95)" stroke-width="2.3" stroke-linecap="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Period Lock & Snapshot
+      </div>
+      <div class="tgt-lock-sub">Freeze current governed NRR + payout estimate into commission_payout_snapshots. ใช้เป็นฐานสำหรับ export / dispute / revision ต่อไป</div>
+      <span class="tgt-lock-status ${isLocked ? 'final' : ''}">${isLocked ? `Locked · ${finalRows.length} rows · ${_commFmtPayout(finalTotal)}` : `Draft preview · ${rows.length} rows · ${_commFmtPayout(total)}`}</span>
+      ${pending ? `<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้ รายการ pending จะไม่ถูกนับใน governed NRR final</div>` : ''}
+      <div class="tgt-lock-actions">
+        <button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button>
+        <button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">${isLocked ? 'Re-lock / revise snapshot' : 'Lock snapshot'}</button>
+      </div>
+    </div>
+    ${rows.length ? `<div class="tgt-snap-table-wrap">
+      <table class="tgt-snap-table">
+        <thead><tr><th>Role</th><th>Beneficiary</th><th>TL</th><th>Raw</th><th>Governed</th><th>Payout</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td><span class="tgt-snap-role ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</span></td>
+            <td><div class="tgt-snap-name">${r.breakdown?.kam_name || r.breakdown?.team_lead_name || r.beneficiary_email}</div><div class="tgt-preview-meta">${r.beneficiary_email}</div></td>
+            <td>${r.team_lead_email || '—'}</td>
+            <td class="tgt-snap-mono">${r.raw_nrr_pct !== null && r.raw_nrr_pct !== undefined ? r.raw_nrr_pct + '%' : '—'}</td>
+            <td class="tgt-snap-mono">${r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct + '%' : '—'}</td>
+            <td class="tgt-snap-mono">${_commFmtPayout(r.payout_amount)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : `<div class="tgt-lock-empty">ยังไม่มีข้อมูลสำหรับ snapshot</div>`}
+    <div class="tgt-rule-note">v208e ยังเป็น snapshot layer — ถ้าต้องแก้หลัง lock จะใช้ re-lock/revision log ใน phase ถัดไป</div>
+  `;
+}
+
+
+function renderNrrExclusionsTab() {
+  const body = document.getElementById('tgt-sheet-body');
+  if (!body) return;
+  const role = (currentUserProfile && currentUserProfile.role) || '';
+  const isAdmin = role === 'admin';
+  const current = _nrrExclusionCurrentPeriod();
+  const rows = (_nrrExclusions || []).filter(r => !current || r.period_month === current);
+  const filtered = rows.filter(r => {
+    if (_nrrExclusionView === 'pending') return r.status === 'submitted' || r.status === 'pending';
+    if (_nrrExclusionView === 'approved') return r.status === 'approved';
+    if (_nrrExclusionView === 'rejected') return r.status === 'rejected';
+    return true;
+  });
+  const pendingCount = rows.filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  const approvedCount = rows.filter(r => r.status === 'approved').length;
+  const impact = rows.filter(r => r.status === 'approved').reduce((s,r)=>s+Number(r.base_gmv || r.estimated_base_gmv || 0),0);
+  body.innerHTML = `
+    <div class="tgt-excl-head">
+      <div>
+        <div class="tgt-excl-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(240,176,0,.9)" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          NRR Exclusion Governance
+        </div>
+        <div class="tgt-excl-sub">TL request ได้ แต่ Admin เท่านั้นที่ approve/reject แล้วจึงกระทบ Governed NRR</div>
+      </div>
+      <span class="tgt-rule-pill">${_nrrGovMonthLabel(current)}</span>
+    </div>
+    <div class="tgt-preview-grid" style="margin-bottom:12px">
+      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Pending</div><div class="tgt-preview-kpi-val">${pendingCount}</div></div>
+      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Approved</div><div class="tgt-preview-kpi-val">${approvedCount}</div></div>
+      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Base impact</div><div class="tgt-preview-kpi-val">${_tgtFmtM(impact)}</div></div>
+    </div>
+    <div class="tgt-excl-tabs">
+      ${['pending','approved','rejected','all'].map(v=>`<button class="tgt-excl-tab ${_nrrExclusionView===v?'active':''}" onclick="setNrrExclusionView('${v}')">${v==='pending'?'Pending':v==='approved'?'Approved':v==='rejected'?'Rejected':'All'}</button>`).join('')}
+    </div>
+    ${filtered.length ? filtered.map(r=>_renderNrrExclusionCard(r,isAdmin)).join('') : `<div class="tgt-preview-empty">ไม่มีรายการในสถานะนี้</div>`}
+    <div class="tgt-rule-note">ตอนนี้ใช้ base impact จาก request estimate ก่อน รอบ lock จะสร้าง immutable snapshot แยกต่างหาก</div>
+  `;
+}
+function _renderNrrExclusionCard(r, isAdmin) {
+  const status = r.status === 'pending' ? 'submitted' : r.status;
+  const base = Number(r.base_gmv || r.estimated_base_gmv || 0);
+  const payoutImpact = 0; // precise payout delta will be calculated at snapshot phase
+  return `<div class="tgt-excl-card ${status === 'submitted' ? 'pending' : status}">
+    <div class="tgt-excl-top">
+      <div>
+        <div class="tgt-excl-name">${r.account_id || 'Account'} ${r.outlet_id ? '· '+r.outlet_id : ''}</div>
+        <div class="tgt-excl-meta">${_nrrReasonLabel(r.reason_code)} · KAM ${r.target_kam_email || '—'} · TL ${r.target_tl_email || '—'}</div>
+      </div>
+      <span class="tgt-excl-status ${status === 'submitted' ? 'pending' : status}">${_nrrExclusionStatusLabel(status)}</span>
+    </div>
+    ${r.reason_text ? `<div class="tgt-excl-meta" style="margin-top:7px">${r.reason_text}</div>` : ''}
+    <div class="tgt-excl-impact">
+      <span class="tgt-excl-chip">Base ${_tgtFmtM(base)}</span>
+      <span class="tgt-excl-chip good">Governed NRR impact after approval</span>
+      <span class="tgt-excl-chip money">Payout impact calculated in preview</span>
+    </div>
+    ${isAdmin && status === 'submitted' ? `<div class="tgt-excl-actions">
+      <button class="tgt-excl-action approve" onclick="reviewNrrExclusion('${r.id}','approved')">Approve</button>
+      <button class="tgt-excl-action reject" onclick="reviewNrrExclusion('${r.id}','rejected')">Reject</button>
+    </div>` : ''}
+  </div>`;
+}
+function setNrrExclusionView(v) {
+  _nrrExclusionView = v;
+  renderNrrExclusionsTab();
+}
+function openNrrExclusionSheetFromKam(kamEmail, accountId, accountName, baseGmv, tlEmail) {
+  _nrrExclusionDraft = {
+    period_month: _nrrExclusionCurrentPeriod(),
+    account_id: accountId || accountName || '',
+    account_name: accountName || accountId || '',
+    target_kam_email: kamEmail || '',
+    target_tl_email: tlEmail || '',
+    base_gmv: Number(baseGmv || 0)
+  };
+  const ov = document.getElementById('nrr-excl-overlay');
+  const acc = document.getElementById('nrr-excl-account');
+  const note = document.getElementById('nrr-excl-note');
+  const reason = document.getElementById('nrr-excl-reason');
+  if (acc) acc.value = `${_nrrExclusionDraft.account_name || _nrrExclusionDraft.account_id} · base ${_tgtFmtM(_nrrExclusionDraft.base_gmv)}`;
+  if (note) note.value = '';
+  if (reason) reason.value = 'closed_business';
+  if (ov) ov.classList.add('open');
+}
+function closeNrrExclusionSheet() {
+  const ov = document.getElementById('nrr-excl-overlay');
+  if (ov) ov.classList.remove('open');
+  _nrrExclusionDraft = null;
+}
+async function submitNrrExclusionRequest() {
+  if (!_nrrExclusionDraft) return;
+  const reason = document.getElementById('nrr-excl-reason')?.value || 'other';
+  const note = document.getElementById('nrr-excl-note')?.value || '';
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  const row = {
+    period_month: _nrrExclusionDraft.period_month,
+    account_id: _nrrExclusionDraft.account_id,
+    outlet_id: null,
+    applies_to: 'both',
+    target_kam_email: _nrrExclusionDraft.target_kam_email,
+    target_tl_email: _nrrExclusionDraft.target_tl_email,
+    reason_code: reason,
+    reason_text: note,
+    status: 'submitted',
+    requested_by: actor,
+    requested_at: new Date().toISOString(),
+    base_gmv: _nrrExclusionDraft.base_gmv,
+    estimated_base_gmv: _nrrExclusionDraft.base_gmv
+  };
+  try {
+    const { data, error } = await supa.from('nrr_exclusions').insert(row).select('*').single();
+    if (error) throw new Error(error.message);
+    _nrrExclusions.push(data || row);
+    closeNrrExclusionSheet();
+    if (typeof showToast === 'function') showToast('ส่งคำขอ exclusion แล้ว', 'ok');
+    try { renderTeamviewSummary(); renderTeamviewKamList(); } catch(e) {}
+  } catch (e) {
+    console.error('[NRR exclusion] submit failed:', e);
+    if (typeof showToast === 'function') showToast('ส่งคำขอไม่สำเร็จ: ' + (e.message || ''), '!');
+  }
+}
+async function reviewNrrExclusion(id, status) {
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  try {
+    const { data, error } = await supa.from('nrr_exclusions')
+      .update({ status, reviewed_by: actor, reviewed_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw new Error(error.message);
+    _nrrExclusions = (_nrrExclusions || []).map(r => r.id === id ? (data || { ...r, status }) : r);
+    renderNrrExclusionsTab();
+    try { renderTeamviewSummary(); renderTeamviewKamList(); renderCommissionPreviewTab(); } catch(e) {}
+  } catch (e) {
+    console.error('[NRR exclusion] review failed:', e);
+    if (typeof showToast === 'function') showToast('อัปเดตไม่สำเร็จ: ' + (e.message || ''), '!');
+  }
+}
+
+
+function renderCommissionPreviewTab() {
+  const body = document.getElementById('tgt-sheet-body');
+  if (!body) return;
+  const model = _commBuildPreviewModel();
+  if (!model.kamRows.length && model.teamPct === null) {
+    body.innerHTML = `<div class="tgt-preview-empty">ยังไม่มีข้อมูลพอสำหรับ preview<br><span style="font-size:10px;color:rgba(255,255,255,.32)">โหลด portview.csv / history ก่อน แล้วกลับมาที่หน้านี้</span></div>`;
+    return;
+  }
+  const teamTier = _commMatchTier('tl', model.teamPct);
+  body.innerHTML = `
+    <div class="tgt-preview-hero">
+      <div class="tgt-preview-head">
+        <div>
+          <div class="tgt-preview-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(100,170,255,.9)" stroke-width="2.2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 5-8"/></svg>
+            Commission Preview
+          </div>
+          <div class="tgt-preview-sub">Estimate จาก NRR ปัจจุบัน + payout tier ที่ admin ตั้งไว้ ยังไม่ใช่ยอดจ่าย final</div>
+        </div>
+        <div class="tgt-preview-total">
+          <div class="tgt-preview-total-label">Exposure</div>
+          <div class="tgt-preview-total-val">${_commFmtPayout(model.totalExposure)}</div>
+        </div>
+      </div>
+      <div class="tgt-preview-grid">
+        <div class="tgt-preview-kpi">
+          <div class="tgt-preview-kpi-label">Team NRR</div>
+          <div class="tgt-preview-kpi-val">${model.teamPct !== null ? model.teamPct + '%' : '—'}</div>
+        </div>
+        <div class="tgt-preview-kpi">
+          <div class="tgt-preview-kpi-label">TL payout</div>
+          <div class="tgt-preview-kpi-val">${_commFmtPayout(model.tlPayout)}</div>
+        </div>
+        <div class="tgt-preview-kpi">
+          <div class="tgt-preview-kpi-label">KAM payout</div>
+          <div class="tgt-preview-kpi-val">${_commFmtPayout(model.kamTotal)}</div>
+        </div>
+      </div>
+      <div class="tgt-rule-note">TL tier: ${teamTier ? (teamTier.payout_label || 'matched tier') : 'no matched tier'} · Governed NRR currently equals Raw NRR until exclusion workflow is active</div>
+    </div>
+    <div class="tgt-preview-section-title">
+      <span>KAM payout estimate</span>
+      <span style="font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.42)">${model.kamRows.length} KAM</span>
+    </div>
+    ${model.kamRows.map(r => {
+      const cls = r.pct === null ? '' : (r.pct >= (_tgtSettings.nrr_threshold || 98) ? 'ok' : 'warn');
+      return `<div class="tgt-preview-row">
+        <div class="tgt-preview-row-top">
+          <div>
+            <div class="tgt-preview-name">${r.kamName || r.kamEmail || 'ไม่ระบุ'}</div>
+            <div class="tgt-preview-meta">${r.accounts || 0} accounts · ${r.kamEmail || ''}</div>
+          </div>
+          <div class="tgt-preview-payout">${_commFmtPayout(r.payout)}</div>
+        </div>
+        <div class="tgt-preview-row-bottom">
+          <span class="tgt-preview-chip ${cls}">NRR ${r.pct !== null ? r.pct + '%' : '—'}</span>
+          <span class="tgt-preview-chip">Tier ${r.tierLabel || '—'}</span>
+          <span class="tgt-preview-chip">Pace ${r.pace !== null ? r.pace + '%' : '—'}</span>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+
+function renderPayoutRulesTab() {
+  const body = document.getElementById('tgt-sheet-body');
+  if (!body) return;
+  const roles = ['tl','kam'];
+  body.innerHTML = `
+    <div class="tgt-rule-note" style="margin:0 2px 12px">
+      Admin ตั้ง NRR payout tier ได้จากตรงนี้ รอบนี้รองรับ standard plan สำหรับ TL และ KAM ก่อน ส่วน assignment per TL / KAM-under-TL จะต่อยอด phase ถัดไป
+    </div>
+    ${roles.map(role => _renderPayoutRuleBlock(role)).join('')}`;
+}
+function _renderPayoutRuleBlock(role) {
+  const d = _commGetDraft(role);
+  const title = role === 'tl' ? 'TL NRR Commission' : 'KAM NRR Commission';
+  const sub = role === 'tl'
+    ? 'ใช้กับ Team Lead payout จาก Team Governed NRR'
+    : 'ใช้กับ KAM payout จาก Individual Governed NRR';
+  return `<div class="tgt-rule-block" data-role="${role}">
+    <div class="tgt-rule-head">
+      <div>
+        <div class="tgt-rule-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(0,208,112,.75)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          ${title}
+        </div>
+        <div class="tgt-rule-sub">${sub}</div>
+      </div>
+      <span class="tgt-rule-pill">${d.measurement_scope === 'governed_nrr' ? 'Governed NRR' : 'Raw NRR'}</span>
+    </div>
+    <div class="tgt-rule-grid">
+      <div class="tgt-rule-field">
+        <label>Plan name</label>
+        <input class="tgt-rule-input" value="${d.plan_name || ''}" oninput="onPayoutRuleHeader('${role}','plan_name',this.value)">
+      </div>
+      <div class="tgt-rule-field">
+        <label>Payout type</label>
+        <select class="tgt-rule-select" onchange="onPayoutRuleHeader('${role}','payout_type',this.value)">
+          <option value="flat_amount" ${d.payout_type === 'flat_amount' ? 'selected' : ''}>Flat amount</option>
+          <option value="bonus_amount" ${d.payout_type === 'bonus_amount' ? 'selected' : ''}>Bonus amount</option>
+        </select>
+      </div>
+    </div>
+    <table class="tgt-rule-table">
+      <thead><tr><th style="width:22%">Min %</th><th style="width:22%">Max %</th><th style="width:24%">Payout</th><th>Label</th><th style="width:30px"></th></tr></thead>
+      <tbody>
+        ${(d.tiers || []).map((t, i) => `<tr>
+          <td><input class="tgt-rule-tier-input" value="${t.min_value ?? ''}" placeholder="-" oninput="onPayoutTierInput('${role}',${i},'min_value',this.value)"></td>
+          <td><input class="tgt-rule-tier-input" value="${t.max_value ?? ''}" placeholder="∞" oninput="onPayoutTierInput('${role}',${i},'max_value',this.value)"></td>
+          <td><input class="tgt-rule-tier-input" value="${t.payout_value ?? 0}" oninput="onPayoutTierInput('${role}',${i},'payout_value',this.value)"></td>
+          <td><input class="tgt-rule-tier-label" value="${t.payout_label || ''}" oninput="onPayoutTierInput('${role}',${i},'payout_label',this.value)"></td>
+          <td><button class="tgt-rule-del" onclick="removePayoutTier('${role}',${i})">×</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <button class="tgt-rule-add" onclick="addPayoutTier('${role}')">+ เพิ่ม tier</button>
+    <div class="tgt-rule-note">ช่วง tier ใช้หลัก min inclusive / max exclusive เช่น 98.5 ถึง 99.0 หมายถึง ≥98.5 และ &lt;99.0</div>
+  </div>`;
+}
+function onPayoutRuleHeader(role, field, value) {
+  const d = _commGetDraft(role);
+  d[field] = value;
+  _commSetDraft(role, d);
+}
+function onPayoutTierInput(role, idx, field, value) {
+  const d = _commGetDraft(role);
+  if (!d.tiers[idx]) return;
+  if (field === 'payout_label') d.tiers[idx][field] = value;
+  else d.tiers[idx][field] = value === '' ? null : Number(value);
+  _commSetDraft(role, d);
+}
+function addPayoutTier(role) {
+  const d = _commGetDraft(role);
+  d.tiers.push({ min_value:null, max_value:null, payout_value:0, payout_label:'New tier' });
+  _commSetDraft(role, d);
+  renderPayoutRulesTab();
+}
+function removePayoutTier(role, idx) {
+  const d = _commGetDraft(role);
+  d.tiers.splice(idx, 1);
+  _commSetDraft(role, d);
+  renderPayoutRulesTab();
+}
+
+
 function onTgtInput(level, email, period, rawVal) {
   const key = `${period}|${level}|${email}`;
   const v = _tgtParseInput(rawVal);
   _tgtPendingEdits[key] = v;
-  // Mark input changed
   const inpId = `tgt-inp-${level}-${_tgtSafeId(email)}-${period}`;
   const inp = document.getElementById(inpId);
   if (inp) inp.classList.toggle('changed', v > 0);
-  // Refresh allocation bar if TL mode
   if (_tgtMode === 'tl') _tgtRefreshAllocBar();
 }
 
@@ -21193,6 +22440,15 @@ function onTgtNrrInput(val) {
   if (v >= 50 && v <= 110) {
     _tgtPendingEdits['__nrr_threshold'] = v;
   }
+}
+
+function onNrrPolicyChange(periodMonth, field, value) {
+  const key = _nrrGovKey(periodMonth, 'all', 'all');
+  const current = _nrrGovGetPending(periodMonth, 'all', 'all');
+  const next = { ...current, [field]: value };
+  if (field === 'base_mode' && value === 'rolling_mom') next.base_month = _nrrGovPrevMonth(periodMonth);
+  _nrrGovPending[key] = next;
+  if (field === 'base_mode') renderNrrPolicyTab();
 }
 
 function _tgtRefreshAllocBar() {
@@ -21243,9 +22499,8 @@ async function saveTargets() {
     if (key === '__nrr_threshold') return;
     const [period, level, email] = key.split('|');
     if (!period || !level || !email) return;
-    // Determine quarter from period
     const [y, mo] = period.split('-');
-    const q = Math.ceil(parseInt(mo) / 3);
+    const q = Math.ceil(parseInt(mo, 10) / 3);
     upsertRows.push({
       period,
       quarter: `${y}-Q${q}`,
@@ -21257,6 +22512,17 @@ async function saveTargets() {
     });
   });
 
+  const policyRows = Object.values(_nrrGovPending).map(p => ({
+    period_month: p.period_month,
+    scope_type: p.scope_type || 'all',
+    scope_key: p.scope_key || 'all',
+    base_mode: p.base_mode || 'rolling_mom',
+    base_month: p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
+    status: p.status || 'draft',
+    updated_by: setBy,
+    updated_at: new Date().toISOString()
+  }));
+
   try {
     if (upsertRows.length > 0) {
       const { error } = await supa.from('targets').upsert(upsertRows, {
@@ -21264,23 +22530,93 @@ async function saveTargets() {
       });
       if (error) throw new Error(error.message);
     }
-    // Save NRR threshold if changed
     if (_tgtPendingEdits['__nrr_threshold'] !== undefined) {
       const v = _tgtPendingEdits['__nrr_threshold'];
-      await supa.from('target_settings').upsert({
+      const { error: settingsErr } = await supa.from('target_settings').upsert({
         key: 'nrr_threshold',
         value: String(v),
         updated_by: setBy,
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
+      if (settingsErr) throw new Error(settingsErr.message);
       _tgtSettings.nrr_threshold = v;
     }
-    // Apply to local cache
+    if (policyRows.length > 0) {
+      const { error: policyErr } = await supa.from('nrr_policies').upsert(policyRows, {
+        onConflict: 'period_month,scope_type,scope_key'
+      });
+      if (policyErr) throw new Error(policyErr.message);
+      policyRows.forEach(r => {
+        _nrrGovPolicies[_nrrGovKey(r.period_month, r.scope_type, r.scope_key)] = { ...r };
+      });
+      _nrrGovPending = {};
+    }
+
+    for (const draft of Object.values(_commRulePending)) {
+      const planPayload = {
+        plan_code: draft.plan_code,
+        plan_name: draft.plan_name || _commPlanName(draft.role),
+        beneficiary_role: draft.beneficiary_role || draft.role,
+        status: 'active',
+        updated_by: setBy,
+        updated_at: new Date().toISOString()
+      };
+      const { data: planRows, error: planErr } = await supa.from('commission_plans')
+        .upsert(planPayload, { onConflict: 'plan_code' })
+        .select('id,plan_code,plan_name,beneficiary_role,status')
+        .single();
+      if (planErr) throw new Error(planErr.message);
+      const plan = planRows;
+      const { data: existingRules, error: exRuleErr } = await supa.from('commission_rules')
+        .select('id')
+        .eq('plan_id', plan.id)
+        .eq('metric_code', 'nrr')
+        .limit(1);
+      if (exRuleErr) throw new Error(exRuleErr.message);
+      let ruleId = existingRules && existingRules[0] && existingRules[0].id;
+      if (ruleId) {
+        const { error: updRuleErr } = await supa.from('commission_rules').update({
+          measurement_scope: draft.measurement_scope || 'governed_nrr',
+          payout_type: draft.payout_type || 'flat_amount',
+          stacking_mode: 'best_match',
+          active: true,
+          updated_at: new Date().toISOString()
+        }).eq('id', ruleId);
+        if (updRuleErr) throw new Error(updRuleErr.message);
+      } else {
+        const { data: ruleRow, error: insRuleErr } = await supa.from('commission_rules').insert({
+          plan_id: plan.id,
+          metric_code: 'nrr',
+          measurement_scope: draft.measurement_scope || 'governed_nrr',
+          payout_type: draft.payout_type || 'flat_amount',
+          stacking_mode: 'best_match',
+          active: true
+        }).select('id').single();
+        if (insRuleErr) throw new Error(insRuleErr.message);
+        ruleId = ruleRow.id;
+      }
+      const { error: delTierErr } = await supa.from('commission_rule_tiers').delete().eq('rule_id', ruleId);
+      if (delTierErr) throw new Error(delTierErr.message);
+      const tierRows = (draft.tiers || []).map((t, idx) => ({
+        rule_id: ruleId,
+        tier_order: idx + 1,
+        min_value: t.min_value === '' ? null : t.min_value,
+        max_value: t.max_value === '' ? null : t.max_value,
+        payout_value: Number(t.payout_value || 0),
+        payout_label: t.payout_label || ''
+      }));
+      if (tierRows.length) {
+        const { error: tierErr } = await supa.from('commission_rule_tiers').insert(tierRows);
+        if (tierErr) throw new Error(tierErr.message);
+      }
+      _commRuleConfig.plans[draft.plan_code] = plan;
+    }
+    _commRulePending = {};
+
     upsertRows.forEach(r => {
       _tgtCache[`${r.period}|${r.level}|${r.for_email}`] = r.gmv_target;
     });
     _tgtPendingEdits = {};
-    // Invalidate cache for this quarter — next open will re-fetch fresh data
     if (_tgtActiveQuarter) delete _tgtQuarterCache[_tgtActiveQuarter];
     if (status) { status.textContent = '✓ บันทึกสำเร็จ'; status.className = 'tgt-status ok'; status.style.display = 'block'; }
     setTimeout(() => closeTargetSetup(), 900);
