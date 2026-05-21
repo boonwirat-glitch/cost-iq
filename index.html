@@ -206,7 +206,7 @@
         <div class="comm-title">Commission Cockpit</div>
         <div class="comm-sub">ตั้ง policy, assign plan, review payout, lock snapshot ใน flow เดียว</div>
       </div>
-      <button class="comm-close" onclick="closeCommissionCockpit()">×</button>
+      <button class="comm-close" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">×</button>
     </div>
     <div class="comm-steps">
       <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
@@ -217,7 +217,7 @@
     </div>
     <div class="comm-body" id="commission-cockpit-body"></div>
     <div class="comm-footer">
-      <button class="comm-secondary" onclick="closeCommissionCockpit()">Close</button>
+      <button class="comm-secondary" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">Close</button>
       <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
     </div>
   </div>
@@ -21585,6 +21585,139 @@ function _updateRestSwipe(grp,idx,opts){
   display:flex !important;
 }
 
+
+/* v209f Commission Cockpit shell repair */
+#commission-cockpit-overlay.comm-overlay{
+  align-items:center !important;
+  justify-content:center !important;
+  padding:18px 0 !important;
+  box-sizing:border-box !important;
+}
+#commission-cockpit-overlay .comm-sheet{
+  position:relative !important;
+  width:min(100vw - 24px, 430px) !important;
+  max-width:430px !important;
+  height:min(86vh, 760px) !important;
+  max-height:760px !important;
+  border-radius:22px !important;
+  overflow:hidden !important;
+}
+#commission-cockpit-overlay .comm-head{
+  padding:14px 16px 10px !important;
+}
+#commission-cockpit-overlay .comm-title{
+  font-size:17px !important;
+}
+#commission-cockpit-overlay .comm-sub{
+  max-width:310px;
+}
+#commission-cockpit-overlay .comm-close{
+  position:absolute !important;
+  top:14px !important;
+  right:14px !important;
+  z-index:5 !important;
+  width:34px !important;
+  height:34px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
+#commission-cockpit-overlay .comm-body{
+  padding:14px 12px 88px !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+}
+#commission-cockpit-overlay .comm-footer{
+  position:absolute !important;
+  left:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  padding:10px 12px 12px !important;
+  box-sizing:border-box !important;
+  display:grid !important;
+  grid-template-columns:72px 1fr !important;
+  gap:8px !important;
+}
+#commission-cockpit-overlay .comm-secondary,
+#commission-cockpit-overlay .comm-save{
+  width:100% !important;
+  min-width:0 !important;
+  border-radius:13px !important;
+  padding:13px 10px !important;
+}
+#commission-cockpit-overlay .comm-steps{
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+}
+#commission-cockpit-overlay .comm-step{
+  font-size:9px !important;
+  padding:10px 3px 9px !important;
+}
+#commission-cockpit-overlay .comm-card,
+#commission-cockpit-overlay .comm-hero{
+  border-radius:14px !important;
+}
+#commission-cockpit-overlay .comm-grid2{
+  grid-template-columns:1fr !important;
+}
+#commission-cockpit-overlay .comm-select{
+  appearance:auto !important;
+  -webkit-appearance:menulist !important;
+  padding-right:32px !important;
+  min-width:0 !important;
+  max-width:100% !important;
+}
+#commission-cockpit-overlay .comm-person-row{
+  grid-template-columns:1fr !important;
+  gap:7px !important;
+}
+#commission-cockpit-overlay .comm-person-row .comm-select{
+  width:100% !important;
+}
+#commission-cockpit-overlay .comm-tier-row{
+  grid-template-columns:.7fr .7fr .9fr 1fr 24px !important;
+  gap:5px !important;
+}
+#commission-cockpit-overlay .comm-input{
+  min-width:0 !important;
+  padding:9px 8px !important;
+  font-size:11px !important;
+}
+.comm-plan-tools{
+  display:flex;
+  gap:7px;
+  margin-top:9px;
+}
+.comm-mini-btn{
+  border:1px solid rgba(255,198,56,.22);
+  background:rgba(255,198,56,.09);
+  color:#ffe08a;
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:10px;
+  font-weight:850;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  cursor:pointer;
+}
+.comm-plan-note{
+  margin-top:7px;
+  font-size:9px;
+  color:rgba(255,255,255,.38);
+  line-height:1.4;
+}
+@media(max-width:430px){
+  #commission-cockpit-overlay.comm-overlay{
+    align-items:flex-end !important;
+    padding:0 !important;
+  }
+  #commission-cockpit-overlay .comm-sheet{
+    width:100vw !important;
+    max-width:100vw !important;
+    height:88vh !important;
+    border-radius:22px 22px 0 0 !important;
+  }
+}
+
 </style>
 
 <!-- Target Setup Overlay HTML -->
@@ -22691,7 +22824,7 @@ function ensureCommissionCockpitOverlay() {
           <div class="comm-title">Commission Cockpit</div>
           <div class="comm-sub">ตั้ง policy, assign plan, review payout, lock snapshot ใน flow เดียว</div>
         </div>
-        <button class="comm-close" onclick="closeCommissionCockpit()">×</button>
+        <button class="comm-close" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">×</button>
       </div>
       <div class="comm-steps">
         <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
@@ -22702,7 +22835,7 @@ function ensureCommissionCockpitOverlay() {
       </div>
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
-        <button class="comm-secondary" onclick="closeCommissionCockpit()">Close</button>
+        <button class="comm-secondary" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">Close</button>
         <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
       </div>
     </div>
@@ -22745,8 +22878,29 @@ window.openCommissionCockpit = openCommissionCockpit;
 
 function closeCommissionCockpit() {
   const ov = document.getElementById('commission-cockpit-overlay');
-  if (ov) ov.classList.remove('open');
+  if (ov) {
+    ov.classList.remove('open');
+    ov.style.display = 'none';
+    ov.style.pointerEvents = 'none';
+  }
 }
+window.closeCommissionCockpit = closeCommissionCockpit;
+
+(function(){
+  if (window.__commCloseClickBound) return;
+  window.__commCloseClickBound = true;
+  document.addEventListener('click', function(e){
+    const closeBtn = e.target && e.target.closest && e.target.closest('[data-comm-close="1"], .comm-close, .comm-secondary');
+    if (!closeBtn) return;
+    const ov = document.getElementById('commission-cockpit-overlay');
+    if (ov && ov.contains(closeBtn)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.closeCommissionCockpit === 'function') window.closeCommissionCockpit();
+    }
+  }, true);
+})();
+
 function switchCommissionStep(step) {
   _commCockpitStep = step;
   renderCommissionCockpit();
@@ -22769,6 +22923,42 @@ function _commGetAssignmentPlan(period, scope, assignee, role) {
 function _commSetAssignment(period, scope, assignee, planCode) {
   _commAssignmentPending[_commAssignmentKey(period, scope, assignee)] = planCode;
 }
+
+function _commCloneLocalPlan(role, baseCode, ownerLabel) {
+  const baseDraft = _commGetDraft(role);
+  const clean = String(ownerLabel || role || 'Custom').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,24) || 'Custom';
+  const code = `${role.toUpperCase()}_NRR_${clean}_${Date.now().toString().slice(-5)}`;
+  const planName = `${ownerLabel || clean} NRR Plan`;
+  _commRulePending[code] = {
+    ...JSON.parse(JSON.stringify(baseDraft)),
+    role,
+    plan_code: code,
+    plan_name: planName,
+    beneficiary_role: role
+  };
+  if (!_commRuleConfig.plans) _commRuleConfig.plans = {};
+  _commRuleConfig.plans[code] = {
+    id: null,
+    plan_code: code,
+    plan_name: planName,
+    beneficiary_role: role,
+    status:'draft'
+  };
+  return code;
+}
+function cloneTlPlanForAssignment(tlEmail, tlName) {
+  const period = _nrrExclusionCurrentPeriod();
+  const code = _commCloneLocalPlan('tl', _commPlanCode('tl'), tlName || tlEmail);
+  _commSetAssignment(period, 'tl', tlEmail, code);
+  renderCommissionCockpit();
+}
+function cloneKamPlanForAssignment(kamEmail, kamName) {
+  const period = _nrrExclusionCurrentPeriod();
+  const code = _commCloneLocalPlan('kam', _commPlanCode('kam'), kamName || kamEmail);
+  _commSetAssignment(period, 'kam', kamEmail, code);
+  renderCommissionCockpit();
+}
+
 function _commPlanNameByCode(code, role) {
   const p = ((_commRuleConfig && _commRuleConfig.plans) || {})[code];
   return p ? p.plan_name : (code || _commPlanName(role));
@@ -22861,6 +23051,8 @@ function renderCommAssignmentStep(body) {
       <div class="comm-field" style="margin-top:10px"><label>Assigned TL plan</label><select class="comm-select" onchange="_commSetAssignment('${period}','tl','${t.email}',this.value)">
         ${tlPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'tl',t.email,'tl')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
       </select></div>
+      <div class="comm-plan-tools"><button class="comm-mini-btn" onclick="cloneTlPlanForAssignment('${t.email}','${(t.name||t.email).replace(/'/g,'')}')">Clone custom TL plan</button></div>
+      <div class="comm-plan-note">ใช้เมื่อต้องการ criteria/payout ของ TL คนนี้ต่างจากคนอื่น</div>
     </div>`).join('') || `<div class="comm-empty">ไม่พบ TL</div>`}
     <div class="comm-section-title">KAM plans by team</div>
     ${tls.map(t=>{
@@ -22869,9 +23061,12 @@ function renderCommAssignmentStep(body) {
         <div class="comm-team-header"><div><div class="comm-name">${t.name||t.email}</div><div class="comm-meta">${kams.length} KAM under team</div></div></div>
         ${kams.map(g=>`<div class="comm-person-row">
           <div><div class="comm-person-name">${g.kamName||g.kamEmail}</div><div class="comm-person-sub">${g.kamEmail}</div></div>
-          <select class="comm-select" style="width:190px" onchange="_commSetAssignment('${period}','kam','${g.kamEmail}',this.value)">
-            ${kamPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'kam',g.kamEmail,'kam')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
-          </select>
+          <div>
+            <select class="comm-select" onchange="_commSetAssignment('${period}','kam','${g.kamEmail}',this.value)">
+              ${kamPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'kam',g.kamEmail,'kam')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
+            </select>
+            <div class="comm-plan-tools"><button class="comm-mini-btn" onclick="cloneKamPlanForAssignment('${g.kamEmail}','${(g.kamName||g.kamEmail).replace(/'/g,'')}')">Clone custom KAM plan</button></div>
+          </div>
         </div>`).join('') || `<div class="comm-empty">ไม่มี KAM ใต้ทีมนี้</div>`}
       </div>`;
     }).join('')}`;
@@ -22965,6 +23160,35 @@ async function saveCommissionAssignments() {
   const entries = Object.entries(_commAssignmentPending || {});
   if (!entries.length) return;
   const actor = (currentUserProfile && currentUserProfile.email) || '';
+  // Persist any locally cloned plan first so assignment has a real plan_id.
+  for (const [, planCode] of entries) {
+    const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode];
+    if (plan && !plan.id) {
+      const draft = _commRulePending[planCode] || {
+        role: plan.beneficiary_role,
+        plan_code: plan.plan_code,
+        plan_name: plan.plan_name,
+        beneficiary_role: plan.beneficiary_role,
+        payout_type:'flat_amount',
+        measurement_scope:'governed_nrr',
+        tiers:_commDefaultTiers(plan.beneficiary_role)
+      };
+      const { data: savedPlan, error: planErr } = await supa.from('commission_plans')
+        .upsert({
+          plan_code: draft.plan_code,
+          plan_name: draft.plan_name,
+          beneficiary_role: draft.beneficiary_role || draft.role,
+          status:'active',
+          updated_by: actor,
+          updated_at: new Date().toISOString()
+        }, { onConflict:'plan_code' })
+        .select('id,plan_code,plan_name,beneficiary_role,status')
+        .single();
+      if (planErr) throw new Error(planErr.message);
+      _commRuleConfig.plans[planCode] = savedPlan;
+      plan.id = savedPlan.id;
+    }
+  }
   const rows = entries.map(([key, planCode]) => {
     const [period, scope, assignee] = key.split('|');
     const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode] || {};
@@ -22979,7 +23203,7 @@ async function saveCommissionAssignments() {
       updated_by: actor,
       updated_at: new Date().toISOString()
     };
-  });
+  }).filter(r => r.plan_id);
   try {
     const writeRows = rows.map(({ plan_code, ...r }) => r);
     const { error } = await supa.from('commission_plan_assignments').upsert(writeRows, { onConflict:'period_month,assignment_scope,assignee_key' });
