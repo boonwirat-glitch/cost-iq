@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v202d: _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -846,6 +846,15 @@ body:not(.kam-mode) #nav-report{display:none!important}
 #swipe-pill.teach{padding:8px 16px;background:linear-gradient(135deg,rgba(0,112,80,.9),rgba(0,64,48,.86));border-color:rgba(0,208,112,.55);box-shadow:0 10px 28px rgba(0,48,38,.28),0 0 18px rgba(0,208,112,.18)}
 #swipe-pill:hover{border-color:rgba(0,208,112,.62);background:rgba(0,96,72,.82)}
 body.kam-mode #swipe-pill{display:none}
+/* ── overlay context: white pill for contrast against green header ── */
+body.restaurant-sheet.kam-mode #swipe-pill{display:flex;z-index:170;background:rgba(255,255,255,.93);border-color:rgba(0,0,0,.07);color:#0a3020;box-shadow:0 8px 24px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.1)}
+body.restaurant-sheet.kam-mode #swipe-pill.teach{background:rgba(255,255,255,.97);border-color:rgba(0,160,80,.22)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-seg{color:rgba(0,50,30,.38)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-seg.on{color:#0a3020;background:rgba(0,200,100,.14)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-dot{background:rgba(0,0,0,.14)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-dot.on{background:var(--g500)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-mini-arrow{color:rgba(0,50,30,.35)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-shadow:none}
 .sp-compact{display:flex;align-items:center;gap:7px}
 #swipe-pill.teach .sp-compact{display:none}
 .sp-teach-text{display:none;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.1px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.18)}
@@ -5134,7 +5143,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     <div id="rest-overview">
     <div class="hero">
       <div class="h-sub" id="h-acct-name">บริษัท ลีฟ ทู อีท จำกัด</div>
-      <div id="data-freshness" style="display:none"></div>
       <div class="h-id" id="hid" style="display:none">Account 741a4cb1 · KAM: Guntinun (Monet) · MC</div>
       <!-- Month + KAM merged row -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -5189,13 +5197,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
         <div class="ov-price-net" id="ov-price-net"></div>
       </div>
     </div>
-    <!-- ══ CATEGORY BREAKDOWN ══ -->
-    <div class="sec mt8" id="overview-cats-sec" style="display:none">
-      <div class="card">
-        <div class="ch" style="margin-bottom:10px"><span class="ct">หมวดหมู่</span></div>
-        <div id="catbars"></div>
-      </div>
-    </div>
     <!-- ══ CHART + INTERPRETATION ══ -->
     <div class="sec mt8">
       <div class="card">
@@ -5216,6 +5217,13 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
           </div>
         </div>
         <div class="chart-insight" id="chart-insight" style="display:none"></div>
+      </div>
+    </div>
+    <!-- ══ CATEGORY BREAKDOWN ══ -->
+    <div class="sec mt8" id="overview-cats-sec" style="display:none">
+      <div class="card">
+        <div class="ch" style="margin-bottom:10px"><span class="ct">หมวดหมู่</span></div>
+        <div id="catbars"></div>
       </div>
     </div>
     <!-- ══ LENS CARDS ══ -->
@@ -8968,11 +8976,17 @@ function __legacyRenderOverviewFallback(){
     const _dWrap=document.getElementById('dial-clickwrap');if(_dWrap){_dWrap.classList.remove('sense-done');_dWrap.style.pointerEvents='';}
   }
   const hist=D.history.length?D.history:SAMPLE.history;
-  const mx=Math.max(...hist.map(h=>h.s),D.current_month?D.current_month.gmv_to_date:0,1);
+  const mx=Math.max(...hist.map(h=>h.s),D.current_month?D.current_month.gmv_to_date:0,D.current_month?(D.current_month.runrate_gmv||0):0,1);
   const fmtK=v=>v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?Math.round(v/1000)+'k':String(Math.round(v));
-  // ── Current month bar (partial, dashed) ──
+  // ── Current month bar (partial + ghost run-rate overlay) ──
   const _cm=D.current_month;
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">${fmtK(_cm.gmv_to_date)}</span><div class="tb" style="--bh:${Math.round((_cm.gmv_to_date/mx)*50)}px;--bar-i:${hist.length};height:${Math.round((_cm.gmv_to_date/mx)*50)}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div><span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _rr=_cm?(_cm.runrate_gmv||0):0;
+  const _actH=_cm&&_cm.gmv_to_date>0?Math.round((_cm.gmv_to_date/mx)*50):0;
+  const _showGhost=_cm&&_rr>_cm.gmv_to_date*1.05&&_actH>0;
+  const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
+  const _rrGap=_rrH-_actH;
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">${fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box">${_rrGap>=13?`<span style="position:absolute;top:2px;left:0;right:0;text-align:center;font-size:6.5px;font-family:'IBM Plex Mono',monospace;color:rgba(0,204,106,0.8);line-height:1">${fmtK(_rr)}</span>`:''}</div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0"></div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
   if(_cm&&_cm.gmv_to_date>0){
@@ -9211,7 +9225,7 @@ function renderOverviewStats(idx){
 
   el.innerHTML=`<div class="lens-row">
     <div class="lens-card">${portfolioSvg}<div class="lens-lbl">Portfolio</div><div class="lens-val">${skuCount} SKU</div><div class="lens-sub">${portfolioSub}</div></div>
-    <div class="lens-card">${rhythmSvg}<div class="lens-lbl">Rhythm</div><div class="lens-val">${fmtAvg(avgOrd)}</div><div class="lens-sub">${freqLabel}</div></div>
+    <div class="lens-card">${rhythmSvg}<div class="lens-lbl">AOV</div><div class="lens-val">${fmtAvg(avgOrd)}</div><div class="lens-sub">${freqLabel}</div></div>
     <div class="lens-card">${outletSvg}<div class="lens-lbl">Outlets</div><div class="lens-val">${outletMain}</div><div class="lens-sub">${outletSub}</div></div>
   </div>`;
 }
@@ -17338,6 +17352,11 @@ function openRestaurantSheet() {
         renderOpps();
         isKAM = true;
       }, 450);
+      // ── Show swipe pill hint in overlay (v205) ──
+      setTimeout(() => {
+        if (!document.body.classList.contains('restaurant-sheet')) return;
+        _setRestSwipeCue('a', 0, {show:true, duration:2200});
+      }, 700);
     });
   });
 }
@@ -19099,7 +19118,7 @@ function _setRestSwipeCue(grp,idx,opts){
   _restSwipeCueState={grp:grp||'a',idx:idx||0};
   const p=document.getElementById('swipe-pill');
   if(!p)return;
-  if(typeof isKAM!=='undefined'&&isKAM){clearTimeout(_pillHideTimer);clearTimeout(_pillCleanupTimer);p.classList.remove('show','teach','compact');return;}
+  if(typeof isKAM!=='undefined'&&isKAM&&!document.body.classList.contains('restaurant-sheet')){clearTimeout(_pillHideTimer);clearTimeout(_pillCleanupTimer);p.classList.remove('show','teach','compact');return;}
   const labels={a:['ภาพรวม','พอร์ต'],b:['Sense','รายงาน']};
   const l=(labels[grp]||labels.a);
   const left=document.getElementById('sp-left-label');
