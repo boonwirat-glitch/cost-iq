@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -2878,6 +2878,54 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
 #kam-sense-back-btn:active{color:var(--n900);}
 #kam-sense-back-btn svg{color:var(--n600);}
 
+
+/* ── v207a: Sense→Opportunity mobile polish ──────────────────────────────
+   1) compact KAM Sense plan tray (less dead safe-area space)
+   2) readable topbar controls on light Sense theme
+   3) keep Opportunity content clear of the expanded tray without over-padding
+*/
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav{
+  padding-top:8px!important;
+  padding-bottom:max(8px,calc(env(safe-area-inset-bottom) - 16px))!important;
+}
+body.kam-sense-active.sense-plan-expanded #sense-plan-section{
+  padding:4px 0 8px!important;
+  margin-bottom:2px!important;
+}
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav .ni{
+  padding:2px 0 0!important;
+  min-height:46px;
+}
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav .ni .lb{
+  margin-top:0!important;
+}
+body.kam-sense-active.sense-plan-expanded #swipe-grp-b{
+  bottom:calc(132px + max(0px,calc(env(safe-area-inset-bottom) - 16px)))!important;
+}
+body.kam-sense-active #scr-opportunities .sec{
+  padding-bottom:72px!important;
+}
+body.sdt-light.kam-sense-active #dataBtnTop,
+body.sdt-light.kam-sense-active .data-btn{
+  background:rgba(0,0,0,.07)!important;
+  opacity:1!important;
+}
+body.sdt-light.kam-sense-active #dataBtnTop svg,
+body.sdt-light.kam-sense-active .data-btn svg{
+  color:rgba(0,0,0,.62)!important;
+  stroke:currentColor!important;
+  opacity:1!important;
+}
+body.sdt-light.kam-sense-active .topbar-right button[title="ออกจากระบบ"]{
+  background:rgba(0,0,0,.07)!important;
+  opacity:1!important;
+}
+body.sdt-light.kam-sense-active .topbar-right button[title="ออกจากระบบ"] svg{
+  color:rgba(0,0,0,.62)!important;
+  stroke:currentColor!important;
+  opacity:1!important;
+}
+
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2902,7 +2950,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v206f-pwa-resume-repair',
+      version: 'v207-console-sku-verify-cleanup',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -3929,10 +3977,10 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
   function resetSenseUi(ctx){
     // v201: guard — don't reset if Sense Gate is mid lazy-load
     if(getFlag(ctx, 'sgRunning', false)){
-      console.log('[SenseGate debug] resetSenseUi: skipped — _sgRunning=true (gate lazy-loading)');
+      if(localStorage.getItem('senseDebug')==='1') console.log('[SenseGate debug] resetSenseUi: skipped — _sgRunning=true (gate lazy-loading)');
       return;
     }
-    console.warn('[SenseGate debug] resetSenseUi: RUNNING (_sgRunning=false) — gate+senseActivated will be reset');
+    if(localStorage.getItem('senseDebug')==='1') console.warn('[SenseGate debug] resetSenseUi: RUNNING (_sgRunning=false) — gate+senseActivated will be reset');
     const raBtn = el('rest-ai-btn');
     const raLoad = el('rest-ai-load');
     const raPreview = el('rest-ai-preview');
@@ -4554,7 +4602,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
   var app=cfg.app||{};
   var assets=cfg.assets||{};
   var ic=assets.iconUrl||'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
-  var m={name:app.name||"Freshket Sense",short_name:app.shortName||"Freshket",start_url:app.manifestStartUrl||"/",display:app.manifestDisplay||"standalone",background_color:app.backgroundColor||"#006050",theme_color:app.themeColor||"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
+  var m={name:app.name||"Freshket Sense",short_name:app.shortName||"Freshket",start_url:(location.origin + (app.manifestStartUrl||"/")),display:app.manifestDisplay||"standalone",background_color:app.backgroundColor||"#006050",theme_color:app.themeColor||"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
   try{var blob=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});
   var url=URL.createObjectURL(blob);
   var el=document.querySelector("link[rel=manifest]");if(el)el.href=url;}catch(e){}
@@ -7002,6 +7050,20 @@ function closeVerifySheet(){
     const prog=document.getElementById('vs-progress-wrap');if(prog)prog.style.display='none';
     const res=document.getElementById('vs-result');if(res)res.style.display='none';
   }
+}
+function goToSenseOpportunitiesAfterVerify(){
+  // v207a: one safe exit path from matcher back to Opportunity, especially inside KAM/PWA fixed-scroll mode.
+  senseActivated=true;
+  footerUnlocked=true;
+  if(isKAM&&currentAccountId&&currentAccountId!=='default')window._kamSenseReturn=true;
+  closeVerifySheet();
+  try{if(typeof renderOpps==='function')renderOpps();}catch(e){}
+  showScreen('opportunities');
+  setTimeout(()=>{
+    const grp=document.getElementById('swipe-grp-b');
+    if(grp)try{grp.scrollTo({top:0,left:0,behavior:'instant'});}catch(e){grp.scrollTop=0;}
+    try{if(typeof updatePbFooter==='function')updatePbFooter();}catch(e){}
+  },80);
 }
 function vsUpdateMode(){
   const m=matcherMode||'fast';const isF=m==='fast';
@@ -9722,8 +9784,17 @@ function setPriceFilter(type){
 // ════════════════════════════════════════
 // RENDER — OPPORTUNITIES
 // ════════════════════════════════════════
+function _oppImpact(o){
+  try{const a=getAlt(o);return Number(a&&a.save)||0;}catch(e){return 0;}
+}
+function _oppSortImpact(a,b){
+  const d=_oppImpact(b)-_oppImpact(a);
+  if(d!==0)return d;
+  return (Number(b.monthlyGmv)||0)-(Number(a.monthlyGmv)||0);
+}
 function getFilteredOpps(){
-  let opps=[...OPPS].sort((a,b)=>b.monthlyGmv-a.monthlyGmv);
+  // v207a: Opportunity should rank by actionable impact (monthly savings), not spend size.
+  let opps=[...OPPS].sort(_oppSortImpact);
   let n;
   if(oppFilter==='top10')n=10;else if(oppFilter==='top20')n=20;else if(oppFilter==='top50')n=50;
   else if(oppFilter==='custom')n=parseInt(document.getElementById('opp-n-input')?.value)||0;
@@ -9874,12 +9945,21 @@ function renderPlanBuilder(opps){
     <div class="plan-tab-panel">${tabPanel}</div>
   </div>${filterPillsHtml}`;
 
-  // Group by category
+  // Group by category — v207a: categories and rows both sort by impact high → low.
   const catGroups={};
   opps.forEach(o=>{if(!catGroups[o.cat])catGroups[o.cat]=[];catGroups[o.cat].push(o);});
+  const catEntries=Object.entries(catGroups).map(([cat,items])=>{
+    items.sort(_oppSortImpact);
+    return [cat,items];
+  }).sort((a,b)=>{
+    const as=a[1].reduce((s,o)=>s+_oppImpact(o),0);
+    const bs=b[1].reduce((s,o)=>s+_oppImpact(o),0);
+    if(bs!==as)return bs-as;
+    return String(a[0]).localeCompare(String(b[0]),'th');
+  });
 
   let groupsHtml='<div class="pb-groups">';
-  Object.entries(catGroups).forEach(([cat,items])=>{
+  catEntries.forEach(([cat,items])=>{
     const catSave=items.reduce((s,o)=>s+(sel.has(o.id)?getAlt(o).save:0),0);
     const catTotal=items.reduce((s,o)=>s+getAlt(o).save,0);
     const selCount=items.filter(o=>sel.has(o.id)).length;
@@ -14692,10 +14772,14 @@ function __legacyShowScreenFallback(name){
     if(_scrEl){_scrEl.classList.add('on');_scrEl.style.display='';}
     const _navEl=document.getElementById('nav-'+name);
     if(_navEl)_navEl.classList.add('on');
+    // v207a: route into Sense should never inherit sheet scroll-lock; scroll the actual fixed container, not only window.
+    document.body.style.overflow='';
     if(name==='opportunities'&&typeof renderOpps==='function')renderOpps();
     setTimeout(_injectKamSenseBackBtn,80);
     setTimeout(_initPlanTray,100);
+    if(_grpB)try{_grpB.scrollTo({top:0,left:0,behavior:'instant'});}catch(e){_grpB.scrollTop=0;}
     window.scrollTo({top:0,left:0,behavior:'instant'});
+    setTimeout(()=>{try{if(typeof updatePbFooter==='function')updatePbFooter();}catch(e){}},120);
     return;
   }
   // ── Restaurant swipe mode ──
@@ -19622,7 +19706,7 @@ function _updateRestSwipe(grp,idx,opts){
     <div id="vs-result" style="display:none;margin-top:10px">
       <div class="gen-result-summary" id="vs-result-summary"></div>
       <div class="gen-result-table" id="vs-result-table"></div>
-      <button id="vs-nav-opps-btn" onclick="senseActivated=true;footerUnlocked=true;closeVerifySheet();renderOpps();showScreen('opportunities');"
+      <button id="vs-nav-opps-btn" onclick="goToSenseOpportunitiesAfterVerify()"
         style="width:100%;margin-top:12px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:14px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s">
         <svg width="12" height="12" viewBox="0 0 10 10" fill="currentColor" stroke="none"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>
         <span id="vs-nav-opps-label">ดูวัตถุดิบที่เจอ →</span>
@@ -22065,5 +22149,420 @@ console.log('[Target Module v1] loaded');
 <!-- NCS cohort drill-down sheet (v206) — pre-injected for position:fixed reliability -->
 <div id="ncs-overlay" class="ncs-overlay" onclick="_ncsClose()"></div>
 <div id="ncs-sheet" class="ncs-sheet"></div>
+<script id="freshket-v207-console-sku-verify-cleanup">
+// v207: console hygiene + SKU Verify robustness.
+// Scope: no loader/performance path changes. Keeps v206f PWA baseline intact.
+(function(global){
+  'use strict';
+  if(global._v207ConsoleSkuPatchInstalled) return;
+  global._v207ConsoleSkuPatchInstalled = true;
+
+  const VERSION = 'v207-console-sku-verify-cleanup';
+
+  function debugOn(){
+    try{return localStorage.getItem('senseDebug')==='1' || localStorage.getItem('freshketDebug')==='1' || localStorage.getItem('freshket_debug')==='1';}
+    catch(e){return false;}
+  }
+  function log(){ if(debugOn()) try{ console.log.apply(console, ['[v207]'].concat([].slice.call(arguments))); }catch(e){} }
+  function warn(){ if(debugOn()) try{ console.warn.apply(console, ['[v207]'].concat([].slice.call(arguments))); }catch(e){} }
+  function toast(msg, icon){ try{ if(typeof showToast==='function') showToast(msg, icon || '✓'); }catch(e){} }
+
+  // ── Console hygiene: hide known noisy debug lines unless explicit debug is on ──
+  try{
+    if(!global._v207ConsoleFiltered){
+      global._v207ConsoleFiltered = true;
+      const origLog = console.log.bind(console);
+      const origWarn = console.warn.bind(console);
+      const shouldHide = function(args){
+        if(debugOn()) return false;
+        const s = Array.prototype.slice.call(args).map(x=>String(x&&x.message?x.message:x)).join(' ');
+        return s.indexOf('[SenseGate debug]') >= 0 || s.indexOf('[Target Module v1] loaded') >= 0;
+      };
+      console.log = function(){ if(shouldHide(arguments)) return; return origLog.apply(console, arguments); };
+      console.warn = function(){ if(shouldHide(arguments)) return; return origWarn.apply(console, arguments); };
+    }
+  }catch(e){}
+
+  // ── Supabase no-row cleanup: 406/PGRST116 should mean "no cloud alts", not an app error ──
+  try{
+    loadAltsFromSupabase = async function(accountId){
+      if(!currentUser || !accountId) return null;
+      try{
+        let q = supa.from('acct_alternatives')
+          .select('data, generated_at')
+          .eq('account_id', accountId);
+        q = (typeof q.maybeSingle === 'function') ? q.maybeSingle() : q.limit(1);
+        const { data, error } = await q;
+        if(error){
+          const code = error.code || '';
+          const status = error.status || 0;
+          if(code === 'PGRST116' || status === 406) return null;
+          warn('loadAltsFromSupabase error', error.message || error);
+          return null;
+        }
+        if(Array.isArray(data)) return data[0] || null;
+        return data || null;
+      }catch(e){
+        warn('loadAltsFromSupabase exception', e && e.message ? e.message : e);
+        return null;
+      }
+    };
+    global.loadAltsFromSupabase = loadAltsFromSupabase;
+  }catch(e){}
+
+  // ── SKU Verify helpers ─────────────────────────────────────────────
+  const TH_DIGITS = {'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
+  function toAsciiDigits(s){ return String(s||'').replace(/[๐-๙]/g, d=>TH_DIGITS[d]||d); }
+  function normName(s){
+    return toAsciiDigits(s)
+      .toLowerCase()
+      .replace(/[()\[\]{}]/g,' ')
+      .replace(/[·•|,:;_\-/\\]+/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  function compact(s){ return normName(s).replace(/\s+/g,''); }
+  function eggKey(name){
+    const n = normName(name);
+    const c = compact(name);
+    if(n.indexOf('ไข่') < 0 && c.indexOf('egg') < 0) return '';
+    let m = n.match(/เบอร์\s*(\d+)/) || c.match(/เบอร์(\d+)/) || n.match(/no\.?\s*(\d+)/) || c.match(/no(\d+)/);
+    if(m && m[1]) return 'egg:no'+m[1];
+    if(c.indexOf('เบอร์หนึ่ง')>=0) return 'egg:no1';
+    return 'egg:unknown';
+  }
+  function familyKey(name, meta){
+    const e = eggKey(name);
+    if(e && e !== 'egg:unknown') return e;
+    const sub = normName(meta && (meta.subclass || meta.sc) || '');
+    if(sub) return 'sub:'+sub;
+    return '';
+  }
+  function tokens(name){
+    return normName(name).split(' ').filter(t=>t && !/^\d+$/.test(t) && !['ตรา','brand','ยี่ห้อ'].includes(t));
+  }
+  function jaccard(a,b){
+    const A = new Set(tokens(a)), B = new Set(tokens(b));
+    if(!A.size || !B.size) return 0;
+    let inter=0; A.forEach(x=>{ if(B.has(x)) inter++; });
+    return inter / Math.max(1, A.size + B.size - inter);
+  }
+  function formConflict(a,b){
+    const aa = compact(a), bb = compact(b);
+    const groups = [['บด','สับ'], ['ชิ้น','แผ่น','สไลซ์'], ['ผง'], ['น้ำ'], ['แช่แข็ง','frozen']];
+    for(const g of groups){
+      const ha = g.some(x=>aa.indexOf(x)>=0);
+      const hb = g.some(x=>bb.indexOf(x)>=0);
+      if((ha || hb) && ha !== hb) return true;
+    }
+    return false;
+  }
+  function spendChange(oldGmv, newGmv){
+    oldGmv = Number(oldGmv||0); newGmv = Number(newGmv||0);
+    if(!oldGmv) return 'same';
+    const r = newGmv / oldGmv;
+    if(r >= 1.10) return 'up';
+    if(r <= 0.90) return 'down';
+    return 'same';
+  }
+  function substituteReason(pair, confidence){
+    const ekA = eggKey(pair.churned_name || ''), ekB = eggKey(pair.new_name || '');
+    if(ekA && ekB && ekA === ekB) return 'เป็นไข่ไก่เบอร์เดียวกัน แต่เปลี่ยนแบรนด์/ผู้ขาย จึงน่าจะเป็นการสลับ SKU';
+    if(confidence === 'high') return 'สินค้าอยู่ในกลุ่มและฟังก์ชันเดียวกัน จึงน่าจะเป็นการสลับไปใช้ SKU ใหม่';
+    return 'สินค้าใกล้เคียงกันในกลุ่มเดียวกัน ควรให้ KAM เช็กว่าเป็นการสลับแบรนด์หรือสเปคหรือไม่';
+  }
+  function pairScore(pair){
+    const fkA = familyKey(pair.churned_name, {subclass:pair.churned_subclass});
+    const fkB = familyKey(pair.new_name, {subclass:pair.new_subclass});
+    const eggA = eggKey(pair.churned_name), eggB = eggKey(pair.new_name);
+    if(formConflict(pair.churned_name, pair.new_name)) return {ok:false, score:0, confidence:'medium'};
+    if(eggA && eggB && eggA === eggB) return {ok:true, score:1.0, confidence:'high'};
+    if(fkA && fkB && fkA === fkB){
+      const sim = jaccard(pair.churned_name, pair.new_name);
+      return {ok:sim >= 0.20 || compact(pair.churned_name).slice(0,4) === compact(pair.new_name).slice(0,4), score:0.72 + sim, confidence:sim >= 0.45 ? 'high' : 'medium'};
+    }
+    const sim = jaccard(pair.churned_name, pair.new_name);
+    return {ok:sim >= 0.55, score:sim, confidence:'medium'};
+  }
+  function fallbackSubstitutions(candidatePairs, mode){
+    const bestByChurned = new Map();
+    (candidatePairs||[]).forEach(pair=>{
+      const s = pairScore(pair);
+      if(!s.ok) return;
+      const key = mode === 'lm' ? String(pair.churned_name) : String(pair.churned_id);
+      const current = bestByChurned.get(key);
+      const ranked = Object.assign({}, pair, { _score:s.score, confidence:s.confidence });
+      if(!current || ranked._score > current._score || (ranked._score === current._score && (ranked.new_gmv||0) > (current.new_gmv||0))){
+        bestByChurned.set(key, ranked);
+      }
+    });
+    return Array.from(bestByChurned.values())
+      .sort((a,b)=>(b._score-a._score)||((b.new_gmv||0)-(a.new_gmv||0)))
+      .slice(0,8)
+      .map(p=> mode === 'lm'
+        ? { churned_name:p.churned_name, new_name:p.new_name, confidence:p.confidence, spend_change:spendChange(p.churned_gmv,p.new_gmv), reason:substituteReason(p,p.confidence) }
+        : { churned_id:String(p.churned_id), new_name:p.new_name, confidence:p.confidence, spend_change:spendChange(p.churned_gmv,p.new_gmv), reason:substituteReason(p,p.confidence) }
+      );
+  }
+  function parseJsonObject(text){
+    const clean = String(text||'').replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    if(!clean) return null;
+    let st = clean.indexOf('{');
+    if(st < 0) return null;
+    let en=-1, depth=0, inStr=false, esc=false;
+    for(let i=st;i<clean.length;i++){
+      const ch=clean[i];
+      if(esc){ esc=false; continue; }
+      if(ch==='\\'){ esc=true; continue; }
+      if(ch==='"'){ inStr=!inStr; continue; }
+      if(inStr) continue;
+      if(ch==='{') depth++;
+      else if(ch==='}'){
+        depth--;
+        if(depth===0){ en=i; break; }
+      }
+    }
+    if(en < 0) return null;
+    try{return JSON.parse(clean.slice(st,en+1));}catch(e){return null;}
+  }
+  async function judgePairsWithAI(candidatePairs, mode){
+    const fallback = fallbackSubstitutions(candidatePairs, mode);
+    if(!candidatePairs.length) return { substitutions:[], source:'none' };
+    const schema = mode === 'lm'
+      ? '{"substitutions":[{"churned_name":"string","new_name":"string","confidence":"high|medium","spend_change":"up|down|same","reason":"string"}]}'
+      : '{"substitutions":[{"churned_id":"string","new_name":"string","confidence":"high|medium","spend_change":"up|down|same","reason":"string"}]}';
+    const sys = OLIVE_BASE + `\n\n-- TASK CONTEXT --\nYou verify whether a churned SKU and a current/new SKU are genuine substitutes. Return JSON only. Same product + same size/grade but different brand/vendor is a valid substitution. Example: egg no.1 brand A -> egg no.1 brand B should be included. Do not include different functions, formulas, flavors, or basic forms.\n\n-- OUTPUT CONTRACT --\nRESPOND WITH VALID JSON ONLY. No markdown. No preamble.\nschema: ${schema}\nIf no pair is a genuine substitution, return {"substitutions":[]}.\nReason must be one short Thai sentence for KAM.`;
+    const userMsg = `Evaluate candidate SKU substitution pairs (${candidatePairs.length} pairs). Use precision, but do not miss same product/brand-switch cases.\n${JSON.stringify(candidatePairs.slice(0,80))}`;
+    try{
+      const txt = await callAI(kamModel==='sonnet'?'sonnet':'haiku', sys, [{role:'user', content:userMsg}], 1000);
+      const parsed = parseJsonObject(txt);
+      const subs = parsed && Array.isArray(parsed.substitutions) ? parsed.substitutions : null;
+      if(subs){
+        // If the model returns empty but deterministic evidence is high-confidence, keep the high-confidence fallback.
+        const highFallback = fallback.filter(x=>x.confidence==='high');
+        return { substitutions: subs.length ? subs : highFallback, source: subs.length ? 'ai' : (highFallback.length?'fallback-high':'ai-empty') };
+      }
+      return { substitutions:fallback, source:'fallback-no-json' };
+    }catch(e){
+      warn('SKU Verify AI failed; using deterministic fallback', e && e.message ? e.message : e);
+      return { substitutions:fallback, source:'fallback-error' };
+    }
+  }
+  function monthSort(label){
+    const p=String(label||'').split(' ');
+    const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return (parseInt(p[1]||0,10)*12)+mo.indexOf(p[0]);
+  }
+  function findSkuMetaByIdOrName(id, name){
+    const sid = String(id||'');
+    const nm = String(name||'');
+    const all = [].concat((D&&D.skus)||[], Object.values((D&&D.skus_monthly)||{}).flat());
+    return all.find(s=>String(s.id||s.item_id)===sid) || all.find(s=>String(s.n||s.name||s.item_name_th||'')===nm) || null;
+  }
+  function uniquePairs(pairs, mode){
+    const seen = new Set();
+    return pairs.filter(p=>{
+      const key = mode==='lm' ? `${p.churned_name}=>${p.new_name}` : `${p.churned_id}=>${p.new_name}`;
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }
+  function currentPoolForThisMonth(prevMonthSkuIds){
+    const rows = ((D&&D.sku_current)||[])
+      .filter(s=>Number(s.gmv_to_date||0)>500)
+      .sort((a,b)=>Number(b.gmv_to_date||0)-Number(a.gmv_to_date||0))
+      .slice(0,80);
+    return rows.map(ns=>{
+      const name = ns.item_name_th || ns.n || ns.name || '';
+      const meta = findSkuMetaByIdOrName(ns.item_id, name) || ns;
+      return {
+        item_id:String(ns.item_id||ns.id||''),
+        item_name_th:name,
+        gmv_to_date:Number(ns.gmv_to_date||ns.gmv||0),
+        orders_this_month:Number(ns.orders_this_month||ns.orders||0),
+        is_new_this_month: !prevMonthSkuIds.has(String(ns.item_id||ns.id||'')),
+        subclass:meta.subclass||meta.sc||'',
+        temperature:meta.temperature||meta.temp||'',
+        cat:meta.d||meta.dept||meta.cat||''
+      };
+    });
+  }
+  function buildThisMonthPairs(){
+    const signals = (typeof computeChurnSignals==='function' ? computeChurnSignals() : [])
+      .filter(s=>s && (s.type==='gone' || s.type==='slow' || s.type==='near'))
+      .sort((a,b)=>({gone:0,slow:1,near:2}[a.type]||3)-({gone:0,slow:1,near:2}[b.type]||3) || (b.gmv||0)-(a.gmv||0))
+      .slice(0,35);
+    const moKeys=Object.keys((D&&D.skus_monthly)||{}).sort((a,b)=>monthSort(b)-monthSort(a));
+    const cmLbl=(D&&D.current_month&&D.current_month.month_label)||'';
+    const prevClosed=moKeys.find(m=>m!==cmLbl)||moKeys[0];
+    const prevMonthSkuIds=prevClosed?new Set(((D.skus_monthly[prevClosed])||[]).map(s=>String(s.id||s.item_id))):new Set();
+    const currentPool = currentPoolForThisMonth(prevMonthSkuIds);
+    const pairs=[];
+    signals.forEach(s=>{
+      const cMeta = findSkuMetaByIdOrName(s.id, s.name) || {};
+      currentPool.forEach(ns=>{
+        if(String(ns.item_id) === String(s.id)) return;
+        const p = {
+          churned_id:String(s.id), churned_name:s.name, churned_dept:s.dept,
+          churned_subclass:cMeta.subclass||cMeta.sc||'ไม่ทราบ', churned_gmv:Number(s.gmv||0), churned_type:s.type,
+          new_id:String(ns.item_id||''), new_name:ns.item_name_th||'', new_cat:ns.cat||'',
+          new_subclass:ns.subclass||'ไม่ทราบ', new_gmv:Number(ns.gmv_to_date||0),
+          is_new_this_month:!!ns.is_new_this_month
+        };
+        const sc = pairScore(p);
+        const subclassCompatible = !p.churned_subclass || !p.new_subclass || p.churned_subclass==='ไม่ทราบ' || p.new_subclass==='ไม่ทราบ' || p.churned_subclass===p.new_subclass;
+        if(sc.ok || subclassCompatible) pairs.push(p);
+      });
+    });
+    return uniquePairs(pairs, 'tm')
+      .sort((a,b)=>(pairScore(b).score||0)-(pairScore(a).score||0) || (b.new_gmv||0)-(a.new_gmv||0))
+      .slice(0,80);
+  }
+  function buildLastMonthPairs(){
+    const sm = typeof computeSkuMovement==='function' ? computeSkuMovement() : null;
+    const dropped = (sm&&sm.droppedSkus)||[];
+    const newSkus = (sm&&sm.newSkus)||[];
+    const pairs=[];
+    dropped.slice(0,35).forEach(d=>{
+      const dMeta = findSkuMetaByIdOrName(d.id, d.name) || {};
+      newSkus.slice(0,60).forEach(n=>{
+        const nMeta = findSkuMetaByIdOrName(n.id, n.name) || {};
+        const p = {
+          churned_name:d.name, churned_dept:d.cat||'', churned_subclass:dMeta.subclass||dMeta.sc||'ไม่ทราบ', churned_gmv:Number(d.gmv||0),
+          new_name:n.name, new_cat:nMeta.d||nMeta.dept||'', new_subclass:nMeta.subclass||nMeta.sc||'ไม่ทราบ', new_gmv:Number(n.gmv||0)
+        };
+        const sc = pairScore(p);
+        const subclassCompatible = !p.churned_subclass || !p.new_subclass || p.churned_subclass==='ไม่ทราบ' || p.new_subclass==='ไม่ทราบ' || p.churned_subclass===p.new_subclass;
+        if(sc.ok || subclassCompatible) pairs.push(p);
+      });
+    });
+    return uniquePairs(pairs, 'lm')
+      .sort((a,b)=>(pairScore(b).score||0)-(pairScore(a).score||0) || (b.new_gmv||0)-(a.new_gmv||0))
+      .slice(0,80);
+  }
+  function starSvg(){ return `<svg class="svb-icon" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>`; }
+  function setBtn(id, cls, text){
+    const b=document.getElementById(id); if(!b) return;
+    b.disabled=false; b.style.opacity=''; b.title='';
+    b.className='sku-verify-btn'+(cls?' '+cls:'');
+    b.innerHTML=starSvg()+text;
+  }
+
+  triggerSkuVerifyFromThisMonth = async function(){
+    if(skuSubstituteLoading) return;
+    const pairs = buildThisMonthPairs();
+    if(!pairs.length){
+      setBtn('sku-verify-tm-btn','','ไม่พบ SKU ที่เปลี่ยน');
+      setTimeout(()=>setBtn('sku-verify-tm-btn', skuSubstituteDone?'done':'', 'SKU Verify'),2500);
+      return;
+    }
+    skuSubstituteLoading=true;
+    setBtn('sku-verify-tm-btn','loading','กำลังตรวจ...');
+    try{
+      const judged = await judgePairsWithAI(pairs, 'tm');
+      skuSubstituteMap = {};
+      (judged.substitutions||[]).forEach(s=>{
+        const pair = pairs.find(p=>String(p.churned_id)===String(s.churned_id) && p.new_name===s.new_name);
+        if(!pair) return;
+        skuSubstituteMap[String(s.churned_id)] = {
+          substituteName:s.new_name,
+          spendChange:s.spend_change || spendChange(pair.churned_gmv, pair.new_gmv),
+          confidence:s.confidence || 'medium',
+          reason:s.reason || substituteReason(pair, s.confidence||'medium'),
+          kamQuestion:'',
+          newGmv:pair.new_gmv || 0,
+          source:judged.source
+        };
+      });
+      skuSubstituteDone=true;
+      skuSubstituteLoading=false;
+      if(kamSubtab==='thismonth' && typeof renderKamThisMonth==='function') renderKamThisMonth();
+      else setBtn('sku-verify-tm-btn','done','✓ SKU Verify');
+      if(judged.source && judged.source.indexOf('fallback')===0) toast('SKU Verify ใช้ rule fallback แล้ว','✓');
+    }catch(e){
+      warn('SKU Verify unexpected error', e && e.message ? e.message : e);
+      skuSubstituteLoading=false;
+      setBtn('sku-verify-tm-btn','','SKU Verify');
+      toast('SKU Verify ยังตรวจไม่สำเร็จ','⚠');
+    }
+  };
+  global.triggerSkuVerifyFromThisMonth = triggerSkuVerifyFromThisMonth;
+
+  triggerSkuVerifyLastMonth = async function(){
+    if(skuSubstituteLoadingLM) return;
+    const pairs = buildLastMonthPairs();
+    if(!pairs.length){
+      setBtn('sku-verify-lm-btn','','ไม่พบ SKU ที่เปลี่ยน');
+      setTimeout(()=>setBtn('sku-verify-lm-btn', skuSubstituteDoneLM?'done':'', 'SKU Verify'),2500);
+      return;
+    }
+    skuSubstituteLoadingLM=true;
+    setBtn('sku-verify-lm-btn','loading','กำลังตรวจ...');
+    try{
+      const judged = await judgePairsWithAI(pairs, 'lm');
+      skuSubstituteMapLM = {};
+      (judged.substitutions||[]).forEach(s=>{
+        const pair = pairs.find(p=>p.churned_name===s.churned_name && p.new_name===s.new_name);
+        if(!pair) return;
+        skuSubstituteMapLM[s.churned_name] = {
+          substituteName:s.new_name,
+          spendChange:s.spend_change || spendChange(pair.churned_gmv, pair.new_gmv),
+          confidence:s.confidence || 'medium',
+          reason:s.reason || substituteReason(pair, s.confidence||'medium'),
+          newGmv:pair.new_gmv || 0,
+          source:judged.source
+        };
+      });
+      skuSubstituteDoneLM=true;
+      skuSubstituteLoadingLM=false;
+      if(kamSubtab==='lastmonth' && typeof renderKamLastMonth==='function') renderKamLastMonth();
+      else setBtn('sku-verify-lm-btn','done','✓ SKU Verify');
+      if(judged.source && judged.source.indexOf('fallback')===0) toast('SKU Verify ใช้ rule fallback แล้ว','✓');
+    }catch(e){
+      warn('SKU Verify LM unexpected error', e && e.message ? e.message : e);
+      skuSubstituteLoadingLM=false;
+      setBtn('sku-verify-lm-btn','','SKU Verify');
+      toast('SKU Verify ยังตรวจไม่สำเร็จ','⚠');
+    }
+  };
+  global.triggerSkuVerifyLastMonth = triggerSkuVerifyLastMonth;
+
+  global.getFreshketV207SkuVerifyState = function(){
+    return {
+      version: VERSION,
+      thisMonthPairs: buildThisMonthPairs().slice(0,20),
+      lastMonthPairs: buildLastMonthPairs().slice(0,20),
+      thisMonthMap: skuSubstituteMap,
+      lastMonthMap: skuSubstituteMapLM,
+      debug: debugOn()
+    };
+  };
+
+  log('installed');
+})(window);
+</script>
+
+<script id="freshket-v207a-sense-opportunity-patch">
+(function(global){
+  global.getFreshketV207aSenseFlowState=function(){
+    const grp=document.getElementById('swipe-grp-b');
+    const bnav=document.querySelector('.bnav');
+    return {
+      version: typeof VERSION!=='undefined'?VERSION:'v207a',
+      kamSenseActive: document.body.classList.contains('kam-sense-active'),
+      planExpanded: document.body.classList.contains('sense-plan-expanded'),
+      bodyOverflow: document.body.style.overflow||'',
+      opportunityCount: Array.isArray(global.OPPS)?global.OPPS.length:null,
+      selectedCount: (global.sel&&typeof global.sel.size==='number')?global.sel.size:null,
+      topImpact: Array.isArray(global.OPPS)?global.OPPS.slice().sort(function(a,b){
+        try{return (getAlt(b).save||0)-(getAlt(a).save||0);}catch(e){return 0;}
+      }).slice(0,8).map(function(o){return {name:o.curName, cat:o.cat, save:(getAlt(o)||{}).save||0};}):[],
+      grpB:{top:grp?grp.scrollTop:null, bottomCss:grp?getComputedStyle(grp).bottom:null},
+      bnav:{height:bnav?Math.round(bnav.getBoundingClientRect().height):null, paddingBottom:bnav?getComputedStyle(bnav).paddingBottom:null}
+    };
+  };
+})(window);
+</script>
+
 </body>
 </html>
