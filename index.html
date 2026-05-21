@@ -6491,6 +6491,13 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 const FRESHKET_APP_CONFIG = window.FreshketSenseConfig || {};
 const SUPA_URL = (FRESHKET_APP_CONFIG.supabase && FRESHKET_APP_CONFIG.supabase.url) || 'https://menslbnyyvpxiyvjywcm.supabase.co';
 const SUPA_KEY = (FRESHKET_APP_CONFIG.supabase && FRESHKET_APP_CONFIG.supabase.publishableKey) || 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
+
+// v208e-fix1: defensive alias for legacy SKU verify button paths.
+window.triggerSkuVerifyFromThisMonth = window.triggerSkuVerifyFromThisMonth || function(){
+  if (typeof window.triggerSkuVerifyFromCurrentMonth === 'function') return window.triggerSkuVerifyFromCurrentMonth();
+  if (typeof window.triggerSkuVerify === 'function') return window.triggerSkuVerify();
+  console.warn('[SKU Verify] trigger function not available yet');
+};
 const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
 let currentUser = null;
@@ -20098,7 +20105,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}${nrrPct!==null?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-left:2px">NRR ${nrrPct}%</span>${nrrPct!==null?`<span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:''}</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${chips}${nrrPct!==null?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-left:2px">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_commPayoutForPct('kam', nrrPct))}</span>`:''}</div>
       <span class="tv-chip-pace" style="margin-left:6px">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
