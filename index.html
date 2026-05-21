@@ -3973,7 +3973,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
       if (_showGhost) {
         // v205c: run rate ON TOP outside (.tba), actual value INSIDE solid bar
         var _actInner = _actH >= 16 ? '<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">'+fmtK(currentMonth.gmv_to_date)+'</span>' : '';
-        currentBar = '<div class="tbw" id="bar-cm" style="cursor:default">'
+        currentBar = '<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()">'
           + '<span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">'+fmtK(_rr)+'</span>'
           + '<div style="position:relative;height:'+_rrH+'px;width:100%;flex-shrink:0">'
           + '<div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div>'
@@ -3981,7 +3981,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
           + '</div>'
           + '<span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
       } else {
-        currentBar = '<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span><div class="tb" style="--bh:'+_actH+'px;--bar-i:'+hist.length+';height:'+_actH+'px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div><span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
+        currentBar = '<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--g700)">'+fmtK(currentMonth.gmv_to_date)+'</span><div class="tb" style="--bh:'+_actH+'px;--bar-i:'+hist.length+';height:'+_actH+'px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div><span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
       }
     }
     tbars.innerHTML = hist.map(function(h,i){
@@ -9025,7 +9025,7 @@ function __legacyRenderOverviewFallback(){
   const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
   const _rrGap=_rrH-_actH;
   const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">${fmtK(_cm.gmv_to_date)}</span>`:'';
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:default"><span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
 
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
@@ -9051,6 +9051,34 @@ function __legacyRenderOverviewFallback(){
   renderOverviewStats(activeMonth);
   renderInterpretation(activeMonth);
   _renderOverviewPaceAndStrip();
+}
+
+function selectCurrentMonth(){
+  // Restore current month view: clear bar highlights, show current month cats
+  const hist=D.history.length?D.history:SAMPLE.history;
+  hist.forEach((_,i)=>{
+    const bar=document.getElementById('tb-'+i);
+    const wrap=document.getElementById('bar-'+i);
+    if(bar)bar.style.background='var(--n200)';
+    if(wrap)wrap.classList.remove('active');
+  });
+  // Highlight ghost bar visually
+  const ghostWrap=document.getElementById('bar-cm');
+  if(ghostWrap)ghostWrap.classList.add('active');
+  // Hide chart-sel-info
+  const _csi=document.getElementById('chart-sel-info');
+  if(_csi)_csi.style.display='none';
+  // Show current month category if available
+  const _curCatLbl=D.current_month&&D.current_month.month_label;
+  if(_curCatLbl&&D.cats_monthly&&D.cats_monthly[_curCatLbl]){
+    const catbarsEl=document.getElementById('catbars');
+    const catSec=document.getElementById('overview-cats-sec');
+    const catHead=catSec?catSec.querySelector('.ct'):null;
+    if(catbarsEl){catbarsEl.innerHTML=renderCatBars(D.cats_monthly[_curCatLbl],3);}
+    if(catSec)catSec.style.display='';
+    if(catHead)catHead.textContent='หมวดหมู่ · '+_curCatLbl+' MTD';
+  }
+  heroLockedToCurrent=true;
 }
 
 function selectMonth(idx,init){
@@ -20890,10 +20918,12 @@ function _tgtKamBaseline3mo(kamEmail, tlEmail, mode) {
   });
   const avgDailyRate = dailyRates.reduce((s,v) => s+v, 0) / last3.length;
   // × days in current month (from paceSignal or calendar)
+  // v205c fix: daysInMonth is top-level on account object, NOT inside paceSignal
+  // a.paceSignal.daysInMonth is always undefined → was defaulting to 30 even in 31-day months
   let daysInCurrentMonth = 30;
   for (const a of accounts) {
-    const ps = a.paceSignal;
-    if (ps && ps.daysInMonth > 0) { daysInCurrentMonth = ps.daysInMonth; break; }
+    const dim = a.daysInMonth || (a.paceSignal && a.paceSignal.daysInMonth) || 0;
+    if (dim > 0) { daysInCurrentMonth = dim; break; }
   }
   return Math.round(avgDailyRate * daysInCurrentMonth);
 }
