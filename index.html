@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -2880,6 +2880,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
 
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Freshket Sense">
 <meta name="theme-color" content="#0d3328">
@@ -2901,7 +2902,7 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v206d-flicker-prewarm-throttle',
+      version: 'v206f-pwa-resume-repair',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -4534,7 +4535,13 @@ body.sdt-light.kam-sense-active.kam-mode .bnav .ni.on .nwrap{background:rgba(0,2
           console.warn('[pwa:v206a] service worker registration failed',swUrl,err);
         });
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
-        console.info('[pwa:v206a] service worker controller changed');
+        console.info('[pwa:v206f] service worker controller changed — reloading once');
+        try{
+          if(!sessionStorage.getItem('freshket_sw_controller_reloaded')){
+            sessionStorage.setItem('freshket_sw_controller_reloaded', String(Date.now()));
+            setTimeout(()=>location.reload(), 120);
+          }
+        }catch(e){ setTimeout(()=>location.reload(), 120); }
       });
     });
   })();
@@ -21851,6 +21858,207 @@ console.log('[Target Module v1] loaded');
   // Paint once after late target/hydration hooks settle.
   setTimeout(()=>paint(), 1200);
   log('[v206e] bundle micro patch installed');
+})(window);
+</script>
+
+
+<script id="freshket-v206f-pwa-resume-patch">
+// v206f: Installed PWA live-update + resume data repair.
+// Scope: no business logic, no SQL, no AI changes.
+(function(global){
+  'use strict';
+  if(global._v206fPwaResumePatchInstalled) return;
+  global._v206fPwaResumePatchInstalled = true;
+
+  const VERSION = 'v206f-pwa-resume-repair';
+  const BUILD_RE = /Freshket Sense\s+v(\d+[a-z]?)/i;
+  const BUILD_STORAGE_KEY = 'freshket_sense_build_version';
+  const LAST_RELOAD_KEY = 'freshket_sense_last_build_reload';
+  let resumeRepairTimer = null;
+  let buildCheckInFlight = null;
+  let dataRepairInFlight = null;
+
+  function debugOn(){
+    try{return localStorage.getItem('senseDebug')==='1' || localStorage.getItem('freshketDebug')==='1';}catch(e){return false;}
+  }
+  function log(){ if(debugOn()) try{ console.log.apply(console, ['[v206f pwa]'].concat([].slice.call(arguments))); }catch(e){} }
+  function warn(){ try{ console.warn.apply(console, ['[v206f pwa]'].concat([].slice.call(arguments))); }catch(e){} }
+  function isStandalonePwa(){
+    try{return !!(global.matchMedia&&global.matchMedia('(display-mode: standalone)').matches) || !!navigator.standalone;}catch(e){return false;}
+  }
+  function now(){ return Date.now ? Date.now() : +new Date(); }
+  function safeCount(obj){ try{return obj ? Object.keys(obj).length : 0;}catch(e){return 0;} }
+  function pvCount(){ try{return Array.isArray(global.portviewBulkData) ? global.portviewBulkData.length : 0;}catch(e){return 0;} }
+  function cmCount(){ try{return safeCount(global.bulkCurrentMonthData);}catch(e){return 0;} }
+  function histCount(){ try{return safeCount(global.bulkHistoryData);}catch(e){return 0;} }
+  function isLoggedIn(){ try{return !!global.currentUser;}catch(e){return false;} }
+  function role(){ try{return (global.currentUserProfile&&global.currentUserProfile.role||'').toLowerCase();}catch(e){return '';} }
+  function onPortfolioSurface(){
+    try{
+      return !!(document.getElementById('scr-portview')?.classList.contains('on') || document.getElementById('scr-teamview')?.classList.contains('on'));
+    }catch(e){return false;}
+  }
+  function criticalReady(){
+    const pv = pvCount();
+    const cm = cmCount();
+    // portview parse builds bulkCurrentMonthData from the same file. If pv exists but cm is empty,
+    // runtime is very likely in a stale/resumed partial state.
+    return pv > 0 && cm > 0;
+  }
+  function getBuildFromHtml(txt){
+    try{ const m = String(txt||'').match(BUILD_RE); return m ? ('v'+m[1]) : null; }catch(e){return null;}
+  }
+  function currentBuild(){
+    try{
+      const cfg=global.FreshketSenseConfig||{};
+      const v=cfg.app&&cfg.app.version;
+      if(v&&String(v).includes('v206f'))return 'v206f';
+    }catch(e){}
+    return 'v206f';
+  }
+
+  function markBuild(){
+    try{
+      const prev=localStorage.getItem(BUILD_STORAGE_KEY);
+      if(prev && prev!==currentBuild()) sessionStorage.setItem('freshket_build_changed_this_session','1');
+      localStorage.setItem(BUILD_STORAGE_KEY,currentBuild());
+    }catch(e){}
+  }
+  markBuild();
+
+  async function askWaitingServiceWorkerToActivate(reg){
+    try{
+      if(reg&&reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING', source:'freshket-sense', version:VERSION});
+    }catch(e){}
+  }
+
+  function installServiceWorkerUpdateGuard(){
+    if(!('serviceWorker' in navigator)) return;
+    try{
+      navigator.serviceWorker.ready.then(function(reg){
+        try{ reg.update && reg.update(); }catch(e){}
+        askWaitingServiceWorkerToActivate(reg);
+        try{
+          reg.addEventListener('updatefound', function(){
+            const sw = reg.installing;
+            if(!sw) return;
+            sw.addEventListener('statechange', function(){
+              if(sw.state === 'installed' && navigator.serviceWorker.controller){
+                try{ sw.postMessage({type:'SKIP_WAITING', source:'freshket-sense', version:VERSION}); }catch(e){}
+              }
+            });
+          });
+        }catch(e){}
+      }).catch(function(){});
+      navigator.serviceWorker.addEventListener('controllerchange', function(){
+        // Existing older handler may also reload. Keep a separate short-lived guard to prevent loops.
+        try{
+          if(sessionStorage.getItem('freshket_sw_controller_reloaded_v206f')) return;
+          sessionStorage.setItem('freshket_sw_controller_reloaded_v206f', String(now()));
+        }catch(e){}
+        setTimeout(function(){ try{ location.reload(); }catch(e){} }, 160);
+      });
+    }catch(e){}
+  }
+  installServiceWorkerUpdateGuard();
+
+  async function checkRemoteBuild(reason){
+    if(buildCheckInFlight) return buildCheckInFlight;
+    buildCheckInFlight = (async function(){
+      try{
+        // Only check on launch/resume. While the app is active, avoid surprise reloads.
+        const url = location.origin + location.pathname + '?__sense_build_check=' + now();
+        const res = await fetch(url, {cache:'no-store', credentials:'same-origin'});
+        if(!res || !res.ok) return null;
+        const txt = await res.text();
+        const remote = getBuildFromHtml(txt);
+        const local = currentBuild();
+        log('build-check', {reason, local, remote});
+        if(remote && remote !== local){
+          const last = Number(sessionStorage.getItem(LAST_RELOAD_KEY)||0);
+          if(now() - last > 12000){
+            sessionStorage.setItem(LAST_RELOAD_KEY, String(now()));
+            // Force a network navigation and avoid reusing stale in-memory PWA state.
+            const next = location.origin + location.pathname + '?__sense_reload=' + encodeURIComponent(remote) + '&t=' + now() + location.hash;
+            warn('new build detected; reloading', {local, remote, reason});
+            location.replace(next);
+          }
+        }
+        return remote;
+      }catch(e){ log('build-check skipped', reason, e&&e.message?e.message:e); return null; }
+      finally{ buildCheckInFlight = null; }
+    })();
+    return buildCheckInFlight;
+  }
+
+  async function repairCriticalData(reason, opts){
+    opts = opts || {};
+    if(dataRepairInFlight) return dataRepairInFlight;
+    dataRepairInFlight = (async function(){
+      try{
+        if(!isLoggedIn()) return false;
+        const pv = pvCount(), cm = cmCount(), hist = histCount();
+        const force = !!opts.force;
+        const loading = !!global.sheetsLoadStarted;
+        const initialInFlight = !!global._cloudInitialPromise;
+        const needsRepair = force || !criticalReady() || (loading && !initialInFlight && pv===0);
+        log('data-sanity', {reason, force, pv, cm, hist, loading, initialInFlight, needsRepair, role:role()});
+        if(!needsRepair) return false;
+        // Do not run multiple loaders on top of each other. If a real initial load is active, let it finish.
+        if(initialInFlight) return false;
+        try{ global.sheetsLoadStarted = false; }catch(e){}
+        try{ global._cloudInitialPromise = null; }catch(e){}
+        try{ global._cloudBackgroundPromise = null; }catch(e){}
+        try{ if(global._clearCloudInFlight) global._clearCloudInFlight(); }catch(e){}
+        try{ if(global._cloudLoadedTabs && global._cloudLoadedTabs.clear) global._cloudLoadedTabs.clear(); }catch(e){}
+        try{ if(global.showToast) global.showToast('รีเฟรชข้อมูลหลังกลับเข้าแอป...','⟳'); }catch(e){}
+        if(typeof global.loadFromCloudflareR2 === 'function'){
+          await global.loadFromCloudflareR2();
+        }else if(typeof global.loadFromGoogleSheets === 'function'){
+          await global.loadFromGoogleSheets();
+        }
+        setTimeout(function(){
+          try{
+            if(onPortfolioSurface() && typeof global.renderPortview === 'function') global.renderPortview();
+            if(document.getElementById('scr-teamview')?.classList.contains('on') && typeof global.renderTeamview === 'function') global.renderTeamview();
+          }catch(e){}
+        }, 260);
+        return true;
+      }catch(e){ warn('data repair failed', reason, e&&e.message?e.message:e); return false; }
+      finally{ dataRepairInFlight = null; }
+    })();
+    return dataRepairInFlight;
+  }
+
+  function scheduleResumeRepair(reason, opts){
+    opts = opts || {};
+    if(resumeRepairTimer) clearTimeout(resumeRepairTimer);
+    resumeRepairTimer = setTimeout(function(){
+      resumeRepairTimer = null;
+      checkRemoteBuild(reason);
+      // PWA/Home Screen is the risky surface, but this is cheap and useful on desktop too.
+      repairCriticalData(reason, opts);
+    }, opts.delay == null ? 900 : opts.delay);
+  }
+
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') scheduleResumeRepair('visibility-visible', {delay:1200});
+  });
+  global.addEventListener('pageshow', function(event){
+    scheduleResumeRepair(event&&event.persisted ? 'pageshow-bfcache' : 'pageshow', {delay:event&&event.persisted?900:1800});
+  });
+  global.addEventListener('focus', function(){ scheduleResumeRepair('window-focus', {delay:1400}); });
+  global.addEventListener('online', function(){ scheduleResumeRepair('online', {delay:450, force:true}); });
+
+  // First-load sanity: when a new build is loaded over an old local/session state, repair once after auth/routing settles.
+  setTimeout(function(){
+    const changed = (function(){ try{return sessionStorage.getItem('freshket_build_changed_this_session')==='1';}catch(e){return false;} })();
+    scheduleResumeRepair(changed ? 'new-build-first-load' : 'first-load-sanity', {delay: changed ? 600 : 2200, force: changed});
+  }, 1200);
+
+  global.getFreshketV206fPwaState = function(){
+    return {version:VERSION, standalone:isStandalonePwa(), loggedIn:isLoggedIn(), role:role(), pvCount:pvCount(), currentMonthAccounts:cmCount(), historyAccounts:histCount(), criticalReady:criticalReady(), sheetsLoadStarted:!!global.sheetsLoadStarted, hasInitialPromise:!!global._cloudInitialPromise};
+  };
 })(window);
 </script>
 
