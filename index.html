@@ -7026,6 +7026,22 @@ supa.auth.onAuthStateChange((event, session) => {
     // Guard A (original): only proceed if no one else has set currentUser yet.
     if (!currentUser) {
       currentUser = session.user;
+      // v218c: preload critical R2 files NOW — parallel with loadUserProfile().
+      // Problem: loadUserProfile() takes ~3s (Supabase query on mobile network).
+      //          Without this, R2 loading only starts AFTER loadUserProfile finishes,
+      //          so showSenseSplash() is called with no data → MAX_SHOW force-fades
+      //          before data ready → user sees empty portfolio "กำลังโหลด..." for 1-2s.
+      // Fix: start R2 loading immediately after auth. By the time loadUserProfile()
+      //      finishes and showSenseSplash() is called, files may already be loaded
+      //      from IndexedDB → _cacheWarm=true → splash fades in ~400ms with real data.
+      // Safe: loadFromCloudflareR2() has a duplicate-load guard (sheetsLoadStarted +
+      //       _cloudInitialPromise) — second call returns the existing promise, no double-fetch.
+      try{
+        if(typeof loadFromCloudflareR2==='function'){
+          loadFromCloudflareR2();
+          _senseDataLog('PRELOAD','R2 preload started parallel with loadUserProfile()');
+        }
+      }catch(e){}
       loadUserProfile().then(() => hideLoginOverlay());
     }
   } else if (event === 'SIGNED_OUT' && currentUser) {
@@ -7114,9 +7130,12 @@ function showSenseSplash(onDone){
                   '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
-  // v218a: cold MAX_SHOW 8000→5000ms (3-file gate, not 6), warm boot 3000→2000ms.
-  // IndexedDB hits portview+history+handover in ~300-600ms → splash feels like a blink on warm boot.
-  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 2000 : 5000);
+  // v218c: warm boot MAX_SHOW 2000→6000ms.
+  // Reason: even with preload, slow mobile ETag requests can take 3-5s.
+  // If data isn't ready within 2000ms, splash force-faded → empty portfolio shown.
+  // 6000ms gives enough headroom for ETag on slow mobile network.
+  // (preload makes data likely ready before splash even shows → fast path)
+  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 6000 : 5000);
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -30194,8 +30213,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v218b-debug';
-  var DATA_EPOCH='2026-05-22-v218b-debug';
+  var VERSION='v218c-preload';
+  var DATA_EPOCH='2026-05-22-v218c-preload';
   function $(id){return document.getElementById(id);} 
   function log(){try{console.log.apply(console,['[Sense v218]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
