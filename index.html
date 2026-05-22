@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- Freshket Sense v210j: KAM commission compact strip — move self-payout out of portfolio health grid, Thai-first copy, readable i-sheet; from v210i — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
-<!-- Freshket Sense v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
+<!-- Freshket Sense v210k: KAM commission compact 2-line strip (Thai-first, multi-source ready, no logic/schema change) | v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TABLE OF CONTENTS — sense_v204.html                                        ║
@@ -27424,6 +27424,249 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
     ensureKamCommissionCard();
     if(tries>20) clearInterval(timer);
   }, 300);
+})();
+</script>
+
+
+<style id="freshket-v210k-kam-commission-compact-css">
+/* v210k: KAM commission is a compact personal payout summary, not an account health card. */
+.pv-commission-strip-slot{margin:0 0 10px 0!important;}
+.pv-comm-strip.v210k{
+  width:100%;
+  border-radius:13px;
+  padding:9px 11px 10px;
+  display:grid;
+  grid-template-columns:minmax(78px,1fr) minmax(76px,auto) minmax(72px,auto) 26px;
+  grid-template-areas:
+    "title amount chip info"
+    "sources sources sources sources";
+  column-gap:8px;
+  row-gap:5px;
+  align-items:center;
+  min-height:58px;
+  background:linear-gradient(135deg,rgba(35,73,126,.54),rgba(15,42,76,.46));
+  border:1px solid rgba(188,215,255,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+.pv-comm-strip.v210k.paid{
+  border-color:rgba(255,224,138,.46);
+  background:linear-gradient(135deg,rgba(255,224,138,.13),rgba(35,73,126,.50));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 18px rgba(240,176,0,.06);
+}
+.pv-comm-strip.v210k .pv-comm-title{
+  grid-area:title;
+  min-width:0;
+  font-size:10px;
+  line-height:1.1;
+  font-weight:900;
+  letter-spacing:.06em;
+  color:rgba(225,238,255,.88);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.pv-comm-strip.v210k .pv-comm-main{
+  grid-area:amount;
+  min-width:76px;
+  text-align:right;
+  justify-self:end;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:21px;
+  font-weight:950;
+  line-height:1;
+  letter-spacing:-.4px;
+  color:#bcd7ff;
+  font-variant-numeric:tabular-nums;
+}
+.pv-comm-strip.v210k.paid .pv-comm-main{
+  color:#ffe08a;
+  text-shadow:0 0 14px rgba(255,224,138,.16);
+}
+.pv-comm-strip.v210k .pv-comm-chip{
+  grid-area:chip;
+  justify-self:end;
+  max-width:104px;
+  min-width:64px;
+  text-align:center;
+  font-size:9px;
+  font-weight:900;
+  line-height:1;
+  border-radius:999px;
+  padding:4px 7px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:rgba(225,238,255,.9);
+  border:1px solid rgba(188,215,255,.22);
+  background:rgba(255,255,255,.065);
+}
+.pv-comm-strip.v210k.paid .pv-comm-chip{
+  color:#ffe08a;
+  border-color:rgba(255,224,138,.36);
+  background:rgba(255,224,138,.12);
+}
+.pv-comm-strip.v210k .pv-comm-i{
+  grid-area:info;
+  justify-self:end;
+  width:25px;
+  height:25px;
+  border-radius:50%;
+  border:1px solid rgba(188,215,255,.30);
+  background:rgba(255,255,255,.075);
+  color:rgba(225,238,255,.86);
+  font-family:Georgia,serif;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .16s,border-color .16s,transform .08s;
+}
+.pv-comm-strip.v210k .pv-comm-i:hover{background:rgba(255,255,255,.12);border-color:rgba(188,215,255,.48);color:#fff;}
+.pv-comm-strip.v210k .pv-comm-i:active{transform:scale(.94)!important;}
+.pv-comm-strip.v210k .pv-comm-sources{
+  grid-area:sources;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  font-size:10.5px;
+  line-height:1.35;
+  font-weight:750;
+  color:rgba(225,238,255,.82);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.pv-comm-strip.v210k .pv-comm-sources span{min-width:0;white-space:nowrap;}
+.pv-comm-strip.v210k .pv-comm-sources b{color:rgba(188,215,255,.92);font-weight:900;}
+.pv-comm-strip.v210k.paid .pv-comm-sources .src-nrr{color:#ffe08a;}
+.pv-comm-strip.v210k .pv-comm-sep{color:rgba(188,215,255,.42);font-weight:900;}
+@media(max-width:360px){
+  .pv-comm-strip.v210k{grid-template-columns:minmax(64px,1fr) minmax(68px,auto) minmax(58px,auto) 24px;column-gap:6px;padding:8px 10px;}
+  .pv-comm-strip.v210k .pv-comm-main{font-size:18px;min-width:68px;}
+  .pv-comm-strip.v210k .pv-comm-chip{font-size:8px;min-width:56px;max-width:86px;padding:4px 6px;}
+  .pv-comm-strip.v210k .pv-comm-sources{font-size:9.5px;gap:4px;}
+  .pv-comm-strip.v210k .pv-comm-i{width:23px;height:23px;}
+}
+/* Bottom sheet: clearer source breakdown for future multi-source commission. */
+.pv-comm-source-table{border-radius:12px;overflow:hidden;border:1px solid rgba(188,215,255,.14);margin:12px 0;background:rgba(255,255,255,.035);}
+.pv-comm-source-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 11px;border-bottom:1px solid rgba(188,215,255,.10);font-size:12px;color:rgba(225,238,255,.84);}
+.pv-comm-source-row:last-child{border-bottom:none;}
+.pv-comm-source-name{font-weight:850;}
+.pv-comm-source-note{display:block;font-size:10px;font-weight:650;color:rgba(188,215,255,.68);margin-top:1px;}
+.pv-comm-source-pay{font-family:'IBM Plex Mono',monospace;font-weight:950;color:#bcd7ff;}
+.pv-comm-source-row.paid .pv-comm-source-pay{color:#ffe08a;}
+</style>
+
+<script id="freshket-v210k-kam-commission-compact-js">
+(function(){
+  function esc(v){
+    try{ return typeof _commEscapeHtml==='function' ? _commEscapeHtml(v) : String(v ?? '').replace(/[&<>'"]/g, function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];}); }
+    catch(e){ return String(v ?? ''); }
+  }
+  function money(n){ try{return _commFmtPayout(n);}catch(e){ n=Number(n||0); return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0'; } }
+  function pts(n){ try{return _commFormatPts(n);}catch(e){ var x=Number(n||0); return x.toFixed(1).replace('.0',''); } }
+  function buildSources(st){
+    var nrr=Number(st&&st.payout||0);
+    var uplift=0;
+    var handover=0;
+    return { nrr:nrr, uplift:uplift, handover:handover };
+  }
+  function buildCompactStrip(){
+    if(typeof _commBuildKamSelfState!=='function') return '';
+    var st=_commBuildKamSelfState();
+    if(!st) return '';
+    var src=buildSources(st);
+    var paid=Number(st.payout||0)>0;
+    var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
+    var status=st.status || (paid?'ถึงเกณฑ์แล้ว':'ยังไม่ถึงเกณฑ์');
+    return '<div class="pv-comm-strip '+cls+'" data-v210k="1">'
+      + '<div class="pv-comm-title">ค่าคอมฯ เดือนนี้</div>'
+      + '<div class="pv-comm-main">'+money(st.payout)+'</div>'
+      + '<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
+      + '<button class="pv-comm-i" aria-label="ดูวิธีคิดค่าคอมฯ" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
+      + '<div class="pv-comm-sources" title="NRR '+esc(money(src.nrr))+' · Uplift '+esc(money(src.uplift))+' · Handover '+esc(money(src.handover))+'">'
+      + '<span class="src-nrr"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">·</span>'
+      + '<span><b>Uplift</b> '+money(src.uplift)+'</span><span class="pv-comm-sep">·</span>'
+      + '<span><b>Handover</b> '+money(src.handover)+'</span>'
+      + '</div>'
+      + '</div>';
+  }
+  function renderCompactStrip(){
+    var slot=document.getElementById('pv-commission-strip') || (function(){
+      var row=document.getElementById('portview-summary-row');
+      if(!row||!row.parentNode) return null;
+      var d=document.createElement('div');
+      d.id='pv-commission-strip';
+      d.className='pv-commission-strip-slot';
+      row.parentNode.insertBefore(d,row);
+      return d;
+    })();
+    if(!slot) return;
+    slot.innerHTML=buildCompactStrip() || '';
+  }
+  function openCompactSheet(){
+    if(typeof _commBuildKamSelfState!=='function') return;
+    var st=_commBuildKamSelfState();
+    if(!st) return;
+    var ov=document.getElementById('pv-comm-sheet-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='pv-comm-sheet-overlay';
+      ov.className='pv-comm-sheet-overlay';
+      ov.onclick=function(e){ if(e.target===ov) closeCompactSheet(); };
+      document.body.appendChild(ov);
+    }
+    var pctText=st.pct!==null && st.pct!==undefined ? (st.pct+'%') : '—';
+    var src=buildSources(st);
+    var tierRows=(st.tiers||[]).map(function(t,idx){
+      var on=st.tier && idx===st.currentIdx;
+      var isNext=st.next && String(t.id||idx)===String(st.next.id||(st.tiers||[]).indexOf(st.next));
+      var label=(typeof _commTierRangeLabel==='function'?_commTierRangeLabel(t):'')+' · '+(t.payout_label||'');
+      return '<div class="pv-comm-tier-row '+(on?'on':isNext?'next':'')+'"><div class="pv-comm-tier-range">'+esc(label)+'</div><div class="pv-comm-tier-pay">'+money(t.payout_value)+'</div></div>';
+    }).join('');
+    var action='รอข้อมูล NRR สำหรับคำนวณค่าคอมฯ เดือนนี้';
+    if(st.pct!==null && st.pct!==undefined){
+      if(st.next) action='NRR ต้องเพิ่มอีก +'+pts(Math.max(0, Number(st.next.min_value)-Number(st.pct)))+' pts เพื่อถึง tier ถัดไป';
+      else if(Number(st.payout||0)>0) action='รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน';
+      else action='ยังไม่ถึง tier แรก ให้โฟกัสร้านเสี่ยงและ monitor ก่อน';
+    }
+    var kpiCls=Number(st.payout||0)>0?'val-bonus':'';
+    ov.innerHTML='<div class="pv-comm-sheet">'
+      + '<div class="pv-comm-sheet-handle"></div>'
+      + '<div class="pv-comm-sheet-body">'
+      + '<div class="pv-comm-sheet-title">วิธีคิดค่าคอมฯ</div>'
+      + '<div class="pv-comm-sheet-sub">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา</div>'
+      + '<div class="pv-comm-sheet-kpis">'
+      + '<div class="pv-comm-sheet-kpi '+kpiCls+'"><div class="pv-comm-sheet-kpi-label">ค่าคอมฯ ตอนนี้</div><div class="pv-comm-sheet-kpi-val">'+money(st.payout)+'</div></div>'
+      + '<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">NRR ที่ใช้คิด</div><div class="pv-comm-sheet-kpi-val">'+esc(pctText)+'</div></div>'
+      + '</div>'
+      + '<div class="pv-comm-source-table">'
+      + '<div class="pv-comm-source-row '+(src.nrr>0?'paid':'')+'"><div><span class="pv-comm-source-name">NRR</span><span class="pv-comm-source-note">คิดจาก rule: '+esc(st.ruleName||'-')+'</span></div><div class="pv-comm-source-pay">'+money(src.nrr)+'</div></div>'
+      + '<div class="pv-comm-source-row"><div><span class="pv-comm-source-name">Uplift</span><span class="pv-comm-source-note">ยังไม่ได้เปิดใช้ในรอบนี้</span></div><div class="pv-comm-source-pay">'+money(src.uplift)+'</div></div>'
+      + '<div class="pv-comm-source-row"><div><span class="pv-comm-source-name">Handover</span><span class="pv-comm-source-note">ยังไม่ได้เปิดใช้ในรอบนี้</span></div><div class="pv-comm-source-pay">'+money(src.handover)+'</div></div>'
+      + '</div>'
+      + '<div class="pv-comm-tier-table">'+tierRows+'</div>'
+      + '<div class="pv-comm-action-note">'+esc(action)+'</div>'
+      + '<button class="pv-comm-sheet-close" onclick="_commCloseKamSelfSheet()">ปิด</button>'
+      + '</div></div>';
+    requestAnimationFrame(function(){ov.classList.add('on');});
+  }
+  function closeCompactSheet(){
+    var ov=document.getElementById('pv-comm-sheet-overlay');
+    if(!ov)return;
+    ov.classList.remove('on');
+    setTimeout(function(){ov.innerHTML='';},260);
+  }
+  window._commRenderKamSelfStrip=renderCompactStrip;
+  window._commOpenKamSelfSheet=openCompactSheet;
+  window._commCloseKamSelfSheet=closeCompactSheet;
+  try{ _commRenderKamSelfStrip=renderCompactStrip; }catch(e){}
+  try{ _commOpenKamSelfSheet=openCompactSheet; }catch(e){}
+  try{ _commCloseKamSelfSheet=closeCompactSheet; }catch(e){}
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(renderCompactStrip,0); setTimeout(renderCompactStrip,400); });
 })();
 </script>
 
