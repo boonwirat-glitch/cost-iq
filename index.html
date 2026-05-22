@@ -7103,9 +7103,9 @@ function showSenseSplash(onDone){
   const _lastReady=Number((function(){try{return localStorage.getItem('sense_last_critical_ready');}catch(e){return 0;}})());
   const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<30*60*1000;
   const MIN_SHOW=_cacheWarm ? 0 : (_isWarmBoot ? 0 : 1650);
-  // v218: cold MAX_SHOW 5000→8000ms — splash now waits for ALL 6 FOREGROUND files (was 3).
-  //       warm boot MAX_SHOW 500→3000ms — IndexedDB usually fast but one miss falls back to network (~1-2s).
-  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 3000 : 8000);
+  // v218a: cold MAX_SHOW 8000→5000ms (3-file gate, not 6), warm boot 3000→2000ms.
+  // IndexedDB hits portview+history+handover in ~300-600ms → splash feels like a blink on warm boot.
+  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 2000 : 5000);
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -9251,14 +9251,16 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         if(tab==='skus')bulkSkusReady=true;
         if(tab==='alternatives')bulkAltsReady=true;
         if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
-        // v218 DATA GATE: when the last FOREGROUND file completes, fire ONE consolidated render.
-        // This is the single flush point for both initial load and bfcache resume reload.
+        // v218a DATA GATE: when portview+history+handover all complete, fire ONE consolidated render.
+        // categories/sku_current/outlets are background files — their arrival doesn't need to
+        // block the portfolio render or hold the splash.
         try{
-          var _fg=['portview','history','categories','sku_current','outlets','handover'];
-          if(_fg.every(function(k){return _cloudLoadedTabs.has(k);})){
-            // Signal splash to start fading (all critical data ready)
+          if(_cloudLoadedTabs.has('portview') &&
+             _cloudLoadedTabs.has('history') &&
+             _cloudLoadedTabs.has('handover')){
+            // Signal splash to start fading (critical data ready)
             if(typeof window._splashDataReady==='function') window._splashDataReady();
-            // Flush queued render (fires after current call stack clears)
+            // Flush queued render
             if(window._pendingRefreshAll){
               window._pendingRefreshAll=false;
               setTimeout(function(){if(typeof refreshAll==='function')refreshAll();},30);
@@ -9742,13 +9744,17 @@ function updateDataStatus(){
 // ════════════════════════════════════════
 // RENDER — OVERVIEW
 // ════════════════════════════════════════
-// v218 DATA GATE: checks if all 6 FOREGROUND critical files are loaded.
-// Used by refreshAll() to prevent partial renders during initial load AND resume reloads.
-// FOREGROUND = ['portview','history','categories','sku_current','outlets','handover']
+// v218a DATA GATE: 3 FOREGROUND files needed for portfolio screen (พอร์ตของฉัน / ภาพรวมทีม).
+// portview → account list, run rate, สั่ง/หาย/SKU counts (all from portview.csv Q8E)
+// history  → NRR/Comeback/Expansion movement, ON TRACK/MONITOR/AT RISK classification
+// handover → Handover badge per account
+// categories/sku_current/outlets load in BACKGROUND after splash — they serve account DETAIL
+// not the portfolio list, so their arrival doesn't cause visible flash on the portfolio screen.
 function allCriticalReady(){
   try{
-    var fg=['portview','history','categories','sku_current','outlets','handover'];
-    return fg.every(function(k){return _cloudLoadedTabs.has(k);});
+    return _cloudLoadedTabs.has('portview') &&
+           _cloudLoadedTabs.has('history') &&
+           _cloudLoadedTabs.has('handover');
   }catch(e){return false;}
 }
 
@@ -30138,8 +30144,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v218-data-gate';
-  var DATA_EPOCH='2026-05-22-v218-data-gate';
+  var VERSION='v218a-gate3';
+  var DATA_EPOCH='2026-05-22-v218a-gate3';
   function $(id){return document.getElementById(id);} 
   function log(){try{console.log.apply(console,['[Sense v218]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
