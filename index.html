@@ -27670,5 +27670,260 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 })();
 </script>
 
+
+
+<style id="freshket-v210l-portfolio-state-cleanup-css">
+/* v210l — Portfolio UX State Cleanup: compact insight, sheet explanations, simpler target color */
+#portview-ai-btn{display:none!important;}
+#portview-ai-output{display:none!important;}
+.pv-sort-sticky{gap:8px;}
+.pv-toggle-btns{display:flex;align-items:center;gap:7px;}
+.pv-insight-mini{
+  height:30px;padding:0 11px;border-radius:10px;border:1px solid rgba(80,150,255,.42);
+  background:linear-gradient(135deg,rgba(38,96,200,.34),rgba(38,96,200,.18));
+  color:rgba(230,242,255,.96);font-family:'IBM Plex Sans Thai',sans-serif;font-size:11px;font-weight:850;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;
+  transition:transform .14s ease,background .2s ease,border-color .2s ease,box-shadow .25s ease,opacity .2s ease;
+  box-shadow:0 0 0 rgba(80,150,255,0);position:relative;overflow:hidden;flex-shrink:0;
+}
+.pv-insight-mini:not(.loading):not(.done){animation:insight-idle-glow 3.2s ease-in-out infinite;}
+.pv-insight-mini:hover{background:linear-gradient(135deg,rgba(38,96,200,.50),rgba(80,140,255,.24));border-color:rgba(150,200,255,.70);}
+.pv-insight-mini:active{transform:scale(.96)!important;}
+.pv-insight-mini.loading{pointer-events:none;border-color:rgba(120,185,255,.85);animation:ai-glow 1.15s ease-in-out infinite;}
+.pv-insight-mini.done{background:linear-gradient(135deg,rgba(38,96,200,.48),rgba(80,140,255,.28));border-color:rgba(160,210,255,.72);box-shadow:0 0 16px rgba(80,150,255,.22);}
+.pv-insight-mini.done-bounce{animation:doneBounce 380ms ease;}
+.pv-insight-mini-star{width:11px;height:11px;flex:0 0 11px;filter:drop-shadow(0 0 7px rgba(150,200,255,.6));}
+.pv-insight-mini.loading .pv-insight-mini-star{animation:iq-spin 1.25s linear infinite;}
+.pv-insight-mini .ai-thinking{gap:3px;}
+@media(max-width:380px){.pv-insight-mini{padding:0 9px;font-size:10.5px}.pv-insight-mini .pv-insight-word{display:none}}
+
+.pv-insight-sheet-overlay,.tgt-explain-sheet-overlay{
+  position:fixed;inset:0;z-index:9300;background:rgba(0,0,0,.46);opacity:0;pointer-events:none;
+  transition:opacity .24s ease;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.pv-insight-sheet-overlay.on,.tgt-explain-sheet-overlay.on{opacity:1;pointer-events:auto;}
+.pv-insight-sheet,.tgt-explain-sheet{
+  position:fixed;left:50%;bottom:0;transform:translateX(-50%) translateY(104%);
+  width:100%;max-width:440px;max-height:82dvh;background:linear-gradient(180deg,#10213c 0%,#0b172b 100%);
+  border:1px solid rgba(140,180,255,.20);border-radius:22px 22px 0 0;box-shadow:0 -18px 48px rgba(0,0,0,.38);
+  transition:transform .34s cubic-bezier(.34,1.12,.64,1);overflow:hidden;display:flex;flex-direction:column;
+}
+.pv-insight-sheet-overlay.on .pv-insight-sheet,.tgt-explain-sheet-overlay.on .tgt-explain-sheet{transform:translateX(-50%) translateY(0);}
+.pv-insight-sheet-handle,.tgt-explain-sheet-handle{width:44px;height:5px;border-radius:999px;background:rgba(255,255,255,.24);margin:10px auto 8px;flex-shrink:0;}
+.pv-insight-sheet-head,.tgt-explain-sheet-head{padding:4px 18px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+.pv-insight-sheet-title,.tgt-explain-sheet-title{font-size:16px;font-weight:900;color:#fff;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;}
+.pv-insight-sheet-sub,.tgt-explain-sheet-sub{font-size:11px;font-weight:650;color:rgba(198,216,245,.74);line-height:1.45;margin-top:3px;}
+.pv-insight-sheet-close,.tgt-explain-sheet-close{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.08);color:rgba(255,255,255,.78);font-size:20px;font-weight:800;cursor:pointer;flex-shrink:0;line-height:1;}
+.pv-insight-sheet-close:active,.tgt-explain-sheet-close:active{transform:scale(.94)!important;}
+.pv-insight-sheet-body,.tgt-explain-sheet-body{padding:16px 18px 26px;overflow-y:auto;-webkit-overflow-scrolling:touch;line-height:1.75;color:rgba(225,238,255,.90);font-size:13px;}
+.pv-insight-sheet-body strong{color:#fff;font-weight:900;}
+.pv-insight-loading{padding:24px 8px;text-align:center;color:rgba(205,225,255,.86);font-size:13px;font-weight:750;}
+.pv-insight-loading-star{display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;margin:0 auto 12px;border-radius:50%;background:rgba(38,96,200,.18);border:1px solid rgba(120,185,255,.28);animation:insight-btn-pulse 1.4s ease-in-out infinite;}
+.pv-insight-error{padding:14px;border-radius:14px;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#ffd0d0;font-weight:750;}
+
+.tgt-explain-sheet-body .tgt-detail-panel{display:block!important;max-height:none!important;opacity:1!important;padding:0!important;margin:0!important;background:transparent!important;border:none!important;}
+.tgt-explain-sheet-body .tgt-det-section{padding:14px 0;border-top:1px solid rgba(255,255,255,.09);}
+.tgt-explain-sheet-body .tgt-det-section:first-child{border-top:none;padding-top:0;}
+.tgt-explain-sheet-body .tgt-det-stitle{font-size:11px!important;color:rgba(190,210,240,.72)!important;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px!important;}
+.tgt-explain-sheet-body .tgt-fml-line,.tgt-explain-sheet-body .tgt-fml-total{color:rgba(225,238,255,.88)!important;}
+.tgt-explain-sheet-body .tgt-fml-total-val{color:#fff!important;}
+.tgt-explain-sheet-body .tgt-color-key{display:none!important;}
+.tgt-info-btn.open{background:rgba(255,255,255,.1);}
+/* Simplify target color: target/projection number is always amber on the main hero. */
+.tgt-rr-target,.tgt-rr-target.tgt-real,.tgt-rr-target.tgt-alloc,.tgt-rr-target.tgt-base{color:var(--amb,#f0b000)!important;text-shadow:none!important;}
+</style>
+
+<script id="freshket-v210l-portfolio-state-cleanup-js">
+(function(){
+  function esc(v){
+    try{ return typeof _commEscapeHtml==='function' ? _commEscapeHtml(v) : String(v ?? '').replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];}); }
+    catch(e){ return String(v ?? ''); }
+  }
+  function fmtK(n){ n=Number(n||0); return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+(n/1000).toFixed(0)+'K':'฿'+Math.round(n); }
+  function insightStar(){ return '<svg class="pv-insight-mini-star" viewBox="0 0 10 10" fill="rgba(170,210,255,.95)" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>'; }
+  function ensureInsightControl(){
+    var wrap=document.querySelector('#pv-sort-sticky .pv-toggle-btns');
+    if(!wrap) return null;
+    var btn=document.getElementById('pv-insight-mini');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.id='pv-insight-mini';
+      btn.className='pv-insight-mini';
+      btn.type='button';
+      btn.onclick=function(){ generatePortviewInsight(); };
+      wrap.insertBefore(btn, wrap.firstChild);
+    }
+    syncInsightButton();
+    return btn;
+  }
+  function syncInsightButton(state){
+    var btn=document.getElementById('pv-insight-mini');
+    if(!btn) return;
+    btn.classList.remove('loading','done','done-bounce');
+    if(state==='loading'){
+      btn.classList.add('loading');
+      btn.innerHTML='<span class="ai-thinking">'+insightStar()+'<span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></span>';
+      return;
+    }
+    var done=false;
+    try{ done=!!portviewAiDone; }catch(e){ done=!!window._pvLastInsightHtml; }
+    if(done || state==='done') btn.classList.add('done');
+    btn.innerHTML=insightStar()+'<span class="pv-insight-word">Insight</span>';
+  }
+  function openInsightSheet(html, opts){
+    opts=opts||{};
+    var ov=document.getElementById('pv-insight-sheet-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='pv-insight-sheet-overlay';
+      ov.className='pv-insight-sheet-overlay';
+      ov.onclick=function(e){ if(e.target===ov) closeInsightSheet(); };
+      document.body.appendChild(ov);
+    }
+    var body='';
+    if(opts.loading){
+      body='<div class="pv-insight-loading"><div class="pv-insight-loading-star">'+insightStar()+'</div><div>Olive กำลังอ่านสัญญาณพอร์ต...</div><div style="font-size:11px;color:rgba(198,216,245,.62);margin-top:3px">จัดลำดับร้านที่ควรดูต่อให้ก่อน</div></div>';
+    }else if(opts.error){
+      body='<div class="pv-insight-error">'+esc(opts.error)+'</div>';
+    }else{
+      body=html||'<div class="pv-insight-loading">ยังไม่มี Insight</div>';
+    }
+    ov.innerHTML='<div class="pv-insight-sheet">'
+      +'<div class="pv-insight-sheet-handle"></div>'
+      +'<div class="pv-insight-sheet-head"><div><div class="pv-insight-sheet-title">'+insightStar()+' Portfolio Insight</div><div class="pv-insight-sheet-sub">อ่านแล้วปิดกลับมาดูพอร์ตต่อได้ ไม่เปลี่ยนตำแหน่งหน้า</div></div><button class="pv-insight-sheet-close" onclick="_pvCloseInsightSheet()">×</button></div>'
+      +'<div class="pv-insight-sheet-body">'+body+'</div>'
+      +'</div>';
+    requestAnimationFrame(function(){ ov.classList.add('on'); });
+  }
+  function closeInsightSheet(){
+    var ov=document.getElementById('pv-insight-sheet-overlay');
+    if(!ov) return;
+    ov.classList.remove('on');
+    setTimeout(function(){ ov.innerHTML=''; },260);
+  }
+  window._pvCloseInsightSheet=closeInsightSheet;
+  window._pvEnsureInsightControl=ensureInsightControl;
+
+  async function generateInsightSheet(){
+    ensureInsightControl();
+    try{
+      if(portviewAiDone && window._pvLastInsightHtml){
+        openInsightSheet(window._pvLastInsightHtml);
+        syncInsightButton('done');
+        return;
+      }
+    }catch(e){ if(window._pvLastInsightHtml){ openInsightSheet(window._pvLastInsightHtml); return; } }
+    syncInsightButton('loading');
+    openInsightSheet('',{loading:true});
+    var accounts=getPortviewAccounts();
+    var _awp=accounts.filter(function(a){return a.paceSignal&&a.paceSignal.pct>0;});
+    var portfolioPace=_awp.length>0?Math.round(_awp.reduce(function(s,a){return s+a.paceSignal.gmvToDate;},0)/Math.max(1,_awp.reduce(function(s,a){return s+a.paceSignal.expected;},0))*100):0;
+    var shortfall=accounts.filter(function(a){return a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn');}).reduce(function(s,a){
+      var g=Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||a.paceSignal.gmvToDate||0));
+      return s+g;
+    },0);
+    var atRisk=accounts
+      .filter(function(a){return a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn');})
+      .map(function(a){a._shortfall=Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||a.paceSignal.gmvToDate||0));return a;})
+      .sort(function(a,b){return b._shortfall-a._shortfall;})
+      .slice(0,8);
+    var ctxLines=atRisk.map(function(a){
+      var baseline=a.paceSignal.baselineGmv||0;
+      var parts=['Pace '+a.paceSignal.pct+'% · baseline '+(baseline>0?fmtK(baseline):'-')+'/เดือน · ขาดอีก '+fmtK(a._shortfall)];
+      var cc=a._churnCounts;
+      if(cc&&(cc.gone>0||cc.near>0)){
+        var churnParts=[];
+        if(cc.gone>0)churnParts.push('หายจริง '+cc.gone+' ตัว');
+        if(cc.near>0)churnParts.push('ใกล้รอบ '+cc.near+' ตัว');
+        parts.push('SKU (interval-aware): '+churnParts.join(', ')+' จาก '+cc.total+' ตัว');
+      } else if(!cc&&a.churnedSkuCount>0){
+        parts.push('SKU หาย '+a.churnedSkuCount+' ตัว ('+fmtK(a.churnedGmv||0)+'): '+(a.topChurnedNames||'').split(' | ').slice(0,2).join(', '));
+      }
+      if(a.missingCatCount>0) parts.push('Category ขาด: '+(a.missingCats||'').split(' | ').slice(0,2).join(', '));
+      return '- '+a.name+' ['+a.paceSignal.cls+']: '+parts.join(' · ');
+    }).join('\n');
+    var quickRecover=accounts
+      .filter(function(a){return a.paceSignal&&a.paceSignal.cls==='warn'&&!(a._churnCounts&&a._churnCounts.gone>0)&&!(a.churnedSkuCount>0);})
+      .sort(function(a,b){return b.paceSignal.pct-a.paceSignal.pct;})
+      .slice(0,2)
+      .map(function(a){return a.name+' ('+a.paceSignal.pct+'% ขาดอีก '+fmtK(Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||a.paceSignal.gmvToDate||0)))+')';})
+      .join(', ');
+    var prompt='ข้อมูลพอร์ต:\nภาพรวม: '+accounts.length+' ร้าน · Pro Rate '+portfolioPace+'% · ส่วนต่างรวม '+fmtK(shortfall)+'\n\nAccounts เสี่ยง ranked by ฿ impact ('+atRisk.length+'):\n'+(ctxLines||'ไม่มี')+(quickRecover?'\n\nQuick recovery candidates (warn + SKU health ok): '+quickRecover:'');
+    var sysPv=OLIVE_BASE+`\n\n-- TASK CONTEXT --\nA KAM is planning their day right now. They can see the list — they need your read on what it actually means and who to contact first. Accounts are ranked by ฿ shortfall, not pace %. Let the money impact drive the priority, not the percentage.\n\nUrgency logic (read the signals, decide yourself):\n- Danger + SKU หาย → โทรวันนี้ก่อนเลย ถามว่าทำไมหยุดสั่ง\n- Danger เฉยๆ → โทรวันนี้ เปิดด้วยความห่วงใย ไม่ใช่ pressure\n- Warn + category ขาด → พรุ่งนี้ ถามว่ายังซื้อ category นั้นอยู่มั้ย\n- Warn เฉยๆ → monitor เตรียม talkline ไว้\n- Safe/Great → ไม่ urgent แต่ถ้ามี opportunity ให้หมายเหตุ\n\n-- OUTPUT CONTRACT --\nThai prose — brief enough to read in 30 seconds.\n\nStructure:\n1. One sentence on portfolio state — lead with the problem, not how many accounts are fine.\n2. Contact list ranked by urgency: name → why it matters → what specifically to ask (max 5)\n3. Quick win if one exists.\n\nDon't repeat numbers already visible in the list.\nWhen mentioning a SKU, use ฿ — not %.`;
+    try{
+      var txt=await callAI('sonnet',sysPv,[{role:'user',content:prompt}],2000);
+      var html=String(txt||'').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      window._pvLastInsightHtml=html;
+      try{ portviewAiDone=true; }catch(e){}
+      openInsightSheet(html);
+      syncInsightButton('done');
+      var btn=document.getElementById('pv-insight-mini');
+      if(btn){btn.classList.add('done-bounce');btn.addEventListener('animationend',function(e){if(e.animationName==='doneBounce')btn.classList.remove('done-bounce');},{once:true});}
+    }catch(e){
+      syncInsightButton();
+      openInsightSheet('',{error:'AI error: '+String(e.message||e).slice(0,80)});
+      try{ showToast('AI error: '+String(e.message||e).slice(0,60),'⚠'); }catch(_e){}
+    }
+  }
+  window.generatePortviewInsight=generateInsightSheet;
+
+  function openTargetExplain(panelId, handleId){
+    var p=document.getElementById(panelId), h=document.getElementById(handleId);
+    if(!p) return;
+    if(h) h.classList.add('open');
+    p.classList.remove('open');
+    var clone=p.cloneNode(true);
+    clone.classList.add('open');
+    clone.querySelectorAll('.tgt-det-section').forEach(function(sec){
+      if(sec.querySelector('.tgt-color-key') || /สีของตัวเลข\s*เป้าหมาย/.test(sec.textContent||'')) sec.remove();
+    });
+    var ov=document.getElementById('tgt-explain-sheet-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='tgt-explain-sheet-overlay';
+      ov.className='tgt-explain-sheet-overlay';
+      ov.onclick=function(e){ if(e.target===ov) closeTargetExplain(); };
+      document.body.appendChild(ov);
+    }
+    ov.dataset.handleId=handleId||'';
+    ov.innerHTML='<div class="tgt-explain-sheet">'
+      +'<div class="tgt-explain-sheet-handle"></div>'
+      +'<div class="tgt-explain-sheet-head"><div><div class="tgt-explain-sheet-title">วิธีอ่านตัวเลขพอร์ต</div><div class="tgt-explain-sheet-sub">แยกข้อมูลยาวออกจากหน้าหลัก เพื่อให้อ่านได้โดยไม่โดนยุบตอน scroll</div></div><button class="tgt-explain-sheet-close" onclick="_tgtCloseExplainSheet()">×</button></div>'
+      +'<div class="tgt-explain-sheet-body">'+clone.outerHTML+'</div>'
+      +'</div>';
+    requestAnimationFrame(function(){ ov.classList.add('on'); });
+  }
+  function closeTargetExplain(){
+    var ov=document.getElementById('tgt-explain-sheet-overlay');
+    if(!ov) return;
+    var handleId=ov.dataset.handleId;
+    if(handleId){ var h=document.getElementById(handleId); if(h) h.classList.remove('open'); }
+    ov.classList.remove('on');
+    setTimeout(function(){ov.innerHTML='';},260);
+  }
+  window._tgtToggleDetail=openTargetExplain;
+  window._tgtCloseExplainSheet=closeTargetExplain;
+
+  function afterRenderHook(){
+    setTimeout(function(){
+      ensureInsightControl();
+      var out=document.getElementById('portview-ai-output'); if(out){out.style.display='none'; out.innerHTML='';}
+    },80);
+  }
+  var _oldRenderPortview=window.renderPortview;
+  if(typeof _oldRenderPortview==='function'){
+    window.renderPortview=function(){ var r=_oldRenderPortview.apply(this,arguments); afterRenderHook(); return r; };
+    try{ renderPortview=window.renderPortview; }catch(e){}
+  }
+  var _oldRenderPortviewList=window.renderPortviewList;
+  if(typeof _oldRenderPortviewList==='function'){
+    window.renderPortviewList=function(){ var r=_oldRenderPortviewList.apply(this,arguments); afterRenderHook(); return r; };
+    try{ renderPortviewList=window.renderPortviewList; }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(ensureInsightControl,0); setTimeout(ensureInsightControl,350); });
+  setTimeout(ensureInsightControl,0);
+})();
+</script>
+
 </body>
 </html>
