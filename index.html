@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 
+<!-- Freshket Sense v212b: PWA data panel + target input + overflow badge cleanup — sync Cloudflare panel count from actual foreground data, comma-format target inputs, hide redundant run-rate overflow badge; preserves v212a freshness unification and no commission/owner/movement formula change -->
+<!-- Freshket Sense v212a: PWA freshness unification — CSV + Supabase governance/commission refresh contract, PWA resume validation, Teamview mobile layout guard; no commission/owner/movement formula change -->
 <!-- Freshket Sense v212: Data Freshness & Loader Correctness patch — critical network-first portview/history/handover, cache fallback, PWA resume freshness validation, build version alignment; preserves v211c movement correctness and commission logic -->
 <!-- Freshket Sense v211c: Handover data refresh + movement classification/sheet UI fix — Q10_FIXED_PROD SQL, cache-busted portview_handover.csv, robust handover parsing, New/Transfer sheet columns, Transfer-out row cards; no commission/schema/role/PWA regression -->
 <!-- Freshket Sense v211a: Commission QA cleanup — static+logic validation pass, snapshot row normalization, admin-write guards preserved, locked/live source-of-truth clarified, TOC/patch map updated; no schema change, no PWA/performance change -->
@@ -3447,7 +3449,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v212-data-freshness-loader',
+      version: 'v212b-pwa-freshness-ui-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -28656,6 +28658,446 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
     validateFreshnessOnResume: validateFreshnessOnResume,
     getFreshness: function(){ try{return JSON.parse(JSON.stringify(global.FreshketSenseDataFreshness||{}));}catch(e){return global.FreshketSenseDataFreshness||{};} }
   };
+})(window);
+</script>
+
+
+<style id="freshket-v212a-pwa-freshness-css">
+/* v212a — PWA width guard for Teamview/KAM cards. UI only; no data/formula changes. */
+@media (max-width: 430px){
+  #scr-teamview{overflow-x:hidden;}
+  #scr-teamview .portview-head{align-items:flex-start!important;gap:10px!important;padding-left:16px!important;padding-right:16px!important;}
+  #scr-teamview #tv-title{font-size:22px!important;line-height:1.18!important;max-width:92px!important;white-space:normal!important;}
+  #scr-teamview #tv-action-btns{gap:7px!important;margin-left:0!important;flex:1!important;justify-content:flex-end!important;flex-wrap:nowrap!important;min-width:0!important;}
+  #scr-teamview #tv-target-btn,
+  #scr-teamview #tv-portfolio-btn,
+  #scr-teamview #tv-commission-btn,
+  #scr-teamview .comm-btn{height:36px!important;padding:7px 10px!important;border-radius:12px!important;font-size:12px!important;white-space:nowrap!important;flex-shrink:0!important;}
+  #scr-teamview #tv-target-btn svg,
+  #scr-teamview #tv-portfolio-btn svg,
+  #scr-teamview #tv-commission-btn svg{width:15px!important;height:15px!important;}
+  #scr-teamview .role-pill{height:28px!important;min-width:42px!important;padding:0 10px!important;}
+  #tv-pace-bar{margin-left:0!important;margin-right:0!important;}
+  #tv-pace-bar > div:first-child{align-items:flex-start!important;gap:6px!important;}
+  #tv-pace-bar > div:first-child > div:first-child{min-width:0!important;flex:1!important;}
+  #tv-pace-bar .pace-pct-val{font-size:28px!important;line-height:1!important;}
+  #tv-pace-bar .pace-bar-wrap{height:6px!important;border-radius:4px!important;}
+  #tv-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;}
+  .tv-full-card,.tv-star-card{padding:16px 16px 14px!important;border-radius:16px!important;margin-bottom:14px!important;}
+  .tv-full-top{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:8px!important;margin-bottom:10px!important;}
+  .tv-full-name{font-size:15px!important;line-height:1.3!important;min-width:0!important;white-space:normal!important;overflow:visible!important;}
+  .tv-full-name span{display:inline-block!important;margin-left:6px!important;white-space:nowrap!important;font-size:10px!important;color:rgba(255,255,255,.56)!important;}
+  .tv-full-pace,.tv-star-pace{font-size:22px!important;line-height:1!important;}
+  .tv-full-bar,.tv-star-bar{height:6px!important;border-radius:999px!important;margin-bottom:12px!important;}
+  .tv-full-fill,.tv-star-fill{border-radius:999px!important;}
+  .tv-full-meta{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"chips gmv" "payout gmv"!important;align-items:center!important;gap:8px 12px!important;font-size:11px!important;}
+  .tv-risk-chips{grid-area:chips!important;display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important;min-width:0!important;}
+  .tv-risk-chips .tv-nrr-pill{margin-left:4px!important;}
+  .tv-risk-chips .tv-payout-pill{grid-area:payout!important;}
+  .tv-full-meta > span:not(.tv-nrr-pill):not(.tv-payout-pill){grid-area:gmv!important;text-align:right!important;align-self:center!important;line-height:1.6!important;white-space:normal!important;min-width:86px!important;}
+  .tv-payout-pill{min-width:96px!important;justify-content:center!important;padding:7px 14px!important;font-size:12px!important;border-radius:999px!important;}
+  .tv-nrr-pill{padding:6px 12px!important;border-radius:999px!important;font-size:12px!important;}
+  .tv-card-exclude{display:none!important;}
+  .bnav{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:calc(100% - 32px)!important;max-width:392px!important;border-radius:36px!important;bottom:14px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;}
+}
+@media (max-width: 370px){
+  #scr-teamview #tv-action-btns{gap:5px!important;}
+  #scr-teamview #tv-target-btn,
+  #scr-teamview #tv-portfolio-btn,
+  #scr-teamview #tv-commission-btn,
+  #scr-teamview .comm-btn{padding:6px 8px!important;font-size:11px!important;}
+  #scr-teamview #tv-title{max-width:82px!important;font-size:20px!important;}
+  .tv-full-name{font-size:14px!important;}
+  .tv-full-pace,.tv-star-pace{font-size:20px!important;}
+}
+</style>
+<script id="freshket-v212a-pwa-freshness-unification-js">
+// v212a — PWA freshness unification.
+// Scope: synchronize CSV freshness with Supabase target/governance/commission state and add mobile Teamview layout guard.
+// No commission formula, NRR formula, movement attribution, owner source, or SQL/schema change.
+(function(global){
+  'use strict';
+  var VERSION = 'v212a-pwa-freshness-unification';
+  var DATA_EPOCH = '2026-05-22-v212a-pwa-freshness-unification';
+  var CRITICAL = ['portview','history','handover'];
+  var lastGovernanceLoadAt = 0;
+  var governanceInFlight = null;
+  var resumeInFlight = null;
+  var lastResumeAt = 0;
+
+  function debugOn(){ try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshketDebug')==='1';}catch(e){return false;} }
+  function log(){ if(debugOn()) try{ console.log.apply(console, ['[v212a freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function warn(){ try{ console.warn.apply(console, ['[v212a freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function now(){ return Date.now ? Date.now() : +new Date(); }
+  function safeClone(x){ try{return JSON.parse(JSON.stringify(x));}catch(e){return x;} }
+  function isLoggedIn(){ try{return !!currentUser;}catch(e){return false;} }
+  function currentQuarter(){ try{return _tgtCurrentQuarter();}catch(e){ return null; } }
+  function hasCoreData(){ try{return Array.isArray(portviewBulkData) && portviewBulkData.length>0;}catch(e){return false;} }
+  function markGov(meta){
+    try{
+      global.FreshketSenseGovernanceFreshness = Object.assign({
+        version: VERSION,
+        dataEpoch: DATA_EPOCH,
+        checkedAt: now(),
+        quarter: currentQuarter()
+      }, meta || {});
+    }catch(e){}
+  }
+  function clearGovernanceMemory(reason){
+    try{ _tgtQuarterCache = {}; }catch(e){}
+    try{ _tgtLoaded = false; }catch(e){}
+    try{ _tgtCache = {}; }catch(e){}
+    try{ _tgtSettings = { nrr_threshold: 98 }; }catch(e){}
+    try{ _nrrGovPolicies = {}; }catch(e){}
+    try{ _nrrExclusions = []; }catch(e){}
+    try{ _commissionSnapshots = []; }catch(e){}
+    try{ _commRuleConfig = { plans:{}, rules:{}, tiers:{}, assignments:[] }; }catch(e){}
+    markGov({source:'cleared', reason:reason||'manual'});
+  }
+  async function forceGovernanceReload(reason, opts){
+    opts = opts || {};
+    var force = !!opts.force;
+    var minGap = opts.minGap == null ? 60000 : opts.minGap;
+    if(governanceInFlight) return governanceInFlight;
+    if(!isLoggedIn() && !opts.allowLoggedOut) return false;
+    if(!force && lastGovernanceLoadAt && (now() - lastGovernanceLoadAt) < minGap){
+      markGov(Object.assign({}, global.FreshketSenseGovernanceFreshness||{}, {source:'memory-fresh', reason:reason||'throttled', skipped:true, ageMs:now()-lastGovernanceLoadAt}));
+      return true;
+    }
+    governanceInFlight = (async function(){
+      var q = currentQuarter();
+      var started = now();
+      try{
+        if(typeof loadTargets !== 'function' || !q){ markGov({source:'unavailable', reason:reason||'unknown'}); return false; }
+        clearGovernanceMemory(reason||'force-reload');
+        if(typeof _setDataPillText === 'function' && !opts.silent) _setDataPillText('Sync governance','Supabase');
+        await loadTargets(q);
+        lastGovernanceLoadAt = now();
+        var metrics = {};
+        try{ metrics.targetKeys = Object.keys(_tgtCache||{}).length; }catch(e){}
+        try{ metrics.policyKeys = Object.keys(_nrrGovPolicies||{}).length; }catch(e){}
+        try{ metrics.exclusions = (_nrrExclusions||[]).length; }catch(e){}
+        try{ metrics.snapshots = (_commissionSnapshots||[]).length; }catch(e){}
+        try{ metrics.assignments = ((_commRuleConfig||{}).assignments||[]).length; }catch(e){}
+        markGov(Object.assign({source:'network', ok:true, reason:reason||'reload', durationMs:now()-started}, metrics));
+        log('governance reloaded', reason, metrics);
+        return true;
+      }catch(err){
+        markGov({source:'error', ok:false, reason:reason||'reload', durationMs:now()-started, error:err && err.message ? err.message : String(err)});
+        warn('governance reload failed', reason, err && err.message ? err.message : err);
+        return false;
+      }finally{ governanceInFlight = null; }
+    })();
+    return governanceInFlight;
+  }
+  function hydrateVisible(reason){
+    try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
+    try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+    try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+    try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
+    try{ if(typeof renderKamOverview === 'function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+    try{ if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('v212a-'+(reason||'hydrate'),{full:true,delay:160}); }catch(e){}
+  }
+  function keysAreCritical(keys){
+    if(!Array.isArray(keys)) return false;
+    var map = {}; keys.forEach(function(k){ map[k]=true; });
+    return CRITICAL.every(function(k){ return !!map[k]; });
+  }
+  async function validateUnifiedFreshness(reason, opts){
+    opts = opts || {};
+    var minGap = opts.force ? 0 : 120000;
+    if(resumeInFlight) return resumeInFlight;
+    if(!isLoggedIn()) return false;
+    if(!opts.force && !hasCoreData()) return false;
+    if(!opts.force && lastResumeAt && (now()-lastResumeAt)<minGap) return false;
+    lastResumeAt = now();
+    resumeInFlight = (async function(){
+      try{
+        if(navigator && navigator.onLine === false){
+          try{ if(typeof showToast === 'function') showToast('ใช้ข้อมูล cached — offline','⚠'); }catch(e){}
+          return false;
+        }
+        var csvOk = true;
+        if(typeof ensureCloudflareFiles === 'function'){
+          csvOk = await ensureCloudflareFiles(CRITICAL, { label:'ตรวจข้อมูลล่าสุด', force:true });
+        }
+        var govOk = await forceGovernanceReload(reason||'resume', {force:true, silent:true, minGap:0});
+        if(csvOk && govOk){
+          hydrateVisible(reason||'resume');
+          try{ if(typeof showToast === 'function') showToast('ข้อมูลล่าสุดแล้ว','✓'); }catch(e){}
+          return true;
+        }
+        try{ if(typeof showToast === 'function') showToast('ตรวจข้อมูลล่าสุดไม่ครบ — ใช้ข้อมูลที่มีอยู่','⚠'); }catch(e){}
+        return false;
+      }catch(err){ warn('unified validation failed', reason, err&&err.message?err.message:err); return false; }
+      finally{ resumeInFlight = null; }
+    })();
+    return resumeInFlight;
+  }
+
+  // Wrap CSV ensure: when critical CSV is refreshed, Supabase governance/commission state must refresh before callers hydrate UI.
+  try{
+    var oldEnsure = ensureCloudflareFiles;
+    if(typeof oldEnsure === 'function' && !oldEnsure.__v212aWrapped){
+      var wrappedEnsure = async function(keys, opts){
+        var ok = await oldEnsure.apply(this, arguments);
+        try{
+          if(ok && (opts && opts.force || keysAreCritical(keys)) && keysAreCritical(keys)){
+            await forceGovernanceReload('ensure-critical-csv', {force:true, silent:true, minGap:0});
+          }
+        }catch(e){ warn('post-ensure governance sync failed', e&&e.message?e.message:e); }
+        return ok;
+      };
+      wrappedEnsure.__v212aWrapped = true;
+      ensureCloudflareFiles = wrappedEnsure;
+    }
+  }catch(e){ warn('ensureCloudflareFiles wrap failed', e&&e.message?e.message:e); }
+
+  // Wrap cold load: clear/reload governance before CSV render path to avoid PWA using stale target/exclusion/snapshot memory.
+  try{
+    var oldLoad = loadFromCloudflareR2;
+    if(typeof oldLoad === 'function' && !oldLoad.__v212aWrapped){
+      var wrappedLoad = async function(){
+        await forceGovernanceReload('cold-load-pre-render', {force:true, silent:true, minGap:0});
+        var res = await oldLoad.apply(this, arguments);
+        await forceGovernanceReload('cold-load-post-csv', {force:true, silent:true, minGap:0});
+        hydrateVisible('cold-load-complete');
+        return res;
+      };
+      wrappedLoad.__v212aWrapped = true;
+      loadFromCloudflareR2 = wrappedLoad;
+      try{ loadFromGoogleSheets = wrappedLoad; }catch(e){}
+      try{ loadFromSupabaseStorage = wrappedLoad; }catch(e){}
+    }
+  }catch(e){ warn('loadFromCloudflareR2 wrap failed', e&&e.message?e.message:e); }
+
+  // Wrap manual refresh: clear both CSV/KAM bundle and Supabase-derived state.
+  try{
+    var oldReload = reloadFromCloudflareR2;
+    if(typeof oldReload === 'function' && !oldReload.__v212aWrapped){
+      var wrappedReload = async function(){
+        clearGovernanceMemory('manual-refresh');
+        try{ lastGovernanceLoadAt = 0; lastResumeAt = 0; }catch(e){}
+        var res = await oldReload.apply(this, arguments);
+        await forceGovernanceReload('manual-refresh-post-csv', {force:true, silent:true, minGap:0});
+        hydrateVisible('manual-refresh');
+        return res;
+      };
+      wrappedReload.__v212aWrapped = true;
+      reloadFromCloudflareR2 = wrappedReload;
+      try{ reloadFromGoogleSheets = wrappedReload; }catch(e){}
+    }
+  }catch(e){ warn('reloadFromCloudflareR2 wrap failed', e&&e.message?e.message:e); }
+
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') setTimeout(function(){ validateUnifiedFreshness('visibility-visible'); }, 2400);
+  });
+  global.addEventListener('pageshow', function(event){
+    setTimeout(function(){ validateUnifiedFreshness(event && event.persisted ? 'pageshow-bfcache' : 'pageshow', {force:!!(event&&event.persisted)}); }, event && event.persisted ? 1200 : 3200);
+  });
+  global.addEventListener('focus', function(){ setTimeout(function(){ validateUnifiedFreshness('window-focus'); }, 2600); });
+  global.addEventListener('online', function(){ setTimeout(function(){ validateUnifiedFreshness('online', {force:true}); }, 800); });
+
+  var api = {
+    version: VERSION,
+    dataEpoch: DATA_EPOCH,
+    criticalKeys: CRITICAL.slice(),
+    forceGovernanceReload: forceGovernanceReload,
+    clearGovernanceMemory: clearGovernanceMemory,
+    validateFreshnessOnResume: validateUnifiedFreshness,
+    getFreshness: function(){
+      return {
+        csv: safeClone(global.FreshketSenseDataFreshness || {}),
+        governance: safeClone(global.FreshketSenseGovernanceFreshness || {}),
+        app: { version: VERSION, dataEpoch: DATA_EPOCH, ts: now() }
+      };
+    }
+  };
+  global.FreshketSenseV212a = api;
+  try{
+    global.FreshketSenseV212 = Object.assign(global.FreshketSenseV212 || {}, {
+      version: VERSION,
+      dataEpoch: DATA_EPOCH,
+      validateFreshnessOnResume: validateUnifiedFreshness,
+      forceGovernanceReload: forceGovernanceReload,
+      getFreshness: api.getFreshness
+    });
+  }catch(e){}
+  markGov({source:'boot', reason:'v212a-loaded'});
+  log('loaded');
+})(window);
+</script>
+
+
+
+<style id="freshket-v212b-panel-target-ui-css">
+/* v212b — UI-only cleanup: remove duplicated overflow badge and keep info button inline. */
+.tgt-overflow-badge{display:none!important;}
+.tgt-pct-legend{align-items:center!important;gap:8px!important;}
+.tgt-info-btn{flex:0 0 auto!important;margin-left:auto!important;}
+@media(max-width:420px){
+  .tgt-pct-legend{gap:7px!important;}
+  .tgt-info-btn{width:28px!important;height:28px!important;min-width:28px!important;}
+  .tgt-month-input{font-variant-numeric:tabular-nums;letter-spacing:.2px;}
+}
+</style>
+<script id="freshket-v212b-panel-target-ui-js">
+// v212b — Data panel counter sync + target comma formatting + redundant badge cleanup.
+// Scope: UI/freshness visibility only. No NRR, commission, owner, or movement formula changes.
+(function(global){
+  'use strict';
+  var VERSION = 'v212b-pwa-freshness-ui-fix';
+  var FOREGROUND_KEYS = ['portview','history','categories','sku_current','outlets','handover'];
+
+  function countObj(o){ try{ return o && typeof o === 'object' ? Object.keys(o).length : 0; }catch(e){ return 0; } }
+  function loadedTabs(){ try{ if(typeof _cloudLoadedTabs !== 'undefined' && _cloudLoadedTabs && typeof _cloudLoadedTabs.has === 'function') return _cloudLoadedTabs; }catch(e){} return null; }
+  function hasTab(tab){ var t=loadedTabs(); return !!(t && t.has(tab)); }
+  function dataLoaded(key){
+    try{
+      if(key === 'portview') return hasTab('portview') || (Array.isArray(global.portviewBulkData) && global.portviewBulkData.length > 0);
+      if(key === 'history') return hasTab('history') || countObj(global.bulkHistoryData) > 0;
+      if(key === 'categories') return hasTab('categories') || countObj(global.bulkCatsData) > 0 || countObj(global.bulkCategoriesData) > 0;
+      if(key === 'sku_current') return hasTab('sku_current') || countObj(global.bulkSkuCurrentData) > 0;
+      if(key === 'outlets') return hasTab('outlets') || countObj(global.bulkOutletsData) > 0;
+      if(key === 'handover'){
+        var h = global.bulkHandoverData || {};
+        return hasTab('handover') || countObj(h.byAccountId) > 0 || countObj(h.byKamName) > 0;
+      }
+    }catch(e){}
+    return false;
+  }
+  function keyToTab(key){ return key === 'sku_current' ? 'sku_current' : key; }
+  function styleChip(key, ok){
+    try{
+      var id = 'sp-' + keyToTab(key);
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.style.background = ok ? 'rgba(0,208,112,.18)' : 'rgba(0,0,0,.06)';
+      el.style.color = ok ? 'var(--g700)' : 'var(--n500)';
+      el.style.fontWeight = ok ? '800' : '600';
+    }catch(e){}
+  }
+  function syncPanelCounter(){
+    var loaded = 0;
+    FOREGROUND_KEYS.forEach(function(k){ var ok = dataLoaded(k); if(ok) loaded++; styleChip(k, ok); });
+    var counter = document.getElementById('sheets-loaded-count');
+    if(counter){
+      counter.style.display = 'inline-block';
+      counter.textContent = loaded >= FOREGROUND_KEYS.length ? (loaded + '/' + FOREGROUND_KEYS.length) : (loaded >= 3 ? 'Core 3/3' : (loaded + '/' + FOREGROUND_KEYS.length));
+      counter.title = loaded >= FOREGROUND_KEYS.length
+        ? 'Foreground data loaded: portview, history, handover, categories, sku_current, outlets'
+        : 'Core data is ready. Enhancement files may still load in background.';
+      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'rgba(0,208,112,.16)' : 'rgba(38,96,200,.15)';
+      counter.style.color = loaded >= FOREGROUND_KEYS.length ? 'var(--g700)' : 'rgba(38,96,200,.85)';
+    }
+    return {loaded:loaded,total:FOREGROUND_KEYS.length,keys:FOREGROUND_KEYS.slice()};
+  }
+
+  function parseTargetNumber(v){
+    try{
+      if(typeof global._tgtParseInput === 'function') return global._tgtParseInput(String(v||''));
+    }catch(e){}
+    var s = String(v||'').replace(/,/g,'').replace(/฿/g,'').trim().toLowerCase();
+    if(!s || s === '—') return 0;
+    if(s.endsWith('m')) return Math.round((parseFloat(s)||0)*1000000);
+    if(s.endsWith('k')) return Math.round((parseFloat(s)||0)*1000);
+    return Math.round(parseFloat(s)||0);
+  }
+  function fmtComma(n){
+    n = Number(n||0);
+    if(!Number.isFinite(n) || n <= 0) return '';
+    return Math.round(n).toLocaleString('en-US');
+  }
+  function formatTargetInput(el){
+    if(!el || !el.classList || !el.classList.contains('tgt-month-input')) return;
+    var v = parseTargetNumber(el.value);
+    el.value = v > 0 ? fmtComma(v) : '';
+    try{ el.classList.toggle('changed', v > 0); }catch(e){}
+  }
+  function formatAllTargetInputs(root){
+    try{ (root||document).querySelectorAll('.tgt-month-input').forEach(formatTargetInput); }catch(e){}
+  }
+
+  // Override display helper so freshly rendered target sheets use comma format.
+  try{
+    global._tgtFmtInput = function(n){ return fmtComma(n); };
+    try{ _tgtFmtInput = global._tgtFmtInput; }catch(e){}
+  }catch(e){}
+
+  // Wrap target render so existing raw-number targets become readable immediately.
+  try{
+    var oldRenderTargetSheetBody = global.renderTargetSheetBody;
+    if(typeof oldRenderTargetSheetBody === 'function' && !oldRenderTargetSheetBody.__v212bWrapped){
+      var wrappedRenderTargetSheetBody = function(){
+        var r = oldRenderTargetSheetBody.apply(this, arguments);
+        setTimeout(function(){ formatAllTargetInputs(document); }, 0);
+        return r;
+      };
+      wrappedRenderTargetSheetBody.__v212bWrapped = true;
+      global.renderTargetSheetBody = wrappedRenderTargetSheetBody;
+      try{ renderTargetSheetBody = wrappedRenderTargetSheetBody; }catch(e){}
+    }
+  }catch(e){}
+
+  // Format on blur, but don't fight the cursor on every keypress.
+  document.addEventListener('blur', function(e){
+    var el = e && e.target;
+    if(el && el.classList && el.classList.contains('tgt-month-input')) formatTargetInput(el);
+  }, true);
+  document.addEventListener('focus', function(e){
+    var el = e && e.target;
+    if(el && el.classList && el.classList.contains('tgt-month-input')){
+      try{ el.inputMode = 'decimal'; }catch(x){}
+    }
+  }, true);
+
+  // Keep the panel counter honest after any load/status render, and after opening the panel.
+  try{
+    var oldUpdateDataStatus = global.updateDataStatus;
+    if(typeof oldUpdateDataStatus === 'function' && !oldUpdateDataStatus.__v212bWrapped){
+      var wrappedUpdateDataStatus = function(){
+        var r = oldUpdateDataStatus.apply(this, arguments);
+        setTimeout(syncPanelCounter, 0);
+        return r;
+      };
+      wrappedUpdateDataStatus.__v212bWrapped = true;
+      global.updateDataStatus = wrappedUpdateDataStatus;
+      try{ updateDataStatus = wrappedUpdateDataStatus; }catch(e){}
+    }
+  }catch(e){}
+  try{
+    var oldOpenDataPanel = global.openDataPanel;
+    if(typeof oldOpenDataPanel === 'function' && !oldOpenDataPanel.__v212bWrapped){
+      var wrappedOpenDataPanel = function(){
+        var r = oldOpenDataPanel.apply(this, arguments);
+        setTimeout(syncPanelCounter, 80);
+        setTimeout(syncPanelCounter, 800);
+        return r;
+      };
+      wrappedOpenDataPanel.__v212bWrapped = true;
+      global.openDataPanel = wrappedOpenDataPanel;
+      try{ openDataPanel = wrappedOpenDataPanel; }catch(e){}
+    }
+  }catch(e){}
+
+  // Also resync after foreground/enhancement loads, without forcing network.
+  [1200, 3000, 6000, 12000].forEach(function(ms){ setTimeout(syncPanelCounter, ms); });
+
+  var api = Object.freeze({
+    version: VERSION,
+    syncPanelCounter: syncPanelCounter,
+    formatTargetInputs: function(){ formatAllTargetInputs(document); },
+    parseTargetNumber: parseTargetNumber,
+    formatComma: fmtComma
+  });
+  global.FreshketSenseV212b = api;
+  try{
+    var prevA = global.FreshketSenseV212a;
+    if(prevA && typeof prevA === 'object'){
+      // Do not mutate frozen v212a object; expose v212b separately.
+    }
+  }catch(e){}
 })(window);
 </script>
 
