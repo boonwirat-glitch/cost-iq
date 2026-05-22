@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 
-<!-- Freshket Sense v211b: Portfolio movement detail sheet unification — nested sheet z-index fix, navy KAM design, drill-down for NRR/Comeback/Expansion + New/Transfer movement groups; no schema, commission, role, PWA/performance change -->
+<!-- Freshket Sense v211c: Handover data refresh + movement classification/sheet UI fix — Q10_FIXED_PROD SQL, cache-busted portview_handover.csv, robust handover parsing, New/Transfer sheet columns, Transfer-out row cards; no commission/schema/role/PWA regression -->
 <!-- Freshket Sense v211a: Commission QA cleanup — static+logic validation pass, snapshot row normalization, admin-write guards preserved, locked/live source-of-truth clarified, TOC/patch map updated; no schema change, no PWA/performance change -->
-<!-- Freshket Sense v211: Commission snapshot + permission hardening | v210l: Portfolio UX State Cleanup (compact Insight sheet + NRR explanation sheet + simplified target color) | v210k: KAM commission compact 2-line strip (Thai-first, multi-source ready, no logic/schema change) | v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207d: performance/PWA/UI baseline preserved -->
+<!-- Freshket Sense v211c: Handover Q10 fixed + movement sheet UI cleanup | v211: Commission snapshot + permission hardening | v210l: Portfolio UX State Cleanup (compact Insight sheet + NRR explanation sheet + simplified target color) | v210k: KAM commission compact 2-line strip (Thai-first, multi-source ready, no logic/schema change) | v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207d: performance/PWA/UI baseline preserved -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║ LATEST PATCH MAP — v211b                                                     ║
@@ -21,6 +21,8 @@
 ║      Compact Portfolio Insight sheet + NRR explanation sheet.                ║
 ║  - freshket-v211-commission-snapshot-hardening-css/js                         ║
 ║      Preview/CSV/scorecard source-of-truth + snapshot lock + admin guards.   ║
+║  - freshket-v211c-handover-movement-fix-css/js                              ║
+║      Q10_FIXED_PROD cache-bust + robust movement sheet UI cleanup.           ║
 ║  - freshket-v211b-portfolio-movement-sheet-css/js                              ║
 ║      Unified KAM navy movement detail sheet + nested z-index fix.            ║
 ║                                                                              ║
@@ -12256,24 +12258,27 @@ FROM raw
 GROUP BY account_id, month_date, item_id
 ORDER BY account_id, month_date, item_id;
 `,
-Q10:`-- Q10: Portview Handover — Transfer Out per KAM
--- v207h: movement attribution hardening
--- - current owner source-of-truth = user_master.staff_owner_email
--- - includes active transfers from last-month KAM owner
--- - includes dormant transfers where old KAM owner had no last-month GMV, preventing false New Sales attribution
--- Output: portview_handover.csv | Refresh: daily with Q8E
--- Columns: kam_name, account_id, account_name, account_type, last_month_gmv, cur_month_gmv,
---          new_owner_type, new_kam_name, transfer_basis, last_order_date
+Q10:`-- Q10_FIXED_PROD: portview_handover.csv
+-- ใช้ export เป็นไฟล์ portview_handover.csv แล้วอัปขึ้น R2
+-- Fix สำคัญ:
+-- 1) old KAM ไม่จำเป็นต้องอยู่ใน active KAM list
+-- 2) current owner ใช้ user_master.staff_owner_email เป็น source of truth
+-- 3) filter dormant zero-zero rows ออก
+-- 4) output schema compatible กับ Freshket Sense เดิม
 
 WITH params AS (
   SELECT
     DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) AS lm_start,
-    DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY)   AS lm_end,
-    DATE_TRUNC(CURRENT_DATE(), MONTH)                              AS cm_start,
-    (SELECT MAX(delivery_date) FROM \`freshket-rn.dwh.order\`
-     WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH))    AS cm_max_date
+    DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY) AS lm_end,
+    DATE_TRUNC(CURRENT_DATE(), MONTH) AS cm_start,
+    (
+      SELECT MAX(delivery_date)
+      FROM \`freshket-rn.dwh.order\`
+      WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)
+    ) AS cm_max_date
 ),
-kam_list AS (
+
+current_kam_list AS (
   SELECT kam_name, kam_email FROM UNNEST([
     STRUCT('Anusorn (Bookbig) Khamphasuk'           AS kam_name, 'anusorn.k@freshket.co'      AS kam_email),
     STRUCT('Chaklid (Dent) Nimraor'                 AS kam_name, 'chaklid.n@freshket.co'      AS kam_email),
@@ -12292,6 +12297,7 @@ kam_list AS (
     STRUCT('Warissara (Ply) Chanaboon'              AS kam_name, 'warissara.c@freshket.co'    AS kam_email)
   ])
 ),
+
 user_master_current AS (
   SELECT *
   FROM \`freshket-rn.dim.user_master\`
@@ -12299,63 +12305,81 @@ user_master_current AS (
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY account_guid
     ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
+      CASE
+        WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0
+        ELSE 1
+      END,
       lasted_order_date DESC NULLS LAST,
       lead_created_at DESC NULLS LAST
   ) = 1
 ),
+
 current_master_owner AS (
   SELECT
-    um.account_guid AS account_id,
+    CAST(um.account_guid AS STRING) AS account_id,
     um.account_name AS master_account_name,
     um.account_type AS master_account_type,
     um.commercial_owner AS current_owner_type,
     um.staff_owner AS master_staff_owner,
-    um.staff_owner_email AS master_staff_owner_email,
-    k.kam_name AS mapped_kam_name
+    LOWER(TRIM(um.staff_owner_email)) AS master_staff_owner_email,
+    k.kam_name AS mapped_kam_name,
+    k.kam_email AS mapped_kam_email
   FROM user_master_current um
-  LEFT JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
-  WHERE um.account_type IN ('SA','MC','Chain')
+  LEFT JOIN current_kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  WHERE um.account_type IN ('SA', 'MC', 'Chain')
 ),
+
 last_month_kam AS (
   SELECT
-    o.account_id, o.account_name, o.account_type,
+    CAST(o.account_id AS STRING) AS account_id,
+    ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_name,
+    ARRAY_AGG(o.account_type ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_type,
     o.ka_owner AS old_kam_name,
     SUM(o.gmv_ex_vat) AS last_month_gmv,
     MAX(o.delivery_date) AS last_order_date_in_last_month,
     'last_month_kam' AS transfer_basis
   FROM \`freshket-rn.dwh.order\` o, params p
-  JOIN kam_list k ON o.ka_owner = k.kam_name
   WHERE o.delivery_date BETWEEN p.lm_start AND p.lm_end
     AND o.commercial_owner = 'KAM'
-    AND o.ka_owner IS NOT NULL AND o.ka_owner != ''
-    AND o.account_type IN ('SA','MC','Chain')
-  GROUP BY o.account_id, o.account_name, o.account_type, o.ka_owner
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY SUM(o.gmv_ex_vat) DESC) = 1
+    AND o.ka_owner IS NOT NULL
+    AND TRIM(o.ka_owner) != ''
+    AND o.account_type IN ('SA', 'MC', 'Chain')
+  GROUP BY CAST(o.account_id AS STRING), o.ka_owner
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY account_id
+    ORDER BY SUM(o.gmv_ex_vat) DESC, MAX(o.delivery_date) DESC
+  ) = 1
 ),
+
 cur_month_gmv AS (
   SELECT
-    o.account_id,
+    CAST(o.account_id AS STRING) AS account_id,
     SUM(o.gmv_ex_vat) AS cur_month_gmv
   FROM \`freshket-rn.dwh.order\` o, params p
   WHERE o.delivery_date BETWEEN p.cm_start AND p.cm_max_date
-    AND o.account_type IN ('SA','MC','Chain')
-  GROUP BY o.account_id
+    AND o.account_type IN ('SA', 'MC', 'Chain')
+  GROUP BY CAST(o.account_id AS STRING)
 ),
+
 last_known_owner AS (
   SELECT
-    o.account_id,
+    CAST(o.account_id AS STRING) AS account_id,
     o.account_name,
     o.account_type,
     o.commercial_owner AS last_owner,
     o.ka_owner AS last_ka_owner,
     o.delivery_date AS last_order_date
   FROM \`freshket-rn.dwh.order\` o
-  WHERE o.account_type IN ('SA','MC','Chain')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY delivery_date DESC) = 1
+  WHERE o.account_type IN ('SA', 'MC', 'Chain')
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(o.account_id AS STRING)
+    ORDER BY o.delivery_date DESC
+  ) = 1
 ),
+
 transfer_base AS (
-  -- Active transfer: account had GMV last month under an old KAM.
+  -- Active transfer: ร้านที่เดือนก่อนยังมียอดภายใต้ KAM เดิม ไม่ว่า KAM เดิมจะยัง active อยู่หรือไม่
   SELECT
     lm.old_kam_name,
     lm.account_id,
@@ -12368,8 +12392,8 @@ transfer_base AS (
 
   UNION ALL
 
-  -- Dormant transfer: no last-month GMV, but latest known KAM owner differs from current master owner.
-  -- This prevents transferred dormant accounts from falling into New Sales just because Q10 had no last-month row.
+  -- Dormant transfer: ร้านที่ไม่มี GMV เดือนก่อน แต่ last known owner เป็น KAM
+  -- จะถูก filter zero-zero ออกท้าย query
   SELECT
     lko.last_ka_owner AS old_kam_name,
     lko.account_id,
@@ -12379,42 +12403,95 @@ transfer_base AS (
     lko.last_order_date,
     'dormant_last_known_kam' AS transfer_basis
   FROM last_known_owner lko
-  JOIN kam_list k ON lko.last_ka_owner = k.kam_name
-  LEFT JOIN last_month_kam lm ON lm.account_id = lko.account_id
-  LEFT JOIN current_master_owner cmo ON cmo.account_id = lko.account_id
+  LEFT JOIN last_month_kam lm
+    ON lm.account_id = lko.account_id
+  LEFT JOIN current_master_owner cmo
+    ON cmo.account_id = lko.account_id
   WHERE lm.account_id IS NULL
     AND lko.last_owner = 'KAM'
-    AND lko.last_ka_owner IS NOT NULL AND lko.last_ka_owner != ''
+    AND lko.last_ka_owner IS NOT NULL
+    AND TRIM(lko.last_ka_owner) != ''
+),
+
+movement_rows AS (
+  SELECT
+    tb.old_kam_name AS kam_name,
+    tb.account_id,
+    tb.account_name,
+    tb.account_type,
+    CAST(tb.last_month_gmv AS INT64) AS last_month_gmv,
+    CAST(ROUND(COALESCE(cm.cur_month_gmv, 0)) AS INT64) AS cur_month_gmv,
+    COALESCE(cmo.current_owner_type, lko.last_owner, 'none') AS new_owner_type,
+    CASE
+      WHEN cmo.mapped_kam_name IS NOT NULL
+        THEN cmo.mapped_kam_name
+      WHEN cmo.account_id IS NOT NULL
+        THEN COALESCE(cmo.master_staff_owner, cmo.master_staff_owner_email, 'none')
+      ELSE COALESCE(lko.last_ka_owner, 'none')
+    END AS new_kam_name,
+    tb.transfer_basis,
+    CAST(tb.last_order_date AS STRING) AS last_order_date
+  FROM transfer_base tb
+  LEFT JOIN cur_month_gmv cm
+    USING (account_id)
+  LEFT JOIN current_master_owner cmo
+    USING (account_id)
+  LEFT JOIN last_known_owner lko
+    USING (account_id)
+  WHERE
+    (
+      cmo.mapped_kam_name IS NOT NULL
+      AND LOWER(TRIM(cmo.mapped_kam_name)) != LOWER(TRIM(tb.old_kam_name))
+    )
+    OR (
+      cmo.account_id IS NOT NULL
+      AND (
+        cmo.mapped_kam_name IS NULL
+        OR cmo.current_owner_type != 'KAM'
+      )
+    )
+    OR (
+      cmo.account_id IS NULL
+      AND lko.last_owner = 'KAM'
+      AND LOWER(TRIM(lko.last_ka_owner)) != LOWER(TRIM(tb.old_kam_name))
+    )
+    OR (
+      cmo.account_id IS NULL
+      AND lko.last_owner IN ('SALE', 'PM', 'ADMIN')
+    )
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY tb.account_id, tb.old_kam_name
+    ORDER BY tb.last_month_gmv DESC, tb.last_order_date DESC
+  ) = 1
+),
+
+cleaned AS (
+  SELECT *
+  FROM movement_rows
+  WHERE NOT (
+    transfer_basis = 'dormant_last_known_kam'
+    AND COALESCE(last_month_gmv, 0) = 0
+    AND COALESCE(cur_month_gmv, 0) = 0
+  )
 )
+
 SELECT
-  tb.old_kam_name AS kam_name,
-  tb.account_id,
-  tb.account_name,
-  tb.account_type,
-  tb.last_month_gmv,
-  ROUND(COALESCE(cm.cur_month_gmv, 0)) AS cur_month_gmv,
-  COALESCE(cmo.current_owner_type, lko.last_owner, 'none') AS new_owner_type,
-  CASE
-    WHEN cmo.mapped_kam_name IS NOT NULL THEN cmo.mapped_kam_name
-    WHEN cmo.account_id IS NOT NULL THEN COALESCE(cmo.master_staff_owner, cmo.master_staff_owner_email, 'none')
-    ELSE COALESCE(lko.last_ka_owner, 'none')
-  END AS new_kam_name,
-  tb.transfer_basis,
-  CAST(tb.last_order_date AS STRING) AS last_order_date
-FROM transfer_base tb
-LEFT JOIN cur_month_gmv cm USING (account_id)
-LEFT JOIN current_master_owner cmo USING (account_id)
-LEFT JOIN last_known_owner lko USING (account_id)
-WHERE
-  (cmo.mapped_kam_name IS NOT NULL AND cmo.mapped_kam_name != tb.old_kam_name)
-  OR (cmo.account_id IS NOT NULL AND (cmo.mapped_kam_name IS NULL OR cmo.current_owner_type != 'KAM'))
-  OR (cmo.account_id IS NULL AND lko.last_owner = 'KAM' AND lko.last_ka_owner != tb.old_kam_name)
-  OR (cmo.account_id IS NULL AND lko.last_owner IN ('SALE','PM','ADMIN'))
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY tb.account_id, tb.old_kam_name
-  ORDER BY tb.last_month_gmv DESC, tb.last_order_date DESC
-) = 1
-ORDER BY tb.old_kam_name, tb.last_month_gmv DESC, tb.last_order_date DESC`
+  kam_name,
+  account_id,
+  account_name,
+  account_type,
+  last_month_gmv,
+  cur_month_gmv,
+  new_owner_type,
+  new_kam_name,
+  transfer_basis,
+  last_order_date
+FROM cleaned
+ORDER BY
+  kam_name,
+  last_month_gmv DESC,
+  cur_month_gmv DESC,
+  last_order_date DESC`
 };
 
 function copyBulkSQL(key, btn){
@@ -28279,6 +28356,154 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
     else if(txt.indexOf('transfer out')>=0){e.preventDefault();e.stopPropagation();render('mv-to');}
   },true);
   console.log('[Freshket Sense '+VERSION+'] Portfolio movement detail sheet unification loaded');
+})();
+</script>
+
+
+
+<style id="freshket-v211c-handover-movement-fix-css">
+/* v211c — Handover movement detail cleanup */
+.tgt-mv-row{position:relative!important;padding-right:42px!important;}
+.tgt-mv-row::after{position:absolute!important;right:4px!important;top:50%!important;transform:translateY(-50%)!important;margin-left:0!important;}
+.tgt-mv-header{padding-right:42px!important;}
+#ncs-sheet .ncs-mv2-cols{grid-template-columns:minmax(0,1fr) 88px 82px!important;column-gap:10px!important;}
+#ncs-sheet .ncs-mv2-cols .ncs-th:nth-child(2),
+#ncs-sheet .ncs-mv2-cols .ncs-th:nth-child(3){text-align:right!important;}
+#ncs-sheet .ncs-chip.mv2{grid-template-columns:minmax(0,1fr) 88px 82px!important;column-gap:10px!important;display:grid!important;align-items:center!important;}
+#ncs-sheet .ncs-chip.mv2 .ncs-chip-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#ncs-sheet .ncs-prev-val{font-size:12px;font-weight:850;text-align:right;color:rgba(210,226,250,.62);white-space:nowrap;}
+#ncs-sheet .ncs-mtd-val{font-size:12px;font-weight:900;text-align:right;white-space:nowrap;}
+#ncs-sheet .ncs-outlet-row.ncs-mv2-outlet{grid-template-columns:minmax(0,1fr) 88px 82px!important;column-gap:10px!important;}
+#ncs-sheet .ncs-outlet-row.ncs-mv2-outlet .ncs-outlet-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#ncs-sheet .ncs-transfer-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:11px 18px;border-bottom:1px solid rgba(255,255,255,.055);}
+#ncs-sheet .ncs-transfer-card:hover{background:rgba(255,255,255,.035);}
+#ncs-sheet .ncs-transfer-name{font-size:12px;font-weight:850;color:rgba(255,255,255,.90);line-height:1.35;min-width:0;}
+#ncs-sheet .ncs-transfer-sub{font-size:10px;font-weight:650;color:rgba(198,216,245,.54);line-height:1.35;margin-top:2px;}
+#ncs-sheet .ncs-transfer-gmv{text-align:right;font-size:13px;font-weight:950;color:#ff9b45;white-space:nowrap;}
+#ncs-sheet .ncs-transfer-mtd{text-align:right;font-size:10px;font-weight:800;color:rgba(198,216,245,.50);margin-top:2px;white-space:nowrap;}
+#ncs-sheet .ncs-subtle-note{font-size:10px;color:rgba(198,216,245,.60);font-weight:700;margin-left:6px;}
+</style>
+<script id="freshket-v211c-handover-movement-fix-js">
+(function(){
+  var VERSION='v211c';
+  var DATA_VERSION='2026-05-22-v211c-handover-fix';
+  function normId(v){return String(v==null?'':v).trim();}
+  function normName(v){return String(v==null?'':v).trim().toLowerCase().replace(/\s+/g,' ');}
+  function esc(v){try{return String(v==null?'':v).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];});}catch(e){return String(v||'');}}
+  function parseLine(line){try{if(typeof parseCSVRow==='function')return parseCSVRow(line);}catch(e){} var out=[],cur='',q=false; for(var i=0;i<String(line).length;i++){var c=line[i]; if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}else if(c===','&&!q){out.push(cur);cur='';}else cur+=c;} out.push(cur); return out;}
+  function fmtK(v){v=Number(v||0);var sign=v<0?'−':'';var av=Math.abs(v);if(av>=1000000)return sign+'฿'+(av/1000000).toFixed(1)+'M';if(av>=1000)return sign+'฿'+Math.round(av/1000)+'K';return sign+'฿'+Math.round(v);}
+  function currentKamName(){try{return window._ncsKamLabel || (currentUserProfile&&(currentUserProfile.kam_name||currentUserProfile.full_name)) || '';}catch(e){return '';}}
+  function setHandoverData(data){try{bulkHandoverData=data;}catch(e){window.bulkHandoverData=data;}}
+  function getHandoverData(){try{return bulkHandoverData || {byAccountId:{},byKamName:{},byAccountIdNorm:{}};}catch(e){return window.bulkHandoverData || {byAccountId:{},byKamName:{},byAccountIdNorm:{}};}}
+  function parseHandoverText(text){
+    var lines=String(text||'').trim().split(/\r?\n/).filter(function(l){return l.trim();});
+    if(lines.length && /kam_name/i.test(lines[0])) lines=lines.slice(1);
+    var byAccountId={}, byAccountIdNorm={}, byKamName={}, byNewKamName={}, rows=[];
+    lines.forEach(function(l){
+      var p=parseLine(l);
+      var kamName=(p[0]||'').trim(), accountId=normId(p[1]), accountName=(p[2]||'').trim(), accountType=(p[3]||'').trim();
+      var lastMonthGmv=Number(p[4]||0)||0, curMonthGmv=Number(p[5]||0)||0, newOwnerType=(p[6]||'').trim(), newKamName=(p[7]||'').trim();
+      var transferBasis=(p[8]||'').trim(), lastOrderDate=(p[9]||'').trim();
+      if(!kamName || !accountId) return;
+      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate};
+      rows.push(row);
+      byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
+      (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
+      if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
+    });
+    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION};
+  }
+  function schedulePortviewRefresh(){
+    try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
+    setTimeout(function(){
+      try{ if(typeof renderPortviewTargetBar==='function') renderPortviewTargetBar(); }catch(e){}
+      try{ if(document.getElementById('scr-portview')&&document.getElementById('scr-portview').classList.contains('on')){ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); if(typeof renderPortviewList==='function')renderPortviewList(); } }catch(e){}
+    },120);
+  }
+  try{
+    if(typeof R2_FILES!=='undefined' && R2_FILES){ R2_FILES.handover='portview_handover.csv?v='+encodeURIComponent(DATA_VERSION); }
+    if(typeof R2_SPECS!=='undefined' && R2_SPECS && R2_SPECS.handover){ R2_SPECS.handover.cache=false; R2_SPECS.handover.version=DATA_VERSION; }
+    try{ if(typeof _csvCacheSet==='function') _csvCacheSet('handover','',null); }catch(e){}
+  }catch(e){}
+  var oldHandle=window.handleFileUpload;
+  if(typeof oldHandle==='function'){
+    window.handleFileUpload=function(type,input){
+      if(type!=='bulk-handover') return oldHandle.apply(this,arguments);
+      var file=input&&input.files&&input.files[0]; if(!file) return;
+      var done=(input&&typeof input._ciqDone==='function')?input._ciqDone:function(){};
+      var reader=new FileReader();
+      reader.onload=function(e){
+        try{
+          var data=parseHandoverText(e.target.result||'');
+          setHandoverData(data);
+          var b=document.getElementById('badge-bulk-handover'); if(b){b.textContent='✓ '+(data.rows?data.rows.length:Object.keys(data.byAccountId||{}).length)+' rows';b.className='dp-slot-badge ok';}
+          var sl=document.getElementById('slot-bulk-handover'); if(sl)sl.style.borderColor='var(--g500)';
+          if((data.byNewKamName&&data.byNewKamName['Ploynitcha (Nitcha) Rujipiromthagoon']) || (data.rows||[]).some(function(r){return /ploynitcha/i.test(r.newKamName||'');})){
+            try{console.log('[Freshket Sense '+VERSION+'] handover contains Ploynitcha transfer-in rows');}catch(e){}
+          }
+          schedulePortviewRefresh(); done();
+        }catch(err){console.warn('[Freshket Sense '+VERSION+'] handover parse failed',err); done();}
+      };
+      reader.readAsText(file);
+    };
+  }
+  function lookupHandover(accountId){var hd=getHandoverData();return (hd.byAccountId&&hd.byAccountId[normId(accountId)]) || (hd.byAccountIdNorm&&hd.byAccountIdNorm[normId(accountId).toLowerCase()]) || null;}
+  function monthDaysFromNr(nr){var mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];var cp=String(nr.currentMonthLabel||'').split(' '),mi=mo.indexOf(cp[0]),yr=parseInt(cp[1]||'0',10)-543;return (mi>=0&&yr>1900)?new Date(yr,mi+1,0).getDate():30;}
+  function rr(v,nr){return nr.daysElapsed>0?Math.round(Number(v||0)/nr.daysElapsed*monthDaysFromNr(nr)):Number(v||0);}
+  function ensure(){var overlay=document.getElementById('ncs-overlay'),sheet=document.getElementById('ncs-sheet');if(!overlay){overlay=document.createElement('div');overlay.id='ncs-overlay';overlay.className='ncs-overlay';overlay.onclick=function(e){if(e.target===overlay)window._ncsClose();};document.body.appendChild(overlay);}if(!sheet){sheet=document.createElement('div');sheet.id='ncs-sheet';sheet.className='ncs-sheet';document.body.appendChild(sheet);}return{overlay:overlay,sheet:sheet};}
+  function normalTabData(nr){return[{key:'nrr',label:'NRR',count:nr.cohortCount||0,gmv:nr.cohortGmv||0,data:nr.cohortDetail||[],color:'#4ddc97'},{key:'cb',label:'Comeback',count:nr.comebackCount||0,gmv:nr.comebackGmv||0,data:nr.comebackDetail||[],color:'#70a8ff'},{key:'ex',label:'Expansion',count:nr.expansionCount||0,gmv:nr.expansionGmv||0,data:nr.expansionDetail||[],color:'#18d0c0'}];}
+  function pushGroups(arr,list,label,color){(list||[]).forEach(function(g){arr.push(Object.assign({},g,{mvType:label,mvColor:color,_mode:'movement'}));});}
+  function movementData(nr,key){
+    var grp,title,thai,color;
+    if(key==='mv-ti'||key==='ti'||key==='transfer-in'){grp=nr.transferIn||{};title='Transfer in';thai='ร้านที่รับโอนเข้าเดือนนี้';color='#70a8ff';}
+    else if(key==='mv-new'||key==='new'||key==='new-sales'){grp=nr.newFromSales||{};title='New (Sales)';thai='ร้านใหม่จาก Sales เดือนนี้';color='#18d0c0';}
+    else {grp=nr.transferOut||{};title='Transfer out';thai='ร้านที่โอนออกจากพอร์ตนี้';color='#ff8a70';}
+    if(key==='mv-to'||key==='to'||key==='transfer-out'){
+      var rows=(grp.detail||[]).map(function(r){return Object.assign({},r,{_mode:'transferOut'});});
+      return{kind:'transferOut',title:title,thai:thai,color:color,count:grp.count||rows.length||0,gmv:grp.gmv||0,rows:rows};
+    }
+    var groups=[]; pushGroups(groups,grp.cohortDetail||[],'NRR','#4ddc97'); pushGroups(groups,grp.comebackDetail||[],'Comeback','#70a8ff'); pushGroups(groups,grp.expansionDetail||[],'Expansion','#18d0c0');
+    groups=groups.reduce(function(acc,g){
+      var id=normId(g.acctId||''); var existing=acc.find(function(x){return normId(x.acctId)===id && id;});
+      if(existing){existing.prevTotal+=Number(g.prevTotal||0);existing.currTotal+=Number(g.currTotal||0);existing.outlets=(existing.outlets||[]).concat(g.outlets||[]);}
+      else acc.push(Object.assign({prevTotal:0,currTotal:0,outlets:[]},g));
+      return acc;
+    },[]).map(function(g){
+      var h=lookupHandover(g.acctId);
+      if(h && key!=='mv-new'){g.prevTotal=Number(h.lastMonthGmv||g.prevTotal||0); if(!g.currTotal)g.currTotal=Number(h.curMonthGmv||0);}
+      return g;
+    }).sort(function(a,b){return (b.currTotal||0)-(a.currTotal||0);});
+    return{kind:'movement',title:title,thai:thai,color:color,count:grp.count||0,gmv:grp.gmv||0,nrr:grp.nrr,groups:groups};
+  }
+  function metaFor(t){if(t.kind==='movement')return (t.count||0)+' ร้าน · '+fmtK(t.gmv||0)+' MTD เดือนนี้';return (t.count||0)+' ร้าน · '+fmtK(t.gmv||0)+' GMV เดือนก่อนที่ออกจากพอร์ต';}
+  function renderNormalRows(t,nr){
+    if(!t.data||!t.data.length)return '<div class="ncs-empty">ไม่มีข้อมูล</div>'; var days=monthDaysFromNr(nr),isNrr=t.key==='nrr';
+    return (t.data||[]).map(function(g,gi){var open=gi<4,chipVal=isNrr?fmtK(rr(g.currTotal,nr)):fmtK(g.currTotal||0);var chip='<div class="ncs-chip'+(open?' open':'')+'" onclick="_ncsChipToggle(this)"><span class="ncs-chip-chev">›</span><span class="ncs-chip-name">'+esc(g.acctName||g.acctId||'—')+'</span><span class="ncs-chip-rr" style="color:'+t.color+'">'+chipVal+'</span></div>';var rows=(g.outlets||[]).map(function(o){if(isNrr){var rv=rr(o.currGmv,nr), cls=rv>=Number(o.prevGmv||0)?'ncs-gmv rr-up':'ncs-gmv rr-dn';return '<div class="ncs-outlet-row nrr-cols"><div class="ncs-outlet-name">'+esc(o.outletName||o.outletId||'—')+'</div><div class="ncs-gmv base">'+(o.prevGmv>0?fmtK(o.prevGmv):'—')+'</div><div class="'+cls+'">'+fmtK(rv)+'</div><div class="ncs-gmv mtd">'+fmtK(o.currGmv||0)+'</div></div>';}return '<div class="ncs-outlet-row simple-cols"><div class="ncs-outlet-name">'+esc(o.outletName||o.outletId||'—')+'</div><div class="ncs-gmv" style="text-align:right;color:'+t.color+'">'+fmtK(o.currGmv||0)+'</div></div>';}).join('');return chip+'<div class="ncs-outlet-rows'+(open?' open':'')+'">'+rows+'</div>';}).join('');
+  }
+  function renderMovementRows(t){
+    if(!t.groups||!t.groups.length)return '<div class="ncs-empty">ไม่มีข้อมูล</div>';
+    return t.groups.map(function(g,gi){var open=gi<2;var prev=Number(g.prevTotal||0);var curr=Number(g.currTotal||0);var chip='<div class="ncs-chip mv2'+(open?' open':'')+'" onclick="_ncsChipToggle(this)"><span class="ncs-chip-name"><span class="ncs-chip-chev">›</span> '+esc(g.acctName||g.acctId||'—')+'</span><span class="ncs-prev-val">'+(prev?fmtK(prev):'—')+'</span><span class="ncs-mtd-val" style="color:'+t.color+'">'+fmtK(curr)+'</span></div>';var outs=(g.outlets||[]).slice(0,80).map(function(o){return '<div class="ncs-outlet-row ncs-mv2-outlet"><div class="ncs-outlet-name">'+esc(o.outletName||o.outletId||'—')+'</div><div class="ncs-gmv base">'+(o.prevGmv?fmtK(o.prevGmv):'—')+'</div><div class="ncs-gmv" style="color:'+t.color+'">'+fmtK(o.currGmv||0)+'</div></div>';}).join('');return chip+'<div class="ncs-outlet-rows'+(open?' open':'')+'">'+outs+'</div>';}).join('');
+  }
+  function renderTransferOutRows(t){
+    if(!t.rows||!t.rows.length)return '<div class="ncs-empty">ไม่มีร้านที่โอนออก</div>';
+    return t.rows.sort(function(a,b){return (b.lastMonthGmv||0)-(a.lastMonthGmv||0);}).map(function(r){var owner=r.newKamName||r.newOwnerType||'—';return '<div class="ncs-transfer-card"><div><div class="ncs-transfer-name">'+esc(r.accountName||r.accountId||'—')+'</div><div class="ncs-transfer-sub">'+esc(r.accountType||'')+' · ย้ายไป: '+esc(owner)+'</div></div><div><div class="ncs-transfer-gmv">'+fmtK(r.lastMonthGmv||0)+'</div><div class="ncs-transfer-mtd">MTD '+fmtK(r.curMonthGmv||0)+'</div></div></div>';}).join('');
+  }
+  function buildRowsForExport(mode,nr){var rows=[]; if(mode==='mv-to'||mode==='to'||mode==='transfer-out'){var t=movementData(nr,'mv-to');rows.push(['Type','Account','Account Type','Last Month GMV','Current MTD GMV','New Owner']);(t.rows||[]).forEach(function(r){rows.push(['Transfer out',r.accountName||r.accountId||'',r.accountType||'',Math.round(r.lastMonthGmv||0),Math.round(r.curMonthGmv||0),r.newKamName||r.newOwnerType||'']);});return rows;} if(/^mv-|^ti$|^new$|transfer-in|new-sales/.test(mode)){var mt=movementData(nr,mode);rows.push(['Movement','Account','Previous Month GMV','Current MTD GMV']);(mt.groups||[]).forEach(function(g){rows.push([mt.title,g.acctName||g.acctId||'',Math.round(g.prevTotal||0),Math.round(g.currTotal||0)]);});return rows;} var tab=(normalTabData(nr).find(function(x){return x.key===mode;})||normalTabData(nr)[0]);rows.push(tab.key==='nrr'?['Type','Account','Outlet','Baseline','Run Rate','GMV MTD']:['Type','Account','Outlet','GMV MTD']);(tab.data||[]).forEach(function(g){(g.outlets||[]).forEach(function(o){if(tab.key==='nrr')rows.push([tab.label,g.acctName||'',o.outletName||o.outletId||'',Math.round(o.prevGmv||0),Math.round(rr(o.currGmv,nr)),Math.round(o.currGmv||0)]);else rows.push([tab.label,g.acctName||'',o.outletName||o.outletId||'',Math.round(o.currGmv||0)]);});});return rows;}
+  function csvEscape(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;} function downloadRows(rows,name){var csv=rows.map(function(r){return r.map(csvEscape).join(',');}).join('\n');var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||'portfolio-detail.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},200);}
+  function render(mode){var nr=window._ncsLastNrrResult, kamLabel=window._ncsKamLabel||currentKamName(); if(!nr){try{showToast('ยังไม่มีข้อมูลพอร์ต','!');}catch(e){}return;} var activeMode=mode||'nrr'; window._ncsActiveMode=activeMode; var dom=ensure(), overlay=dom.overlay, sheet=dom.sheet; var isMovement=/^mv-|^ti$|^new$|^to$|transfer-in|transfer-out|new-sales/.test(activeMode); var title='รายละเอียด GMV', subtitle='ดูรายร้าน/สาขา โดยไม่ต้องปิด panel คำอธิบายหลัก', meta='', head='', body='', total='', totalColor='#4ddc97';
+    if(isMovement){var mt=movementData(nr,activeMode);title='รายละเอียด '+mt.title;subtitle=mt.thai+' — '+esc(kamLabel);meta=metaFor(mt);total=fmtK(mt.gmv||0);totalColor=mt.color;if(mt.kind==='transferOut'){head='';body=renderTransferOutRows(mt);sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+esc(title)+'</div><div class="ncs-subtitle">'+esc(subtitle)+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span></div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(mt.title)+'</span><span class="ncs-total-val" style="color:'+totalColor+'">'+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}else{head='<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">เดือนก่อน</div><div class="ncs-th r">MTD</div>';body=renderMovementRows(mt);sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+esc(title)+'</div><div class="ncs-subtitle">'+esc(subtitle)+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head ncs-mv2-cols">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(mt.title)+' <span class="ncs-subtle-note">MTD</span></span><span class="ncs-total-val" style="color:'+totalColor+'">'+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}}
+    else{var tabs=normalTabData(nr); if(!tabs.find(function(x){return x.key===activeMode;})) activeMode='nrr'; var t=tabs.find(function(x){return x.key===activeMode;})||tabs[0]; var tabsHtml=tabs.map(function(x){return '<button class="ncs-tab t-'+x.key+(x.key===activeMode?' on':'')+'" onclick="_ncsSetTab(\''+x.key+'\')">'+x.label+'<br><span style="font-size:9px;opacity:.75">'+(x.count||0)+' outlets</span></button>';}).join(''); head=t.key==='nrr'?'<div class="ncs-th">Outlet</div><div class="ncs-th r">ฐาน</div><div class="ncs-th r" style="color:rgba(77,220,151,.72)">Run Rate</div><div class="ncs-th r">MTD</div>':'<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">MTD</div>'; body=renderNormalRows(t,nr); sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">รายละเอียด GMV — '+esc(kamLabel)+'</div><div class="ncs-subtitle">แยก NRR / Comeback / Expansion ให้ดูระดับ account และ outlet</div><div class="ncs-tabs">'+tabsHtml+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+(t.count||0)+' outlets · '+fmtK(t.gmv||0)+' MTD</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head '+(t.key==='nrr'?'nrr-cols':'simple-cols')+'">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(t.label)+'</span><span class="ncs-total-val" style="color:'+t.color+'">'+(t.key==='nrr'?'':'+')+fmtK(t.gmv||0)+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}
+    var parent=document.getElementById('tgt-explain-sheet-overlay'); if(parent&&parent.classList.contains('on'))parent.classList.add('ncs-child-open'); requestAnimationFrame(function(){overlay.classList.add('on');sheet.classList.add('on');});
+  }
+  window._tgtShowCohortSheet=function(tab){render(tab||'nrr');};
+  window._ncsClose=function(){var overlay=document.getElementById('ncs-overlay'),sheet=document.getElementById('ncs-sheet');if(overlay)overlay.classList.remove('on');if(sheet)sheet.classList.remove('on');var parent=document.getElementById('tgt-explain-sheet-overlay');if(parent)parent.classList.remove('ncs-child-open');setTimeout(function(){if(sheet)sheet.innerHTML='';},280);};
+  window._ncsChipToggle=function(chip){chip.classList.toggle('open');var r=chip.nextElementSibling;if(r)r.classList.toggle('open');};
+  window._ncsToggleAll=function(){var body=document.getElementById('ncs-body');if(!body)return;var chips=Array.from(body.querySelectorAll('.ncs-chip'));var groups=Array.from(body.querySelectorAll('.ncs-outlet-rows'));var any=groups.some(function(g){return g.classList.contains('open');});chips.forEach(function(c){c.classList.toggle('open',!any);});groups.forEach(function(g){g.classList.toggle('open',!any);});var btn=document.getElementById('ncs-toggle-btn');if(btn)btn.textContent=any?'ขยายทั้งหมด':'ย่อทั้งหมด';};
+  window._ncsSetTab=function(k){render(k||'nrr');};
+  window._ncsExportCSV=function(){try{downloadRows(buildRowsForExport(window._ncsActiveMode||'nrr',window._ncsLastNrrResult),'portfolio_'+String(window._ncsActiveMode||'nrr').replace(/[^a-z0-9_-]/gi,'_')+'.csv');}catch(e){console.warn('[v211c] csv export failed',e);}};
+  window._ncsCopyTSV=function(){try{var rows=buildRowsForExport(window._ncsActiveMode||'nrr',window._ncsLastNrrResult);var tsv=rows.map(function(r){return r.join('\t');}).join('\n');navigator.clipboard.writeText(tsv);try{showToast('Copy TSV แล้ว','ok');}catch(e){}}catch(e){console.warn('[v211c] copy failed',e);}};
+  document.addEventListener('click',function(e){var row=e.target.closest&&e.target.closest('.tgt-mv-row');if(!row||e.target.closest('.tgt-mv-header'))return;var txt=(row.textContent||'').toLowerCase();if(txt.indexOf('transfer in')>=0){e.preventDefault();e.stopPropagation();render('mv-ti');}else if(txt.indexOf('new (sales)')>=0||txt.indexOf('new')>=0){e.preventDefault();e.stopPropagation();render('mv-new');}else if(txt.indexOf('transfer out')>=0){e.preventDefault();e.stopPropagation();render('mv-to');}},true);
+  console.log('[Freshket Sense '+VERSION+'] Handover cache bust + movement sheet UI fix loaded');
 })();
 </script>
 
