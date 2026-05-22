@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- Freshket Sense v214: Login & Loading Flow Stability — central app readiness gate + debug flight recorder; preserves v212c diagnostics, v213f Teamview responsive fixes, and business formulas. -->
+<!-- Freshket Sense v214c: Auth/Resume Hardening — direct auth/session orchestration, no SW auto-reload, no stale storage/sample first paint; preserves business logic. -->
 
 <!-- Freshket Sense v213b: Auth-safe Guided UX cleanup — fixes v213a cold/no-session login overlay suppression; no data/NRR/commission formula changes -->
 <!-- Freshket Sense v213a: Guided UX cleanup | v213: Guided Intelligence UX — SKU default to price trend, Restaurant drill-down CTA + coach mark, premium commission reward states, PWA entry viewport reset, Olive FAB safe-zone clamp/snap; no data/commission/NRR/owner/movement logic change -->
@@ -5087,13 +5087,8 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
           console.warn('[pwa:v206a] service worker registration failed',swUrl,err);
         });
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
-        console.info('[pwa:v206f] service worker controller changed — reloading once');
-        try{
-          if(!sessionStorage.getItem('freshket_sw_controller_reloaded')){
-            sessionStorage.setItem('freshket_sw_controller_reloaded', String(Date.now()));
-            setTimeout(()=>location.reload(), 120);
-          }
-        }catch(e){ setTimeout(()=>location.reload(), 120); }
+        console.info('[pwa:v214c] service worker controller changed — auto reload disabled to protect session');
+        try{ sessionStorage.setItem('freshket_sw_controller_reloaded', 'v214c-disabled-'+String(Date.now())); }catch(e){}
       });
     });
   })();
@@ -5337,39 +5332,29 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 .comm-kpi-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 </style>
 </head>
-<body class="sense-v214-booting">
+<body class="sense-v214c-booting">
 
-<style id="freshket-v214-app-readiness-css">
-/* v214 app readiness guard: prevent stale/sample/app-shell flash while auth/data gate is deciding. */
-body.sense-v214-booting .topbar,
-body.sense-v214-booting .main,
-body.sense-v214-booting .bnav,
-body.sense-v214-booting .aifab,
-body.sense-v214-booting .aipanel,
-body.sense-v214-booting #dataPanel,
-body.sense-v214-booting .data-overlay,
-body.sense-v214-login-required .topbar,
-body.sense-v214-login-required .main,
-body.sense-v214-login-required .bnav,
-body.sense-v214-login-required .aifab,
-body.sense-v214-login-required .aipanel,
-body.sense-v214-login-required #dataPanel,
-body.sense-v214-login-required .data-overlay{
-  visibility:hidden!important;
-  pointer-events:none!important;
-}
-body.sense-v214-booting #login-overlay,
-body.sense-v214-booting #sense-splash,
-body.sense-v214-login-required #login-overlay,
-body.sense-v214-login-required #sense-splash,
-body.sense-v214-app-ready .topbar,
-body.sense-v214-app-ready .main,
-body.sense-v214-app-ready .bnav,
-body.sense-v214-app-ready .aifab{
-  visibility:visible!important;
-}
-body.sense-v214-login-required #login-overlay{pointer-events:auto!important;}
-body.sense-v214-auth-checking #login-overlay{visibility:visible!important;}
+<style id="freshket-v214c-auth-gate-css">
+/* v214c: hard auth/render gate. Prevent stale sample/storage/user screen from appearing while auth is being decided. */
+body.sense-v214c-booting .topbar,
+body.sense-v214c-booting .main,
+body.sense-v214c-booting .bnav,
+body.sense-v214c-booting .aifab,
+body.sense-v214c-booting .aipanel,
+body.sense-v214c-booting #dataPanel,
+body.sense-v214c-login-required .topbar,
+body.sense-v214c-login-required .main,
+body.sense-v214c-login-required .bnav,
+body.sense-v214c-login-required .aifab,
+body.sense-v214c-login-required .aipanel,
+body.sense-v214c-login-required #dataPanel{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+body.sense-v214c-app-ready .topbar,
+body.sense-v214c-app-ready .main,
+body.sense-v214c-app-ready .bnav,
+body.sense-v214c-app-ready .aifab{visibility:visible;}
+body.sense-v214c-booting #login-overlay{display:flex;}
+body.sense-v214c-login-required #login-overlay{display:flex!important;opacity:1!important;pointer-events:auto!important;}
+body.sense-v214c-auth-checking #login-overlay{display:flex!important;}
 </style>
 
 <script>
@@ -6704,7 +6689,16 @@ window.triggerSkuVerifyFromThisMonth = window.triggerSkuVerifyFromThisMonth || f
   if (typeof window.triggerSkuVerify === 'function') return window.triggerSkuVerify();
   console.warn('[SKU Verify] trigger function not available yet');
 };
-const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    storage: window.localStorage,
+    storageKey: 'freshket-sense-auth-v214c'
+  }
+});
 
 let currentUser = null;
 let currentUserProfile = null;
@@ -6794,6 +6788,7 @@ function resetRuntimeSessionState(){
 }
 
 function _showLoginOverlayClean(){
+  sense214cShowLogin(window.__senseExplicitSignOut?'explicit-signout-clean':'login-required-clean');
   resetRuntimeSessionState();
   const ov = document.getElementById('login-overlay');
   passwordRecoveryMode = false;
@@ -6932,52 +6927,195 @@ window._sessionCheckHandling = false;
 window._visibilityGraceTimer = null;
 window._pwaResumeCheckInFlight = null;
 
+// v214c: single auth/render gate + flight recorder. Auth/session/loading only; no business formula changes.
+window.__sense214cTimeline = window.__sense214cTimeline || [];
+window.__sense214cPhase = 'BOOTING';
+window.__senseRouteUnlocked = false;
+window.__sensePendingRoute = null;
+window.__senseExplicitSignOut = false;
+window.__senseSoftSignOutTimer = null;
+window.__senseLastShowScreen = {name:null, ts:0};
+window.__senseLoginGeneration = 0;
+window.__senseSuppressAutoLoginUI = false;
+
+function sense214cLog(area, event, detail, level){
+  try{
+    const entry={
+      t:new Date().toISOString(),
+      ms:(performance&&performance.now)?Math.round(performance.now()):Date.now(),
+      phase:window.__sense214cPhase,
+      area, event, detail:detail||null,
+      auth:{
+        currentUser:!!currentUser,
+        profile:!!currentUserProfile,
+        role:(currentUserProfile&&currentUserProfile.role)||null,
+        email:(currentUser&&currentUser.email)||(currentUserProfile&&currentUserProfile.email)||null,
+        explicitSignOut:!!window.__senseExplicitSignOut,
+        routeUnlocked:!!window.__senseRouteUnlocked,
+        loginRunning:!!loginTransitionRunning
+      },
+      data:{
+        sheetsLoadStarted:!!(typeof sheetsLoadStarted!=='undefined'&&sheetsLoadStarted),
+        criticalInFlight:!!(typeof _cloudInitialPromise!=='undefined'&&_cloudInitialPromise),
+        portviewRows:(typeof portviewBulkData!=='undefined'&&portviewBulkData&&portviewBulkData.length)||0,
+        historyAccounts:(typeof bulkHistoryData!=='undefined'&&bulkHistoryData&&Object.keys(bulkHistoryData).length)||0,
+        handoverAccounts:(typeof bulkHandoverData!=='undefined'&&bulkHandoverData&&bulkHandoverData.byAccountId&&Object.keys(bulkHandoverData.byAccountId).length)||0
+      },
+      ui:(function(){try{const ov=document.getElementById('login-overlay');const sp=document.getElementById('sense-splash');const scr=document.querySelector('.scr.on');return {login:ov?getComputedStyle(ov).display:null,splash:sp?getComputedStyle(sp).display:null,screen:scr?scr.id:null,body:document.body?document.body.className:''};}catch(e){return {};}})()
+    };
+    window.__sense214cTimeline.push(entry);
+    if(window.__sense214cTimeline.length>500)window.__sense214cTimeline.shift();
+    const method=level==='error'?'error':(level==='warn'?'warn':'info');
+    console[method]('[Sense v214c]['+area+'] '+event, detail||{}, {phase:entry.phase,auth:entry.auth,data:entry.data,ui:entry.ui});
+    return entry;
+  }catch(e){}
+}
+
+function sense214cAuthStorage(){
+  const out={localStorageKeys:0,sessionStorageKeys:0,hasLikelySupabaseKey:false,storageKeyPresent:false};
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i)||'';if(/^sb-|supabase/i.test(k)||k.indexOf('auth-token')>=0||k.indexOf('freshket-sense-auth')>=0){out.localStorageKeys++;out.hasLikelySupabaseKey=true;if(k==='freshket-sense-auth-v214c')out.storageKeyPresent=true;}}}catch(e){}
+  try{for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i)||'';if(/^sb-|supabase/i.test(k)||k.indexOf('auth-token')>=0||k.indexOf('freshket-sense-auth')>=0){out.sessionStorageKeys++;out.hasLikelySupabaseKey=true;}}}catch(e){}
+  return out;
+}
+
+function sense214cSetPhase(phase, reason, detail){
+  window.__sense214cPhase=phase||window.__sense214cPhase||'BOOTING';
+  try{
+    document.body.classList.remove('sense-v214c-booting','sense-v214c-auth-checking','sense-v214c-login-required','sense-v214c-app-ready','sense-v214c-resume-validating');
+    if(phase==='LOGIN_REQUIRED'||phase==='AUTH_EXPIRED')document.body.classList.add('sense-v214c-login-required');
+    else if(phase==='APP_READY'||phase==='OFFLINE_CACHE_READY')document.body.classList.add('sense-v214c-app-ready');
+    else if(phase==='RESUME_VALIDATING')document.body.classList.add('sense-v214c-app-ready','sense-v214c-resume-validating');
+    else if(phase==='AUTH_CHECKING'||phase==='PROFILE_LOADING'||phase==='DATA_LOADING')document.body.classList.add('sense-v214c-booting','sense-v214c-auth-checking');
+    else document.body.classList.add('sense-v214c-booting');
+  }catch(e){}
+  sense214cLog('GATE','phase '+phase,{reason:reason||'',detail:detail||null});
+}
+
+function sense214cHideLogin(reason){
+  try{const ov=document.getElementById('login-overlay');if(ov){ov.style.display='none';ov.style.opacity='0';ov.classList.remove('lgi-checking');}}catch(e){}
+  sense214cLog('UI','login hidden',{reason:reason||''});
+}
+function sense214cShowLogin(reason, opts){
+  opts=opts||{};
+  window.__senseRouteUnlocked=false;
+  sense214cSetPhase('LOGIN_REQUIRED',reason||'show-login');
+  try{const sp=document.getElementById('sense-splash');if(sp){sp.style.display='none';sp.style.opacity='';sp.style.transition='';}}catch(e){}
+  try{const ov=document.getElementById('login-overlay');if(ov){ov.classList.remove('lgi-checking');if(!opts.keepRecovery)ov.classList.remove('password-recovery');ov.style.display='flex';ov.style.opacity='1';}}catch(e){}
+  sense214cLog('UI','login shown',{reason:reason||'',storage:sense214cAuthStorage()});
+}
+function sense214cCriticalReady(){
+  try{return !!(portviewBulkData&&portviewBulkData.length>0&&bulkHistoryData&&Object.keys(bulkHistoryData).length>0);}catch(e){return false;}
+}
+async function sense214cGetSessionWithGrace(reason, graceMs){
+  const check=async(source)=>{const r=await supa.auth.getSession();const s=r&&r.data&&r.data.session;if(s&&s.user)return {ok:true,session:s,source};return {ok:false,source};};
+  try{
+    let r=await check('first');
+    if(r.ok){sense214cLog('AUTH','session alive',{reason,source:r.source});return r;}
+    if(graceMs){await new Promise(resolve=>setTimeout(resolve,graceMs));r=await check('grace');if(r.ok){sense214cLog('AUTH','session alive',{reason,source:r.source});return r;}}
+    sense214cLog('AUTH','session missing',{reason,graceMs:graceMs||0,storage:sense214cAuthStorage()},'warn');
+    return r;
+  }catch(e){
+    // Network/offline during resume should never force logout.
+    sense214cLog('AUTH','session check failed but non-destructive',{reason,error:e&&e.message?e.message:String(e)},'warn');
+    return {ok:!!currentUser,session:currentUser?{user:currentUser}:null,source:'error-nondestructive'};
+  }
+}
+function sense214cClearVisualStateForNewLogin(email){
+  window.__senseRouteUnlocked=false;
+  window.__sensePendingRoute=null;
+  window.__senseLoginGeneration++;
+  try{currentUser=null;currentUserProfile=null;}catch(e){}
+  try{currentAccountId=null;}catch(e){}
+  try{portviewLevel='rep';portviewRepEmail=null;teamviewLevel='team';teamviewSelectedKam=null;teamviewKamFilter=null;}catch(e){}
+  try{document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));}catch(e){}
+  try{const main=document.querySelector('.main'); if(main)main.style.display='';}catch(e){}
+  sense214cSetPhase('AUTH_CHECKING','login-submit',{email:email||null});
+}
+async function sense214cWaitCriticalData(reason, timeoutMs){
+  if(sense214cCriticalReady())return 'already-ready';
+  try{if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function'){sense214cLog('DATA','critical load requested',{reason});loadFromGoogleSheets();}}catch(e){sense214cLog('DATA','critical load request failed',{error:e&&e.message?e.message:String(e)},'warn');}
+  const p=(typeof _cloudInitialPromise!=='undefined'&&_cloudInitialPromise)?_cloudInitialPromise:null;
+  if(p&&typeof p.then==='function'){
+    const r=await Promise.race([p.then(()=> 'resolved').catch(e=>'error:'+((e&&e.message)||e)), new Promise(resolve=>setTimeout(()=>resolve('timeout'),timeoutMs||5200))]);
+    sense214cLog('DATA','critical wait done',{reason,result:r,ready:sense214cCriticalReady()});
+    return r;
+  }
+  await new Promise(resolve=>setTimeout(resolve,300));
+  return sense214cCriticalReady()?'ready-after-delay':'no-promise';
+}
+function sense214cTargetScreen(){
+  const role=getCurrentRole();
+  if(role==='tl'||role==='admin')return 'teamview';
+  return 'portview';
+}
+function sense214cUnlockRoute(reason){
+  window.__senseRouteUnlocked=true;
+  sense214cHideLogin(reason||'app-ready');
+  sense214cSetPhase('APP_READY',reason||'app-ready');
+}
+function sense214cInstallDebugApi(){
+  try{
+    const dbg=window.FreshketSenseDebug||{};
+    const oldVersion=dbg.version;
+    dbg.version=function(){let base={};try{base=typeof oldVersion==='function'?oldVersion():{};}catch(e){}return Object.assign({},base,{build:'v214c_auth_resume_hardening',currentBuild:'v214c',authResumeHardening:true,objects:Object.assign({},base.objects||{},{v214c:true})});};
+    dbg.timeline=function(){return (window.__sense214cTimeline||[]).slice();};
+    dbg.state=function(){return {phase:window.__sense214cPhase,routeUnlocked:window.__senseRouteUnlocked,pendingRoute:window.__sensePendingRoute,explicitSignOut:window.__senseExplicitSignOut};};
+    dbg.authStorage=sense214cAuthStorage;
+    dbg.dump=function(){return {version:'v214c_auth_resume_hardening',state:dbg.state(),auth:{currentUser:!!currentUser,profile:!!currentUserProfile,role:(currentUserProfile&&currentUserProfile.role)||null,email:(currentUser&&currentUser.email)||(currentUserProfile&&currentUserProfile.email)||null},storage:sense214cAuthStorage(),data:{portviewRows:(portviewBulkData&&portviewBulkData.length)||0,historyAccounts:bulkHistoryData?Object.keys(bulkHistoryData).length:0,handoverAccounts:(bulkHandoverData&&bulkHandoverData.byAccountId)?Object.keys(bulkHandoverData.byAccountId).length:0,sheetsLoadStarted:!!sheetsLoadStarted,criticalInFlight:!!_cloudInitialPromise},ui:(function(){const scr=document.querySelector('.scr.on');const ov=document.getElementById('login-overlay');return {screen:scr?scr.id:null,login:ov?getComputedStyle(ov).display:null,body:document.body.className};})(),timeline:(window.__sense214cTimeline||[]).slice(-80)};};
+    window.FreshketSenseDebug=dbg;
+  }catch(e){}
+}
+sense214cInstallDebugApi();
+sense214cSetPhase('BOOTING','script-init');
+
 supa.auth.onAuthStateChange((event, session) => {
-  console.log('[auth:v202]', event, '| session:', !!session, '| currentUser:', !!currentUser, '| loginRunning:', loginTransitionRunning, '@', Date.now());
-  // Recovery links create a temporary auth session first. Do not route into the app yet.
+  sense214cLog('AUTH', event, {session:!!session, hasCurrentUser:!!currentUser, explicit:!!window.__senseExplicitSignOut});
   if (event === 'PASSWORD_RECOVERY' || passwordRecoveryMode || _urlLooksLikePasswordRecovery()) {
     if (session?.user) currentUser = session.user;
     showPasswordResetForm();
     return;
   }
-
   if (event === 'TOKEN_REFRESHED' && session) {
-    // Fix v22.2: handle silent token refresh on mobile.
     currentUser = session.user;
-    // v206a: cancel all PWA resume grace timers — token refresh confirms session alive.
     if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
     if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
+    if(window.__sense214cPhase==='LOGIN_REQUIRED' && currentUserProfile){ sense214cUnlockRoute('token-refresh-restored'); }
     return;
   }
-
   if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-    // v206a: auth recovered; cancel delayed signed-out/login UI from mobile token churn.
     if (window._signedOutTimer) { clearTimeout(window._signedOutTimer); window._signedOutTimer = null; }
+    if (window.__senseSoftSignOutTimer) { clearTimeout(window.__senseSoftSignOutTimer); window.__senseSoftSignOutTimer = null; }
     if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; }
     if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; }
-    // Fix v194 Guard A: doLogin() already handled this SIGNED_IN — skip to avoid double hideLoginOverlay.
-    if (event === 'SIGNED_IN' && window._doLoginHandled) {
-      window._doLoginHandled = false;
+    currentUser = session.user;
+    window.__senseExplicitSignOut = false;
+    if (event === 'SIGNED_IN' && window._doLoginHandled) { window._doLoginHandled = false; return; }
+    if (event === 'INITIAL_SESSION' && window._sessionCheckHandling) return;
+    if (!currentUserProfile || currentUserProfile.id !== currentUser.id) {
+      loadUserProfile().then(() => {
+        if(window.__sense214cPhase==='AUTH_CHECKING'||window.__sense214cPhase==='PROFILE_LOADING') hideLoginOverlay();
+      }).catch(()=>{});
+    }
+    return;
+  }
+  if (event === 'SIGNED_OUT') {
+    if(window.__senseExplicitSignOut){
+      currentUser=null;currentUserProfile=null;
+      sense214cShowLogin('explicit-signout');
       return;
     }
-    // Fix v194 Guard B: checkSession() is mid-flight handling INITIAL_SESSION — skip race.
-    if (event === 'INITIAL_SESSION' && window._sessionCheckHandling) return;
-    // Guard A (original): only proceed if no one else has set currentUser yet.
-    if (!currentUser) {
-      currentUser = session.user;
-      loadUserProfile().then(() => hideLoginOverlay());
-    }
-  } else if (event === 'SIGNED_OUT' && currentUser) {
-    currentUser = null;
-    currentUserProfile = null;
-    // Debounce: Supabase sometimes fires SIGNED_OUT then SIGNED_IN rapidly (internal token ops).
-    // Wait 600ms before showing login — if SIGNED_IN follows, the timer is cleared by the
-    // !currentUser check inside onAuthStateChange(SIGNED_IN) path.
-    clearTimeout(window._signedOutTimer);
-    window._signedOutTimer = setTimeout(() => {
-      window._signedOutTimer = null;
-      if (!currentUser) _showLoginOverlayClean(); // still signed out → show login
-    }, 600);
+    // Mobile/PWA can emit transient SIGNED_OUT during token churn. Never destroy an active session UI here.
+    sense214cLog('AUTH','SIGNED_OUT treated as soft/transient',{hadCurrentUser:!!currentUser,storage:sense214cAuthStorage()},'warn');
+    if(window.__senseSoftSignOutTimer)clearTimeout(window.__senseSoftSignOutTimer);
+    window.__senseSoftSignOutTimer=setTimeout(async()=>{
+      window.__senseSoftSignOutTimer=null;
+      const r=await sense214cGetSessionWithGrace('soft-signed-out-confirm',2500);
+      if(r.ok&&r.session&&r.session.user){currentUser=r.session.user; sense214cHideLogin('soft-signout-recovered'); return;}
+      // If we had an active user, keep the screen alive rather than force-login. API errors can handle true expiry later.
+      if(currentUser){sense214cLog('AUTH','soft signout unresolved; keeping current UI alive',{storage:sense214cAuthStorage()},'warn');return;}
+      sense214cShowLogin('confirmed-no-session-after-soft-signout');
+    },7000);
+    return;
   }
 });
 
@@ -6990,24 +7128,27 @@ async function doLogin() {
   if (!email || !pwd) { showLoginError('กรุณากรอก email และ password'); return; }
   btn.disabled = true; btnText.textContent = 'กำลังเข้าสู่ระบบ...';
   errEl.style.display = 'none';
+  window.__senseExplicitSignOut=false;
+  window.__senseSuppressAutoLoginUI=true;
+  sense214cClearVisualStateForNewLogin(email);
+  const ov=document.getElementById('login-overlay'); if(ov)ov.classList.add('lgi-checking');
   try {
     const { data, error } = await supa.auth.signInWithPassword({ email, password: pwd });
-    if (error) { showLoginError('Email หรือ password ไม่ถูกต้อง'); return; }
-    // Fix v194: set flag BEFORE hideLoginOverlay so onAuthStateChange(SIGNED_IN)
-    // (which fires async from signInWithPassword) knows doLogin already handles UI.
+    if (error) { sense214cShowLogin('login-error'); showLoginError('Email หรือ password ไม่ถูกต้อง'); return; }
     window._doLoginHandled = true;
     currentUser = data.user;
-    // v195 Step 1: start R2 fetch immediately — runs in parallel with loadUserProfile
-    // so cache-warm data is already ingested by the time splash shows.
-    // sheetsLoadStarted guard prevents double-call if _autoRouteAfterLogin also fires.
+    sense214cSetPhase('PROFILE_LOADING','login-success',{email});
     if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
     await loadUserProfile();
     hideLoginOverlay();
   } catch(e) {
     window._doLoginHandled = false;
+    sense214cShowLogin('login-exception');
     showLoginError('เกิดข้อผิดพลาด กรุณาลองใหม่');
     console.error('[login]', e);
   } finally {
+    window.__senseSuppressAutoLoginUI=false;
+    if(ov)ov.classList.remove('lgi-checking');
     btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบ';
   }
 }
@@ -7104,115 +7245,52 @@ function showSenseSplash(onDone){
   }
 }
 function hideLoginOverlay() {
-  // Fix v194 Fix F: safety net — ensure _doLoginHandled never stays true
-  // across multiple hideLoginOverlay calls regardless of which path triggered it.
-  window._doLoginHandled = false;
-  if (loginTransitionRunning) return;
+  if (!currentUser) { sense214cLog('UI','hideLoginOverlay ignored - no current user',{},'warn'); return; }
+  if (loginTransitionRunning) { sense214cLog('UI','hideLoginOverlay ignored - transition running',{}); return; }
   loginTransitionRunning = true;
-
-  // v198 flash fix: hide login overlay IMMEDIATELY before splash starts.
-  // Root cause: cache-warm splash fades at t=400ms but onDone() fires at t=900ms
-  // → login overlay shows through the fading splash (500ms window).
-  // Hiding here ensures login is gone before any splash animation.
-  const ovImmediate = document.getElementById('login-overlay');
-  if (ovImmediate) {
-    ovImmediate.style.display = 'none';
-    ovImmediate.classList.remove('lgi-checking');
-  }
-
-  // Safety valve v22.2: if transition never completes (e.g. concurrent auth events
-  // during splash), force-clear lock after 4s and ensure login overlay is hidden.
-  // Prevents the "hang + loop" symptom where loginTransitionRunning stays true
-  // and subsequent hideLoginOverlay() calls all return early, leaving login visible.
-  const lockSafetyTimer = setTimeout(() => {
-    if (loginTransitionRunning) {
-      loginTransitionRunning = false;
-      const _ovSafe = document.getElementById('login-overlay');
-      if (_ovSafe && currentUser) {
-        _ovSafe.style.display = 'none';
-        _ovSafe.classList.remove('lgi-checking');
-      }
-      console.warn('[login transition] safety valve triggered — forced unlock after 4s');
-    }
-  }, 4000);
-
+  sense214cSetPhase('DATA_LOADING','hideLoginOverlay');
+  sense214cHideLogin('hideLoginOverlay-start');
   const ov = document.getElementById('login-overlay');
+  if (ov) ov.classList.remove('lgi-checking');
   let finished = false;
-  const fallbackTimer = setTimeout(() => {
-    console.warn('[login transition] splash fallback release');
-    finish();
-  }, 3200);
-
-  const finish = () => {
+  const finish = async () => {
     if (finished) return;
     finished = true;
-    clearTimeout(fallbackTimer);
-    clearTimeout(lockSafetyTimer);
-
-    if (ov) {
-      ov.style.display = 'none';
-      ov.classList.remove('lgi-checking');
-    }
-
-    _autoRouteAfterLogin();
-
-    setTimeout(() => {
-      loginTransitionRunning = false;
-    }, 300);
+    try{ window._splashPreFade = null; }catch(e){}
+    await sense214cWaitCriticalData('before-auto-route',5200);
+    try{ _autoRouteAfterLogin(); }catch(e){ sense214cLog('ROUTE','auto-route failed',{error:e&&e.message?e.message:String(e)},'error'); }
+    setTimeout(() => { loginTransitionRunning = false; }, 200);
   };
-
-  // v202d: set pre-fade hook — correct screen forced right before splash becomes transparent
-  window._splashPreFade = () => {
-    try{
-      const _pf_role = getCurrentRole();
-      _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
-      if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
-      else{if(typeof showScreen==='function')showScreen('portview');}
-    }catch(e){}
-  };
-  try {
-    if (typeof showSenseSplash === 'function') {
-      showSenseSplash(finish);
-    } else {
-      finish();
-    }
-  } catch(e) {
-    console.warn('[login transition] splash failed:', e);
-    finish();
-  }
+  try{
+    window._splashPreFade = null;
+    if (typeof showSenseSplash === 'function') showSenseSplash(finish);
+    else finish();
+  }catch(e){ sense214cLog('UI','splash failed',{error:e&&e.message?e.message:String(e)},'warn'); finish(); }
 }
 
 function _autoRouteAfterLogin() {
-  // Auto-load core portfolio data from Cloudflare R2
-  // Guard: skip if already started
+  if(!currentUser || !currentUserProfile){ sense214cLog('ROUTE','blocked - missing auth/profile',{hasUser:!!currentUser,hasProfile:!!currentUserProfile},'warn'); return; }
   if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
-
   const role = getCurrentRole();
-  _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
-  // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
+  const target = sense214cTargetScreen();
+  sense214cUnlockRoute('auto-route');
+  sense214cLog('ROUTE','auto-route',{role,target,email:currentUser&&currentUser.email});
   if(isRepRole(role)&&currentUser&&currentUser.email){
     _bundlePreWarming=true;
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
       _bundlePreWarming=false;
-      // v206d: avoid a full portfolio repaint if user is already on portfolio.
       if(typeof _senseHydrateVisiblePortfolio==='function'&&_senseHydrateVisiblePortfolio('rep-bundle',{delay:260}))return;
       refreshAll();
     });
   }
-  // v206d: TL/Admin pre-warm is deliberately throttled and capped.
-  // Old behavior fetched every KAM bundle sequentially after 5s, causing console noise + memory/CPU pressure.
   if(isTLRole(role)||isAdminRole(role))_startTlBundlePrewarm();
-  if (isTLRole(role) || isAdminRole(role)) {
-    setMode('kam');
+  setMode('kam');
+  if(target==='teamview'){
     showScreen('teamview');
-  } else {
-    setMode('kam');
+  }else{
     const myAccounts = getPortviewAccounts();
-    if (myAccounts && myAccounts.length === 1) {
-      portviewSelectAccount(myAccounts[0].id);
-    } else {
-      showScreen('portview');
-    }
+    if (myAccounts && myAccounts.length === 1) portviewSelectAccount(myAccounts[0].id);
+    else showScreen('portview');
   }
 }
 
@@ -7237,12 +7315,9 @@ async function loadUserProfile() {
 }
 
 async function doSignOut() {
-  try {
-    await supa.auth.signOut();
-  } catch(e) {
-    console.warn('[signOut]', e);
-  }
-  // Note: onAuthStateChange(SIGNED_OUT) should also run. This fallback prevents stale splash/loader state.
+  window.__senseExplicitSignOut = true;
+  window.__senseRouteUnlocked = false;
+  try { await supa.auth.signOut(); } catch(e) { console.warn('[signOut]', e); }
   currentUser = null;
   currentUserProfile = null;
   _showLoginOverlayClean();
@@ -7294,34 +7369,28 @@ function _setLocalPersona(role, email, name){
 }
 
 async function checkSession() {
-  // LOCAL DEV MODE: ?local=1 bypasses Supabase auth entirely
   if(window.location.search.includes('local=1')){
+    window.__senseRouteUnlocked=true;
     activateLocalMode();
     return;
   }
-  if(window.self!==window.top){activateLocalMode();return;}
-  // Password recovery links should show reset form, not bypass login into the app.
+  if(window.self!==window.top){window.__senseRouteUnlocked=true;activateLocalMode();return;}
   if(_urlLooksLikePasswordRecovery()){
-    try {
-      const { data: { session } } = await supa.auth.getSession();
-      if (session?.user) currentUser = session.user;
-    } catch(e) {
-      console.warn('[password recovery] session check failed:', e.message);
-    }
+    try { const { data: { session } } = await supa.auth.getSession(); if (session?.user) currentUser = session.user; } catch(e) { console.warn('[password recovery] session check failed:', e.message); }
     showPasswordResetForm();
     return;
   }
-  // Show "checking session" state — hides form, shows dots
+  window.__senseRouteUnlocked=false;
+  sense214cSetPhase('AUTH_CHECKING','checkSession');
   const ov = document.getElementById('login-overlay');
   if(ov) ov.classList.add('lgi-checking');
+  window._sessionCheckHandling = true;
   try {
-    const { data: { session } } = await supa.auth.getSession();
-    // Fix v194 Guard B: set flag BEFORE await to block onAuthStateChange(INITIAL_SESSION)
-    // from racing into hideLoginOverlay() while checkSession is still handling it.
-    if (session && !currentUser) {
-      window._sessionCheckHandling = true;
-      currentUser = session.user;
-      // v195 Step 1: start R2 fetch in parallel with loadUserProfile (same guard applies)
+    const storage=sense214cAuthStorage();
+    const result=await sense214cGetSessionWithGrace('boot-check', storage.hasLikelySupabaseKey?4200:700);
+    if (result.ok && result.session && result.session.user) {
+      currentUser = result.session.user;
+      sense214cSetPhase('PROFILE_LOADING','session-restored',{email:currentUser.email});
       if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
       await loadUserProfile();
       window._sessionCheckHandling = false;
@@ -7329,12 +7398,11 @@ async function checkSession() {
       return;
     }
   } catch(e) {
-    window._sessionCheckHandling = false;
-    // Network error (offline, etc.) — fall through to show login form
-    console.warn('[checkSession] network error:', e.message);
+    console.warn('[checkSession] non-fatal:', e.message);
   }
-  // No valid session or error — reveal login form
+  window._sessionCheckHandling = false;
   if(ov) ov.classList.remove('lgi-checking');
+  sense214cShowLogin('no-session-on-boot');
 }
 
 
@@ -7346,34 +7414,25 @@ async function _pwaSilentSessionCheck(reason, graceMs){
   if(window._pwaResumeCheckInFlight)return window._pwaResumeCheckInFlight;
   window._pwaResumeCheckInFlight=(async()=>{
     try{
-      const first=await supa.auth.getSession();
-      let session=first&&first.data&&first.data.session;
-      if(session&&session.user){
-        currentUser=session.user;
-        const ov=document.getElementById('login-overlay');
-        if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
+      sense214cSetPhase(window.__senseRouteUnlocked?'RESUME_VALIDATING':'AUTH_CHECKING','pwa-silent-check',{reason});
+      const res=await sense214cGetSessionWithGrace('pwa:'+reason, Math.max(graceMs||0,3500));
+      if(res.ok&&res.session&&res.session.user){
+        currentUser=res.session.user;
+        sense214cHideLogin('pwa-session-alive');
+        if(window.__senseRouteUnlocked)sense214cSetPhase('APP_READY','pwa-session-alive');
         return true;
       }
-      await new Promise(r=>setTimeout(r,graceMs||2500));
-      const second=await supa.auth.getSession();
-      session=second&&second.data&&second.data.session;
-      if(session&&session.user){
-        currentUser=session.user;
-        const ov=document.getElementById('login-overlay');
-        if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
-        return true;
-      }
+      // Critical change v214c: resume must be non-destructive. Keep current UI alive on transient null session.
       if(currentUser){
-        console.warn('[pwa:v206a] confirmed session lost after resume',reason);
-        currentUser=null;
-        currentUserProfile=null;
-        sheetsLoadStarted=false;
-        _showLoginOverlayClean();
+        sense214cLog('RESUME','session temporarily missing; keeping app alive',{reason,storage:sense214cAuthStorage()},'warn');
+        sense214cHideLogin('pwa-transient-null-session');
+        if(window.__senseRouteUnlocked)sense214cSetPhase('APP_READY','pwa-transient-null-session');
+        return true;
       }
+      sense214cLog('RESUME','no current user during resume; login not forced here',{reason,storage:sense214cAuthStorage()},'warn');
       return false;
     }catch(e){
-      // Offline / flaky mobile network: do not disrupt the current screen.
-      console.warn('[pwa:v206a] resume session check skipped',reason,e&&e.message?e.message:e);
+      sense214cLog('RESUME','resume session check skipped',{reason,error:e&&e.message?e.message:String(e)},'warn');
       return true;
     }finally{
       window._pwaResumeCheckInFlight=null;
@@ -7381,6 +7440,7 @@ async function _pwaSilentSessionCheck(reason, graceMs){
   })();
   return window._pwaResumeCheckInFlight;
 }
+
 
 // Phase 10: Auth/session runtime boundary (adapter-first; no behavior change intended).
 // Freshket Sense auth/session runtime boundary — Phase 10.
@@ -15901,6 +15961,19 @@ function toggleSsbTooltip(){
 // ════════════════════════════════════════
 
 function showScreen(name){
+  if(!window.__senseRouteUnlocked && !(window.location && window.location.search && window.location.search.includes('local=1'))){
+    window.__sensePendingRoute=name;
+    sense214cLog('ROUTE','showScreen blocked until app ready',{target:name,phase:window.__sense214cPhase});
+    return;
+  }
+  try{
+    const now=Date.now();
+    if(window.__senseLastShowScreen && window.__senseLastShowScreen.name===name && now-window.__senseLastShowScreen.ts<450){
+      sense214cLog('DEDUP','duplicate showScreen skipped',{target:name,deltaMs:now-window.__senseLastShowScreen.ts});
+      return;
+    }
+    window.__senseLastShowScreen={name:name,ts:now};
+  }catch(e){}
   const controller = window.FreshketSenseNavigationRuntime;
   if(controller && typeof controller.showScreenFromLegacy === 'function'){
     try{
@@ -20763,337 +20836,15 @@ function initOliveAvatar(){
   _setImg('aiav-img','aiav-svg');
 }
 
-
-// ════════════════════════════════════════
-// v214 LOGIN / LOADING STABILITY GATE
-// Central app-readiness orchestration + console flight recorder.
-// Scope: auth/session/loading/resume only. No business formula/data schema changes.
-// ════════════════════════════════════════
-(function(global){
-  'use strict';
-  var VERSION='v214_login_loading_stability';
-  var MAX_TIMELINE=420;
-  var state='BOOTING';
-  var bootStarted=false;
-  var finalInstalled=false;
-  var lastResumeAt=0;
-  var resumeTimer=null;
-  var resumeInFlight=null;
-  var releaseTimer=null;
-  var timeline=[];
-  var wrapIds={};
-
-  function _now(){return new Date().toISOString();}
-  function _ms(){return (global.performance&&performance.now)?Math.round(performance.now()):Date.now();}
-  function _safe(fn,fallback){try{return fn();}catch(e){return fallback;}}
-  function _role(){return _safe(function(){return typeof getCurrentRole==='function'?getCurrentRole():((currentUserProfile&&currentUserProfile.role)||null);},null);}
-  function _email(){return _safe(function(){return currentUser&&currentUser.email || currentUserProfile&&currentUserProfile.email || null;},null);}
-  function _counts(){return {
-    portviewRows:_safe(function(){return (portviewBulkData||[]).length;},0),
-    historyAccounts:_safe(function(){return Object.keys(bulkHistoryData||{}).length;},0),
-    handoverAccounts:_safe(function(){return Object.keys((bulkHandoverData&&bulkHandoverData.byAccountId)||{}).length;},0),
-    handoverKams:_safe(function(){return Object.keys((bulkHandoverData&&bulkHandoverData.byKamName)||{}).length;},0),
-    currentMonthAccounts:_safe(function(){return Object.keys(bulkCurrentMonthData||{}).length;},0)
-  };}
-  function _loader(){return {
-    sheetsLoadStarted:_safe(function(){return !!sheetsLoadStarted;},false),
-    criticalInFlight:_safe(function(){return !!_cloudInitialPromise;},false),
-    backgroundInFlight:_safe(function(){return !!_cloudBackgroundPromise;},false),
-    cloudLoadedTabs:_safe(function(){return Array.from(_cloudLoadedTabs||[]);},[]),
-    inFlightTabs:_safe(function(){return Object.keys(_cloudInFlight||{});},[]),
-    bulkSkusReady:_safe(function(){return !!bulkSkusReady;},false),
-    bulkAltsReady:_safe(function(){return !!bulkAltsReady;},false)
-  };}
-  function _ui(){return {
-    login:_safe(function(){var el=document.getElementById('login-overlay');return el?{display:el.style.display||getComputedStyle(el).display,checking:el.classList.contains('lgi-checking'),recovery:el.classList.contains('password-recovery')}:null;},null),
-    splash:_safe(function(){var el=document.getElementById('sense-splash');return el?{display:el.style.display||getComputedStyle(el).display,opacity:el.style.opacity||''}:null;},null),
-    shellClass:_safe(function(){return document.body?document.body.className:'';},''),
-    activeScreen:_safe(function(){var el=document.querySelector('.scr.on');return el?el.id:null;},null)
-  };}
-  function _auth(){return {
-    sessionMemory:_safe(function(){return !!currentUser;},false),
-    currentUser:_safe(function(){return !!currentUser;},false),
-    profile:_safe(function(){return !!currentUserProfile;},false),
-    role:_role(),
-    email:_email(),
-    loginTransitionRunning:_safe(function(){return !!loginTransitionRunning;},false),
-    passwordRecovery:_safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false),
-    explicitSignOut:!!global.__senseExplicitSignOut
-  };}
-  function log(area,event,detail,level){
-    var entry={t:_now(),ms:_ms(),state:state,area:area,event:event,detail:detail||null,auth:_auth(),loader:_loader(),counts:_counts(),ui:_ui()};
-    timeline.push(entry); if(timeline.length>MAX_TIMELINE)timeline.shift();
-    try{
-      var method=level==='warn'?'warn':(level==='error'?'error':'info');
-      console[method]('[Sense v214]['+area+'] '+event, detail||'', {state:entry.state,auth:entry.auth,loader:entry.loader,counts:entry.counts,ui:entry.ui});
-    }catch(e){}
-    return entry;
-  }
-  function syncClasses(next){
-    try{
-      if(!document.body)return;
-      document.body.classList.remove('sense-v214-booting','sense-v214-auth-checking','sense-v214-login-required','sense-v214-app-ready','sense-v214-resume-validating');
-      if(next==='LOGIN_REQUIRED'||next==='AUTH_EXPIRED')document.body.classList.add('sense-v214-login-required');
-      else if(next==='APP_READY'||next==='OFFLINE_CACHE_READY')document.body.classList.add('sense-v214-app-ready');
-      else if(next==='RESUME_VALIDATING')document.body.classList.add('sense-v214-app-ready','sense-v214-resume-validating');
-      else if(next==='AUTH_CHECKING')document.body.classList.add('sense-v214-booting','sense-v214-auth-checking');
-      else document.body.classList.add('sense-v214-booting');
-    }catch(e){}
-  }
-  function setState(next,reason,detail){
-    if(!next)next=state;
-    if(next!==state){
-      var prev=state; state=next; syncClasses(next); log('GATE',prev+' → '+next,{reason:reason||'',detail:detail||null});
-    }else{
-      syncClasses(next); log('GATE','stay '+next,{reason:reason||'',detail:detail||null});
-    }
-  }
-  function hideLoginOnly(reason){
-    try{var ov=document.getElementById('login-overlay'); if(ov){ov.style.display='none';ov.style.opacity='0';ov.classList.remove('lgi-checking');}}catch(e){}
-    log('UI','login hidden',{reason:reason||''});
-  }
-  function showLoginOnly(reason){
-    setState('LOGIN_REQUIRED',reason||'show-login');
-    try{
-      var ov=document.getElementById('login-overlay');
-      if(ov){ov.classList.remove('lgi-checking');ov.classList.remove('password-recovery');ov.style.display='flex';ov.style.opacity='1';}
-      var sp=document.getElementById('sense-splash'); if(sp){sp.style.display='none';sp.style.opacity='';sp.style.transition='';}
-    }catch(e){}
-    log('UI','login shown',{reason:reason||''});
-  }
-  function releaseApp(reason){
-    if(releaseTimer){clearTimeout(releaseTimer);releaseTimer=null;}
-    hideLoginOnly(reason||'app-ready');
-    setState('APP_READY',reason||'app-ready');
-    log('BOOT','app released',{reason:reason||'',route:_ui().activeScreen,role:_role(),counts:_counts()});
-  }
-  function releaseAfterCriticalData(reason){
-    if(releaseTimer)clearTimeout(releaseTimer);
-    var p=_safe(function(){return _cloudInitialPromise;},null);
-    var released=false;
-    function done(why){if(released)return;released=true;releaseApp(why);}
-    if(p&&typeof p.then==='function'){
-      log('DATA','waiting critical data before shell release',{reason:reason||'',timeoutMs:3200});
-      Promise.race([p,new Promise(function(resolve){setTimeout(function(){resolve('__timeout__');},3200);})]).then(function(v){
-        log('DATA','critical wait resolved',{result:v==='__timeout__'?'timeout':'resolved',counts:_counts()});
-        done(reason||'critical-data-ready');
-      }).catch(function(e){log('DATA','critical wait failed',{error:String(e&&e.message||e)},'warn');done('critical-data-error-fallback');});
-    }else{
-      releaseTimer=setTimeout(function(){done(reason||'route-ready-no-critical-promise');},260);
-    }
-  }
-  async function confirmSession(reason,graceMs){
-    if(_safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false))return true;
-    if(!global.supa||!global.supa.auth||typeof global.supa.auth.getSession!=='function')return _safe(function(){return !!currentUser;},false);
-    try{
-      var r=await global.supa.auth.getSession();
-      var s=r&&r.data&&r.data.session;
-      if(s&&s.user){currentUser=s.user; log('AUTH','session alive',{reason:reason,source:'first-check'}); return true;}
-      if(graceMs){await new Promise(function(resolve){setTimeout(resolve,graceMs);});}
-      var r2=await global.supa.auth.getSession();
-      var s2=r2&&r2.data&&r2.data.session;
-      if(s2&&s2.user){currentUser=s2.user; log('AUTH','session alive',{reason:reason,source:'grace-check'}); return true;}
-      log('AUTH','session missing after confirm',{reason:reason,graceMs:graceMs||0},'warn');
-      return false;
-    }catch(e){
-      log('AUTH','session check skipped/failed',{reason:reason,error:String(e&&e.message||e)},'warn');
-      return true; // offline/flaky network should not disrupt current UI
-    }
-  }
-  function scheduleResumeValidation(source){
-    var now=Date.now();
-    lastResumeAt=now;
-    if(!_safe(function(){return !!currentUser;},false)){log('RESUME','skip no current user',{source:source});return;}
-    if(now-(global.__v214LastResumeValidationAt||0)<2200){log('RESUME','throttled',{source:source});return;}
-    global.__v214LastResumeValidationAt=now;
-    if(resumeTimer)clearTimeout(resumeTimer);
-    resumeTimer=setTimeout(function(){
-      if(resumeInFlight){log('RESUME','dedup in-flight',{source:source});return;}
-      setState('RESUME_VALIDATING','resume:'+source);
-      log('RESUME','silent validation start',{source:source});
-      resumeInFlight=confirmSession('resume:'+source,1800).then(function(ok){
-        if(ok){hideLoginOnly('resume-session-alive');setState('APP_READY','resume-session-alive');}
-        else{try{currentUser=null;currentUserProfile=null;}catch(e){} showLoginOnly('resume-session-expired');}
-        log('RESUME','silent validation done',{source:source,ok:ok});
-      }).finally(function(){resumeInFlight=null;});
-    },180);
-  }
-  function exposeDebug(){
-    try{
-      var prev=global.FreshketSenseDebug||{};
-      var prevVersion=typeof prev.version==='function'?prev.version:null;
-      var debug=Object.assign({},prev,{
-        version:function(){var base={};try{base=prevVersion?prevVersion():{};}catch(e){} return Object.assign({},base,{build:VERSION,currentBuild:'v214',loginLoadingStability:true,dataEpoch:'2026-05-22-v214-login-loading-stability',objects:Object.assign({},base.objects||{},{v214:true})});},
-        timeline:function(){return timeline.slice();},
-        state:function(){return {state:state,auth:_auth(),loader:_loader(),counts:_counts(),ui:_ui(),lastResumeAt:lastResumeAt};},
-        auth:function(){return _auth();},
-        loader:function(){return _loader();},
-        resume:function(){return {lastResumeAt:lastResumeAt,lastResumeIso:lastResumeAt?new Date(lastResumeAt).toISOString():null,inFlight:!!resumeInFlight,timer:!!resumeTimer,throttleAt:global.__v214LastResumeValidationAt||0};},
-        dump:function(){return {version:VERSION,state:state,auth:_auth(),data:_counts(),loader:_loader(),resume:this.resume(),ui:_ui(),timeline:timeline.slice(-120)};}
-      });
-      global.FreshketSenseDebug=debug;
-    }catch(e){}
-  }
-  function _assignGlobal(name,fn){
-    try{global[name]=fn;}catch(e){}
-    try{eval(name+'=fn');}catch(e){}
-  }
-  function _getFn(name){return _safe(function(){return eval(name);},global[name]);}
-  function wrap(name,factory,tag){
-    try{
-      var old=_getFn(name);
-      if(typeof old!=='function')return false;
-      var key=name+':' +(tag||'default');
-      if(old.__v214Wrapped&&wrapIds[key])return true;
-      var wrapped=factory(old);
-      if(typeof wrapped!=='function')return false;
-      wrapped.__v214Wrapped=true;
-      wrapped.__v214Old=old;
-      wrapIds[key]=true;
-      _assignGlobal(name,wrapped);
-      return true;
-    }catch(e){log('PATCH','wrap failed',{name:name,error:String(e&&e.message||e)},'warn');return false;}
-  }
-  function reinstall(reason){
-    exposeDebug();
-    wrap('_showLoginOverlayClean',function(old){
-      return function v214ShowLoginOverlayClean(){
-        var args=arguments;
-        log('UI','show login requested',{reason:reason||'wrap',state:state,explicitSignOut:!!global.__senseExplicitSignOut});
-        if(_safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false)){
-          return old.apply(this,args);
-        }
-        if(_safe(function(){return !!currentUser;},false)&&!global.__senseExplicitSignOut){
-          hideLoginOnly('suppress-show-login-current-session');
-          if(state!=='BOOTING'&&state!=='AUTH_CHECKING')setState('APP_READY','suppress-show-login-current-session');
-          return;
-        }
-        if(state==='RESUME_VALIDATING'&&!global.__senseExplicitSignOut){
-          log('UI','show login delayed during resume validation',{});
-          confirmSession('show-login-request-during-resume',1600).then(function(ok){if(!ok)showLoginOnly('resume-confirmed-no-session');});
-          return;
-        }
-        setState('LOGIN_REQUIRED','showLoginOverlay');
-        return old.apply(this,args);
-      };
-    },reason||'install');
-    wrap('hideLoginOverlay',function(old){
-      return function v214HideLoginOverlay(){
-        log('UI','hide login requested',{state:state,role:_role(),counts:_counts()});
-        if(!_safe(function(){return !!currentUser;},false)&&!_safe(function(){return !!passwordRecoveryMode;},false)){
-          log('UI','hide login allowed but no currentUser yet',{state:state},'warn');
-        }
-        setState('PROFILE_LOADING','hideLoginOverlay');
-        return old.apply(this,arguments);
-      };
-    },reason||'install');
-    wrap('_autoRouteAfterLogin',function(old){
-      return function v214AutoRouteAfterLogin(){
-        log('ROUTE','auto-route start',{role:_role(),email:_email(),counts:_counts()});
-        setState('DATA_LOADING','auto-route');
-        var ret=old.apply(this,arguments);
-        log('ROUTE','auto-route called',{role:_role(),screen:_ui().activeScreen,counts:_counts()});
-        releaseAfterCriticalData('auto-route-complete');
-        return ret;
-      };
-    },reason||'install');
-    wrap('checkSession',function(old){
-      return async function v214CheckSession(){
-        log('AUTH','checkSession start',{state:state});
-        setState('AUTH_CHECKING','checkSession');
-        try{
-          var ret=await old.apply(this,arguments);
-          log('AUTH','checkSession done',{hasUser:_safe(function(){return !!currentUser;},false),profile:_safe(function(){return !!currentUserProfile;},false),role:_role()});
-          if(!_safe(function(){return !!currentUser;},false)&&!_safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false)){
-            showLoginOnly('checkSession-no-session');
-          }
-          return ret;
-        }catch(e){
-          log('AUTH','checkSession error',{error:String(e&&e.message||e)},'warn');
-          showLoginOnly('checkSession-error');
-          throw e;
-        }
-      };
-    },reason||'install');
-    wrap('doLogin',function(old){
-      return async function v214DoLogin(){
-        log('AUTH','login submit',{});
-        setState('AUTH_CHECKING','doLogin');
-        try{var r=await old.apply(this,arguments); log('AUTH','login flow returned',{hasUser:_safe(function(){return !!currentUser;},false),role:_role()}); return r;}
-        catch(e){log('AUTH','login flow error',{error:String(e&&e.message||e)},'warn');setState('LOGIN_REQUIRED','login-error');throw e;}
-      };
-    },reason||'install');
-    wrap('doSignOut',function(old){
-      return async function v214DoSignOut(){
-        global.__senseExplicitSignOut=true;
-        log('AUTH','explicit signout start',{});
-        setState('AUTH_EXPIRED','explicit-signout');
-        try{return await old.apply(this,arguments);}finally{setTimeout(function(){global.__senseExplicitSignOut=false;},2400);log('AUTH','explicit signout done',{});}
-      };
-    },reason||'install');
-    wrap('loadFromCloudflareR2',function(old){
-      return function v214LoadFromCloudflareR2(){
-        var before=_loader();
-        log('DATA','cloud load requested',{before:before});
-        if(before.criticalInFlight){log('DEDUP','cloud load uses existing in-flight promise',{tabs:before.inFlightTabs});}
-        var ret=old.apply(this,arguments);
-        if(ret&&typeof ret.then==='function'){
-          ret.then(function(){log('DATA','cloud load resolved',{counts:_counts(),loader:_loader()});})
-             .catch(function(e){log('DATA','cloud load failed',{error:String(e&&e.message||e)},'warn');});
-        }else{
-          log('DATA','cloud load returned without promise',{returnType:typeof ret,loader:_loader(),counts:_counts()});
-        }
-        return ret;
-      };
-    },reason||'install');
-    try{if(typeof loadFromCloudflareR2==='function')_assignGlobal('loadFromGoogleSheets',function(){return loadFromCloudflareR2.apply(this,arguments);});}catch(e){}
-    wrap('reloadFromCloudflareR2',function(old){
-      return function v214ReloadFromCloudflareR2(){log('DATA','manual reload requested',{});return old.apply(this,arguments);};
-    },reason||'install');
-    try{if(typeof reloadFromCloudflareR2==='function')_assignGlobal('reloadFromGoogleSheets',function(){return reloadFromCloudflareR2.apply(this,arguments);});}catch(e){}
-    wrap('showScreen',function(old){
-      return function v214ShowScreen(name){
-        log('ROUTE','showScreen',{target:name,state:state,role:_role(),counts:_counts()});
-        return old.apply(this,arguments);
-      };
-    },reason||'install');
-    log('PATCH','v214 wrappers installed',{reason:reason||'',finalInstalled:finalInstalled});
-    return true;
-  }
-  async function boot(){
-    if(bootStarted){log('BOOT','dedup boot call',{});return;}
-    bootStarted=true;
-    exposeDebug();
-    reinstall('pre-init');
-    setState('AUTH_CHECKING','boot');
-    log('BOOT','start',{version:VERSION});
-    try{await checkSession();}
-    catch(e){log('BOOT','checkSession failed in boot',{error:String(e&&e.message||e)},'warn');}
-    setTimeout(function(){
-      if(_safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false))return;
-      if(!_safe(function(){return !!currentUser;},false))showLoginOnly('boot-no-session-final');
-      else log('BOOT','session found; waiting route/splash release',{role:_role(),counts:_counts()});
-    },30);
-  }
-  try{document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')scheduleResumeValidation('visibilitychange');},{passive:true});}catch(e){}
-  try{global.addEventListener('pageshow',function(event){scheduleResumeValidation(event&&event.persisted?'pageshow-bfcache':'pageshow');},{passive:true});}catch(e){}
-  try{global.addEventListener('focus',function(){scheduleResumeValidation('focus');},{passive:true});}catch(e){}
-  try{global.addEventListener('online',function(){scheduleResumeValidation('online');},{passive:true});}catch(e){}
-  global.FreshketSenseV214Gate={version:VERSION,boot:boot,reinstall:reinstall,setState:setState,releaseApp:releaseApp,showLogin:showLoginOnly,hideLogin:hideLoginOnly,scheduleResumeValidation:scheduleResumeValidation,log:log,timeline:function(){return timeline.slice();},dump:function(){return global.FreshketSenseDebug&&global.FreshketSenseDebug.dump?global.FreshketSenseDebug.dump():{state:state,timeline:timeline.slice(-120)};}};
-  exposeDebug();
-  reinstall('bootstrap');
-  syncClasses(state);
-})(window);
-
 (function init(){
   // Show local-dev-btn only on localhost
   if(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'){
     const ldb=document.getElementById('local-dev-btn');
     if(ldb)ldb.style.display='block';
   }
-  // v214: Boot must be owned by the app readiness gate. Do not let storage/sample render race auth.
-  if(window.FreshketSenseV214Gate&&typeof window.FreshketSenseV214Gate.boot==='function')window.FreshketSenseV214Gate.boot();
-  else checkSession().catch(()=>{});
+  // Do not prefetch bulk data before auth; mobile Safari can crash on large CSV parsing.
+  // Check Supabase session first (shows/hides login overlay)
+  checkSession().catch(()=>{});
   // ── Guard B: visibilitychange — silent token re-check only, NO routing ────
   // Fires when user returns to the PWA after backgrounding it.
   // Fix v22.2: added 2s grace period before forcing re-login.
@@ -21154,10 +20905,10 @@ function initOliveAvatar(){
       }
     }
   }catch(e){}
-  // v214: Do NOT restore local account storage or sample data during boot.
-  // Auth/profile/critical data must decide the first visible route. This prevents stale account/sample flash.
-  try{updateDataStatus();}catch(e){}
-  try{if(window.FreshketSenseV214Gate)window.FreshketSenseV214Gate.log('BOOT','initial storage/sample restore skipped',{reason:'auth-gated-v214'});}catch(e){}
+  // v214c: Do not restore local account storage or sample data during boot.
+  // Auth/profile/critical data owns the first visible route, preventing stale user/sample flashes.
+  try{ updateDataStatus(); }catch(e){}
+  try{ sense214cLog('BOOT','storage/sample first paint skipped',{reason:'auth-gated-v214c'}); }catch(e){}
 })();
 
 // ── Restaurant swipe cue helpers (v154) ──
@@ -26915,12 +26666,8 @@ console.log('[Target Module v1] loaded');
         }catch(e){}
       }).catch(function(){});
       navigator.serviceWorker.addEventListener('controllerchange', function(){
-        // Existing older handler may also reload. Keep a separate short-lived guard to prevent loops.
-        try{
-          if(sessionStorage.getItem('freshket_sw_controller_reloaded_v206f')) return;
-          sessionStorage.setItem('freshket_sw_controller_reloaded_v206f', String(now()));
-        }catch(e){}
-        setTimeout(function(){ try{ location.reload(); }catch(e){} }, 160);
+        try{ sessionStorage.setItem('freshket_sw_controller_reloaded_v206f', 'v214c-disabled-'+String(now())); }catch(e){}
+        log('service worker controller changed — auto reload disabled by v214c');
       });
     }catch(e){}
   }
@@ -26948,14 +26695,8 @@ console.log('[Target Module v1] loaded');
         const local = currentBuild();
         log('build-check', {reason, local, remote});
         if(remote && remote !== local){
-          const last = Number(sessionStorage.getItem(LAST_RELOAD_KEY)||0);
-          if(now() - last > 12000){
-            sessionStorage.setItem(LAST_RELOAD_KEY, String(now()));
-            // Force a network navigation and avoid reusing stale in-memory PWA state.
-            const next = location.origin + location.pathname + '?__sense_reload=' + encodeURIComponent(remote) + '&t=' + now() + location.hash;
-            warn('new build detected; reloading', {local, remote, reason});
-            location.replace(next);
-          }
+          // v214c: never auto-reload during auth/resume. Surface only in diagnostics; user can hard refresh manually.
+          warn('new build detected; auto reload disabled by v214c', {local, remote, reason});
         }
         return remote;
       }catch(e){ log('build-check skipped', reason, e&&e.message?e.message:e); return null; }
@@ -30957,247 +30698,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 </script>
 
 
-
-<!-- Freshket Sense v214 finalizer: re-apply auth/loading wrappers after legacy v213 patches installed. -->
-<script id="freshket-v214-login-loading-stability-finalizer-js">
-(function(global){
-  'use strict';
-  function run(){
-    try{
-      if(global.FreshketSenseV214Gate&&typeof global.FreshketSenseV214Gate.reinstall==='function'){
-        global.FreshketSenseV214Gate.reinstall('finalizer-after-v213-patches');
-        global.FreshketSenseV214Gate.log('PATCH','v214 finalizer active',{build:'v214_login_loading_stability'});
-      }
-    }catch(e){try{console.warn('[Sense v214][PATCH] finalizer failed',e&&e.message?e.message:e);}catch(_){} }
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(run,0);},{once:true});
-  else setTimeout(run,0);
-})(window);
+<script id="freshket-v214c-final-marker-js">
+(function(){try{console.info('[Sense v214c] auth/resume hardening installed'); if(window.FreshketSenseDebug&&window.FreshketSenseDebug.version)console.info('[Sense v214c] debug version', window.FreshketSenseDebug.version());}catch(e){}})();
 </script>
-
-
-<!-- Freshket Sense v214b: Session persistence + route/render stability hotfix. No business logic changes. -->
-<script id="freshket-v214b-session-route-stability-js">
-(function(global){
-  'use strict';
-  var VERSION='v214b_login_session_stability_hotfix';
-  var lastRoute={name:null,ts:0};
-  var pendingRoute=null;
-  var confirmingLoginShow=false;
-  function safe(fn,fb){try{return fn();}catch(e){return fb;}}
-  function now(){return Date.now();}
-  function gate(){return global.FreshketSenseV214Gate||null;}
-  function log(area,event,detail,level){
-    try{
-      if(gate()&&typeof gate().log==='function') gate().log(area,event,Object.assign({v214b:true},detail||{}),level);
-      else console[(level==='warn'?'warn':level==='error'?'error':'info')]('[Sense v214b]['+area+'] '+event,detail||{});
-    }catch(e){}
-  }
-  function assignGlobal(name,fn){try{global[name]=fn;}catch(e){} try{eval(name+'=fn');}catch(e){}}
-  function getFn(name){return safe(function(){return eval(name);},global[name]);}
-  function state(){return safe(function(){return global.FreshketSenseDebug&&global.FreshketSenseDebug.state?global.FreshketSenseDebug.state().state:null;},null);}
-  function hasCurrentUser(){return safe(function(){return !!currentUser;},false);}
-  function hasRecovery(){return safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false);}
-  function setSwNoAutoReload(reason){
-    try{sessionStorage.setItem('freshket_sw_controller_reloaded','v214b-disabled-'+String(now()));}catch(e){}
-    try{sessionStorage.setItem('freshket_sw_controller_reloaded_v206f','v214b-disabled-'+String(now()));}catch(e){}
-    try{global.__freshketSenseDisableControllerReload=true;}catch(e){}
-    log('PWA','controllerchange auto-reload disabled',{reason:reason||'stability'});
-  }
-  async function getSessionWithGrace(reason,graceMs){
-    if(hasRecovery())return {ok:true,recovery:true,session:null};
-    if(!global.supa||!global.supa.auth||typeof global.supa.auth.getSession!=='function')return {ok:hasCurrentUser(),session:null};
-    try{
-      var r=await global.supa.auth.getSession();
-      var s=r&&r.data&&r.data.session;
-      if(s&&s.user){try{currentUser=s.user;}catch(e){} return {ok:true,session:s,source:'first'};}
-      if(graceMs){await new Promise(function(resolve){setTimeout(resolve,graceMs);});}
-      var r2=await global.supa.auth.getSession();
-      var s2=r2&&r2.data&&r2.data.session;
-      if(s2&&s2.user){try{currentUser=s2.user;}catch(e){} return {ok:true,session:s2,source:'grace'};}
-      return {ok:false,session:null,source:'missing'};
-    }catch(e){
-      log('AUTH','session confirm failed - keep current UI',{reason:reason,error:String(e&&e.message||e)},'warn');
-      return {ok:hasCurrentUser(),session:null,source:'error'};
-    }
-  }
-  function authStorageStatus(){
-    var out={localStorageKeys:0,sessionStorageKeys:0,hasLikelySupabaseKey:false,keys:[]};
-    try{
-      for(var i=0;i<localStorage.length;i++){
-        var k=localStorage.key(i)||'';
-        if(/^sb-|supabase/i.test(k)||k.indexOf('auth-token')>=0){out.localStorageKeys++;out.hasLikelySupabaseKey=true;out.keys.push(k.replace(/(auth-token|refresh-token|access-token).*/i,'$1…'));}
-      }
-    }catch(e){}
-    try{
-      for(var j=0;j<sessionStorage.length;j++){
-        var sk=sessionStorage.key(j)||'';
-        if(/^sb-|supabase/i.test(sk)||sk.indexOf('auth-token')>=0){out.sessionStorageKeys++;out.hasLikelySupabaseKey=true;}
-      }
-    }catch(e){}
-    return out;
-  }
-  function waitCriticalData(timeoutMs){
-    var p=safe(function(){return _cloudInitialPromise;},null);
-    if(p&&typeof p.then==='function'){
-      return Promise.race([p,new Promise(function(resolve){setTimeout(function(){resolve('__timeout__');},timeoutMs||3600);})]);
-    }
-    return Promise.resolve('__no_promise__');
-  }
-  function install(){
-    setSwNoAutoReload('install');
-
-    // Hotfix 1: SIGNED_OUT timers and legacy resume checks must verify Supabase twice before showing login.
-    var showBase=getFn('_showLoginOverlayClean');
-    if(typeof showBase==='function'&&!showBase.__v214bConfirmBeforeShow){
-      var original=showBase.__v214Old || showBase;
-      var wrappedShow=function v214bShowLoginOverlayClean(){
-        var args=arguments;
-        log('UI','show login requested - confirm first',{state:state(),hasCurrentUser:hasCurrentUser(),explicit:!!global.__senseExplicitSignOut,storage:authStorageStatus()});
-        if(hasRecovery()||global.__senseExplicitSignOut){return original.apply(this,args);}
-        if(hasCurrentUser()){
-          try{if(gate())gate().hideLogin('v214b-current-user-suppress-login');}catch(e){}
-          try{if(gate())gate().setState('APP_READY','v214b-current-user-suppress-login');}catch(e){}
-          return;
-        }
-        if(confirmingLoginShow){log('AUTH','login show confirmation deduped',{});return;}
-        confirmingLoginShow=true;
-        try{if(gate())gate().setState('AUTH_CHECKING','v214b-confirm-before-login');}catch(e){}
-        getSessionWithGrace('show-login-request',1800).then(function(res){
-          confirmingLoginShow=false;
-          if(res.ok&&res.session){
-            log('AUTH','transient signout suppressed',{source:res.source,storage:authStorageStatus()});
-            try{
-              if(typeof loadUserProfile==='function'){
-                Promise.resolve(loadUserProfile()).finally(function(){
-                  try{if(typeof hideLoginOverlay==='function')hideLoginOverlay();}catch(e){}
-                });
-              }else if(gate())gate().hideLogin('v214b-session-restored');
-            }catch(e){try{if(gate())gate().hideLogin('v214b-session-restored-no-profile');}catch(_){} }
-            return;
-          }
-          log('AUTH','confirmed no session - show login',{source:res.source,storage:authStorageStatus()},'warn');
-          return original.apply(null,args);
-        }).catch(function(e){
-          confirmingLoginShow=false;
-          log('AUTH','confirm-before-login failed - do not disrupt',{error:String(e&&e.message||e)},'warn');
-        });
-      };
-      wrappedShow.__v214bConfirmBeforeShow=true;
-      wrappedShow.__v214bBase=original;
-      assignGlobal('_showLoginOverlayClean',wrappedShow);
-    }
-
-    // Hotfix 2: make legacy PWA silent checker non-destructive; it must not clear users/show login on transient null session.
-    var pwaBase=getFn('_pwaSilentSessionCheck');
-    if(typeof pwaBase==='function'&&!pwaBase.__v214bNonDestructive){
-      var wrappedPwa=function v214bPwaSilentSessionCheck(reason,graceMs){
-        log('RESUME','legacy pwa check intercepted',{reason:reason,graceMs:graceMs});
-        return getSessionWithGrace('legacy-pwa:'+reason, Math.max(graceMs||0,2200)).then(function(res){
-          if(res.ok){
-            try{if(gate())gate().hideLogin('v214b-pwa-session-alive');}catch(e){}
-            try{if(gate())gate().setState('APP_READY','v214b-pwa-session-alive');}catch(e){}
-            return true;
-          }
-          log('AUTH','pwa confirmed no session - login allowed',{reason:reason,storage:authStorageStatus()},'warn');
-          try{currentUser=null;currentUserProfile=null;}catch(e){}
-          var sh=getFn('_showLoginOverlayClean');
-          if(typeof sh==='function')sh();
-          return false;
-        });
-      };
-      wrappedPwa.__v214bNonDestructive=true;
-      assignGlobal('_pwaSilentSessionCheck',wrappedPwa);
-    }
-
-    // Hotfix 3: delay auto-route until critical data is ready, so Teamview/commission does not flash through partial states.
-    var ar=getFn('_autoRouteAfterLogin');
-    if(typeof ar==='function'&&!ar.__v214bDelayedRoute){
-      var arBase=ar.__v214Old || ar;
-      var arWrapped=function v214bAutoRouteAfterLogin(){
-        var ctx=this,args=arguments;
-        try{if(gate())gate().setState('DATA_LOADING','v214b-delay-auto-route');}catch(e){}
-        log('ROUTE','auto-route delayed until critical data',{role:safe(function(){return typeof getCurrentRole==='function'?getCurrentRole():null;},null)});
-        waitCriticalData(4200).then(function(result){
-          log('DATA','critical gate for route resolved',{result:result==='__timeout__'?'timeout':result});
-          var ret=arBase.apply(ctx,args);
-          setTimeout(function(){try{if(gate())gate().releaseApp('v214b-route-after-critical');}catch(e){}},80);
-          return ret;
-        }).catch(function(e){
-          log('ROUTE','delayed auto-route failed; fallback release',{error:String(e&&e.message||e)},'warn');
-          try{arBase.apply(ctx,args);}catch(_){}
-          try{if(gate())gate().releaseApp('v214b-route-fallback');}catch(_){}
-        });
-      };
-      arWrapped.__v214bDelayedRoute=true;
-      arWrapped.__v214Old=arBase;
-      assignGlobal('_autoRouteAfterLogin',arWrapped);
-    }
-
-    // Hotfix 4: suppress duplicate same-screen route storms and block app routes while auth/login is not ready.
-    var ss=getFn('showScreen');
-    if(typeof ss==='function'&&!ss.__v214bRouteGuard){
-      var ssBase=ss.__v214Old || ss;
-      var ssWrapped=function v214bShowScreen(name){
-        var st=state();
-        var authed=hasCurrentUser();
-        if(!authed || st==='LOGIN_REQUIRED' || st==='AUTH_EXPIRED' || st==='AUTH_CHECKING' || st==='PROFILE_LOADING'){
-          pendingRoute=name;
-          log('ROUTE','showScreen blocked until app ready',{target:name,state:st,authed:authed});
-          return;
-        }
-        var t=now();
-        if(lastRoute.name===name && t-lastRoute.ts<900){
-          log('DEDUP','duplicate showScreen skipped',{target:name,deltaMs:t-lastRoute.ts});
-          return;
-        }
-        lastRoute={name:name,ts:t};
-        return ssBase.apply(this,arguments);
-      };
-      ssWrapped.__v214bRouteGuard=true;
-      ssWrapped.__v214Old=ssBase;
-      assignGlobal('showScreen',ssWrapped);
-    }
-
-    // Hotfix 5: when gate releases, apply any blocked route once, after the app is actually ready.
-    if(gate()&&typeof gate().releaseApp==='function'&&!gate().releaseApp.__v214bPendingRoute){
-      var oldRelease=gate().releaseApp;
-      gate().releaseApp=function v214bReleaseApp(reason){
-        var r=oldRelease.apply(this,arguments);
-        if(pendingRoute&&hasCurrentUser()){
-          var target=pendingRoute; pendingRoute=null;
-          setTimeout(function(){
-            try{
-              var fn=getFn('showScreen');
-              log('ROUTE','applying pending route after release',{target:target,reason:reason});
-              if(typeof fn==='function')fn(target);
-            }catch(e){log('ROUTE','pending route failed',{error:String(e&&e.message||e)},'warn');}
-          },90);
-        }
-        return r;
-      };
-      gate().releaseApp.__v214bPendingRoute=true;
-    }
-
-    // Extend debug without leaking token values.
-    try{
-      var dbg=global.FreshketSenseDebug||{};
-      var oldVersion=dbg.version;
-      dbg.version=function(){var base={};try{base=typeof oldVersion==='function'?oldVersion():{};}catch(e){} base.build=VERSION;base.currentBuild='v214b';base.loginLoadingStability=true;base.sessionRouteHotfix=true;base.objects=Object.assign({},base.objects||{},{v214b:true});return base;};
-      dbg.authStorage=authStorageStatus;
-      var oldDump=dbg.dump;
-      dbg.dump=function(){var d={};try{d=typeof oldDump==='function'?oldDump():{};}catch(e){} d.version=VERSION;d.authStorage=authStorageStatus();d.routeGuard={lastRoute:lastRoute,pendingRoute:pendingRoute};d.autoReloadDisabled=true;return d;};
-      global.FreshketSenseDebug=dbg;
-    }catch(e){}
-    log('PATCH','v214b installed',{version:VERSION,storage:authStorageStatus()});
-  }
-  function installLater(){try{install();}catch(e){try{console.warn('[Sense v214b][PATCH] install failed',e&&e.message?e.message:e);}catch(_){}}}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(installLater,20);},{once:true});
-  else setTimeout(installLater,20);
-  setTimeout(installLater,600); // re-assert after legacy/finalizer wrappers
-  global.FreshketSenseV214b={version:VERSION,install:install,setSwNoAutoReload:setSwNoAutoReload,authStorageStatus:authStorageStatus};
-})(window);
-</script>
-
 </body>
 </html>
