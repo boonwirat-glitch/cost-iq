@@ -1,3 +1,21 @@
+<!-- Freshket Sense v216 TRUST PASS — Phase 2 surgical patch on v215 baseline.
+     Goal: complete-trust app feel. No phantom data, no multi-flash, no 1-frame login flash, no force-refresh mid-use.
+     Edits (7 jobs, no new code paths — config + condition tightening only):
+       1. v212a lastResumeAt initialized to Date.now() (was 0) — suppresses 5th flash at 5-10s from
+          first cold-load validateUnifiedFreshness force-fetching CSV unnecessarily.
+       2. useSampleData() skipped when Supabase auth token detected in localStorage — eliminates
+          phantom "[ตัวอย่าง] บ.ลีฟ ทู อีท จำกัด" / sample_741a4cb1abcd flash on every cold boot.
+       3-5. Splash _splashDataReady trigger now requires portview + history + handover all loaded
+          (was: just portview + history). Splash holds until 3 critical Team View files all ready,
+          so all sequential refreshAll() calls happen BEHIND the splash. Cold MAX_SHOW extended
+          2000ms → 5000ms as safety net for slow R2.
+       6. Splash MAX_SHOW cold extended 2000ms → 5000ms — fallback when one critical file is slow.
+       7. Sync boot cover script injected after splash HTML — if Supabase session detected in
+          localStorage synchronously (before main JS init), hides login overlay and shows splash early.
+          Eliminates the 1-frame login flash on PWA reload that the user reported.
+     PRESERVED: all of v215 (auth/resume owner cleanup), commission feature, NRR, KAM/TL/Admin role logic,
+                data loader business logic, Olive, all UI fixes (v213c-v213f), Supabase auth flow.
+     Rollback: revert to sense_v215_auth_owner_cleanup.html. -->
 <!-- Freshket Sense v215 AUTH/RESUME OWNER CLEANUP — minimal surgical patch on v214f baseline.
      Goal: trustable app behavior at every micro-moment (cold open, login, resume, token refresh, daily refresh).
      Edits (3 jobs, ~3 `return;` neutralizations, no new code paths):
@@ -5604,6 +5622,32 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="spl-ticker-wrap"><span id="spl-ticker"></span></div>
 <div class="spl-bar-track"><div id="spl-bar"></div></div>
 </div><!-- แสดงเมื่อกด [local dev] -->
+<script>
+// v216 FIX 2B — sync boot cover. Runs immediately after splash/login HTML, BEFORE main JS init.
+// If a Supabase auth session exists in localStorage, hide login overlay and show splash (same dark gradient)
+// BEFORE the first paint. This eliminates the 1-frame login flash on PWA reload that the user reported.
+// Without session: login overlay stays visible as before (CSS default display:flex).
+(function(){
+  'use strict';
+  try{
+    var hasSession=false;
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(k && /^sb-.+-auth-token$/.test(k)){
+        var v=localStorage.getItem(k);
+        if(v && v.length>20){ hasSession=true; break; }
+      }
+    }
+    if(hasSession){
+      var login=document.getElementById('login-overlay');
+      if(login){ login.style.display='none'; }
+      var splash=document.getElementById('sense-splash');
+      if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
+      try{ console.info('[Sense v216] boot cover applied — Supabase session detected, splash shown early to prevent 1-frame login flash'); }catch(e){}
+    }
+  }catch(e){}
+})();
+</script>
 <div id="local-persona-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;padding:20px">
 <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:100%;max-width:400px;max-height:80vh;overflow-y:auto">
 <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.6);letter-spacing:.8px;margin-bottom:4px">LOCAL DEV MODE</div>
@@ -7012,7 +7056,11 @@ function showSenseSplash(onDone){
   // Falls through to normal timing if cache was cold — zero regression risk.
   const _cacheWarm = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0;
   const MIN_SHOW=_cacheWarm ? 0 : 1650;
-  const MAX_SHOW=_cacheWarm ? 400 : 2000; // v194: reduced from 4200ms
+  // v216 FIX 2C-Light: cold MAX_SHOW extended from 2000ms → 5000ms.
+  // Reason: splash now waits for portview + history + handover (3 critical files).
+  //         If one is slow, the old 2000ms force-fade caused user to see splash → partial render → re-render flashes.
+  //         5000ms gives enough headroom for typical R2 cold load while preserving a sane fallback if a file fails.
+  const MAX_SHOW=_cacheWarm ? 400 : 5000;
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -8767,7 +8815,9 @@ function handleFileUpload(type,input){
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
       if(typeof window._splashProgress==='function')
         window._splashProgress(80,'คำนวณ baseline 3 เดือน...');
-      if(portviewBulkData&&portviewBulkData.length>0){
+      // v216 FIX 2C-Light: also require handover ready before splash fade — prevents
+      // handover-arrival flash on Team View (the "ทำการบ้าน X/Y" badges per KAM card).
+      if(portviewBulkData&&portviewBulkData.length>0 && bulkHandoverData && Object.keys(bulkHandoverData.byAccountId||{}).length>0){
         if(typeof window._splashDataReady==='function')window._splashDataReady();
       }
       _done();
@@ -8810,8 +8860,10 @@ function handleFileUpload(type,input){
       // ── Smart Splash: drive progress bar (portview = 45%) ──────────────
       if(typeof window._splashProgress==='function')
         window._splashProgress(45,'คำนวณ baseline 3 เดือน...');
-      // ── Check if we can signal splash-ready (history also loaded) ──────
-      if(Object.keys(bulkHistoryData).length>0){
+      // ── v216 FIX 2C-Light: signal splash-ready only when ALL 3 critical files loaded ──
+      // (was: just history check) — splash now holds until handover also arrives to prevent
+      // post-fade re-render flash from handover badges updating in Team View.
+      if(Object.keys(bulkHistoryData).length>0 && bulkHandoverData && Object.keys(bulkHandoverData.byAccountId||{}).length>0){
         if(typeof window._splashDataReady==='function')window._splashDataReady();
       }
       // ── Render: only if portview screen is active AND splash already gone ──
@@ -8926,6 +8978,13 @@ function handleFileUpload(type,input){
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
+      // v216 FIX 2C-Light: signal splash-ready when handover is loaded AND portview+history both ready.
+      // Splash holds until ALL 3 critical team-view files loaded → no flash after fade.
+      try{
+        if(portviewBulkData && portviewBulkData.length>0 && Object.keys(bulkHistoryData).length>0){
+          if(typeof window._splashDataReady==='function') window._splashDataReady();
+        }
+      }catch(e){}
       // toast removed v205b — bulk ingest noise
       _done();
     };
@@ -20823,6 +20882,23 @@ function initOliveAvatar(){
     applyMeta();refreshAll();
     // User has real data — skip onboarding
     try{localStorage.setItem('ciq_visited','1');}catch(e){}
+  }else if((function(){
+    // v216 FIX 2A: detect Supabase auth token in localStorage synchronously.
+    // If session exists, real data will arrive from R2 — phantom sample data ("[ตัวอย่าง] บ.ลีฟ ทู อีท จำกัด" / sample_741a4cb1abcd)
+    // must NOT render in between. This was the source of "[v202 debug] _getKamEmailForAccount: portviewBulkData not loaded yet for sample_..." console noise.
+    try{
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k && /^sb-.+-auth-token$/.test(k)){
+          var v=localStorage.getItem(k);
+          if(v && v.length>20) return true;
+        }
+      }
+    }catch(e){}
+    return false;
+  })()){
+    // Authenticated session detected — skip useSampleData(). Real R2 data arrives shortly.
+    try{ console.info('[Sense v216] useSampleData() skipped — Supabase session detected, real data loading from R2'); }catch(e){}
   }else{
     useSampleData();
     // Check if first visit — show onboarding (with sample data loaded as preview)
@@ -28753,7 +28829,10 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   var lastGovernanceLoadAt = 0;
   var governanceInFlight = null;
   var resumeInFlight = null;
-  var lastResumeAt = 0;
+  // v216 FIX 2D: was `0` — caused first cold-load to bypass minGap check and force-fetch CSV at ~3.2s,
+  //              producing the "5th flash" 5-10s after splash. Initialize to boot time so cold load is
+  //              treated as "already validated" — main loader already fetched fresh data.
+  var lastResumeAt = (typeof Date.now === 'function' ? Date.now() : +new Date());
 
   function debugOn(){ try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshketDebug')==='1';}catch(e){return false;} }
   function log(){ if(debugOn()) try{ console.log.apply(console, ['[v212a freshness]'].concat([].slice.call(arguments))); }catch(e){} }
@@ -29951,15 +30030,15 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v215-auth-owner-cleanup';
-  var DATA_EPOCH='2026-05-22-v215-auth-owner-cleanup';
+  var VERSION='v216-trust-pass';
+  var DATA_EPOCH='2026-05-22-v216-trust-pass';
   function $(id){return document.getElementById(id);} 
-  function log(){try{console.log.apply(console,['[Sense v215]'].concat([].slice.call(arguments)));}catch(e){}}
+  function log(){try{console.log.apply(console,['[Sense v216]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
-    try{ global.FRESHKET_BUILD='v215'; }catch(e){}
+    try{ global.FRESHKET_BUILD='v216'; }catch(e){}
     try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
-    try{ global.currentBuild=function(){return 'v215';}; }catch(e){}
-    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v215',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true}};}; } }catch(e){}
+    try{ global.currentBuild=function(){return 'v216';}; }catch(e){}
+    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v216',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true,v216:true}};}; } }catch(e){}
   }
   function hideLoginUi(){
     try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.style.opacity='0'; ov.classList.remove('lgi-checking'); } }catch(e){}
