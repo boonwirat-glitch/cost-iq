@@ -7101,8 +7101,19 @@ function showSenseSplash(onDone){
   // where the OS kills the app after short background (1-60s) and cold-boots on resume.
   // Result: iOS kill → open → ~300ms splash → app. User perceives "blink" not "reload".
   const _lastReady=Number((function(){try{return localStorage.getItem('sense_last_critical_ready');}catch(e){return 0;}})());
-  const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<30*60*1000;
+  // v218b: extended from 30min → 6h (= IndexedDB TTL). Data freshness is guaranteed separately
+  // by ETag conditional GET on every load — warm boot only controls splash MIN/MAX timing.
+  const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<6*60*60*1000;
   const MIN_SHOW=_cacheWarm ? 0 : (_isWarmBoot ? 0 : 1650);
+  // v218b: data load debug logger — filter '[Sense⚡]' in DevTools console (Info level).
+  // To silence: window._senseLoadDebug = false
+  // To re-enable: window._senseLoadDebug = true
+  _senseDataLog('SPLASH',
+    _cacheWarm ? '🟢 WARM (JS state — portviewBulkData populated)' :
+    _isWarmBoot ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=2000ms' :
+                  '🔴 COLD — MIN=1650ms MAX=5000ms',
+    _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
+  );
   // v218a: cold MAX_SHOW 8000→5000ms (3-file gate, not 6), warm boot 3000→2000ms.
   // IndexedDB hits portview+history+handover in ~300-600ms → splash feels like a blink on warm boot.
   const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 2000 : 5000);
@@ -7164,6 +7175,9 @@ function showSenseSplash(onDone){
     if(faded)return;
     faded=true;
     clearTimeout(tSetup);clearTimeout(tMax);clearInterval(tCheck);
+    // v218b: log splash total duration
+    _senseDataLog('SPLASH','⬇️ fading at t='+Math.round(Date.now()-startMs)+'ms',
+      dataReady?'(data ready)':'(MAX_SHOW timeout — data not all ready)');
     window._splashProgress=null;window._splashDataReady=null;
     if(bar){bar.style.transition='width .25s ease';bar.style.width='100%';}
     setTimeout(()=>{
@@ -9207,6 +9221,8 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
   if(!force&&_cloudLoadedTabs.has(tab))return true;
   if(!force&&_cloudInFlight[tab])return _cloudInFlight[tab];
   const p=(async()=>{
+    const _ft0=performance.now(); // v218b timing
+    let _src='R2-full';           // v218b: track data source for debug log
     const dot=document.getElementById('sp-'+tab);
     if(dot)dot.style.background='rgba(38,96,200,.12)';
     try{
@@ -9221,17 +9237,22 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
             const _url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
             const _res=await window.FreshketSenseRuntime.data.fetchWithEtag(_url,cached.etag||null,_specFetchTimeout(spec));
             if(_res.notModified){
+              _src='IDB→ETag304'; // v218b: cache hit, unchanged
               text=cached.text;  // 304: file unchanged, extend cache life
               _csvCacheSet(tab,text,_res.etag);
             } else if(_res.text){
+              _src='IDB→ETag200(UPDATED)'; // v218b: cache hit, server has new data
               text=_res.text;    // 200: new file → store below with new ETag
               _csvCacheSet(tab,text,_res.etag);
             }
             // else: fetch threw → fall through to re-fetch (handled by catch below)
           }catch(e){
             // Network error: use cache as offline fallback (better than nothing)
+            _src='IDB-offline-fallback'; // v218b
             if(cached.text){text=cached.text;console.warn('[cache] conditional GET failed, using cache:',tab,e&&e.message);}
           }
+        } else {
+          _src=cached?'IDB-expired→R2':'IDB-miss→R2'; // v218b
         }
       }
       if(!text){
@@ -9251,6 +9272,8 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         if(tab==='skus')bulkSkusReady=true;
         if(tab==='alternatives')bulkAltsReady=true;
         if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
+        // v218b: log file completion — source tells you IndexedDB vs R2, ETag 304 vs 200
+        _senseDataLog(tab,'✅',_src,(text?Math.round(text.length/1024):0)+'KB',Math.round(performance.now()-_ft0)+'ms');
         // v218a DATA GATE: when portview+history+handover all complete, fire ONE consolidated render.
         // categories/sku_current/outlets are background files — their arrival doesn't need to
         // block the portfolio render or hold the splash.
@@ -9260,6 +9283,8 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
              _cloudLoadedTabs.has('handover')){
             // Signal splash to start fading (critical data ready)
             if(typeof window._splashDataReady==='function') window._splashDataReady();
+            // v218b: log gate event — this is the single most important event in the load pipeline
+            _senseDataLog('🚪 GATE ✅','portview+history+handover ready → splash fade + render flush');
             // Flush queued render
             if(window._pendingRefreshAll){
               window._pendingRefreshAll=false;
@@ -9269,6 +9294,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         }catch(e){}
       }else{
         if(dot){dot.style.background='rgba(240,80,0,.12)';dot.style.color='var(--org)';}
+        _senseDataLog(tab,'❌ INGEST FAILED — check R2 file format'); // v218b
       }
       return !!ok;
     }catch(err){
@@ -9750,6 +9776,22 @@ function updateDataStatus(){
 // handover → Handover badge per account
 // categories/sku_current/outlets load in BACKGROUND after splash — they serve account DETAIL
 // not the portfolio list, so their arrival doesn't cause visible flash on the portfolio screen.
+
+// v218b: data load performance logger — filter '[Sense⚡]' in DevTools console (Info level).
+// What it shows: IndexedDB hit/miss, ETag 304/200, gate events, render calls, splash timing.
+// To silence: window._senseLoadDebug = false  |  To re-enable: window._senseLoadDebug = true
+function _senseDataLog(){
+  try{
+    if(window._senseLoadDebug===false)return;
+    var args=Array.prototype.slice.call(arguments);
+    var tag=String(args[0]);
+    var rest=args.slice(1);
+    var t=typeof performance!=='undefined'?Math.round(performance.now())+'ms':'';
+    console.info.apply(console,
+      ['%c[Sense⚡ '+t+'] '+tag,'color:#00CC6A;font-weight:600;font-family:monospace'].concat(rest));
+  }catch(e){}
+}
+
 function allCriticalReady(){
   try{
     return _cloudLoadedTabs.has('portview') &&
@@ -9760,12 +9802,20 @@ function allCriticalReady(){
 
 function refreshAll(){
   // v217 FIX B: splash guard (belt-and-suspenders — data gate below is the primary guard now)
-  if(window._senseSplashActive){ window._pendingRefreshAll=true; return; }
-  // v218 DATA GATE: block render until ALL 6 FOREGROUND files loaded.
-  // Replaces the 4-6 partial renders (one per file callback) with ONE render at the end.
-  // Works for BOTH initial load (splash covers the wait) AND bfcache resume reloads (old
-  // DOM stays visible while files reload silently, then ONE update when all ready).
-  if(!allCriticalReady()){ window._pendingRefreshAll=true; return; }
+  if(window._senseSplashActive){
+    _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — splash active');
+    window._pendingRefreshAll=true; return;
+  }
+  // v218 DATA GATE: block render until portview+history+handover all loaded.
+  if(!allCriticalReady()){
+    var _pending=[];
+    try{ if(!_cloudLoadedTabs.has('portview'))_pending.push('portview');
+         if(!_cloudLoadedTabs.has('history')) _pending.push('history');
+         if(!_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
+    _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
+    window._pendingRefreshAll=true; return;
+  }
+  _senseDataLog('RENDER','refreshAll() ✅ FIRED');
   renderOverview();renderPortfolio();renderOpps();renderReport();
   activeMonth=D.history.length-1;selectMonth(activeMonth,true);
   // Update sub-tab visibility
@@ -30144,8 +30194,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v218a-gate3';
-  var DATA_EPOCH='2026-05-22-v218a-gate3';
+  var VERSION='v218b-debug';
+  var DATA_EPOCH='2026-05-22-v218b-debug';
   function $(id){return document.getElementById(id);} 
   function log(){try{console.log.apply(console,['[Sense v218]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
