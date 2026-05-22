@@ -1,3 +1,20 @@
+<!-- Freshket Sense v215 AUTH/RESUME OWNER CLEANUP — minimal surgical patch on v214f baseline.
+     Goal: trustable app behavior at every micro-moment (cold open, login, resume, token refresh, daily refresh).
+     Edits (3 jobs, ~3 `return;` neutralizations, no new code paths):
+       1. v213b boot() neutralized (was line ~30010) — primary auth/resume villain.
+          installResumeCorrection() fired on every visibilitychange/pageshow/focus without debounce,
+          used 900ms grace (shorter than main app's 2500–3500ms), and called showLoginNow() →
+          resetRuntimeSessionState() on transient null getSession() during iOS Supabase token refresh.
+          Caused "logout เอง + flash login + auto-relogin + กระตุก" symptom across KAM/TL/Admin.
+       2. v213a installPwaResumeLoginFlashGuard() neutralized (was line ~29841) — secondary culprit.
+          hideLoginUi() force-closed splash element mid-animation on resume. Caused "ขึ้นจอที่ไม่ควรขึ้น".
+          v213a guided UX work (SKU price default, restaurant glint, FAB cleanup, coach removal) PRESERVED.
+       3. SW controllerchange duplicate handler neutralized (was line ~26570).
+          Earlier handler at line ~5088 already reloads once. Single owner = safer.
+     Main app's _pwaSilentSessionCheck (line ~7309) is now the SOLE owner of resume session validation.
+     PRESERVED: commission feature, NRR, KAM/TL/Admin role logic, data loader, Olive, v212/v212a freshness,
+                v206f data repair, v212c diagnostics (frozen), v213c–v213f UI fixes, splash animation.
+     Rollback: revert 3 `return;` statements at the marked locations → identical to v214f. -->
 <!-- Freshket Sense v214f EMERGENCY RESTORE: rollback to v213f teamview card rail balance after v214d/e auth owner cleanup blank-screen regression. No code logic changes from v213f baseline. Use to unbrick production while auth/loading refactor is redesigned offline. -->
 <!DOCTYPE html>
 
@@ -26568,6 +26585,14 @@ console.log('[Target Module v1] loaded');
         }catch(e){}
       }).catch(function(){});
       navigator.serviceWorker.addEventListener('controllerchange', function(){
+        // v215 NEUTRALIZED — duplicate SW reload handler.
+        // Reason: earlier handler at line ~5088 already reloads once on controllerchange with
+        //         its own sessionStorage guard. Having a second handler with a different guard
+        //         key meant a second reload could fire mid-boot if the first guard was cleared
+        //         (e.g., sessionStorage cleared by browser on PWA kill). Single owner is safer.
+        try{ console.info('[Sense v215] duplicate SW controllerchange handler neutralized'); }catch(e){}
+        return;
+        // ── original body below kept for forensic reference only; never executed ──
         // Existing older handler may also reload. Keep a separate short-lived guard to prevent loops.
         try{
           if(sessionStorage.getItem('freshket_sw_controller_reloaded_v206f')) return;
@@ -29839,7 +29864,17 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   }
 
   function installPwaResumeLoginFlashGuard(){
-    // The app should not flash the login screen on short iOS PWA resumes. We verify silently first.
+    // v215 NEUTRALIZED — auth/resume owner cleanup.
+    // Reason: this guard wrapped doSignOut + _showLoginOverlayClean and listened to
+    //         visibilitychange/pageshow to force-hide both login overlay AND splash.
+    //         hideLoginUi() killed splash mid-animation causing "ขึ้นจอที่ไม่ควรขึ้น" flashes.
+    //         Main app's _pwaSilentSessionCheck (line ~7309) is the sole owner of resume
+    //         session validation, with proper 2.5–3.5s grace and 2-step retry.
+    // Other v213a UX cleanup (FAB, SKU price default, restaurant glint, coach removal) is
+    // intentionally PRESERVED — only this auth/resume wrapper is removed.
+    try{ console.info('[Sense v215] v213a installPwaResumeLoginFlashGuard neutralized — main app owns auth/resume'); }catch(e){}
+    return;
+    // ── original code below kept for forensic reference only; never executed ──
     var explicit=false;
     try{
       var oldSignOut=global.doSignOut;
@@ -29911,18 +29946,20 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 <!-- Freshket Sense v213b: Auth-safe guided UX cleanup — fix v213a over-suppressed login overlay on cold/no-session load; keep guided UX cleanup, SKU price default, top-toggle removal, commission styling, and data freshness unchanged -->
 <script id="freshket-v213b-auth-safe-resume-js">
 // v213b — Auth-safe resume guard. v213a hid login too aggressively on cold/no-session load.
+// v215 OVERRIDE: setBuild() still runs but installAuthSafeLogin/installResumeCorrection are neutralized.
+//                VERSION/DATA_EPOCH updated to v215 so console/debug shows correct build.
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v213b-auth-safe-guided-ux';
-  var DATA_EPOCH='2026-05-22-v213b-auth-safe-guided-ux';
+  var VERSION='v215-auth-owner-cleanup';
+  var DATA_EPOCH='2026-05-22-v215-auth-owner-cleanup';
   function $(id){return document.getElementById(id);} 
-  function log(){try{console.log.apply(console,['[Sense v213b]'].concat([].slice.call(arguments)));}catch(e){}}
+  function log(){try{console.log.apply(console,['[Sense v215]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
-    try{ global.FRESHKET_BUILD='v213b'; }catch(e){}
+    try{ global.FRESHKET_BUILD='v215'; }catch(e){}
     try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
-    try{ global.currentBuild=function(){return 'v213b';}; }catch(e){}
-    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v213b',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true}};}; } }catch(e){}
+    try{ global.currentBuild=function(){return 'v215';}; }catch(e){}
+    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v215',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true}};}; } }catch(e){}
   }
   function hideLoginUi(){
     try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.style.opacity='0'; ov.classList.remove('lgi-checking'); } }catch(e){}
@@ -29998,15 +30035,24 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     try{ global.addEventListener('focus',function(){ correctAfterResume(); },{passive:true}); }catch(e){}
   }
   function boot(){
-    setBuild();
+    // v215 NEUTRALIZED — primary auth/resume villain.
+    // Reason: installResumeCorrection() fired on every visibilitychange/pageshow/focus
+    //         without debounce, calling correctAfterResume() which used a 900ms grace
+    //         (shorter than main app's 2500–3500ms) for transient null getSession().
+    //         iOS PWA returns null transiently during Supabase token refresh; v213b would
+    //         then call showLoginNow() → resetRuntimeSessionState() → wipe portviewBulkData,
+    //         set login overlay display:flex !important. Supabase would then fire SIGNED_IN
+    //         (refresh succeeded), main onAuthStateChange would auto-rehydrate causing the
+    //         "flash login + auto-relogin + กระตุก" symptom. Same path explains "logout เอง".
+    //         installAuthSafeLogin() also wrapped _showLoginOverlayClean adding more races.
+    // Main app's _pwaSilentSessionCheck (line ~7309) is the sole owner now.
+    setBuild();  // harmless: only updates FRESHKET_BUILD/version metadata
+    try{ console.info('[Sense v215] v213b auth-safe resume neutralized — main app owns auth/resume'); }catch(e){}
+    log('v215: neutralized — main app owns auth/resume');
+    return;
+    // ── original boot body below kept for forensic reference only; never executed ──
     installAuthSafeLogin();
     installResumeCorrection();
-    // Initial correction: if v213a already hid login while unsigned out, restore it quickly.
-    setTimeout(async function(){
-      var s=await sessionExists();
-      if(s.ok) hideLoginUi(); else showLoginNow();
-    },700);
-    log('installed');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
   global.FreshketSenseV213b={version:VERSION,showLogin:showLoginNow,hideLogin:hideLoginUi,checkSession:sessionExists};
