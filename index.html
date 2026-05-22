@@ -30180,5 +30180,244 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 })(window);
 </script>
 
+
+<!-- Freshket Sense v213d: Teamview PWA rail/alignment cleanup — single content rail, contained Team Insight, mobile commission card cleanup, hide redundant target label; UI-only no data/logic change -->
+<style id="freshket-v213d-teamview-rail-cleanup-css">
+/* v213d — Final PWA Teamview rail cleanup. Scope: CSS/runtime layout only. No data/NRR/commission formula changes. */
+@media (max-width: 430px){
+  body.v213d-teamview-active #scr-teamview{
+    --tv-rail-x:16px;
+    overflow-x:hidden!important;
+  }
+  /* One shared content rail for Team header/pace/metrics/insight/cards */
+  body.v213d-teamview-active #scr-teamview .portview-head,
+  body.v213d-teamview-active #tv-pace-bar,
+  body.v213d-teamview-active #tv-summary-row,
+  body.v213d-teamview-active #tv-ai-btn,
+  body.v213d-teamview-active #teamview-content{
+    box-sizing:border-box!important;
+  }
+  body.v213d-teamview-active #scr-teamview .portview-head{
+    padding-left:var(--tv-rail-x)!important;
+    padding-right:var(--tv-rail-x)!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar,
+  body.v213d-teamview-active #tv-summary-row,
+  body.v213d-teamview-active #tv-ai-btn{
+    width:calc(100% - (var(--tv-rail-x) * 2))!important;
+    margin-left:var(--tv-rail-x)!important;
+    margin-right:var(--tv-rail-x)!important;
+    max-width:none!important;
+  }
+  body.v213d-teamview-active #teamview-content{
+    padding-left:var(--tv-rail-x)!important;
+    padding-right:var(--tv-rail-x)!important;
+  }
+
+  /* Pace block: keep all text inside the rail and remove redundant denominator label. */
+  body.v213d-teamview-active #tv-pace-bar{
+    margin-top:4px!important;
+    margin-bottom:12px!important;
+    overflow:hidden!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar > div:first-child{
+    display:flex!important;
+    align-items:flex-end!important;
+    justify-content:space-between!important;
+    gap:10px!important;
+    min-width:0!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar > div:first-child > div:first-child{
+    min-width:0!important;
+    flex:1 1 auto!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar > div:first-child > div:last-child{
+    flex:0 0 auto!important;
+    max-width:46%!important;
+    min-width:118px!important;
+    overflow:hidden!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar > div:first-child > div:last-child > div{
+    display:none!important; /* remove target/baseline label on mobile */
+  }
+  body.v213d-teamview-active #tv-pace-bar > div:first-child > div:last-child span{
+    white-space:nowrap!important;
+  }
+  body.v213d-teamview-active #tv-pace-bar .pace-bar-wrap{
+    width:100%!important;
+    margin-top:7px!important;
+  }
+
+  /* Summary cards: contain inside rail and stop desktop decorative overflow. */
+  body.v213d-teamview-active #tv-summary-row.portview-summary-row{
+    width:calc(100% - (var(--tv-rail-x) * 2))!important;
+    margin:0 var(--tv-rail-x) 12px!important;
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:8px!important;
+    overflow:visible!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-wrap{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:8px!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-card{
+    min-width:0!important;
+    overflow:hidden!important;
+    padding:10px 10px!important;
+    border-radius:13px!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-card.commission::before{
+    display:none!important; /* floating ฿ icon caused overlap on PWA */
+    content:none!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-card.commission{
+    background:linear-gradient(145deg,rgba(255,198,56,.18),rgba(65,117,219,.18))!important;
+    border-color:rgba(255,198,56,.30)!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 8px 18px rgba(0,0,0,.10)!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-label{
+    font-size:8px!important;
+    line-height:1.15!important;
+    letter-spacing:.045em!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-value{
+    font-size:17px!important;
+    line-height:1.03!important;
+    margin-top:5px!important;
+    white-space:nowrap!important;
+    letter-spacing:-.04em!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-meta{
+    font-size:7.8px!important;
+    line-height:1.2!important;
+    margin-top:4px!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  body.v213d-teamview-active #tv-summary-row .tv-signal-card.commission .tv-signal-meta{
+    color:rgba(255,244,214,.72)!important;
+  }
+
+  /* Lower stat cards stay compact but respect the same rail. */
+  body.v213d-teamview-active #tv-summary-row .portview-stat{
+    min-width:0!important;
+    width:auto!important;
+    padding:10px 6px!important;
+    border-radius:13px!important;
+    overflow:hidden!important;
+  }
+
+  /* Team Insight must never overflow beyond the cards rail. */
+  body.v213d-teamview-active #tv-ai-btn{
+    display:flex!important;
+    height:44px!important;
+    min-height:44px!important;
+    max-width:none!important;
+    margin-top:2px!important;
+    margin-bottom:24px!important;
+    border-radius:13px!important;
+    overflow:hidden!important;
+  }
+  body.v213d-teamview-active #tv-ai-btn::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);
+    transform:translateX(-130%);
+    animation:tv213dInsightSheen 1.2s ease .45s 1 both;
+  }
+  @keyframes tv213dInsightSheen{to{transform:translateX(130%);}}
+
+  /* KAM cards are the reference rail; keep their content contained. */
+  body.v213d-teamview-active .tv-full-card,
+  body.v213d-teamview-active .tv-star-card{
+    width:100%!important;
+    box-sizing:border-box!important;
+  }
+  body.v213d-teamview-active .tv-full-meta{
+    min-width:0!important;
+    overflow:hidden!important;
+  }
+  body.v213d-teamview-active .tv-full-meta > span:not(.tv-nrr-pill):not(.tv-payout-pill){
+    min-width:92px!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+}
+
+@media (max-width: 370px){
+  body.v213d-teamview-active #scr-teamview{--tv-rail-x:14px;}
+  body.v213d-teamview-active #tv-summary-row .tv-signal-card{padding:9px 8px!important;}
+  body.v213d-teamview-active #tv-summary-row .tv-signal-value{font-size:15.5px!important;}
+  body.v213d-teamview-active #tv-summary-row .tv-signal-meta{font-size:7.2px!important;}
+  body.v213d-teamview-active #tv-pace-bar > div:first-child > div:last-child{min-width:108px!important;max-width:44%!important;}
+}
+</style>
+<script id="freshket-v213d-teamview-rail-cleanup-js">
+// v213d — Teamview PWA rail/alignment cleanup. UI only; no data/NRR/commission formula change.
+(function(global){
+  'use strict';
+  var VERSION='v213d-teamview-rail-cleanup';
+  var DATA_EPOCH='2026-05-22-v213d-teamview-rail-cleanup';
+  function log(){try{console.log.apply(console,['[Sense v213d]'].concat([].slice.call(arguments)));}catch(e){}}
+  function small(){try{return !!(global.matchMedia&&global.matchMedia('(max-width: 430px)').matches);}catch(e){return false;}}
+  function isTeam(){try{return !!document.getElementById('scr-teamview')?.classList.contains('on');}catch(e){return false;}}
+  function shortBaht(txt){
+    try{
+      return String(txt||'')
+        .replace(/฿(\d{1,3}),(\d{3})(?!\d)/g,function(_,a,b){ var n=parseInt(a+b,10); return n>=1000?'฿'+(n/1000).toFixed(n%1000?1:0)+'k':'฿'+n; })
+        .replace(/฿(\d+),(\d{3}),(\d{3})/g,function(_,a,b,c){ var n=parseInt(a+b+c,10); return '฿'+(n/1000000).toFixed(1)+'M'; });
+    }catch(e){return txt;}
+  }
+  function compactCommissionMeta(){
+    if(!small()||!isTeam()) return;
+    try{
+      document.querySelectorAll('#tv-summary-row .tv-signal-card.commission .tv-signal-meta').forEach(function(el){
+        if(!el.dataset.v213dFull) el.dataset.v213dFull=el.textContent||'';
+        var t=el.dataset.v213dFull;
+        t=t.replace(/^KAM team\s+/i,'KAM ');
+        el.textContent=shortBaht(t);
+        el.title=el.dataset.v213dFull;
+      });
+    }catch(e){}
+  }
+  function cleanupPaceLabel(){
+    if(!small()||!isTeam()) return;
+    try{
+      var bar=document.getElementById('tv-pace-bar');
+      if(!bar) return;
+      var right=bar.querySelector(':scope > div:first-child > div:last-child');
+      if(right){
+        var divs=right.querySelectorAll('div');
+        divs.forEach(function(d){ if(/target|baseline/i.test(d.textContent||'')) d.style.display='none'; });
+      }
+    }catch(e){}
+  }
+  function apply(){
+    try{document.body.classList.toggle('v213d-teamview-active',isTeam());}catch(e){}
+    compactCommissionMeta(); cleanupPaceLabel();
+  }
+  function setVersion(){
+    try{global.FRESHKET_BUILD='v213d';}catch(e){}
+    try{if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION;}catch(e){}
+    try{global.currentBuild=function(){return 'v213d';};}catch(e){}
+    try{if(global.FreshketSenseDebug){var old=global.FreshketSenseDebug.version;global.FreshketSenseDebug.version=function(){var base={};try{base=typeof old==='function'?old():{};}catch(e){} base.build=VERSION;base.dataEpoch=DATA_EPOCH;base.configVersion=VERSION;base.currentBuild='v213d';base.objects=Object.assign({},base.objects||{},{v213d:true});return base;};}}catch(e){}
+  }
+  function wrap(){['renderTeamview','renderTeamviewSummary','renderTeamviewKamList','showScreen','setTvView'].forEach(function(name){try{var old=global[name];if(typeof old==='function'&&!old.__v213dRail){var w=function(){var r=old.apply(this,arguments);setTimeout(apply,0);setTimeout(apply,80);setTimeout(apply,260);return r;};w.__v213dRail=true;global[name]=w;try{eval(name+'=w');}catch(e){} }}catch(e){}});}
+  setVersion(); wrap();
+  try{document.addEventListener('DOMContentLoaded',function(){setTimeout(apply,120);});}catch(e){}
+  try{global.addEventListener('resize',function(){setTimeout(apply,80);},{passive:true});}catch(e){}
+  try{global.addEventListener('pageshow',function(){setTimeout(apply,180);},{passive:true});}catch(e){}
+  global.FreshketSenseV213d={version:VERSION,dataEpoch:DATA_EPOCH,apply:apply};
+  setTimeout(function(){apply();log('installed');},300);
+})(window);
+</script>
+
 </body>
 </html>
