@@ -7026,22 +7026,33 @@ supa.auth.onAuthStateChange((event, session) => {
     // Guard A (original): only proceed if no one else has set currentUser yet.
     if (!currentUser) {
       currentUser = session.user;
-      // v218c: preload critical R2 files NOW — parallel with loadUserProfile().
-      // Problem: loadUserProfile() takes ~3s (Supabase query on mobile network).
-      //          Without this, R2 loading only starts AFTER loadUserProfile finishes,
-      //          so showSenseSplash() is called with no data → MAX_SHOW force-fades
-      //          before data ready → user sees empty portfolio "กำลังโหลด..." for 1-2s.
-      // Fix: start R2 loading immediately after auth. By the time loadUserProfile()
-      //      finishes and showSenseSplash() is called, files may already be loaded
-      //      from IndexedDB → _cacheWarm=true → splash fades in ~400ms with real data.
-      // Safe: loadFromCloudflareR2() has a duplicate-load guard (sheetsLoadStarted +
-      //       _cloudInitialPromise) — second call returns the existing promise, no double-fetch.
-      try{
-        if(typeof loadFromCloudflareR2==='function'){
-          loadFromCloudflareR2();
-          _senseDataLog('PRELOAD','R2 preload started parallel with loadUserProfile()');
+      // v219 STRATEGY B: Step 1 — fast IndexedDB preload (no network, no ETag).
+      // Runs parallel with loadUserProfile (~3s). By the time showSenseSplash() is called,
+      // all 3 critical files should already be in memory from IndexedDB → splash fades in ~900ms.
+      // If IndexedDB empty (cold start), returns 0 → ETag path takes over (normal flow).
+      window._idbPreloaded=false;
+      _preloadFromIndexedDB().then(function(count){
+        if(count<3){
+          // Partial or no IndexedDB hit — kick off normal R2 load with ETag
+          try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
         }
-      }catch(e){}
+        // v219 STRATEGY B: Step 2 — schedule background ETag check 3s after preload.
+        // Verifies R2 for fresh data silently after app renders with IndexedDB data.
+        // 304 = no-op (silent). 200 = new data → re-ingest → refreshAll → silent UI update.
+        if(count>0){
+          clearTimeout(window._bgEtagTimer);
+          window._bgEtagTimer=setTimeout(async function(){
+            try{
+              _senseDataLog('BACKGROUND','ETag check for portview+history+handover...');
+              for(var _bt of ['portview','history','handover']){
+                try{ var _bs=R2_SPECS[_bt]; if(_bs) await _fetchCloudflareFile(_bs,{force:true}); }catch(e){}
+              }
+              window._idbPreloaded=false; // reset after first real ETag cycle
+              _senseDataLog('BACKGROUND','ETag check complete');
+            }catch(e){}
+          },3000);
+        }
+      });
       loadUserProfile().then(() => hideLoginOverlay());
     }
   } else if (event === 'SIGNED_OUT' && currentUser) {
@@ -7110,36 +7121,31 @@ function showSenseSplash(onDone){
   // v195 Step 2: if portviewBulkData already loaded from IndexedDB cache (pre-fetch
   // started in doLogin/checkSession before splash), use fast-path timing.
   // Falls through to normal timing if cache was cold — zero regression risk.
-  const _cacheWarm = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0;
-  // v217 FIX C: warm boot detection — if critical R2 data was successfully loaded within the last
-  // 30 minutes (timestamp saved by _splashDataReady), use near-zero MIN_SHOW so IndexedDB cache
-  // loading feels like a brief blink rather than a full reload. This addresses the iOS PWA behavior
-  // where the OS kills the app after short background (1-60s) and cold-boots on resume.
-  // Result: iOS kill → open → ~300ms splash → app. User perceives "blink" not "reload".
+  const _cacheWarm = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0 && !window._idbPreloaded;
+  // v219 STRATEGY B: _idbPreloaded = 3 critical files loaded from IndexedDB (no ETag).
+  // data is in memory but JS wasn't warm (different from _cacheWarm which is JS-state warm from prev session).
+  // Use MAX_SHOW > tSetup(900ms) so routing fires correctly before splash force-fades.
+  const _idbPreloaded = !!window._idbPreloaded;
   const _lastReady=Number((function(){try{return localStorage.getItem('sense_last_critical_ready');}catch(e){return 0;}})());
   // v218b: extended from 30min → 6h (= IndexedDB TTL). Data freshness is guaranteed separately
   // by ETag conditional GET on every load — warm boot only controls splash MIN/MAX timing.
   const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<6*60*60*1000;
-  const MIN_SHOW=_cacheWarm ? 0 : (_isWarmBoot ? 0 : 1650);
-  // v218b: data load debug logger — filter '[Sense⚡]' in DevTools console (Info level).
-  // To silence: window._senseLoadDebug = false
-  // To re-enable: window._senseLoadDebug = true
+  const MIN_SHOW=(_cacheWarm||_idbPreloaded) ? 0 : (_isWarmBoot ? 0 : 1650);
   _senseDataLog('SPLASH',
-    _cacheWarm ? '🟢 WARM (JS state — portviewBulkData populated)' :
-    _isWarmBoot ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=2000ms' :
-                  '🔴 COLD — MIN=1650ms MAX=5000ms',
+    _cacheWarm    ? '🟢 WARM (JS state)' :
+    _idbPreloaded ? '⚡ IDB-FAST (Strategy B — no ETag) — MIN=0ms MAX=1500ms' :
+    _isWarmBoot   ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=6000ms' :
+                    '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
-  // v218c: warm boot MAX_SHOW 2000→6000ms.
-  // Reason: even with preload, slow mobile ETag requests can take 3-5s.
-  // If data isn't ready within 2000ms, splash force-faded → empty portfolio shown.
-  // 6000ms gives enough headroom for ETag on slow mobile network.
-  // (preload makes data likely ready before splash even shows → fast path)
-  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 6000 : 5000);
+  // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
+  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 5000));
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
-  let dataReady=_cacheWarm; // v195: treat as ready if cache warm
+  // v219: if IndexedDB preloaded, allCriticalReady()=true → dataReady=true immediately
+  // (gate already fired before showSenseSplash was called → no need to wait for _splashDataReady signal)
+  let dataReady=_cacheWarm || (_idbPreloaded && allCriticalReady());
 
   // ── Progress bar: data-driven (not fake) ──────────────────
   // Exported so data loaders can update it
@@ -9809,6 +9815,53 @@ function _senseDataLog(){
     console.info.apply(console,
       ['%c[Sense⚡ '+t+'] '+tag,'color:#00CC6A;font-weight:600;font-family:monospace'].concat(rest));
   }catch(e){}
+}
+
+// v219 STRATEGY B: Read 3 critical files directly from IndexedDB — no network, no ETag wait.
+// Called immediately after auth, before loadUserProfile (which takes ~3s on mobile).
+// Goal: populate portviewBulkData, bulkHistoryData, bulkHandoverData from IndexedDB cache
+//       so that by the time showSenseSplash() is called, allCriticalReady()=true and
+//       dataReady=true → splash fades in ~900ms (appReady tSetup) instead of 6-8s (ETag).
+// Safe: if IndexedDB is empty (cold start), function returns 0 → normal ETag flow takes over.
+// Background ETag: scheduled 3s after render to check R2 for updated data silently.
+async function _preloadFromIndexedDB(){
+  var TABS=['portview','history','handover'];
+  var loaded=0;
+  try{
+    var tasks=TABS.map(async function(tab){
+      try{
+        var cached=await _csvCacheGet(tab);
+        if(!cached||!cached.text||!cached.ts) return; // not in IndexedDB
+        if((Date.now()-cached.ts)>=_CSV_TTL) return;  // expired (> 6h)
+        var spec=R2_SPECS[tab];
+        if(!spec) return;
+        var ok=await ingestCSVText(spec.type,cached.text,{timeoutMs:30000});
+        if(ok){
+          _cloudLoadedTabs.add(tab);
+          loaded++;
+          var kb=Math.round(cached.text.length/1024);
+          var age=Math.round((Date.now()-cached.ts)/60000);
+          _senseDataLog(tab,'⚡ IDB-DIRECT (no ETag)',kb+'KB',age+'min old');
+        }
+      }catch(e){}
+    });
+    await Promise.all(tasks);
+    if(loaded===3){
+      window._idbPreloaded=true;
+      _senseDataLog('⚡ IDB-PRELOAD','all 3 critical files ready — splash will use fast path (no ETag wait)');
+      // Signal splash gate (if splash already started) — fires if window._splashDataReady is set
+      if(allCriticalReady()){
+        if(typeof window._splashDataReady==='function') window._splashDataReady();
+        if(window._pendingRefreshAll){
+          window._pendingRefreshAll=false;
+          setTimeout(function(){if(typeof refreshAll==='function')refreshAll();},30);
+        }
+      }
+    }else{
+      _senseDataLog('⚡ IDB-PRELOAD',loaded+'/3 files found — falling back to ETag for missing files');
+    }
+  }catch(e){}
+  return loaded;
 }
 
 function allCriticalReady(){
@@ -30213,8 +30266,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v218c-preload';
-  var DATA_EPOCH='2026-05-22-v218c-preload';
+  var VERSION='v219-strategy-b';
+  var DATA_EPOCH='2026-05-22-v219-strategy-b';
   function $(id){return document.getElementById(id);} 
   function log(){try{console.log.apply(console,['[Sense v218]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
