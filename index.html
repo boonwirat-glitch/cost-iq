@@ -1,3 +1,19 @@
+<!-- Freshket Sense v217 SMOOTH RESUME — Phase 3 surgical patch on v216 baseline.
+     Goal: eliminate remaining flash-รัวๆ after splash + make iOS cold boot feel like resume.
+     Edits (6 jobs):
+       A. Init: clear stale sample_ ID from currentAccountId before loadFromStorage (was causing
+          _getKamEmailForAccount: portviewBulkData not loaded yet for sample_741a4cb1abcd console noise).
+       B. refreshAll() splash guard: set window._senseSplashActive=true at showSenseSplash start.
+          All refreshAll() calls during R2 file loading are queued (no-op). doFade releases guard
+          and fires one consolidated refreshAll after splash fully disappears → eliminates 4-flash
+          pattern from categories/prices/sku_current/alternatives arriving sequentially after splash.
+       C. Warm boot detection: _splashDataReady saves sense_last_critical_ready timestamp to localStorage.
+          On next cold boot, if timestamp < 30min → MIN_SHOW=0ms, MAX_SHOW=500ms → IndexedDB loads
+          critical data in ~200-300ms → splash appears for ~300ms total → feels like native resume
+          not "forced full reload". Addresses iOS PWA kill-on-background-sleep behavior.
+     PRESERVED: all of v216 + v215 (auth/resume owner cleanup), commission, NRR, role logic,
+                data loader, Olive, all UI fixes (v213c-v213f), Supabase auth flow.
+     Rollback: revert to sense_v216_trust_pass.html. -->
 <!-- Freshket Sense v216 TRUST PASS — Phase 2 surgical patch on v215 baseline.
      Goal: complete-trust app feel. No phantom data, no multi-flash, no 1-frame login flash, no force-refresh mid-use.
      Edits (7 jobs, no new code paths — config + condition tightening only):
@@ -7048,6 +7064,11 @@ function showLoginError(msg) {
 function showSenseSplash(onDone){
   const splash=document.getElementById('sense-splash');
   if(!splash){onDone();return;}
+  // v217 FIX B: set active flag so refreshAll() calls during load are queued, not executed.
+  // Prevents 4-flash pattern where each R2 file's onLoad callback re-renders the visible screen.
+  // Guard is released and one final refreshAll fires in doFade after splash fully disappears.
+  window._senseSplashActive=true;
+  window._pendingRefreshAll=false;
   splash.style.display='flex';splash.style.opacity='1';
   const tickerEl=document.getElementById('spl-ticker');
   const bar=document.getElementById('spl-bar');
@@ -7055,12 +7076,19 @@ function showSenseSplash(onDone){
   // started in doLogin/checkSession before splash), use fast-path timing.
   // Falls through to normal timing if cache was cold — zero regression risk.
   const _cacheWarm = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0;
-  const MIN_SHOW=_cacheWarm ? 0 : 1650;
+  // v217 FIX C: warm boot detection — if critical R2 data was successfully loaded within the last
+  // 30 minutes (timestamp saved by _splashDataReady), use near-zero MIN_SHOW so IndexedDB cache
+  // loading feels like a brief blink rather than a full reload. This addresses the iOS PWA behavior
+  // where the OS kills the app after short background (1-60s) and cold-boots on resume.
+  // Result: iOS kill → open → ~300ms splash → app. User perceives "blink" not "reload".
+  const _lastReady=Number((function(){try{return localStorage.getItem('sense_last_critical_ready');}catch(e){return 0;}})());
+  const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<30*60*1000;
+  const MIN_SHOW=_cacheWarm ? 0 : (_isWarmBoot ? 0 : 1650);
   // v216 FIX 2C-Light: cold MAX_SHOW extended from 2000ms → 5000ms.
   // Reason: splash now waits for portview + history + handover (3 critical files).
   //         If one is slow, the old 2000ms force-fade caused user to see splash → partial render → re-render flashes.
   //         5000ms gives enough headroom for typical R2 cold load while preserving a sane fallback if a file fails.
-  const MAX_SHOW=_cacheWarm ? 400 : 5000;
+  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 500 : 5000);
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -7086,6 +7114,8 @@ function showSenseSplash(onDone){
   window._splashDataReady = function() {
     if(faded)return;
     dataReady=true;
+    // v217 FIX C: save timestamp so next cold boot knows data was recently ready → warm boot path.
+    try{ localStorage.setItem('sense_last_critical_ready', Date.now()); }catch(e){}
     if(bar){bar.style.transition='width .25s ease';bar.style.width='100%';}
     if(tickerEl){
       tickerEl.style.opacity='0';
@@ -7129,6 +7159,12 @@ function showSenseSplash(onDone){
         splash.style.display='none';
         splash.style.opacity='';splash.style.transition='';
         if(bar){bar.style.transition='none';bar.style.width='0';}
+        // v217 FIX B: release guard — splash is fully gone, fire one consolidated render.
+        window._senseSplashActive=false;
+        if(window._pendingRefreshAll){
+          window._pendingRefreshAll=false;
+          try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
+        }
       },380);
     },220);
   }
@@ -9677,6 +9713,10 @@ function updateDataStatus(){
 // RENDER — OVERVIEW
 // ════════════════════════════════════════
 function refreshAll(){
+  // v217 FIX B: if splash is active, queue one pending render instead of running now.
+  // Prevents 4-flash pattern from sequential R2 file load callbacks each calling refreshAll
+  // while splash is covering the screen. doFade releases the guard and fires one final render.
+  if(window._senseSplashActive){ window._pendingRefreshAll=true; return; }
   renderOverview();renderPortfolio();renderOpps();renderReport();
   activeMonth=D.history.length-1;selectMonth(activeMonth,true);
   // Update sub-tab visibility
@@ -20876,6 +20916,9 @@ function initOliveAvatar(){
   // Restore last used account
   const recent=getAccountIndex();
   if(recent.length>0)currentAccountId=recent[0].id;
+  // v217 FIX A: if localStorage has a stale sample_ ID from before v216 (when useSampleData
+  // ran and called saveToStorage), clear it so R2 load doesn't warn about sample_741a4cb1abcd.
+  try{ if(currentAccountId && /^sample_/.test(currentAccountId)) currentAccountId=null; }catch(e){}
   const fromStorage=loadFromStorage();
   updateDataStatus();
   if(fromStorage&&(D.history.length||D.skus.length)){
@@ -30030,15 +30073,15 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v216-trust-pass';
-  var DATA_EPOCH='2026-05-22-v216-trust-pass';
+  var VERSION='v217-smooth-resume';
+  var DATA_EPOCH='2026-05-22-v217-smooth-resume';
   function $(id){return document.getElementById(id);} 
-  function log(){try{console.log.apply(console,['[Sense v216]'].concat([].slice.call(arguments)));}catch(e){}}
+  function log(){try{console.log.apply(console,['[Sense v217]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
-    try{ global.FRESHKET_BUILD='v216'; }catch(e){}
+    try{ global.FRESHKET_BUILD='v217'; }catch(e){}
     try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
-    try{ global.currentBuild=function(){return 'v216';}; }catch(e){}
-    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v216',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true,v216:true}};}; } }catch(e){}
+    try{ global.currentBuild=function(){return 'v217';}; }catch(e){}
+    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v217',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true,v216:true,v217:true}};}; } }catch(e){}
   }
   function hideLoginUi(){
     try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.style.opacity='0'; ov.classList.remove('lgi-checking'); } }catch(e){}
