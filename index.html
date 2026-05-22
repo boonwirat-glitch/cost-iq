@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 
+<!-- Freshket Sense v211b: Portfolio movement detail sheet unification — nested sheet z-index fix, navy KAM design, drill-down for NRR/Comeback/Expansion + New/Transfer movement groups; no schema, commission, role, PWA/performance change -->
 <!-- Freshket Sense v211a: Commission QA cleanup — static+logic validation pass, snapshot row normalization, admin-write guards preserved, locked/live source-of-truth clarified, TOC/patch map updated; no schema change, no PWA/performance change -->
 <!-- Freshket Sense v211: Commission snapshot + permission hardening | v210l: Portfolio UX State Cleanup (compact Insight sheet + NRR explanation sheet + simplified target color) | v210k: KAM commission compact 2-line strip (Thai-first, multi-source ready, no logic/schema change) | v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207d: performance/PWA/UI baseline preserved -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ LATEST PATCH MAP — v211a                                                     ║
+║ LATEST PATCH MAP — v211b                                                     ║
 ║                                                                              ║
-║ Baseline: sense_v211_commission_snapshot_permission_hardening.html           ║
-║ Scope: Commission feature closure QA, low-risk cleanup, TOC patch map.        ║
+║ Baseline: sense_v211a_commission_qa_cleanup.html                              ║
+║ Scope: Portfolio movement detail sheet UX hardening after commission closure. ║
 ║                                                                              ║
 ║ Runtime patch blocks near file end:                                           ║
 ║  - freshket-v210h-commission-regression-fix-css/js                            ║
@@ -20,14 +21,18 @@
 ║      Compact Portfolio Insight sheet + NRR explanation sheet.                ║
 ║  - freshket-v211-commission-snapshot-hardening-css/js                         ║
 ║      Preview/CSV/scorecard source-of-truth + snapshot lock + admin guards.   ║
+║  - freshket-v211b-portfolio-movement-sheet-css/js                              ║
+║      Unified KAM navy movement detail sheet + nested z-index fix.            ║
 ║                                                                              ║
-║ v211a QA notes:                                                               ║
+║ v211b QA notes:                                                               ║
 ║  - All inline scripts pass node --check.                                      ║
 ║  - v211 snapshot logic tested with mocked live/final rows: admin/TL/KAM       ║
 ║    scoping, locked-over-live precedence, CSV source, admin write guard,       ║
 ║    and lock payload normalization.                                            ║
 ║  - Removed misleading stale top release header; retained legacy target-module ║
 ║    commission functions as fallback to avoid regression.                     ║
+║  - v211b intentionally overrides _tgtShowCohortSheet at runtime instead of    ║
+║    rewriting target-module logic, minimizing regression risk.                ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 -->
 <!--
@@ -28074,5 +28079,208 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   console.log('[Freshket Sense '+VERSION+'] Commission snapshot + permission hardening QA cleanup loaded');
 })();
 </script>
+
+<style id="freshket-v211b-portfolio-movement-sheet-css">
+/* v211b — Portfolio Movement Detail Sheet Unification */
+/* Keep old ncs ids but lift them above the v210l explanation sheet and restyle them into KAM navy. */
+#ncs-overlay.ncs-overlay{
+  z-index:9650!important;background:rgba(0,0,0,.50)!important;
+  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+}
+#ncs-sheet.ncs-sheet{
+  z-index:9651!important;background:linear-gradient(180deg,#10213c 0%,#0b172b 100%)!important;
+  border:1px solid rgba(140,180,255,.20)!important;border-radius:22px 22px 0 0!important;
+  box-shadow:0 -18px 52px rgba(0,0,0,.46)!important;max-height:86dvh!important;overflow:hidden!important;
+}
+#ncs-sheet .ncs-handle div{width:44px!important;height:5px!important;background:rgba(255,255,255,.24)!important;border-radius:999px!important;}
+#ncs-sheet .ncs-header{padding:0 18px 13px!important;border-bottom:1px solid rgba(255,255,255,.09)!important;background:linear-gradient(180deg,rgba(20,44,82,.32),rgba(20,44,82,0))!important;}
+#ncs-sheet .ncs-title{font-size:16px!important;font-weight:900!important;color:#fff!important;letter-spacing:-.2px!important;margin-bottom:4px!important;}
+#ncs-sheet .ncs-subtitle{font-size:11px;font-weight:700;color:rgba(198,216,245,.70);line-height:1.45;margin-bottom:10px;}
+#ncs-sheet .ncs-close-x{position:absolute;right:16px;top:16px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.08);color:rgba(255,255,255,.78);font-size:20px;font-weight:900;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;}
+#ncs-sheet .ncs-close-x:active{transform:scale(.94)!important;}
+#ncs-sheet .ncs-tabs{background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important;padding:4px!important;gap:4px!important;}
+#ncs-sheet .ncs-tab{color:rgba(198,216,245,.55)!important;border-radius:9px!important;padding:8px 5px!important;}
+#ncs-sheet .ncs-tab.on{background:rgba(120,170,255,.14)!important;color:#fff!important;box-shadow:0 0 0 1px rgba(140,180,255,.12) inset!important;}
+#ncs-sheet .ncs-tab.on.t-nrr{color:#4ddc97!important;}#ncs-sheet .ncs-tab.on.t-cb{color:#70a8ff!important;}#ncs-sheet .ncs-tab.on.t-ex{color:#18d0c0!important;}
+#ncs-sheet .ncs-meta{padding:10px 18px!important;background:rgba(255,255,255,.035)!important;border-bottom:1px solid rgba(255,255,255,.08)!important;}
+#ncs-sheet .ncs-meta-text{font-size:12px!important;color:rgba(225,238,255,.82)!important;font-weight:650!important;}
+#ncs-sheet .ncs-sort-btn{color:rgba(225,238,255,.72)!important;background:rgba(255,255,255,.07)!important;border-color:rgba(255,255,255,.14)!important;border-radius:8px!important;}
+#ncs-sheet .ncs-tbl-head{padding:8px 18px!important;background:rgba(255,255,255,.025)!important;border-bottom:1px solid rgba(255,255,255,.09)!important;}
+#ncs-sheet .ncs-th{font-size:10px!important;color:rgba(190,210,240,.68)!important;letter-spacing:.07em!important;}
+#ncs-sheet .ncs-body{background:rgba(0,0,0,.02)!important;}
+#ncs-sheet .ncs-chip{padding:9px 18px!important;background:rgba(255,255,255,.055)!important;border-top:1px solid rgba(255,255,255,.08)!important;border-bottom:1px solid rgba(255,255,255,.06)!important;}
+#ncs-sheet .ncs-chip:hover{background:rgba(120,170,255,.09)!important;}
+#ncs-sheet .ncs-chip-name{font-size:12px!important;font-weight:850!important;color:rgba(255,255,255,.88)!important;}
+#ncs-sheet .ncs-chip-rr{font-size:12px!important;}
+#ncs-sheet .ncs-chip-badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;margin-left:6px;font-size:9px;font-weight:900;border:1px solid rgba(255,255,255,.12);color:rgba(225,238,255,.76);background:rgba(255,255,255,.055);white-space:nowrap;}
+#ncs-sheet .ncs-outlet-row{padding:8px 18px!important;border-bottom:1px solid rgba(255,255,255,.045)!important;}
+#ncs-sheet .ncs-outlet-row:hover{background:rgba(255,255,255,.035)!important;}
+#ncs-sheet .ncs-outlet-name{font-size:12px!important;color:rgba(245,250,255,.92)!important;}
+#ncs-sheet .ncs-gmv{font-size:11px!important;}
+#ncs-sheet .ncs-total{padding:12px 18px!important;background:rgba(255,255,255,.045)!important;border-top:1px solid rgba(255,255,255,.10)!important;}
+#ncs-sheet .ncs-total-lbl{color:rgba(190,210,240,.58)!important;}
+#ncs-sheet .ncs-total-val{font-size:17px!important;}
+#ncs-sheet .ncs-footer{padding:12px 18px!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important;background:rgba(0,0,0,.14)!important;border-top:1px solid rgba(255,255,255,.08)!important;}
+#ncs-sheet .ncs-btn{border-radius:12px!important;padding:12px 14px!important;}
+#ncs-sheet .ncs-btn.primary{background:rgba(77,220,151,.10)!important;border-color:rgba(77,220,151,.32)!important;color:#4ddc97!important;}
+#ncs-sheet .ncs-btn.secondary{background:rgba(255,255,255,.06)!important;border-color:rgba(255,255,255,.12)!important;color:rgba(225,238,255,.70)!important;}
+#ncs-sheet .ncs-empty{color:rgba(198,216,245,.50)!important;}
+#ncs-sheet .ncs-mv-cols{grid-template-columns:minmax(0,1fr) 74px 70px!important;}
+#ncs-sheet .ncs-to-cols{grid-template-columns:minmax(0,1fr) 82px 90px!important;}
+#ncs-sheet .ncs-mv-type{font-size:10px;font-weight:900;text-align:right;white-space:nowrap;}
+#ncs-sheet .ncs-owner{font-size:10px;color:rgba(198,216,245,.58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;}
+/* Make portfolio movement rows feel like drill-down affordances. */
+.tgt-mv-row{cursor:pointer;border-radius:8px;transition:background .16s ease,transform .10s ease;padding-left:6px!important;padding-right:6px!important;margin-left:-6px;margin-right:-6px;}
+.tgt-mv-row:hover{background:rgba(255,255,255,.045);}
+.tgt-mv-row:active{transform:scale(.992)!important;background:rgba(255,255,255,.07);}
+.tgt-mv-row::after{content:'ดู ›';font-size:10px;font-weight:850;color:rgba(180,210,255,.70);border:1px solid rgba(140,180,255,.20);background:rgba(140,180,255,.07);border-radius:7px;padding:2px 7px;white-space:nowrap;margin-left:3px;}
+.tgt-mv-header::after{content:'';display:none;}
+/* If a detail sheet is opened from inside the explanation sheet, keep the parent visibly behind it. */
+.tgt-explain-sheet-overlay.ncs-child-open .tgt-explain-sheet{filter:brightness(.72) blur(1.2px);transform:translateX(-50%) translateY(2px) scale(.985)!important;transition:filter .22s ease,transform .22s ease;}
+</style>
+<script id="freshket-v211b-portfolio-movement-sheet-js">
+(function(){
+  var VERSION='v211b';
+  var oldShow=window._tgtShowCohortSheet;
+  var activeMode='nrr';
+  function esc(v){try{return String(v==null?'':v).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];});}catch(e){return String(v||'');}}
+  function fmtK(v){v=Number(v||0);var sign=v<0?'−':'';var av=Math.abs(v);if(av>=1000000)return sign+'฿'+(av/1000000).toFixed(1)+'M';if(av>=1000)return sign+'฿'+Math.round(av/1000)+'K';return sign+'฿'+Math.round(av);}
+  function rr(v, daysElapsed, daysInMonth){return daysElapsed>0?Math.round(Number(v||0)/daysElapsed*daysInMonth):Number(v||0);}
+  function monthDaysFromNr(nr){
+    var moNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var cp=String(nr.currentMonthLabel||'').split(' '), mi=moNames.indexOf(cp[0]), yr=parseInt(cp[1]||'0',10)-543;
+    return (mi>=0 && yr>1900) ? new Date(yr,mi+1,0).getDate() : 30;
+  }
+  function ensure(){
+    var overlay=document.getElementById('ncs-overlay');
+    var sheet=document.getElementById('ncs-sheet');
+    if(!overlay){overlay=document.createElement('div');overlay.id='ncs-overlay';overlay.className='ncs-overlay';overlay.onclick=function(e){if(e.target===overlay) window._ncsClose();};document.body.appendChild(overlay);}
+    if(!sheet){sheet=document.createElement('div');sheet.id='ncs-sheet';sheet.className='ncs-sheet';document.body.appendChild(sheet);}
+    return {overlay:overlay,sheet:sheet};
+  }
+  function normalTabData(nr){
+    return [
+      {key:'nrr', label:'NRR', count:nr.cohortCount||0, gmv:nr.cohortGmv||0, data:nr.cohortDetail||[], color:'#4ddc97'},
+      {key:'cb', label:'Comeback', count:nr.comebackCount||0, gmv:nr.comebackGmv||0, data:nr.comebackDetail||[], color:'#70a8ff'},
+      {key:'ex', label:'Expansion', count:nr.expansionCount||0, gmv:nr.expansionGmv||0, data:nr.expansionDetail||[], color:'#18d0c0'}
+    ];
+  }
+  function pushMovementGroups(arr, list, label, color){
+    (list||[]).forEach(function(g){
+      arr.push(Object.assign({}, g, {mvType:label, mvColor:color, _mode:'movement'}));
+    });
+  }
+  function movementData(nr, key){
+    var grp, title, thai, color;
+    if(key==='mv-ti'||key==='ti'||key==='transfer-in'){grp=nr.transferIn||{};title='Transfer in';thai='ร้านที่รับโอนเข้าเดือนนี้';color='#70a8ff';}
+    else if(key==='mv-new'||key==='new'||key==='new-sales'){grp=nr.newFromSales||{};title='New (Sales)';thai='ร้านใหม่จาก Sales เดือนนี้';color='#18d0c0';}
+    else {grp=nr.transferOut||{};title='Transfer out';thai='ร้านที่โอนออกจากพอร์ตนี้';color='#ff8a70';}
+    if(key==='mv-to'||key==='to'||key==='transfer-out'){
+      var rows=(grp.detail||[]).map(function(r){return Object.assign({},r,{_mode:'transferOut'});});
+      return {kind:'transferOut', title:title, thai:thai, color:color, count:grp.count||rows.length||0, gmv:grp.gmv||0, rows:rows};
+    }
+    var groups=[];
+    pushMovementGroups(groups, grp.cohortDetail||[], 'NRR', '#4ddc97');
+    pushMovementGroups(groups, grp.comebackDetail||[], 'Comeback', '#70a8ff');
+    pushMovementGroups(groups, grp.expansionDetail||[], 'Expansion', '#18d0c0');
+    groups.sort(function(a,b){return (b.currTotal||0)-(a.currTotal||0);});
+    return {kind:'movement', title:title, thai:thai, color:color, count:grp.count||0, gmv:grp.gmv||0, nrr:grp.nrr, groups:groups};
+  }
+  function metaFor(t,nr){
+    if(t.kind==='movement') return (t.count||0)+' ร้าน · '+fmtK(t.gmv||0)+' GMV เดือนนี้';
+    if(t.kind==='transferOut') return (t.count||0)+' ร้าน · '+fmtK(t.gmv||0)+' GMV เดือนก่อนที่ออกจากพอร์ต';
+    if(t.key==='nrr') return (t.count||0)+' outlets · '+fmtK(t.gmv||0)+' MTD · ฐาน '+esc(nr.prevMonth||'');
+    if(t.key==='cb') return (t.count||0)+' outlets กลับมาซื้อ · ไม่มี GMV ในเดือนก่อน';
+    return (t.count||0)+' outlets ใหม่ · ไม่เคยซื้อมาก่อนในฐานข้อมูลพอร์ตนี้';
+  }
+  function renderNormalRows(t,nr){
+    if(!t.data||!t.data.length) return '<div class="ncs-empty">ไม่มีข้อมูลในกลุ่มนี้</div>';
+    var isNrr=t.key==='nrr', days=monthDaysFromNr(nr), colCls=isNrr?'nrr-cols':'simple-cols';
+    return t.data.map(function(g,gi){
+      var autoOpen=gi<4;
+      var chipVal=isNrr?fmtK(rr(g.currTotal,nr.daysElapsed,days)):fmtK(g.currTotal);
+      var chip='<div class="ncs-chip'+(autoOpen?' open':'')+'" onclick="_ncsChipToggle(this)"><span class="ncs-chip-chev">›</span><span class="ncs-chip-name">'+esc(g.acctName||g.acctId||'—')+'</span><span class="ncs-chip-rr" style="color:'+t.color+'">'+chipVal+'</span></div>';
+      var outlets=(g.outlets||[]).map(function(o){
+        var name=esc(o.outletName||o.outletId||'—');
+        if(isNrr){var run=rr(o.currGmv,nr.daysElapsed,days), cls=run>=(o.prevGmv||0)?'ncs-gmv rr-up':'ncs-gmv rr-dn';return '<div class="ncs-outlet-row nrr-cols"><div class="ncs-outlet-name">'+name+'</div><div class="ncs-gmv base">'+((o.prevGmv||0)>0?fmtK(o.prevGmv):'—')+'</div><div class="'+cls+'">'+fmtK(run)+'</div><div class="ncs-gmv mtd">'+fmtK(o.currGmv)+'</div></div>';}
+        return '<div class="ncs-outlet-row simple-cols"><div class="ncs-outlet-name">'+name+'</div><div class="ncs-gmv" style="color:'+t.color+'">'+fmtK(o.currGmv)+'</div></div>';
+      }).join('');
+      return chip+'<div class="ncs-outlet-rows'+(autoOpen?' open':'')+'">'+outlets+'</div>';
+    }).join('');
+  }
+  function renderMovementRows(t){
+    if(!t.groups||!t.groups.length) return '<div class="ncs-empty">ไม่มีรายละเอียด account/outlet ในกลุ่มนี้</div>';
+    return t.groups.map(function(g,gi){
+      var autoOpen=gi<5;
+      var badge='<span class="ncs-chip-badge" style="color:'+g.mvColor+';border-color:'+g.mvColor+'55;background:'+g.mvColor+'16">'+esc(g.mvType)+'</span>';
+      var chip='<div class="ncs-chip'+(autoOpen?' open':'')+'" onclick="_ncsChipToggle(this)"><span class="ncs-chip-chev">›</span><span class="ncs-chip-name">'+esc(g.acctName||g.acctId||'—')+badge+'</span><span class="ncs-chip-rr" style="color:'+g.mvColor+'">'+fmtK(g.currTotal||0)+'</span></div>';
+      var outlets=(g.outlets||[]).map(function(o){return '<div class="ncs-outlet-row ncs-mv-cols"><div class="ncs-outlet-name">'+esc(o.outletName||o.outletId||'—')+'</div><div class="ncs-mv-type" style="color:'+g.mvColor+'">'+esc(g.mvType)+'</div><div class="ncs-gmv" style="color:'+g.mvColor+'">'+fmtK(o.currGmv||0)+'</div></div>';}).join('');
+      return chip+'<div class="ncs-outlet-rows'+(autoOpen?' open':'')+'">'+outlets+'</div>';
+    }).join('');
+  }
+  function renderTransferOutRows(t){
+    if(!t.rows||!t.rows.length) return '<div class="ncs-empty">ไม่มีร้านที่โอนออก</div>';
+    return t.rows.sort(function(a,b){return (b.lastMonthGmv||0)-(a.lastMonthGmv||0);}).map(function(r){
+      var owner=(r.newKamName||r.newOwnerType||'—');
+      return '<div class="ncs-outlet-row ncs-to-cols"><div class="ncs-outlet-name">'+esc(r.accountName||r.accountId||'—')+'<div style="font-size:10px;color:rgba(198,216,245,.48);margin-top:1px">'+esc(r.accountType||'')+'</div></div><div class="ncs-gmv rr-dn">'+fmtK(r.lastMonthGmv||0)+'</div><div class="ncs-owner">'+esc(owner)+'</div></div>';
+    }).join('');
+  }
+  function buildRowsForExport(mode,nr){
+    var rows=[];
+    if(mode==='mv-to'||mode==='to'||mode==='transfer-out'){
+      var t=movementData(nr,'mv-to'); rows.push(['Type','Account','Account Type','Last Month GMV','Current Month GMV','New Owner']);
+      (t.rows||[]).forEach(function(r){rows.push(['Transfer out',r.accountName||r.accountId||'',r.accountType||'',Math.round(r.lastMonthGmv||0),Math.round(r.curMonthGmv||0),r.newKamName||r.newOwnerType||'']);});
+      return rows;
+    }
+    if(/^mv-|^ti$|^new$|transfer-in|new-sales/.test(mode)){
+      var mt=movementData(nr,mode); rows.push(['Movement','Subtype','Account','Outlet','GMV MTD']);
+      (mt.groups||[]).forEach(function(g){(g.outlets||[]).forEach(function(o){rows.push([mt.title,g.mvType,g.acctName||g.acctId||'',o.outletName||o.outletId||'',Math.round(o.currGmv||0)]);});});
+      return rows;
+    }
+    var tab=(normalTabData(nr).find(function(x){return x.key===mode;})||normalTabData(nr)[0]), days=monthDaysFromNr(nr); rows.push(tab.key==='nrr'?['Type','Account','Outlet','Baseline','Run Rate','GMV MTD']:['Type','Account','Outlet','GMV MTD']);
+    (tab.data||[]).forEach(function(g){(g.outlets||[]).forEach(function(o){if(tab.key==='nrr')rows.push([tab.label,g.acctName||'',o.outletName||o.outletId||'',Math.round(o.prevGmv||0),Math.round(rr(o.currGmv,nr.daysElapsed,days)),Math.round(o.currGmv||0)]);else rows.push([tab.label,g.acctName||'',o.outletName||o.outletId||'',Math.round(o.currGmv||0)]);});});
+    return rows;
+  }
+  function csvEscape(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+  function downloadRows(rows, name){var csv=rows.map(function(r){return r.map(csvEscape).join(',');}).join('\n');var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||'portfolio-detail.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},200);}
+  function render(mode){
+    var nr=window._ncsLastNrrResult, kamLabel=window._ncsKamLabel||''; if(!nr){try{showToast('ยังไม่มีข้อมูลพอร์ต','!');}catch(e){} return;}
+    activeMode=mode||'nrr'; var dom=ensure(), overlay=dom.overlay, sheet=dom.sheet;
+    var isMovement=/^mv-|^ti$|^new$|^to$|transfer-in|transfer-out|new-sales/.test(activeMode);
+    var title='รายละเอียด GMV', subtitle='ดูรายร้าน/สาขา โดยไม่ต้องปิด panel คำอธิบายหลัก';
+    var tabsHtml='', meta='', head='', body='', total='', totalColor='#4ddc97';
+    if(isMovement){
+      var mt=movementData(nr,activeMode); title='รายละเอียด '+mt.title; subtitle=mt.thai+' — '+esc(kamLabel); meta=metaFor(mt,nr); total=fmtK(mt.gmv||0); totalColor=mt.color;
+      head=mt.kind==='transferOut'?'<div class="ncs-th">Account</div><div class="ncs-th r">GMV เดิม</div><div class="ncs-th r">ไปที่</div>':'<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">ประเภท</div><div class="ncs-th r">GMV</div>';
+      body=mt.kind==='transferOut'?renderTransferOutRows(mt):renderMovementRows(mt);
+      sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+esc(title)+'</div><div class="ncs-subtitle">'+esc(subtitle)+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head '+(mt.kind==='transferOut'?'ncs-to-cols':'ncs-mv-cols')+'">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(mt.title)+'</span><span class="ncs-total-val" style="color:'+totalColor+'">'+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';
+    }else{
+      var tabs=normalTabData(nr); if(!tabs.find(function(x){return x.key===activeMode;})) activeMode='nrr'; var t=tabs.find(function(x){return x.key===activeMode;})||tabs[0]; title='รายละเอียด GMV — '+esc(kamLabel); subtitle='แยก NRR / Comeback / Expansion ให้ดูระดับ account และ outlet'; meta=metaFor(t,nr); total=fmtK(t.gmv||0); totalColor=t.color;
+      tabsHtml=tabs.map(function(x){return '<button class="ncs-tab t-'+x.key+(x.key===activeMode?' on':'')+'" onclick="_ncsSetTab(\''+x.key+'\')">'+x.label+'<br><span style="font-size:9px;opacity:.75">'+(x.count||0)+' outlets</span></button>';}).join('');
+      head=t.key==='nrr'?'<div class="ncs-th">Outlet</div><div class="ncs-th r">ฐาน</div><div class="ncs-th r" style="color:rgba(77,220,151,.72)">Run Rate</div><div class="ncs-th r">MTD</div>':'<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">MTD</div>';
+      body=renderNormalRows(t,nr);
+      sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+title+'</div><div class="ncs-subtitle">'+subtitle+'</div><div class="ncs-tabs">'+tabsHtml+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head '+(t.key==='nrr'?'nrr-cols':'simple-cols')+'">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(t.label)+'</span><span class="ncs-total-val" style="color:'+totalColor+'">'+(t.key==='nrr'?'':'+')+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';
+    }
+    var parent=document.getElementById('tgt-explain-sheet-overlay'); if(parent&&parent.classList.contains('on')) parent.classList.add('ncs-child-open');
+    requestAnimationFrame(function(){overlay.classList.add('on');sheet.classList.add('on');});
+  }
+  window._tgtShowCohortSheet=function(tab){render(tab||'nrr');};
+  window._ncsClose=function(){var overlay=document.getElementById('ncs-overlay'),sheet=document.getElementById('ncs-sheet'); if(overlay)overlay.classList.remove('on'); if(sheet)sheet.classList.remove('on'); var parent=document.getElementById('tgt-explain-sheet-overlay'); if(parent)parent.classList.remove('ncs-child-open'); setTimeout(function(){if(sheet)sheet.innerHTML='';},280);};
+  window._ncsChipToggle=function(chip){chip.classList.toggle('open');var r=chip.nextElementSibling;if(r)r.classList.toggle('open');};
+  window._ncsToggleAll=function(){var body=document.getElementById('ncs-body');if(!body)return;var chips=Array.from(body.querySelectorAll('.ncs-chip'));var groups=Array.from(body.querySelectorAll('.ncs-outlet-rows'));var any=groups.some(function(g){return g.classList.contains('open');});chips.forEach(function(c){c.classList.toggle('open',!any);});groups.forEach(function(g){g.classList.toggle('open',!any);});var btn=document.getElementById('ncs-toggle-btn');if(btn)btn.textContent=any?'ขยายทั้งหมด':'ย่อทั้งหมด';};
+  window._ncsSetTab=function(k){render(k||'nrr');};
+  window._ncsExportCSV=function(){try{downloadRows(buildRowsForExport(activeMode,window._ncsLastNrrResult),'portfolio_'+String(activeMode).replace(/[^a-z0-9_-]/gi,'_')+'.csv');}catch(e){console.warn('[v211b] csv export failed',e);}};
+  window._ncsCopyTSV=function(){try{var rows=buildRowsForExport(activeMode,window._ncsLastNrrResult);var tsv=rows.map(function(r){return r.join('\t');}).join('\n');navigator.clipboard.writeText(tsv);try{showToast('Copy TSV แล้ว','ok');}catch(e){}}catch(e){console.warn('[v211b] copy failed',e);}};
+  document.addEventListener('click',function(e){
+    var row=e.target.closest&&e.target.closest('.tgt-mv-row'); if(!row || e.target.closest('.tgt-mv-header')) return;
+    var txt=(row.textContent||'').toLowerCase();
+    if(txt.indexOf('transfer in')>=0){e.preventDefault();e.stopPropagation();render('mv-ti');}
+    else if(txt.indexOf('new (sales)')>=0 || txt.indexOf('new')>=0){e.preventDefault();e.stopPropagation();render('mv-new');}
+    else if(txt.indexOf('transfer out')>=0){e.preventDefault();e.stopPropagation();render('mv-to');}
+  },true);
+  console.log('[Freshket Sense '+VERSION+'] Portfolio movement detail sheet unification loaded');
+})();
+</script>
+
 </body>
 </html>
