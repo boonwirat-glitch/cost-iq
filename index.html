@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 
+<!-- Freshket Sense v212: Data Freshness & Loader Correctness patch — critical network-first portview/history/handover, cache fallback, PWA resume freshness validation, build version alignment; preserves v211c movement correctness and commission logic -->
 <!-- Freshket Sense v211c: Handover data refresh + movement classification/sheet UI fix — Q10_FIXED_PROD SQL, cache-busted portview_handover.csv, robust handover parsing, New/Transfer sheet columns, Transfer-out row cards; no commission/schema/role/PWA regression -->
 <!-- Freshket Sense v211a: Commission QA cleanup — static+logic validation pass, snapshot row normalization, admin-write guards preserved, locked/live source-of-truth clarified, TOC/patch map updated; no schema change, no PWA/performance change -->
 <!-- Freshket Sense v211c: Handover Q10 fixed + movement sheet UI cleanup | v211: Commission snapshot + permission hardening | v210l: Portfolio UX State Cleanup (compact Insight sheet + NRR explanation sheet + simplified target color) | v210k: KAM commission compact 2-line strip (Thai-first, multi-source ready, no logic/schema change) | v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207d: performance/PWA/UI baseline preserved -->
@@ -3446,7 +3447,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v207d-sense-glass-nav-fix',
+      version: 'v212-data-freshness-loader',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -3485,9 +3486,9 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
     data: Object.freeze({
       r2Base: R2_BASE,
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover']),
-      // v206b: critical path shows portfolio as soon as portview+history are ready; details hydrate after first paint.
-      criticalKeys: Object.freeze(['portview','history']),
-      enhancementKeys: Object.freeze(['categories','sku_current','outlets','handover']),
+      // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
+      criticalKeys: Object.freeze(['portview','history','handover']),
+      enhancementKeys: Object.freeze(['categories','sku_current','outlets']),
       backgroundKeys: Object.freeze([]),  // v207b: no global bulk SKU auto-load; Sense uses per-KAM bundle on demand
       r2Files: Object.freeze({
         portview: 'portview.csv',
@@ -3501,7 +3502,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
         handover: 'portview_handover.csv'
       }),
       r2Specs: Object.freeze({
-        portview: Object.freeze({type:'portview-bulk',tab:'portview',cache:true}),
+        portview: Object.freeze({type:'portview-bulk',tab:'portview',cache:false,freshness:'network-first'}),
         history: Object.freeze({type:'bulk-data',tab:'history',cache:true}),
         categories: Object.freeze({type:'bulk-categories',tab:'categories',cache:true}),
         sku_current: Object.freeze({type:'bulk-sku-current',tab:'sku_current',cache:true}),
@@ -3509,7 +3510,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
         skus: Object.freeze({type:'bulk-skus',tab:'skus',cache:false,heavy:true}),
         alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true}),
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
-        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true})
+        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:false,freshness:'network-first'})
       })
     }),
     legacySheets: Object.freeze({
@@ -13342,7 +13343,7 @@ function setAiProvider(p){
   const ORCH_CFG = global.FreshketSenseConfig || {};
   const ORCH_DATA_CFG = ORCH_CFG.data || {};
   const FOREGROUND = (ORCH_DATA_CFG.foregroundKeys || ['portview','history','categories','sku_current','outlets','handover']).slice();
-  const CRITICAL = (ORCH_DATA_CFG.criticalKeys || ['portview','history']).slice();
+  const CRITICAL = (ORCH_DATA_CFG.criticalKeys || ['portview','history','handover']).slice();
   const ENHANCEMENT = (ORCH_DATA_CFG.enhancementKeys || FOREGROUND.filter(function(k){return CRITICAL.indexOf(k)<0;})).slice();
   const BACKGROUND = (ORCH_DATA_CFG.backgroundKeys || ['skus','alternatives']).slice();
   const ALL = FOREGROUND.concat(BACKGROUND);
@@ -13408,6 +13409,24 @@ function setAiProvider(p){
   function fetchTimeout(spec){ return spec && spec.heavy ? 240000 : 90000; }
   function ingestTimeout(spec){ return spec && spec.heavy ? 240000 : 90000; }
 
+  const V212_DATA_EPOCH = '2026-05-22-v212-data-freshness';
+  const V212_NETWORK_FIRST_TABS = { portview:true, history:true, handover:true };
+  function v212ShouldNetworkFirst(tab, spec, force){
+    return !!force || !!V212_NETWORK_FIRST_TABS[tab] || (spec && spec.freshness === 'network-first');
+  }
+  function v212FreshUrl(url, tab){
+    try{
+      const sep = String(url).indexOf('?') >= 0 ? '&' : '?';
+      return String(url) + sep + 'v=' + encodeURIComponent(V212_DATA_EPOCH) + '&cb=' + Date.now();
+    }catch(e){ return url; }
+  }
+  function v212RecordFreshness(tab, meta){
+    try{
+      global.FreshketSenseDataFreshness = global.FreshketSenseDataFreshness || {};
+      global.FreshketSenseDataFreshness[tab] = Object.assign({ tab:tab, dataEpoch:V212_DATA_EPOCH, checkedAt:Date.now() }, meta || {});
+    }catch(e){}
+  }
+
   async function fetchCloudflareFile(spec, opts){
     opts = opts || {};
     const force = !!opts.force;
@@ -13415,39 +13434,66 @@ function setAiProvider(p){
     if(!spec || !spec.tab) return false;
     const tab = spec.tab;
     const inFlight = getInFlight();
+    const networkFirst = v212ShouldNetworkFirst(tab, spec, force);
 
-    if(!force && isLoaded(tab)) return true;
+    if(!force && !networkFirst && isLoaded(tab)) return true;
     if(!force && inFlight[tab]) return inFlight[tab];
 
     const p = (async function(){
-      record('_fetchCloudflareFile', 'start', { tab, force, heavy: !!spec.heavy });
+      record('_fetchCloudflareFile', 'start', { tab, force, heavy: !!spec.heavy, networkFirst });
       const dot = document.getElementById('sp-' + tab);
       if(dot) dot.style.background = 'rgba(38,96,200,.12)';
       try{
         let text = null;
+        let source = 'network';
+        let cached = null;
         const useCache = (cacheOverride !== undefined) ? cacheOverride : !!spec.cache;
-        if(useCache){
-          const cached = await baseData.csvCacheGet(tab);
-          if(cached && cached.ts && (Date.now() - cached.ts) < getTtl()) text = cached.text;
+        if(useCache && !networkFirst){
+          cached = await baseData.csvCacheGet(tab);
+          if(cached && cached.ts && (Date.now() - cached.ts) < getTtl()){
+            text = cached.text;
+            source = 'cache';
+          }
         }
         if(!text){
           const files = getFiles();
-          const url = `${getBase()}/${files[tab] || tab + '.csv'}`;
-          text = await baseData.fetchTextWithTimeout(url, fetchTimeout(spec));
-          if(useCache) baseData.csvCacheSet(tab, text);
+          let url = `${getBase()}/${files[tab] || tab + '.csv'}`;
+          if(networkFirst) url = v212FreshUrl(url, tab);
+          try{
+            text = await baseData.fetchTextWithTimeout(url, fetchTimeout(spec));
+            source = 'network';
+            // v212: keep a fallback copy even for network-first files; never use it before trying network.
+            if(useCache || networkFirst) baseData.csvCacheSet(tab, text);
+          }catch(fetchErr){
+            if(useCache || networkFirst){
+              cached = cached || await baseData.csvCacheGet(tab);
+              if(cached && cached.text){
+                text = cached.text;
+                source = 'offline-cache';
+                safeWarn('[v212 freshness] network failed; using cached ' + tab, fetchErr && fetchErr.message ? fetchErr.message : fetchErr);
+              }else{
+                throw fetchErr;
+              }
+            }else{
+              throw fetchErr;
+            }
+          }
         }
         const ok = await ingestCSVText(spec.type, text, { timeoutMs: ingestTimeout(spec) });
         if(ok){
           markLoaded(tab);
-          if(dot){ dot.style.background = 'rgba(0,208,112,.18)'; dot.style.color = 'var(--g700)'; }
-          record('_fetchCloudflareFile', 'done', { tab, ok:true });
+          v212RecordFreshness(tab, { source, bytes:text ? text.length : 0, networkFirst, force, ageMs: source === 'cache' || source === 'offline-cache' ? (cached && cached.ts ? Date.now() - cached.ts : null) : 0 });
+          if(dot){ dot.style.background = source === 'offline-cache' ? 'rgba(240,176,0,.18)' : 'rgba(0,208,112,.18)'; dot.style.color = source === 'offline-cache' ? '#9a6500' : 'var(--g700)'; }
+          record('_fetchCloudflareFile', 'done', { tab, ok:true, source, networkFirst });
         }else{
           if(dot){ dot.style.background = 'rgba(240,80,0,.12)'; dot.style.color = 'var(--org)'; }
-          record('_fetchCloudflareFile', 'done', { tab, ok:false });
+          v212RecordFreshness(tab, { source:'failed', networkFirst, force });
+          record('_fetchCloudflareFile', 'done', { tab, ok:false, source, networkFirst });
         }
         return !!ok;
       }catch(err){
         if(dot){ dot.style.background = 'rgba(240,80,0,.12)'; dot.style.color = 'var(--org)'; }
+        v212RecordFreshness(tab, { source:'error', networkFirst, force, error:err && err.message ? err.message : String(err) });
         recordError('_fetchCloudflareFile:' + tab, err);
         safeWarn('[Cloudflare R2]', tab, err && err.message ? err.message : err);
         return false;
@@ -13640,7 +13686,7 @@ function setAiProvider(p){
       const criticalOk = criticalResults.filter(Boolean).length;
       orchStatus.foregroundLoaded = criticalOk;
       if(btn){ btn.disabled = false; btn.textContent = 'Refresh data'; }
-      if(criticalOk > 0){
+      if(criticalOk === CRITICAL.length){
         safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + criticalOk + '/' + CRITICAL.length + ' ไฟล์','✓');
         baseData.setDataPillText('พร้อมใช้งาน','เติมรายละเอียดต่อเบื้องหลัง');
         try{
@@ -13650,8 +13696,8 @@ function setAiProvider(p){
         try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !(typeof _senseHydrateVisiblePortfolio === 'function')) renderTeamview(); }catch(e){}
         nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 450);
       }else{
-        safeToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
-        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:0 }); }, 500);
+        safeToast('ข้อมูลหลักยังไม่ครบ — กด Refresh data','⚠');
+        nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 500);
       }
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
@@ -13675,6 +13721,9 @@ function setAiProvider(p){
     await baseData.csvCacheClear();
     try{ sheetsLoadStarted = false; }catch(e){}
     try{ bulkSkusReady = false; bulkAltsReady = false; }catch(e){}
+    try{ if(typeof _kamBundleLoaded !== 'undefined' && _kamBundleLoaded && _kamBundleLoaded.clear) _kamBundleLoaded.clear(); }catch(e){}
+    try{ if(typeof _kamBundleInFlight !== 'undefined' && _kamBundleInFlight) Object.keys(_kamBundleInFlight).forEach(function(k){ delete _kamBundleInFlight[k]; }); }catch(e){}
+    try{ global.FreshketSenseDataFreshness = {}; }catch(e){}
     const tabs = getLoadedTabs();
     if(tabs && typeof tabs.clear === 'function') tabs.clear();
     clearInFlight();
@@ -28505,6 +28554,109 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   document.addEventListener('click',function(e){var row=e.target.closest&&e.target.closest('.tgt-mv-row');if(!row||e.target.closest('.tgt-mv-header'))return;var txt=(row.textContent||'').toLowerCase();if(txt.indexOf('transfer in')>=0){e.preventDefault();e.stopPropagation();render('mv-ti');}else if(txt.indexOf('new (sales)')>=0||txt.indexOf('new')>=0){e.preventDefault();e.stopPropagation();render('mv-new');}else if(txt.indexOf('transfer out')>=0){e.preventDefault();e.stopPropagation();render('mv-to');}},true);
   console.log('[Freshket Sense '+VERSION+'] Handover cache bust + movement sheet UI fix loaded');
 })();
+</script>
+
+
+
+<script id="freshket-v212-data-freshness-js">
+// v212 — Data Freshness & Loader Correctness patch.
+// Scope: loader/cache/PWA freshness only. No commission, owner-source, movement-attribution, or schema changes.
+(function(global){
+  'use strict';
+  var VERSION = 'v212-data-freshness-loader';
+  var DATA_EPOCH = '2026-05-22-v212-data-freshness';
+  var CRITICAL = ['portview','history','handover'];
+  var validateTimer = null;
+  var validateInFlight = null;
+  var lastValidateAt = Date.now(); // avoid double-validating immediately after first boot/pageshow
+
+  function debugOn(){ try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshketDebug')==='1';}catch(e){return false;} }
+  function log(){ if(debugOn()) try{ console.log.apply(console, ['[v212 freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function warn(){ try{ console.warn.apply(console, ['[v212 freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function now(){ return Date.now ? Date.now() : +new Date(); }
+  function isLoggedIn(){ try{return !!currentUser;}catch(e){return false;} }
+  function hasCoreData(){ try{return Array.isArray(portviewBulkData) && portviewBulkData.length>0;}catch(e){return false;} }
+  function onVisibleDataSurface(){
+    try{
+      return !!(document.getElementById('scr-portview')?.classList.contains('on') || document.getElementById('scr-teamview')?.classList.contains('on') || document.getElementById('scr-kam-overview')?.classList.contains('on'));
+    }catch(e){ return false; }
+  }
+  function hydrate(reason){
+    try{ if(typeof updateDataStatus==='function') updateDataStatus(); }catch(e){}
+    try{ if(typeof updateMatcherPreStatus==='function') updateMatcherPreStatus(); }catch(e){}
+    try{
+      if(typeof _senseHydrateVisiblePortfolio==='function') _senseHydrateVisiblePortfolio('v212-'+reason,{full:true,delay:120});
+      else {
+        if(typeof renderPortview==='function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview();
+        if(typeof renderTeamview==='function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview();
+      }
+    }catch(e){}
+    try{ if(typeof renderKamOverview==='function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+  }
+  function summarizeFreshness(){
+    try{
+      var f=global.FreshketSenseDataFreshness||{};
+      return CRITICAL.map(function(k){ var x=f[k]||{}; return k+':'+(x.source||'unknown'); }).join(' · ');
+    }catch(e){ return ''; }
+  }
+  async function validateFreshnessOnResume(reason, opts){
+    opts = opts || {};
+    var minGap = opts.force ? 0 : 180000;
+    if(validateInFlight) return validateInFlight;
+    if(!isLoggedIn()) return false;
+    if(!opts.force && !hasCoreData()) return false;
+    if(!opts.force && now()-lastValidateAt < minGap) return false;
+    lastValidateAt = now();
+    validateInFlight = (async function(){
+      try{
+        if(navigator && navigator.onLine===false){
+          try{ if(typeof showToast==='function') showToast('ใช้ข้อมูล cached — offline','⚠'); }catch(e){}
+          return false;
+        }
+        if(typeof ensureCloudflareFiles !== 'function') return false;
+        log('validate start', reason, {surface:onVisibleDataSurface(), core:hasCoreData()});
+        try{ if(typeof _setDataPillText==='function') _setDataPillText('ตรวจข้อมูลล่าสุด','0/'+CRITICAL.length); }catch(e){}
+        var ok = await ensureCloudflareFiles(CRITICAL, {label:'ตรวจข้อมูลล่าสุด', force:true});
+        if(ok){
+          hydrate(reason||'resume');
+          try{ if(typeof showToast==='function') showToast('ข้อมูลล่าสุดแล้ว','✓'); }catch(e){}
+        }else{
+          try{ if(typeof showToast==='function') showToast('ตรวจข้อมูลล่าสุดไม่ครบ — ใช้ข้อมูลที่มีอยู่','⚠'); }catch(e){}
+        }
+        log('validate done', reason, {ok:ok, freshness:summarizeFreshness()});
+        return !!ok;
+      }catch(e){ warn('validate failed', reason, e&&e.message?e.message:e); return false; }
+      finally{ validateInFlight = null; }
+    })();
+    return validateInFlight;
+  }
+  function schedule(reason, opts){
+    opts = opts || {};
+    if(validateTimer) clearTimeout(validateTimer);
+    validateTimer = setTimeout(function(){
+      validateTimer = null;
+      validateFreshnessOnResume(reason, opts);
+    }, opts.delay == null ? 1200 : opts.delay);
+  }
+
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') schedule('visibility-visible', {delay:1600});
+  });
+  global.addEventListener('pageshow', function(event){
+    if(event && event.persisted) schedule('pageshow-bfcache', {delay:900, force:true});
+    else schedule('pageshow', {delay:2600});
+  });
+  global.addEventListener('focus', function(){ schedule('window-focus', {delay:1800}); });
+  global.addEventListener('online', function(){ schedule('online', {delay:500, force:true}); });
+
+  global.FreshketSenseV212 = {
+    version: VERSION,
+    dataEpoch: DATA_EPOCH,
+    criticalKeys: CRITICAL.slice(),
+    validateFreshnessOnResume: validateFreshnessOnResume,
+    getFreshness: function(){ try{return JSON.parse(JSON.stringify(global.FreshketSenseDataFreshness||{}));}catch(e){return global.FreshketSenseDataFreshness||{};} }
+  };
+})(window);
 </script>
 
 </body>
