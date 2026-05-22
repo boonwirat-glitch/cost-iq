@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- Freshket Sense v214d: Auth owner cleanup — single auth/resume owner, no legacy auth patch conflict, console flight recorder; no business logic changes -->
+<!-- Freshket Sense v214e: Auth owner cleanup hotfix — single auth/resume owner, no legacy auth patch conflict, console flight recorder; no business logic changes -->
 <!-- Freshket Sense v213a: Guided UX cleanup | v213: Guided Intelligence UX — SKU default to price trend, Restaurant drill-down CTA + coach mark, premium commission reward states, PWA entry viewport reset, Olive FAB safe-zone clamp/snap; no data/commission/NRR/owner/movement logic change -->
 <!-- Freshket Sense v212c: Diagnostics + reliable foreground counter — exposes FreshketSenseDebug status/rows/network/version, readable build metadata, lexical/global data row detection, no extra reloads or business logic changes -->
 <!-- Freshket Sense v212b: PWA data panel + target input + overflow badge cleanup — sync Cloudflare panel count from actual foreground data, comma-format target inputs, hide redundant run-rate overflow badge; preserves v212a freshness unification and no commission/owner/movement formula change -->
@@ -30366,7 +30366,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   'use strict';
   if(global.__SenseV214DInstalled) return;
   global.__SenseV214DInstalled = true;
-  var VERSION = 'v214d_auth_owner_cleanup';
+  var VERSION = 'v214e_auth_owner_cleanup_hotfix';
   var timeline = [];
   var state = {
     phase: 'BOOTING',
@@ -30397,7 +30397,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   function log(type,msg,detail){
     var item={t:new Date().toISOString(),ms:now(),type:type,msg:msg,phase:state.phase,role:state.role,route:state.route,email:state.email,counts:counts(),detail:detail||null};
     timeline.push(item); if(timeline.length>220) timeline.shift();
-    try{ console.log('[Sense v214d]['+type+'] '+msg, clone(item)); }catch(e){}
+    try{ console.log('[Sense v214e]['+type+'] '+msg, clone(item)); }catch(e){}
     return item;
   }
   function setPhase(phase, reason, detail){
@@ -30626,25 +30626,28 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   try{ global.addEventListener('online',function(){ controlledResume('online'); },true); }catch(e){}
 
   function patchDebug(){
+    var existing=null, oldStatus=null, dbg={};
+    try{ global.FRESHKET_BUILD='v214e'; }catch(e){}
+    try{ if(global.FreshketSenseConfig&&global.FreshketSenseConfig.app&&!Object.isFrozen(global.FreshketSenseConfig.app)) global.FreshketSenseConfig.app.version=VERSION; }catch(e){}
+    try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&!Object.isFrozen(global.FRESHKET_CONFIG.app)) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
+    try{ global.currentBuild=function(){return 'v214e';}; }catch(e){}
+    try{ existing=global.FreshketSenseDebug||null; oldStatus=existing&&existing.status; }catch(e){}
     try{
-      global.FRESHKET_BUILD='v214d';
-      if(global.FreshketSenseConfig&&global.FreshketSenseConfig.app) global.FreshketSenseConfig.app.version=VERSION;
-      if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION;
-      global.currentBuild=function(){return 'v214d';};
-      var dbg=global.FreshketSenseDebug=global.FreshketSenseDebug||{};
-      var oldStatus=dbg.status;
-      dbg.version=function(){return {build:VERSION,currentBuild:'v214d',authOwner:'v214d',legacyRemoved:{v206f:true,v213b:true,v213aResume:true}, autoReloadDisabled:true};};
+      if(existing){ Object.keys(existing).forEach(function(k){ try{ dbg[k]=existing[k]; }catch(e){} }); }
+      dbg.version=function(){return {build:VERSION,currentBuild:'v214e',authOwner:'v214e',legacyRemoved:{v206f:true,v213b:true,v213aResume:true}, autoReloadDisabled:true, frozenDebugReplaced:!!(existing&&Object.isFrozen&&Object.isFrozen(existing))};};
       dbg.timeline=function(){return timeline.slice();};
       dbg.state=function(){return clone(state);};
       dbg.auth=function(){return {sessionEpoch:state.sessionEpoch, user:!!global.currentUser, userEmail:global.currentUser&&global.currentUser.email||null, profile:!!global.currentUserProfile, profileEmail:global.currentUserProfile&&global.currentUserProfile.email||null, role:role(), storage:authStorage()};};
       dbg.loader=function(){return {criticalReady:state.criticalReady, counts:counts(), sheetsLoadStarted:(function(){try{return !!sheetsLoadStarted;}catch(e){return null;}})(), cloudInitialPromise:!!global._cloudInitialPromise};};
       dbg.resume=function(){return {lastResumeAt:state.lastResumeAt, phase:state.phase, autoReloadDisabled:true};};
       dbg.authStorage=authStorage;
-      dbg.dump=function(){return {version:VERSION, state:clone(state), auth:dbg.auth(), loader:dbg.loader(), resume:dbg.resume(), ui:{login:(function(){try{return getComputedStyle(document.getElementById('login-overlay')).display;}catch(e){return null;}})(), splash:(function(){try{return getComputedStyle(document.getElementById('sense-splash')).display;}catch(e){return null;}})(), bodyClass:document.body.className}, timeline:timeline.slice(-80), oldStatus:typeof oldStatus==='function'?oldStatus():null};};
-    }catch(e){ console.warn('[Sense v214d] debug patch failed',e); }
+      dbg.dump=function(){return {version:VERSION, state:clone(state), auth:dbg.auth(), loader:dbg.loader(), resume:dbg.resume(), ui:{login:(function(){try{var el=document.getElementById('login-overlay');return el?getComputedStyle(el).display:null;}catch(e){return null;}})(), splash:(function(){try{var el=document.getElementById('sense-splash');return el?getComputedStyle(el).display:null;}catch(e){return null;}})(), bodyClass:(document.body&&document.body.className)||''}, timeline:timeline.slice(-80), oldStatus:typeof oldStatus==='function'?oldStatus():null};};
+      try{ Object.defineProperty(global,'FreshketSenseDebug',{value:dbg,writable:true,configurable:true}); }
+      catch(e){ try{ global.FreshketSenseDebug=dbg; }catch(e2){} }
+    }catch(e){ console.warn('[Sense v214e] debug patch failed',e); }
   }
   patchDebug(); paintGate();
-  log('BOOT','v214d installed',{authStorage:authStorage()});
+  log('BOOT','v214e installed',{authStorage:authStorage()});
 })(window);
 </script>
 
