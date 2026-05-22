@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 
+<!-- Freshket Sense v212c: Diagnostics + reliable foreground counter — exposes FreshketSenseDebug status/rows/network/version, readable build metadata, lexical/global data row detection, no extra reloads or business logic changes -->
 <!-- Freshket Sense v212b: PWA data panel + target input + overflow badge cleanup — sync Cloudflare panel count from actual foreground data, comma-format target inputs, hide redundant run-rate overflow badge; preserves v212a freshness unification and no commission/owner/movement formula change -->
 <!-- Freshket Sense v212a: PWA freshness unification — CSV + Supabase governance/commission refresh contract, PWA resume validation, Teamview mobile layout guard; no commission/owner/movement formula change -->
 <!-- Freshket Sense v212: Data Freshness & Loader Correctness patch — critical network-first portview/history/handover, cache fallback, PWA resume freshness validation, build version alignment; preserves v211c movement correctness and commission logic -->
@@ -3449,7 +3450,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v212b-pwa-freshness-ui-fix',
+      version: 'v212c-diagnostics-counter-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -29098,6 +29099,225 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
       // Do not mutate frozen v212a object; expose v212b separately.
     }
   }catch(e){}
+})(window);
+</script>
+
+
+<style id="freshket-v212c-diagnostics-css">
+/* v212c — diagnostic visibility only. No layout/business formula changes. */
+#sheets-loaded-count.sense-core-ready{background:rgba(38,96,200,.15)!important;color:rgba(38,96,200,.9)!important;}
+#sheets-loaded-count.sense-all-ready{background:rgba(0,208,112,.16)!important;color:var(--g700)!important;}
+#sheets-loaded-count.sense-partial{background:rgba(240,176,0,.16)!important;color:#9a6500!important;}
+</style>
+<script id="freshket-v212c-diagnostics-js">
+// v212c — Reliable diagnostics + foreground counter, with zero extra network/reload behavior.
+// Scope: debug/readability only. Does not change NRR, commission, owner, movement, loader policy, or SQL.
+(function(global){
+  'use strict';
+  var VERSION = 'v212c-diagnostics-counter-fix';
+  var DATA_EPOCH = '2026-05-22-v212c-diagnostics-counter-fix';
+  var FOREGROUND = ['portview','history','categories','sku_current','outlets','handover'];
+  var CORE = ['portview','history','handover'];
+
+  function now(){ return Date.now ? Date.now() : +new Date(); }
+  function safeClone(x){ try{return JSON.parse(JSON.stringify(x));}catch(e){return x;} }
+  function countObj(o){ try{return o && typeof o === 'object' ? Object.keys(o).length : 0;}catch(e){return 0;} }
+  function arrLen(a){ try{return Array.isArray(a) ? a.length : 0;}catch(e){return 0;} }
+  function readVar(name){
+    try{ if(Object.prototype.hasOwnProperty.call(global, name)) return global[name]; }catch(e){}
+    try{ return (0,eval)(name); }catch(e){}
+    try{ return eval(name); }catch(e){}
+    return undefined;
+  }
+  function readTabs(){
+    var t = readVar('_cloudLoadedTabs');
+    try{ return t && typeof t.has === 'function' ? t : null; }catch(e){ return null; }
+  }
+  function tabHas(k){ var t=readTabs(); try{return !!(t && t.has(k));}catch(e){return false;} }
+  function tabList(){ var t=readTabs(); try{return t ? Array.from(t) : [];}catch(e){return [];} }
+  function handoverCounts(){
+    var h = readVar('bulkHandoverData') || {};
+    return {
+      accounts: countObj(h.byAccountId),
+      kams: countObj(h.byKamName),
+      rawRows: arrLen(h.rows || h.rawRows || h.data)
+    };
+  }
+  function rows(){
+    var h = handoverCounts();
+    var out = {
+      portviewRows: arrLen(readVar('portviewBulkData')),
+      currentMonthAccounts: countObj(readVar('bulkCurrentMonthData')),
+      historyAccounts: countObj(readVar('bulkHistoryData')),
+      handoverAccounts: h.accounts,
+      handoverKams: h.kams,
+      handoverRawRows: h.rawRows,
+      categoriesAccounts: countObj(readVar('bulkCatsData')) || countObj(readVar('bulkCategoriesData')),
+      skuCurrentAccounts: countObj(readVar('bulkSkuCurrentData')),
+      outletsAccounts: countObj(readVar('bulkOutletsData')),
+      loadedTabs: tabList()
+    };
+    out.coreReady = !!(out.portviewRows > 0 && out.historyAccounts > 0 && (out.handoverAccounts > 0 || out.handoverKams > 0 || tabHas('handover')));
+    out.foregroundReadyCount = FOREGROUND.filter(function(k){ return loaded(k, out); }).length;
+    out.foregroundTotal = FOREGROUND.length;
+    return out;
+  }
+  function loaded(key, snapshot){
+    var r = snapshot || rows();
+    if(key === 'portview') return tabHas('portview') || r.portviewRows > 0;
+    if(key === 'history') return tabHas('history') || r.historyAccounts > 0;
+    if(key === 'categories') return tabHas('categories') || r.categoriesAccounts > 0;
+    if(key === 'sku_current') return tabHas('sku_current') || r.skuCurrentAccounts > 0;
+    if(key === 'outlets') return tabHas('outlets') || r.outletsAccounts > 0;
+    if(key === 'handover') return tabHas('handover') || r.handoverAccounts > 0 || r.handoverKams > 0 || r.handoverRawRows > 0;
+    return false;
+  }
+  function freshness(){
+    var v212 = null, v212a = null;
+    try{ v212 = global.FreshketSenseV212 && typeof global.FreshketSenseV212.getFreshness === 'function' ? global.FreshketSenseV212.getFreshness() : null; }catch(e){ v212 = {error:e&&e.message?e.message:String(e)}; }
+    try{ v212a = global.FreshketSenseV212a && typeof global.FreshketSenseV212a.getFreshness === 'function' ? global.FreshketSenseV212a.getFreshness() : null; }catch(e){ v212a = {error:e&&e.message?e.message:String(e)}; }
+    return {
+      csv: safeClone(global.FreshketSenseDataFreshness || (v212&&v212.csv) || (v212a&&v212a.csv) || {}),
+      governance: safeClone(global.FreshketSenseGovernanceFreshness || (v212&&v212.governance) || (v212a&&v212a.governance) || {}),
+      v212: safeClone(v212),
+      v212a: safeClone(v212a)
+    };
+  }
+  function version(){
+    var cfg = global.FreshketSenseConfig || global.FRESHKET_CONFIG || {};
+    var cfgVersion = null;
+    try{ cfgVersion = cfg.app && cfg.app.version; }catch(e){}
+    return {
+      build: VERSION,
+      dataEpoch: DATA_EPOCH,
+      configVersion: cfgVersion || null,
+      currentBuild: VERSION.replace(/^v(\d+[a-z]?).*$/i, 'v$1'),
+      objects: {
+        FreshketSenseDebug: !!global.FreshketSenseDebug,
+        FreshketSenseV212b: !!global.FreshketSenseV212b,
+        FreshketSenseV212a: !!global.FreshketSenseV212a,
+        FreshketSenseV212: !!global.FreshketSenseV212
+      },
+      url: String(location.href),
+      standalone: !!((global.matchMedia && global.matchMedia('(display-mode: standalone)').matches) || navigator.standalone)
+    };
+  }
+  function resourceRows(pattern){
+    var re = pattern instanceof RegExp ? pattern : /portview|bulk_|sense_|supabase|rest\/v1/i;
+    try{
+      return performance.getEntriesByType('resource')
+        .filter(function(r){ return re.test(r.name); })
+        .map(function(r){ return {
+          file: String(r.name).split('/').pop().split('?')[0],
+          url: r.name,
+          duration: Math.round(r.duration || 0),
+          sizeKB: Math.round((r.transferSize || 0) / 1024),
+          startMs: Math.round(r.startTime || 0),
+          initiator: r.initiatorType || ''
+        }; });
+    }catch(e){ return [{error:e&&e.message?e.message:String(e)}]; }
+  }
+  function network(){ return resourceRows(); }
+  function heavyNetwork(){ return resourceRows(/bulk_skus|bulk_alternatives|sense_skus|sense_alts|bulk_price/i); }
+  function status(){
+    var r = rows();
+    var f = freshness();
+    return {
+      version: version(),
+      rows: r,
+      freshness: f,
+      counter: syncCounter(),
+      networkSummary: {
+        matchingResources: network().length,
+        heavyResources: heavyNetwork().length
+      },
+      ts: now()
+    };
+  }
+  function chipId(key){
+    if(key === 'history') return 'sp-history';
+    if(key === 'categories') return 'sp-categories';
+    if(key === 'sku_current') return 'sp-sku_current';
+    if(key === 'outlets') return 'sp-outlets';
+    if(key === 'handover') return 'sp-handover';
+    return 'sp-' + key;
+  }
+  function paintChip(key, ok){
+    try{
+      var el = document.getElementById(chipId(key));
+      if(!el) return;
+      el.style.background = ok ? 'rgba(0,208,112,.18)' : 'rgba(0,0,0,.06)';
+      el.style.color = ok ? 'var(--g700)' : 'var(--n500)';
+      el.style.fontWeight = ok ? '800' : '600';
+      el.title = ok ? 'Loaded' : 'Not confirmed loaded';
+    }catch(e){}
+  }
+  function syncCounter(){
+    var r = rows();
+    var loadedKeys = FOREGROUND.filter(function(k){ return loaded(k, r); });
+    var coreKeys = CORE.filter(function(k){ return loaded(k, r); });
+    FOREGROUND.forEach(function(k){ paintChip(k, loadedKeys.indexOf(k) >= 0); });
+    var counter = document.getElementById('sheets-loaded-count');
+    var label;
+    if(loadedKeys.length >= FOREGROUND.length) label = loadedKeys.length + '/' + FOREGROUND.length;
+    else if(coreKeys.length >= CORE.length) label = 'Core 3/3';
+    else label = loadedKeys.length + '/' + FOREGROUND.length;
+    if(counter){
+      counter.style.display = 'inline-block';
+      counter.textContent = label;
+      counter.classList.remove('sense-core-ready','sense-all-ready','sense-partial');
+      counter.classList.add(loadedKeys.length >= FOREGROUND.length ? 'sense-all-ready' : (coreKeys.length >= CORE.length ? 'sense-core-ready' : 'sense-partial'));
+      counter.title = 'Foreground loaded: ' + loadedKeys.join(', ') + ' | Core: ' + coreKeys.join(', ');
+    }
+    return {label:label, loaded:loadedKeys.length, total:FOREGROUND.length, loadedKeys:loadedKeys, coreLoaded:coreKeys.length, coreTotal:CORE.length, coreKeys:coreKeys, rows:r};
+  }
+  function installWrappers(){
+    try{
+      var oldUpdate = global.updateDataStatus;
+      if(typeof oldUpdate === 'function' && !oldUpdate.__v212cWrapped){
+        var wrappedUpdate = function(){ var ret = oldUpdate.apply(this, arguments); setTimeout(syncCounter, 0); setTimeout(syncCounter, 300); return ret; };
+        wrappedUpdate.__v212cWrapped = true;
+        global.updateDataStatus = wrappedUpdate;
+        try{ updateDataStatus = wrappedUpdate; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldOpen = global.openDataPanel;
+      if(typeof oldOpen === 'function' && !oldOpen.__v212cWrapped){
+        var wrappedOpen = function(){ var ret = oldOpen.apply(this, arguments); setTimeout(syncCounter, 60); setTimeout(syncCounter, 700); setTimeout(syncCounter, 1800); return ret; };
+        wrappedOpen.__v212cWrapped = true;
+        global.openDataPanel = wrappedOpen;
+        try{ openDataPanel = wrappedOpen; }catch(e){}
+      }
+    }catch(e){}
+  }
+  function logLoaded(reason){
+    try{ console.log('[SenseDebug]', reason || 'status', status()); }catch(e){}
+  }
+
+  installWrappers();
+  try{ global.FRESHKET_CONFIG = global.FreshketSenseConfig || global.FRESHKET_CONFIG || {}; }catch(e){}
+  try{ global.FRESHKET_BUILD = VERSION; }catch(e){}
+  try{ global.currentBuild = function(){ return 'v212c'; }; }catch(e){}
+
+  var api = Object.freeze({
+    version: version,
+    rows: rows,
+    freshness: freshness,
+    network: network,
+    heavyNetwork: heavyNetwork,
+    status: status,
+    syncCounter: syncCounter,
+    log: logLoaded
+  });
+  global.FreshketSenseDebug = api;
+  global.FreshketSenseV212c = api;
+
+  [250, 1200, 3000, 7000, 14000].forEach(function(ms){ setTimeout(syncCounter, ms); });
+  try{ document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') setTimeout(syncCounter, 1200); }); }catch(e){}
+  try{ global.addEventListener('pageshow', function(){ setTimeout(syncCounter, 1200); }); }catch(e){}
+  try{ global.addEventListener('online', function(){ setTimeout(syncCounter, 600); }); }catch(e){}
+  try{ console.log('[SenseDebug] v212c installed', version()); }catch(e){}
 })(window);
 </script>
 
