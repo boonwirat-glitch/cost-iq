@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 
+<!-- Freshket Sense v213b: Auth-safe Guided UX cleanup — fixes v213a cold/no-session login overlay suppression; no data/NRR/commission formula changes -->
 <!-- Freshket Sense v213a: Guided UX cleanup | v213: Guided Intelligence UX — SKU default to price trend, Restaurant drill-down CTA + coach mark, premium commission reward states, PWA entry viewport reset, Olive FAB safe-zone clamp/snap; no data/commission/NRR/owner/movement logic change -->
 <!-- Freshket Sense v212c: Diagnostics + reliable foreground counter — exposes FreshketSenseDebug status/rows/network/version, readable build metadata, lexical/global data row detection, no extra reloads or business logic changes -->
 <!-- Freshket Sense v212b: PWA data panel + target input + overflow badge cleanup — sync Cloudflare panel count from actual foreground data, comma-format target inputs, hide redundant run-rate overflow badge; preserves v212a freshness unification and no commission/owner/movement formula change -->
@@ -29902,6 +29903,113 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   global.FreshketSenseV213a={version:VERSION, forcePriceTrend:forcePriceTrend, glintRestaurantAction:function(){glintShown=false;glintRestaurantAction();}, hideTopModeToggle:hideTopModeToggle};
 })(window);
+</script>
+
+
+
+<!-- Freshket Sense v213b: Auth-safe guided UX cleanup — fix v213a over-suppressed login overlay on cold/no-session load; keep guided UX cleanup, SKU price default, top-toggle removal, commission styling, and data freshness unchanged -->
+<script id="freshket-v213b-auth-safe-resume-js">
+// v213b — Auth-safe resume guard. v213a hid login too aggressively on cold/no-session load.
+(function(){
+  'use strict';
+  var global=window;
+  var VERSION='v213b-auth-safe-guided-ux';
+  var DATA_EPOCH='2026-05-22-v213b-auth-safe-guided-ux';
+  function $(id){return document.getElementById(id);} 
+  function log(){try{console.log.apply(console,['[Sense v213b]'].concat([].slice.call(arguments)));}catch(e){}}
+  function setBuild(){
+    try{ global.FRESHKET_BUILD='v213b'; }catch(e){}
+    try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
+    try{ global.currentBuild=function(){return 'v213b';}; }catch(e){}
+    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v213b',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true}};}; } }catch(e){}
+  }
+  function hideLoginUi(){
+    try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.style.opacity='0'; ov.classList.remove('lgi-checking'); } }catch(e){}
+    try{ var spl=$('sense-splash'); if(spl){ spl.style.display='none'; spl.style.opacity=''; } }catch(e){}
+  }
+  function showLoginNow(){
+    try{ if(typeof global.resetRuntimeSessionState==='function') global.resetRuntimeSessionState(); }catch(e){}
+    try{ global.currentUser=null; global.currentUserProfile=null; }catch(e){}
+    try{
+      var ov=$('login-overlay');
+      if(ov){ ov.classList.remove('lgi-checking'); ov.classList.remove('password-recovery'); ov.style.display='flex'; ov.style.opacity='1'; }
+    }catch(e){}
+    try{ var spl=$('sense-splash'); if(spl){ spl.style.display='none'; spl.style.opacity=''; spl.style.transition=''; } }catch(e){}
+    try{ var fab=$('aifab'); if(fab) fab.classList.add('v213a-hidden'); }catch(e){}
+  }
+  async function sessionExists(){
+    try{
+      if(global.currentUser) return {ok:true,user:global.currentUser,source:'memory'};
+      if(!global.supa||!global.supa.auth||typeof global.supa.auth.getSession!=='function') return {ok:false,source:'no-supa'};
+      var res=await global.supa.auth.getSession();
+      var session=res&&res.data&&res.data.session;
+      if(session&&session.user){ global.currentUser=session.user; return {ok:true,user:session.user,source:'supabase'}; }
+      return {ok:false,source:'supabase'};
+    }catch(e){ return {ok:null,source:'error',error:String(e&&e.message||e)}; }
+  }
+  function shouldDelayLogin(){
+    try{
+      if(global.__senseExplicitSignOut) return false;
+      if(global.currentUser) return true;
+      var t=global.__v213bLastResumeAt||global.__v213aLastResumeAt||0;
+      return !!t && Date.now()-t<3500;
+    }catch(e){return false;}
+  }
+  function installAuthSafeLogin(){
+    var previous=global._showLoginOverlayClean;
+    function authSafeShowLogin(){
+      var args=arguments;
+      if(global.__senseExplicitSignOut){ showLoginNow(); return; }
+      if(global.currentUser){ hideLoginUi(); return; }
+      if(shouldDelayLogin()){
+        hideLoginUi();
+        setTimeout(async function(){
+          var s=await sessionExists();
+          if(s.ok){ hideLoginUi(); try{ if(typeof global.loadUserProfile==='function'&&!global.currentUserProfile) global.loadUserProfile(); }catch(e){} }
+          else { showLoginNow(); }
+        },350);
+        return;
+      }
+      // Cold/no-session path: verify once, then show login if no session. Do NOT hide indefinitely.
+      setTimeout(async function(){
+        var s=await sessionExists();
+        if(s.ok){ hideLoginUi(); try{ if(typeof global.loadUserProfile==='function'&&!global.currentUserProfile) global.loadUserProfile(); }catch(e){} }
+        else { showLoginNow(); }
+      },0);
+    }
+    authSafeShowLogin.__v213bAuthSafe=true;
+    global._showLoginOverlayClean=authSafeShowLogin;
+    try{ _showLoginOverlayClean=authSafeShowLogin; }catch(e){}
+    // Keep a recovery handle for console/manual QA.
+    global.FreshketSenseAuthRecover={showLogin:showLoginNow,hideLogin:hideLoginUi,checkSession:sessionExists,previousShowLogin:previous};
+  }
+  function installResumeCorrection(){
+    async function correctAfterResume(){
+      global.__v213bLastResumeAt=Date.now();
+      var s=await sessionExists();
+      if(s.ok){ hideLoginUi(); }
+      else if(global.__senseExplicitSignOut){ showLoginNow(); }
+      // If no session but not explicit signout on resume, show login after a short grace — no sample app leak.
+      else { setTimeout(async function(){ var s2=await sessionExists(); if(s2.ok) hideLoginUi(); else showLoginNow(); },900); }
+    }
+    try{ document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') correctAfterResume(); },{passive:true}); }catch(e){}
+    try{ global.addEventListener('pageshow',function(){ correctAfterResume(); },{passive:true}); }catch(e){}
+    try{ global.addEventListener('focus',function(){ correctAfterResume(); },{passive:true}); }catch(e){}
+  }
+  function boot(){
+    setBuild();
+    installAuthSafeLogin();
+    installResumeCorrection();
+    // Initial correction: if v213a already hid login while unsigned out, restore it quickly.
+    setTimeout(async function(){
+      var s=await sessionExists();
+      if(s.ok) hideLoginUi(); else showLoginNow();
+    },700);
+    log('installed');
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
+  global.FreshketSenseV213b={version:VERSION,showLogin:showLoginNow,hideLogin:hideLoginUi,checkSession:sessionExists};
+})();
 </script>
 
 </body>
