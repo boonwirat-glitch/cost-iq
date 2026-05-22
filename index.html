@@ -30975,5 +30975,229 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 })(window);
 </script>
 
+
+<!-- Freshket Sense v214b: Session persistence + route/render stability hotfix. No business logic changes. -->
+<script id="freshket-v214b-session-route-stability-js">
+(function(global){
+  'use strict';
+  var VERSION='v214b_login_session_stability_hotfix';
+  var lastRoute={name:null,ts:0};
+  var pendingRoute=null;
+  var confirmingLoginShow=false;
+  function safe(fn,fb){try{return fn();}catch(e){return fb;}}
+  function now(){return Date.now();}
+  function gate(){return global.FreshketSenseV214Gate||null;}
+  function log(area,event,detail,level){
+    try{
+      if(gate()&&typeof gate().log==='function') gate().log(area,event,Object.assign({v214b:true},detail||{}),level);
+      else console[(level==='warn'?'warn':level==='error'?'error':'info')]('[Sense v214b]['+area+'] '+event,detail||{});
+    }catch(e){}
+  }
+  function assignGlobal(name,fn){try{global[name]=fn;}catch(e){} try{eval(name+'=fn');}catch(e){}}
+  function getFn(name){return safe(function(){return eval(name);},global[name]);}
+  function state(){return safe(function(){return global.FreshketSenseDebug&&global.FreshketSenseDebug.state?global.FreshketSenseDebug.state().state:null;},null);}
+  function hasCurrentUser(){return safe(function(){return !!currentUser;},false);}
+  function hasRecovery(){return safe(function(){return !!passwordRecoveryMode || (typeof _urlLooksLikePasswordRecovery==='function'&&_urlLooksLikePasswordRecovery());},false);}
+  function setSwNoAutoReload(reason){
+    try{sessionStorage.setItem('freshket_sw_controller_reloaded','v214b-disabled-'+String(now()));}catch(e){}
+    try{sessionStorage.setItem('freshket_sw_controller_reloaded_v206f','v214b-disabled-'+String(now()));}catch(e){}
+    try{global.__freshketSenseDisableControllerReload=true;}catch(e){}
+    log('PWA','controllerchange auto-reload disabled',{reason:reason||'stability'});
+  }
+  async function getSessionWithGrace(reason,graceMs){
+    if(hasRecovery())return {ok:true,recovery:true,session:null};
+    if(!global.supa||!global.supa.auth||typeof global.supa.auth.getSession!=='function')return {ok:hasCurrentUser(),session:null};
+    try{
+      var r=await global.supa.auth.getSession();
+      var s=r&&r.data&&r.data.session;
+      if(s&&s.user){try{currentUser=s.user;}catch(e){} return {ok:true,session:s,source:'first'};}
+      if(graceMs){await new Promise(function(resolve){setTimeout(resolve,graceMs);});}
+      var r2=await global.supa.auth.getSession();
+      var s2=r2&&r2.data&&r2.data.session;
+      if(s2&&s2.user){try{currentUser=s2.user;}catch(e){} return {ok:true,session:s2,source:'grace'};}
+      return {ok:false,session:null,source:'missing'};
+    }catch(e){
+      log('AUTH','session confirm failed - keep current UI',{reason:reason,error:String(e&&e.message||e)},'warn');
+      return {ok:hasCurrentUser(),session:null,source:'error'};
+    }
+  }
+  function authStorageStatus(){
+    var out={localStorageKeys:0,sessionStorageKeys:0,hasLikelySupabaseKey:false,keys:[]};
+    try{
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i)||'';
+        if(/^sb-|supabase/i.test(k)||k.indexOf('auth-token')>=0){out.localStorageKeys++;out.hasLikelySupabaseKey=true;out.keys.push(k.replace(/(auth-token|refresh-token|access-token).*/i,'$1…'));}
+      }
+    }catch(e){}
+    try{
+      for(var j=0;j<sessionStorage.length;j++){
+        var sk=sessionStorage.key(j)||'';
+        if(/^sb-|supabase/i.test(sk)||sk.indexOf('auth-token')>=0){out.sessionStorageKeys++;out.hasLikelySupabaseKey=true;}
+      }
+    }catch(e){}
+    return out;
+  }
+  function waitCriticalData(timeoutMs){
+    var p=safe(function(){return _cloudInitialPromise;},null);
+    if(p&&typeof p.then==='function'){
+      return Promise.race([p,new Promise(function(resolve){setTimeout(function(){resolve('__timeout__');},timeoutMs||3600);})]);
+    }
+    return Promise.resolve('__no_promise__');
+  }
+  function install(){
+    setSwNoAutoReload('install');
+
+    // Hotfix 1: SIGNED_OUT timers and legacy resume checks must verify Supabase twice before showing login.
+    var showBase=getFn('_showLoginOverlayClean');
+    if(typeof showBase==='function'&&!showBase.__v214bConfirmBeforeShow){
+      var original=showBase.__v214Old || showBase;
+      var wrappedShow=function v214bShowLoginOverlayClean(){
+        var args=arguments;
+        log('UI','show login requested - confirm first',{state:state(),hasCurrentUser:hasCurrentUser(),explicit:!!global.__senseExplicitSignOut,storage:authStorageStatus()});
+        if(hasRecovery()||global.__senseExplicitSignOut){return original.apply(this,args);}
+        if(hasCurrentUser()){
+          try{if(gate())gate().hideLogin('v214b-current-user-suppress-login');}catch(e){}
+          try{if(gate())gate().setState('APP_READY','v214b-current-user-suppress-login');}catch(e){}
+          return;
+        }
+        if(confirmingLoginShow){log('AUTH','login show confirmation deduped',{});return;}
+        confirmingLoginShow=true;
+        try{if(gate())gate().setState('AUTH_CHECKING','v214b-confirm-before-login');}catch(e){}
+        getSessionWithGrace('show-login-request',1800).then(function(res){
+          confirmingLoginShow=false;
+          if(res.ok&&res.session){
+            log('AUTH','transient signout suppressed',{source:res.source,storage:authStorageStatus()});
+            try{
+              if(typeof loadUserProfile==='function'){
+                Promise.resolve(loadUserProfile()).finally(function(){
+                  try{if(typeof hideLoginOverlay==='function')hideLoginOverlay();}catch(e){}
+                });
+              }else if(gate())gate().hideLogin('v214b-session-restored');
+            }catch(e){try{if(gate())gate().hideLogin('v214b-session-restored-no-profile');}catch(_){} }
+            return;
+          }
+          log('AUTH','confirmed no session - show login',{source:res.source,storage:authStorageStatus()},'warn');
+          return original.apply(null,args);
+        }).catch(function(e){
+          confirmingLoginShow=false;
+          log('AUTH','confirm-before-login failed - do not disrupt',{error:String(e&&e.message||e)},'warn');
+        });
+      };
+      wrappedShow.__v214bConfirmBeforeShow=true;
+      wrappedShow.__v214bBase=original;
+      assignGlobal('_showLoginOverlayClean',wrappedShow);
+    }
+
+    // Hotfix 2: make legacy PWA silent checker non-destructive; it must not clear users/show login on transient null session.
+    var pwaBase=getFn('_pwaSilentSessionCheck');
+    if(typeof pwaBase==='function'&&!pwaBase.__v214bNonDestructive){
+      var wrappedPwa=function v214bPwaSilentSessionCheck(reason,graceMs){
+        log('RESUME','legacy pwa check intercepted',{reason:reason,graceMs:graceMs});
+        return getSessionWithGrace('legacy-pwa:'+reason, Math.max(graceMs||0,2200)).then(function(res){
+          if(res.ok){
+            try{if(gate())gate().hideLogin('v214b-pwa-session-alive');}catch(e){}
+            try{if(gate())gate().setState('APP_READY','v214b-pwa-session-alive');}catch(e){}
+            return true;
+          }
+          log('AUTH','pwa confirmed no session - login allowed',{reason:reason,storage:authStorageStatus()},'warn');
+          try{currentUser=null;currentUserProfile=null;}catch(e){}
+          var sh=getFn('_showLoginOverlayClean');
+          if(typeof sh==='function')sh();
+          return false;
+        });
+      };
+      wrappedPwa.__v214bNonDestructive=true;
+      assignGlobal('_pwaSilentSessionCheck',wrappedPwa);
+    }
+
+    // Hotfix 3: delay auto-route until critical data is ready, so Teamview/commission does not flash through partial states.
+    var ar=getFn('_autoRouteAfterLogin');
+    if(typeof ar==='function'&&!ar.__v214bDelayedRoute){
+      var arBase=ar.__v214Old || ar;
+      var arWrapped=function v214bAutoRouteAfterLogin(){
+        var ctx=this,args=arguments;
+        try{if(gate())gate().setState('DATA_LOADING','v214b-delay-auto-route');}catch(e){}
+        log('ROUTE','auto-route delayed until critical data',{role:safe(function(){return typeof getCurrentRole==='function'?getCurrentRole():null;},null)});
+        waitCriticalData(4200).then(function(result){
+          log('DATA','critical gate for route resolved',{result:result==='__timeout__'?'timeout':result});
+          var ret=arBase.apply(ctx,args);
+          setTimeout(function(){try{if(gate())gate().releaseApp('v214b-route-after-critical');}catch(e){}},80);
+          return ret;
+        }).catch(function(e){
+          log('ROUTE','delayed auto-route failed; fallback release',{error:String(e&&e.message||e)},'warn');
+          try{arBase.apply(ctx,args);}catch(_){}
+          try{if(gate())gate().releaseApp('v214b-route-fallback');}catch(_){}
+        });
+      };
+      arWrapped.__v214bDelayedRoute=true;
+      arWrapped.__v214Old=arBase;
+      assignGlobal('_autoRouteAfterLogin',arWrapped);
+    }
+
+    // Hotfix 4: suppress duplicate same-screen route storms and block app routes while auth/login is not ready.
+    var ss=getFn('showScreen');
+    if(typeof ss==='function'&&!ss.__v214bRouteGuard){
+      var ssBase=ss.__v214Old || ss;
+      var ssWrapped=function v214bShowScreen(name){
+        var st=state();
+        var authed=hasCurrentUser();
+        if(!authed || st==='LOGIN_REQUIRED' || st==='AUTH_EXPIRED' || st==='AUTH_CHECKING' || st==='PROFILE_LOADING'){
+          pendingRoute=name;
+          log('ROUTE','showScreen blocked until app ready',{target:name,state:st,authed:authed});
+          return;
+        }
+        var t=now();
+        if(lastRoute.name===name && t-lastRoute.ts<900){
+          log('DEDUP','duplicate showScreen skipped',{target:name,deltaMs:t-lastRoute.ts});
+          return;
+        }
+        lastRoute={name:name,ts:t};
+        return ssBase.apply(this,arguments);
+      };
+      ssWrapped.__v214bRouteGuard=true;
+      ssWrapped.__v214Old=ssBase;
+      assignGlobal('showScreen',ssWrapped);
+    }
+
+    // Hotfix 5: when gate releases, apply any blocked route once, after the app is actually ready.
+    if(gate()&&typeof gate().releaseApp==='function'&&!gate().releaseApp.__v214bPendingRoute){
+      var oldRelease=gate().releaseApp;
+      gate().releaseApp=function v214bReleaseApp(reason){
+        var r=oldRelease.apply(this,arguments);
+        if(pendingRoute&&hasCurrentUser()){
+          var target=pendingRoute; pendingRoute=null;
+          setTimeout(function(){
+            try{
+              var fn=getFn('showScreen');
+              log('ROUTE','applying pending route after release',{target:target,reason:reason});
+              if(typeof fn==='function')fn(target);
+            }catch(e){log('ROUTE','pending route failed',{error:String(e&&e.message||e)},'warn');}
+          },90);
+        }
+        return r;
+      };
+      gate().releaseApp.__v214bPendingRoute=true;
+    }
+
+    // Extend debug without leaking token values.
+    try{
+      var dbg=global.FreshketSenseDebug||{};
+      var oldVersion=dbg.version;
+      dbg.version=function(){var base={};try{base=typeof oldVersion==='function'?oldVersion():{};}catch(e){} base.build=VERSION;base.currentBuild='v214b';base.loginLoadingStability=true;base.sessionRouteHotfix=true;base.objects=Object.assign({},base.objects||{},{v214b:true});return base;};
+      dbg.authStorage=authStorageStatus;
+      var oldDump=dbg.dump;
+      dbg.dump=function(){var d={};try{d=typeof oldDump==='function'?oldDump():{};}catch(e){} d.version=VERSION;d.authStorage=authStorageStatus();d.routeGuard={lastRoute:lastRoute,pendingRoute:pendingRoute};d.autoReloadDisabled=true;return d;};
+      global.FreshketSenseDebug=dbg;
+    }catch(e){}
+    log('PATCH','v214b installed',{version:VERSION,storage:authStorageStatus()});
+  }
+  function installLater(){try{install();}catch(e){try{console.warn('[Sense v214b][PATCH] install failed',e&&e.message?e.message:e);}catch(_){}}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(installLater,20);},{once:true});
+  else setTimeout(installLater,20);
+  setTimeout(installLater,600); // re-assert after legacy/finalizer wrappers
+  global.FreshketSenseV214b={version:VERSION,install:install,setSwNoAutoReload:setSwNoAutoReload,authStorageStatus:authStorageStatus};
+})(window);
+</script>
+
 </body>
 </html>
