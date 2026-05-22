@@ -30181,7 +30181,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 </script>
 
 
-<!-- Freshket Sense v213d: Teamview PWA rail/alignment cleanup — single content rail, contained Team Insight, mobile commission card cleanup, hide redundant target label; UI-only no data/logic change -->
+<!-- Freshket Sense v213e: Teamview PWA full-rail alignment — single content rail, contained Team Insight, mobile commission card cleanup, hide redundant target label; UI-only no data/logic change -->
 <style id="freshket-v213d-teamview-rail-cleanup-css">
 /* v213d — Final PWA Teamview rail cleanup. Scope: CSS/runtime layout only. No data/NRR/commission formula changes. */
 @media (max-width: 430px){
@@ -30416,6 +30416,95 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   try{global.addEventListener('pageshow',function(){setTimeout(apply,180);},{passive:true});}catch(e){}
   global.FreshketSenseV213d={version:VERSION,dataEpoch:DATA_EPOCH,apply:apply};
   setTimeout(function(){apply();log('installed');},300);
+})(window);
+</script>
+
+
+<!-- Freshket Sense v213e: Teamview PWA full-rail alignment — expand pace/metrics/insight to same rail as KAM cards; UI-only no data/logic change -->
+<style id="freshket-v213e-teamview-full-rail-align-css">
+/* v213e — PWA Teamview full rail alignment. v213d over-inset the top metrics by adding an extra inner rail. */
+@media (max-width: 430px){
+  body.v213e-teamview-active #scr-teamview{
+    overflow-x:hidden!important;
+  }
+
+  /* The portview header already provides the page rail on PWA.
+     Do NOT add another inner margin to pace/metrics/insight; it makes the top zone narrower than KAM cards. */
+  body.v213e-teamview-active #tv-pace-bar,
+  body.v213e-teamview-active #tv-summary-row,
+  body.v213e-teamview-active #tv-ai-btn{
+    width:100%!important;
+    max-width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+  }
+
+  body.v213e-teamview-active #tv-collapsible{
+    width:100%!important;
+    max-width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Keep the KAM list on the same visual rail as the top zone. */
+  body.v213e-teamview-active #teamview-content{
+    padding-left:0!important;
+    padding-right:0!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Match the top action/title rail to the same container. */
+  body.v213e-teamview-active #scr-teamview .portview-title-row,
+  body.v213e-teamview-active #scr-teamview .portview-back-wrap{
+    width:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Give the pace row enough room without creating right-side phantom gutter. */
+  body.v213e-teamview-active #tv-pace-bar > div:first-child{
+    width:100%!important;
+  }
+  body.v213e-teamview-active #tv-pace-bar > div:first-child > div:last-child{
+    min-width:0!important;
+    max-width:48%!important;
+  }
+
+  /* Cards should fill the rail, not create their own inset. */
+  body.v213e-teamview-active #tv-summary-row.portview-summary-row{
+    width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
+  }
+
+  body.v213e-teamview-active #tv-ai-btn{
+    width:100%!important;
+  }
+}
+</style>
+<script id="freshket-v213e-teamview-full-rail-align-js">
+// v213e — Teamview PWA full-rail align. UI only; no data/NRR/commission formula change.
+(function(global){
+  'use strict';
+  var VERSION='v213e-teamview-full-rail-align';
+  var DATA_EPOCH='2026-05-22-v213e-teamview-full-rail-align';
+  function isTeam(){try{return !!document.getElementById('scr-teamview')?.classList.contains('on');}catch(e){return false;}}
+  function apply(){try{document.body.classList.toggle('v213e-teamview-active',isTeam());}catch(e){}}
+  function setVersion(){
+    try{global.FRESHKET_BUILD='v213e';}catch(e){}
+    try{if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION;}catch(e){}
+    try{global.currentBuild=function(){return 'v213e';};}catch(e){}
+    try{if(global.FreshketSenseDebug){var old=global.FreshketSenseDebug.version;global.FreshketSenseDebug.version=function(){var base={};try{base=typeof old==='function'?old():{};}catch(e){} base.build=VERSION;base.dataEpoch=DATA_EPOCH;base.configVersion=VERSION;base.currentBuild='v213e';base.objects=Object.assign({},base.objects||{},{v213e:true});return base;};}}catch(e){}
+  }
+  function wrap(){['renderTeamview','renderTeamviewSummary','renderTeamviewKamList','showScreen','setTvView'].forEach(function(name){try{var old=global[name];if(typeof old==='function'&&!old.__v213eRail){var w=function(){var r=old.apply(this,arguments);setTimeout(apply,0);setTimeout(apply,80);setTimeout(apply,260);return r;};w.__v213eRail=true;global[name]=w;try{eval(name+'=w');}catch(e){} }}catch(e){}});}
+  setVersion(); wrap();
+  try{document.addEventListener('DOMContentLoaded',function(){setTimeout(apply,120);});}catch(e){}
+  try{global.addEventListener('resize',function(){setTimeout(apply,80);},{passive:true});}catch(e){}
+  try{global.addEventListener('pageshow',function(){setTimeout(apply,180);},{passive:true});}catch(e){}
+  global.FreshketSenseV213e={version:VERSION,dataEpoch:DATA_EPOCH,apply:apply};
+  setTimeout(function(){apply();try{console.log('[Sense v213e] installed');}catch(e){}},300);
 })(window);
 </script>
 
