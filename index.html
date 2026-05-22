@@ -1,3 +1,22 @@
+<!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
+     Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
+           files are ready — not once per file callback. Eliminates 4-6 visible flashes on
+           BOTH cold boot AND bfcache resume reload.
+     Architecture change (data-gate pattern):
+       allCriticalReady() = _cloudLoadedTabs has all 6 FOREGROUND files:
+         portview, history, categories, sku_current, outlets, handover
+       refreshAll() blocks (queues _pendingRefreshAll) until allCriticalReady() = true.
+       _fetchCloudflareFile: when last FOREGROUND file arrives → signal _splashDataReady
+         + flush _pendingRefreshAll. Single consolidated render at end of load cycle.
+       _splashDataReady ownership moved from 3 file callbacks → _fetchCloudflareFile.
+       v212a validateUnifiedFreshness: clears _cloudLoadedTabs before force-reload so
+         data-gate also blocks refreshAll during bfcache resume reload.
+     Other fixes:
+       ciq_index localStorage: purge stale sample_ entries on init (fixes [ตัวอย่าง] in list).
+       MAX_SHOW: cold 5000→8000ms, warm boot 500→3000ms (6 files need more headroom).
+     PRESERVED: all of v215-v217 (auth/resume owner cleanup, trust pass, smooth resume),
+                commission, NRR, role logic, data loader, Olive, all UI fixes.
+     Rollback: revert to sense_v217_smooth_resume.html. -->
 <!-- Freshket Sense v217 SMOOTH RESUME — Phase 3 surgical patch on v216 baseline.
      Goal: eliminate remaining flash-รัวๆ after splash + make iOS cold boot feel like resume.
      Edits (6 jobs):
@@ -7084,11 +7103,9 @@ function showSenseSplash(onDone){
   const _lastReady=Number((function(){try{return localStorage.getItem('sense_last_critical_ready');}catch(e){return 0;}})());
   const _isWarmBoot=_lastReady>0 && (Date.now()-_lastReady)<30*60*1000;
   const MIN_SHOW=_cacheWarm ? 0 : (_isWarmBoot ? 0 : 1650);
-  // v216 FIX 2C-Light: cold MAX_SHOW extended from 2000ms → 5000ms.
-  // Reason: splash now waits for portview + history + handover (3 critical files).
-  //         If one is slow, the old 2000ms force-fade caused user to see splash → partial render → re-render flashes.
-  //         5000ms gives enough headroom for typical R2 cold load while preserving a sane fallback if a file fails.
-  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 500 : 5000);
+  // v218: cold MAX_SHOW 5000→8000ms — splash now waits for ALL 6 FOREGROUND files (was 3).
+  //       warm boot MAX_SHOW 500→3000ms — IndexedDB usually fast but one miss falls back to network (~1-2s).
+  const MAX_SHOW=_cacheWarm ? 400 : (_isWarmBoot ? 3000 : 8000);
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -7159,9 +7176,9 @@ function showSenseSplash(onDone){
         splash.style.display='none';
         splash.style.opacity='';splash.style.transition='';
         if(bar){bar.style.transition='none';bar.style.width='0';}
-        // v217 FIX B: release guard — splash is fully gone, fire one consolidated render.
+        // v217 FIX B + v218: release splash guard; fire pending render only if data also ready.
         window._senseSplashActive=false;
-        if(window._pendingRefreshAll){
+        if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
           try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         }
@@ -8851,10 +8868,10 @@ function handleFileUpload(type,input){
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
       if(typeof window._splashProgress==='function')
         window._splashProgress(80,'คำนวณ baseline 3 เดือน...');
-      // v216 FIX 2C-Light: also require handover ready before splash fade — prevents
-      // handover-arrival flash on Team View (the "ทำการบ้าน X/Y" badges per KAM card).
+      // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
+      // Old 3-file check removed — was causing early splash fade before categories/sku_current/outlets loaded.
       if(portviewBulkData&&portviewBulkData.length>0 && bulkHandoverData && Object.keys(bulkHandoverData.byAccountId||{}).length>0){
-        if(typeof window._splashDataReady==='function')window._splashDataReady();
+        // intentionally no-op — _fetchCloudflareFile owns _splashDataReady signal
       }
       _done();
     };reader.readAsText(file);return;
@@ -8896,11 +8913,10 @@ function handleFileUpload(type,input){
       // ── Smart Splash: drive progress bar (portview = 45%) ──────────────
       if(typeof window._splashProgress==='function')
         window._splashProgress(45,'คำนวณ baseline 3 เดือน...');
-      // ── v216 FIX 2C-Light: signal splash-ready only when ALL 3 critical files loaded ──
-      // (was: just history check) — splash now holds until handover also arrives to prevent
-      // post-fade re-render flash from handover badges updating in Team View.
+      // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
+      // Old 3-file check removed — was causing early splash fade before categories/sku_current loaded.
       if(Object.keys(bulkHistoryData).length>0 && bulkHandoverData && Object.keys(bulkHandoverData.byAccountId||{}).length>0){
-        if(typeof window._splashDataReady==='function')window._splashDataReady();
+        // intentionally no-op — _fetchCloudflareFile owns _splashDataReady signal
       }
       // ── Render: only if portview screen is active AND splash already gone ──
       // Smart splash covers loading; render fires from foreground completion
@@ -9014,11 +9030,11 @@ function handleFileUpload(type,input){
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
-      // v216 FIX 2C-Light: signal splash-ready when handover is loaded AND portview+history both ready.
-      // Splash holds until ALL 3 critical team-view files loaded → no flash after fade.
+      // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
+      // Old 3-file check removed — was causing early splash fade before categories/sku_current/outlets loaded.
       try{
         if(portviewBulkData && portviewBulkData.length>0 && Object.keys(bulkHistoryData).length>0){
-          if(typeof window._splashDataReady==='function') window._splashDataReady();
+          // intentionally no-op — _fetchCloudflareFile owns _splashDataReady signal
         }
       }catch(e){}
       // toast removed v205b — bulk ingest noise
@@ -9235,6 +9251,20 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         if(tab==='skus')bulkSkusReady=true;
         if(tab==='alternatives')bulkAltsReady=true;
         if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
+        // v218 DATA GATE: when the last FOREGROUND file completes, fire ONE consolidated render.
+        // This is the single flush point for both initial load and bfcache resume reload.
+        try{
+          var _fg=['portview','history','categories','sku_current','outlets','handover'];
+          if(_fg.every(function(k){return _cloudLoadedTabs.has(k);})){
+            // Signal splash to start fading (all critical data ready)
+            if(typeof window._splashDataReady==='function') window._splashDataReady();
+            // Flush queued render (fires after current call stack clears)
+            if(window._pendingRefreshAll){
+              window._pendingRefreshAll=false;
+              setTimeout(function(){if(typeof refreshAll==='function')refreshAll();},30);
+            }
+          }
+        }catch(e){}
       }else{
         if(dot){dot.style.background='rgba(240,80,0,.12)';dot.style.color='var(--org)';}
       }
@@ -9712,11 +9742,24 @@ function updateDataStatus(){
 // ════════════════════════════════════════
 // RENDER — OVERVIEW
 // ════════════════════════════════════════
+// v218 DATA GATE: checks if all 6 FOREGROUND critical files are loaded.
+// Used by refreshAll() to prevent partial renders during initial load AND resume reloads.
+// FOREGROUND = ['portview','history','categories','sku_current','outlets','handover']
+function allCriticalReady(){
+  try{
+    var fg=['portview','history','categories','sku_current','outlets','handover'];
+    return fg.every(function(k){return _cloudLoadedTabs.has(k);});
+  }catch(e){return false;}
+}
+
 function refreshAll(){
-  // v217 FIX B: if splash is active, queue one pending render instead of running now.
-  // Prevents 4-flash pattern from sequential R2 file load callbacks each calling refreshAll
-  // while splash is covering the screen. doFade releases the guard and fires one final render.
+  // v217 FIX B: splash guard (belt-and-suspenders — data gate below is the primary guard now)
   if(window._senseSplashActive){ window._pendingRefreshAll=true; return; }
+  // v218 DATA GATE: block render until ALL 6 FOREGROUND files loaded.
+  // Replaces the 4-6 partial renders (one per file callback) with ONE render at the end.
+  // Works for BOTH initial load (splash covers the wait) AND bfcache resume reloads (old
+  // DOM stays visible while files reload silently, then ONE update when all ready).
+  if(!allCriticalReady()){ window._pendingRefreshAll=true; return; }
   renderOverview();renderPortfolio();renderOpps();renderReport();
   activeMonth=D.history.length-1;selectMonth(activeMonth,true);
   // Update sub-tab visibility
@@ -20850,6 +20893,22 @@ function initOliveAvatar(){
     const ldb=document.getElementById('local-dev-btn');
     if(ldb)ldb.style.display='block';
   }
+  // v218 FIX: purge stale sample_ entries from ciq_index localStorage left over from
+  // pre-v216 sessions when useSampleData() was allowed to run and called saveToStorage().
+  // These caused "[ตัวอย่าง] บ.ลีฟ ทู อีท จำกัด" to appear in the account list.
+  try{
+    var _raw=localStorage.getItem('ciq_index');
+    if(_raw){
+      var _parsed=JSON.parse(_raw);
+      if(Array.isArray(_parsed)){
+        var _clean=_parsed.filter(function(a){return a&&a.id&&!/^sample_/.test(a.id);});
+        if(_clean.length!==_parsed.length){
+          localStorage.setItem('ciq_index',JSON.stringify(_clean));
+          console.info('[Sense v218] purged',_parsed.length-_clean.length,'sample_ entries from ciq_index');
+        }
+      }
+    }
+  }catch(e){}
   // Do not prefetch bulk data before auth; mobile Safari can crash on large CSV parsing.
   // Check Supabase session first (shows/hides login overlay)
   checkSession().catch(()=>{});
@@ -28971,6 +29030,12 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
         }
         var csvOk = true;
         if(typeof ensureCloudflareFiles === 'function'){
+          // v218 DATA GATE: clear loaded tabs before force-reload so refreshAll() stays blocked
+          // (allCriticalReady()=false) during the entire reload window. When the last file
+          // completes, _fetchCloudflareFile's gate flushes _pendingRefreshAll → ONE render.
+          // Without this, _cloudLoadedTabs has stale entries → allCriticalReady()=true → each
+          // file completion fires refreshAll() → 6 flashes visible during resume reload.
+          try{ if(window._cloudLoadedTabs && typeof window._cloudLoadedTabs.clear==='function') window._cloudLoadedTabs.clear(); }catch(e){}
           csvOk = await ensureCloudflareFiles(CRITICAL, { label:'ตรวจข้อมูลล่าสุด', force:true });
         }
         var govOk = await forceGovernanceReload(reason||'resume', {force:true, silent:true, minGap:0});
@@ -30073,15 +30138,15 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 (function(){
   'use strict';
   var global=window;
-  var VERSION='v217-smooth-resume';
-  var DATA_EPOCH='2026-05-22-v217-smooth-resume';
+  var VERSION='v218-data-gate';
+  var DATA_EPOCH='2026-05-22-v218-data-gate';
   function $(id){return document.getElementById(id);} 
-  function log(){try{console.log.apply(console,['[Sense v217]'].concat([].slice.call(arguments)));}catch(e){}}
+  function log(){try{console.log.apply(console,['[Sense v218]'].concat([].slice.call(arguments)));}catch(e){}}
   function setBuild(){
-    try{ global.FRESHKET_BUILD='v217'; }catch(e){}
+    try{ global.FRESHKET_BUILD='v218'; }catch(e){}
     try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
-    try{ global.currentBuild=function(){return 'v217';}; }catch(e){}
-    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v217',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true,v216:true,v217:true}};}; } }catch(e){}
+    try{ global.currentBuild=function(){return 'v218';}; }catch(e){}
+    try{ if(global.FreshketSenseDebug){ global.FreshketSenseDebug.version=function(){return {build:VERSION,dataEpoch:DATA_EPOCH,configVersion:(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||null,currentBuild:'v218',objects:{v212:!!global.FreshketSenseV212,v212a:!!global.FreshketSenseV212a,v212b:!!global.FreshketSenseV212b,v212c:!!global.FreshketSenseDebug,v213:!!global.FreshketSenseV213,v213a:!!global.FreshketSenseV213a,v213b:true,v215:true,v216:true,v217:true,v218:true}};}; } }catch(e){}
   }
   function hideLoginUi(){
     try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.style.opacity='0'; ov.classList.remove('lgi-checking'); } }catch(e){}
