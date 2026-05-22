@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- Freshket Sense v213: Guided Intelligence UX — SKU default to price trend, Restaurant drill-down CTA + coach mark, premium commission reward states, PWA entry viewport reset, Olive FAB safe-zone clamp/snap; no data/commission/NRR/owner/movement logic change -->
+<!-- Freshket Sense v213a: Guided UX cleanup | v213: Guided Intelligence UX — SKU default to price trend, Restaurant drill-down CTA + coach mark, premium commission reward states, PWA entry viewport reset, Olive FAB safe-zone clamp/snap; no data/commission/NRR/owner/movement logic change -->
 <!-- Freshket Sense v212c: Diagnostics + reliable foreground counter — exposes FreshketSenseDebug status/rows/network/version, readable build metadata, lexical/global data row detection, no extra reloads or business logic changes -->
 <!-- Freshket Sense v212b: PWA data panel + target input + overflow badge cleanup — sync Cloudflare panel count from actual foreground data, comma-format target inputs, hide redundant run-rate overflow badge; preserves v212a freshness unification and no commission/owner/movement formula change -->
 <!-- Freshket Sense v212a: PWA freshness unification — CSV + Supabase governance/commission refresh contract, PWA resume validation, Teamview mobile layout guard; no commission/owner/movement formula change -->
@@ -29631,6 +29631,276 @@ html.v213-app-entry-reset,html.v213-app-entry-reset body{overscroll-behavior:non
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   global.FreshketSenseV213={version:VERSION, applyCommissionClasses:applyCommissionClasses, clampAssistantFab:function(){return global.FreshketSenseV213_clampAssistantFab&&global.FreshketSenseV213_clampAssistantFab(true,true);}, resetAssistantFab:function(){return global.FreshketSenseV213_resetAssistantFab&&global.FreshketSenseV213_resetAssistantFab();}};
+})(window);
+</script>
+
+
+
+<!-- Freshket Sense v213a: Guided UX cleanup — remove intrusive coach mark, hide top mode toggle, restore ร้าน label alignment, force SKU price default on every sheet entry, add subtle price trend motion, suppress PWA resume login flash, and harden Olive FAB opt-out/safe reset; no data/NRR/commission formula changes -->
+<style id="freshket-v213a-guided-ux-cleanup-css">
+/* v213a — cleanup after field test. Keep the useful affordance, remove intrusive floating helper. */
+#v213-drill-coach{display:none!important;opacity:0!important;pointer-events:none!important;visibility:hidden!important;}
+body.kam-mode #mode-toggle-wrap,
+#mode-toggle-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+
+/* Restaurant drill CTA: use original wording, align with the rest of the icon bar, signal with 1-2 calm glints only. */
+body.kam-mode #nav-restaurant{position:relative;}
+body.kam-mode #nav-restaurant .lb{line-height:1.15!important;margin-top:2px!important;text-align:center!important;white-space:nowrap!important;}
+body.kam-mode #nav-restaurant .nwrap{position:relative;border-radius:16px;overflow:visible;}
+body.kam-mode #nav-restaurant .nwrap:before{display:none!important;animation:none!important;}
+body.kam-mode #nav-restaurant.v213a-drill-glint .nwrap:after{
+  content:'';position:absolute;inset:-7px;border-radius:20px;pointer-events:none;
+  background:linear-gradient(105deg,transparent 10%,rgba(255,255,255,.42) 45%,rgba(120,210,255,.28) 52%,transparent 78%);
+  transform:translateX(-115%) rotate(8deg);
+  animation:v213a-nav-glint 1.05s ease-out 0s 2 both;
+  filter:blur(.2px);
+}
+@keyframes v213a-nav-glint{0%{opacity:0;transform:translateX(-120%) rotate(8deg)}18%{opacity:.85}72%{opacity:.55}100%{opacity:0;transform:translateX(120%) rotate(8deg)}}
+
+/* Price trend default: make the movement visible but premium, not noisy. */
+.sku-view-toggle.v213a-price-default #svt-price.on{position:relative;overflow:hidden;}
+.sku-view-toggle.v213a-price-default #svt-price.on:after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.28) 42%,rgba(0,208,112,.22) 54%,transparent 78%);
+  transform:translateX(-120%);
+  animation:v213a-price-sheen 1.25s ease .18s 1 both;
+}
+@keyframes v213a-price-sheen{0%{opacity:0;transform:translateX(-120%)}20%{opacity:.9}100%{opacity:0;transform:translateX(120%)}}
+#skulist.v213a-price-list-pulse .sparkline{animation:v213a-sparkline-rise .7s ease-out 1 both;}
+@keyframes v213a-sparkline-rise{from{opacity:.35;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+
+/* Olive bubble: no startup-floating before the app is ready; allow full opt-out if position gets weird. */
+body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!important;}
+#aifab.v213a-hidden{display:none!important;}
+</style>
+<script id="freshket-v213a-guided-ux-cleanup-js">
+// v213a — Field-test cleanup for Guided Intelligence UX.
+// Scope: UX only. No loader, SQL, NRR, commission formula, owner or movement logic changes.
+(function(global){
+  'use strict';
+  var VERSION='v213a-guided-ux-cleanup';
+  var DATA_EPOCH='2026-05-22-v213a-guided-ux-cleanup';
+  function $(id){return document.getElementById(id);} 
+  function log(){try{console.log.apply(console,['[Sense v213a]'].concat([].slice.call(arguments)));}catch(e){}}
+
+  function setBuild(){
+    global.FRESHKET_BUILD='v213a';
+    try{ if(global.FreshketSenseConfig&&global.FreshketSenseConfig.app) global.FreshketSenseConfig.app.version=VERSION; }catch(e){}
+    try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
+    global.currentBuild=function(){return 'v213a';};
+  }
+
+  function removeIntrusiveCoach(){
+    try{ localStorage.setItem('sense_hint_restaurant_drill_seen','1'); }catch(e){}
+    try{ var el=$('v213-drill-coach'); if(el) el.remove(); }catch(e){}
+    try{ var nav=$('nav-restaurant'); if(nav) nav.classList.remove('v213-coach-pulse'); }catch(e){}
+  }
+
+  function hideTopModeToggle(){
+    try{ var w=$('mode-toggle-wrap'); if(w){ w.style.display='none'; w.setAttribute('aria-hidden','true'); } }catch(e){}
+  }
+
+  function restoreRestaurantLabel(){
+    try{
+      var lab=$('nav-restaurant-label'); if(lab) lab.textContent='ร้าน';
+      var nav=$('nav-restaurant');
+      if(nav){ nav.setAttribute('aria-label','เปิดรายละเอียดร้านใน account นี้'); nav.title='เปิดรายละเอียดร้านใน account นี้'; }
+    }catch(e){}
+  }
+
+  var glintShown=false;
+  function glintRestaurantAction(){
+    if(glintShown) return;
+    try{
+      if(!document.body.classList.contains('kam-mode')) return;
+      if(document.body.classList.contains('restaurant-sheet')) return;
+      var nav=$('nav-restaurant'); if(!nav||!nav.getClientRects().length) return;
+      glintShown=true;
+      nav.classList.add('v213a-drill-glint');
+      setTimeout(function(){try{nav.classList.remove('v213a-drill-glint');}catch(e){}},2400);
+    }catch(e){}
+  }
+
+  function installRestaurantCleanup(){
+    function run(){ removeIntrusiveCoach(); hideTopModeToggle(); restoreRestaurantLabel(); setTimeout(glintRestaurantAction,600); }
+    run();
+    [500,1500,3500].forEach(function(ms){setTimeout(run,ms);});
+    try{
+      var oldShow=global.showScreen;
+      if(typeof oldShow==='function'&&!oldShow.__v213aRestaurantCleanup){
+        var wrapped=function(){ var ret=oldShow.apply(this,arguments); setTimeout(run,120); return ret; };
+        wrapped.__v213aRestaurantCleanup=true; global.showScreen=wrapped; try{showScreen=wrapped;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldToggle=global.toggleRestaurantSheet;
+      if(typeof oldToggle==='function'&&!oldToggle.__v213aRestaurantCleanup){
+        var wrappedToggle=function(){ removeIntrusiveCoach(); var ret=oldToggle.apply(this,arguments); setTimeout(function(){ hideTopModeToggle(); restoreRestaurantLabel(); },80); return ret; };
+        wrappedToggle.__v213aRestaurantCleanup=true; global.toggleRestaurantSheet=wrappedToggle; try{toggleRestaurantSheet=wrappedToggle;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldSetMode=global.setMode;
+      if(typeof oldSetMode==='function'&&!oldSetMode.__v213aNoTopToggle){
+        var wrappedSetMode=function(mode){ var ret=oldSetMode.apply(this,arguments); setTimeout(function(){ hideTopModeToggle(); restoreRestaurantLabel(); },80); return ret; };
+        wrappedSetMode.__v213aNoTopToggle=true; global.setMode=wrappedSetMode; try{setMode=wrappedSetMode;}catch(e){}
+      }
+    }catch(e){}
+  }
+
+  function forcePriceTrend(reason){
+    try{
+      var screen=$('scr-portfolio');
+      if(!screen || !screen.classList.contains('on')) return false;
+      var toggle=document.querySelector('.sku-view-toggle'); if(toggle) toggle.classList.add('v213a-price-default');
+      // Reset v213's manual latch only on sheet/screen entry. User can still switch to ยอดซื้อ after the entry settles.
+      global._v213SkuManualChoice=false;
+      if(typeof global.setSkuView==='function'){
+        global.__v213aForceSkuPrice=true;
+        global.setSkuView('price');
+        global.__v213aForceSkuPrice=false;
+      }else{
+        var btn=$('svt-price'); if(btn) btn.click();
+      }
+      var list=$('skulist'); if(list){ list.classList.remove('v213a-price-list-pulse'); void list.offsetWidth; list.classList.add('v213a-price-list-pulse'); }
+      return true;
+    }catch(e){ global.__v213aForceSkuPrice=false; return false; }
+  }
+
+  function installSkuDefaultFix(){
+    function schedule(reason){ [40,180,520,1100].forEach(function(ms){ setTimeout(function(){ forcePriceTrend(reason); },ms); }); }
+    try{
+      var oldShow=global.showScreen;
+      if(typeof oldShow==='function'&&!oldShow.__v213aSkuPrice){
+        var wrapped=function(name){ var ret=oldShow.apply(this,arguments); if(name==='portfolio') schedule('showScreen'); return ret; };
+        wrapped.__v213aSkuPrice=true; global.showScreen=wrapped; try{showScreen=wrapped;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldOverlay=global._overlayNav;
+      if(typeof oldOverlay==='function'&&!oldOverlay.__v213aSkuPrice){
+        var wrappedOverlay=function(name){ var ret=oldOverlay.apply(this,arguments); if(name==='portfolio') schedule('overlay'); return ret; };
+        wrappedOverlay.__v213aSkuPrice=true; global._overlayNav=wrappedOverlay; try{_overlayNav=wrappedOverlay;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldOpen=global.openRestaurantSheet;
+      if(typeof oldOpen==='function'&&!oldOpen.__v213aSkuPrice){
+        var wrappedOpen=function(){ var ret=oldOpen.apply(this,arguments); setTimeout(function(){ schedule('restaurantSheetOpen'); },220); return ret; };
+        wrappedOpen.__v213aSkuPrice=true; global.openRestaurantSheet=wrappedOpen; try{openRestaurantSheet=wrappedOpen;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldSelect=global.portviewSelectAccount;
+      if(typeof oldSelect==='function'&&!oldSelect.__v213aSkuPrice){
+        var wrappedSelect=function(){ var ret=oldSelect.apply(this,arguments); setTimeout(function(){ schedule('accountSelect'); },260); return ret; };
+        wrappedSelect.__v213aSkuPrice=true; global.portviewSelectAccount=wrappedSelect; try{portviewSelectAccount=wrappedSelect;}catch(e){}
+      }
+    }catch(e){}
+    [700,1800,3600].forEach(function(ms){ setTimeout(function(){ forcePriceTrend('boot'); },ms); });
+  }
+
+  function markAppReady(){
+    try{ document.body.classList.add('sense-app-ready'); }catch(e){}
+  }
+
+  function installOliveFabCleanup(){
+    function hideBeforeLogin(){
+      try{
+        var fab=$('aifab');
+        var login=$('login-overlay');
+        if(!fab) return;
+        var loginVisible=login && login.style.display!=='none' && getComputedStyle(login).display!=='none';
+        if(loginVisible){ fab.classList.add('v213a-hidden'); }
+      }catch(e){}
+    }
+    function showAfterLogin(){
+      try{ var fab=$('aifab'); if(fab) fab.classList.remove('v213a-hidden'); markAppReady(); }catch(e){}
+      try{ if(global.FreshketSenseV213_clampAssistantFab) global.FreshketSenseV213_clampAssistantFab(true,true); }catch(e){}
+    }
+    hideBeforeLogin();
+    try{
+      var oldHide=global.hideLoginOverlay;
+      if(typeof oldHide==='function'&&!oldHide.__v213aFabReady){
+        var wrappedHide=function(){ var ret=oldHide.apply(this,arguments); setTimeout(showAfterLogin,450); setTimeout(showAfterLogin,1300); return ret; };
+        wrappedHide.__v213aFabReady=true; global.hideLoginOverlay=wrappedHide; try{hideLoginOverlay=wrappedHide;}catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldShow=global._showLoginOverlayClean;
+      if(typeof oldShow==='function'&&!oldShow.__v213aFabReady){
+        var wrappedShow=function(){ var ret=oldShow.apply(this,arguments); setTimeout(hideBeforeLogin,0); return ret; };
+        wrappedShow.__v213aFabReady=true; global._showLoginOverlayClean=wrappedShow; try{_showLoginOverlayClean=wrappedShow;}catch(e){}
+      }
+    }catch(e){}
+    [300,1000,2500].forEach(function(ms){setTimeout(function(){ hideBeforeLogin(); if(global.currentUser) showAfterLogin(); },ms);});
+  }
+
+  function installPwaResumeLoginFlashGuard(){
+    // The app should not flash the login screen on short iOS PWA resumes. We verify silently first.
+    var explicit=false;
+    try{
+      var oldSignOut=global.doSignOut;
+      if(typeof oldSignOut==='function'&&!oldSignOut.__v213aExplicit){
+        var wrappedSignOut=function(){ explicit=true; global.__senseExplicitSignOut=true; return oldSignOut.apply(this,arguments); };
+        wrappedSignOut.__v213aExplicit=true; global.doSignOut=wrappedSignOut; try{doSignOut=wrappedSignOut;}catch(e){}
+      }
+    }catch(e){}
+    function recentlyResumed(){
+      try{ return Date.now()-(global.__v213aLastResumeAt||0)<9000; }catch(e){return false;}
+    }
+    function hideLoginUi(){
+      try{ var ov=$('login-overlay'); if(ov){ ov.style.display='none'; ov.classList.remove('lgi-checking'); } }catch(e){}
+      try{ var spl=$('sense-splash'); if(spl){ spl.style.display='none'; } }catch(e){}
+    }
+    async function verifyThenMaybeShow(oldFn,args){
+      try{
+        var res=await global.supa.auth.getSession();
+        var s=res&&res.data&&res.data.session;
+        if(s&&s.user){
+          global.currentUser=s.user; hideLoginUi();
+          try{ if(typeof global.loadUserProfile==='function' && !global.currentUserProfile) global.loadUserProfile(); }catch(e){}
+          return true;
+        }
+      }catch(e){ hideLoginUi(); return true; }
+      setTimeout(async function(){
+        try{
+          var res2=await global.supa.auth.getSession(); var s2=res2&&res2.data&&res2.data.session;
+          if(s2&&s2.user){ global.currentUser=s2.user; hideLoginUi(); return; }
+        }catch(e){ hideLoginUi(); return; }
+        if(!explicit && !global.__senseExplicitSignOut){ hideLoginUi(); return; }
+        oldFn.apply(global,args||[]);
+      },2200);
+      return true;
+    }
+    try{
+      var oldClean=global._showLoginOverlayClean;
+      if(typeof oldClean==='function'&&!oldClean.__v213aResumeGuard){
+        var wrappedClean=function(){
+          if(!explicit && !global.__senseExplicitSignOut && (recentlyResumed() || document.visibilityState==='visible')){
+            hideLoginUi(); verifyThenMaybeShow(oldClean,arguments); return;
+          }
+          return oldClean.apply(this,arguments);
+        };
+        wrappedClean.__v213aResumeGuard=true; global._showLoginOverlayClean=wrappedClean; try{_showLoginOverlayClean=wrappedClean;}catch(e){}
+      }
+    }catch(e){}
+    try{ document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ global.__v213aLastResumeAt=Date.now(); hideLoginUi(); } },{passive:true}); }catch(e){}
+    try{ global.addEventListener('pageshow',function(){ global.__v213aLastResumeAt=Date.now(); hideLoginUi(); },{passive:true}); }catch(e){}
+  }
+
+  function boot(){
+    setBuild();
+    removeIntrusiveCoach();
+    installRestaurantCleanup();
+    installSkuDefaultFix();
+    installOliveFabCleanup();
+    installPwaResumeLoginFlashGuard();
+    setTimeout(markAppReady,1800);
+    log('cleanup installed');
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  global.FreshketSenseV213a={version:VERSION, forcePriceTrend:forcePriceTrend, glintRestaurantAction:function(){glintShown=false;glintRestaurantAction();}, hideTopModeToggle:hideTopModeToggle};
 })(window);
 </script>
 
