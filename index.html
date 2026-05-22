@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Freshket Sense v210i: role normalization hardening — canonical auth role rep, UI label KAM, admin-only commission cockpit, KAM commission card injection, TL visibility guard; from v210h — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
+<!-- Freshket Sense v210j: KAM commission compact strip — move self-payout out of portfolio health grid, Thai-first copy, readable i-sheet; from v210i — visual hierarchy, micro-interactions, dirty-state save, close guard, validation, payout readiness feedback; surgical patch from v210d only; no schema change -->
 <!-- Freshket Sense v210d: Rule Library Cleanup + archive/inactive rules + usage count + preview rule name (surgical, no schema change) | v210c: rule reload fix | v207h: movement attribution hardening — dormant transfers in Q10, days_with_current_kam pending-transfer guard, NRR/CB/EX movement totals (SQL+runtime only; no PWA/perf/UI change) | v207f: Teamview target denominator consistency — use run rate vs target wherever target exists; fallback to baseline only when no target (no performance/PWA change) | v207e: logic validation patch — score consistency, matcher price basis, admin all-team target/NRR (no performance/PWA change) | v207d: restore Sense Opportunity frosted-glass bottom nav/tray (no logic change) | v207c: desktop reload loop fix + compact Sense bottom tray (no global bulk SKU auto-load for TL/Admin/PWA, Sense Gate bundle preflight, bottom/top layout cleanup) | v207a: Sense→Opportunity UX/performance micro-polish (compact plan tray, light topbar icon contrast, impact-first opportunity ordering, verify return guard) | v207: Console hygiene + SKU Verify fallback for brand-switch substitutions + Supabase no-row cleanup | v206f: PWA live-update reload + resume data repair for installed Home Screen app | v206e: TL account bundle demand micro-state + no bulk fallback for TL/PWA + retryable SKU intelligence loading | v206d: cold-start flicker reduction + TL prewarm throttle + silent hydrate + debug-gated bundle logs | v206: NRR Cohort Drill-down Sheet — _tgtShowCohortSheet(tab,kamLabel); _groupNRR extended to return cohortDetail/comebackDetail/expansionDetail (account-grouped, outlet-level, sorted delta% asc for NRR / currGmv desc for CB+EX); gmvSection rows tappable → bottom sheet slide-up with 3 tabs (NRR/Comeback/Expansion); CSV download + Copy TSV export; ncs-* CSS design system; window._ncsLastNrrResult stores latest nrrResult for sheet access | v205c: (1) _tgtKamBaseline3mo exclude current MTD month; (2) _buildKamGroups g.baseline → _tgtKamBaseline3mo; (3) parens always show + font; (4) ghost bar modular renderer; (5) remove debug logs; (6) ETag-based conditional GET replaces HEAD+GET double-trip; csvCacheSet stores etag; fetchWithEtag helper; (7) selectMonth shows current month cats when heroLockedToCurrent+init; (8) Q2B v3 include current MTD; bulk_categories → daily group | v205b: (1) remove bulk_price noise toast; (2) Case B tlEmail fallback — scan _tgtCache when portview CSV missing col18; (3) target debug logs | prev v205b draft: add debug console.log in loadTargets to diagnose target cache miss (rows/error/cache state) | v205a: remove bulk-ingest noise toasts (bulk_skus/bulk_alternatives/bulk_sku_current) — fire on every KAM bundle fetch causing toast spam for TL/Admin | v205: ghost run-rate bar on current month — _showGhost when runrate>actual*1.05; mx includes runrate for correct scale; fmtK run-rate label inside ghost when gap>=13px | v204 (prev): _splashPreFade hook — force correct screen right before splash opacity transition (eliminates old-session screen flash) | v202c: fix login flash (clear portviewBulkData+currentAccountId on logout) + fix opplist-muted timing (after renderOpps, sync) | v202b: resetRuntimeSessionState — add footerUnlocked, setMode(kam), bundle clear (eliminate all session-bleed bugs) | v202a: fix opplist-muted applied before showScreen | v202: per-KAM bundle architecture — load ~4MB per KAM (sense_skus/alts_[email].csv) instead of 120MB bulk; silent background for KAM role, TL pre-warm on teamviewDrillKam, bundle-first ensureSenseData with 10s timeout fallback to bulk; IndexedDB cache bundle-skus/alts-[safeKey] 6h TTL; _kamBundleLoaded Set + _kamBundleInFlight dedup | v201f: replace hardcoded 623-row kam_map in all 8 SQLs (Q8E/Q9B/Q2B/Q3B/Q4B/Q5B/Q6B/Q7B) with dynamic dwh.order+user_master UNION (90d churn window, dwh.order priority 1) | v201e: fix Q10 portview_handover cur_month QUALIFY — ใช้ MAX(delivery_date) แทน SUM(gmv_ex_vat) แก้ bug transfer ซ้อน 2 รอบในเดือนเดียว | v201d: move alternatives to Tier 2 background sequential (skus→alts); cold-start yield 2s warm 500ms; _sgRevealPending — reveal waits for data | v201c: fix Sense Gate animation — start _sgRunThinking immediately on tap (not after lazy-load); add _sgRevealTimer for abort-on-fail | v201b: add failure-path diagnostic logs for Sense Gate debug | v201a: fix stale console log tags (Target Module / auth) | v201: fix Sense Gate bounce-back to KAM mode during alternatives lazy-load — BUG1: guard refreshAll in bulk-skus Pass1 with _sgRunning check; BUG2: guard resetSenseUi to skip when _sgRunning=true; adds console.log debug traces | v200b: fix kam-overview gradient end-color #0a1628→#0d1f3c — eliminates visible seam/'void' between content and gap area; <!-- Freshket Sense v200: fix account view empty space at scroll-end — remove kam-overview min-height (background covered by scr-overview/body); KAM .main padding-bottom reduced from 148px to nav height -->
 <!--
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -5249,17 +5249,54 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 .portview-stat.danger{border-color:rgba(255,100,120,.42)!important;background:linear-gradient(135deg,rgba(229,62,62,.15),rgba(120,50,90,.08))!important;box-shadow:inset 0 0 0 1px rgba(229,62,62,.08);}
 .portview-stat.warn .portview-stat-val{color:#f0b000!important;text-shadow:0 0 16px rgba(240,176,0,.16);}
 .portview-stat.danger .portview-stat-val{color:#ff7f8a!important;text-shadow:0 0 16px rgba(255,100,120,.16);}
-.pv-comm-card{margin:0 0 12px;border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:12px;align-items:start;background:linear-gradient(135deg,rgba(255,224,138,.12),rgba(100,170,255,.08));border:1px solid rgba(255,224,138,.26);box-shadow:0 10px 24px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.04);}
-.pv-comm-card.hit{background:linear-gradient(135deg,rgba(255,224,138,.16),rgba(0,208,112,.08));border-color:rgba(255,224,138,.38);}
-.pv-comm-card.miss{background:linear-gradient(135deg,rgba(188,215,255,.10),rgba(255,255,255,.035));border-color:rgba(188,215,255,.16);}
-.pv-comm-eyebrow{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,224,138,.70);margin-bottom:5px;}
-.pv-comm-main{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:950;line-height:1;color:#ffe08a;text-shadow:0 0 18px rgba(255,224,138,.12);}
-.pv-comm-card.miss .pv-comm-main{color:#bcd7ff;text-shadow:none;}
-.pv-comm-sub{font-size:10.5px;color:rgba(225,238,255,.56);line-height:1.45;margin-top:6px;}
-.pv-comm-info{margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);font-size:10.5px;font-weight:750;color:rgba(225,238,255,.76);line-height:1.45;}
-.pv-comm-i{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(225,238,255,.65);font-family:Georgia,serif;font-size:12px;font-weight:800;cursor:pointer;transition:background .16s,border-color .16s,transform .08s;}
-.pv-comm-i:hover{background:rgba(255,255,255,.10);border-color:rgba(255,224,138,.35);color:#ffe08a;}
-.pv-comm-i:active{transform:scale(.94);}
+
+.pv-commission-strip-slot{display:block;width:100%;margin:0 0 10px 0;}
+.pv-commission-strip-slot:empty{display:none;}
+.pv-comm-strip{width:100%;border-radius:14px;padding:11px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:linear-gradient(135deg,rgba(35,73,126,.58),rgba(15,42,76,.46));border:1px solid rgba(188,215,255,.20);box-shadow:inset 0 1px 0 rgba(255,255,255,.045);}
+.pv-comm-strip.hit{background:linear-gradient(135deg,rgba(0,208,112,.13),rgba(35,73,126,.48));border-color:rgba(77,220,151,.36);}
+.pv-comm-strip.bonus{background:linear-gradient(135deg,rgba(255,224,138,.15),rgba(35,73,126,.48));border-color:rgba(255,224,138,.40);}
+.pv-comm-strip.miss{background:linear-gradient(135deg,rgba(35,73,126,.56),rgba(15,42,76,.48));border-color:rgba(188,215,255,.20);}
+.pv-comm-left{min-width:0;}
+.pv-comm-top{display:flex;align-items:center;gap:7px;margin-bottom:5px;min-width:0;}
+.pv-comm-eyebrow{font-size:9px;font-weight:900;line-height:1;text-transform:uppercase;letter-spacing:.08em;color:rgba(188,215,255,.86);white-space:nowrap;}
+.pv-comm-chip{font-size:9px;font-weight:850;line-height:1;border-radius:999px;padding:4px 7px;white-space:nowrap;border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.88);background:rgba(255,255,255,.055);}
+.pv-comm-strip.hit .pv-comm-chip{color:#84ffc0;background:rgba(0,208,112,.12);border-color:rgba(77,220,151,.28);}
+.pv-comm-strip.bonus .pv-comm-chip{color:#ffe08a;background:rgba(255,224,138,.12);border-color:rgba(255,224,138,.30);}
+.pv-comm-copyline{font-size:11px;font-weight:700;color:rgba(225,238,255,.82);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-comm-next{font-size:10px;font-weight:750;color:rgba(188,215,255,.78);line-height:1.35;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv-comm-strip.miss .pv-comm-next{color:#ffc96b;}
+.pv-comm-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.pv-comm-main{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:950;letter-spacing:-.4px;line-height:1;color:#bcd7ff;text-align:right;font-variant-numeric:tabular-nums;}
+.pv-comm-strip.hit .pv-comm-main{color:#4ddc97;text-shadow:0 0 14px rgba(77,220,151,.12);}
+.pv-comm-strip.bonus .pv-comm-main{color:#ffe08a;text-shadow:0 0 14px rgba(255,224,138,.14);}
+.pv-comm-i{width:25px;height:25px;border-radius:50%;border:1px solid rgba(188,215,255,.26);background:rgba(255,255,255,.07);color:rgba(225,238,255,.82);font-family:Georgia,serif;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .16s,border-color .16s,transform .08s;}
+.pv-comm-i:hover{background:rgba(255,255,255,.11);border-color:rgba(188,215,255,.42);color:#fff;}
+.pv-comm-i:active{transform:scale(.94)!important;}
+.pv-comm-progress{grid-column:1/-1;height:3px;border-radius:999px;background:rgba(188,215,255,.14);overflow:hidden;margin-top:0;}
+.pv-comm-progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#f0b000,#4ddc97);width:0;transition:width .45s ease;}
+.pv-comm-strip.miss .pv-comm-progress-fill{background:linear-gradient(90deg,#697a9b,#f0b000);}
+.pv-comm-strip.hit .pv-comm-progress-fill{background:linear-gradient(90deg,#00c864,#4ddc97);}
+.pv-comm-strip.bonus .pv-comm-progress-fill{background:linear-gradient(90deg,#f0b000,#ffe08a);}
+@media(max-width:360px){.pv-comm-strip{padding:10px 11px;gap:8px}.pv-comm-main{font-size:18px}.pv-comm-copyline{font-size:10.5px}.pv-comm-next{font-size:9.5px}.pv-comm-chip{display:none}}
+.pv-comm-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:320;opacity:0;pointer-events:none;transition:opacity .22s ease;}
+.pv-comm-sheet-overlay.on{opacity:1;pointer-events:all;}
+.pv-comm-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:#0f1b2f;border:1px solid rgba(188,215,255,.16);border-radius:22px 22px 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.34);transition:transform .30s cubic-bezier(.34,1.1,.64,1);max-height:78vh;overflow:auto;color:#fff;}
+.pv-comm-sheet-overlay.on .pv-comm-sheet{transform:translateX(-50%) translateY(0);}
+.pv-comm-sheet-handle{width:42px;height:5px;border-radius:999px;background:rgba(188,215,255,.28);margin:10px auto 16px;}
+.pv-comm-sheet-body{padding:0 18px 24px;}
+.pv-comm-sheet-title{font-size:17px;font-weight:900;color:#fff;margin-bottom:4px;}
+.pv-comm-sheet-sub{font-size:12px;color:rgba(225,238,255,.74);line-height:1.55;margin-bottom:14px;}
+.pv-comm-sheet-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.pv-comm-sheet-kpi{border-radius:12px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);padding:10px 11px;}
+.pv-comm-sheet-kpi-label{font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.76);margin-bottom:4px;}
+.pv-comm-sheet-kpi-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:950;color:#bcd7ff;line-height:1;}
+.pv-comm-sheet-kpi.val-good .pv-comm-sheet-kpi-val{color:#4ddc97;}.pv-comm-sheet-kpi.val-bonus .pv-comm-sheet-kpi-val{color:#ffe08a;}
+.pv-comm-tier-table{border-radius:12px;overflow:hidden;border:1px solid rgba(188,215,255,.14);margin:12px 0;background:rgba(255,255,255,.035);}
+.pv-comm-tier-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 11px;border-bottom:1px solid rgba(188,215,255,.10);font-size:12px;color:rgba(225,238,255,.78);}
+.pv-comm-tier-row:last-child{border-bottom:none;}.pv-comm-tier-row.on{background:rgba(0,208,112,.10);color:#fff;}.pv-comm-tier-row.next{background:rgba(240,176,0,.10);color:#fff;}
+.pv-comm-tier-range{font-weight:750;}.pv-comm-tier-pay{font-family:'IBM Plex Mono',monospace;font-weight:950;color:#ffe08a;}
+.pv-comm-action-note{border-radius:12px;background:rgba(240,176,0,.10);border:1px solid rgba(240,176,0,.22);padding:10px 12px;color:rgba(255,238,190,.94);font-size:12px;font-weight:700;line-height:1.55;}
+.pv-comm-sheet-close{width:100%;margin-top:14px;border:none;border-radius:12px;padding:12px;background:rgba(188,215,255,.10);color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-weight:850;font-size:13px;cursor:pointer;}
 .comm-total .comm-total-val{font-variant-numeric:tabular-nums;}
 .comm-kpi-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 </style>
@@ -6528,6 +6565,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
       <div class="pv-collapsible expanded" id="pv-collapsible">
       <!-- Summary stats -->
       <div id="portview-pace-bar" style="display:none;margin-bottom:12px"></div>
+      <div id="pv-commission-strip" class="pv-commission-strip-slot"></div>
       <div class="portview-summary-row" id="portview-summary-row"></div>
       <!-- AI Insight button -->
       <button class="portview-ai-btn" id="portview-ai-btn" onclick="generatePortviewInsight()">
@@ -19769,8 +19807,8 @@ function __legacyRenderPortviewSummaryFallback(){
   };
   const _warnBox=_tierBox('warn',_pfWarn,'MONITOR',warnRunRate,warn,warnShortfall,'ต่ำกว่า baseline','rgba(240,176,0,.9)',warn===0);
   const _dangerBox=_tierBox('danger',_pfDanger,'AT RISK',dangerRunRate,danger,dangerShortfall,'กำลังหาย','rgba(255,136,136,.9)',danger===0);
-  const _kamCommissionCard = _commBuildKamSelfCard();
-  el.innerHTML=`${_kamCommissionCard}<div class="portview-tier-grid">
+  try { if (typeof _commRenderKamSelfStrip === 'function') _commRenderKamSelfStrip(); } catch(_e) {}
+  el.innerHTML=`<div class="portview-tier-grid">
     <div class="portview-tier-col-ok" style="width:${okColW}%">
       <div class="portview-tier-box safe${_pfOk}" data-pf="ok" onclick="setPortviewFilter('ok')">
         <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:4px">
@@ -23088,31 +23126,140 @@ function _commBuildPayoutSummary(scope) {
   };
 }
 
-function _commBuildKamSelfCard() {
-  const role = getCurrentRole();
+function _commFormatPts(n) {
+  const x = Number(n || 0);
+  return x.toFixed(1).replace('.0','');
+}
+function _commTierRangeLabel(t) {
+  const min = t.min_value === null || t.min_value === undefined || t.min_value === '' ? null : Number(t.min_value);
+  const max = t.max_value === null || t.max_value === undefined || t.max_value === '' ? null : Number(t.max_value);
+  if (min === null && max !== null) return `< ${_commFormatPts(max)}%`;
+  if (min !== null && max === null) return `≥ ${_commFormatPts(min)}%`;
+  if (min !== null && max !== null) return `${_commFormatPts(min)}–${_commFormatPts(max)}%`;
+  return 'ทุกช่วง';
+}
+function _commBuildKamSelfState() {
+  const role = getCurrentRole ? getCurrentRole() : ((currentUserProfile && currentUserProfile.role) || '');
   const email = (currentUserProfile && currentUserProfile.email) || '';
-  // v210h: KAM users may be stored as role='rep' in profiles. Show the self commission card for any non-TL/Admin portfolio user.
-  if (isTLRole(role) || isAdminRole(role) || !email || portviewLevel === 'rep-detail') return '';
+  if (isTLRole(role) || isAdminRole(role) || !email || portviewLevel === 'rep-detail') return null;
   const period = _nrrExclusionCurrentPeriod();
   const pct = _commKamNrrPct(email);
   const planCode = _commGetAssignmentPlan(period, 'kam', email, 'kam');
   const payout = _commPayoutForPctByCode(planCode, 'kam', pct);
   const tier = _commMatchTierByCode(planCode, 'kam', pct);
   const ruleName = _commPlanNameByCode(planCode, 'kam');
-  const tiers = (_commGetDraftByCode(planCode, 'kam').tiers || []).slice().sort((a,b)=>Number(a.min_value ?? -Infinity)-Number(b.min_value ?? -Infinity));
+  const tiers = (_commGetDraftByCode(planCode, 'kam').tiers || [])
+    .slice()
+    .sort((a,b)=>Number(a.min_value ?? -Infinity)-Number(b.min_value ?? -Infinity));
   const next = pct === null ? null : tiers.find(t => Number(t.payout_value||0) > Number(payout||0) && t.min_value !== null && Number(t.min_value) > pct);
-  const nextText = next ? `อีก ${Math.max(0, Number(next.min_value)-pct).toFixed(1).replace('.0','')} pts ถึง ${_commFmtPayout(next.payout_value)} (${_commEscapeHtml(next.payout_label||'next tier')})` : (payout>0 ? 'รักษา NRR ให้ไม่หลุด tier นี้จนจบเดือน' : 'ดัน NRR ให้ถึง threshold เพื่อเริ่มรับ payout');
-  const explain = `Governed NRR ${pct!==null?pct+'%':'—'} · ${_commEscapeHtml(ruleName)}${tier&&tier.payout_label?' · '+_commEscapeHtml(tier.payout_label):''}`;
-  return `<div class="pv-comm-card ${payout>0?'hit':'miss'}">
-    <div class="pv-comm-copy">
-      <div class="pv-comm-eyebrow">Commission this month</div>
-      <div class="pv-comm-main">${_commFmtPayout(payout)}</div>
-      <div class="pv-comm-sub">${explain}</div>
-      <div id="pv-comm-info" class="pv-comm-info" style="display:none">${nextText}</div>
+  const currentIdx = tier ? tiers.findIndex(t => String(t.id||'') === String(tier.id||'') || (t.min_value === tier.min_value && t.max_value === tier.max_value && t.payout_value === tier.payout_value)) : -1;
+  let status = 'ยังไม่ถึงเกณฑ์';
+  let cls = 'miss';
+  if (payout > 0) {
+    const maxPayout = Math.max(0, ...tiers.map(t=>Number(t.payout_value||0)));
+    cls = payout >= maxPayout && maxPayout > 0 ? 'bonus' : 'hit';
+    status = cls === 'bonus' ? 'โบนัสสูงสุด' : 'ถึงเกณฑ์แล้ว';
+  }
+  let nextText = 'ดัน NRR ให้ถึงเกณฑ์แรกเพื่อเริ่มรับค่าคอมฯ';
+  if (pct === null) nextText = 'รอข้อมูล NRR ของเดือนนี้';
+  else if (next) nextText = `อีก +${_commFormatPts(Math.max(0, Number(next.min_value)-pct))} pts ถึง ${_commFmtPayout(next.payout_value)}`;
+  else if (payout > 0) nextText = 'รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน';
+  const currentMin = tier && tier.min_value !== null && tier.min_value !== undefined ? Number(tier.min_value) : null;
+  const nextMin = next && next.min_value !== null && next.min_value !== undefined ? Number(next.min_value) : null;
+  let progress = payout > 0 ? 100 : 0;
+  if (pct !== null && nextMin !== null) {
+    const base = currentMin !== null ? currentMin : Math.max(0, nextMin - 10);
+    const denom = Math.max(1, nextMin - base);
+    progress = Math.max(4, Math.min(96, ((pct - base) / denom) * 100));
+  }
+  return { role, email, period, pct, planCode, payout, tier, ruleName, tiers, next, currentIdx, status, cls, nextText, progress };
+}
+function _commBuildKamSelfCard() {
+  const st = _commBuildKamSelfState();
+  if (!st) return '';
+  const pctText = st.pct !== null ? `${st.pct}%` : '—';
+  const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
+  return `<div class="pv-comm-strip ${st.cls}">
+    <div class="pv-comm-left">
+      <div class="pv-comm-top">
+        <div class="pv-comm-eyebrow">ค่าคอมฯ เดือนนี้</div>
+        <div class="pv-comm-chip">${_commEscapeHtml(st.status)}</div>
+      </div>
+      <div class="pv-comm-copyline">Governed NRR ${pctText} · ${tierLabel}</div>
+      <div class="pv-comm-next">${_commEscapeHtml(st.nextText)}</div>
     </div>
-    <button class="pv-comm-i" onclick="event.stopPropagation();const d=document.getElementById('pv-comm-info');if(d)d.style.display=d.style.display==='none'?'block':'none';">i</button>
+    <div class="pv-comm-right">
+      <div class="pv-comm-main">${_commFmtPayout(st.payout)}</div>
+      <button class="pv-comm-i" aria-label="ดูวิธีคำนวณค่าคอมฯ" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>
+    </div>
+    <div class="pv-comm-progress"><div class="pv-comm-progress-fill" style="width:${Math.round(st.progress)}%"></div></div>
   </div>`;
 }
+function _commRenderKamSelfStrip() {
+  const slot = document.getElementById('pv-commission-strip') || (function(){
+    const row = document.getElementById('portview-summary-row');
+    if (!row || !row.parentNode) return null;
+    const d = document.createElement('div');
+    d.id = 'pv-commission-strip';
+    d.className = 'pv-commission-strip-slot';
+    row.parentNode.insertBefore(d, row);
+    return d;
+  })();
+  if (!slot) return;
+  const html = _commBuildKamSelfCard();
+  slot.innerHTML = html || '';
+}
+function _commOpenKamSelfSheet() {
+  const st = _commBuildKamSelfState();
+  if (!st) return;
+  let ov = document.getElementById('pv-comm-sheet-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'pv-comm-sheet-overlay';
+    ov.className = 'pv-comm-sheet-overlay';
+    ov.onclick = function(e){ if(e.target === ov) _commCloseKamSelfSheet(); };
+    document.body.appendChild(ov);
+  }
+  const pctText = st.pct !== null ? `${st.pct}%` : '—';
+  const tierRows = st.tiers.map((t, idx)=>{
+    const on = st.tier && (idx === st.currentIdx);
+    const isNext = st.next && String(t.id||idx) === String(st.next.id||st.tiers.indexOf(st.next));
+    return `<div class="pv-comm-tier-row ${on?'on':isNext?'next':''}">
+      <div class="pv-comm-tier-range">${_commEscapeHtml(_commTierRangeLabel(t))} · ${_commEscapeHtml(t.payout_label || '')}</div>
+      <div class="pv-comm-tier-pay">${_commFmtPayout(t.payout_value)}</div>
+    </div>`;
+  }).join('');
+  const kpiCls = st.cls === 'bonus' ? 'val-bonus' : (st.payout > 0 ? 'val-good' : '');
+  const action = st.pct === null
+    ? 'ยังไม่มีข้อมูล NRR สำหรับคำนวณค่าคอมฯ เดือนนี้'
+    : (st.next ? `ต้องเพิ่ม Governed NRR อีก +${_commFormatPts(Math.max(0, Number(st.next.min_value)-st.pct))} pts เพื่อถึง tier ถัดไป` : (st.payout > 0 ? 'ตอนนี้ถึง tier แล้ว เป้าหมายคือรักษา NRR ไม่ให้หลุดก่อนจบเดือน' : 'ยังไม่ถึง payout tier แรก ให้โฟกัสร้านเสี่ยงและ monitor ก่อน'));
+  ov.innerHTML = `<div class="pv-comm-sheet">
+    <div class="pv-comm-sheet-handle"></div>
+    <div class="pv-comm-sheet-body">
+      <div class="pv-comm-sheet-title">วิธีคิดค่าคอมฯ</div>
+      <div class="pv-comm-sheet-sub">คำนวณจาก Governed NRR หลัง policy adjustment ของเดือนนี้</div>
+      <div class="pv-comm-sheet-kpis">
+        <div class="pv-comm-sheet-kpi ${kpiCls}"><div class="pv-comm-sheet-kpi-label">ค่าคอมฯ ตอนนี้</div><div class="pv-comm-sheet-kpi-val">${_commFmtPayout(st.payout)}</div></div>
+        <div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Governed NRR</div><div class="pv-comm-sheet-kpi-val">${pctText}</div></div>
+      </div>
+      <div class="pv-comm-sheet-sub"><strong style="color:#fff">Rule:</strong> ${_commEscapeHtml(st.ruleName)}</div>
+      <div class="pv-comm-tier-table">${tierRows}</div>
+      <div class="pv-comm-action-note">${_commEscapeHtml(action)}</div>
+      <button class="pv-comm-sheet-close" onclick="_commCloseKamSelfSheet()">ปิด</button>
+    </div>
+  </div>`;
+  requestAnimationFrame(()=>ov.classList.add('on'));
+}
+function _commCloseKamSelfSheet() {
+  const ov = document.getElementById('pv-comm-sheet-overlay');
+  if (!ov) return;
+  ov.classList.remove('on');
+  setTimeout(()=>{ ov.innerHTML=''; }, 260);
+}
+window._commRenderKamSelfStrip = _commRenderKamSelfStrip;
+window._commOpenKamSelfSheet = _commOpenKamSelfSheet;
+window._commCloseKamSelfSheet = _commCloseKamSelfSheet;
+
 function _commSnapshotCsv(rows) {
   const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','rule_name','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
   const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
@@ -27202,25 +27349,14 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   }
   function ensureKamCommissionCard(){
     normalizeProfileAndBody();
-    var row=document.getElementById('portview-summary-row');
-    if(!row)return;
-    var existing=row.querySelector('.pv-comm-card');
-    if(!isRep() || !safeProfile() || !safeProfile().email || (typeof portviewLevel!=='undefined' && portviewLevel==='rep-detail')){
-      if(existing) existing.remove();
-      return;
-    }
-    if(existing) return;
-    if(typeof _commBuildKamSelfCard!=='function') return;
-    var html='';
-    try{ html=_commBuildKamSelfCard(); }catch(e){ console.warn('[v210i] KAM commission card build failed', e); }
-    if(!html)return;
-    var holder=document.createElement('div');
-    holder.innerHTML=html;
-    var card=holder.firstElementChild;
-    if(card){
-      card.setAttribute('data-v210i','1');
-      row.insertBefore(card, row.firstChild);
-    }
+    try{
+      if (typeof _commRenderKamSelfStrip === 'function') {
+        _commRenderKamSelfStrip();
+        return;
+      }
+    }catch(e){ console.warn('[v210j] KAM commission strip render failed', e); }
+    var slot=document.getElementById('pv-commission-strip');
+    if(slot) slot.innerHTML='';
   }
   window.syncCommissionAdminVisibility=syncCommissionAdminVisibility;
   window._commEnsureKamSelfCard=ensureKamCommissionCard;
