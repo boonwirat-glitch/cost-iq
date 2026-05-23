@@ -1,4 +1,4 @@
-<!-- Freshket Sense v224c: + NRR widget self-heal (debounce reset + retry after target=0). Rollback: sense_v224.html -->
+<!-- Freshket Sense v224c: + NRR self-heal + _preloadFromIndexedDB respects cache:false (portview+handover always fresh from R2). Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -10933,6 +10933,7 @@ async function _preloadFromIndexedDB(){
         if((Date.now()-cached.ts)>=_CSV_TTL) return;  // expired (> 6h)
         var spec=R2_SPECS[tab];
         if(!spec) return;
+        if(spec.cache===false) return; // v224c: respect network-first — never serve stale IDB for cache:false files
         var ok=await ingestCSVText(spec.type,cached.text,{timeoutMs:30000});
         if(ok){
           _cloudLoadedTabs.add(tab);
