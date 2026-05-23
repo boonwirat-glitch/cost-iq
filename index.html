@@ -8950,7 +8950,7 @@ function handleFileUpload(type,input){
         const _moSrtBD=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
         D.history=(bulkHistoryData[currentAccountId]||[]).slice().sort((a,b)=>_moSrtBD(a.m)-_moSrtBD(b.m));
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
-        fileStatus.history=true;refreshAll();
+        fileStatus.history=true;_scheduleRefreshAll(400); // v221b: was refreshAll() — debounce to batch with ETag 200 re-ingest
       }
       // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
@@ -8991,7 +8991,8 @@ function handleFileUpload(type,input){
         fileStatus['current-month']=true;
         if(typeof updateKamSubtabVisibility==='function')updateKamSubtabVisibility();
         // v203: skip refreshAll if restaurant sheet is open — avoids D.current_month bleed when portview reloads mid-browse
-        if(typeof refreshAll==='function'&&!document.body.classList.contains('restaurant-sheet'))refreshAll();
+        // v221b: debounced — portview ETag 200 re-ingest was causing a standalone visible re-render
+        if(typeof _scheduleRefreshAll==='function'&&!document.body.classList.contains('restaurant-sheet'))_scheduleRefreshAll(400);
       }
       const atRisk=portviewBulkData.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).length;
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
