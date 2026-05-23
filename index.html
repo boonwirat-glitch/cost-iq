@@ -1,12 +1,18 @@
-<!-- Freshket Sense v224 — 3 surgical fixes, no auth/boot/RenderBus changes.
-     P1. loadFromCloudflareR2: guard direct renderPortview/renderTeamview with
-         _senseSplashActive check. Pre-RenderBus holdovers causing redundant second
-         render on cold boot. Scroll reset preserved. RenderBus handles render.
-     P2. _commBuildKamSelfCard: return '' if !_tgtLoaded — prevents wrong commission
-         number flash before loadTargets() (Supabase async) completes.
-     P3. showSenseSplash MAX_SHOW warmBoot: 6000→1500ms. No manual Refresh in app
-         so IDB-cleared edge case is not a real scenario. 1500 > tSetup(900ms).
-     Rollback: revert P1 L9778, P2 L23828, P3 L7224. -->
+<!-- Freshket Sense v224 — 7-point patch: warm resume skip-splash + targeted governance render.
+     Problem B (splash every PWA resume): hideLoginOverlay() called 2x per session from
+       SIGNED_OUT→SIGNED_IN auth cycle. _senseBootComplete flag prevents second call from
+       re-running boot sequence. _canSkipSplash _idbPreloaded guard removed (safe now).
+       B1: hideLoginOverlay() — _senseBootComplete guard (token refresh = quiet hide)
+       B2: _canSkipSplash — remove _idbPreloaded guard
+       B3: skip-splash path — set _senseBootComplete=true
+       B4: doFade inner setTimeout — set _senseBootComplete=true after first render
+       B5: resetRuntimeSessionState() — reset flag on sign-out
+     Problem A (multiple full-page renders): v212a cold-load wrap called hydrateVisible →
+       refreshAll() after governance loads, causing full-page flash even though only
+       commission/NRR data changed.
+       A1: _governanceTargetedRender() — new function, updates only commission+NRR+teamview
+       A2: v212a wrap — hydrateVisible → _governanceTargetedRender (fallback preserved)
+     Rollback: revert B1-B5 in hideLoginOverlay/doFade/resetRuntimeState, revert A2 in v212a. -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -6861,6 +6867,8 @@ function resetRuntimeSessionState(){
   // v202a bundle state
   try { _kamBundleLoaded.clear(); } catch(e) {}
   try { Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]); } catch(e) {}
+  // v224 B5: reset boot-complete flag so next login gets full boot sequence
+  try { window._senseBootComplete = false; } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
@@ -7230,9 +7238,8 @@ function showSenseSplash(onDone){
                     '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
-  // v224 P3: warmBoot MAX_SHOW 6000→1500ms. No manual Refresh in this app so the
-  // IDB-cleared edge case doesn't exist. 1500ms > tSetup(900ms) — routing still fires.
-  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 1500 : 5000));
+  // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
+  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 5000));
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -7310,6 +7317,7 @@ function showSenseSplash(onDone){
         if(bar){bar.style.transition='none';bar.style.width='0';}
         // v217 FIX B + v218: release splash guard; fire pending render only if data also ready.
         window._senseSplashActive=false;
+        window._senseBootComplete=true; // v224 B4: first render done — auth events no longer need full boot
         if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
           // v223: stamp RenderBus settle window so background files batch correctly after this
@@ -7323,7 +7331,17 @@ function showSenseSplash(onDone){
 function hideLoginOverlay() {
   // Fix v194 Fix F: safety net — ensure _doLoginHandled never stays true
   // across multiple hideLoginOverlay calls regardless of which path triggered it.
+  var _wasDoLogin = window._doLoginHandled; // v224 B1: save before reset
   window._doLoginHandled = false;
+  // v224 B1: boot already complete — this is a token-refresh auth event (SIGNED_OUT→SIGNED_IN).
+  // Just hide the overlay silently. Don't re-run splash, routing, or render cycle.
+  // Exception: doLogin() sets _doLoginHandled=true (genuine user re-login needs full boot).
+  if (window._senseBootComplete && !_wasDoLogin) {
+    var _ovBoot = document.getElementById('login-overlay');
+    if (_ovBoot) { _ovBoot.style.display='none'; _ovBoot.classList.remove('lgi-checking'); }
+    loginTransitionRunning = false;
+    return;
+  }
   if (loginTransitionRunning) return;
   loginTransitionRunning = true;
 
@@ -7387,16 +7405,15 @@ function hideLoginOverlay() {
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
-  // v223 Option A: skip splash entirely on warm IDB boot
-  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
-  // → restore last state → render immediately → ETag check silently in background
+  // v224 skip-splash: last_critical_ready < 30min is sufficient.
+  // _idbPreloaded guard removed — double-boot is now prevented by _senseBootComplete (B1).
+  // If IDB hasn't finished at t=200ms, RenderBus gates render until t=350ms. No blank screen.
   var _canSkipSplash = (function(){
     try{
-      if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30; // IDB data is fresh enough to show immediately
+      return ageMin < 30;
     }catch(e){return false;}
   })();
 
@@ -7431,6 +7448,7 @@ function hideLoginOverlay() {
     // Render immediately with IDB data
     if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
     else if(typeof refreshAll==='function') setTimeout(refreshAll,30);
+    window._senseBootComplete=true; // v224 B3: skip-splash done — subsequent auth events just hide overlay
     loginTransitionRunning=false;
     clearTimeout(lockSafetyTimer);
     return;
@@ -9791,13 +9809,8 @@ async function loadFromCloudflareR2(){
         window.scrollTo({top:0,left:0,behavior:'instant'});
         document.body.scrollTop=0;document.documentElement.scrollTop=0;
       }
-      // v224 P1: skip direct renders while splash is active — RenderBus handles
-      // render via per-file signals already. These calls are pre-RenderBus holdovers
-      // that cause a redundant second render on every cold boot.
-      if(!window._senseSplashActive){
-        if(typeof renderPortview==='function')renderPortview();
-        if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
-      }
+      if(typeof renderPortview==='function')renderPortview();
+      if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
     }else{
       // v195 Step 3: persistent offline banner (not just toast) when all 5 foreground files fail
       showToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
@@ -23843,8 +23856,6 @@ function _commBuildKamSelfState() {
 function _commBuildKamSelfCard() {
   const st = _commBuildKamSelfState();
   if (!st) return '';
-  // v224 P2: hide strip until loadTargets() completes — prevents wrong number flash.
-  if (!_tgtLoaded) return '';
   const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
@@ -29339,6 +29350,28 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   .tv-full-pace,.tv-star-pace{font-size:20px!important;}
 }
 </style>
+<script>
+// v224 A1: _governanceTargetedRender — targeted update for governance-only data.
+// Called after forceGovernanceReload completes (commission rules, NRR policies, targets).
+// Replaces hydrateVisible → refreshAll() which re-rendered the entire page.
+// Only updates the 3 sections that actually changed: commission strip, NRR bar, teamview commission.
+window._governanceTargetedRender = function(reason) {
+  try { if(typeof updateDataStatus === 'function') updateDataStatus(); } catch(e) {}
+  // Commission strip (KAM portview)
+  try { if(typeof _commRenderKamSelfStrip === 'function') _commRenderKamSelfStrip(); } catch(e) {}
+  // NRR / target bar (portview)
+  try { if(typeof renderPortviewTargetBar === 'function') renderPortviewTargetBar(); } catch(e) {}
+  // Teamview commission column (TL/Admin)
+  try {
+    if(typeof renderTeamviewSummary === 'function' &&
+       document.getElementById('scr-teamview') &&
+       document.getElementById('scr-teamview').classList.contains('on')) {
+      renderTeamviewSummary();
+    }
+  } catch(e) {}
+  try { if(typeof _senseDataLog === 'function') _senseDataLog('RENDER','governance targeted: '+reason); } catch(e) {}
+};
+</script>
 <script id="freshket-v212a-pwa-freshness-unification-js">
 // v212a — PWA freshness unification.
 // Scope: synchronize CSV freshness with Supabase target/governance/commission state and add mobile Teamview layout guard.
@@ -29504,7 +29537,14 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
         await forceGovernanceReload('cold-load-pre-render', {force:true, silent:true, minGap:0});
         var res = await oldLoad.apply(this, arguments);
         await forceGovernanceReload('cold-load-post-csv', {force:true, silent:true, minGap:0});
-        hydrateVisible('cold-load-complete');
+        // v224 A1+A2: targeted governance render instead of hydrateVisible → full refreshAll().
+        // After cold-load, only commission strip + NRR bar + teamview commission changed.
+        // Full refreshAll() via hydrateVisible caused a visible full-page flash every cold boot.
+        if(typeof window._governanceTargetedRender === 'function'){
+          window._governanceTargetedRender('cold-load-complete');
+        } else {
+          hydrateVisible('cold-load-complete'); // fallback if function not yet defined
+        }
         return res;
       };
       wrappedLoad.__v212aWrapped = true;
