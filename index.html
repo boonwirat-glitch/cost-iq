@@ -1,3 +1,15 @@
+<!-- Freshket Sense v224 PWA RESUME FIX — surgical 3-job patch on v223 baseline.
+     Goal: iOS PWA warm resume skips splash entirely. Commission strip shows only when data ready.
+     Jobs:
+       P1. _canSkipSplash: removed window._idbPreloaded guard (was always false at t=200ms when
+           profile cache fires, while IDB completes at t=350ms — timing gap = skip-splash never fired).
+           New condition: last_critical_ready < 30min only. IDB TTL=6h >> 30min → data integrity intact.
+       P2. showSenseSplash MAX_SHOW warmBoot: 6000ms → 1500ms. Was causing 5.6s splash hang when
+           P1 guard fell through. 1500ms > tSetup(900ms) so routing still fires before force-fade.
+       P3. _commBuildKamSelfCard: return '' if !_tgtLoaded. Prevents wrong commission number
+           flash on first render before loadTargets() (Supabase async) completes.
+     No logic changes to RenderBus, allCriticalReady, auth state machine, or commission calculation.
+     Rollback: revert 3 str_replace blocks (P1 L7383, P2 L7225, P3 L23829). -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -7217,12 +7229,14 @@ function showSenseSplash(onDone){
   _senseDataLog('SPLASH',
     _cacheWarm    ? '🟢 WARM (JS state)' :
     _idbPreloaded ? '⚡ IDB-FAST (Strategy B — no ETag) — MIN=0ms MAX=1500ms' :
-    _isWarmBoot   ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=6000ms' :
+    _isWarmBoot   ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=1500ms' :
                     '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
-  // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
-  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 5000));
+  // v224: _isWarmBoot MAX_SHOW 6000→1500ms. Old 6000ms caused 5.6s hang when
+  // _canSkipSplash fell through to showSenseSplash() — IDB data was ready at ~350ms
+  // but splash held until MAX_SHOW timeout. 1500ms > tSetup(900ms) so routing fires.
+  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 1500 : 5000));
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -7377,16 +7391,18 @@ function hideLoginOverlay() {
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
-  // v223 Option A: skip splash entirely on warm IDB boot
-  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
-  // → restore last state → render immediately → ETag check silently in background
+  // v224 skip-splash: only condition = last_critical_ready < 30min.
+  // Removed _idbPreloaded guard (v223 regression): profile cache fires at t≈200ms
+  // but IDB preload completes at t≈350ms — guard was always false when evaluated,
+  // so skip-splash never fired on iOS PWA resume (every resume = cold reload on iOS).
+  // Safety: last_critical_ready < 30min implies IDB TTL (6h) is intact. If IDB is
+  // empty for any reason, RenderBus gates render until data arrives — no blank screen.
   var _canSkipSplash = (function(){
     try{
-      if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30; // IDB data is fresh enough to show immediately
+      return ageMin < 30;
     }catch(e){return false;}
   })();
 
@@ -23828,6 +23844,10 @@ function _commBuildKamSelfState() {
 function _commBuildKamSelfCard() {
   const st = _commBuildKamSelfState();
   if (!st) return '';
+  // v224: if loadTargets() not complete, show nothing — prevent wrong number flash.
+  // _tgtLoaded is set true inside loadTargets() after Supabase fetch completes.
+  // Showing 0 or wrong payout before data ready destroys trust more than a blank strip.
+  if (!_tgtLoaded) return '';
   const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
