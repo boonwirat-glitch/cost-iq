@@ -3761,8 +3761,8 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   opacity:1!important;
   pointer-events:auto!important;
 }
-.pv-comm-card[data-v210i="1"]{animation:pvCommIn .22s ease both;}
-@keyframes pvCommIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+/* pvCommIn animation removed — caused visible flash on every re-render */
+.pv-comm-card[data-v210i="1"]{}
 
 /* ── freshket-v210k-kam-commission-compact-css ── */
 /* v210k: KAM commission is a compact personal payout summary, not an account health card. */
@@ -21322,6 +21322,10 @@ function __legacyRenderPortviewSummaryFallback(){
   const _warnBox=_tierBox('warn',_pfWarn,'MONITOR',warnRunRate,warn,warnShortfall,'ต่ำกว่า baseline','rgba(240,176,0,.9)',warn===0);
   const _dangerBox=_tierBox('danger',_pfDanger,'AT RISK',dangerRunRate,danger,dangerShortfall,'กำลังหาย','rgba(255,136,136,.9)',danger===0);
   try { if (typeof _commRenderKamSelfStrip === 'function') _commRenderKamSelfStrip(); } catch(_e) {}
+  // Value guard: skip tier grid rebuild if counts and GMV unchanged
+  const _tierKey=`${ok}|${warn}|${danger}|${Math.round(okRunRate)}|${Math.round(warnRunRate)}|${Math.round(dangerRunRate)}`;
+  if(el._lastTierKey===_tierKey && el.innerHTML.trim()) return;
+  el._lastTierKey=_tierKey;
   el.innerHTML=`<div class="portview-tier-grid">
     <div class="portview-tier-col-ok" style="width:${okColW}%">
       <div class="portview-tier-box safe${_pfOk}" data-pf="ok" onclick="setPortviewFilter('ok')">
@@ -28998,7 +29002,11 @@ console.log('[Target Module v1] loaded');
       return d;
     })();
     if(!slot) return;
-    slot.innerHTML=buildCompactStrip() || '';
+    var html=buildCompactStrip() || '';
+    // Value guard: skip rebuild if content unchanged
+    if(slot._lastCommHtml===html && slot.innerHTML) return;
+    slot._lastCommHtml=html;
+    slot.innerHTML=html;
   }
   function openCompactSheet(){
     if(typeof _commBuildKamSelfState!=='function') return;
