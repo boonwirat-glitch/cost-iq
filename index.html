@@ -1,4 +1,4 @@
-<!-- Freshket Sense v224d: ETag 0ms + list guard _skuSnap + cold MAX_SHOW 8000ms. Rollback: sense_v224.html -->
+<!-- Freshket Sense v224d: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4732,7 +4732,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
         skus: Object.freeze({type:'bulk-skus',tab:'skus',cache:false,heavy:true}),
         alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true}),
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
-        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:false,freshness:'network-first'})
+        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true}) // v224d: cache:true so IDB fast path works
       })
     }),
     legacySheets: Object.freeze({
@@ -27466,9 +27466,12 @@ async function renderPortviewTargetBar() {
     if (oldBar) oldBar.style.display = 'block';
     return;
   }
-  // Value guard: skip full re-render if displayed value already matches
+  // Value guard: skip re-render only if BOTH pace% AND nrr state are unchanged
+  // v224d fix: nrrPct must be part of key — otherwise widget won't update when history.csv loads late
   const _existingPctEl = bar.querySelector('#tgt-pct-num');
-  if (_existingPctEl && _existingPctEl.textContent === pct+'%') return;
+  const _renderKey = `${pct}|${nrrPct !== null ? nrrPct : 'x'}`;
+  if (_existingPctEl && _existingPctEl.dataset.renderKey === _renderKey) return;
+  if (_existingPctEl) _existingPctEl.dataset.renderKey = _renderKey;
 
   void bar.offsetHeight;
   const colorKeySection = `<div class="tgt-det-section">
@@ -29723,8 +29726,8 @@ console.log('[Target Module v1] loaded');
   }
   try{
     if(typeof R2_FILES!=='undefined' && R2_FILES){ R2_FILES.handover='portview_handover.csv?v='+encodeURIComponent(DATA_VERSION); }
-    if(typeof R2_SPECS!=='undefined' && R2_SPECS && R2_SPECS.handover){ R2_SPECS.handover.cache=false; R2_SPECS.handover.version=DATA_VERSION; }
-    try{ if(typeof _csvCacheSet==='function') _csvCacheSet('handover','',null); }catch(e){}
+    // v224d: removed handover IDB clear (_csvCacheSet('handover','',null)) — was preventing handover from ever being cached → cold-boot on every load
+    // v224d: removed R2_SPECS.handover.cache=false override — handover now uses cache:true for warm-boot IDB fast path
   }catch(e){}
   var oldHandle=window.handleFileUpload;
   if(typeof oldHandle==='function'){
