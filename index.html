@@ -7053,7 +7053,18 @@ supa.auth.onAuthStateChange((event, session) => {
           },3000);
         }
       });
-      loadUserProfile().then(() => hideLoginOverlay());
+      // v220 PROFILE CACHE: inject cached profile → hideLoginOverlay immediately (no 3s wait).
+      // loadUserProfile() runs in background → silent update if profile changed.
+      // First-ever login: cache miss → falls back to original await path.
+      var _cp=_profileCacheGet(currentUser.id);
+      if(_cp){
+        currentUserProfile=_cp; normalizeCurrentUserProfileRole();
+        _senseDataLog('PROFILE','⚡ cache hit → hideLoginOverlay immediately (saves ~3s)');
+        hideLoginOverlay();
+        loadUserProfile(); // background revalidate — no await, no gate
+      }else{
+        loadUserProfile().then(()=>hideLoginOverlay());
+      }
     }
   } else if (event === 'SIGNED_OUT' && currentUser) {
     currentUser = null;
@@ -7338,6 +7349,33 @@ function _autoRouteAfterLogin() {
   }
 }
 
+// v220 PROFILE CACHE: stale-while-revalidate for currentUserProfile.
+// Eliminates ~3s Supabase gate on every cold boot (warm AND cold — profile fetch is always slow).
+// Key: sense_profile_v1_{userId}, TTL 24h. Invalidated on signOut.
+// Safe fields: id, email, role, full_name, kam_name, squad — no tokens, no sensitive data.
+const _PROFILE_CACHE_KEY_PREFIX='sense_profile_v1_';
+const _PROFILE_CACHE_TTL=24*60*60*1000; // 24h
+function _profileCacheGet(userId){
+  try{
+    var raw=localStorage.getItem(_PROFILE_CACHE_KEY_PREFIX+userId);
+    if(!raw) return null;
+    var obj=JSON.parse(raw);
+    if(!obj||!obj.ts||!obj.profile) return null;
+    if(Date.now()-obj.ts>_PROFILE_CACHE_TTL){ localStorage.removeItem(_PROFILE_CACHE_KEY_PREFIX+userId); return null; }
+    return obj.profile;
+  }catch(e){return null;}
+}
+function _profileCacheSet(profile){
+  try{
+    if(!profile||!profile.id) return;
+    localStorage.setItem(_PROFILE_CACHE_KEY_PREFIX+profile.id,
+      JSON.stringify({ts:Date.now(),profile:profile}));
+  }catch(e){}
+}
+function _profileCacheClear(userId){
+  try{ if(userId) localStorage.removeItem(_PROFILE_CACHE_KEY_PREFIX+userId); }catch(e){}
+}
+
 async function loadUserProfile() {
   if (!currentUser) return;
   try {
@@ -7345,6 +7383,7 @@ async function loadUserProfile() {
     if (!error && data) {
       currentUserProfile = data;
       normalizeCurrentUserProfileRole();
+      _profileCacheSet(currentUserProfile); // v220: persist for next cold boot
     } else {
       // Fallback: build minimal profile from auth session so role/email still work
       currentUserProfile = { id: currentUser.id, email: currentUser.email, role: 'rep', full_name: '' };
@@ -7364,6 +7403,7 @@ async function doSignOut() {
   } catch(e) {
     console.warn('[signOut]', e);
   }
+  _profileCacheClear(currentUser && currentUser.id); // v220: invalidate cache on explicit logout
   // Note: onAuthStateChange(SIGNED_OUT) should also run. This fallback prevents stale splash/loader state.
   currentUser = null;
   currentUserProfile = null;
@@ -7445,9 +7485,19 @@ async function checkSession() {
       currentUser = session.user;
       // v195 Step 1: start R2 fetch in parallel with loadUserProfile (same guard applies)
       if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
-      await loadUserProfile();
-      window._sessionCheckHandling = false;
-      hideLoginOverlay();
+      // v220 PROFILE CACHE: same cache-first pattern as onAuthStateChange path.
+      var _cpcs=_profileCacheGet(session.user.id);
+      if(_cpcs){
+        currentUserProfile=_cpcs; normalizeCurrentUserProfileRole();
+        _senseDataLog('PROFILE','⚡ cache hit (checkSession) → hideLoginOverlay immediately');
+        window._sessionCheckHandling=false;
+        hideLoginOverlay();
+        loadUserProfile(); // background revalidate
+      }else{
+        await loadUserProfile();
+        window._sessionCheckHandling = false;
+        hideLoginOverlay();
+      }
       return;
     }
   } catch(e) {
