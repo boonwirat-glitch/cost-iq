@@ -7230,8 +7230,8 @@ function showSenseSplash(onDone){
         window._senseSplashActive=false;
         if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
-          // v221c: stamp lastFired so settle window protects subsequent debounced renders
-          try{if(typeof _scheduleRefreshAllLastFired!=='undefined') _scheduleRefreshAllLastFired=Date.now();}catch(e){}
+          // v223: stamp RenderBus settle window so background files batch correctly after this
+          if(window.RenderBus) window.RenderBus.markRender();
           try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         }
       },380);
@@ -7329,10 +7329,8 @@ function _autoRouteAfterLogin() {
     _bundlePreWarming=true;
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
       _bundlePreWarming=false;
-      // v221d: replaced _senseHydrateVisiblePortfolio (3-step cascade) + refreshAll()
-      // with debounced render. Settle window batches this with concurrent R2 arrivals
-      // (categories/sku_current/outlets) → ONE combined render instead of 3-4 separate.
-      if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(200);
+      // v223: RenderBus batches with concurrent file arrivals
+      if(window.RenderBus) window.RenderBus.signal('bundle');
       else refreshAll();
     });
   }
@@ -8677,7 +8675,7 @@ function handleFileUpload(type,input){
         D.cats_monthly=bulkCatsData[currentAccountId];
         const moSort=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
         const mk=Object.keys(D.cats_monthly).sort((a,b)=>moSort(b)-moSort(a));
-        D.cats=mk.length?D.cats_monthly[mk[0]]:[];fileStatus.categories=true;_scheduleRefreshAll(400); // v221
+        D.cats=mk.length?D.cats_monthly[mk[0]]:[];fileStatus.categories=true;if(window.RenderBus)window.RenderBus.signal('categories'); // v223
       }
       // toast removed v205b — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(30,'กำลังโหลดหมวดหมู่...');
@@ -8803,7 +8801,7 @@ function handleFileUpload(type,input){
           const mk=Object.keys(D.skus_monthly).sort((a,b)=>_ms(b)-_ms(a));
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
           if(D.alts.length&&D.skus.length)computeOPPS();
-          if(!_sgRunning&&!_bundlePreWarming){_scheduleRefreshAll(400);} // v221
+          if(!_sgRunning&&!_bundlePreWarming){if(window.RenderBus)window.RenderBus.signal('skus');} // v223
         }
       }else{
         // no currentAccountId (TL view) — all lines go to remaining
@@ -8890,7 +8888,7 @@ function handleFileUpload(type,input){
             }
           }else{remaining.push(l);}
         });
-        if(bulkPriceData[pri]&&typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(400); // v221
+        if(bulkPriceData[pri]&&window.RenderBus)window.RenderBus.signal('price'); // v223
       }else{
         lines.forEach(l=>remaining.push(l));
       }
@@ -8954,7 +8952,7 @@ function handleFileUpload(type,input){
         const _moSrtBD=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
         D.history=(bulkHistoryData[currentAccountId]||[]).slice().sort((a,b)=>_moSrtBD(a.m)-_moSrtBD(b.m));
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
-        fileStatus.history=true;_scheduleRefreshAll(400); // v221b: was refreshAll() — debounce to batch with ETag 200 re-ingest
+        fileStatus.history=true;if(window.RenderBus)window.RenderBus.signal('history'); // v223
       }
       // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
@@ -8996,7 +8994,8 @@ function handleFileUpload(type,input){
         if(typeof updateKamSubtabVisibility==='function')updateKamSubtabVisibility();
         // v203: skip refreshAll if restaurant sheet is open — avoids D.current_month bleed when portview reloads mid-browse
         // v221b: debounced — portview ETag 200 re-ingest was causing a standalone visible re-render
-        if(typeof _scheduleRefreshAll==='function'&&!document.body.classList.contains('restaurant-sheet'))_scheduleRefreshAll(400);
+        // v221b debounced, v223 through RenderBus
+        if(window.RenderBus&&!document.body.classList.contains('restaurant-sheet'))window.RenderBus.signal('portview');
       }
       const atRisk=portviewBulkData.filter(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')).length;
       const nb=document.getElementById('port-nav-badge');if(nb){nb.textContent=atRisk;nb.style.display=atRisk>0?'flex':'none';}
@@ -9012,16 +9011,10 @@ function handleFileUpload(type,input){
       if(Object.keys(bulkHistoryData).length>0 && bulkHandoverData && Object.keys(bulkHandoverData.byAccountId||{}).length>0){
         // intentionally no-op — _fetchCloudflareFile owns _splashDataReady signal
       }
-      // ── Render: only if portview screen is active AND splash already gone ──
-      // v222: deferred 300ms so concurrent file arrivals batch into one renderPortview() call.
-      // Was: immediate renderPortviewSummary() + renderPortviewList() = two synchronous paints.
+      // ── Render: v223 RenderBus handles portview update when history arrives ──
       if(document.getElementById('scr-portview')?.classList.contains('on')){
         if(Object.keys(bulkHistoryData).length>0){
-          clearTimeout(window._pvHistoryHydrateTimer);
-          window._pvHistoryHydrateTimer=setTimeout(function(){
-            window._pvHistoryHydrateTimer=null;
-            if(typeof renderPortview==='function') renderPortview();
-          },300);
+          if(window.RenderBus) window.RenderBus.signal('history_portview');
         }
       }
       _done();
@@ -9043,7 +9036,7 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
-      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(400);} // v221
+      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(window.RenderBus)window.RenderBus.signal('sku_current');} // v223
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
@@ -9062,7 +9055,7 @@ function handleFileUpload(type,input){
         //        to prevent gate dismissal mid-load; reset only on manual/background reload
         if(!_sgRunning&&!_bundlePreWarming){
           senseActivated=false;_sgRunning=false;
-          _scheduleRefreshAll(400);updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus(); // v221
+          if(window.RenderBus)window.RenderBus.signal('alternatives');updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus(); // v223
         }
       }
       // toast removed v205a — bulk ingest noise
@@ -9372,13 +9365,16 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
              _cloudLoadedTabs.has('handover')){
             // Signal splash to start fading (critical data ready)
             if(typeof window._splashDataReady==='function') window._splashDataReady();
-            // v218b: log gate event — this is the single most important event in the load pipeline
-            _senseDataLog('🚪 GATE ✅','portview+history+handover ready → splash fade + render flush');
-            // Flush queued render
-            if(window._pendingRefreshAll){
+            _senseDataLog('🚪 GATE ✅','portview+history+handover ready → splash fade');
+            // v223: route through RenderBus instead of direct setTimeout(refreshAll)
+            if(window.RenderBus){ window.RenderBus.signal(tab); }
+            else if(window._pendingRefreshAll){
               window._pendingRefreshAll=false;
               setTimeout(function(){if(typeof refreshAll==='function')refreshAll();},30);
             }
+          } else {
+            // Non-critical file — signal RenderBus; it'll fire after critical gate opens
+            if(window.RenderBus) window.RenderBus.signal(tab);
           }
         }catch(e){}
       }else{
@@ -9699,6 +9695,7 @@ async function reloadFromCloudflareR2(){
   _cloudBackgroundPromise=null;
   _cloudLoadToken++;
   try{if(typeof _scheduleRefreshAllLastFired!=='undefined') _scheduleRefreshAllLastFired=0;}catch(e){} // v221c: reset settle window
+  if(window.RenderBus) window.RenderBus.reset(); // v223
   // v202: clear per-KAM bundle state so reload fetches fresh bundles
   _kamBundleLoaded.clear();
   Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]);
@@ -9906,6 +9903,8 @@ async function _preloadFromIndexedDB(){
           var kb=Math.round(cached.text.length/1024);
           var age=Math.round((Date.now()-cached.ts)/60000);
           _senseDataLog(tab,'⚡ IDB-DIRECT (no ETag)',kb+'KB',age+'min old');
+          // v223: signal RenderBus — it'll wait for critical gate, then render
+          if(window.RenderBus) window.RenderBus.signal(tab);
         }
       }catch(e){}
     });
@@ -9915,10 +9914,7 @@ async function _preloadFromIndexedDB(){
       _senseDataLog('⚡ IDB-PRELOAD','critical 3 ready ('+loaded+'/6 total) — splash fast path, R2 skipped');
       if(allCriticalReady()){
         if(typeof window._splashDataReady==='function') window._splashDataReady();
-        if(window._pendingRefreshAll){
-          window._pendingRefreshAll=false;
-          setTimeout(function(){if(typeof refreshAll==='function')refreshAll();},30);
-        }
+        // v223: RenderBus already has signals from per-file loads above — no extra flush needed
       }
     }else{
       _senseDataLog('⚡ IDB-PRELOAD',criticalLoaded+'/3 critical found ('+loaded+'/6 total) — falling back to ETag');
@@ -9954,6 +9950,93 @@ function _scheduleRefreshAll(delayMs){
     if(typeof refreshAll==='function') refreshAll();
   }, wait);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v223 RENDERBUS — single owner of all data-driven screen renders.
+//
+// Architecture: data loaders call RenderBus.signal(source) when their data
+// is ready. RenderBus decides WHEN to render — never immediately, always
+// after checking: (1) splash gone? (2) critical data ready? (3) settle window.
+//
+// Result: ONE render per data-arrival burst, regardless of how many files
+// arrive concurrently. Eliminates the N-files = N-flashes pattern.
+//
+// Cases handled:
+//   cold boot    → files arrive during splash → queued → doFade fires first render
+//                  → background files batch into ONE post-splash render
+//   warm boot    → IDB loads all 6 in ~150ms → doFade fires → done (no R2 needed)
+//   resume       → validateUnifiedFreshness calls reset() → files re-arrive → one render
+//   manual reload → reloadFromCloudflareR2 calls reset() → one render when done
+//   data update  → ETag 200 → signal() → settle window → one render
+//
+// Interactive actions (account switch, button taps) bypass RenderBus and call
+// renderXxx() directly — they need immediate response.
+// ─────────────────────────────────────────────────────────────────────────────
+window.RenderBus = (function(){
+  var _timer = null;
+  var _lastRender = 0;
+  var _ready = new Set();
+  var SETTLE_MS = 800; // ms — renders batch if arrivals within this window
+
+  function _flush(){
+    _timer = null;
+    _lastRender = Date.now();
+    _senseDataLog('RENDERBUS','🎯 RENDER ['+Array.from(_ready).join(',')+']');
+    // Primary: KAM account detail screen
+    if(typeof refreshAll === 'function') refreshAll();
+    // Portfolio list screen (not covered by refreshAll)
+    try{
+      if(document.getElementById('scr-portview')?.classList.contains('on') &&
+         typeof renderPortview === 'function') renderPortview();
+    }catch(e){}
+    // Team view screen
+    try{
+      if(document.getElementById('scr-teamview')?.classList.contains('on') &&
+         typeof renderTeamview === 'function') renderTeamview();
+    }catch(e){}
+  }
+
+  function signal(source){
+    _ready.add(source);
+    // Blocked by splash
+    if(window._senseSplashActive){
+      window._pendingRefreshAll = true;
+      _senseDataLog('RENDERBUS','⏳ '+source+' — queued (splash)');
+      return;
+    }
+    // Blocked until critical files ready
+    if(typeof allCriticalReady === 'function' && !allCriticalReady()){
+      window._pendingRefreshAll = true;
+      _senseDataLog('RENDERBUS','⏳ '+source+' — queued (waiting portview+history+handover)');
+      return;
+    }
+    // Settle window: batch concurrent arrivals
+    var now = Date.now();
+    var sinceLastRender = _lastRender ? now - _lastRender : Infinity;
+    var wait = sinceLastRender < SETTLE_MS ? SETTLE_MS - sinceLastRender + 50 : 50;
+    clearTimeout(_timer);
+    _timer = setTimeout(_flush, wait);
+    _senseDataLog('RENDERBUS','📡 '+source+' — render in '+wait+'ms (settle: '+(sinceLastRender<SETTLE_MS?sinceLastRender+'ms since last':'fresh')+')');
+  }
+
+  // Call after doFade fires its first render — stamps settle window so
+  // subsequent signals don't fire too close to the main render.
+  function markRender(){
+    _lastRender = Date.now();
+    _senseDataLog('RENDERBUS','🕐 render stamped');
+  }
+
+  // Call on manual reload or resume re-fetch — clears ready set and timers.
+  // Does NOT reset _lastRender (avoids render bursting right after reset).
+  function reset(){
+    _ready.clear();
+    clearTimeout(_timer);
+    _timer = null;
+    _senseDataLog('RENDERBUS','🔄 reset (reload/resume)');
+  }
+
+  return { signal: signal, markRender: markRender, reset: reset };
+})();
 
 function refreshAll(){
   // v217 FIX B: splash guard (belt-and-suspenders — data gate below is the primary guard now)
@@ -13934,14 +14017,8 @@ function setAiProvider(p){
       orchStatus.foregroundLoaded = criticalLoaded + okCount;
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
-      // v222: debounced — was _senseHydrateVisiblePortfolio('enhancement-ready',{delay:360}) cascade
-      try{
-        if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(400);
-        else {
-          if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview();
-          if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview();
-        }
-      }catch(e){}
+      // v223: RenderBus handles render
+      try{ if(window.RenderBus) window.RenderBus.signal('enhancement'); }catch(e){}
       record('startCloudEnhancementLoad','done',{ okCount, total:keys.length });
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded + okCount, total:ALL.length });
       return results;
@@ -14061,12 +14138,9 @@ function setAiProvider(p){
       if(criticalOk === CRITICAL.length){
         safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + criticalOk + '/' + CRITICAL.length + ' ไฟล์','✓');
         baseData.setDataPillText('พร้อมใช้งาน','เติมรายละเอียดต่อเบื้องหลัง');
-        // v222: debounced — settle window batches with concurrent background file arrivals
-        try{
-          if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(300);
-          else if(typeof renderPortview === 'function') renderPortview();
-        }catch(e){}
-        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !(typeof _scheduleRefreshAll === 'function')) renderTeamview(); }catch(e){}
+        // v223: RenderBus handles render
+        try{ if(window.RenderBus) window.RenderBus.signal('critical'); }catch(e){}
+        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !window.RenderBus) renderTeamview(); }catch(e){}
         nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 450);
       }else{
         safeToast('ข้อมูลหลักยังไม่ครบ — กด Refresh data','⚠');
@@ -29212,13 +29286,15 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   function hydrateVisible(reason){
     try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
     try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
-    // v222: direct screen renders are synchronous → single browser paint.
-    // Removed _senseHydrateVisiblePortfolio() — its summary+list+strip setTimeout cascade
-    // was adding 2 extra async paints on top of the renderPortview() call below.
-    // renderPortview() already covers the full portview screen.
-    try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
-    try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
-    try{ if(typeof renderKamOverview === 'function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+    // v223: RenderBus handles all screen renders — one flush for all screens
+    if(window.RenderBus){
+      window.RenderBus.signal('hydrate-'+reason);
+    } else {
+      // Fallback if RenderBus not available
+      try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
+      try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
+      try{ if(typeof renderKamOverview === 'function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+    }
   }
   function keysAreCritical(keys){
     if(!Array.isArray(keys)) return false;
@@ -29247,6 +29323,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
           // Without this, _cloudLoadedTabs has stale entries → allCriticalReady()=true → each
           // file completion fires refreshAll() → 6 flashes visible during resume reload.
           try{ if(window._cloudLoadedTabs && typeof window._cloudLoadedTabs.clear==='function') window._cloudLoadedTabs.clear(); }catch(e){}
+          if(window.RenderBus) window.RenderBus.reset(); // v223: reset so re-arriving files batch correctly
           csvOk = await ensureCloudflareFiles(CRITICAL, { label:'ตรวจข้อมูลล่าสุด', force:true });
         }
         var govOk = await forceGovernanceReload(reason||'resume', {force:true, silent:true, minGap:0});
