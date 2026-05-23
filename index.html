@@ -1,4 +1,4 @@
-<!-- Freshket Sense v224d: ETag check 3000ms→0ms (immediate). Reverts IDB preload change. Rollback: sense_v224.html -->
+<!-- Freshket Sense v224d: ETag 0ms + list guard _skuSnap + cold MAX_SHOW 8000ms. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -8142,7 +8142,7 @@ function showSenseSplash(onDone){
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
   // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
-  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 5000));
+  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 8000)); // v224d: cold boot 5000→8000ms for slow R2
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -20826,7 +20826,9 @@ function __legacyRenderPortviewListFallback(){
   const _pvSnap=portviewBulkData.length>0
     ?`${portviewBulkData.length}:${portviewBulkData[0]?.accountId||''}:${portviewBulkData[portviewBulkData.length-1]?.accountId||''}`
     :'0';
-  const _listKey=`${portviewFilter}|${portviewLevel||''}|${portviewRepEmail||''}|${pvSortMode}|${pvSortDir}|${pvViewMode}|${searchQ}|${_pvSnap}`;
+  // Include heavy-data readiness — list must re-render when SKU/alternatives data arrives
+  const _skuSnap=(typeof bulkSkusReady!=='undefined'&&bulkSkusReady?'1':'0')+(typeof bulkSkuCurrentData!=='undefined'&&Object.keys(bulkSkuCurrentData||{}).length>0?'s':'');
+  const _listKey=`${portviewFilter}|${portviewLevel||''}|${portviewRepEmail||''}|${pvSortMode}|${pvSortDir}|${pvViewMode}|${searchQ}|${_pvSnap}|${_skuSnap}`;
   if(listEl._lastListKey===_listKey && listEl.children.length>0) return;
   listEl._lastListKey=_listKey;
 
