@@ -10521,6 +10521,9 @@ async function _fetchKamBundle(kamEmail){
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
         _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
+        // v224e: set bulkSkusReady so _skuSnap changes from '0s'→'1s' → portview value guard passes → _churnCounts rendered
+        try{bulkSkusReady=true;}catch(e){}
+        setTimeout(()=>{try{if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();}catch(e){}},150);
       }else{
         console.warn('[v202 bundle] ⚠️ incomplete:', kamEmail, 'skus:', okSkus, 'alts:', okAlts);
       }
