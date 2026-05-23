@@ -6979,7 +6979,58 @@ async function submitPasswordReset(){
   }
 }
 
-// ── Reactive auth state listener ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// v223 RESUME STATE — Option A + B
+// Save current screen + account on leave → restore on warm resume → skip splash
+// ─────────────────────────────────────────────────────────────────────────────
+(function(){
+  var KEY = 'sense_resume_state_v1';
+
+  // Save state before page leaves (swipe out, tab switch, close)
+  function saveResumeState(){
+    if(!window.currentUser||!window.currentUserProfile) return;
+    try{
+      var screen = 'portview';
+      try{
+        // Read active screen from DOM
+        ['portview','teamview','sense','account','history-scr'].forEach(function(s){
+          var el=document.getElementById('scr-'+s)||document.getElementById(s);
+          if(el&&el.classList.contains('on')) screen=s;
+        });
+      }catch(e){}
+      var state = {
+        screen: screen,
+        accountId: window.currentAccountId||'default',
+        savedAt: Date.now()
+      };
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }catch(e){}
+  }
+
+  window._getResumeState = function(){
+    try{
+      var raw=localStorage.getItem(KEY);
+      if(!raw) return null;
+      var s=JSON.parse(raw);
+      // Only restore if saved within 6 hours
+      if(!s||!s.savedAt||(Date.now()-s.savedAt)>6*60*60*1000) return null;
+      return s;
+    }catch(e){return null;}
+  };
+
+  window._clearResumeState = function(){
+    try{localStorage.removeItem(KEY);}catch(e){}
+  };
+
+  // Save on every leave event
+  window.addEventListener('pagehide', saveResumeState);
+  window.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='hidden') saveResumeState();
+  });
+  window.addEventListener('beforeunload', saveResumeState);
+})();
+
+
 // Guard A: only act when currentUser not yet set → prevents double-invoke
 //          if doLogin() already completed before onAuthStateChange fires
 // Guard D: SIGNED_OUT only triggers login UI if we were actually logged in
@@ -7069,14 +7120,35 @@ supa.auth.onAuthStateChange((event, session) => {
   } else if (event === 'SIGNED_OUT' && currentUser) {
     currentUser = null;
     currentUserProfile = null;
-    // Debounce: Supabase sometimes fires SIGNED_OUT then SIGNED_IN rapidly (internal token ops).
-    // Wait 600ms before showing login — if SIGNED_IN follows, the timer is cleared by the
-    // !currentUser check inside onAuthStateChange(SIGNED_IN) path.
+    // v223: SIGNED_OUT from JWT expiry — Supabase auto-refresh may be in flight.
+    // Strategy:
+    //   1. Wait 600ms for rapid SIGNED_IN (fast network token refresh)
+    //   2. If no SIGNED_IN: actively call getSession() — Supabase may have a valid
+    //      refreshed session that hasn't fired SIGNED_IN yet (race condition)
+    //   3. If getSession() returns a valid session: inject it silently (no login form)
+    //   4. Only show login if getSession() confirms truly signed out
     clearTimeout(window._signedOutTimer);
-    window._signedOutTimer = setTimeout(() => {
+    window._signedOutTimer = setTimeout(async () => {
       window._signedOutTimer = null;
-      if (!currentUser) _showLoginOverlayClean(); // still signed out → show login
-    }, 600);
+      if (currentUser) return; // SIGNED_IN already fired — cancel
+      // Step 2: active session check before showing login
+      try {
+        const { data } = await supa.auth.getSession();
+        if (data && data.session && data.session.user) {
+          // Session recovered — inject silently without showing login
+          _senseDataLog('AUTH','✅ session recovered after SIGNED_OUT (JWT refresh race) — staying signed in');
+          currentUser = data.session.user;
+          loadUserProfile(); // refresh profile in background
+          return;
+        }
+      } catch(e) {
+        console.warn('[auth] getSession() failed after SIGNED_OUT:', e);
+      }
+      // Truly signed out — show login
+      _senseDataLog('AUTH','🔒 SIGNED_OUT confirmed — showing login');
+      _profileCacheClear(currentUser?.id);
+      _showLoginOverlayClean();
+    }, 800); // 800ms — gives auto-refresh more time to complete
   }
 });
 
@@ -7305,6 +7377,55 @@ function hideLoginOverlay() {
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
+  // v223 Option A: skip splash entirely on warm IDB boot
+  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
+  // → restore last state → render immediately → ETag check silently in background
+  var _canSkipSplash = (function(){
+    try{
+      if(!window._idbPreloaded) return false;
+      var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
+      if(!lr) return false;
+      var ageMin = (Date.now()-lr)/60000;
+      return ageMin < 30; // IDB data is fresh enough to show immediately
+    }catch(e){return false;}
+  })();
+
+  if(_canSkipSplash){
+    // Option B: restore last screen + account before rendering
+    var _rs = window._getResumeState ? window._getResumeState() : null;
+    if(_rs){
+      try{
+        if(_rs.accountId&&_rs.accountId!=='default') window.currentAccountId=_rs.accountId;
+      }catch(e){}
+      _senseDataLog('RESUME','⚡ skip splash — restoring to '+(_rs.screen||'portview')+
+        ' (IDB '+Math.round((Date.now()-Number(localStorage.getItem('sense_last_critical_ready')||0))/60000)+'min old)');
+    }else{
+      _senseDataLog('RESUME','⚡ skip splash — warm IDB boot (no saved state)');
+    }
+    // Hide splash + login overlay immediately
+    var _splEl=document.getElementById('sense-splash');
+    if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
+    window._senseSplashActive=false;
+    window._pendingRefreshAll=false;
+    // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
+    _autoRouteAfterLogin();
+    // Restore saved screen (after route which defaults to portview/teamview)
+    if(_rs&&_rs.screen&&typeof showScreen==='function'){
+      setTimeout(function(){
+        try{
+          var safeScreens=['portview','teamview'];
+          if(safeScreens.indexOf(_rs.screen)>=0) showScreen(_rs.screen);
+        }catch(e){}
+      },0);
+    }
+    // Render immediately with IDB data
+    if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
+    else if(typeof refreshAll==='function') setTimeout(refreshAll,30);
+    loginTransitionRunning=false;
+    clearTimeout(lockSafetyTimer);
+    return;
+  }
+
   try {
     if (typeof showSenseSplash === 'function') {
       showSenseSplash(finish);
