@@ -25062,6 +25062,15 @@ async function loadTargets(quarter) {
     ts: Date.now()
   };
   _tgtLoaded = true;
+  // v224e: persist to localStorage — next session reads this instantly (no Supabase cold-start flash)
+  try{
+    localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
+      cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
+      commRules:JSON.parse(JSON.stringify(_commRuleConfig||{})),
+      nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions||[])),
+      commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots||[]))
+    }}));
+  }catch(e){}
 }
 
 function _tgtGet(period, level, email) {
@@ -27201,6 +27210,13 @@ async function renderPortviewTargetBar() {
     if(_calcEl)_calcEl.innerHTML=''; // clear placeholder before real render
     // Reset debounce: targets freshly loaded — allow immediate re-render on next call
     bar._lastRenderMs = 0;
+    // v224e: re-render teamview KAM list so each KAM's pace% uses real target, not baseline
+    // (fixes "stuck at baseline" case where KAM cards never updated after targets loaded)
+    try{
+      if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function'){
+        setTimeout(()=>{try{renderTeamviewKamList();}catch(e){}},50);
+      }
+    }catch(e){}
   }
 
   const now    = new Date();
@@ -27654,6 +27670,31 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(_injectPortviewBarEl, 500);
 }
+
+// ── v224e: Pre-load targets from localStorage at module parse time ──
+// Runs synchronously before first refreshAll — _tgtLoaded=true means first render uses real target,
+// not 3-month baseline fallback. Eliminates baseline→target flash on TL teamview.
+(function _tgtPreloadFromLocalStorage(){
+  try{
+    const _q=_tgtCurrentQuarter();
+    const _raw=localStorage.getItem('sense_tgt_ls_'+_q);
+    if(!_raw)return;
+    const _obj=JSON.parse(_raw);
+    if(!_obj||!_obj.ts||!_obj.data)return;
+    if(Date.now()-_obj.ts>24*60*60*1000)return; // stale after 24h
+    const d=_obj.data;
+    _tgtCache={...(d.cache||{})};
+    _tgtSettings={...(d.settings||{nrr_threshold:98})};
+    _nrrGovPolicies={...(d.nrrPolicies||{})};
+    _commRuleConfig=JSON.parse(JSON.stringify(d.commRules||{plans:{},rules:{},tiers:{}}));
+    _nrrExclusions=JSON.parse(JSON.stringify(d.nrrExclusions||[]));
+    _commissionSnapshots=JSON.parse(JSON.stringify(d.commissionSnapshots||[]));
+    _tgtQuarterCache[_q]={cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
+      commRules:JSON.parse(JSON.stringify(_commRuleConfig)),nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions)),
+      commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots)),ts:_obj.ts};
+    _tgtLoaded=true;
+  }catch(e){}
+})();
 
 // ── Init: poll for portview visibility on startup ──────────────
 setTimeout(async function _tgtInitCheck() {
