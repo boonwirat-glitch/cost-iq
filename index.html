@@ -7230,6 +7230,8 @@ function showSenseSplash(onDone){
         window._senseSplashActive=false;
         if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
+          // v221c: stamp lastFired so settle window protects subsequent debounced renders
+          try{if(typeof _scheduleRefreshAllLastFired!=='undefined') _scheduleRefreshAllLastFired=Date.now();}catch(e){}
           try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         }
       },380);
@@ -9316,6 +9318,12 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
               _src='IDB→ETag304'; // v218b: cache hit, unchanged
               text=cached.text;  // 304: file unchanged, extend cache life
               _csvCacheSet(tab,text,_res.etag);
+              // v221c: 304 + already in memory = skip re-ingest entirely → no callback → no render
+              if(_cloudLoadedTabs.has(tab)){
+                _senseDataLog(tab,'⚡ 304 skip-reingest — data current, no render needed');
+                if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';} // mark done
+                return true;
+              }
             } else if(_res.text){
               _src='IDB→ETag200(UPDATED)'; // v218b: cache hit, server has new data
               text=_res.text;    // 200: new file → store below with new ETag
@@ -9685,6 +9693,7 @@ async function reloadFromCloudflareR2(){
   _cloudInitialPromise=null;
   _cloudBackgroundPromise=null;
   _cloudLoadToken++;
+  try{if(typeof _scheduleRefreshAllLastFired!=='undefined') _scheduleRefreshAllLastFired=0;}catch(e){} // v221c: reset settle window
   // v202: clear per-KAM bundle state so reload fetches fresh bundles
   _kamBundleLoaded.clear();
   Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]);
@@ -9921,18 +9930,24 @@ function allCriticalReady(){
   }catch(e){return false;}
 }
 
-// v221 DEBOUNCE: background file callbacks (categories, sku_current, outlets, price, alternatives)
-// each call refreshAll() independently → 4-6 visible re-renders after splash.
-// _scheduleRefreshAll batches all arrivals within 400ms into ONE consolidated render.
-// Used ONLY by background file ingest callbacks — not by doFade or the data gate.
+// v221 DEBOUNCE + v221c SETTLE WINDOW
+// background file callbacks batch into ONE render per 1000ms window.
+// Prevents double-render when files arrive in two waves (e.g. resume/ETag check).
 var _scheduleRefreshAllTimer=null;
+var _scheduleRefreshAllLastFired=0;
+var _SETTLE_WINDOW=1000; // ms — renders can't fire faster than once per 1s
 function _scheduleRefreshAll(delayMs){
+  const now=Date.now();
+  const sinceLastRender=_scheduleRefreshAllLastFired?now-_scheduleRefreshAllLastFired:Infinity;
+  const waitForSettle=_scheduleRefreshAllLastFired&&sinceLastRender<_SETTLE_WINDOW?_SETTLE_WINDOW-sinceLastRender+50:0;
+  const wait=Math.max(delayMs||400,waitForSettle);
   clearTimeout(_scheduleRefreshAllTimer);
   _scheduleRefreshAllTimer=setTimeout(function(){
     _scheduleRefreshAllTimer=null;
+    _scheduleRefreshAllLastFired=Date.now();
     _senseDataLog('RENDER','_scheduleRefreshAll ✅ debounced render fired');
     if(typeof refreshAll==='function') refreshAll();
-  }, delayMs||400);
+  }, wait);
 }
 
 function refreshAll(){
