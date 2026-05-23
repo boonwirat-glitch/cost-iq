@@ -1,4 +1,4 @@
-<!-- Freshket Sense v224: CSS + JS patch consolidation. TOC corrected. No logic change. Rollback: index.html (v223b baseline). -->
+<!-- Freshket Sense v224c: + NRR widget self-heal (debounce reset + retry after target=0). Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -11014,7 +11014,7 @@ window.RenderBus = (function(){
   var _timer = null;
   var _lastRender = 0;
   var _ready = new Set();
-  var SETTLE_MS = 800; // ms — renders batch if arrivals within this window
+  var SETTLE_MS = 2000; // ms — increased from 800ms: batches signals that arrive within 2s of each other
 
   function _flush(){
     _timer = null;
@@ -20823,6 +20823,14 @@ function __legacyRenderPortviewListFallback(){
   }
   const _pvVisitMap=getVisitMap((currentUserProfile&&currentUserProfile.email)||'local');
 
+  // Value guard: skip full list rebuild if data + context unchanged
+  const _pvSnap=portviewBulkData.length>0
+    ?`${portviewBulkData.length}:${portviewBulkData[0]?.accountId||''}:${portviewBulkData[portviewBulkData.length-1]?.accountId||''}`
+    :'0';
+  const _listKey=`${portviewFilter}|${portviewLevel||''}|${portviewRepEmail||''}|${pvSortMode}|${pvSortDir}|${pvViewMode}|${searchQ}|${_pvSnap}`;
+  if(listEl._lastListKey===_listKey && listEl.children.length>0) return;
+  listEl._lastListKey=_listKey;
+
   // ── Card builders ──
   function _buildBadges(a){
     const _cc=a._churnCounts;
@@ -27184,6 +27192,8 @@ async function renderPortviewTargetBar() {
     }
     await loadTargets(_tgtCurrentQuarter());
     if(_calcEl)_calcEl.innerHTML=''; // clear placeholder before real render
+    // Reset debounce: targets freshly loaded — allow immediate re-render on next call
+    bar._lastRenderMs = 0;
   }
 
   const now    = new Date();
@@ -27260,7 +27270,21 @@ async function renderPortviewTargetBar() {
     if (target > 0) fbMode = 'base';
   }
 
-  if (!target) { bar.style.display = 'none'; return; }
+  if (!target) {
+    bar.style.display = 'none';
+    // Self-heal: portviewBulkData or targets may still be loading.
+    // Schedule one retry — bypasses debounce so widget recovers without kill+reload.
+    if (!bar._healPending) {
+      bar._healPending = true;
+      setTimeout(() => {
+        bar._healPending = false;
+        bar._lastRenderMs = 0; // bypass debounce for retry
+        try { renderPortviewTargetBar(); } catch(e) {}
+      }, 2000);
+    }
+    return;
+  }
+  bar._healPending = false; // render succeeded — clear retry flag
 
   // ── Pace % ───────────────────────────────────────────────────
   const pct = Math.round(runRate / target * 100);
