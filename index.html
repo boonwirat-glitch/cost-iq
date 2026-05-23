@@ -498,7 +498,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 
 /* ── MICRO-INTERACTION: Portview hero fade-in ── */
 @keyframes _heroIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-#portview-pace-bar,#tgt-portview-bar,#tgt-nrr-bar{animation:_heroIn .3s ease forwards}
+#portview-pace-bar,#tgt-nrr-bar{animation:_heroIn .3s ease forwards}
 
 /* ── MICRO-INTERACTION: Splash ticker transition ── */
 #spl-ticker{transition:opacity .18s ease}
@@ -20341,33 +20341,17 @@ function __legacyRenderPortviewSummaryFallback(){
   // Pace bar with run rate / baseline
   const paceBarEl=document.getElementById('portview-pace-bar');
   if(paceBarEl&&acctWithPace.length>0&&!_preferTargetWidget){
-    // Animate pace% counting up from previous value (feels calculated, not snapped)
-    setTimeout(()=>{
-      const _pEl=paceBarEl.querySelector('#pv-pace-pct');
-      if(_pEl){
-        const _target=portfolioPace;
-        const _from=Math.max(0,_prevPaceVal||0);
-        const _dur=_from===0?600:350; // slower on first show, faster on update
-        const _start=performance.now();
-        const _tick=t=>{
-          const p=Math.min((t-_start)/_dur,1);
-          const ease=1-Math.pow(1-p,3);
-          _pEl.textContent=Math.round(_from+(_target-_from)*ease)+'%';
-          if(p<1)requestAnimationFrame(_tick);
-        };
-        requestAnimationFrame(_tick);
-      }
-    },50);
     const _pvDays=acctWithPace[0]?.paceSignal.daysElapsed||0;
     const _pvDaysInMo=acctWithPace[0]?.paceSignal.daysInMonth||30;
     const _totalGmv=acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0);
     const _totalExp=acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0);
-    paceBarEl.style.display='block';
+    // Value guard: skip full re-render if value unchanged
     const _prevPacePct = paceBarEl.querySelector('#pv-pace-pct');
-    const _prevPaceVal = _prevPacePct ? parseInt(_prevPacePct.textContent)||0 : 0;
+    if(_prevPacePct && _prevPacePct.textContent===portfolioPace+'%' && paceBarEl.style.display==='block') return;
+    paceBarEl.style.display='block';
     paceBarEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
       <div style="display:flex;align-items:baseline;gap:6px">
-        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${ppCls}">0%</span>
+        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
           <span style="font-size:11px;color:rgba(255,255,255,.4)">Pro Rate พอร์ต</span>
           <button onclick="(function(){const d=document.getElementById('pv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.45);font-size:9px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;transition:all .15s">i</button>
@@ -26552,6 +26536,10 @@ async function renderPortviewTargetBar() {
     if (oldBar) oldBar.style.display = 'block';
     return;
   }
+  // Value guard: skip full re-render if displayed value already matches
+  const _existingPctEl = bar.querySelector('#tgt-pct-num');
+  if (_existingPctEl && _existingPctEl.textContent === pct+'%' && bar.style.display === 'block') return;
+
   void bar.offsetHeight; // force reflow so browser registers opacity:0 before transitioning
   bar.style.opacity = '1';
   const colorKeySection = `<div class="tgt-det-section">
@@ -26570,7 +26558,7 @@ async function renderPortviewTargetBar() {
   bar.innerHTML = `
     <div class="tgt-bar-header">
       <div class="tgt-bar-left">
-        <span id="tgt-pct-num" class="tgt-bar-pct ${cls}">0%</span>
+        <span id="tgt-pct-num" class="tgt-bar-pct ${cls}">${pct}%</span>
         ${daysElapsed>0?`<span class="tgt-bar-days-inline">${daysElapsed} / ${daysInMonth} วัน</span>`:''}
       </div>
       <div class="tgt-bar-right">
@@ -26599,21 +26587,6 @@ async function renderPortviewTargetBar() {
       ${gmvSection}${nrrSection}${baselineSection}${colorKeySection}
     </div>`;
 
-  // ── Micro-interactions: animate numbers in after render ──
-  setTimeout(()=>{
-    // Pace% counts up
-    const _pctEl = bar.querySelector('#tgt-pct-num');
-    if(_pctEl){
-      const _tgt=pct, _dur=500, _s=performance.now();
-      const _f=t=>{const p=Math.min((t-_s)/_dur,1),e=1-Math.pow(1-p,3);_pctEl.textContent=Math.round(_tgt*e)+'%';if(p<1)requestAnimationFrame(_f);};
-      requestAnimationFrame(_f);
-    }
-    // Legend items stagger in
-    bar.querySelectorAll('.tgt-pl-item').forEach((el,i)=>{
-      el.style.opacity='0';
-      el.style.animation=`_numReveal .25s ease ${i*80}ms forwards`;
-    });
-  },30);
 }
 
 function _tgtToggleDetail(panelId, handleId) {
