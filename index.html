@@ -7329,9 +7329,11 @@ function _autoRouteAfterLogin() {
     _bundlePreWarming=true;
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
       _bundlePreWarming=false;
-      // v206d: avoid a full portfolio repaint if user is already on portfolio.
-      if(typeof _senseHydrateVisiblePortfolio==='function'&&_senseHydrateVisiblePortfolio('rep-bundle',{delay:260}))return;
-      refreshAll();
+      // v221d: replaced _senseHydrateVisiblePortfolio (3-step cascade) + refreshAll()
+      // with debounced render. Settle window batches this with concurrent R2 arrivals
+      // (categories/sku_current/outlets) → ONE combined render instead of 3-4 separate.
+      if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(200);
+      else refreshAll();
     });
   }
   // v206d: TL/Admin pre-warm is deliberately throttled and capped.
@@ -9011,13 +9013,16 @@ function handleFileUpload(type,input){
         // intentionally no-op — _fetchCloudflareFile owns _splashDataReady signal
       }
       // ── Render: only if portview screen is active AND splash already gone ──
-      // Smart splash covers loading; render fires from foreground completion
+      // v222: deferred 300ms so concurrent file arrivals batch into one renderPortview() call.
+      // Was: immediate renderPortviewSummary() + renderPortviewList() = two synchronous paints.
       if(document.getElementById('scr-portview')?.classList.contains('on')){
         if(Object.keys(bulkHistoryData).length>0){
-          renderPortviewSummary();
-          renderPortviewList();
+          clearTimeout(window._pvHistoryHydrateTimer);
+          window._pvHistoryHydrateTimer=setTimeout(function(){
+            window._pvHistoryHydrateTimer=null;
+            if(typeof renderPortview==='function') renderPortview();
+          },300);
         }
-        // else: foreground completion fires renderPortview() when both ready
       }
       _done();
     };reader.readAsText(file);return;
@@ -9875,16 +9880,16 @@ function _senseDataLog(){
   }catch(e){}
 }
 
-// v219 STRATEGY B: Read 3 critical files directly from IndexedDB — no network, no ETag wait.
-// Called immediately after auth, before loadUserProfile (which takes ~3s on mobile).
-// Goal: populate portviewBulkData, bulkHistoryData, bulkHandoverData from IndexedDB cache
-//       so that by the time showSenseSplash() is called, allCriticalReady()=true and
-//       dataReady=true → splash fades in ~900ms (appReady tSetup) instead of 6-8s (ETag).
-// Safe: if IndexedDB is empty (cold start), function returns 0 → normal ETag flow takes over.
-// Background ETag: scheduled 3s after render to check R2 for updated data silently.
+// v219 STRATEGY B + v222 PHASE 2: Read up to 6 files from IndexedDB — no network, no ETag wait.
+// v222 expansion: also preload categories, sku_current, outlets (cache:true files).
+// On warm boot: all 6 files load from IDB in ~150ms → NO R2 downloads needed at all.
+// _idbPreloaded=true fires when critical 3 ready (portview+history+handover).
+// Extra 3 are a bonus — eliminate the post-splash debounced batch render on warm boot.
 async function _preloadFromIndexedDB(){
-  var TABS=['portview','history','handover'];
-  var loaded=0;
+  var CRITICAL=['portview','history','handover'];
+  var EXTRA=['categories','sku_current','outlets']; // v222: also preload — cache:true in IDB
+  var TABS=[...CRITICAL,...EXTRA];
+  var loaded=0; var criticalLoaded=0;
   try{
     var tasks=TABS.map(async function(tab){
       try{
@@ -9897,6 +9902,7 @@ async function _preloadFromIndexedDB(){
         if(ok){
           _cloudLoadedTabs.add(tab);
           loaded++;
+          if(CRITICAL.indexOf(tab)>=0) criticalLoaded++;
           var kb=Math.round(cached.text.length/1024);
           var age=Math.round((Date.now()-cached.ts)/60000);
           _senseDataLog(tab,'⚡ IDB-DIRECT (no ETag)',kb+'KB',age+'min old');
@@ -9904,10 +9910,9 @@ async function _preloadFromIndexedDB(){
       }catch(e){}
     });
     await Promise.all(tasks);
-    if(loaded===3){
+    if(criticalLoaded===3){
       window._idbPreloaded=true;
-      _senseDataLog('⚡ IDB-PRELOAD','all 3 critical files ready — splash will use fast path (no ETag wait)');
-      // Signal splash gate (if splash already started) — fires if window._splashDataReady is set
+      _senseDataLog('⚡ IDB-PRELOAD','critical 3 ready ('+loaded+'/6 total) — splash fast path, R2 skipped');
       if(allCriticalReady()){
         if(typeof window._splashDataReady==='function') window._splashDataReady();
         if(window._pendingRefreshAll){
@@ -9916,7 +9921,7 @@ async function _preloadFromIndexedDB(){
         }
       }
     }else{
-      _senseDataLog('⚡ IDB-PRELOAD',loaded+'/3 files found — falling back to ETag for missing files');
+      _senseDataLog('⚡ IDB-PRELOAD',criticalLoaded+'/3 critical found ('+loaded+'/6 total) — falling back to ETag');
     }
   }catch(e){}
   return loaded;
@@ -13929,9 +13934,9 @@ function setAiProvider(p){
       orchStatus.foregroundLoaded = criticalLoaded + okCount;
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
-      // v206d: hydrate visible portfolio/team lists instead of full re-rendering the screen.
+      // v222: debounced — was _senseHydrateVisiblePortfolio('enhancement-ready',{delay:360}) cascade
       try{
-        if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('enhancement-ready',{delay:360});
+        if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(400);
         else {
           if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview();
           if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview();
@@ -14056,11 +14061,12 @@ function setAiProvider(p){
       if(criticalOk === CRITICAL.length){
         safeToast('พร้อมใช้งาน — ข้อมูลหลัก ' + criticalOk + '/' + CRITICAL.length + ' ไฟล์','✓');
         baseData.setDataPillText('พร้อมใช้งาน','เติมรายละเอียดต่อเบื้องหลัง');
+        // v222: debounced — settle window batches with concurrent background file arrivals
         try{
-          if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('critical-ready',{full:true,delay:140});
+          if(typeof _scheduleRefreshAll==='function') _scheduleRefreshAll(300);
           else if(typeof renderPortview === 'function') renderPortview();
         }catch(e){}
-        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !(typeof _senseHydrateVisiblePortfolio === 'function')) renderTeamview(); }catch(e){}
+        try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on') && !(typeof _scheduleRefreshAll === 'function')) renderTeamview(); }catch(e){}
         nextIdle(function(){ startCloudEnhancementLoad({ token, criticalLoaded:criticalOk }); }, 450);
       }else{
         safeToast('ข้อมูลหลักยังไม่ครบ — กด Refresh data','⚠');
@@ -29206,10 +29212,13 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   function hydrateVisible(reason){
     try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
     try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
+    // v222: direct screen renders are synchronous → single browser paint.
+    // Removed _senseHydrateVisiblePortfolio() — its summary+list+strip setTimeout cascade
+    // was adding 2 extra async paints on top of the renderPortview() call below.
+    // renderPortview() already covers the full portview screen.
     try{ if(typeof renderTeamview === 'function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview(); }catch(e){}
     try{ if(typeof renderPortview === 'function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview(); }catch(e){}
     try{ if(typeof renderKamOverview === 'function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
-    try{ if(typeof _senseHydrateVisiblePortfolio === 'function') _senseHydrateVisiblePortfolio('v212a-'+(reason||'hydrate'),{full:true,delay:160}); }catch(e){}
   }
   function keysAreCritical(keys){
     if(!Array.isArray(keys)) return false;
