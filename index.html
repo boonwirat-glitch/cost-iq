@@ -3586,7 +3586,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
         skus: Object.freeze({type:'bulk-skus',tab:'skus',cache:false,heavy:true}),
         alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true}),
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
-        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true,freshness:'network-first'})
+        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:false,freshness:'network-first'})
       })
     }),
     legacySheets: Object.freeze({
@@ -7198,9 +7198,6 @@ function showSenseSplash(onDone){
   // Guard is released and one final refreshAll fires in doFade after splash fully disappears.
   window._senseSplashActive=true;
   window._pendingRefreshAll=false;
-  // v223 fix: kill any pending RenderBus timers from pre-splash IDB signals.
-  // Without this, stale timers fire _flush() during splash → renderPortview() bypass.
-  if(window.RenderBus && window.RenderBus._cancelPending) window.RenderBus._cancelPending();
   splash.style.display='flex';splash.style.opacity='1';
   const tickerEl=document.getElementById('spl-ticker');
   const bar=document.getElementById('spl-bar');
@@ -7381,16 +7378,15 @@ function hideLoginOverlay() {
     }catch(e){}
   };
   // v223 Option A: skip splash entirely on warm IDB boot
-  // v223b FIX: removed _idbPreloaded dependency — that variable isn't set yet when
-  // hideLoginOverlay() runs (IDB preload resolves ~150ms later).
-  // last_critical_ready in localStorage is available immediately and is the reliable signal.
-  // Render is NOT triggered here — IDB preload signals hit RenderBus directly (no splash blocking them).
+  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
+  // → restore last state → render immediately → ETag check silently in background
   var _canSkipSplash = (function(){
     try{
+      if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30; // IDB data < 30min = safe to skip splash
+      return ageMin < 30; // IDB data is fresh enough to show immediately
     }catch(e){return false;}
   })();
 
@@ -7406,14 +7402,14 @@ function hideLoginOverlay() {
     }else{
       _senseDataLog('RESUME','⚡ skip splash — warm IDB boot (no saved state)');
     }
-    // Hide splash overlay immediately — no animation, no blocking
+    // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
     window._senseSplashActive=false;
     window._pendingRefreshAll=false;
-    // Fire _autoRouteAfterLogin → starts R2 loads, ETag check, bundle fetch
+    // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
     _autoRouteAfterLogin();
-    // Restore saved screen after route
+    // Restore saved screen (after route which defaults to portview/teamview)
     if(_rs&&_rs.screen&&typeof showScreen==='function'){
       setTimeout(function(){
         try{
@@ -7422,8 +7418,9 @@ function hideLoginOverlay() {
         }catch(e){}
       },0);
     }
-    // DO NOT signal RenderBus here — IDB preload signals hit it directly now that
-    // _senseSplashActive=false. They will batch and render in ~150ms.
+    // Render immediately with IDB data
+    if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
+    else if(typeof refreshAll==='function') setTimeout(refreshAll,30);
     loginTransitionRunning=false;
     clearTimeout(lockSafetyTimer);
     return;
@@ -10104,17 +10101,20 @@ window.RenderBus = (function(){
 
   function _flush(){
     _timer = null;
-    // v223 fix: if splash became active between timer-set and timer-fire (IDB signals before splash),
-    // abort flush and queue instead. doFade will release the queued render.
-    if(window._senseSplashActive){
-      window._pendingRefreshAll = true;
-      _senseDataLog('RENDERBUS','⏳ flush deferred — splash active');
-      return;
-    }
     _lastRender = Date.now();
     _senseDataLog('RENDERBUS','🎯 RENDER ['+Array.from(_ready).join(',')+']');
-    // refreshAll() handles active screen routing internally — no need for direct render calls here.
+    // Primary: KAM account detail screen
     if(typeof refreshAll === 'function') refreshAll();
+    // Portfolio list screen (not covered by refreshAll)
+    try{
+      if(document.getElementById('scr-portview')?.classList.contains('on') &&
+         typeof renderPortview === 'function') renderPortview();
+    }catch(e){}
+    // Team view screen
+    try{
+      if(document.getElementById('scr-teamview')?.classList.contains('on') &&
+         typeof renderTeamview === 'function') renderTeamview();
+    }catch(e){}
   }
 
   function signal(source){
@@ -10156,8 +10156,7 @@ window.RenderBus = (function(){
     _senseDataLog('RENDERBUS','🔄 reset (reload/resume)');
   }
 
-  return { signal: signal, markRender: markRender, reset: reset,
-    _cancelPending: function(){ clearTimeout(_timer); _timer=null; } };
+  return { signal: signal, markRender: markRender, reset: reset };
 })();
 
 function refreshAll(){
