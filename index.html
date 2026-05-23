@@ -1,15 +1,12 @@
-<!-- Freshket Sense v224 PWA RESUME FIX — surgical 3-job patch on v223 baseline.
-     Goal: iOS PWA warm resume skips splash entirely. Commission strip shows only when data ready.
-     Jobs:
-       P1. _canSkipSplash: removed window._idbPreloaded guard (was always false at t=200ms when
-           profile cache fires, while IDB completes at t=350ms — timing gap = skip-splash never fired).
-           New condition: last_critical_ready < 30min only. IDB TTL=6h >> 30min → data integrity intact.
-       P2. showSenseSplash MAX_SHOW warmBoot: 6000ms → 1500ms. Was causing 5.6s splash hang when
-           P1 guard fell through. 1500ms > tSetup(900ms) so routing still fires before force-fade.
-       P3. _commBuildKamSelfCard: return '' if !_tgtLoaded. Prevents wrong commission number
-           flash on first render before loadTargets() (Supabase async) completes.
-     No logic changes to RenderBus, allCriticalReady, auth state machine, or commission calculation.
-     Rollback: revert 3 str_replace blocks (P1 L7383, P2 L7225, P3 L23829). -->
+<!-- Freshket Sense v224 — 3 surgical fixes, no auth/boot/RenderBus changes.
+     P1. loadFromCloudflareR2: guard direct renderPortview/renderTeamview with
+         _senseSplashActive check. Pre-RenderBus holdovers causing redundant second
+         render on cold boot. Scroll reset preserved. RenderBus handles render.
+     P2. _commBuildKamSelfCard: return '' if !_tgtLoaded — prevents wrong commission
+         number flash before loadTargets() (Supabase async) completes.
+     P3. showSenseSplash MAX_SHOW warmBoot: 6000→1500ms. No manual Refresh in app
+         so IDB-cleared edge case is not a real scenario. 1500 > tSetup(900ms).
+     Rollback: revert P1 L9778, P2 L23828, P3 L7224. -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -7229,13 +7226,12 @@ function showSenseSplash(onDone){
   _senseDataLog('SPLASH',
     _cacheWarm    ? '🟢 WARM (JS state)' :
     _idbPreloaded ? '⚡ IDB-FAST (Strategy B — no ETag) — MIN=0ms MAX=1500ms' :
-    _isWarmBoot   ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=1500ms' :
+    _isWarmBoot   ? '🟡 WARM (IndexedDB < 6h) — MIN=0ms MAX=6000ms' :
                     '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
-  // v224: _isWarmBoot MAX_SHOW 6000→1500ms. Old 6000ms caused 5.6s hang when
-  // _canSkipSplash fell through to showSenseSplash() — IDB data was ready at ~350ms
-  // but splash held until MAX_SHOW timeout. 1500ms > tSetup(900ms) so routing fires.
+  // v224 P3: warmBoot MAX_SHOW 6000→1500ms. No manual Refresh in this app so the
+  // IDB-cleared edge case doesn't exist. 1500ms > tSetup(900ms) — routing still fires.
   const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 1500 : 5000));
   const startMs=Date.now();
   let faded=false;
@@ -7391,18 +7387,16 @@ function hideLoginOverlay() {
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
-  // v224 skip-splash: only condition = last_critical_ready < 30min.
-  // Removed _idbPreloaded guard (v223 regression): profile cache fires at t≈200ms
-  // but IDB preload completes at t≈350ms — guard was always false when evaluated,
-  // so skip-splash never fired on iOS PWA resume (every resume = cold reload on iOS).
-  // Safety: last_critical_ready < 30min implies IDB TTL (6h) is intact. If IDB is
-  // empty for any reason, RenderBus gates render until data arrives — no blank screen.
+  // v223 Option A: skip splash entirely on warm IDB boot
+  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
+  // → restore last state → render immediately → ETag check silently in background
   var _canSkipSplash = (function(){
     try{
+      if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30;
+      return ageMin < 30; // IDB data is fresh enough to show immediately
     }catch(e){return false;}
   })();
 
@@ -9797,8 +9791,13 @@ async function loadFromCloudflareR2(){
         window.scrollTo({top:0,left:0,behavior:'instant'});
         document.body.scrollTop=0;document.documentElement.scrollTop=0;
       }
-      if(typeof renderPortview==='function')renderPortview();
-      if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
+      // v224 P1: skip direct renders while splash is active — RenderBus handles
+      // render via per-file signals already. These calls are pre-RenderBus holdovers
+      // that cause a redundant second render on every cold boot.
+      if(!window._senseSplashActive){
+        if(typeof renderPortview==='function')renderPortview();
+        if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
+      }
     }else{
       // v195 Step 3: persistent offline banner (not just toast) when all 5 foreground files fail
       showToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
@@ -23844,9 +23843,7 @@ function _commBuildKamSelfState() {
 function _commBuildKamSelfCard() {
   const st = _commBuildKamSelfState();
   if (!st) return '';
-  // v224: if loadTargets() not complete, show nothing — prevent wrong number flash.
-  // _tgtLoaded is set true inside loadTargets() after Supabase fetch completes.
-  // Showing 0 or wrong payout before data ready destroys trust more than a blank strip.
+  // v224 P2: hide strip until loadTargets() completes — prevents wrong number flash.
   if (!_tgtLoaded) return '';
   const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
