@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v224c
+// Freshket Sense — Service Worker v224d
 // Strategy: Cache-first for app shell (instant resume) + background network update.
 //
 // v223b: Changed from network-first to cache-first for navigation.
@@ -16,7 +16,7 @@
 // skipWaiting() intentionally omitted — see v195 comment.
 // New SW waits for all tabs to close before activating (prevents auth interruption).
 
-const CACHE_NAME = 'freshket-sense-v224c';
+const CACHE_NAME = 'freshket-sense-v224d';
 const OFFLINE_URL = '/index.html';
 
 self.addEventListener('install', event => {

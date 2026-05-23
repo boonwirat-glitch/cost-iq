@@ -1,4 +1,4 @@
-<!-- Freshket Sense v224c: + NRR self-heal + _preloadFromIndexedDB respects cache:false (portview+handover always fresh from R2). Rollback: sense_v224.html -->
+<!-- Freshket Sense v224d: ETag check 3000ms→0ms (immediate). Reverts IDB preload change. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -8008,9 +8008,8 @@ supa.auth.onAuthStateChange((event, session) => {
           // Partial or no IndexedDB hit — kick off normal R2 load with ETag
           try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
         }
-        // v219 STRATEGY B: Step 2 — schedule background ETag check 3s after preload.
-        // Verifies R2 for fresh data silently after app renders with IndexedDB data.
-        // 304 = no-op (silent). 200 = new data → re-ingest → refreshAll → silent UI update.
+        // v224d: ETag check fires immediately after IDB render (was 3000ms).
+        // Minimises stale-data window: 304 = silent no-op, 200 = re-render within ~500ms.
         if(count>0){
           clearTimeout(window._bgEtagTimer);
           window._bgEtagTimer=setTimeout(async function(){
@@ -8022,7 +8021,7 @@ supa.auth.onAuthStateChange((event, session) => {
               window._idbPreloaded=false; // reset after first real ETag cycle
               _senseDataLog('BACKGROUND','ETag check complete');
             }catch(e){}
-          },3000);
+          },0);
         }
       });
       // v220 PROFILE CACHE: inject cached profile → hideLoginOverlay immediately (no 3s wait).
@@ -10933,7 +10932,6 @@ async function _preloadFromIndexedDB(){
         if((Date.now()-cached.ts)>=_CSV_TTL) return;  // expired (> 6h)
         var spec=R2_SPECS[tab];
         if(!spec) return;
-        if(spec.cache===false) return; // v224c: respect network-first — never serve stale IDB for cache:false files
         var ok=await ingestCSVText(spec.type,cached.text,{timeoutMs:30000});
         if(ok){
           _cloudLoadedTabs.add(tab);
