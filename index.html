@@ -26528,8 +26528,8 @@ async function renderPortviewTargetBar() {
   // Ensure pace bar is hidden — tgt bar is the single visible widget (v190)
   const oldBar = document.getElementById('portview-pace-bar');
   if (oldBar) oldBar.style.display = 'none';
-  bar.style.opacity = '0';
   bar.style.display = target > 0 ? 'block' : 'none';
+  bar.style.opacity = '1';
   bar.classList.remove('tgt-skeleton');
   if (!target) {
     // No target set — reveal legacy pace bar as fallback (v190)
@@ -26538,10 +26538,9 @@ async function renderPortviewTargetBar() {
   }
   // Value guard: skip full re-render if displayed value already matches
   const _existingPctEl = bar.querySelector('#tgt-pct-num');
-  if (_existingPctEl && _existingPctEl.textContent === pct+'%' && bar.style.display === 'block') return;
+  if (_existingPctEl && _existingPctEl.textContent === pct+'%') return;
 
-  void bar.offsetHeight; // force reflow so browser registers opacity:0 before transitioning
-  bar.style.opacity = '1';
+  void bar.offsetHeight;
   const colorKeySection = `<div class="tgt-det-section">
     <div class="tgt-det-stitle">สีของตัวเลข เป้าหมาย</div>
     <div class="tgt-color-key">
