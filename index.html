@@ -7378,16 +7378,15 @@ function hideLoginOverlay() {
     }catch(e){}
   };
   // v223 Option A: skip splash entirely on warm IDB boot
-  // v223b FIX: removed _idbPreloaded dependency — that variable isn't set yet when
-  // hideLoginOverlay() runs (IDB preload resolves ~150ms later).
-  // last_critical_ready in localStorage is available immediately and is the reliable signal.
-  // Render is NOT triggered here — IDB preload signals hit RenderBus directly (no splash blocking them).
+  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
+  // → restore last state → render immediately → ETag check silently in background
   var _canSkipSplash = (function(){
     try{
+      if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30; // IDB data < 30min = safe to skip splash
+      return ageMin < 30; // IDB data is fresh enough to show immediately
     }catch(e){return false;}
   })();
 
@@ -7403,14 +7402,14 @@ function hideLoginOverlay() {
     }else{
       _senseDataLog('RESUME','⚡ skip splash — warm IDB boot (no saved state)');
     }
-    // Hide splash overlay immediately — no animation, no blocking
+    // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
     window._senseSplashActive=false;
     window._pendingRefreshAll=false;
-    // Fire _autoRouteAfterLogin → starts R2 loads, ETag check, bundle fetch
+    // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
     _autoRouteAfterLogin();
-    // Restore saved screen after route
+    // Restore saved screen (after route which defaults to portview/teamview)
     if(_rs&&_rs.screen&&typeof showScreen==='function'){
       setTimeout(function(){
         try{
@@ -7419,8 +7418,9 @@ function hideLoginOverlay() {
         }catch(e){}
       },0);
     }
-    // DO NOT signal RenderBus here — IDB preload signals hit it directly now that
-    // _senseSplashActive=false. They will batch and render in ~150ms.
+    // Render immediately with IDB data
+    if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
+    else if(typeof refreshAll==='function') setTimeout(refreshAll,30);
     loginTransitionRunning=false;
     clearTimeout(lockSafetyTimer);
     return;
