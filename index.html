@@ -8673,7 +8673,7 @@ function handleFileUpload(type,input){
         D.cats_monthly=bulkCatsData[currentAccountId];
         const moSort=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
         const mk=Object.keys(D.cats_monthly).sort((a,b)=>moSort(b)-moSort(a));
-        D.cats=mk.length?D.cats_monthly[mk[0]]:[];fileStatus.categories=true;refreshAll();
+        D.cats=mk.length?D.cats_monthly[mk[0]]:[];fileStatus.categories=true;_scheduleRefreshAll(400); // v221
       }
       // toast removed v205b — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(30,'กำลังโหลดหมวดหมู่...');
@@ -8799,7 +8799,7 @@ function handleFileUpload(type,input){
           const mk=Object.keys(D.skus_monthly).sort((a,b)=>_ms(b)-_ms(a));
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
           if(D.alts.length&&D.skus.length)computeOPPS();
-          if(!_sgRunning&&!_bundlePreWarming){refreshAll();}
+          if(!_sgRunning&&!_bundlePreWarming){_scheduleRefreshAll(400);} // v221
         }
       }else{
         // no currentAccountId (TL view) — all lines go to remaining
@@ -8886,7 +8886,7 @@ function handleFileUpload(type,input){
             }
           }else{remaining.push(l);}
         });
-        if(bulkPriceData[pri]&&typeof refreshAll==='function')refreshAll();
+        if(bulkPriceData[pri]&&typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(400); // v221
       }else{
         lines.forEach(l=>remaining.push(l));
       }
@@ -9035,7 +9035,7 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
-      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(typeof refreshAll==='function')refreshAll();}
+      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(400);} // v221
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
@@ -9054,7 +9054,7 @@ function handleFileUpload(type,input){
         //        to prevent gate dismissal mid-load; reset only on manual/background reload
         if(!_sgRunning&&!_bundlePreWarming){
           senseActivated=false;_sgRunning=false;
-          refreshAll();updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus();
+          _scheduleRefreshAll(400);updateDataStatus();if(typeof updateMatcherPreStatus==='function')updateMatcherPreStatus(); // v221
         }
       }
       // toast removed v205a — bulk ingest noise
@@ -9573,11 +9573,9 @@ function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
     if(token!==_cloudLoadToken)return;
     _cloudBackgroundPromise=null;
     // ── Tier 3: v198d fix — moved from .then() to .finally() ──
-    // bulk_price โหลดเสมอ ไม่ว่า skus/alternatives จะสำเร็จหรือล้มเหลว
-    // v198e: ใช้ _cloudLoadToken ณ เวลา finally() รัน (ไม่ใช่ captured token)
-    // เพื่อป้องกัน stale token จาก auth events (SIGNED_OUT → token++)
-    const _priceToken = _cloudLoadToken;
-    setTimeout(()=>_startDeferredPriceLoad(_priceToken),3000);
+    // v221: bulk_price auto-load disabled — load on-demand only (call _startDeferredPriceLoad() when sparklines needed)
+    // Was: setTimeout(()=>_startDeferredPriceLoad(_priceToken),3000);
+    _senseDataLog('BACKGROUND','bulk_price deferred — call _startDeferredPriceLoad() when sparklines needed');
   });
   return _cloudBackgroundPromise;
 }
@@ -9920,6 +9918,20 @@ function allCriticalReady(){
            _cloudLoadedTabs.has('history') &&
            _cloudLoadedTabs.has('handover');
   }catch(e){return false;}
+}
+
+// v221 DEBOUNCE: background file callbacks (categories, sku_current, outlets, price, alternatives)
+// each call refreshAll() independently → 4-6 visible re-renders after splash.
+// _scheduleRefreshAll batches all arrivals within 400ms into ONE consolidated render.
+// Used ONLY by background file ingest callbacks — not by doFade or the data gate.
+var _scheduleRefreshAllTimer=null;
+function _scheduleRefreshAll(delayMs){
+  clearTimeout(_scheduleRefreshAllTimer);
+  _scheduleRefreshAllTimer=setTimeout(function(){
+    _scheduleRefreshAllTimer=null;
+    _senseDataLog('RENDER','_scheduleRefreshAll ✅ debounced render fired');
+    if(typeof refreshAll==='function') refreshAll();
+  }, delayMs||400);
 }
 
 function refreshAll(){
@@ -13985,12 +13997,8 @@ function setAiProvider(p){
       return [false,false];
     }).finally(function(){
       try{ if(token === _cloudLoadToken) _cloudBackgroundPromise = null; }catch(e){}
-      // ── v198f: Tier 3 deferred price load — orchestrator path ──
-      // Legacy path had this fix but orchestrator never called it
-      try{
-        const _pt = _cloudLoadToken;
-        setTimeout(function(){ _startDeferredPriceLoad(_pt); }, 3000);
-      }catch(e){}
+      // ── v221: Tier 3 deferred price load disabled — on-demand only ──
+      // v198f path was: setTimeout(function(){ _startDeferredPriceLoad(_pt); }, 3000);
     });
 
     try{ _cloudBackgroundPromise = p; }catch(e){}
