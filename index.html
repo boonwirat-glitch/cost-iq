@@ -10637,15 +10637,14 @@ async function loadFromCloudflareR2(){
         window.scrollTo({top:0,left:0,behavior:'instant'});
         document.body.scrollTop=0;document.documentElement.scrollTop=0;
       }
-      // v224e: only render portview when all critical data ready — prevents partial renders
-      if(typeof allCriticalReady==='function' && allCriticalReady()){
+      // v224e fix: render portview/teamview when data is available.
+      // Guard: suppress ONLY when portviewBulkData is empty (prevents 0% red bar flash).
+      // allCriticalReady() check removed from here — it was blocking renders via
+      // non-existent schedulePortviewListRender() → silent no-op → empty sparkline bars.
+      const _pvHasData = typeof portviewBulkData !== 'undefined' && portviewBulkData && portviewBulkData.length > 0;
+      if(_pvHasData){
         if(typeof renderPortview==='function')renderPortview();
         if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
-      } else {
-        // Data gate not met — refreshAll() will handle render when ready
-        if(typeof schedulePortviewListRender==='function'&&document.getElementById('scr-portview')?.classList.contains('on')){
-          schedulePortviewListRender(300);
-        }
       }
     }else{
       // v195 Step 3: persistent offline banner (not just toast) when all 5 foreground files fail
