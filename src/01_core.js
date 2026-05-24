@@ -332,7 +332,10 @@ supa.auth.onAuthStateChange((event, session) => {
       // all 3 critical files should already be in memory from IndexedDB → splash fades in ~900ms.
       // If IndexedDB empty (cold start), returns 0 → ETag path takes over (normal flow).
       window._idbPreloaded=false;
-      _preloadFromIndexedDB().then(function(count){
+      // v225 A1: expose promise so profile-cache-hit path can wait for IDB result (race fix).
+      var _idbPreloadProm = _preloadFromIndexedDB();
+      window._idbPreloadPromise = _idbPreloadProm;
+      _idbPreloadProm.then(function(count){
         if(count<3){
           // Partial or no IndexedDB hit — kick off normal R2 load with ETag
           try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
@@ -356,14 +359,27 @@ supa.auth.onAuthStateChange((event, session) => {
       // v220 PROFILE CACHE: inject cached profile → hideLoginOverlay immediately (no 3s wait).
       // loadUserProfile() runs in background → silent update if profile changed.
       // First-ever login: cache miss → falls back to original await path.
+      //
+      // v225 A2: skip-splash race fix — wait for IDB preload before calling hideLoginOverlay.
+      // Root cause: _canSkipSplash evaluates window._idbPreloaded synchronously, but IDB is async.
+      // Profile cache hit fired hideLoginOverlay before IDB resolved → _idbPreloaded always false
+      // → skip-splash never triggered even on warm boot.
+      // Fix: race IDB promise against 500ms timeout. IDB typically resolves in ~150ms on warm boot.
+      // If IDB takes >500ms (cold start / very slow device), proceed anyway — skip-splash won't fire
+      // but that's correct (IDB not ready = not a warm boot).
       var _cp=_profileCacheGet(currentUser.id);
       if(_cp){
         currentUserProfile=_cp; normalizeCurrentUserProfileRole();
-        _senseDataLog('PROFILE','⚡ cache hit → hideLoginOverlay immediately (saves ~3s)');
-        hideLoginOverlay();
-        loadUserProfile(); // background revalidate — no await, no gate
+        _senseDataLog('PROFILE','⚡ cache hit → waiting for IDB preload before hideLoginOverlay (max 500ms)');
+        Promise.race([
+          window._idbPreloadPromise,
+          new Promise(function(r){setTimeout(r,500);})
+        ]).then(function(){
+          hideLoginOverlay();
+          loadUserProfile(); // background revalidate — no await, no gate
+        });
       }else{
-        loadUserProfile().then(()=>hideLoginOverlay());
+        loadUserProfile().then(function(){hideLoginOverlay();});
       }
     }
   } else if (event === 'SIGNED_OUT' && currentUser) {
@@ -807,9 +823,8 @@ function _autoRouteAfterLogin() {
   _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
   if(isRepRole(role)&&currentUser&&currentUser.email){
-    _bundlePreWarming=true;
+    // v225: removed _bundlePreWarming flag — consistent with TL prewarm removal
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
-      _bundlePreWarming=false;
       // v223: RenderBus batches with concurrent file arrivals
       if(window.RenderBus) window.RenderBus.signal('bundle');
       else refreshAll();

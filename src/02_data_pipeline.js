@@ -891,7 +891,7 @@ let _cloudInitialPromise = null;
 let _cloudBackgroundPromise = null;
 let _cloudLoadToken = 0;
 const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded to memory
-let _bundlePreWarming = false;         // v204: true during TL pre-warm → suppress re-renders
+let _bundlePreWarming = false;         // v225: always false — suppress flag removed (never set to true)
 const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
 // v206d: performance guardrails for mobile/PWA.
@@ -937,23 +937,20 @@ function _startTlBundlePrewarm(){
   if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
   const runId=++_tlPrewarmRunId;
   _tlPrewarmTimer=setTimeout(async()=>{
-    const emails=_senseGetTlPrewarmEmails(8); // v224e: cover more KAMs (was 5)
+    const emails=_senseGetTlPrewarmEmails(8);
     if(!emails.length)return;
-    _senseLog('%c[v224e bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    _bundlePreWarming=true;
+    _senseLog('%c[v225 bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v225: removed _bundlePreWarming suppress flag — RenderBus SETTLE_MS batches concurrent
+    // bundle signals naturally. User-active throttle removed (HTTP fetches don't block UI thread).
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
-      // v224e: shorter user-interaction throttle (was 8×900ms = 7.2s max)
-      // Prewarm data is critical for TL — don't delay more than 1.5s
-      let waitLoops=0;
-      while(_senseIsUserActive()&&waitLoops<3){await _senseSleep(500);waitLoops++;}
       await _fetchKamBundle(e).catch(()=>{});
-      await _senseSleep(400); // v224e: was 950ms
+      // v225: signal RenderBus per bundle → portview list updates progressively, not all-at-end
+      try{ if(window.RenderBus) window.RenderBus.signal('bundle:'+e.replace(/[@.]/g,'_')); }catch(_){}
+      await _senseSleep(200); // v225: 400→200ms gap (R2 has no rate limit at this scale)
     }
-    _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
-    if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('tl-prewarm',{delay:420});
-    _senseLog('%c[v206d bundle] TL prewarm complete/throttled','color:#00d070');
+    _senseLog('%c[v225 bundle] TL prewarm complete','color:#00d070');
   },2000);
 }
 

@@ -506,14 +506,9 @@
     }, opts.delay == null ? 900 : opts.delay);
   }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') scheduleResumeRepair('visibility-visible', {delay:1200});
-  });
-  global.addEventListener('pageshow', function(event){
-    scheduleResumeRepair(event&&event.persisted ? 'pageshow-bfcache' : 'pageshow', {delay:event&&event.persisted?900:1800});
-  });
-  global.addEventListener('focus', function(){ scheduleResumeRepair('window-focus', {delay:1400}); });
-  global.addEventListener('online', function(){ scheduleResumeRepair('online', {delay:450, force:true}); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v206f.
+  // Replaced by ResumeCoordinator at end of 08_patches.js — single coordinator
+  // for all 3 patches (v206f/v212/v212a) to prevent 3× render on every resume.
 
   // First-load sanity: when a new build is loaded over an old local/session state, repair once after auth/routing settles.
   setTimeout(function(){
@@ -1678,15 +1673,8 @@
     }, opts.delay == null ? 1200 : opts.delay);
   }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') schedule('visibility-visible', {delay:1600});
-  });
-  global.addEventListener('pageshow', function(event){
-    if(event && event.persisted) schedule('pageshow-bfcache', {delay:900, force:true});
-    else schedule('pageshow', {delay:2600});
-  });
-  global.addEventListener('focus', function(){ schedule('window-focus', {delay:1800}); });
-  global.addEventListener('online', function(){ schedule('online', {delay:500, force:true}); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v212.
+  // Handled by ResumeCoordinator at end of 08_patches.js.
 
   global.FreshketSenseV212 = {
     version: VERSION,
@@ -1894,14 +1882,8 @@
     }
   }catch(e){ warn('reloadFromCloudflareR2 wrap failed', e&&e.message?e.message:e); }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') setTimeout(function(){ validateUnifiedFreshness('visibility-visible'); }, 2400);
-  });
-  global.addEventListener('pageshow', function(event){
-    setTimeout(function(){ validateUnifiedFreshness(event && event.persisted ? 'pageshow-bfcache' : 'pageshow', {force:!!(event&&event.persisted)}); }, event && event.persisted ? 1200 : 3200);
-  });
-  global.addEventListener('focus', function(){ setTimeout(function(){ validateUnifiedFreshness('window-focus'); }, 2600); });
-  global.addEventListener('online', function(){ setTimeout(function(){ validateUnifiedFreshness('online', {force:true}); }, 800); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v212a.
+  // Handled by ResumeCoordinator at end of 08_patches.js.
 
   var api = {
     version: VERSION,
@@ -2733,4 +2715,121 @@
   try{global.addEventListener('pageshow',function(){setTimeout(apply,180);},{passive:true});}catch(e){}
   global.FreshketSenseV213f={version:VERSION,dataEpoch:DATA_EPOCH,apply:apply};
   setTimeout(function(){apply();try{console.log('[Sense v213f] installed');}catch(e){}},300);
+})(window);
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v225-resume-coordinator
+//////////////////////////////////////////////////////////////////////////////
+//
+// v225 ResumeCoordinator — Single entry point for all resume events.
+//
+// REPLACES: 12 individual event listeners from v206f, v212, v212a
+//   (visibilitychange × 3, pageshow × 3, focus × 3, online × 3)
+//
+// PROBLEM SOLVED: 3 independent patches each added their own listeners,
+// firing at t=1200/1600/2400ms on every screen wake → 3 renders per resume.
+//
+// DESIGN:
+//   - ONE set of event listeners for all resume triggers
+//   - Gate I11: skip if login form is visible (user may be typing)
+//   - Gate: skip if not logged in
+//   - Dedup: MIN_GAP 60s — no repeat check within 1 minute
+//   - Delegates to v212a.validateFreshnessOnResume (most comprehensive)
+//     which handles ETag check (CSV) + governance reload (Supabase)
+//   - If stale data found → ETag fetch → result goes through RenderBus
+//     (not direct renderXxx calls)
+//
+// INVARIANTS ENFORCED:
+//   I5: visibilitychange/pageshow → coordinator only
+//   I8: resume + data unchanged + <60s → zero render
+//   I11: login overlay visible → zero trigger
+
+(function(global){
+  'use strict';
+  var VERSION = 'v225-resume-coordinator';
+  var MIN_GAP_MS = 60000; // 60s — minimum gap between freshness checks
+  var _lastRunAt = 0;
+  var _timer = null;
+  var _inFlight = null;
+
+  function _isLoginVisible(){
+    try{
+      var ov = document.getElementById('login-overlay');
+      if(!ov) return false;
+      // Overlay is visible if display is not 'none' and doesn't have hidden class
+      return ov.style.display !== 'none' && !ov.classList.contains('lgi-hidden');
+    }catch(e){ return false; }
+  }
+
+  function _isLoggedIn(){
+    try{ return !!global.currentUser; }catch(e){ return false; }
+  }
+
+  function _schedule(reason, delayMs){
+    clearTimeout(_timer);
+    _timer = setTimeout(function(){
+      _timer = null;
+      _run(reason);
+    }, delayMs || 1200);
+  }
+
+  function _run(reason){
+    // Gate I11: don't disturb login form (user may be typing password)
+    if(_isLoginVisible()) return;
+    // Gate: not logged in yet — auth will handle data load
+    if(!_isLoggedIn()) return;
+    // Dedup: already checked recently
+    if(_inFlight) return;
+    var now = Date.now();
+    if(now - _lastRunAt < MIN_GAP_MS) return;
+    _lastRunAt = now;
+
+    _inFlight = (function(){
+      // Use v212a's unified validator (handles CSV ETag + governance/commission reload).
+      // Call with force:true to bypass its internal 180s dedup — coordinator owns timing.
+      var validator = null;
+      try{
+        if(global.FreshketSenseV212a && typeof global.FreshketSenseV212a.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212a.validateFreshnessOnResume;
+        } else if(global.FreshketSenseV212 && typeof global.FreshketSenseV212.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212.validateFreshnessOnResume;
+        }
+      }catch(e){}
+
+      var p = validator
+        ? validator(reason, {force: true})
+        : Promise.resolve(false);
+
+      p.catch(function(){}).finally
+        ? p.catch(function(){}).finally(function(){ _inFlight = null; })
+        : p.then(function(){ _inFlight = null; }, function(){ _inFlight = null; });
+
+      return p;
+    })();
+  }
+
+  // ── Single set of listeners (replaces 12 from v206f/v212/v212a) ──────────
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') _schedule('visibility-visible', 1200);
+  });
+  global.addEventListener('pageshow', function(event){
+    // bfcache restore (faster): 900ms; normal page show: 1800ms
+    _schedule(event && event.persisted ? 'pageshow-bfcache' : 'pageshow',
+              event && event.persisted ? 900 : 1800);
+  });
+  global.addEventListener('focus', function(){ _schedule('window-focus', 1400); });
+  global.addEventListener('online', function(){
+    // Network restored — check immediately (but still respect MIN_GAP)
+    _schedule('online', 450);
+  });
+
+  // Expose for diagnostics
+  global.FreshketSenseResumeCoordinator = {
+    version: VERSION,
+    getLastRunAt: function(){ return _lastRunAt; },
+    getState: function(){ return {lastRunAt: _lastRunAt, inFlight: !!_inFlight, timer: !!_timer}; }
+  };
+
+  try{ console.log('[Sense v225] ResumeCoordinator installed — replaces 12 resume listeners'); }catch(e){}
 })(window);
