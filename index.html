@@ -11820,6 +11820,10 @@ function __legacyRenderPortfolioFallback(){
 :'';
     priceRow.style.display=priceTotal>0?'flex':'none';
   }
+  // v224e: cache priceUp/priceDn to window so renderPortMoMInsight() can read them
+  // even when called from outside renderPortfolio() scope (e.g. portviewSelectAccount)
+  window._portfolioPriceUp = priceUp;
+  window._portfolioPriceDn = priceDn;
   renderSKUList(skus);
   renderPortMoMInsight();
   if(window._expandPortTop)window._expandPortTop();
@@ -19559,9 +19563,13 @@ function renderPortMoMInsight(){
   if(newCount>0)parts.push(`SKU ใหม่ ${newCount} รายการ`);
   if(!parts.length){el.style.display='none';return;}
   // v224e: elevated styling — this insight is more useful than the old green concentration box
-  const _hasPriceInfo = priceUp > 0 || priceDn > 0;
+  // priceUp/priceDn are local in renderPortfolio() — read from window cache set there,
+  // or default to 0 when called outside portfolio context (portviewSelect, etc.)
+  const _pu = (typeof priceUp !== 'undefined') ? priceUp : (window._portfolioPriceUp || 0);
+  const _pd = (typeof priceDn !== 'undefined') ? priceDn : (window._portfolioPriceDn || 0);
+  const _hasPriceInfo = _pu > 0 || _pd > 0;
   const _priceHint = _hasPriceInfo
-    ? `<span style="font-size:10px;color:var(--n500);margin-left:4px">(${priceUp>0?`▲${priceUp}`:''} ${priceDn>0?`▼${priceDn}`:''})</span>`
+    ? `<span style="font-size:10px;color:var(--n500);margin-left:4px">(${_pu>0?`▲${_pu}`:''} ${_pd>0?`▼${_pd}`:''})</span>`
     : '';
   el.innerHTML=`<span style="font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--n500);text-transform:uppercase">เทียบ ${prevMo}</span>${_priceHint}<div style="margin-top:4px;font-size:13px;font-weight:600;color:var(--n900);line-height:1.55">${parts.join(' <span style="color:var(--n400)">·</span> ')}</div>`;
   el.style.cssText='display:block;background:var(--g50);border-left:3px solid var(--g500);border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px';
