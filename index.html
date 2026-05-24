@@ -27561,6 +27561,11 @@ if (document.readyState === 'loading') {
 setTimeout(async function _tgtInitCheck() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   if (!role) { setTimeout(_tgtInitCheck, 600); return; }
+  // v224e render-gate: wait for portview+history data before NRR render
+  // prevents NRR bar rendering with ฿0 then re-rendering with real value
+  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
+    setTimeout(_tgtInitCheck, 400); return;
+  }
   _injectPortviewBarEl();
   await loadTargets(_tgtCurrentQuarter());
   renderPortviewTargetBar();
@@ -27573,8 +27578,6 @@ setTimeout(async function _tgtInitCheck() {
       if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
     }
   }catch(e){ console.warn('[target init] teamview refresh', e); }
-  // Re-run NRR after short delay to ensure DOM is ready
-  setTimeout(() => { _injectPortviewBarEl(); renderPortviewNRRBar(); }, 800);
   _tgtInjectTeamviewTargetRows();
 }, 1500);
 
@@ -27589,6 +27592,69 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 }
 
+
+
+// ── Commission Render Gate (v224e) ─────────────────────────────────────
+// Single entry point for all commission UI renders on startup.
+// Renders ONCE when role AND allCriticalReady() are both true.
+// Deduplicates: skips re-render if underlying data hasn't changed.
+// Eliminates the 7-render cascade (DOMContentLoaded × 3 timers + setInterval)
+// that caused commission numbers to flicker on every login.
+(function(){
+  'use strict';
+  var _lastCommKey = '';
+  var _hooked = false;
+
+  function _dataKey(){
+    try{
+      var ph = (typeof portviewBulkData!=='undefined' && portviewBulkData) ? portviewBulkData.length : -1;
+      var hh = (typeof bulkHistoryData!=='undefined' && bulkHistoryData) ? Object.keys(bulkHistoryData).length : -1;
+      var r  = (typeof getCurrentRole==='function') ? getCurrentRole()
+                : ((window.currentUserProfile&&window.currentUserProfile.role)||'');
+      return r + ':' + ph + ':' + hh;
+    }catch(e){ return ''; }
+  }
+
+  function _commGatedRender(){
+    var r = (typeof getCurrentRole==='function') ? getCurrentRole()
+            : ((window.currentUserProfile&&window.currentUserProfile.role)||'');
+    if (!r) return;
+    if (typeof allCriticalReady==='function' && !allCriticalReady()) return;
+    var key = _dataKey();
+    if (!key || key === _lastCommKey) return;
+    _lastCommKey = key;
+    try{ if(typeof syncCommissionAdminVisibility==='function') syncCommissionAdminVisibility(); }catch(e){}
+    try{ if(typeof ensureKamCommissionCard==='function') ensureKamCommissionCard(); }catch(e){}
+  }
+
+  window._commGatedRender = _commGatedRender;
+
+  // Reset key on each refreshAll so commission re-renders after data refresh
+  function _hookRefreshAll(){
+    if(_hooked) return;
+    if(typeof refreshAll !== 'function') return;
+    _hooked = true;
+    var _orig = refreshAll;
+    var _hooked_fn = function(){
+      var res = _orig.apply(this, arguments);
+      _lastCommKey = ''; // allow re-render with new data
+      _commGatedRender();
+      return res;
+    };
+    window.refreshAll = _hooked_fn;
+    try{ refreshAll = _hooked_fn; }catch(e){}
+  }
+
+  // Hook immediately if refreshAll already defined, else retry
+  _hookRefreshAll();
+  if(!_hooked){
+    var _hookTimer = setInterval(function(){
+      _hookRefreshAll();
+      if(_hooked) clearInterval(_hookTimer);
+    }, 200);
+    setTimeout(function(){ clearInterval(_hookTimer); }, 5000);
+  }
+})();
 
 // ══════════════════════════════════════════════════════════════════
 // COMMISSION PATCHES — inlined for locality
@@ -27612,7 +27678,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     btn.style.display=isAdmin?'inline-flex':'none';
   }
   window.syncCommissionAdminVisibility=syncCommissionAdminVisibility;
-  document.addEventListener('DOMContentLoaded', function(){ setTimeout(syncCommissionAdminVisibility,0); setTimeout(syncCommissionAdminVisibility,600); });
+  // v224e render-gate: commission admin visibility handled by _commGatedRender, not timers
   document.addEventListener('click', function(e){
     var btn=e.target&&e.target.closest&&e.target.closest('#tv-commission-btn,.commission-open');
     if(!btn)return;
@@ -27689,7 +27755,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     renderPortviewSummary=function(){
       normalizeProfileAndBody();
       var out=_renderPortviewSummary.apply(this, arguments);
-      requestAnimationFrame(function(){ syncCommissionAdminVisibility(); ensureKamCommissionCard(); });
+      requestAnimationFrame(function(){ syncCommissionAdminVisibility(); });
+      // v224e: ensureKamCommissionCard moved to _commGatedRender (data-gate-aware)
       return out;
     };
   }catch(e){}
@@ -27698,8 +27765,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     renderPortview=function(){
       normalizeProfileAndBody();
       var out=_renderPortview.apply(this, arguments);
-      setTimeout(function(){ ensureKamCommissionCard(); }, 0);
-      setTimeout(function(){ ensureKamCommissionCard(); }, 250);
+      // v224e: ensureKamCommissionCard moved to _commGatedRender (fires once after data ready)
+      if(typeof window._commGatedRender==='function') window._commGatedRender();
       return out;
     };
   }catch(e){}
@@ -27725,11 +27792,6 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     window.openCommissionCockpit=openCommissionCockpit;
   }catch(e){}
 
-  document.addEventListener('DOMContentLoaded', function(){
-    syncCommissionAdminVisibility(); ensureKamCommissionCard();
-    setTimeout(function(){syncCommissionAdminVisibility(); ensureKamCommissionCard();}, 300);
-    setTimeout(function(){syncCommissionAdminVisibility(); ensureKamCommissionCard();}, 900);
-  });
   document.addEventListener('click', function(e){
     var btn=e.target&&e.target.closest&&e.target.closest('#tv-commission-btn,.commission-open');
     if(!btn)return;
@@ -27739,13 +27801,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(typeof showToast==='function') showToast('Commission Cockpit เปิดได้เฉพาะ Admin','!');
     }
   }, true);
-  var tries=0;
-  var timer=setInterval(function(){
-    tries++;
-    syncCommissionAdminVisibility();
-    ensureKamCommissionCard();
-    if(tries>20) clearInterval(timer);
-  }, 300);
+  // v224e render-gate: DOMContentLoaded timers and setInterval polling removed.
+  // Commission strip renders via _commGatedRender() which fires once after
+  // allCriticalReady() = true. Eliminates 7-render cascade on login.
 })();
 
 
@@ -27864,7 +27922,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   try{ _commRenderKamSelfStrip=renderCompactStrip; }catch(e){}
   try{ _commOpenKamSelfSheet=openCompactSheet; }catch(e){}
   try{ _commCloseKamSelfSheet=closeCompactSheet; }catch(e){}
-  document.addEventListener('DOMContentLoaded', function(){ setTimeout(renderCompactStrip,0); setTimeout(renderCompactStrip,400); });
+  // v224e render-gate: DOMContentLoaded timers removed — renderCompactStrip called via _commGatedRender
 })();
 
 
