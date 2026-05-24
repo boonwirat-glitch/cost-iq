@@ -1264,6 +1264,13 @@ function renderPortviewSummary(){
 }
 
 function __legacyRenderPortviewSummaryFallback(){
+  // v224e: Skip render entirely if portview+history not ready yet.
+  // Prevents partial renders showing 0%/danger pace before data loads.
+  // refreshAll() (gated on allCriticalReady) will trigger the correct render.
+  if(typeof allCriticalReady==='function' && !allCriticalReady() &&
+     (typeof portviewBulkData==='undefined' || !portviewBulkData || portviewBulkData.length===0)){
+    return;
+  }
   // v210h: create target widget anchor before legacy pace renders.
   // This prevents the first-login 1-2 frame double-panel flash in KAM Portfolio.
   try { if (typeof _injectPortviewBarEl === 'function') _injectPortviewBarEl(); } catch(_e) {}
@@ -1291,7 +1298,9 @@ function __legacyRenderPortviewSummaryFallback(){
   const dangerShortfall=accounts.filter(a=>a.paceSignal&&a.paceSignal.cls==='danger').reduce((s,a)=>s+Math.max(0,(a.paceSignal.baselineGmv||0)-(a.paceSignal.runrate||0)),0);
   // Pace bar with run rate / baseline
   const paceBarEl=document.getElementById('portview-pace-bar');
-  if(paceBarEl&&acctWithPace.length>0&&!_preferTargetWidget){
+  // v224e: suppress pace bar if data not fully loaded — prevents low/0% flash
+  const _dataReady = typeof allCriticalReady!=='function' || allCriticalReady();
+  if(paceBarEl&&acctWithPace.length>0&&!_preferTargetWidget&&_dataReady){
     const _pvDays=acctWithPace[0]?.paceSignal.daysElapsed||0;
     const _pvDaysInMo=acctWithPace[0]?.paceSignal.daysInMonth||30;
     const _totalGmv=acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0);

@@ -471,7 +471,7 @@ function showSenseSplash(onDone){
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
   // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
-  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 6000 : 8000)); // v224d: cold boot 5000→8000ms for slow R2
+  const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 5000 : 5000)); // v224e: reduced — splash never blocks beyond 5s
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
@@ -626,16 +626,100 @@ function hideLoginOverlay() {
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
-  // v223 Option A: skip splash entirely on warm IDB boot
-  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 30min
-  // → restore last state → render immediately → ETag check silently in background
+
+// ── v224e: PWA Shimmer — shown on warm IDB resume instead of stale data ─────
+// Injects skeleton placeholders for portview/teamview while ETag check runs.
+// Cleared by RenderBus._flush() right before the first real render fires.
+(function(){
+  var _SHIMMER_CSS_ID = 'sense-shimmer-css';
+  var _SHIMMER_IDS = ['pv-shimmer-wrap','tv-shimmer-wrap'];
+
+  function _injectCSS(){
+    if(document.getElementById(_SHIMMER_CSS_ID)) return;
+    var s=document.createElement('style');
+    s.id=_SHIMMER_CSS_ID;
+    s.textContent=[
+      '@keyframes sense-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}',
+      '.sense-shimmer-line{border-radius:6px;background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:sense-shimmer 1.4s ease infinite;}',
+      '.sense-shimmer-card{background:rgba(255,255,255,.03);border-radius:12px;padding:16px;margin-bottom:10px;}',
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  function _makeBar(w,h,mb){
+    return '<div class="sense-shimmer-line" style="width:'+w+';height:'+h+'px;margin-bottom:'+(mb||8)+'px"></div>';
+  }
+
+  function _makeCard(){
+    return '<div class="sense-shimmer-card">'+
+      _makeBar('55%',11,10)+
+      _makeBar('80%',20,10)+
+      _makeBar('40%',9,0)+
+    '</div>';
+  }
+
+  window._activatePortviewShimmer = function(){
+    try{
+      _injectCSS();
+      // Summary row shimmer
+      var summaryEl=document.getElementById('portview-summary-row');
+      if(summaryEl && !document.getElementById('pv-shimmer-wrap')){
+        var sw=document.createElement('div');
+        sw.id='pv-shimmer-wrap';
+        sw.style.cssText='padding:0 0 8px';
+        sw.innerHTML=_makeBar('45%',11,10)+_makeBar('100%',6,0);
+        summaryEl.innerHTML='';
+        summaryEl.appendChild(sw);
+      }
+      // List shimmer (3 skeleton cards)
+      var listEl=document.getElementById('portview-list');
+      if(listEl && !document.getElementById('tv-shimmer-wrap')){
+        var lw=document.createElement('div');
+        lw.id='tv-shimmer-wrap';
+        lw.innerHTML=_makeCard()+_makeCard()+_makeCard();
+        listEl.innerHTML='';
+        listEl.appendChild(lw);
+      }
+      window._pwaShimmerActive=true;
+    }catch(e){}
+  };
+
+  window._activateTeamviewShimmer = function(){
+    try{
+      _injectCSS();
+      var sumEl=document.getElementById('teamview-summary');
+      if(sumEl){
+        sumEl.innerHTML='<div style="padding:12px">'+_makeBar('40%',11,10)+_makeBar('100%',6,0)+'</div>';
+      }
+      var listEl=document.getElementById('teamview-list');
+      if(listEl){
+        listEl.innerHTML='<div style="padding:4px 0">'+_makeCard()+_makeCard()+_makeCard()+'</div>';
+      }
+      window._pwaShimmerActive=true;
+    }catch(e){}
+  };
+
+  window._deactivatePortviewShimmer = function(){
+    try{
+      window._pwaShimmerActive=false;
+      _SHIMMER_IDS.forEach(function(id){
+        var el=document.getElementById(id);
+        if(el && el.parentNode) el.parentNode.removeChild(el);
+      });
+    }catch(e){}
+  };
+})();
+
+  // v224e: skip splash entirely on warm IDB boot
+  // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 90min
+  // → show shimmer skeleton → ETag check in background → replace with real data
   var _canSkipSplash = (function(){
     try{
       if(!window._idbPreloaded) return false;
       var lr = Number(localStorage.getItem('sense_last_critical_ready')||0);
       if(!lr) return false;
       var ageMin = (Date.now()-lr)/60000;
-      return ageMin < 30; // IDB data is fresh enough to show immediately
+      return ageMin < 90; // v224e: extended 30→90min — data updates once/day, daily workflow fits easily
     }catch(e){return false;}
   })();
 
@@ -659,17 +743,44 @@ function hideLoginOverlay() {
     // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
     _autoRouteAfterLogin();
     // Restore saved screen (after route which defaults to portview/teamview)
-    if(_rs&&_rs.screen&&typeof showScreen==='function'){
+    var _targetScreen='portview';
+    if(_rs&&_rs.screen){_targetScreen=_rs.screen;}
+    if(typeof showScreen==='function'){
       setTimeout(function(){
         try{
           var safeScreens=['portview','teamview'];
-          if(safeScreens.indexOf(_rs.screen)>=0) showScreen(_rs.screen);
+          if(safeScreens.indexOf(_targetScreen)>=0) showScreen(_targetScreen);
         }catch(e){}
       },0);
     }
-    // Render immediately with IDB data
-    if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
-    else if(typeof refreshAll==='function') setTimeout(refreshAll,30);
+    // v224e: show shimmer skeleton instead of stale data.
+    // RenderBus will clear shimmer and render once ETag check completes (~200-400ms).
+    setTimeout(function(){
+      try{
+        var onPv = document.getElementById('scr-portview') &&
+                   document.getElementById('scr-portview').classList.contains('on');
+        var onTv = document.getElementById('scr-teamview') &&
+                   document.getElementById('scr-teamview').classList.contains('on');
+        if(onPv && typeof window._activatePortviewShimmer==='function') window._activatePortviewShimmer();
+        else if(onTv && typeof window._activateTeamviewShimmer==='function') window._activateTeamviewShimmer();
+        // If shimmer not activated (wrong screen / DOM not ready), fall back to normal render
+        if(!window._pwaShimmerActive){
+          if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
+          else if(typeof refreshAll==='function') refreshAll();
+        }
+        // Safety: if ETag check somehow never fires (offline), clear shimmer + render after 3s
+        setTimeout(function(){
+          if(window._pwaShimmerActive){
+            if(typeof window._deactivatePortviewShimmer==='function') window._deactivatePortviewShimmer();
+            if(typeof refreshAll==='function') refreshAll();
+          }
+        }, 3000);
+      }catch(e){
+        // Fallback: render without shimmer
+        if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
+        else if(typeof refreshAll==='function') refreshAll();
+      }
+    }, 0);
     loginTransitionRunning=false;
     clearTimeout(lockSafetyTimer);
     return;

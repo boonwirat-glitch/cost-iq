@@ -1369,8 +1369,16 @@ async function loadFromCloudflareR2(){
         window.scrollTo({top:0,left:0,behavior:'instant'});
         document.body.scrollTop=0;document.documentElement.scrollTop=0;
       }
-      if(typeof renderPortview==='function')renderPortview();
-      if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
+      // v224e: only render portview when all critical data ready — prevents partial renders
+      if(typeof allCriticalReady==='function' && allCriticalReady()){
+        if(typeof renderPortview==='function')renderPortview();
+        if(typeof renderTeamview==='function'&&document.getElementById('scr-teamview')?.classList.contains('on'))renderTeamview();
+      } else {
+        // Data gate not met — refreshAll() will handle render when ready
+        if(typeof schedulePortviewListRender==='function'&&document.getElementById('scr-portview')?.classList.contains('on')){
+          schedulePortviewListRender(300);
+        }
+      }
     }else{
       // v195 Step 3: persistent offline banner (not just toast) when all 5 foreground files fail
       showToast('โหลดข้อมูลหลักไม่สำเร็จ — กด Refresh data','⚠');
@@ -1692,6 +1700,12 @@ window.RenderBus = (function(){
     _timer = null;
     _lastRender = Date.now();
     _senseDataLog('RENDERBUS','🎯 RENDER ['+Array.from(_ready).join(',')+']');
+    // v224e: clear shimmer right before render — ETag check done, real data incoming
+    try{
+      if(window._pwaShimmerActive && typeof window._deactivatePortviewShimmer==='function'){
+        window._deactivatePortviewShimmer();
+      }
+    }catch(e){}
     // Primary: KAM account detail screen
     if(typeof refreshAll === 'function') refreshAll();
     // Portfolio list screen (not covered by refreshAll)
