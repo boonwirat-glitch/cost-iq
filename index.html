@@ -7025,14 +7025,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div style="font-size:11px;color:var(--n400);line-height:1.6"><span style="font-weight:600;color:var(--n600)">SKU ที่ไม่มีกราฟ</span> = ยอดซื้อต่ำกว่า <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--n600)">฿100/เดือน</span> หรือยังไม่มีข้อมูลย้อนหลัง</div>
 </div>
 </div>
-<!-- v224e: on-demand 6-month price load button (hidden until price view active + not loaded) -->
-<div id="price-6mo-btn-wrap" style="display:none;align-items:center;justify-content:space-between;background:rgba(0,204,106,.06);border:1px solid rgba(0,204,106,.18);border-radius:10px;padding:8px 12px;margin:4px 0 8px">
-<div>
-  <div style="font-size:12px;font-weight:600;color:var(--g700)">โหลดราคา 6 เดือน</div>
-  <div style="font-size:11px;color:var(--n500);margin-top:1px">ตอนนี้แสดง 2-3 เดือน · กด Load เพื่อดูกราฟ 6 เดือน</div>
-</div>
-<button id="price-6mo-btn" onclick="_loadPrice6mo()" style="background:rgba(0,204,106,.15);border:1px solid rgba(0,204,106,.35);color:var(--g700);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">โหลด</button>
-</div>
 <div class="sku-search-row">
 <input class="sku-search" id="skuSearch" oninput="filterSKUs()" placeholder="ค้นหาชื่อสินค้า..."/>
 </div>
@@ -7828,7 +7820,10 @@ supa.auth.onAuthStateChange((event, session) => {
       // all 3 critical files should already be in memory from IndexedDB → splash fades in ~900ms.
       // If IndexedDB empty (cold start), returns 0 → ETag path takes over (normal flow).
       window._idbPreloaded=false;
-      _preloadFromIndexedDB().then(function(count){
+      // v225 A1: expose promise so profile-cache-hit path can wait for IDB result (race fix).
+      var _idbPreloadProm = _preloadFromIndexedDB();
+      window._idbPreloadPromise = _idbPreloadProm;
+      _idbPreloadProm.then(function(count){
         if(count<3){
           // Partial or no IndexedDB hit — kick off normal R2 load with ETag
           try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
@@ -7852,14 +7847,27 @@ supa.auth.onAuthStateChange((event, session) => {
       // v220 PROFILE CACHE: inject cached profile → hideLoginOverlay immediately (no 3s wait).
       // loadUserProfile() runs in background → silent update if profile changed.
       // First-ever login: cache miss → falls back to original await path.
+      //
+      // v225 A2: skip-splash race fix — wait for IDB preload before calling hideLoginOverlay.
+      // Root cause: _canSkipSplash evaluates window._idbPreloaded synchronously, but IDB is async.
+      // Profile cache hit fired hideLoginOverlay before IDB resolved → _idbPreloaded always false
+      // → skip-splash never triggered even on warm boot.
+      // Fix: race IDB promise against 500ms timeout. IDB typically resolves in ~150ms on warm boot.
+      // If IDB takes >500ms (cold start / very slow device), proceed anyway — skip-splash won't fire
+      // but that's correct (IDB not ready = not a warm boot).
       var _cp=_profileCacheGet(currentUser.id);
       if(_cp){
         currentUserProfile=_cp; normalizeCurrentUserProfileRole();
-        _senseDataLog('PROFILE','⚡ cache hit → hideLoginOverlay immediately (saves ~3s)');
-        hideLoginOverlay();
-        loadUserProfile(); // background revalidate — no await, no gate
+        _senseDataLog('PROFILE','⚡ cache hit → waiting for IDB preload before hideLoginOverlay (max 500ms)');
+        Promise.race([
+          window._idbPreloadPromise,
+          new Promise(function(r){setTimeout(r,500);})
+        ]).then(function(){
+          hideLoginOverlay();
+          loadUserProfile(); // background revalidate — no await, no gate
+        });
       }else{
-        loadUserProfile().then(()=>hideLoginOverlay());
+        loadUserProfile().then(function(){hideLoginOverlay();});
       }
     }
   } else if (event === 'SIGNED_OUT' && currentUser) {
@@ -8303,9 +8311,8 @@ function _autoRouteAfterLogin() {
   _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
   if(isRepRole(role)&&currentUser&&currentUser.email){
-    _bundlePreWarming=true;
+    // v225: removed _bundlePreWarming flag — consistent with TL prewarm removal
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
-      _bundlePreWarming=false;
       // v223: RenderBus batches with concurrent file arrivals
       if(window.RenderBus) window.RenderBus.signal('bundle');
       else refreshAll();
@@ -10167,7 +10174,7 @@ let _cloudInitialPromise = null;
 let _cloudBackgroundPromise = null;
 let _cloudLoadToken = 0;
 const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded to memory
-let _bundlePreWarming = false;         // v204: true during TL pre-warm → suppress re-renders
+let _bundlePreWarming = false;         // v225: always false — suppress flag removed (never set to true)
 const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
 // v206d: performance guardrails for mobile/PWA.
@@ -10213,23 +10220,20 @@ function _startTlBundlePrewarm(){
   if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
   const runId=++_tlPrewarmRunId;
   _tlPrewarmTimer=setTimeout(async()=>{
-    const emails=_senseGetTlPrewarmEmails(8); // v224e: cover more KAMs (was 5)
+    const emails=_senseGetTlPrewarmEmails(8);
     if(!emails.length)return;
-    _senseLog('%c[v224e bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    _bundlePreWarming=true;
+    _senseLog('%c[v225 bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v225: removed _bundlePreWarming suppress flag — RenderBus SETTLE_MS batches concurrent
+    // bundle signals naturally. User-active throttle removed (HTTP fetches don't block UI thread).
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
-      // v224e: shorter user-interaction throttle (was 8×900ms = 7.2s max)
-      // Prewarm data is critical for TL — don't delay more than 1.5s
-      let waitLoops=0;
-      while(_senseIsUserActive()&&waitLoops<3){await _senseSleep(500);waitLoops++;}
       await _fetchKamBundle(e).catch(()=>{});
-      await _senseSleep(400); // v224e: was 950ms
+      // v225: signal RenderBus per bundle → portview list updates progressively, not all-at-end
+      try{ if(window.RenderBus) window.RenderBus.signal('bundle:'+e.replace(/[@.]/g,'_')); }catch(_){}
+      await _senseSleep(200); // v225: 400→200ms gap (R2 has no rate limit at this scale)
     }
-    _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
-    if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('tl-prewarm',{delay:420});
-    _senseLog('%c[v206d bundle] TL prewarm complete/throttled','color:#00d070');
+    _senseLog('%c[v225 bundle] TL prewarm complete','color:#00d070');
   },2000);
 }
 
@@ -11807,10 +11811,19 @@ function __legacyRenderPortfolioFallback(){
     });
   }
   const priceTotal=priceUp+priceDn;
-  // v224e: concentration card removed (top-sku-card) — not useful enough for the space
-  // top5pct still computed above and available for other consumers
+  // ── Concentration card ──
+  const topPctNum=parseFloat(top5pct)||0;
+  const conBarColor=topPctNum>70?'rgba(240,176,0,.9)':topPctNum>=50?'rgba(255,255,255,.55)':'rgba(0,204,106,.8)';
+  const conInterp=topPctNum>70?'พึ่งพาสินค้าหลักสูง — ถ้า SKU เหล่านี้ขาดหรือราคาขึ้น กระทบยอดทันที':topPctNum>=50?'พอร์ตกระจายพอสมควร — ยังมี SKU อื่นรองรับหากสินค้าหลักขาด':'พอร์ตกระจายดี — ไม่พึ่งพาสินค้าใดสินค้าหนึ่งมากเกินไป';
   const topSkuEl=document.getElementById('top-sku-card');
-  if(topSkuEl){topSkuEl.style.display='none';topSkuEl.innerHTML='';}
+  if(topSkuEl){
+    const conBg=topPctNum>70?'var(--amb50)':topPctNum<50?'var(--g50)':'var(--n50)';
+    const conBorder=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n200)';
+    const conTextColor=topPctNum>70?'#9a6500':topPctNum<50?'var(--g700)':'var(--n600)';
+    const conNumColor=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n400)';
+    topSkuEl.style.cssText=`background:${conBg};border-left:3px solid ${conBorder};border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px;display:block;box-shadow:none`;
+    topSkuEl.innerHTML=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:${conNumColor}">${top5pct}%</span></div><div style="font-size:12px;color:${conTextColor};line-height:1.5;font-weight:500">${conInterp}</div>`;
+  }
   // ── Category pills only ──
   const depts=['ทั้งหมด',...new Set(skus.map(s=>s.d))];
   document.getElementById('skuCatFilter').innerHTML=depts.map(d=>`<button class="fpill ${d==='ทั้งหมด'&&!priceMovFilter?'on':''}" onclick="setSkuFilter('${d}',this)">${d}</button>`).join('');
@@ -11821,10 +11834,6 @@ function __legacyRenderPortfolioFallback(){
 :'';
     priceRow.style.display=priceTotal>0?'flex':'none';
   }
-  // v224e: cache priceUp/priceDn to window so renderPortMoMInsight() can read them
-  // even when called from outside renderPortfolio() scope (e.g. portviewSelectAccount)
-  window._portfolioPriceUp = priceUp;
-  window._portfolioPriceDn = priceDn;
   renderSKUList(skus);
   renderPortMoMInsight();
   if(window._expandPortTop)window._expandPortTop();
@@ -19563,17 +19572,8 @@ function renderPortMoMInsight(){
   }
   if(newCount>0)parts.push(`SKU ใหม่ ${newCount} รายการ`);
   if(!parts.length){el.style.display='none';return;}
-  // v224e: elevated styling — this insight is more useful than the old green concentration box
-  // priceUp/priceDn are local in renderPortfolio() — read from window cache set there,
-  // or default to 0 when called outside portfolio context (portviewSelect, etc.)
-  const _pu = (typeof priceUp !== 'undefined') ? priceUp : (window._portfolioPriceUp || 0);
-  const _pd = (typeof priceDn !== 'undefined') ? priceDn : (window._portfolioPriceDn || 0);
-  const _hasPriceInfo = _pu > 0 || _pd > 0;
-  const _priceHint = _hasPriceInfo
-    ? `<span style="font-size:10px;color:var(--n500);margin-left:4px">(${_pu>0?`▲${_pu}`:''} ${_pd>0?`▼${_pd}`:''})</span>`
-    : '';
-  el.innerHTML=`<span style="font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--n500);text-transform:uppercase">เทียบ ${prevMo}</span>${_priceHint}<div style="margin-top:4px;font-size:13px;font-weight:600;color:var(--n900);line-height:1.55">${parts.join(' <span style="color:var(--n400)">·</span> ')}</div>`;
-  el.style.cssText='display:block;background:var(--g50);border-left:3px solid var(--g500);border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px';
+  el.innerHTML=`เทียบ ${prevMo}: <strong>${parts.join(' · ')}</strong>`;
+  el.style.display='block';
 }
 
 // ── SKU View Toggle ──
@@ -19584,35 +19584,7 @@ function setSkuView(v){
   const note=document.getElementById('sparkline-note');
   if(btn)btn.style.display=v==='price'?'flex':'none';
   if(note&&v!=='price')note.style.display='none'; // hide note when switching away
-  // v224e: show "ราคา 6 เดือน" load button when price view active + bulk_price not loaded
-  _updatePriceLoadBtn();
   renderSKUList();
-}
-
-function _updatePriceLoadBtn(){
-  const wrap=document.getElementById('price-6mo-btn-wrap');
-  if(!wrap)return;
-  const priceLoaded=typeof _cloudLoadedTabs!=='undefined'&&_cloudLoadedTabs&&_cloudLoadedTabs.has('price');
-  const inView=skuView==='price';
-  if(inView&&!priceLoaded){
-    wrap.style.display='flex';
-  }else{
-    wrap.style.display='none';
-  }
-}
-
-async function _loadPrice6mo(){
-  const wrap=document.getElementById('price-6mo-btn-wrap');
-  const btn=document.getElementById('price-6mo-btn');
-  if(btn){btn.textContent='กำลังโหลด...';btn.disabled=true;}
-  try{
-    if(typeof _startDeferredPriceLoad==='function') await _startDeferredPriceLoad();
-    // after load: re-render SKU list to show full sparklines
-    if(typeof renderSKUList==='function') renderSKUList();
-    _updatePriceLoadBtn(); // hides button once loaded
-  }catch(e){
-    if(btn){btn.textContent='ลองอีกครั้ง';btn.disabled=false;}
-  }
 }
 function toggleSparklineNote(){
   const note=document.getElementById('sparkline-note');
@@ -28887,14 +28859,9 @@ console.log('[Target Module v1] loaded');
     }, opts.delay == null ? 900 : opts.delay);
   }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') scheduleResumeRepair('visibility-visible', {delay:1200});
-  });
-  global.addEventListener('pageshow', function(event){
-    scheduleResumeRepair(event&&event.persisted ? 'pageshow-bfcache' : 'pageshow', {delay:event&&event.persisted?900:1800});
-  });
-  global.addEventListener('focus', function(){ scheduleResumeRepair('window-focus', {delay:1400}); });
-  global.addEventListener('online', function(){ scheduleResumeRepair('online', {delay:450, force:true}); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v206f.
+  // Replaced by ResumeCoordinator at end of 08_patches.js — single coordinator
+  // for all 3 patches (v206f/v212/v212a) to prevent 3× render on every resume.
 
   // First-load sanity: when a new build is loaded over an old local/session state, repair once after auth/routing settles.
   setTimeout(function(){
@@ -30059,15 +30026,8 @@ console.log('[Target Module v1] loaded');
     }, opts.delay == null ? 1200 : opts.delay);
   }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') schedule('visibility-visible', {delay:1600});
-  });
-  global.addEventListener('pageshow', function(event){
-    if(event && event.persisted) schedule('pageshow-bfcache', {delay:900, force:true});
-    else schedule('pageshow', {delay:2600});
-  });
-  global.addEventListener('focus', function(){ schedule('window-focus', {delay:1800}); });
-  global.addEventListener('online', function(){ schedule('online', {delay:500, force:true}); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v212.
+  // Handled by ResumeCoordinator at end of 08_patches.js.
 
   global.FreshketSenseV212 = {
     version: VERSION,
@@ -30275,14 +30235,8 @@ console.log('[Target Module v1] loaded');
     }
   }catch(e){ warn('reloadFromCloudflareR2 wrap failed', e&&e.message?e.message:e); }
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') setTimeout(function(){ validateUnifiedFreshness('visibility-visible'); }, 2400);
-  });
-  global.addEventListener('pageshow', function(event){
-    setTimeout(function(){ validateUnifiedFreshness(event && event.persisted ? 'pageshow-bfcache' : 'pageshow', {force:!!(event&&event.persisted)}); }, event && event.persisted ? 1200 : 3200);
-  });
-  global.addEventListener('focus', function(){ setTimeout(function(){ validateUnifiedFreshness('window-focus'); }, 2600); });
-  global.addEventListener('online', function(){ setTimeout(function(){ validateUnifiedFreshness('online', {force:true}); }, 800); });
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v212a.
+  // Handled by ResumeCoordinator at end of 08_patches.js.
 
   var api = {
     version: VERSION,
@@ -31114,6 +31068,123 @@ console.log('[Target Module v1] loaded');
   try{global.addEventListener('pageshow',function(){setTimeout(apply,180);},{passive:true});}catch(e){}
   global.FreshketSenseV213f={version:VERSION,dataEpoch:DATA_EPOCH,apply:apply};
   setTimeout(function(){apply();try{console.log('[Sense v213f] installed');}catch(e){}},300);
+})(window);
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v225-resume-coordinator
+//////////////////////////////////////////////////////////////////////////////
+//
+// v225 ResumeCoordinator — Single entry point for all resume events.
+//
+// REPLACES: 12 individual event listeners from v206f, v212, v212a
+//   (visibilitychange × 3, pageshow × 3, focus × 3, online × 3)
+//
+// PROBLEM SOLVED: 3 independent patches each added their own listeners,
+// firing at t=1200/1600/2400ms on every screen wake → 3 renders per resume.
+//
+// DESIGN:
+//   - ONE set of event listeners for all resume triggers
+//   - Gate I11: skip if login form is visible (user may be typing)
+//   - Gate: skip if not logged in
+//   - Dedup: MIN_GAP 60s — no repeat check within 1 minute
+//   - Delegates to v212a.validateFreshnessOnResume (most comprehensive)
+//     which handles ETag check (CSV) + governance reload (Supabase)
+//   - If stale data found → ETag fetch → result goes through RenderBus
+//     (not direct renderXxx calls)
+//
+// INVARIANTS ENFORCED:
+//   I5: visibilitychange/pageshow → coordinator only
+//   I8: resume + data unchanged + <60s → zero render
+//   I11: login overlay visible → zero trigger
+
+(function(global){
+  'use strict';
+  var VERSION = 'v225-resume-coordinator';
+  var MIN_GAP_MS = 60000; // 60s — minimum gap between freshness checks
+  var _lastRunAt = 0;
+  var _timer = null;
+  var _inFlight = null;
+
+  function _isLoginVisible(){
+    try{
+      var ov = document.getElementById('login-overlay');
+      if(!ov) return false;
+      // Overlay is visible if display is not 'none' and doesn't have hidden class
+      return ov.style.display !== 'none' && !ov.classList.contains('lgi-hidden');
+    }catch(e){ return false; }
+  }
+
+  function _isLoggedIn(){
+    try{ return !!global.currentUser; }catch(e){ return false; }
+  }
+
+  function _schedule(reason, delayMs){
+    clearTimeout(_timer);
+    _timer = setTimeout(function(){
+      _timer = null;
+      _run(reason);
+    }, delayMs || 1200);
+  }
+
+  function _run(reason){
+    // Gate I11: don't disturb login form (user may be typing password)
+    if(_isLoginVisible()) return;
+    // Gate: not logged in yet — auth will handle data load
+    if(!_isLoggedIn()) return;
+    // Dedup: already checked recently
+    if(_inFlight) return;
+    var now = Date.now();
+    if(now - _lastRunAt < MIN_GAP_MS) return;
+    _lastRunAt = now;
+
+    _inFlight = (function(){
+      // Use v212a's unified validator (handles CSV ETag + governance/commission reload).
+      // Call with force:true to bypass its internal 180s dedup — coordinator owns timing.
+      var validator = null;
+      try{
+        if(global.FreshketSenseV212a && typeof global.FreshketSenseV212a.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212a.validateFreshnessOnResume;
+        } else if(global.FreshketSenseV212 && typeof global.FreshketSenseV212.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212.validateFreshnessOnResume;
+        }
+      }catch(e){}
+
+      var p = validator
+        ? validator(reason, {force: true})
+        : Promise.resolve(false);
+
+      p.catch(function(){}).finally
+        ? p.catch(function(){}).finally(function(){ _inFlight = null; })
+        : p.then(function(){ _inFlight = null; }, function(){ _inFlight = null; });
+
+      return p;
+    })();
+  }
+
+  // ── Single set of listeners (replaces 12 from v206f/v212/v212a) ──────────
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') _schedule('visibility-visible', 1200);
+  });
+  global.addEventListener('pageshow', function(event){
+    // bfcache restore (faster): 900ms; normal page show: 1800ms
+    _schedule(event && event.persisted ? 'pageshow-bfcache' : 'pageshow',
+              event && event.persisted ? 900 : 1800);
+  });
+  global.addEventListener('focus', function(){ _schedule('window-focus', 1400); });
+  global.addEventListener('online', function(){
+    // Network restored — check immediately (but still respect MIN_GAP)
+    _schedule('online', 450);
+  });
+
+  // Expose for diagnostics
+  global.FreshketSenseResumeCoordinator = {
+    version: VERSION,
+    getLastRunAt: function(){ return _lastRunAt; },
+    getState: function(){ return {lastRunAt: _lastRunAt, inFlight: !!_inFlight, timer: !!_timer}; }
+  };
+
+  try{ console.log('[Sense v225] ResumeCoordinator installed — replaces 12 resume listeners'); }catch(e){}
 })(window);
 </script>
 </body>
