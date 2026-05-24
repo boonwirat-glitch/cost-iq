@@ -1,30 +1,55 @@
-// Freshket Sense — Service Worker v224d
-// Strategy: Cache-first for app shell (instant resume) + background network update.
+// Freshket Sense — Service Worker v225
+// Strategy: Cache-first, background revalidate (stale-while-revalidate)
 //
-// v223b: Changed from network-first to cache-first for navigation.
-// Reason: On iOS PWA, every resume = full page reload. Network-first added
-// 200-500ms of network round-trip before any JS could start. Cache-first
-// serves the cached HTML instantly (~0ms), then updates the cache in background.
-// Result: JS starts ~300ms faster on every resume.
+// v225 rewrite: fixed all redirect-related ERR_FAILED bugs.
 //
-// Cache update strategy: stale-while-revalidate
-// - Serve from cache immediately (fast)
-// - Fetch network version in background
-// - Update cache for next open
-// - User sees latest version on the NEXT open (1 version behind max)
+// Root cause of previous failures:
+//   - cache.add() stores opaqueredirect responses when Cloudflare redirects
+//   - fetch(url, {redirect:'follow'}) returns response.redirected=true
+//   - Chrome rejects SW responses where response.redirected=true for navigation requests
+//   - request.redirect mode for navigation is 'manual', not 'follow'
 //
-// skipWaiting() intentionally omitted — see v195 comment.
-// New SW waits for all tabs to close before activating (prevents auth interruption).
+// Fix: always strip redirect flag by creating fresh Response from body.
+// Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'freshket-sense-v224d';
-const OFFLINE_URL = '/index.html';
+const CACHE_NAME = 'freshket-sense-v225';
+const APP_URL = '/index.html';
 
+// ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
+async function fetchClean(url) {
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      cache: 'no-cache',
+    });
+    if (!response.ok) return null;
+
+    // Strip redirect flag — Chrome rejects SW navigation responses where
+    // response.redirected===true. Create a fresh non-redirected Response.
+    const body = await response.arrayBuffer();
+    const ct = response.headers.get('content-type') || 'text/html; charset=utf-8';
+    return new Response(body, {
+      status: 200,
+      statusText: 'OK',
+      headers: { 'Content-Type': ct },
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+// ── Install: pre-cache app shell ─────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.add(OFFLINE_URL))
+    fetchClean(APP_URL).then(response => {
+      if (!response) return; // offline during install — SW still activates
+      return caches.open(CACHE_NAME).then(cache => cache.put(APP_URL, response));
+    })
   );
+  self.skipWaiting(); // activate immediately so new SW takes effect without waiting
 });
 
+// ── Activate: clear old caches ───────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -32,7 +57,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== CACHE_NAME)
           .map(key => {
-            console.log('[SW v223b] clearing old cache:', key);
+            console.log('[SW v225] clearing old cache:', key);
             return caches.delete(key);
           })
       )
@@ -41,64 +66,57 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// ── Fetch: handle navigation requests only ───────────────────────────────────
 self.addEventListener('fetch', event => {
   if (event.request.mode !== 'navigate') return;
 
-  event.respondWith(
-    caches.open(CACHE_NAME).then(async cache => {
-      const cached = await cache.match(OFFLINE_URL);
+  event.respondWith(handleNavigate());
+});
 
-      // Background network fetch — update cache for next open.
-      // v224e: fetch OFFLINE_URL directly (not event.request) to avoid Safari iOS
-      // "Response served by service worker has redirections" error.
-      // Cloudflare redirects '/' → '/index.html'; fetching event.request would
-      // cache an opaqueredirect response which Safari PWA rejects on navigation.
-      const networkFetch = fetch(OFFLINE_URL, {redirect: 'follow'})
-        .then(response => {
-          if (response && response.ok && response.type !== 'opaqueredirect') {
-            cache.put(OFFLINE_URL, response.clone());
-          }
-          return (response && response.type !== 'opaqueredirect') ? response : null;
-        })
-        .catch(() => null);
+async function handleNavigate() {
+  const cache = await caches.open(CACHE_NAME);
 
-      // Cache-first: serve cached immediately, fall back to network if no cache
-      if (cached) {
-        return cached; // instant — no network wait
-      }
+  // 1. Try cache
+  try {
+    const cached = await cache.match(APP_URL);
+    if (cached && cached.ok && cached.status === 200) {
+      // Background revalidate — updates cache for next visit
+      fetchClean(APP_URL)
+        .then(fresh => { if (fresh) cache.put(APP_URL, fresh); })
+        .catch(() => {});
+      return cached;
+    }
+  } catch (e) { /* cache read failed — fall through to network */ }
 
-      // v224e fix: no cache yet — await network properly.
-      // Original code had `return networkFetch || cache.match(...)` which is a bug:
-      // networkFetch is a Promise (always truthy), so || branch never ran.
-      // When network fails, Promise resolved to null → browser got null → ERR_FAILED.
-      const netResponse = await networkFetch;
-      if (netResponse && netResponse.ok) return netResponse;
+  // 2. No clean cache — fetch from network
+  const fresh = await fetchClean(APP_URL);
+  if (fresh) {
+    cache.put(APP_URL, fresh.clone()).catch(() => {});
+    return fresh;
+  }
 
-      // Network failed AND no cache — show a graceful page instead of ERR_FAILED.
-      // User sees a retry button; pressing it reloads once SW is ready.
-      return new Response(
-        `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
+  // 3. Offline with no cache — show retry page
+  return new Response(
+    `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Freshket Sense</title>
 <style>
-  body{margin:0;background:#061410;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;
-       display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
-  .icon{font-size:48px;margin-bottom:20px}
+  body{margin:0;background:#061410;color:#fff;
+       font-family:'IBM Plex Sans Thai',system-ui,sans-serif;
+       display:flex;align-items:center;justify-content:center;
+       min-height:100vh;text-align:center;padding:20px}
   h2{font-size:18px;font-weight:600;margin:0 0 8px}
   p{font-size:13px;color:rgba(255,255,255,.5);margin:0 0 28px;line-height:1.6}
-  button{background:rgba(0,208,112,.15);border:1px solid rgba(0,208,112,.35);color:#00d070;
-         border-radius:12px;padding:12px 28px;font-size:14px;cursor:pointer;
-         font-family:inherit;transition:background .15s}
-  button:active{background:rgba(0,208,112,.25)}
+  button{background:rgba(0,208,112,.15);border:1px solid rgba(0,208,112,.35);
+         color:#00d070;border-radius:12px;padding:12px 28px;font-size:14px;
+         cursor:pointer;font-family:inherit}
 </style></head>
 <body><div>
-  <div class="icon">⟳</div>
+  <div style="font-size:40px;margin-bottom:16px">⟳</div>
   <h2>กำลังเชื่อมต่อ</h2>
   <p>โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต<br>แล้วลองเปิดใหม่อีกครั้ง</p>
   <button onclick="location.reload()">ลองอีกครั้ง</button>
 </div></body></html>`,
-        { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      );
-    })
+    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
   );
-});
+}
