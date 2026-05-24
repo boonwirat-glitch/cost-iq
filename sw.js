@@ -62,8 +62,39 @@ self.addEventListener('fetch', event => {
       if (cached) {
         return cached; // instant — no network wait
       }
-      // First install: no cache yet — wait for network
-      return networkFetch || cache.match(OFFLINE_URL);
+
+      // v224e fix: no cache yet — await network properly.
+      // Original code had `return networkFetch || cache.match(...)` which is a bug:
+      // networkFetch is a Promise (always truthy), so || branch never ran.
+      // When network fails, Promise resolved to null → browser got null → ERR_FAILED.
+      const netResponse = await networkFetch;
+      if (netResponse && netResponse.ok) return netResponse;
+
+      // Network failed AND no cache — show a graceful page instead of ERR_FAILED.
+      // User sees a retry button; pressing it reloads once SW is ready.
+      return new Response(
+        `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Freshket Sense</title>
+<style>
+  body{margin:0;background:#061410;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;
+       display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
+  .icon{font-size:48px;margin-bottom:20px}
+  h2{font-size:18px;font-weight:600;margin:0 0 8px}
+  p{font-size:13px;color:rgba(255,255,255,.5);margin:0 0 28px;line-height:1.6}
+  button{background:rgba(0,208,112,.15);border:1px solid rgba(0,208,112,.35);color:#00d070;
+         border-radius:12px;padding:12px 28px;font-size:14px;cursor:pointer;
+         font-family:inherit;transition:background .15s}
+  button:active{background:rgba(0,208,112,.25)}
+</style></head>
+<body><div>
+  <div class="icon">⟳</div>
+  <h2>กำลังเชื่อมต่อ</h2>
+  <p>โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต<br>แล้วลองเปิดใหม่อีกครั้ง</p>
+  <button onclick="location.reload()">ลองอีกครั้ง</button>
+</div></body></html>`,
+        { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      );
     })
   );
 });
