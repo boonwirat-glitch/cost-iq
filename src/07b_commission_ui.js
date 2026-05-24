@@ -1897,8 +1897,14 @@ async function renderPortviewTargetBar() {
   // (not outlet-level), causing wrong NRR%/Comeback%/Expansion% at first render.
   // If outlets not loaded yet: skip NRR computation → nrrPct=null → shimmer shown.
   // When outlets arrive, RenderBus re-renders → key changes ('loading'→actual) → correct values.
-  const _outletsReady = (typeof bulkOutletsData !== 'undefined' && bulkOutletsData &&
-    Object.keys(bulkOutletsData).length > 0);
+  // v225g fix2: check if outlets FILE was ingested, not if it has data.
+  // bulkOutletsData = {accountId: months} — empty {} if KAM has no outlet accounts.
+  // Object.keys({}).length === 0 → _outletsReady always false → shimmer never resolves.
+  // Correct: use _cloudLoadedTabs.has('outlets') (set after ingest, cleared during ETag refresh).
+  const _outletsReady = (function(){
+    try{ return typeof _cloudLoadedTabs !== 'undefined' && _cloudLoadedTabs.has('outlets'); }
+    catch(e){ return typeof bulkOutletsData !== 'undefined' && bulkOutletsData && Object.keys(bulkOutletsData).length > 0; }
+  })();
 
   const nrrResult = _outletsReady
     ? (_repDetail
