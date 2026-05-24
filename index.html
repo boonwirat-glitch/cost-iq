@@ -10222,19 +10222,21 @@ function _startTlBundlePrewarm(){
   _tlPrewarmTimer=setTimeout(async()=>{
     const emails=_senseGetTlPrewarmEmails(8);
     if(!emails.length)return;
-    _senseLog('%c[v225b bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    // v225b fix: signal RenderBus ONCE at end, not per bundle.
-    // Per-bundle signals caused 7-14 renders: bundles arrive every ~1890ms (just under
-    // SETTLE_MS=2000ms), so each bundle reset the timer and fired its own render.
-    // One signal at end = 1 render for all bundles combined.
+    _senseLog('%c[v225d bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v225d: restore _bundlePreWarming=true during prewarm to suppress Path 1/2 internal renders.
+    // Without this flag, _fetchKamBundle completion and ingestCSVText bulk-skus both fire
+    // direct renderPortviewList/renderTeamviewKamList calls per bundle → N renders during prewarm.
+    // Flag suppresses those; single RenderBus signal at end gives exactly 1 render.
+    _bundlePreWarming=true;
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
       await _fetchKamBundle(e).catch(()=>{});
       await _senseSleep(200);
     }
+    _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
     try{ if(window.RenderBus) window.RenderBus.signal('bundle:prewarm-complete'); }catch(_){}
-    _senseLog('%c[v225b bundle] TL prewarm complete — 1 render signal','color:#00d070');
+    _senseLog('%c[v225d bundle] TL prewarm complete — 1 render signal','color:#00d070');
   },2000);
 }
 
@@ -10474,7 +10476,8 @@ async function _fetchKamBundle(kamEmail){
         _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
         // v224e: set bulkSkusReady so _skuSnap changes from '0s'→'1s' → portview value guard passes → _churnCounts rendered
         try{bulkSkusReady=true;}catch(e){}
-        setTimeout(()=>{try{if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();}catch(e){}},150);
+        // v225d: guard with _bundlePreWarming — suppress during TL prewarm, allow on direct/KAM loads
+        if(!_bundlePreWarming){setTimeout(()=>{try{if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();}catch(e){}},150);}
       }else{
         console.warn('[v202 bundle] ⚠️ incomplete:', kamEmail, 'skus:', okSkus, 'alts:', okAlts);
       }
@@ -21873,6 +21876,31 @@ function __legacyRenderTeamviewKamListFallback(){
 function __legacyRenderTeamviewKamListSync(groups, el){
   if(!el)return;
   if(!groups)groups=_buildKamGroups();
+
+  // ── v225e Value Guard ─────────────────────────────────────────────────────
+  // Skip DOM repaint if visible data hasn't changed since last render.
+  // Prevents redundant repaints from: ETag 304, bundle:prewarm-complete,
+  // hydrate-cold-load-complete when no actual data change occurred.
+  try{
+    var _tvPvSnap=portviewBulkData&&portviewBulkData.length>0
+      ?portviewBulkData.length+':'+(portviewBulkData[0]&&(portviewBulkData[0].accountId||portviewBulkData[0].id)||''):'0';
+    var _tvHistN=typeof bulkHistoryData!=='undefined'?Object.keys(bulkHistoryData).length:0;
+    var _tvCommN=(typeof window._tgtCache!=='undefined'&&window._tgtCache)?Object.keys(window._tgtCache).length:0;
+    var _tvVisitN=window._tvVisitMap
+      ?Object.values(window._tvVisitMap).reduce(function(s,v){return s+Object.keys(v||{}).length;},0):-1;
+    var _tvKey=[
+      typeof tvViewMode!=='undefined'?tvViewMode:'full',
+      typeof teamviewLevel!=='undefined'?(teamviewLevel||''):'',
+      typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
+      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN
+    ].join('|');
+    if(el._lastTvListKey===_tvKey&&el.children.length>0){
+      try{window._senseDataLog('TEAMVIEW','⚡ value guard — skip repaint (unchanged)');}catch(e){}
+      return;
+    }
+    el._lastTvListKey=_tvKey;
+  }catch(e){}
+  // ─────────────────────────────────────────────────────────────────────────
   if(!groups.length){el.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ไม่มีข้อมูล KAM</div><div class="portview-no-data-sub">Q8E ต้องมีคอลัมน์ kam_email และ tl_email<br>เพื่อแยกพอร์ตตาม KAM ได้</div></div>`;return;}
 
   // Flat list sorted by urgency: danger → warn → safe/great → star
@@ -31111,7 +31139,7 @@ console.log('[Target Module v1] loaded');
   'use strict';
   var VERSION = 'v225-resume-coordinator';
   var MIN_GAP_MS = 60000; // 60s — minimum gap between freshness checks
-  var _lastRunAt = 0;
+  var _lastRunAt = Date.now(); // v225d: init to now — prevents initial pageshow from triggering ETag check (already runs via background timer)
   var _timer = null;
   var _inFlight = null;
 
