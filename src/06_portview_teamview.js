@@ -861,7 +861,15 @@ function __legacyRenderPortviewListFallback(){
     ?`${portviewBulkData.length}:${portviewBulkData[0]?.accountId||''}:${portviewBulkData[portviewBulkData.length-1]?.accountId||''}`
     :'0';
   // Include heavy-data readiness — list must re-render when SKU/alternatives data arrives
-  const _skuSnap=(typeof bulkSkusReady!=='undefined'&&bulkSkusReady?'1':'0')+(typeof bulkSkuCurrentData!=='undefined'&&Object.keys(bulkSkuCurrentData||{}).length>0?'s':'');
+  // v225b fix: add bulkSkusData key count to _skuSnap.
+  // Bug: _skuSnap only tracked bulkSkusReady (bulk_skus.csv) and bulkSkuCurrentData.
+  // It did NOT track bulkSkusData (per-account SKU monthly data from KAM bundle).
+  // Result: when KAM bundle loaded and populated bulkSkusData[accountId], _listKey
+  // was unchanged → early return → computeChurnCountsForAccount() never re-ran →
+  // สั่ง/หาย/เฝ้าดู badges never appeared on KAM's own portview.
+  // TL didn't hit this bug because prewarm loaded bundle BEFORE first portview render.
+  const _bulkSkusDataN=(typeof bulkSkusData!=='undefined'&&bulkSkusData)?Object.keys(bulkSkusData).length:0;
+  const _skuSnap=(typeof bulkSkusReady!=='undefined'&&bulkSkusReady?'1':'0')+(typeof bulkSkuCurrentData!=='undefined'&&Object.keys(bulkSkuCurrentData||{}).length>0?'s':'')+'b'+_bulkSkusDataN;
   const _listKey=`${portviewFilter}|${portviewLevel||''}|${portviewRepEmail||''}|${pvSortMode}|${pvSortDir}|${pvViewMode}|${searchQ}|${_pvSnap}|${_skuSnap}`;
   if(listEl._lastListKey===_listKey && listEl.children.length>0) return;
   listEl._lastListKey=_listKey;

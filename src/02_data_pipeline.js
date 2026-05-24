@@ -939,18 +939,19 @@ function _startTlBundlePrewarm(){
   _tlPrewarmTimer=setTimeout(async()=>{
     const emails=_senseGetTlPrewarmEmails(8);
     if(!emails.length)return;
-    _senseLog('%c[v225 bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    // v225: removed _bundlePreWarming suppress flag — RenderBus SETTLE_MS batches concurrent
-    // bundle signals naturally. User-active throttle removed (HTTP fetches don't block UI thread).
+    _senseLog('%c[v225b bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v225b fix: signal RenderBus ONCE at end, not per bundle.
+    // Per-bundle signals caused 7-14 renders: bundles arrive every ~1890ms (just under
+    // SETTLE_MS=2000ms), so each bundle reset the timer and fired its own render.
+    // One signal at end = 1 render for all bundles combined.
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
       await _fetchKamBundle(e).catch(()=>{});
-      // v225: signal RenderBus per bundle → portview list updates progressively, not all-at-end
-      try{ if(window.RenderBus) window.RenderBus.signal('bundle:'+e.replace(/[@.]/g,'_')); }catch(_){}
-      await _senseSleep(200); // v225: 400→200ms gap (R2 has no rate limit at this scale)
+      await _senseSleep(200);
     }
     if(runId!==_tlPrewarmRunId)return;
-    _senseLog('%c[v225 bundle] TL prewarm complete','color:#00d070');
+    try{ if(window.RenderBus) window.RenderBus.signal('bundle:prewarm-complete'); }catch(_){}
+    _senseLog('%c[v225b bundle] TL prewarm complete — 1 render signal','color:#00d070');
   },2000);
 }
 
