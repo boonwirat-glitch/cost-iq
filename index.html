@@ -27381,9 +27381,19 @@ async function renderPortviewTargetBar() {
   // ── NRR computation ──────────────────────────────────────────
   // v182: pass tlEmail as second arg for TL so NRR is scoped to team only
   // rep-detail: admin/TL viewing a specific KAM → use that KAM's email, not admin email
-  const nrrResult = _repDetail
-    ? _tgtComputeKamNRR(_repEmail, null)
-    : (_showAll ? _tgtComputeKamNRR(null, null) : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null));
+  //
+  // v225g: outlets gate — without bulkOutletsData, _tgtComputeKamNRR gives account-level NRR
+  // (not outlet-level), causing wrong NRR%/Comeback%/Expansion% at first render.
+  // If outlets not loaded yet: skip NRR computation → nrrPct=null → shimmer shown.
+  // When outlets arrive, RenderBus re-renders → key changes ('loading'→actual) → correct values.
+  const _outletsReady = (typeof bulkOutletsData !== 'undefined' && bulkOutletsData &&
+    Object.keys(bulkOutletsData).length > 0);
+
+  const nrrResult = _outletsReady
+    ? (_repDetail
+        ? _tgtComputeKamNRR(_repEmail, null)
+        : (_showAll ? _tgtComputeKamNRR(null, null) : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null)))
+    : null;
   let nrrPct=null, cohortGmv=0, cbGmv=0, exGmv=0;
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
 
@@ -27418,9 +27428,14 @@ async function renderPortviewTargetBar() {
   // Refresh compact strip so it shows the same % as widget
   if (typeof _pvBuildCompactStrip === 'function') setTimeout(_pvBuildCompactStrip, 0);
 
-  // ── Pct legend (hide if 0) ────────────────────────────────────
-  const nrrLeg = nrrPct !== null
-    ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${nrrPct}%</span></span>` : '';
+  // ── Pct legend (hide if 0; shimmer if outlets not yet loaded) ────
+  // v225g: outlets not ready → show shimmer pill instead of wrong NRR%
+  const _nrrShimmer = `<span class="tgt-pl-item" style="display:inline-flex;align-items:center;gap:4px"><span class="tgt-pl-dot nrr" style="opacity:.3"></span><span style="display:inline-block;width:52px;height:10px;border-radius:5px;background:rgba(255,255,255,.08);animation:_dotBlink 1.2s ease-in-out infinite"></span></span>`;
+  const nrrLeg = !_outletsReady
+    ? _nrrShimmer
+    : (nrrPct !== null
+        ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${nrrPct}%</span></span>`
+        : '');
   const cbPct  = baselinePrevGmv>0&&cbGmv>0 ? '+'+Math.round(cbGmv/baselinePrevGmv*100)+'%' : null;
   const exPct  = baselinePrevGmv>0&&exGmv>0 ? '+'+Math.round(exGmv/baselinePrevGmv*100)+'%' : null;
   const cbLeg  = cbPct ? `<span class="tgt-pl-item"><span class="tgt-pl-dot comeback"></span><span class="tgt-pl-lbl">Comeback</span>&thinsp;<span class="tgt-pl-val comeback">${cbPct}</span></span>` : '';
@@ -27556,7 +27571,8 @@ async function renderPortviewTargetBar() {
   // Value guard: skip re-render only if BOTH pace% AND nrr state are unchanged
   // v224d fix: nrrPct must be part of key — otherwise widget won't update when history.csv loads late
   const _existingPctEl = bar.querySelector('#tgt-pct-num');
-  const _renderKey = `${pct}|${nrrPct !== null ? nrrPct : 'x'}`;
+  // v225g: include outlets state in key — forces re-render when outlets arrive (shimmer→real)
+  const _renderKey = `${pct}|${_outletsReady ? (nrrPct !== null ? nrrPct : 'x') : 'loading'}`;
   if (_existingPctEl && _existingPctEl.dataset.renderKey === _renderKey) return;
   if (_existingPctEl) _existingPctEl.dataset.renderKey = _renderKey;
 
