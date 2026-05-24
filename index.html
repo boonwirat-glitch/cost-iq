@@ -7025,6 +7025,14 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div style="font-size:11px;color:var(--n400);line-height:1.6"><span style="font-weight:600;color:var(--n600)">SKU ที่ไม่มีกราฟ</span> = ยอดซื้อต่ำกว่า <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--n600)">฿100/เดือน</span> หรือยังไม่มีข้อมูลย้อนหลัง</div>
 </div>
 </div>
+<!-- v224e: on-demand 6-month price load button (hidden until price view active + not loaded) -->
+<div id="price-6mo-btn-wrap" style="display:none;align-items:center;justify-content:space-between;background:rgba(0,204,106,.06);border:1px solid rgba(0,204,106,.18);border-radius:10px;padding:8px 12px;margin:4px 0 8px">
+<div>
+  <div style="font-size:12px;font-weight:600;color:var(--g700)">โหลดราคา 6 เดือน</div>
+  <div style="font-size:11px;color:var(--n500);margin-top:1px">ตอนนี้แสดง 2-3 เดือน · กด Load เพื่อดูกราฟ 6 เดือน</div>
+</div>
+<button id="price-6mo-btn" onclick="_loadPrice6mo()" style="background:rgba(0,204,106,.15);border:1px solid rgba(0,204,106,.35);color:var(--g700);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">โหลด</button>
+</div>
 <div class="sku-search-row">
 <input class="sku-search" id="skuSearch" oninput="filterSKUs()" placeholder="ค้นหาชื่อสินค้า..."/>
 </div>
@@ -11798,19 +11806,10 @@ function __legacyRenderPortfolioFallback(){
     });
   }
   const priceTotal=priceUp+priceDn;
-  // ── Concentration card ──
-  const topPctNum=parseFloat(top5pct)||0;
-  const conBarColor=topPctNum>70?'rgba(240,176,0,.9)':topPctNum>=50?'rgba(255,255,255,.55)':'rgba(0,204,106,.8)';
-  const conInterp=topPctNum>70?'พึ่งพาสินค้าหลักสูง — ถ้า SKU เหล่านี้ขาดหรือราคาขึ้น กระทบยอดทันที':topPctNum>=50?'พอร์ตกระจายพอสมควร — ยังมี SKU อื่นรองรับหากสินค้าหลักขาด':'พอร์ตกระจายดี — ไม่พึ่งพาสินค้าใดสินค้าหนึ่งมากเกินไป';
+  // v224e: concentration card removed (top-sku-card) — not useful enough for the space
+  // top5pct still computed above and available for other consumers
   const topSkuEl=document.getElementById('top-sku-card');
-  if(topSkuEl){
-    const conBg=topPctNum>70?'var(--amb50)':topPctNum<50?'var(--g50)':'var(--n50)';
-    const conBorder=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n200)';
-    const conTextColor=topPctNum>70?'#9a6500':topPctNum<50?'var(--g700)':'var(--n600)';
-    const conNumColor=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n400)';
-    topSkuEl.style.cssText=`background:${conBg};border-left:3px solid ${conBorder};border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px;display:block;box-shadow:none`;
-    topSkuEl.innerHTML=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:${conNumColor}">${top5pct}%</span></div><div style="font-size:12px;color:${conTextColor};line-height:1.5;font-weight:500">${conInterp}</div>`;
-  }
+  if(topSkuEl){topSkuEl.style.display='none';topSkuEl.innerHTML='';}
   // ── Category pills only ──
   const depts=['ทั้งหมด',...new Set(skus.map(s=>s.d))];
   document.getElementById('skuCatFilter').innerHTML=depts.map(d=>`<button class="fpill ${d==='ทั้งหมด'&&!priceMovFilter?'on':''}" onclick="setSkuFilter('${d}',this)">${d}</button>`).join('');
@@ -19559,8 +19558,13 @@ function renderPortMoMInsight(){
   }
   if(newCount>0)parts.push(`SKU ใหม่ ${newCount} รายการ`);
   if(!parts.length){el.style.display='none';return;}
-  el.innerHTML=`เทียบ ${prevMo}: <strong>${parts.join(' · ')}</strong>`;
-  el.style.display='block';
+  // v224e: elevated styling — this insight is more useful than the old green concentration box
+  const _hasPriceInfo = priceUp > 0 || priceDn > 0;
+  const _priceHint = _hasPriceInfo
+    ? `<span style="font-size:10px;color:var(--n500);margin-left:4px">(${priceUp>0?`▲${priceUp}`:''} ${priceDn>0?`▼${priceDn}`:''})</span>`
+    : '';
+  el.innerHTML=`<span style="font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--n500);text-transform:uppercase">เทียบ ${prevMo}</span>${_priceHint}<div style="margin-top:4px;font-size:13px;font-weight:600;color:var(--n900);line-height:1.55">${parts.join(' <span style="color:var(--n400)">·</span> ')}</div>`;
+  el.style.cssText='display:block;background:var(--g50);border-left:3px solid var(--g500);border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px';
 }
 
 // ── SKU View Toggle ──
@@ -19571,7 +19575,35 @@ function setSkuView(v){
   const note=document.getElementById('sparkline-note');
   if(btn)btn.style.display=v==='price'?'flex':'none';
   if(note&&v!=='price')note.style.display='none'; // hide note when switching away
+  // v224e: show "ราคา 6 เดือน" load button when price view active + bulk_price not loaded
+  _updatePriceLoadBtn();
   renderSKUList();
+}
+
+function _updatePriceLoadBtn(){
+  const wrap=document.getElementById('price-6mo-btn-wrap');
+  if(!wrap)return;
+  const priceLoaded=typeof _cloudLoadedTabs!=='undefined'&&_cloudLoadedTabs&&_cloudLoadedTabs.has('price');
+  const inView=skuView==='price';
+  if(inView&&!priceLoaded){
+    wrap.style.display='flex';
+  }else{
+    wrap.style.display='none';
+  }
+}
+
+async function _loadPrice6mo(){
+  const wrap=document.getElementById('price-6mo-btn-wrap');
+  const btn=document.getElementById('price-6mo-btn');
+  if(btn){btn.textContent='กำลังโหลด...';btn.disabled=true;}
+  try{
+    if(typeof _startDeferredPriceLoad==='function') await _startDeferredPriceLoad();
+    // after load: re-render SKU list to show full sparklines
+    if(typeof renderSKUList==='function') renderSKUList();
+    _updatePriceLoadBtn(); // hides button once loaded
+  }catch(e){
+    if(btn){btn.textContent='ลองอีกครั้ง';btn.disabled=false;}
+  }
 }
 function toggleSparklineNote(){
   const note=document.getElementById('sparkline-note');

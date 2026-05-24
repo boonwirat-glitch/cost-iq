@@ -48,13 +48,17 @@ self.addEventListener('fetch', event => {
     caches.open(CACHE_NAME).then(async cache => {
       const cached = await cache.match(OFFLINE_URL);
 
-      // Background network fetch — update cache for next open
-      const networkFetch = fetch(event.request)
+      // Background network fetch — update cache for next open.
+      // v224e: fetch OFFLINE_URL directly (not event.request) to avoid Safari iOS
+      // "Response served by service worker has redirections" error.
+      // Cloudflare redirects '/' → '/index.html'; fetching event.request would
+      // cache an opaqueredirect response which Safari PWA rejects on navigation.
+      const networkFetch = fetch(OFFLINE_URL, {redirect: 'follow'})
         .then(response => {
-          if (response && response.ok) {
+          if (response && response.ok && response.type !== 'opaqueredirect') {
             cache.put(OFFLINE_URL, response.clone());
           }
-          return response;
+          return (response && response.type !== 'opaqueredirect') ? response : null;
         })
         .catch(() => null);
 
