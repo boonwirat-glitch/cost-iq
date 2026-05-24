@@ -21856,6 +21856,18 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
   window._tvLastRenderMs=Date.now();
   const el=document.getElementById('teamview-content');
   if(!el)return;
+
+  // v225f: ensure targets loaded BEFORE _buildKamGroups().
+  // Root cause: original code built groups first, then awaited visit map.
+  // _tvResolveKamDenominator() inside _buildKamGroups() checks _tvTargetsReady()=(_tgtLoaded&&_tgtGet).
+  // If targets not yet loaded when groups are built → denominator=baseline, baked in permanently.
+  // Fix: load targets first → then build groups → groups use correct targets from the start.
+  if(typeof _tgtLoaded !== 'undefined' && !_tgtLoaded){
+    if(typeof loadTargets === 'function' && typeof _tgtCurrentQuarter === 'function'){
+      try{ await loadTargets(_tgtCurrentQuarter()); }catch(e){}
+    }
+  }
+
   const groups=_buildKamGroups();
   // Pre-fetch visit data from Supabase for TL/Admin (so "ทำการบ้าน" shows KAM's actual visits)
   const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin');
