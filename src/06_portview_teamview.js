@@ -1412,6 +1412,15 @@ function portviewSelectAccount(accountId){
   try{
     closeDataPanel&&closeDataPanel();
     window._returnToPortview=true;
+    // v224e: TL/Admin — eagerly start bundle fetch BEFORE switchAccount
+    // so bundle is in-flight while UI transitions, reducing SKU movement wait time
+    const _pvRole=(currentUserProfile&&currentUserProfile.role)||'';
+    if(_pvRole==='tl'||_pvRole==='admin'){
+      const _pvKamEmail=typeof _getKamEmailForAccount==='function'?_getKamEmailForAccount(accountId):null;
+      if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
+        _fetchKamBundle(_pvKamEmail).catch(()=>{});
+      }
+    }
     switchAccount(accountId);
     showScreen('overview');
     setTimeout(()=>{

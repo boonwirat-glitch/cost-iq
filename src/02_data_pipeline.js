@@ -937,23 +937,24 @@ function _startTlBundlePrewarm(){
   if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
   const runId=++_tlPrewarmRunId;
   _tlPrewarmTimer=setTimeout(async()=>{
-    const emails=_senseGetTlPrewarmEmails(5);
+    const emails=_senseGetTlPrewarmEmails(8); // v224e: cover more KAMs (was 5)
     if(!emails.length)return;
-    _senseLog('%c[v206d bundle] TL prewarm throttled:', 'color:#00d070', emails.length, 'KAMs', emails);
+    _senseLog('%c[v224e bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
     _bundlePreWarming=true;
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
-      // Do not compete with the first user interactions after boot/search/scroll.
+      // v224e: shorter user-interaction throttle (was 8×900ms = 7.2s max)
+      // Prewarm data is critical for TL — don't delay more than 1.5s
       let waitLoops=0;
-      while(_senseIsUserActive()&&waitLoops<8){await _senseSleep(900);waitLoops++;}
+      while(_senseIsUserActive()&&waitLoops<3){await _senseSleep(500);waitLoops++;}
       await _fetchKamBundle(e).catch(()=>{});
-      await _senseSleep(950);
+      await _senseSleep(400); // v224e: was 950ms
     }
     _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
     if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('tl-prewarm',{delay:420});
     _senseLog('%c[v206d bundle] TL prewarm complete/throttled','color:#00d070');
-  },9000);
+  },2000);
 }
 
 // ── CSV Cache (IndexedDB, TTL 6h) — foreground files only ──
