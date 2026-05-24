@@ -1919,6 +1919,31 @@ function __legacyRenderTeamviewKamListFallback(){
 function __legacyRenderTeamviewKamListSync(groups, el){
   if(!el)return;
   if(!groups)groups=_buildKamGroups();
+
+  // ── v225e Value Guard ─────────────────────────────────────────────────────
+  // Skip DOM repaint if visible data hasn't changed since last render.
+  // Prevents redundant repaints from: ETag 304, bundle:prewarm-complete,
+  // hydrate-cold-load-complete when no actual data change occurred.
+  try{
+    var _tvPvSnap=portviewBulkData&&portviewBulkData.length>0
+      ?portviewBulkData.length+':'+(portviewBulkData[0]&&(portviewBulkData[0].accountId||portviewBulkData[0].id)||''):'0';
+    var _tvHistN=typeof bulkHistoryData!=='undefined'?Object.keys(bulkHistoryData).length:0;
+    var _tvCommN=(typeof window._tgtCache!=='undefined'&&window._tgtCache)?Object.keys(window._tgtCache).length:0;
+    var _tvVisitN=window._tvVisitMap
+      ?Object.values(window._tvVisitMap).reduce(function(s,v){return s+Object.keys(v||{}).length;},0):-1;
+    var _tvKey=[
+      typeof tvViewMode!=='undefined'?tvViewMode:'full',
+      typeof teamviewLevel!=='undefined'?(teamviewLevel||''):'',
+      typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
+      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN
+    ].join('|');
+    if(el._lastTvListKey===_tvKey&&el.children.length>0){
+      try{window._senseDataLog('TEAMVIEW','⚡ value guard — skip repaint (unchanged)');}catch(e){}
+      return;
+    }
+    el._lastTvListKey=_tvKey;
+  }catch(e){}
+  // ─────────────────────────────────────────────────────────────────────────
   if(!groups.length){el.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ไม่มีข้อมูล KAM</div><div class="portview-no-data-sub">Q8E ต้องมีคอลัมน์ kam_email และ tl_email<br>เพื่อแยกพอร์ตตาม KAM ได้</div></div>`;return;}
 
   // Flat list sorted by urgency: danger → warn → safe/great → star

@@ -939,19 +939,21 @@ function _startTlBundlePrewarm(){
   _tlPrewarmTimer=setTimeout(async()=>{
     const emails=_senseGetTlPrewarmEmails(8);
     if(!emails.length)return;
-    _senseLog('%c[v225b bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    // v225b fix: signal RenderBus ONCE at end, not per bundle.
-    // Per-bundle signals caused 7-14 renders: bundles arrive every ~1890ms (just under
-    // SETTLE_MS=2000ms), so each bundle reset the timer and fired its own render.
-    // One signal at end = 1 render for all bundles combined.
+    _senseLog('%c[v225d bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v225d: restore _bundlePreWarming=true during prewarm to suppress Path 1/2 internal renders.
+    // Without this flag, _fetchKamBundle completion and ingestCSVText bulk-skus both fire
+    // direct renderPortviewList/renderTeamviewKamList calls per bundle → N renders during prewarm.
+    // Flag suppresses those; single RenderBus signal at end gives exactly 1 render.
+    _bundlePreWarming=true;
     for(const e of emails){
       if(runId!==_tlPrewarmRunId)break;
       await _fetchKamBundle(e).catch(()=>{});
       await _senseSleep(200);
     }
+    _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
     try{ if(window.RenderBus) window.RenderBus.signal('bundle:prewarm-complete'); }catch(_){}
-    _senseLog('%c[v225b bundle] TL prewarm complete — 1 render signal','color:#00d070');
+    _senseLog('%c[v225d bundle] TL prewarm complete — 1 render signal','color:#00d070');
   },2000);
 }
 
@@ -1191,7 +1193,8 @@ async function _fetchKamBundle(kamEmail){
         _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
         // v224e: set bulkSkusReady so _skuSnap changes from '0s'→'1s' → portview value guard passes → _churnCounts rendered
         try{bulkSkusReady=true;}catch(e){}
-        setTimeout(()=>{try{if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();}catch(e){}},150);
+        // v225d: guard with _bundlePreWarming — suppress during TL prewarm, allow on direct/KAM loads
+        if(!_bundlePreWarming){setTimeout(()=>{try{if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();}catch(e){}},150);}
       }else{
         console.warn('[v202 bundle] ⚠️ incomplete:', kamEmail, 'skus:', okSkus, 'alts:', okAlts);
       }

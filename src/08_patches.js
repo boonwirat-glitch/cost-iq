@@ -2749,7 +2749,7 @@
   'use strict';
   var VERSION = 'v225-resume-coordinator';
   var MIN_GAP_MS = 60000; // 60s — minimum gap between freshness checks
-  var _lastRunAt = 0;
+  var _lastRunAt = Date.now(); // v225d: init to now — prevents initial pageshow from triggering ETag check (already runs via background timer)
   var _timer = null;
   var _inFlight = null;
 
