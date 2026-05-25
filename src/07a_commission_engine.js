@@ -1137,13 +1137,12 @@ function _commComputeUpsellSku(kamEmail) {
     const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 2500);       // ฿2,500 gate for P1
 
     // MTD mode — commission on actual amounts, no projection
-    // P3 uses dayRatio to scale full-month baseline to current day (Option A)
+    // MTD mode — actual MTD vs full month baseline, no day scaling
     let daysElapsed = new Date().getDate();
     try {
       const sample = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
       if (sample && sample.daysElapsed > 0) daysElapsed = sample.daysElapsed;
     } catch(e) {}
-    const dayRatio = Math.min(daysElapsed, 30) / 30; // 0–1
 
     const p1Groups = [];
     const p3Groups = [];
@@ -1186,19 +1185,15 @@ function _commComputeUpsellSku(kamEmail) {
             if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = lbl; }
           }
 
-          // P3 Option A — compare actual MTD vs prorated baseline
-          // scaledBaseline = what KAM "should have" sold by this day based on best prior month
-          const scaledBaseline = maxBaseline * dayRatio;
-
-          if (rawExistingGmv > scaledBaseline * p3Thresh) {
-            const incremental = rawExistingGmv - scaledBaseline;
+          // P3: actual MTD vs full month baseline — no day scaling
+          if (rawExistingGmv > maxBaseline * p3Thresh) {
+            const incremental = rawExistingGmv - maxBaseline;
             if (incremental >= p3MinIncr) {
               const comm = incremental * p3Rate;
               p3Groups.push({ accountId, groupKey,
                 existing_curr: rawExistingGmv,
-                max_baseline: maxBaseline, scaled_baseline: scaledBaseline,
+                max_baseline: maxBaseline,
                 max_baseline_month: maxBaselineMonth,
-                day_ratio: dayRatio,
                 incremental, commission: comm });
             }
           }
@@ -1353,7 +1348,6 @@ function _commComputeGmvGate(kamEmail) {
 function _commComputeTeamUpsellMult(tlEmail) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
-    // Get all KAMs under this TL from portviewBulkData
     const kamEmails = Array.from(new Set(
       (portviewBulkData || [])
         .filter(r => r.tlEmail === tlEmail && r.kamEmail)
@@ -1364,13 +1358,19 @@ function _commComputeTeamUpsellMult(tlEmail) {
     let teamUpsellGmv = 0;
     let teamBaselineGmv = 0;
 
-    const period = _nrrExclusionCurrentPeriod();
+    // Fast path: use pre-computed team summary (sense_upsell_team.csv)
+    // Avoids loading 15 per-KAM bundles just for the multiplier
+    const hasTeamData = typeof bulkUpsellTeamData !== 'undefined' &&
+                        bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
 
     kamEmails.forEach(ke => {
-      const upsell = _commComputeUpsellSku(ke);
-      teamUpsellGmv += upsell.tl_upsell_base; // P1 + P3 incremental only
-
-      // NRR baseline GMV for this KAM
+      if (hasTeamData && bulkUpsellTeamData[ke]) {
+        teamUpsellGmv += bulkUpsellTeamData[ke].tl_upsell_base || 0;
+      } else if (bulkUpsellData && bulkUpsellData.loaded) {
+        // Fallback: compute from per-KAM bundle if loaded
+        const upsell = _commComputeUpsellSku(ke);
+        teamUpsellGmv += upsell.tl_upsell_base;
+      }
       const raw = _tgtComputeKamNRR(ke, null);
       teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
     });

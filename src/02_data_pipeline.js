@@ -841,7 +841,44 @@ function handleFileUpload(type,input){
     };
     reader.readAsText(file);return;
   }
-  // ── bulk-upsell (Q3C: sense_upsell_bulk.csv) ──
+  // ── bulk-upsell-team (sense_upsell_team.csv) ──
+  // Tiny foreground file: pre-computed P1/P3 totals per KAM for TL multiplier
+  // Columns: kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base
+  if(type==='bulk-upsell-team'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        const team={};
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          const kamEmail=(p[0]||'').trim();
+          if(!kamEmail)return;
+          team[kamEmail]={
+            p1_gmv:      parseFloat(p[1])||0,
+            p3_incr:     parseFloat(p[2])||0,
+            outlet_gmv:  parseFloat(p[3])||0,
+            tl_upsell_base: parseFloat(p[4])||0
+          };
+        });
+        bulkUpsellTeamData=team;
+        const cnt=Object.keys(team).length;
+        const b=document.getElementById('badge-bulk-upsell-team');
+        if(b){b.textContent='✓ '+cnt+' KAMs';b.className='dp-slot-badge ok';}
+        // TL multiplier card can now render
+        try{ if(typeof _tgtRenderTeamGovCard==='function' && typeof renderTeamview==='function')renderTeamview(); }catch(e){}
+      }catch(err){
+        console.warn('[Q3C team] parse error',err);
+        bulkUpsellTeamData={};
+      }
+      _done();
+    };
+    reader.readAsText(file);return;
+  }
+
+  // ── bulk-upsell-kam (sense_upsell_{safekey}.csv) ──
+  // Per-KAM demand bundle: same 8-column structure, single KAM only
+  // ── bulk-upsell (Q3C: sense_upsell_bulk.csv) ──  [legacy, not used in Option B]
   // Grain: kam_email × account_id × month_label × group_key
   // Columns: kam_email, account_id, month_label, group_key,
   //          existing_gmv, new_gmv, comeback_gmv, total_gmv
@@ -888,9 +925,9 @@ function handleFileUpload(type,input){
         });
         bulkUpsellData={byKam,baselineGroups,loaded:true,baselineLabel:_baselineLabel};
         const kamCount=Object.keys(byKam).length;
-        const b=document.getElementById('badge-bulk-upsell');
+        const b=document.getElementById('badge-bulk-upsell-kam');
         if(b){b.textContent='✓ '+kamCount+' KAMs / '+rowCount+' rows';b.className='dp-slot-badge ok';}
-        const sl=document.getElementById('slot-bulk-upsell');if(sl)sl.style.borderColor='var(--g500)';
+        const sl=document.getElementById('slot-bulk-upsell-kam');if(sl)sl.style.borderColor='var(--g500)';
         // Clear loading state cache so strip re-renders with real values
         try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
         // Trigger commission strip re-render now that upsell data is available
@@ -1033,7 +1070,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell:'sense_upsell_bulk.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv'};
 const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
   portview:{type:'portview-bulk',tab:'portview',cache:false}, // Level 3: always fetch — changes daily
@@ -1048,8 +1085,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   price:{type:'bulk-price',tab:'price',cache:false,heavy:false},
   // Q10: transfer-out per KAM
   handover:{type:'bulk-handover',tab:'handover',cache:true},
-  // Q3C: upsell SKU bulk (all KAMs) for commission P1/P3 + Upsell Outlet calc
-  upsell:{type:'bulk-upsell',tab:'upsell',cache:true},
+  // Q3C team summary: pre-computed P1/P3 totals per KAM for TL multiplier
+  upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -1278,12 +1315,45 @@ async function _fetchKamBundle(kamEmail){
   return p;
 }
 
+// Fetch per-KAM upsell bundle on demand (like SKU bundles)
+const _upsellBundleLoaded=new Set();
+const _upsellBundleInFlight={};
+
+async function _fetchUpsellBundle(kamEmail){
+  if(!kamEmail)return false;
+  const safeKey=_kamSafeKey(kamEmail);
+  if(_upsellBundleLoaded.has(safeKey))return true;
+  if(_upsellBundleInFlight[safeKey])return _upsellBundleInFlight[safeKey];
+  const p=(async()=>{
+    try{
+      const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+      const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+      if(ok){
+        _upsellBundleLoaded.add(safeKey);
+        // Clear strip cache so it re-renders with real upsell values
+        try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+      }
+      return ok;
+    }catch(e){
+      console.warn('[upsell bundle] error',kamEmail,e&&e.message);
+      return false;
+    }finally{
+      delete _upsellBundleInFlight[safeKey];
+    }
+  })();
+  _upsellBundleInFlight[safeKey]=p;
+  return p;
+}
+window._fetchUpsellBundle=_fetchUpsellBundle;
+
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   // v202: KAM role — fire per-KAM bundle in parallel (silent, no pill, no toast)
   const _bgRole=currentUserProfile&&currentUserProfile.role||'rep';
   if(_bgRole!=='tl'&&_bgRole!=='admin'&&currentUser&&currentUser.email){
     _fetchKamBundle(currentUser.email).catch(()=>{});
+    _fetchUpsellBundle(currentUser.email).catch(()=>{});  // Q3C per-KAM upsell bundle
   }
   if(_cloudBackgroundPromise)return _cloudBackgroundPromise;
   const counter=document.getElementById('sheets-loaded-count');
@@ -1403,7 +1473,7 @@ async function loadFromCloudflareR2(){
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell'];
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team'];
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
