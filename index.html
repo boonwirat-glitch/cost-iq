@@ -25549,32 +25549,25 @@ function _commComputeHandoverRetention(kamEmail) {
 // ── GMV Gate Engine ─────────────────────────────────────────────
 // Returns { ach_pct, cap_multiplier, gate_active }
 // KAM-only: TL does not have GMV Gate
-function _commComputeGmvGate(kamEmail) {
+function _commComputeGmvGate(kamEmail, nrrPct) {
+  // Gate based on NRR% — same metric already computed in _commBuildKamPayout
+  // nrrPct passed in directly (no need to recompute GMV separately)
   try {
-    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 95); // %
+    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 95); // NRR% threshold
     const t2 = _commGetConfig('gmv_gate', 'threshold_2', 90);
     const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.70);
     const c2 = _commGetConfig('gmv_gate', 'cap_2', 0.35);
 
-    // Get KAM run-rate and target for current period
-    const period = _nrrExclusionCurrentPeriod(); // "2026-05"
-    const target = _tgtGet(period, 'kam', kamEmail);
+    if (nrrPct === null || nrrPct === undefined) {
+      return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
+    }
 
-    // Run-rate GMV from portviewBulkData
-    const pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
-    const runrate = pvRow ? (pvRow.runrate || 0) : 0;
-
-    if (!target || target <= 0) return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
-
-    const achPct = runrate / target * 100;
     let cap = 1.0;
-    if (achPct < t2)      cap = c2;
-    else if (achPct < t1) cap = c1;
+    if (nrrPct < t2)      cap = c2;
+    else if (nrrPct < t1) cap = c1;
 
     return {
-      ach_pct: Math.round(achPct * 10) / 10,
-      kam_runrate: runrate,
-      kam_target: target,
+      ach_pct: nrrPct,
       cap_multiplier: cap,
       gate_active: cap < 1.0
     };
@@ -25663,10 +25656,27 @@ function _commBuildKamPayout(kamEmail) {
     const planCode = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
     const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
 
-    const upsellSku     = _commComputeUpsellSku(kamEmail);
-    const upsellOutlet  = _commComputeUpsellOutlet(kamEmail);
+    // Upsell: try full bundle first, fall back to pre-computed team summary
+    // Team summary (bulkUpsellTeamData) is loaded as FOREGROUND — always available
+    let upsellSku, upsellOutlet;
+    const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
+    const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData && bulkUpsellTeamData[kamEmail];
+    if (!_bundleLoaded && _teamRow) {
+      // Fast path: use pre-computed totals from team summary
+      const p1Rate    = _commGetConfig('upsell_sku',  'p1_rate',  0.03);
+      const p3Rate    = _commGetConfig('upsell_sku',  'p3_rate',  0.03);
+      const outRate   = _commGetConfig('upsell_outlet','rate',    0.015);
+      const skuComm   = (_teamRow.p1_gmv * p1Rate) + (_teamRow.p3_incr * p3Rate);
+      const outComm   = (_teamRow.outlet_gmv * outRate);
+      upsellSku    = { total_comm: skuComm, p1_comm: _teamRow.p1_gmv * p1Rate,
+                       p3_comm: _teamRow.p3_incr * p3Rate, p1_groups: [], p3_groups: [] };
+      upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
+    } else {
+      upsellSku    = _commComputeUpsellSku(kamEmail);
+      upsellOutlet = _commComputeUpsellOutlet(kamEmail);
+    }
     const handover      = _commComputeHandoverRetention(kamEmail);
-    const gate          = _commComputeGmvGate(kamEmail);
+    const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
 
     const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
@@ -29114,6 +29124,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(!st) return '';
     var src=buildSources(st);
     if(!src) return '';
+    // Self-healing: if upsell not loaded yet, trigger fetch now
+    if(src.loading && st.email && typeof _fetchUpsellBundle==='function'){
+      _fetchUpsellBundle(st.email).catch(function(){});
+    }
     var finalAmt=src.final;
     var paid=finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
