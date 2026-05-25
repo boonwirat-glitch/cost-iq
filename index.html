@@ -23373,8 +23373,8 @@ flex-wrap:wrap;}
 .tv-signal-value.warn{color:#f6ad55}
 .tv-signal-meta{
   margin-top:4px;
-  font-size:9px;
-  color:rgba(255,255,255,.44);
+  font-size:10px;
+  color:rgba(255,255,255,.62);
   line-height:1.3;
   white-space:nowrap;
   overflow:hidden;
@@ -23522,9 +23522,9 @@ flex-wrap:wrap;}
 .tv-signal-card.commission::before{
   content:'฿';position:absolute;right:12px;top:10px;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:rgba(255,224,138,.30);
 }
-.tv-signal-card.commission .tv-signal-label{color:rgba(255,224,138,.72)}
-.tv-signal-card.commission .tv-signal-value{color:#fff3ca}
-.tv-signal-card.commission .tv-signal-meta{color:rgba(255,244,214,.60)}
+.tv-signal-card.commission .tv-signal-label{color:rgba(255,224,138,.80)}
+.tv-signal-card.commission .tv-signal-value{color:var(--amb)}
+.tv-signal-card.commission .tv-signal-meta{color:rgba(255,244,214,.75)}
 .tv-action-btn.commission-open{
   border-color:rgba(255,198,56,.22);
   background:linear-gradient(135deg,rgba(255,198,56,.18),rgba(100,170,255,.14));
@@ -25173,29 +25173,38 @@ function _commOpenTlDetailSheet() {
   const um = typeof _commComputeTeamUpsellMult === 'function' ? _commComputeTeamUpsellMult(tlEmail) : {multiplier:1.0,tier:1,team_upsell_pct:0};
   const multLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
   function fmtP(n){ return _commFmtPayout(n||0); }
-  // KAM rows
-  const kamRows = summary.kamRows.map(r => {
+
+  // KAM rows — single line per KAM, amber payout, readable detail
+  const kamRows = (summary.kamRows || []).map(r => {
     const bd = r.breakdown || {};
-    const upsell = bd.upsell_sku ? (bd.upsell_sku.total_commission||0) + ((bd.upsell_outlet&&bd.upsell_outlet.commission)||0) : 0;
+    const upsell = (bd.upsell_sku ? (bd.upsell_sku.total_comm||bd.upsell_sku.total_commission||0) : 0)
+                 + (bd.upsell_outlet ? (bd.upsell_outlet.commission||0) : 0);
     const nrrP = bd.nrr_payout || 0;
-    const ho = bd.handover ? bd.handover.payout||0 : 0;
-    const name = bd.kam_name || r.beneficiary_email || '';
-    const nrr = r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct+'%' : '—';
+    const ho   = bd.handover ? (bd.handover.payout||0) : 0;
+    const finalAmt = r.payout_amount || r.final_payout || 0;
+    // resolve name: use portview display name
+    const pvRow = (portviewBulkData||[]).find(p => p.kamEmail === (r.beneficiary_email||''));
+    const name = (pvRow && pvRow.kamName) || bd.kam_name || r.beneficiary_email || '';
+    const nrr  = r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct+'%' : '—';
+    const detailParts = ['NRR '+fmtP(nrrP)];
+    if (upsell > 0) detailParts.push('Uplift '+fmtP(upsell));
+    if (ho > 0)     detailParts.push('HO '+fmtP(ho));
+    const amberStyle = finalAmt > 0 ? 'color:#f0b000;font-weight:700' : 'color:rgba(255,255,255,.4)';
     return `<div class="pv-comm-tl-kam-row">
       <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
       <div class="pv-comm-tl-kam-nrr">${nrr}</div>
-      <div class="pv-comm-tl-kam-pay">${fmtP(r.payout_amount)}</div>
-      <div class="pv-comm-tl-kam-detail">
-        NRR ${fmtP(nrrP)}${upsell>0?' · Uplift '+fmtP(upsell):''}${ho>0?' · HO '+fmtP(ho):''}
-      </div>
+      <div class="pv-comm-tl-kam-pay" style="${amberStyle}">${fmtP(finalAmt)}</div>
+      <div class="pv-comm-tl-kam-detail">${detailParts.join(' · ')}</div>
     </div>`;
   }).join('');
+
   const multSection = multLoaded
     ? `<div class="pv-comm-tl-mult">
-        <span>Upsell Mult ×${um.multiplier.toFixed(2)}</span>
-        <span style="color:rgba(255,255,255,.5);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell (T${um.tier})</span>
+        <span style="color:#f0b000;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
+        <span style="color:rgba(255,255,255,.6);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
        </div>`
     : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
+
   ov.innerHTML = `<div class="pv-comm-sheet">
     <div class="pv-comm-sheet-handle"></div>
     <div class="pv-comm-sheet-body">
@@ -25238,19 +25247,17 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
   s.id = '_comm_tl_styles';
   s.textContent = `
     .tv-mult-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
-    .tv-mult-badge.ok{background:rgba(0,204,106,.18);color:#00CC6A}
+    .tv-mult-badge.ok{background:rgba(240,176,0,.18);color:#f0b000}
     .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
-    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.05);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
-    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 48px 72px;gap:4px;padding:6px 0 3px;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08);margin-top:4px}
-    .pv-comm-tl-kam-list{display:flex;flex-direction:column;gap:1px;max-height:300px;overflow-y:auto;margin-top:4px}
-    .pv-comm-tl-kam-row{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(240,176,0,.07);border:1px solid rgba(240,176,0,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
+    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
+    .pv-comm-tl-kam-list{display:flex;flex-direction:column;max-height:320px;overflow-y:auto;margin-top:2px}
+    .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 44px 76px;grid-template-rows:auto auto;gap:1px 4px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
     .pv-comm-tl-kam-row:last-child{border-bottom:none}
-    .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;grid-column:1;display:grid;grid-template-columns:1fr 48px 72px;gap:4px;align-items:baseline}
-    .pv-comm-tl-kam-nrr{font-size:12px;color:rgba(255,255,255,.6);text-align:right}
-    .pv-comm-tl-kam-pay{font-size:13px;font-weight:700;color:#FFBB00;text-align:right}
-    .pv-comm-tl-kam-detail{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;padding-left:0}
-    .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 48px 72px;gap:2px 4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-    .pv-comm-tl-kam-detail{grid-column:1/-1;font-size:10px;color:rgba(255,255,255,.35)}
+    .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;grid-column:1}
+    .pv-comm-tl-kam-nrr{font-size:11px;color:rgba(255,255,255,.55);text-align:right;grid-row:1;grid-column:2}
+    .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;text-align:right;grid-row:1;grid-column:3}
+    .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:10px;color:rgba(255,255,255,.48);line-height:1.4}
   `;
   (document.head || document.body).appendChild(s);
 })();
@@ -25770,7 +25777,11 @@ function _commBuildKamPayout(kamEmail) {
     // Team summary (bulkUpsellTeamData) is loaded as FOREGROUND — always available
     let upsellSku, upsellOutlet;
     const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
-    const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData && bulkUpsellTeamData[kamEmail];
+    // Q3C Team SQL keys by ka_owner (display name), not email — try both
+    const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const _kamDisplayName = _pvRow ? (_pvRow.kamName || '') : '';
+    const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData &&
+      (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
     if (!_bundleLoaded && _teamRow) {
       // Fast path: use pre-computed totals from team summary
       const p1Rate    = _commGetConfig('upsell_sku',  'p1_rate',  0.03);
