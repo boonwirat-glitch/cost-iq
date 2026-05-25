@@ -1750,7 +1750,7 @@ function _senseDataLog(){
 // Extra 3 are a bonus — eliminate the post-splash debounced batch render on warm boot.
 async function _preloadFromIndexedDB(){
   var CRITICAL=['portview','history','handover'];
-  var EXTRA=['categories','sku_current','outlets']; // v222: also preload — cache:true in IDB
+  var EXTRA=['categories','sku_current','outlets','upsell_team']; // v222+v226: also preload — cache:true in IDB
   var TABS=[...CRITICAL,...EXTRA];
   var loaded=0; var criticalLoaded=0;
   try{
@@ -1777,7 +1777,7 @@ async function _preloadFromIndexedDB(){
     await Promise.all(tasks);
     if(criticalLoaded===3){
       window._idbPreloaded=true;
-      _senseDataLog('⚡ IDB-PRELOAD','critical 3 ready ('+loaded+'/6 total) — splash fast path, R2 skipped');
+      _senseDataLog('⚡ IDB-PRELOAD','critical 3 ready ('+loaded+'/'+TABS.length+' total) — splash fast path, R2 skipped');
       if(allCriticalReady()){
         if(typeof window._splashDataReady==='function') window._splashDataReady();
         // v223: RenderBus already has signals from per-file loads above — no extra flush needed
