@@ -25460,10 +25460,19 @@ function _commComputeUpsellOutlet(kamEmail) {
     if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
     const _pvRow2 = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
     const _kamKey2 = (_pvRow2 && _pvRow2.kamName) ? _pvRow2.kamName : kamEmail;
-    const kamData = (bulkUpsellData.byKam || {})[_kamKey2] || (bulkUpsellData.byKam || {})[kamEmail] || {};
+    const byKam2 = bulkUpsellData.byKam || {};
+    let kamData = byKam2[_kamKey2] || byKam2[kamEmail] || {};
+    if (!Object.keys(kamData).length && _kamKey2) {
+      const _fk = Object.keys(byKam2).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
+      if (_fk) kamData = byKam2[_fk];
+    }
     if (!Object.keys(kamData).length) return EMPTY;
     const baselineGroups = bulkUpsellData.baselineGroups || {};
-    const baselineSet = baselineGroups[_kamKey2] || baselineGroups[kamEmail] || {};
+    let baselineSet = baselineGroups[_kamKey2] || baselineGroups[kamEmail] || {};
+    if (!Object.keys(baselineSet).length && _kamKey2) {
+      const _fk2 = Object.keys(baselineGroups).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
+      if (_fk2) baselineSet = baselineGroups[_fk2];
+    }
     const currLabel = _commCurrentMonthLabel();
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
 
