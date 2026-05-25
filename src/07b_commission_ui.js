@@ -2805,6 +2805,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var uplift=Number((p.upsell_sku&&p.upsell_sku.total_comm)||0)+Number((p.upsell_outlet&&p.upsell_outlet.commission)||0);
       var hv=Number((p.handover&&p.handover.payout)||0);
       var cap=Number(p.gate_cap||1.0);
+      // final = governance NRR (st.payout) + upsell + handover, then gate applied
+      // Do NOT use p.nrr_payout which may be 0 if plan lookup fails
       return {loading:false,nrr:nrr,uplift:uplift,handover:hv,
         gate_cap:cap,gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
         upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,

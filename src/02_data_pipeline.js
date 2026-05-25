@@ -1330,9 +1330,12 @@ async function _fetchUpsellBundle(kamEmail){
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       if(ok){
         _upsellBundleLoaded.add(safeKey);
-        // Clear strip cache so it re-renders with real upsell values
-        try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
-        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        // Clear strip cache and force full re-render pipeline
+        setTimeout(()=>{
+          try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+          try{ if(typeof _commGatedRender==='function') _commGatedRender(); }catch(e){}
+          try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        }, 100);
       }
       return ok;
     }catch(e){
