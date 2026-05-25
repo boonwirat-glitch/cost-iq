@@ -29083,23 +29083,25 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   function money(n){ try{return _commFmtPayout(n);}catch(e){ n=Number(n||0); return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0'; } }
   function pts(n){ try{return _commFormatPts(n);}catch(e){ var x=Number(n||0); return x.toFixed(1).replace('.0',''); } }
   // v225-comm: buildSources uses real payout via _commBuildKamPayout
+  // v226-comm: NRR always from governance st.payout; upsell/handover added on top when bundle loaded
   function buildSources(st){
-    var email=st&&st.email;
-    if(!email) return null;
+    var nrr=Number(st&&st.payout||0);
+    var base={loading:false,nrr:nrr,uplift:0,handover:0,gate_cap:1.0,gate_active:false,final:nrr};
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
-      return {loading:true,nrr:Number(st&&st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st&&st.payout||0)};
+      return Object.assign({},base,{loading:true});
     }
     try{
-      var p=typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
-      if(!p) return {nrr:Number(st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st.payout||0)};
-      return {loading:false,nrr:Number(p.nrr_payout||0),
-        upsell_sku:Number((p.upsell_sku&&p.upsell_sku.total_comm)||0),
-        upsell_outlet:Number((p.upsell_outlet&&p.upsell_outlet.commission)||0),
-        handover:Number((p.handover&&p.handover.payout)||0),
-        gate_cap:Number(p.gate_cap||1.0),gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
+      var email=st&&st.email;
+      var p=email&&typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
+      if(!p) return base;
+      var uplift=Number((p.upsell_sku&&p.upsell_sku.total_comm)||0)+Number((p.upsell_outlet&&p.upsell_outlet.commission)||0);
+      var hv=Number((p.handover&&p.handover.payout)||0);
+      var cap=Number(p.gate_cap||1.0);
+      return {loading:false,nrr:nrr,uplift:uplift,handover:hv,
+        gate_cap:cap,gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
         upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,
-        final:Number(p.final_payout||0)};
-    }catch(e){ return {nrr:Number(st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st.payout||0)}; }
+        final:Math.round((nrr+uplift+hv)*cap)};
+    }catch(e){ return base; }
   }
   function buildCompactStrip(){
     if(typeof _commBuildKamSelfState!=='function') return '';
@@ -29107,22 +29109,6 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(!st) return '';
     var src=buildSources(st);
     if(!src) return '';
-    if(src.loading){
-      // Show NRR row immediately; dim Upsell/Handover until Q3C loads
-      var _cls="v210k "+(src.nrr>0?"paid":"unpaid")+" "+esc(st.cls||"");
-      var _st=st.status||(src.nrr>0?"ถึงเกณฑแล้ว":"ยังไม่ถึงเกณฑ");
-      return '<div class="'+_cls+'" data-v210k="1">'
-        +'<div class="pv-comm-title">ค่าคอมฯ เดือนนี้</div>'
-        +'<div class="pv-comm-main">'+money(src.nrr)+'</div>'
-        +'<div class="pv-comm-chip" title="'+esc(_st)+'">'+esc(_st)+'</div>'
-        +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
-        +'<div class="pv-comm-sources">'
-        +'<span><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">·</span>'
-        +'<span style="color:rgba(255,255,255,.3)"><b>Upsell</b> —</span><span class="pv-comm-sep">·</span>'
-        +'<span style="color:rgba(255,255,255,.3)"><b>Handover</b> —</span>'
-        +'</div>'
-        +'</div>';
-    }
     var finalAmt=src.final;
     var paid=finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
@@ -29134,9 +29120,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
       +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
       +'<div class="pv-comm-sources">'
-      +'<span><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span><b>Upsell</b> '+money(src.upsell_sku+src.upsell_outlet)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span><b>Handover</b> '+money(src.handover)+'</span>'
+      +'<span class="src-nrr"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span>'+(src.loading?'<span style="color:rgba(255,255,255,.35)">':'')+'<b>Uplift</b> '+money(src.uplift||0)+(src.loading?'</span>':'')+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span>'+(src.loading?'<span style="color:rgba(255,255,255,.35)">':'')+'<b>Handover</b> '+money(src.handover||0)+(src.loading?'</span>':'')+'</span>'
       +'</div>'
       +'</div>';
   }
