@@ -2826,20 +2826,23 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(src.loading && st.email && typeof _fetchUpsellBundle==='function'){
       _fetchUpsellBundle(st.email).catch(function(){});
     }
-    var finalAmt=src.final;
-    var paid=finalAmt>0;
+    var finalAmt=src.loading?null:src.final;
+    var paid=!src.loading&&finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
-    var status=st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11');
-    var gateNote=src.gate_active?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
+    var status=src.loading?'กำลังโหลด...':(st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11'));
+    var gateNote=(!src.loading&&src.gate_active)?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
+    var mainHtml=src.loading
+      ?'<div class="skel" style="width:90px;height:28px;border-radius:6px;display:inline-block"></div>'
+      :money(finalAmt);
     return '<div class="pv-comm-strip '+cls+'" data-v210k="1">'
       +'<div class="pv-comm-title">\u0e04\u0e48\u0e32\u0e04\u0e2d\u0e21\u0e2f \u0e40\u0e14\u0e37\u0e2d\u0e19\u0e19\u0e35\u0e49'+gateNote+'</div>'
-      +'<div class="pv-comm-main">'+money(finalAmt)+'</div>'
+      +'<div class="pv-comm-main">'+mainHtml+'</div>'
       +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
       +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
       +'<div class="pv-comm-sources">'
-      +'<span class="src-nrr"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span>'+(src.loading?'<span style="color:rgba(255,255,255,.35)">':'')+'<b>Uplift</b> '+money(src.uplift||0)+(src.loading?'</span>':'')+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span>'+(src.loading?'<span style="color:rgba(255,255,255,.35)">':'')+'<b>Handover</b> '+money(src.handover||0)+(src.loading?'</span>':'')+'</span>'
+      +'<span style="color:'+(src.nrr>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
       +'</div>'
       +'</div>';
   }
@@ -2940,13 +2943,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var d=src.upsell_sku_detail;
       var p1g=d.p1&&d.p1.groups?d.p1.groups:[];
       var p3g=d.p3&&d.p3.groups?d.p3.groups:[];
-      p1Detail=[ruleLine(p1g.length>0,"P1: item ใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
+      p1Detail=[ruleLine(p1g.length>0,"หมวดใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
       if(p1g.length) p1Detail.push(ruleIndent(p1g.slice(0,3).map(function(g){return esc(g.group_key)+" "+money(g.total_gmv);}).join(" · ")+(p1g.length>3?" +"+(p1g.length-3)+" more":"")));
-      p3Detail=[ruleLine(p3g.length>0,"P3: growth >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
+      p3Detail=[ruleLine(p3g.length>0,"ขายเพิ่ม >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
       if(p3g.length) p3Detail.push(ruleIndent(p3g.slice(0,3).map(function(g){return esc(g.group_key)+" incr "+money(g.incremental);}).join(" · ")+(p3g.length>3?" +"+(p3g.length-3)+" more":"")));
     }
     var upsellSkuDetail=p1Detail.length||p3Detail.length?ruleBox(p1Detail.concat(p3Detail)):"";
-    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","Upsell SKU","item ใหม่ "+p1Rate+"% · growth >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
+    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","Upsell SKU","หมวดใหม่ "+p1Rate+"% · ขายเพิ่ม >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
 
     // Upsell Outlet row
     var outDetail="";
@@ -2957,31 +2960,36 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     }
     var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Upsell Outlet","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
 
-    // Handover row
+    // Handover row — 2-line tier breakdown
     var hoDetail="";
     if(src.handover_detail){
       var hd=src.handover_detail;
-      var hoHit=hd.tier>=2;
-      hoDetail=ruleBox([ruleLine(hoHit,"retention "+hd.retention_pct+"% → Tier "+hd.tier,money(hd.payout)),
-                         ruleIndent("เป้า: ≥"+hoT2+"% = ฿"+hoT2Pay+" · ≥"+hoT3+"% = +฿"+hoT3Bon+" · เทียบ "+money(hd.current_gmv)+"/"+money(hd.baseline_gmv)+" ("+hd.accounts+" ร้าน)")]);
+      var hoHit2=hd.retention_pct>=hoT2;
+      var hoHit3=hd.retention_pct>=hoT3;
+      hoDetail=ruleBox([
+        ruleIndent("retention "+hd.retention_pct+"% ("+hd.accounts+" ร้าน) — "+money(hd.current_gmv)+" / "+money(hd.baseline_gmv)),
+        ruleLine(hoHit2,"≥"+hoT2+"% → ฿"+hoT2Pay,hoHit2?money(hd.payout>0?Math.min(hd.payout,Number(String(hoT2Pay).replace(/,/g,""))||2500):0):""),
+        ruleLine(hoHit3,"≥"+hoT3+"% → +฿"+hoT3Bon+" (bonus)",hoHit3?money(Number(String(hoT3Bon).replace(/,/g,""))||2500):"")
+      ]);
     }
     var handoverRow=srcRow(src.handover>0?"paid":"","Handover","≥"+hoT2+"% = ฿"+hoT2Pay+" · ≥"+hoT3+"% = +฿"+hoT3Bon,money(src.handover),hoDetail);
 
-    // GMV Gate row
+    // NRR Gate row (renamed from GMV Gate — gate uses NRR%, not run-rate)
     var gateRow="";
     if(src.gate&&src.gate.ach_pct!==null&&src.gate.ach_pct!==undefined){
       var gPct=src.gate.ach_pct;
       var gCapPct=Math.round(src.gate_cap*100);
       var gRule=gPct>=gT1?"≥"+gT1+"% → ไม่มี cap":gPct>=gT2?gT2+"–"+gT1+"% → cap "+gC1+"%":"<"+gT2+"% → cap "+gC2+"%";
       var gRowCls="pv-comm-source-row"+(src.gate_active?" gate-warn":"");
-      gateRow=srcRow(gRowCls,"GMV Gate"+(src.gate_active?" ⚠":""),"run-rate "+money(src.gate.kam_runrate)+"/เป้า "+money(src.gate.kam_target)+" = "+gPct+"% · "+gRule,"<span class=\""+( src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
+      gateRow=srcRow(gRowCls,"NRR Gate"+(src.gate_active?" ⚠":""),"NRR "+gPct+"% · "+gRule,"<span class=\""+(src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
     }
 
     var loadNote=src.loading?"<div style=\"font-size:11px;color:#FFBB00;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
     var kpiCls=finalAmt>0?"val-bonus":"";
+    var safeEmail=(st.email||"").replace(/'/g,"\\'");
     var auditBtn=typeof _commBuildKamAuditSql==="function"&&st.email
-      ?"<button class=\"comm-secondary\" style=\"font-size:11px;padding:5px 10px;margin-left:8px\" onclick=\"_commCopyAuditSql({email:\\"+JSON.stringify(st.email)+"\\})\">ตรวจรายละเอียด</button>"
-      :"";
+      ?'<button class="comm-secondary" style="font-size:11px;padding:5px 10px;margin-left:8px" onclick="_commCopyAuditSql({email:\''+safeEmail+'\'})">ตรวจรายละเอียด</button>'
+      :'';
 
     var html=[
       "<div class=\"pv-comm-sheet\">",

@@ -238,31 +238,29 @@ function _tgtRenderTeamGovCard() {
   const commissionMeta = isTLRole(role)
     ? `KAM team ${_commFmtPayout(summary.kamPayout)}${_tlMultText}`
     : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
-  // Upsell multiplier card (TL only, shown when upsell data loaded)
-  let upsellCard = '';
+  // Upsell Mult — folded into Commission card meta (not a separate card)
+  let multBadge = '';
+  let umData = null;
   if ((isTLRole(role) || isAdminRole(role)) && typeof _commComputeTeamUpsellMult === 'function') {
     try {
-      // For TL: their own email. For Admin: use first TL from portview for overview
       const _govEmail = isTLRole(role)
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
-      const um = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : { multiplier:1.0, tier:1, team_upsell_pct:0 };
-      if (typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded) {
-        const multCls = um.multiplier > 1 ? 'ok' : '';
-        upsellCard = `<div class="tv-signal-card ${multCls}">
-          <div class="tv-signal-label">Upsell Mult</div>
-          <div class="tv-signal-value ${multCls}">${um.multiplier.toFixed(2)}×</div>
-          <div class="tv-signal-meta">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</div>
-        </div>`;
-      } else {
-        upsellCard = `<div class="tv-signal-card">
-          <div class="tv-signal-label">Upsell Mult</div>
-          <div class="tv-signal-value">—</div>
-          <div class="tv-signal-meta">กำลังโหลด...</div>
-        </div>`;
+      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
+      if (umData && (typeof bulkUpsellData !== 'undefined') && bulkUpsellData && bulkUpsellData.loaded) {
+        const multCls = umData.multiplier > 1 ? 'ok' : '';
+        multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
+      } else if (isTLRole(role) || isAdminRole(role)) {
+        multBadge = `<span class="tv-mult-badge loading">×—</span>`;
       }
     } catch(e) {}
   }
+  const commMeta2 = isTLRole(role)
+    ? (umData && (typeof bulkUpsellData !== 'undefined') && bulkUpsellData && bulkUpsellData.loaded
+        ? `KAM team ${_commFmtPayout(summary.kamPayout)} · ${umData.team_upsell_pct.toFixed(1)}% upsell`
+        : `KAM team ${_commFmtPayout(summary.kamPayout)}`)
+    : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
+
   return `<div class="tv-gov-card">
     <div class="tv-signal-wrap">
       <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
@@ -270,12 +268,11 @@ function _tgtRenderTeamGovCard() {
         <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${governedPct !== null ? governedPct + '%' : '—'}</div>
         <div class="tv-signal-meta">${baseTxt}</div>
       </div>
-      <div class="tv-signal-card commission">
-        <div class="tv-signal-label">Commission</div>
+      <div class="tv-signal-card commission" style="cursor:pointer" onclick="event.stopPropagation();_commOpenTlDetailSheet()">
+        <div class="tv-signal-label">Commission ${multBadge}</div>
         <div class="tv-signal-value">${_commFmtPayout(commissionMain)}</div>
-        <div class="tv-signal-meta">${commissionMeta}</div>
+        <div class="tv-signal-meta">${commMeta2}</div>
       </div>
-      ${upsellCard}
       <div class="tv-signal-card ${pending ? 'warn' : 'ok'}">
         <div class="tv-signal-label">Exceptions</div>
         <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
@@ -924,7 +921,105 @@ function _commCloseKamSelfSheet() {
   ov.classList.remove('on');
   setTimeout(()=>{ ov.innerHTML=''; }, 260);
 }
-window._commRenderKamSelfStrip = _commRenderKamSelfStrip;
+// ── TL Commission Detail Sheet ────────────────────────────────
+function _commOpenTlDetailSheet() {
+  const role = getCurrentRole ? getCurrentRole() : '';
+  if (!isTLRole(role) && !isAdminRole(role)) return;
+  let ov = document.getElementById('pv-comm-tl-sheet-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'pv-comm-tl-sheet-overlay';
+    ov.className = 'pv-comm-sheet-overlay';
+    ov.onclick = function(e){ if(e.target===ov) _commCloseTlDetailSheet(); };
+    document.body.appendChild(ov);
+  }
+  const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
+  const tlPayout = _commBuildTlPayout(tlEmail);
+  const summary = _commBuildPayoutSummary('tl');
+  const um = typeof _commComputeTeamUpsellMult === 'function' ? _commComputeTeamUpsellMult(tlEmail) : {multiplier:1.0,tier:1,team_upsell_pct:0};
+  const multLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
+  function fmtP(n){ return _commFmtPayout(n||0); }
+  // KAM rows
+  const kamRows = summary.kamRows.map(r => {
+    const bd = r.breakdown || {};
+    const upsell = bd.upsell_sku ? (bd.upsell_sku.total_commission||0) + ((bd.upsell_outlet&&bd.upsell_outlet.commission)||0) : 0;
+    const nrrP = bd.nrr_payout || 0;
+    const ho = bd.handover ? bd.handover.payout||0 : 0;
+    const name = bd.kam_name || r.beneficiary_email || '';
+    const nrr = r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct+'%' : '—';
+    return `<div class="pv-comm-tl-kam-row">
+      <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
+      <div class="pv-comm-tl-kam-nrr">${nrr}</div>
+      <div class="pv-comm-tl-kam-pay">${fmtP(r.payout_amount)}</div>
+      <div class="pv-comm-tl-kam-detail">
+        NRR ${fmtP(nrrP)}${upsell>0?' · Uplift '+fmtP(upsell):''}${ho>0?' · HO '+fmtP(ho):''}
+      </div>
+    </div>`;
+  }).join('');
+  const multSection = multLoaded
+    ? `<div class="pv-comm-tl-mult">
+        <span>Upsell Mult ×${um.multiplier.toFixed(2)}</span>
+        <span style="color:rgba(255,255,255,.5);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell (T${um.tier})</span>
+       </div>`
+    : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
+  ov.innerHTML = `<div class="pv-comm-sheet">
+    <div class="pv-comm-sheet-handle"></div>
+    <div class="pv-comm-sheet-body">
+      <div class="pv-comm-sheet-title">Commission ทีม</div>
+      <div class="pv-comm-sheet-kpis">
+        <div class="pv-comm-sheet-kpi val-bonus">
+          <div class="pv-comm-sheet-kpi-label">TL ได้</div>
+          <div class="pv-comm-sheet-kpi-val">${fmtP(tlPayout.final_payout)}</div>
+        </div>
+        <div class="pv-comm-sheet-kpi">
+          <div class="pv-comm-sheet-kpi-label">KAM ทีมรวม</div>
+          <div class="pv-comm-sheet-kpi-val">${fmtP(summary.kamPayout)}</div>
+        </div>
+      </div>
+      <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
+      ${multSection}
+      <div class="pv-comm-section-label" style="margin-top:12px">รายละเอียดต่อ KAM</div>
+      <div class="pv-comm-tl-kam-header">
+        <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
+      </div>
+      <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
+      <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
+    </div>
+  </div>`;
+  requestAnimationFrame(()=>ov.classList.add('on'));
+}
+function _commCloseTlDetailSheet() {
+  const ov = document.getElementById('pv-comm-tl-sheet-overlay');
+  if (!ov) return;
+  ov.classList.remove('on');
+  setTimeout(()=>{ ov.innerHTML=''; }, 260);
+}
+window._commOpenTlDetailSheet = _commOpenTlDetailSheet;
+window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
+
+// Inject CSS for TL badge + TL detail sheet + KAM list
+(function(){
+  if (document.getElementById('_comm_tl_styles')) return;
+  const s = document.createElement('style');
+  s.id = '_comm_tl_styles';
+  s.textContent = `
+    .tv-mult-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
+    .tv-mult-badge.ok{background:rgba(0,204,106,.18);color:#00CC6A}
+    .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
+    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.05);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
+    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 48px 72px;gap:4px;padding:6px 0 3px;font-size:10px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08);margin-top:4px}
+    .pv-comm-tl-kam-list{display:flex;flex-direction:column;gap:1px;max-height:300px;overflow-y:auto;margin-top:4px}
+    .pv-comm-tl-kam-row{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .pv-comm-tl-kam-row:last-child{border-bottom:none}
+    .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;grid-column:1;display:grid;grid-template-columns:1fr 48px 72px;gap:4px;align-items:baseline}
+    .pv-comm-tl-kam-nrr{font-size:12px;color:rgba(255,255,255,.6);text-align:right}
+    .pv-comm-tl-kam-pay{font-size:13px;font-weight:700;color:#FFBB00;text-align:right}
+    .pv-comm-tl-kam-detail{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;padding-left:0}
+    .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 48px 72px;gap:2px 4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .pv-comm-tl-kam-detail{grid-column:1/-1;font-size:10px;color:rgba(255,255,255,.35)}
+  `;
+  (document.head || document.body).appendChild(s);
+})();
 window._commOpenKamSelfSheet = _commOpenKamSelfSheet;
 window._commCloseKamSelfSheet = _commCloseKamSelfSheet;
 
@@ -1275,27 +1370,41 @@ function _commComputeHandoverRetention(kamEmail) {
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
                   tier:0, payout:0, detail:[] };
   try {
-    if (!bulkHandoverData || !bulkHandoverData.byNewKamName) return EMPTY;
-    // Q10 stores by kamName (display name), not email — match via portviewBulkData
-    const kamRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
-    const kamName = kamRow ? kamRow.kamName : null;
-    if (!kamName) return EMPTY;
+    // Handover = Sales→KAM: accounts new to this KAM this month, NOT transferred from another KAM
+    // Same classification logic as portview rendering (07b line ~1580):
+    //   isNew: daysWithCurrentKam <= daysElapsed
+    //   Handover: isNew AND NOT in byAccountId (byAccountId = KAM→KAM transfers from Q10)
+    const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
+              ? bulkHandoverData : { byAccountId:{} };
 
-    const accounts = bulkHandoverData.byNewKamName[kamName] || [];
-    if (!accounts.length) return EMPTY;
+    const pvAccounts = (portviewBulkData || []).filter(r => r.kamEmail === kamEmail);
+    if (!pvAccounts.length) return EMPTY;
 
-    const t2Pct    = _commGetConfig('handover', 'tier2_pct',    100);
-    const t3Pct    = _commGetConfig('handover', 'tier3_pct',    120);
-    const t2Pay    = _commGetConfig('handover', 'tier2_payout', 2500);
-    const t3Bonus  = _commGetConfig('handover', 'tier3_bonus',  2500);
+    // Use daysElapsed from first portview row (consistent with NRR engine)
+    const daysElapsed = pvAccounts[0].daysElapsed > 0 ? pvAccounts[0].daysElapsed : new Date().getDate();
+
+    // Filter to Handover (Sales→KAM) accounts only
+    const handoverAccounts = pvAccounts.filter(a => {
+      const isNew = a.daysWithCurrentKam !== null &&
+                    a.daysWithCurrentKam !== undefined &&
+                    a.daysWithCurrentKam <= daysElapsed;
+      return isNew && !(hd.byAccountId && hd.byAccountId[a.id]);
+    });
+
+    if (!handoverAccounts.length) return EMPTY;
+
+    const t2Pct   = _commGetConfig('handover', 'tier2_pct',    100);
+    const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
+    const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
+    const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
 
     let baselineGmv = 0, currentGmv = 0;
     const detail = [];
-    accounts.forEach(a => {
-      baselineGmv += a.lastMonthGmv || 0;
-      currentGmv  += a.curMonthGmv  || 0;
-      detail.push({ account_id: a.accountId, name: a.accountName,
-                    baseline: a.lastMonthGmv, current: a.curMonthGmv });
+    handoverAccounts.forEach(a => {
+      baselineGmv += a.lastGmv   || 0;  // lastGmv = last month GMV under Sales (baseline)
+      currentGmv  += a.gmvToDate || 0;  // gmvToDate = KAM's MTD this month
+      detail.push({ account_id: a.id, name: a.name,
+                    baseline: a.lastGmv || 0, current: a.gmvToDate || 0 });
     });
 
     const retentionPct = baselineGmv > 0 ? (currentGmv / baselineGmv * 100) : 0;
@@ -1304,7 +1413,8 @@ function _commComputeHandoverRetention(kamEmail) {
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
-    return { accounts: accounts.length, baseline_gmv: baselineGmv, current_gmv: currentGmv,
+    return { accounts: handoverAccounts.length, baseline_gmv: baselineGmv,
+             current_gmv: currentGmv,
              retention_pct: Math.round(retentionPct * 10) / 10, tier, payout, detail };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
