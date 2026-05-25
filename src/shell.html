@@ -3531,6 +3531,8 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 .pv-comm-tier-range{font-weight:750;}.pv-comm-tier-pay{font-family:'IBM Plex Mono',monospace;font-weight:950;color:#ffe08a;}
 .pv-comm-action-note{border-radius:12px;background:rgba(240,176,0,.10);border:1px solid rgba(240,176,0,.22);padding:10px 12px;color:rgba(255,238,190,.94);font-size:12px;font-weight:700;line-height:1.55;}
 .pv-comm-sheet-close{width:100%;margin-top:14px;border:none;border-radius:12px;padding:12px;background:rgba(188,215,255,.10);color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-weight:850;font-size:13px;cursor:pointer;}
+.pv-comm-sheet-close-row{display:flex;gap:8px;align-items:center;margin-top:14px;}
+.pv-comm-sheet-close-row .pv-comm-sheet-close{width:auto;flex:1;margin-top:0;}
 .comm-total .comm-total-val{font-variant-numeric:tabular-nums;}
 .comm-kpi-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -4069,7 +4071,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     gap:8px!important;margin:0 16px 12px!important;align-items:stretch!important;
   }
   #tv-summary-row .tv-gov-card{grid-column:1 / -1!important;padding:0!important;background:transparent!important;border:none!important;box-shadow:none!important;}
-  #tv-summary-row .tv-signal-wrap{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;width:100%!important;}
+  #tv-summary-row .tv-signal-wrap{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;width:100%!important;flex-wrap:wrap;}
   #tv-summary-row .tv-signal-card{padding:9px 10px!important;border-radius:12px!important;min-height:66px!important;}
   #tv-summary-row .tv-signal-label{font-size:8.5px!important;line-height:1.15!important;letter-spacing:.04em!important;}
   #tv-summary-row .tv-signal-value{font-size:17px!important;line-height:1.08!important;margin-top:5px!important;}
@@ -4226,7 +4228,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     gap:8px!important;
     width:100%!important;
     min-width:0!important;
-  }
+  flex-wrap:wrap;}
   body.v213d-teamview-active #tv-summary-row .tv-signal-card{
     min-width:0!important;
     overflow:hidden!important;
@@ -4457,6 +4459,13 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     padding-left:14px!important;
     padding-right:14px!important;
   }
+}
+
+.comm-formula-note{
+  margin-top:6px;padding:6px 10px;border-radius:6px;
+  background:var(--ac-bg);border-left:2px solid var(--br-ac);
+  font-size:11px;color:var(--tx2);line-height:1.6;
+  font-family:'IBM Plex Sans Thai',sans-serif;
 }
 </style>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
@@ -8148,7 +8157,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:8px;
   width:100%;
-}
+flex-wrap:wrap;}
 .tv-signal-card{
   background:rgba(255,255,255,.045);
   border:1px solid rgba(255,255,255,.075);
@@ -8295,7 +8304,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 }
 
 @media(max-width:430px){
-  .tv-signal-wrap{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .tv-signal-wrap{grid-template-columns:repeat(3,minmax(0,1fr));gap:7pxflex-wrap:wrap;}
   .tv-signal-card{padding:9px 8px;border-radius:12px}
   .tv-signal-value{font-size:16px}
   .tv-signal-label{font-size:8.3px}
@@ -8981,6 +8990,40 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
   #commission-cockpit-overlay .comm-step{min-height:42px;}
 }
 
+
+.pv-comm-gate-warn{
+  display:inline-flex;align-items:center;gap:3px;
+  background:rgba(240,176,0,.18);color:rgba(255,224,138,.95);
+  border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;
+  margin-left:4px;vertical-align:middle;
+}
+.pv-comm-source-row.gate-warn .pv-comm-source-name{ color:rgba(255,224,138,.95); }
+.pv-comm-source-row.gate-warn .pv-comm-source-pay{ color:rgba(255,224,138,.95);font-weight:800; }
+.comm-component-section{ padding:0; }
+.comm-component-title{ font-size:11px;font-weight:700;color:rgba(255,255,255,.5);
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px; }
+.comm-component-rates-card{ padding:14px 16px; }
+
+/* v226: Commission sheet rule explanation boxes */
+.pv-comm-rule-box{
+  margin:0 0 0 0;padding:6px 10px 6px 14px;
+  background:rgba(255,255,255,.03);
+  border-left:2px solid rgba(188,215,255,.18);
+}
+.pv-comm-rule-line{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;color:rgba(255,255,255,.5);padding:2px 0;
+}
+.pv-comm-rule-line.hit{ color:rgba(255,255,255,.85); }
+.pv-comm-rule-line.miss{ color:rgba(255,255,255,.35);text-decoration:line-through; }
+.pv-comm-rule-indent{
+  font-size:10px;color:rgba(255,255,255,.4);padding:2px 0 0 8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pv-comm-section-label{
+  font-size:10px;font-weight:700;color:rgba(255,255,255,.4);
+  text-transform:uppercase;letter-spacing:.04em;margin-top:12px;
+}
 </style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
