@@ -2808,6 +2808,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       // final = governance NRR (st.payout) + upsell + handover, then gate applied
       // Do NOT use p.nrr_payout which may be 0 if plan lookup fails
       return {loading:false,nrr:nrr,uplift:uplift,handover:hv,
+        // Keep separate fields for sheet detail rows
+        upsell_sku:Number((p.upsell_sku&&p.upsell_sku.total_comm)||0),
+        upsell_outlet:Number((p.upsell_outlet&&p.upsell_outlet.commission)||0),
         gate_cap:cap,gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
         upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,
         final:Math.round((nrr+uplift+hv)*cap)};
@@ -2819,6 +2822,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(!st) return '';
     var src=buildSources(st);
     if(!src) return '';
+    // Self-healing: if upsell not loaded yet, trigger fetch now
+    if(src.loading && st.email && typeof _fetchUpsellBundle==='function'){
+      _fetchUpsellBundle(st.email).catch(function(){});
+    }
     var finalAmt=src.final;
     var paid=finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
