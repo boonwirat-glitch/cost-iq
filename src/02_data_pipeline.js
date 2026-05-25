@@ -803,6 +803,7 @@ function handleFileUpload(type,input){
       const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
       const byAccountId={};
       const byKamName={};
+      const byNewKamName={}; // commission: index by receiving KAM for Handover retention calc
       lines.forEach(l=>{
         const p=parseCSVRow(l);
         const kamName=(p[0]||'').trim();
@@ -814,13 +815,16 @@ function handleFileUpload(type,input){
         const newOwnerType=(p[6]||'').trim();
         const newKamName=(p[7]||'').trim();
         if(!kamName||!accountId)return;
-        // index by account_id for Transfer-in lookup
         byAccountId[accountId]={kamName,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName};
-        // index by kam_name for Transfer-out per KAM
         if(!byKamName[kamName])byKamName[kamName]=[];
         byKamName[kamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName});
+        // index by NEW KAM name (receiving) for Handover commission
+        if(newKamName){
+          if(!byNewKamName[newKamName])byNewKamName[newKamName]=[];
+          byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
+        }
       });
-      bulkHandoverData={byAccountId,byKamName};
+      bulkHandoverData={byAccountId,byKamName,byNewKamName};
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
@@ -833,6 +837,68 @@ function handleFileUpload(type,input){
         }
       }catch(e){}
       // toast removed v205b — bulk ingest noise
+      _done();
+    };
+    reader.readAsText(file);return;
+  }
+  // ── bulk-upsell (Q3C: sense_upsell_bulk.csv) ──
+  // Grain: kam_email × account_id × month_label × group_key
+  // Columns: kam_email, account_id, month_label, group_key,
+  //          existing_gmv, new_gmv, comeback_gmv, total_gmv
+  // All GMV values = raw actual (no 30d projection) — JS normalizes at compute time
+  if(type==='bulk-upsell'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        // Build two indexes in one pass:
+        //   byKam[kamEmail][accountId][group_key][month_label] = {existing_gmv,new_gmv,comeback_gmv,total_gmv}
+        //   baselineGroups[kamEmail][accountId] = Set of group_keys present in baseline month (prev month)
+        const byKam={};
+        const baselineGroups={};
+        // Determine baseline month label (prev calendar month, Thai format)
+        const _now=new Date();
+        const _bm=new Date(_now.getFullYear(),_now.getMonth()-1,1);
+        const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        const _baselineLabel=_thMonths[_bm.getMonth()]+' '+(_bm.getFullYear()+543);
+        let rowCount=0;
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          const kamEmail=(p[0]||'').trim();
+          const accountId=(p[1]||'').trim();
+          const monthLabel=(p[2]||'').trim();
+          const groupKey=(p[3]||'').trim();
+          const existingGmv=parseFloat(p[4])||0;
+          const newGmv=parseFloat(p[5])||0;
+          const comebackGmv=parseFloat(p[6])||0;
+          const totalGmv=parseFloat(p[7])||0;
+          if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
+          // byKam index
+          if(!byKam[kamEmail])byKam[kamEmail]={};
+          if(!byKam[kamEmail][accountId])byKam[kamEmail][accountId]={};
+          if(!byKam[kamEmail][accountId][groupKey])byKam[kamEmail][accountId][groupKey]={};
+          byKam[kamEmail][accountId][groupKey][monthLabel]={existingGmv,newGmv,comebackGmv,totalGmv};
+          // baselineGroups index — group_key present in baseline month with any GMV
+          if(monthLabel===_baselineLabel && totalGmv>0){
+            if(!baselineGroups[kamEmail])baselineGroups[kamEmail]={};
+            if(!baselineGroups[kamEmail][accountId])baselineGroups[kamEmail][accountId]=new Set();
+            baselineGroups[kamEmail][accountId].add(groupKey);
+          }
+          rowCount++;
+        });
+        bulkUpsellData={byKam,baselineGroups,loaded:true,baselineLabel:_baselineLabel};
+        const kamCount=Object.keys(byKam).length;
+        const b=document.getElementById('badge-bulk-upsell');
+        if(b){b.textContent='✓ '+kamCount+' KAMs / '+rowCount+' rows';b.className='dp-slot-badge ok';}
+        const sl=document.getElementById('slot-bulk-upsell');if(sl)sl.style.borderColor='var(--g500)';
+        // Clear loading state cache so strip re-renders with real values
+        try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
+        // Trigger commission strip re-render now that upsell data is available
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+      }catch(err){
+        console.warn('[Q3C] parse error',err);
+        bulkUpsellData={byKam:{},baselineGroups:{},loaded:false};
+      }
       _done();
     };
     reader.readAsText(file);return;
@@ -967,7 +1033,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell:'sense_upsell_bulk.csv'};
 const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
   portview:{type:'portview-bulk',tab:'portview',cache:false}, // Level 3: always fetch — changes daily
@@ -982,6 +1048,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   price:{type:'bulk-price',tab:'price',cache:false,heavy:false},
   // Q10: transfer-out per KAM
   handover:{type:'bulk-handover',tab:'handover',cache:true},
+  // Q3C: upsell SKU bulk (all KAMs) for commission P1/P3 + Upsell Outlet calc
+  upsell:{type:'bulk-upsell',tab:'upsell',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -1335,7 +1403,7 @@ async function loadFromCloudflareR2(){
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover'];
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell'];
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
@@ -1365,6 +1433,16 @@ async function loadFromCloudflareR2(){
     if(btn){btn.disabled=false;btn.textContent='Refresh data';}
     if(fgOk>0){
       showToast('พร้อมใช้งาน — ข้อมูลหลัก '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
+      // QC-06: if upsell file failed, release commission strip from loading state after 15s
+      setTimeout(function(){
+        try{
+          if(typeof bulkUpsellData!=='undefined' && !bulkUpsellData.loaded){
+            bulkUpsellData.loaded=false; // keep false but allow NRR-only render
+            var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml='';
+            if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip();
+          }
+        }catch(e){}
+      }, 15000);
       // Reset scroll to top if portview is active — prevents scroll-anchoring from
       // triggering collapse observer when header grows during data re-render
       if(document.getElementById('scr-portview')?.classList.contains('on')){

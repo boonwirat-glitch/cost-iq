@@ -326,6 +326,202 @@ function renderCommAssignmentStep(body) {
     }).join('')}`;
 }
 
+// v226: Component Rates editor — admin-configurable params for Upsell SKU / Outlet / Handover / Gate / TL Mult
+// Reads/writes to commission_rules params jsonb via _commGetConfig
+// UI uses the same _commRuleConfig cache; on save calls saveCommissionComponentRates()
+function _renderComponentRatesEditor() {
+  const cfg = (k, p, def) => {
+    try {
+      const v = _commGetConfig(k, p, def);
+      return v !== null && v !== undefined ? v : def;
+    } catch(e) { return def; }
+  };
+  // unit types: 'pct-d' = decimal rate (0.03→display 3, save ÷100)
+  //             'pct-i' = integer percent (95→display 95, save as-is)
+  //             'mul'   = multiplier/cap (0.70→display 0.70, save as-is)
+  //             '฿'     = baht amount (2500→display 2500, save as-is)
+  const fld = (label, metricCode, param, defaultVal, step, unit) => {
+    const v = cfg(metricCode, param, defaultVal);
+    const isDecimalPct = unit === 'pct-d';
+    const display = isDecimalPct ? (Math.round(v * 10000) / 100) : v;
+    const unitLabel = isDecimalPct ? '%' : unit === 'pct-i' ? '%' : unit === 'mul' ? '×' : (unit || '฿');
+    const saveExpr = isDecimalPct ? 'this.value/100' : 'Number(this.value)';
+    return `<div class="comm-field">
+      <label>${_commEscapeHtml(label)}</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input class="comm-input" style="width:90px" type="number" step="${step||'any'}" value="${display}"
+          oninput="_commSetComponentParam('${metricCode}','${param}',${saveExpr})">
+        <span style="font-size:11px;color:rgba(255,255,255,.5)">${unitLabel}</span>
+      </div>
+    </div>`;
+  };
+  return `
+    <div class="comm-component-section">
+      <div class="comm-component-title">Upsell SKU</div>
+      <div class="comm-grid2" style="gap:8px">
+        ${fld('P1 rate (item ใหม่ บัญชีนี้)','upsell_sku','p1_rate',0.03,0.005,'pct-d')}
+        ${fld('P3 rate (growth existing item)','upsell_sku','p3_rate',0.03,0.005,'pct-d')}
+        ${fld('P3 growth threshold ×','upsell_sku','p3_threshold_pct',1.50,0.05,'mul')}
+        ${fld('P1 & P3 min GMV (gate)','upsell_sku','p1_min_gmv',2500,100,'฿')}
+        ${fld('P3 min incremental (gate)','upsell_sku','p3_min_incremental',2500,100,'฿')}
+      </div>
+      <div class="comm-formula-note">
+        <b>P1</b>: item ใหม่ที่บัญชีนี้ไม่เคยซื้อ (เดือนก่อน) · GMV ≥ ฿${cfg('upsell_sku','p1_min_gmv',2500).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p1_rate',0.03)*100)}% ทุก outlet<br>
+        <b>P3</b>: item เดิม existing outlet · ยอดปัจจุบัน > baseline × ${cfg('upsell_sku','p3_threshold_pct',1.50).toFixed(2)} AND incremental ≥ ฿${cfg('upsell_sku','p3_min_incremental',2500).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p3_rate',0.03)*100)}% × incremental
+      </div>
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">Upsell Outlet</div>
+      <div class="comm-grid2" style="gap:8px">
+        ${fld('Rate (outlet ใหม่/comeback)','upsell_outlet','rate',0.015,0.005,'pct-d')}
+      </div>
+      <div class="comm-formula-note">
+        GMV จาก outlet ใหม่/comeback × ${Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10}% · ไม่นับ item ที่ได้ P1 ไปแล้ว
+      </div>
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">Handover Retention</div>
+      <div class="comm-grid2" style="gap:8px">
+        ${fld('Tier 2 retention threshold','handover','tier2_pct',100,5,'pct-i')}
+        ${fld('Tier 3 retention threshold','handover','tier3_pct',120,5,'pct-i')}
+        ${fld('Tier 2 payout','handover','tier2_payout',2500,500,'฿')}
+        ${fld('Tier 3 bonus (เพิ่มเติมจาก T2)','handover','tier3_bonus',2500,500,'฿')}
+      </div>
+      <div class="comm-formula-note">
+        retention = ยอด MTD / ยอดเดือนสุดท้ายก่อนโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
+      </div>
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">GMV Gate (KAM only)</div>
+      <div class="comm-grid2" style="gap:8px">
+        ${fld('Threshold 1 — ไม่มี cap เมื่อ ≥ (%)','gmv_gate','threshold_1',95,1,'pct-i')}
+        ${fld('Cap 1 — เมื่อต่ำกว่า T1 (×)','gmv_gate','cap_1',0.70,0.05,'mul')}
+        ${fld('Threshold 2 (%)','gmv_gate','threshold_2',90,1,'pct-i')}
+        ${fld('Cap 2 — เมื่อต่ำกว่า T2 (×)','gmv_gate','cap_2',0.35,0.05,'mul')}
+      </div>
+      <div class="comm-formula-note">
+        ≥${cfg('gmv_gate','threshold_1',95)}% → ×1.0 (ไม่มี cap) · ${cfg('gmv_gate','threshold_2',90)}–${cfg('gmv_gate','threshold_1',95)}% → ×${cfg('gmv_gate','cap_1',0.70)} · &lt;${cfg('gmv_gate','threshold_2',90)}% → ×${cfg('gmv_gate','cap_2',0.35)}<br>
+        ใช้กับ (NRR + Upsell SKU + Upsell Outlet + Handover) รวมก่อน × gate
+      </div>
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">TL Upsell Multiplier Tiers</div>
+      <div class="comm-tier-helper"><span>Upsell %</span><strong>= Σ(P1+P3 incr) ÷ Team NRR baseline</strong></div>
+      <div class="comm-table-lite comm-tier-table" style="margin-top:8px">
+        <div class="comm-tier-row head"><div>Min upsell %</div><div>Max upsell %</div><div>Multiplier ×</div><div></div></div>
+        ${_renderTlUpsellTierRows()}
+      </div>
+      <button class="comm-add" onclick="_commAddTlUpsellTier()">+ เพิ่ม tier</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="comm-save" onclick="saveCommissionComponentRates()">Save rates</button>
+      <div class="comm-plan-note" style="margin:0;align-self:center">ค่าเหล่านี้ใช้ทันทีหลัง save และกระทบ commission ของทุกคน</div>
+    </div>`;
+}
+
+function _renderTlUpsellTierRows() {
+  // Read tiers from _commRuleConfig.rules.tl_upsell_mult[0].tiers or use defaults
+  let tiers = [];
+  try {
+    const rules = _commRuleConfig && _commRuleConfig.rules && _commRuleConfig.rules['tl_upsell_mult'];
+    tiers = (rules && rules[0] && rules[0].tiers) ? rules[0].tiers : [];
+  } catch(e) {}
+  if (!tiers.length) tiers = [
+    {min_pct:0,max_pct:1.99,multiplier:1.00},
+    {min_pct:2,max_pct:2.99,multiplier:1.20},
+    {min_pct:3,max_pct:3.99,multiplier:1.35},
+    {min_pct:4,max_pct:4.99,multiplier:1.50},
+    {min_pct:5,max_pct:null,multiplier:1.80}
+  ];
+  return tiers.map((t,i) => `<div class="comm-tier-row">
+    <input class="comm-input comm-tier-min" value="${t.min_pct ?? ''}" placeholder="-" inputmode="decimal"
+      oninput="_commSetTlUpsellTier(${i},'min_pct',this.value)">
+    <input class="comm-input comm-tier-max" value="${t.max_pct ?? ''}" placeholder="∞" inputmode="decimal"
+      oninput="_commSetTlUpsellTier(${i},'max_pct',this.value)">
+    <input class="comm-input comm-tier-payout" value="${t.multiplier ?? 1.0}" placeholder="1.0" inputmode="decimal"
+      oninput="_commSetTlUpsellTier(${i},'multiplier',this.value)">
+    <button class="comm-del" onclick="_commRemoveTlUpsellTier(${i})">×</button>
+  </div>`).join('');
+}
+
+// In-memory staging for component params (flushed on saveCommissionComponentRates)
+let _commComponentPending = {};
+function _commSetComponentParam(metricCode, param, value) {
+  if (!_commComponentPending[metricCode]) _commComponentPending[metricCode] = {};
+  _commComponentPending[metricCode][param] = Number(value);
+  _commMarkChanged();
+}
+function _commAddTlUpsellTier() {
+  try {
+    const rules = _commRuleConfig.rules || {};
+    if (!rules.tl_upsell_mult) rules.tl_upsell_mult = [{ tiers:[] }];
+    if (!rules.tl_upsell_mult[0].tiers) rules.tl_upsell_mult[0].tiers = [];
+    rules.tl_upsell_mult[0].tiers.push({min_pct:null,max_pct:null,multiplier:1.0});
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commRemoveTlUpsellTier(idx) {
+  try {
+    _commRuleConfig.rules.tl_upsell_mult[0].tiers.splice(idx, 1);
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commSetTlUpsellTier(idx, field, value) {
+  try {
+    const t = _commRuleConfig.rules.tl_upsell_mult[0].tiers[idx];
+    if (!t) return;
+    t[field] = value === '' ? null : Number(value);
+    _commMarkChanged();
+  } catch(e) {}
+}
+
+async function saveCommissionComponentRates() {
+  if (!Object.keys(_commComponentPending).length) {
+    showToast('ไม่มีการเปลี่ยนแปลง', '!'); return;
+  }
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+  const toUpsert = [];
+  for (const [metricCode, params] of Object.entries(_commComponentPending)) {
+    // Merge with existing params
+    const existing = {};
+    try {
+      const rules = _commRuleConfig.rules && _commRuleConfig.rules[metricCode];
+      if (rules && rules[0] && rules[0].params) Object.assign(existing, rules[0].params);
+    } catch(e) {}
+    const merged = { ...existing, ...params };
+    toUpsert.push({ metric_code: metricCode, params: merged, updated_by: actor });
+  }
+  try {
+    // Upsert into commission_rules — match by metric_code (assumes one rule per metric_code for component rates)
+    for (const row of toUpsert) {
+      // Store in target_settings (key: '{metric_code}_params')
+      // Avoids commission_rules CHECK constraint restrictions
+      const { error } = await supa.from('target_settings')
+        .upsert({ key: row.metric_code + '_params',
+                  value: JSON.stringify(row.params),
+                  updated_by: row.updated_by },
+                 { onConflict: 'key' });
+      if (error) throw error;
+      // Update _tgtSettings cache immediately so UI reflects new values
+      if (!_tgtSettings) _tgtSettings = {};
+      _tgtSettings[row.metric_code + '_params'] = row.params;
+    }
+    _commComponentPending = {};
+    _commSoftenPostSaveUi();
+    showToast('Component rates saved', '✓');
+    renderCommissionCockpit();
+  } catch(e) {
+    showToast('Save failed: ' + (e.message || e), '✗');
+  }
+}
+window.saveCommissionComponentRates = saveCommissionComponentRates;
+window._commSetComponentParam = _commSetComponentParam;
+window._commAddTlUpsellTier = _commAddTlUpsellTier;
+window._commRemoveTlUpsellTier = _commRemoveTlUpsellTier;
+window._commSetTlUpsellTier = _commSetTlUpsellTier;
+
 function renderCommRulesStep(body) {
   const tlRules = _commRulesForRole('tl', { activeOnly:true });
   const kamRules = _commRulesForRole('kam', { activeOnly:true });
@@ -338,11 +534,13 @@ function renderCommRulesStep(body) {
         <div><div class="comm-hero-title">3. Rule Library</div><div class="comm-hero-sub">สร้าง rule หลายชุด แล้วนำไป assign ให้ TL/KAM ใน Step 2</div></div>
       </div>
     </div>
+    <div class="comm-section-title">Component Rates (Upsell & Gate)</div>
+    <div class="comm-card comm-component-rates-card">${_renderComponentRatesEditor()}</div>
     <div class="comm-rule-actions">
       <button class="comm-create-rule-btn" onclick="_commCreateRule('tl')">+ Create TL Rule</button>
       <button class="comm-create-rule-btn" onclick="_commCreateRule('kam')">+ Create KAM Rule</button>
     </div>
-    <div class="comm-rule-group-title">TL Rules</div>
+    <div class="comm-rule-group-title">TL Rules (NRR Tiers)</div>
     <div class="comm-rule-library">${tlRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
     <div class="comm-rule-group-title">KAM Rules</div>
     <div class="comm-rule-library">${kamRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
@@ -530,11 +728,46 @@ function renderCommLockStep(body) {
         <div class="comm-preview-tl-money"><span>Total payout</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
       </div>
       <div class="comm-kam-subhead"><span>KAM payout in this team</span><em>${t.kamRows.filter(k=>k.payout>0).length}/${t.kamRows.length} hit payout</em></div>
-      ${t.kamRows.slice(0,5).map(k=>`<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}"><div><div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div><div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · Rule: ${_commEscapeHtml(k.planName || _commPlanNameByCode(k.planCode,'kam'))} · ${_commEscapeHtml(k.tierLabel||'—')}</div></div><div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div></div>`).join('')}
+      ${t.kamRows.slice(0,5).map(k=>{
+        // v226: show component breakdown if available in breakdown jsonb
+        const bd = k.breakdown || {};
+        const nrrP = bd.nrr_payout !== undefined ? _commFmtPayout(bd.nrr_payout) : null;
+        const upsellP = (bd.upsell_sku && bd.upsell_sku.total_commission !== undefined) ? _commFmtPayout(bd.upsell_sku.total_commission + ((bd.upsell_outlet && bd.upsell_outlet.commission)||0)) : null;
+        const handoverP = bd.handover ? _commFmtPayout(bd.handover.payout||0) : null;
+        const gateTxt = bd.gmv_gate && bd.gmv_gate.gate_active ? `⚠ gate×${bd.gmv_gate.cap}` : null;
+        const breakdown = nrrP ? `<span style="color:rgba(255,255,255,.5);font-size:10px"> NRR ${nrrP}${upsellP?' · Upsell '+upsellP:''}${handoverP?' · HO '+handoverP:''}${gateTxt?' · '+gateTxt:''}</span>` : '';
+        return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
+          <div>
+            <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
+            <div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
+          </div>
+          <div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div>
+        </div>`;
+      }).join('')}
       ${t.kamRows.length>5?`<div class="comm-meta comm-more-note">+${t.kamRows.length-5} more KAM in CSV/export</div>`:''}
     </div>`).join('') || `<div class="comm-empty">ยังไม่มีทีมให้ preview</div>`}
     <div class="comm-section-title">Snapshot rows</div>
-    <div class="comm-lock-list">${rows.slice(0,12).map(r=>`<div class="comm-lock-row"><div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div><div><div class="comm-person-name">${_commEscapeHtml(r.breakdown?.kam_name||r.breakdown?.team_lead_name||r.beneficiary_email)}</div><div class="comm-person-sub">${_commEscapeHtml(r.breakdown?.rule_name || _commPlanNameByCode(r.breakdown?.payout_source, r.beneficiary_role))} · Raw ${r.raw_nrr_pct??'—'}% → Governed ${r.governed_nrr_pct??'—'}%</div></div><div class="comm-row-money ${Number(r.payout_amount||0)>0?'hit':''}">${_commFmtPayout(r.payout_amount)}</div></div>`).join('')}</div>`;
+    <div class="comm-lock-list">${rows.slice(0,12).map(r=>{
+      const bd = r.breakdown || {};
+      const isKam = r.beneficiary_role === 'kam';
+      const name = _commEscapeHtml(bd.kam_name || bd.team_lead_name || r.beneficiary_email);
+      let sub = `NRR ${r.governed_nrr_pct??'—'}%`;
+      if (isKam && bd.nrr_payout !== undefined) {
+        const parts = [`NRR ${_commFmtPayout(bd.nrr_payout)}`];
+        if (bd.upsell_sku && bd.upsell_sku.total_commission > 0) parts.push(`Upsell ${_commFmtPayout(bd.upsell_sku.total_commission)}`);
+        if (bd.upsell_outlet && bd.upsell_outlet.commission > 0) parts.push(`Outlet ${_commFmtPayout(bd.upsell_outlet.commission)}`);
+        if (bd.handover && bd.handover.payout > 0) parts.push(`HO ${_commFmtPayout(bd.handover.payout)}`);
+        if (bd.gmv_gate && bd.gmv_gate.gate_active) parts.push(`Gate×${bd.gmv_gate.cap}`);
+        sub = parts.join(' · ');
+      } else if (!isKam && bd.upsell_mult) {
+        sub = `NRR ${_commFmtPayout(bd.nrr_payout||0)} × ${bd.upsell_mult.multiplier||1}× (Upsell ${bd.upsell_mult.team_upsell_pct||0}%)`;
+      }
+      return `<div class="comm-lock-row">
+        <div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div>
+        <div><div class="comm-person-name">${name}</div><div class="comm-person-sub">${sub}</div></div>
+        <div class="comm-row-money ${Number(r.payout_amount||0)>0?'hit':''}">${_commFmtPayout(r.payout_amount)}</div>
+      </div>`;
+    }).join('')}</div>`;
 }
 
 async function saveCommissionRules() {
@@ -2557,31 +2790,55 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   }
   function money(n){ try{return _commFmtPayout(n);}catch(e){ n=Number(n||0); return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0'; } }
   function pts(n){ try{return _commFormatPts(n);}catch(e){ var x=Number(n||0); return x.toFixed(1).replace('.0',''); } }
+  // v225-comm: buildSources uses real payout via _commBuildKamPayout
   function buildSources(st){
-    var nrr=Number(st&&st.payout||0);
-    var uplift=0;
-    var handover=0;
-    return { nrr:nrr, uplift:uplift, handover:handover };
+    var email=st&&st.email;
+    if(!email) return null;
+    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
+      return {loading:true,nrr:Number(st&&st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st&&st.payout||0)};
+    }
+    try{
+      var p=typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
+      if(!p) return {nrr:Number(st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st.payout||0)};
+      return {loading:false,nrr:Number(p.nrr_payout||0),
+        upsell_sku:Number((p.upsell_sku&&p.upsell_sku.total_comm)||0),
+        upsell_outlet:Number((p.upsell_outlet&&p.upsell_outlet.commission)||0),
+        handover:Number((p.handover&&p.handover.payout)||0),
+        gate_cap:Number(p.gate_cap||1.0),gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
+        upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,
+        final:Number(p.final_payout||0)};
+    }catch(e){ return {nrr:Number(st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st.payout||0)}; }
   }
   function buildCompactStrip(){
     if(typeof _commBuildKamSelfState!=='function') return '';
     var st=_commBuildKamSelfState();
     if(!st) return '';
     var src=buildSources(st);
-    var paid=Number(st.payout||0)>0;
+    if(!src) return '';
+    if(src.loading){
+      return '<div class="pv-comm-strip v210k unpaid '+esc(st.cls||'')+'" data-v210k="1">'
+        +'<div class="pv-comm-title">\u0e04\u0e48\u0e32\u0e04\u0e2d\u0e21\u0e2f \u0e40\u0e14\u0e37\u0e2d\u0e19\u0e19\u0e35\u0e49</div>'
+        +'<div class="pv-comm-main">'+money(src.nrr)+'</div>'
+        +'<div class="pv-comm-chip">\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14...</div>'
+        +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
+        +'</div>';
+    }
+    var finalAmt=src.final;
+    var paid=finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
-    var status=st.status || (paid?'ถึงเกณฑ์แล้ว':'ยังไม่ถึงเกณฑ์');
+    var status=st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11');
+    var gateNote=src.gate_active?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
     return '<div class="pv-comm-strip '+cls+'" data-v210k="1">'
-      + '<div class="pv-comm-title">ค่าคอมฯ เดือนนี้</div>'
-      + '<div class="pv-comm-main">'+money(st.payout)+'</div>'
-      + '<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
-      + '<button class="pv-comm-i" aria-label="ดูวิธีคิดค่าคอมฯ" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
-      + '<div class="pv-comm-sources" title="NRR '+esc(money(src.nrr))+' · Uplift '+esc(money(src.uplift))+' · Handover '+esc(money(src.handover))+'">'
-      + '<span class="src-nrr"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">·</span>'
-      + '<span><b>Uplift</b> '+money(src.uplift)+'</span><span class="pv-comm-sep">·</span>'
-      + '<span><b>Handover</b> '+money(src.handover)+'</span>'
-      + '</div>'
-      + '</div>';
+      +'<div class="pv-comm-title">\u0e04\u0e48\u0e32\u0e04\u0e2d\u0e21\u0e2f \u0e40\u0e14\u0e37\u0e2d\u0e19\u0e19\u0e35\u0e49'+gateNote+'</div>'
+      +'<div class="pv-comm-main">'+money(finalAmt)+'</div>'
+      +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
+      +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
+      +'<div class="pv-comm-sources">'
+      +'<span><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span><b>Upsell</b> '+money(src.upsell_sku+src.upsell_outlet)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span><b>Handover</b> '+money(src.handover)+'</span>'
+      +'</div>'
+      +'</div>';
   }
   function renderCompactStrip(){
     var slot=document.getElementById('pv-commission-strip') || (function(){
@@ -2601,51 +2858,150 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     slot.innerHTML=html;
   }
   function openCompactSheet(){
-    if(typeof _commBuildKamSelfState!=='function') return;
+    if(typeof _commBuildKamSelfState!=="function") return;
     var st=_commBuildKamSelfState();
     if(!st) return;
-    var ov=document.getElementById('pv-comm-sheet-overlay');
+    var ov=document.getElementById("pv-comm-sheet-overlay");
     if(!ov){
-      ov=document.createElement('div');
-      ov.id='pv-comm-sheet-overlay';
-      ov.className='pv-comm-sheet-overlay';
+      ov=document.createElement("div");
+      ov.id="pv-comm-sheet-overlay";
+      ov.className="pv-comm-sheet-overlay";
       ov.onclick=function(e){ if(e.target===ov) closeCompactSheet(); };
       document.body.appendChild(ov);
     }
-    var pctText=st.pct!==null && st.pct!==undefined ? (st.pct+'%') : '—';
+    var pctText=st.pct!==null&&st.pct!==undefined?(st.pct+"%"):"—";
     var src=buildSources(st);
+    if(!src) src={loading:false,nrr:Number(st&&st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st&&st.payout||0)};
+    var finalAmt=src.loading?src.nrr:src.final;
+
+    // Config-tied rule values
+    function cfg(k,p,d){try{return typeof _commGetConfig==="function"?_commGetConfig(k,p,d):d;}catch(e){return d;}}
+    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*100);
+    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*100);
+    var p3Thresh=cfg("upsell_sku","p3_threshold_pct",1.50);
+    var p3ThreshPct=Math.round((p3Thresh-1)*100);
+    var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",2500)).toLocaleString("en-US");
+    var p1MinGmv=Number(cfg("upsell_sku","p1_min_gmv",2500)).toLocaleString("en-US");
+    var outRate=Math.round(cfg("upsell_outlet","rate",0.015)*1000)/10;
+    var hoT2=cfg("handover","tier2_pct",100);
+    var hoT3=cfg("handover","tier3_pct",120);
+    var hoT2Pay=Number(cfg("handover","tier2_payout",2500)).toLocaleString("en-US");
+    var hoT3Bon=Number(cfg("handover","tier3_bonus",2500)).toLocaleString("en-US");
+    var gT1=cfg("gmv_gate","threshold_1",95);
+    var gT2=cfg("gmv_gate","threshold_2",90);
+    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*100);
+    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*100);
+
+    // NRR tiers
     var tierRows=(st.tiers||[]).map(function(t,idx){
-      var on=st.tier && idx===st.currentIdx;
-      var isNext=st.next && String(t.id||idx)===String(st.next.id||(st.tiers||[]).indexOf(st.next));
-      var label=(typeof _commTierRangeLabel==='function'?_commTierRangeLabel(t):'')+' · '+(t.payout_label||'');
-      return '<div class="pv-comm-tier-row '+(on?'on':isNext?'next':'')+'"><div class="pv-comm-tier-range">'+esc(label)+'</div><div class="pv-comm-tier-pay">'+money(t.payout_value)+'</div></div>';
-    }).join('');
-    var action='รอข้อมูล NRR สำหรับคำนวณค่าคอมฯ เดือนนี้';
-    if(st.pct!==null && st.pct!==undefined){
-      if(st.next) action='NRR ต้องเพิ่มอีก +'+pts(Math.max(0, Number(st.next.min_value)-Number(st.pct)))+' pts เพื่อถึง tier ถัดไป';
-      else if(Number(st.payout||0)>0) action='รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน';
-      else action='ยังไม่ถึง tier แรก ให้โฟกัสร้านเสี่ยงและ monitor ก่อน';
+      var on=st.tier&&idx===st.currentIdx;
+      var isNext=st.next&&String(t.id||idx)===String(st.next.id||(st.tiers||[]).indexOf(st.next));
+      var lbl=(typeof _commTierRangeLabel==="function"?_commTierRangeLabel(t):"")+"·"+(t.payout_label||"");
+      return ["<div class=\"pv-comm-tier-row ",(on?"on":isNext?"next":""),"\">",              "<div class=\"pv-comm-tier-range\">",esc(lbl),"</div>",              "<div class=\"pv-comm-tier-pay\">",money(t.payout_value),"</div></div>"].join("");
+    }).join("");
+
+    // Action note
+    var action="รอข้อมูล NRR";
+    if(st.pct!==null&&st.pct!==undefined){
+      if(st.next) action="NRR ต้องเพิ่มอีก +"+pts(Math.max(0,Number(st.next.min_value)-Number(st.pct)))+" pts ถึง tier ถัดไป";
+      else if(finalAmt>0) action="รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน";
+      else action="ยังไม่ถึง tier แรก";
     }
-    var kpiCls=Number(st.payout||0)>0?'val-bonus':'';
-    ov.innerHTML='<div class="pv-comm-sheet">'
-      + '<div class="pv-comm-sheet-handle"></div>'
-      + '<div class="pv-comm-sheet-body">'
-      + '<div class="pv-comm-sheet-title">วิธีคิดค่าคอมฯ</div>'
-      + '<div class="pv-comm-sheet-sub">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา</div>'
-      + '<div class="pv-comm-sheet-kpis">'
-      + '<div class="pv-comm-sheet-kpi '+kpiCls+'"><div class="pv-comm-sheet-kpi-label">ค่าคอมฯ ตอนนี้</div><div class="pv-comm-sheet-kpi-val">'+money(st.payout)+'</div></div>'
-      + '<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">NRR ที่ใช้คิด</div><div class="pv-comm-sheet-kpi-val">'+esc(pctText)+'</div></div>'
-      + '</div>'
-      + '<div class="pv-comm-source-table">'
-      + '<div class="pv-comm-source-row '+(src.nrr>0?'paid':'')+'"><div><span class="pv-comm-source-name">NRR</span><span class="pv-comm-source-note">คิดจาก rule: '+esc(st.ruleName||'-')+'</span></div><div class="pv-comm-source-pay">'+money(src.nrr)+'</div></div>'
-      + '<div class="pv-comm-source-row"><div><span class="pv-comm-source-name">Uplift</span><span class="pv-comm-source-note">ยังไม่ได้เปิดใช้ในรอบนี้</span></div><div class="pv-comm-source-pay">'+money(src.uplift)+'</div></div>'
-      + '<div class="pv-comm-source-row"><div><span class="pv-comm-source-name">Handover</span><span class="pv-comm-source-note">ยังไม่ได้เปิดใช้ในรอบนี้</span></div><div class="pv-comm-source-pay">'+money(src.handover)+'</div></div>'
-      + '</div>'
-      + '<div class="pv-comm-tier-table">'+tierRows+'</div>'
-      + '<div class="pv-comm-action-note">'+esc(action)+'</div>'
-      + '<button class="pv-comm-sheet-close" onclick="_commCloseKamSelfSheet()">ปิด</button>'
-      + '</div></div>';
-    requestAnimationFrame(function(){ov.classList.add('on');});
+
+    // Helper: build a source row
+    function srcRow(cls,name,note,pay,detail){
+      return ["<div class=\"pv-comm-source-row ",cls,"\"><div>",
+              "<span class=\"pv-comm-source-name\">",esc(name),"</span>",
+              "<span class=\"pv-comm-source-note\">",note,"</span>",
+              "</div><div class=\"pv-comm-source-pay\">",pay,"</div></div>",
+              detail||""].join("");
+    }
+    function ruleBox(lines){
+      return "<div class=\"pv-comm-rule-box\">"+lines.join("")+"</div>";
+    }
+    function ruleLine(hit,label,pay){
+      return "<div class=\"pv-comm-rule-line "+(hit?"hit":"miss")+"\"><span>"+esc(label)+"</span><span>"+pay+"</span></div>";
+    }
+    function ruleIndent(txt){
+      return "<div class=\"pv-comm-rule-indent\">"+txt+"</div>";
+    }
+
+    // NRR row
+    var firstPayTier=st.tiers&&st.tiers.find(function(t){return Number(t.payout_value||0)>0;});
+    var nrrMinPct=firstPayTier&&firstPayTier.min_value!==null?firstPayTier.min_value:"—";
+    var nrrRow=srcRow(src.nrr>0?"paid":"","NRR","เกณฑ์ ≥"+nrrMinPct+"% · "+esc(st.ruleName||"—"),money(src.nrr),"");
+
+    // Upsell SKU row
+    var p1Detail=[],p3Detail=[];
+    if(src.upsell_sku_detail){
+      var d=src.upsell_sku_detail;
+      var p1g=d.p1&&d.p1.groups?d.p1.groups:[];
+      var p3g=d.p3&&d.p3.groups?d.p3.groups:[];
+      p1Detail=[ruleLine(p1g.length>0,"P1: item ใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
+      if(p1g.length) p1Detail.push(ruleIndent(p1g.slice(0,3).map(function(g){return esc(g.group_key)+" "+money(g.total_gmv);}).join(" · ")+(p1g.length>3?" +"+(p1g.length-3)+" more":"")));
+      p3Detail=[ruleLine(p3g.length>0,"P3: growth >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
+      if(p3g.length) p3Detail.push(ruleIndent(p3g.slice(0,3).map(function(g){return esc(g.group_key)+" incr "+money(g.incremental);}).join(" · ")+(p3g.length>3?" +"+(p3g.length-3)+" more":"")));
+    }
+    var upsellSkuDetail=p1Detail.length||p3Detail.length?ruleBox(p1Detail.concat(p3Detail)):"";
+    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","Upsell SKU","item ใหม่ "+p1Rate+"% · growth >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
+
+    // Upsell Outlet row
+    var outDetail="";
+    if(src.upsell_outlet_detail){
+      var od=src.upsell_outlet_detail;
+      outDetail=ruleBox([ruleLine(od.outlet_gmv>0,"ใหม่ "+money(od.new_gmv)+" · comeback "+money(od.comeback_gmv)," × "+outRate+"%"),
+                          ruleIndent("ไม่นับ item ที่ได้ P1 ไปแล้ว")]);
+    }
+    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Upsell Outlet","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
+
+    // Handover row
+    var hoDetail="";
+    if(src.handover_detail){
+      var hd=src.handover_detail;
+      var hoHit=hd.tier>=2;
+      hoDetail=ruleBox([ruleLine(hoHit,"retention "+hd.retention_pct+"% → Tier "+hd.tier,money(hd.payout)),
+                         ruleIndent("เป้า: ≥"+hoT2+"% = ฿"+hoT2Pay+" · ≥"+hoT3+"% = +฿"+hoT3Bon+" · เทียบ "+money(hd.current_gmv)+"/"+money(hd.baseline_gmv)+" ("+hd.accounts+" ร้าน)")]);
+    }
+    var handoverRow=srcRow(src.handover>0?"paid":"","Handover","≥"+hoT2+"% = ฿"+hoT2Pay+" · ≥"+hoT3+"% = +฿"+hoT3Bon,money(src.handover),hoDetail);
+
+    // GMV Gate row
+    var gateRow="";
+    if(src.gate&&src.gate.ach_pct!==null&&src.gate.ach_pct!==undefined){
+      var gPct=src.gate.ach_pct;
+      var gCapPct=Math.round(src.gate_cap*100);
+      var gRule=gPct>=gT1?"≥"+gT1+"% → ไม่มี cap":gPct>=gT2?gT2+"–"+gT1+"% → cap "+gC1+"%":"<"+gT2+"% → cap "+gC2+"%";
+      var gRowCls="pv-comm-source-row"+(src.gate_active?" gate-warn":"");
+      gateRow=srcRow(gRowCls,"GMV Gate"+(src.gate_active?" ⚠":""),"run-rate "+money(src.gate.kam_runrate)+"/เป้า "+money(src.gate.kam_target)+" = "+gPct+"% · "+gRule,"<span class=\""+( src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
+    }
+
+    var loadNote=src.loading?"<div style=\"font-size:11px;color:#FFBB00;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
+    var kpiCls=finalAmt>0?"val-bonus":"";
+    var auditBtn=typeof _commBuildKamAuditSql==="function"&&st.email
+      ?"<button class=\"comm-secondary\" style=\"font-size:11px;padding:5px 10px;margin-left:8px\" onclick=\"_commCopyAuditSql({email:\\"+JSON.stringify(st.email)+"\\})\">ตรวจรายละเอียด</button>"
+      :"";
+
+    var html=[
+      "<div class=\"pv-comm-sheet\">",
+      "<div class=\"pv-comm-sheet-handle\"></div>",
+      "<div class=\"pv-comm-sheet-body\">",
+      "<div class=\"pv-comm-sheet-title\">วิธีคิดค่าคอมฯ</div>",
+      "<div class=\"pv-comm-sheet-sub\">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา</div>",
+      loadNote,
+      "<div class=\"pv-comm-sheet-kpis\">",
+      "<div class=\"pv-comm-sheet-kpi ",kpiCls,"\"><div class=\"pv-comm-sheet-kpi-label\">ค่าคอมฯ สุทธิ์</div><div class=\"pv-comm-sheet-kpi-val\">",money(finalAmt),"</div></div>",
+      "<div class=\"pv-comm-sheet-kpi\"><div class=\"pv-comm-sheet-kpi-label\">NRR</div><div class=\"pv-comm-sheet-kpi-val\">",esc(pctText),"</div></div>",
+      "</div>",
+      "<div class=\"pv-comm-source-table\">",nrrRow,upsellSkuRow,upsellOutRow,handoverRow,gateRow,"</div>",
+      "<div class=\"pv-comm-section-label\" style=\"margin-top:12px\">เกณฑ์ NRR</div>",
+      "<div class=\"pv-comm-tier-table\">",tierRows,"</div>",
+      "<div class=\"pv-comm-action-note\">",esc(action),"</div>",
+      "<div class=\"pv-comm-sheet-close-row\">",
+      "<button class=\"pv-comm-sheet-close\" onclick=\"_commCloseKamSelfSheet()\">ปิด</button>",
+      auditBtn,"</div>",
+      "</div></div>"
+    ].join("");
+    ov.innerHTML=html;
+    requestAnimationFrame(function(){ov.classList.add("on");});
   }
   function closeCompactSheet(){
     var ov=document.getElementById('pv-comm-sheet-overlay');

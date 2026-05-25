@@ -92,6 +92,7 @@ function resetRuntimeSessionState(){
   try { window._pwaResumeCheckInFlight = null; } catch(e) {}
   // v202: clear ALL Sense + UI state so next login never inherits previous session
   try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
+  try { bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; } catch(e) {}  // Q3C: clear upsell index on logout
   try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
   try { senseActivated=false; } catch(e) {}
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
@@ -1343,6 +1344,7 @@ const _bulkSkusSeen={};   // v202 dedup: aid → mo → Set<itemId> — prevents
 let bulkPriceData={};      // Q6B: aid → {item_id → [{mo, unit_price, avg_piece_price}]} (6-month price history for sparkline)
 let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover.csv — transfer out per KAM
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
+let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_bulk.csv — upsell SKU by group_key
 let bulkSkuCurrentData={}; // Q7B: aid → [{item_id, orders_this_month, gmv_to_date, item_name_th, last_order_date}]
 let bulkAltsUnverified={}; // Q4B: aid → [unverified alt pairs]
 let bulkKamNames={};       // Q8E v2: aid → kam_name string (for TL grouping)

@@ -225,9 +225,44 @@ function _tgtRenderTeamGovCard() {
     : `${!policyPublished ? 'Policy still draft' : ''}${(!policyPublished && pending) ? ' · ' : ''}${pending ? pending + ' pending exception' + (pending>1?'s':'') : ''}`;
   const isAdmin = isAdminRole(role);
   const commissionMain = isTLRole(role) ? summary.tlPayout : summary.total;
+  // QC-12: show TL multiplier tier in govCard meta
+  let _tlMultText = '';
+  try {
+    if (isTLRole(role)) {
+      const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
+      const _um2 = typeof _commComputeTeamUpsellMult==='function' && bulkUpsellData && bulkUpsellData.loaded
+        ? _commComputeTeamUpsellMult(_govEm2) : null;
+      if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
+    }
+  } catch(e) {}
   const commissionMeta = isTLRole(role)
-    ? `KAM team ${_commFmtPayout(summary.kamPayout)}`
+    ? `KAM team ${_commFmtPayout(summary.kamPayout)}${_tlMultText}`
     : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
+  // Upsell multiplier card (TL only, shown when upsell data loaded)
+  let upsellCard = '';
+  if ((isTLRole(role) || isAdminRole(role)) && typeof _commComputeTeamUpsellMult === 'function') {
+    try {
+      // For TL: their own email. For Admin: use first TL from portview for overview
+      const _govEmail = isTLRole(role)
+        ? ((currentUserProfile && currentUserProfile.email) || '')
+        : ((_commGetTlListFromPortview()[0] || {}).email || '');
+      const um = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : { multiplier:1.0, tier:1, team_upsell_pct:0 };
+      if (typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded) {
+        const multCls = um.multiplier > 1 ? 'ok' : '';
+        upsellCard = `<div class="tv-signal-card ${multCls}">
+          <div class="tv-signal-label">Upsell Mult</div>
+          <div class="tv-signal-value ${multCls}">${um.multiplier.toFixed(2)}×</div>
+          <div class="tv-signal-meta">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</div>
+        </div>`;
+      } else {
+        upsellCard = `<div class="tv-signal-card">
+          <div class="tv-signal-label">Upsell Mult</div>
+          <div class="tv-signal-value">—</div>
+          <div class="tv-signal-meta">กำลังโหลด...</div>
+        </div>`;
+      }
+    } catch(e) {}
+  }
   return `<div class="tv-gov-card">
     <div class="tv-signal-wrap">
       <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
@@ -240,6 +275,7 @@ function _tgtRenderTeamGovCard() {
         <div class="tv-signal-value">${_commFmtPayout(commissionMain)}</div>
         <div class="tv-signal-meta">${commissionMeta}</div>
       </div>
+      ${upsellCard}
       <div class="tv-signal-card ${pending ? 'warn' : 'ok'}">
         <div class="tv-signal-label">Exceptions</div>
         <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
@@ -620,6 +656,9 @@ function _commGetTlListFromPortview() {
   });
   return Object.values(map);
 }
+// v225-comm: Extended snapshot rows with full component breakdown
+// payout_amount = final_payout (NRR + Upsell + Handover) × GMV Gate
+// breakdown jsonb includes config_snapshot for audit immutability
 function _commBuildSnapshotRows() {
   const period = _nrrExclusionCurrentPeriod();
   const actor = (currentUserProfile && currentUserProfile.email) || '';
@@ -632,32 +671,28 @@ function _commBuildSnapshotRows() {
   const tls = role === 'admin' ? _commGetTlListFromPortview() : [{ email: visibleTlEmail, name: (currentUserProfile && currentUserProfile.full_name) || visibleTlEmail }];
 
   tls.filter(t => t.email).forEach(tl => {
-    const raw = _tgtComputeKamNRR(null, tl.email);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, null, tl.email);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'tl', tl.email, 'tl');
-    const payout = _commPayoutForPctByCode(planCode, 'tl', pct);
+    const tlPayout = _commBuildTlPayout(tl.email);
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
       beneficiary_email: tl.email,
       team_lead_email: tl.email,
-      raw_nrr_pct: rawPct,
-      governed_nrr_pct: pct,
-      payout_amount: payout,
+      raw_nrr_pct: tlPayout.nrr_pct,
+      governed_nrr_pct: tlPayout.nrr_pct,
+      payout_amount: tlPayout.final_payout,
       snapshot_status: 'final',
       breakdown: {
-        type: 'tl_nrr',
+        version: 1,
+        computed_at: new Date().toISOString(),
+        period,
+        type: 'tl_full',
         role: 'tl',
         team_lead_name: tl.name || tl.email,
-        raw_nrr_pct: rawPct,
-        governed_nrr_pct: pct,
-        excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email),
-        base_gmv: raw ? raw.baselinePrevGmv : 0,
-        current_gmv: raw ? raw.cohortGmv : 0,
-        payout_source: planCode,
-        rule_name: _commPlanNameByCode(planCode, 'tl')
+        nrr_pct: tlPayout.nrr_pct,
+        nrr_payout: tlPayout.nrr_payout,
+        upsell_mult: tlPayout.upsell_mult,
+        final_payout: tlPayout.final_payout,
+        excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email)
       },
       created_by: actor,
       updated_by: actor
@@ -667,34 +702,60 @@ function _commBuildSnapshotRows() {
   const groups = role === 'admin' ? allGroups : allGroups.filter(g => (g.accounts || []).some(a => a.tlEmail === visibleTlEmail));
   groups.forEach(g => {
     if (!g.kamEmail) return;
-    const raw = _tgtComputeKamNRR(g.kamEmail, null);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, g.kamEmail, null);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
-    const payout = _commPayoutForPctByCode(planCode, 'kam', pct);
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
+    const kamPayout = _commBuildKamPayout(g.kamEmail);
     rows.push({
       period_month: period,
       beneficiary_role: 'kam',
       beneficiary_email: g.kamEmail,
       team_lead_email: tlEmail,
-      raw_nrr_pct: rawPct,
-      governed_nrr_pct: pct,
-      payout_amount: payout,
+      raw_nrr_pct: kamPayout.nrr_pct,
+      governed_nrr_pct: kamPayout.nrr_pct,
+      payout_amount: kamPayout.final_payout,
       snapshot_status: 'final',
       breakdown: {
-        type: 'kam_nrr',
+        version: 1,
+        computed_at: new Date().toISOString(),
+        period,
+        baseline_month: (bulkUpsellData && bulkUpsellData.baselineLabel) || '',
+        type: 'kam_full',
         role: 'kam',
         kam_name: g.kamName || g.kamEmail,
-        raw_nrr_pct: rawPct,
-        governed_nrr_pct: pct,
+        nrr_pct: kamPayout.nrr_pct,
+        nrr_payout: kamPayout.nrr_payout,
+        upsell_sku: {
+          total_commission: kamPayout.upsell_sku.total_comm,
+          p1: { gmv: kamPayout.upsell_sku.p1.gmv, comm: kamPayout.upsell_sku.p1.comm,
+                groups: kamPayout.upsell_sku.p1.groups },
+          p3: { gmv_incremental: kamPayout.upsell_sku.p3.gmv_incremental,
+                comm: kamPayout.upsell_sku.p3.comm, groups: kamPayout.upsell_sku.p3.groups }
+        },
+        upsell_outlet: kamPayout.upsell_outlet,
+        handover: { accounts: kamPayout.handover.accounts,
+                    baseline_gmv: kamPayout.handover.baseline_gmv,
+                    current_gmv: kamPayout.handover.current_gmv,
+                    retention_pct: kamPayout.handover.retention_pct,
+                    tier: kamPayout.handover.tier,
+                    payout: kamPayout.handover.payout,
+                    detail: kamPayout.handover.detail },
+        components_subtotal: kamPayout.subtotal,
+        gmv_gate: kamPayout.gate,
+        final_payout: kamPayout.final_payout,
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
-        base_gmv: raw ? raw.baselinePrevGmv : 0,
-        current_gmv: raw ? raw.cohortGmv : 0,
         account_count: g.total || ((g.accounts || []).length),
-        payout_source: planCode,
-        rule_name: _commPlanNameByCode(planCode, 'kam')
+        // Config snapshot — freeze param values at time of snapshot for audit
+        config_snapshot: {
+          upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
+          upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
+          upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',1.50),
+          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',2500),
+          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
+          upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
+          gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
+          gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',90),
+          gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.70),
+          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0.35)
+        }
       },
       created_by: actor,
       updated_by: actor
@@ -868,10 +929,45 @@ window._commOpenKamSelfSheet = _commOpenKamSelfSheet;
 window._commCloseKamSelfSheet = _commCloseKamSelfSheet;
 
 function _commSnapshotCsv(rows) {
-  const headers = ['period_month','beneficiary_role','beneficiary_email','team_lead_email','rule_name','raw_nrr_pct','governed_nrr_pct','payout_amount','status'];
-  const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
-  const getVal = (r,h) => h === 'rule_name' ? (r.breakdown && r.breakdown.rule_name) : r[h];
-  return [headers.join(',')].concat(rows.map(r => headers.map(h => esc(getVal(r,h))).join(','))).join('\n');
+  const header = [
+    'period_month','beneficiary_role','beneficiary_email','team_lead_email',
+    'name','raw_nrr_pct','governed_nrr_pct',
+    'nrr_payout','upsell_sku','upsell_outlet','handover',
+    'subtotal','gate_cap','final_payout',
+    'handover_retention_pct','handover_accounts',
+    'p1_gmv','p3_incremental','upsell_mult',
+    'snapshot_status','computed_at'
+  ].join(',');
+  const esc = v => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const dataRows = rows.map(r => {
+    const bd = r.breakdown || {};
+    const isKam = r.beneficiary_role === 'kam';
+    const name = bd.kam_name || bd.team_lead_name || r.beneficiary_email;
+    const upsellSku   = isKam && bd.upsell_sku ? bd.upsell_sku.total_commission : '';
+    const upsellOut   = isKam && bd.upsell_outlet ? bd.upsell_outlet.commission : '';
+    const handoverPay = isKam && bd.handover ? bd.handover.payout : '';
+    const subtotal    = isKam && bd.components_subtotal !== undefined ? bd.components_subtotal : '';
+    const gateCap     = isKam && bd.gmv_gate ? bd.gmv_gate.cap_multiplier : '';
+    const retPct      = isKam && bd.handover ? bd.handover.retention_pct : '';
+    const hoAccts     = isKam && bd.handover ? bd.handover.accounts : '';
+    const p1Gmv       = isKam && bd.upsell_sku && bd.upsell_sku.p1 ? bd.upsell_sku.p1.gmv : '';
+    const p3Incr      = isKam && bd.upsell_sku && bd.upsell_sku.p3 ? bd.upsell_sku.p3.gmv_incremental : '';
+    const upsellMult  = !isKam && bd.upsell_mult ? bd.upsell_mult.multiplier : '';
+    return [
+      esc(r.period_month), esc(r.beneficiary_role), esc(r.beneficiary_email), esc(r.team_lead_email),
+      esc(name), esc(r.raw_nrr_pct), esc(r.governed_nrr_pct),
+      esc(bd.nrr_payout !== undefined ? bd.nrr_payout : ''), esc(upsellSku), esc(upsellOut), esc(handoverPay),
+      esc(subtotal), esc(gateCap), esc(r.payout_amount),
+      esc(retPct), esc(hoAccts),
+      esc(p1Gmv), esc(p3Incr), esc(upsellMult),
+      esc(r.snapshot_status), esc(bd.computed_at || '')
+    ].join(',');
+  });
+  return [header, ...dataRows].join('\n');
 }
 // SECTION:SNAPSHOT_LOCK
 function exportCommissionSnapshotCsv() {
@@ -939,6 +1035,451 @@ function _nrrReasonLabel(code) {
 // ── Supabase load ───────────────────────────────────────────────
 let _tgtQuarterCache = {}; // per-quarter cache {quarter: {cache, settings, ts}}
 const _TGT_CACHE_TTL = 5 * 60 * 1000; // 5 min TTL — fresh enough for a session
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_UPSELL_ENGINE
+// Commission components beyond NRR: P1, P3, Upsell Outlet,
+// Handover retention, GMV Gate, TL Upsell Multiplier.
+// All rates/thresholds are admin-configurable via commission_rules.
+// ══════════════════════════════════════════════════════════════
+
+// ── Config helpers ──────────────────────────────────────────────
+// _commGetConfig: read component param from target_settings (loaded in _tgtSettings).
+// Key pattern: '{metricCode}_params' → JSON object → paramName
+// Falls back to hardcoded default so the app never returns NaN.
+function _commGetConfig(metricCode, paramName, defaultVal) {
+  try {
+    const key = metricCode + '_params';
+    const raw = _tgtSettings && _tgtSettings[key];
+    if (raw) {
+      const params = typeof raw === 'object' ? raw : JSON.parse(raw);
+      if (params[paramName] !== undefined && params[paramName] !== null)
+        return Number(params[paramName]);
+    }
+  } catch(e) {}
+  // Also check _commRuleConfig for backwards compatibility
+  try {
+    const rules = _commRuleConfig && _commRuleConfig.rules;
+    if (rules) {
+      const arr = rules[metricCode];
+      if (arr && arr.length > 0) {
+        const params = arr[0].params || {};
+        if (params[paramName] !== undefined && params[paramName] !== null)
+          return Number(params[paramName]);
+      }
+    }
+  } catch(e) {}
+  return defaultVal !== undefined ? defaultVal : null;
+}
+
+// ── Thai month helpers ──────────────────────────────────────────
+const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                    'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function _commCurrentMonthLabel() {
+  const n = new Date();
+  return _TH_MONTHS[n.getMonth()] + ' ' + (n.getFullYear() + 543);
+}
+
+function _commBaselineMonthLabel() {
+  const n = new Date();
+  const b = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+  return _TH_MONTHS[b.getMonth()] + ' ' + (b.getFullYear() + 543);
+}
+
+// Generate Thai month label N months before current
+function _commMonthLabelOffset(monthsBack) {
+  const n = new Date();
+  const d = new Date(n.getFullYear(), n.getMonth() - monthsBack, 1);
+  return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+}
+
+// Days in a given month (from Thai label e.g. "เม.ย. 2569")
+function _commDaysInLabel(label) {
+  try {
+    const parts = label.split(' ');
+    const mIdx = _TH_MONTHS.indexOf(parts[0]);
+    const year = parseInt(parts[1]) - 543;
+    if (mIdx < 0 || !year) return 30;
+    return new Date(year, mIdx + 1, 0).getDate();
+  } catch(e) { return 30; }
+}
+
+// ── Upsell SKU Engine ───────────────────────────────────────────
+// Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
+// p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
+// p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
+function _commComputeUpsellSku(kamEmail) {
+  const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
+                  total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
+  try {
+    if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
+    const byKam = bulkUpsellData.byKam || {};
+    const baselineGroups = bulkUpsellData.baselineGroups || {};
+
+    // Q3C CSV uses ka_owner (display name) as key, not email.
+    // Map: kamEmail → kamName via portviewBulkData for lookup.
+    const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const _kamKey = (_pvRow && _pvRow.kamName) ? _pvRow.kamName : kamEmail;
+    const kamData = byKam[_kamKey] || byKam[kamEmail] || {};
+    if (Object.keys(kamData).length === 0) return EMPTY;
+
+    const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
+
+    const currLabel  = _commCurrentMonthLabel();
+    const baseLabel  = _commBaselineMonthLabel();
+
+    // Config (admin-configurable, with spec defaults)
+    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
+    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.03);
+    const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 1.50); // 150% = 50% growth
+    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 2500);
+    const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 2500);       // ฿2,500 gate for P1
+
+    // MTD mode — commission on actual amounts, no projection
+    // P3 uses dayRatio to scale full-month baseline to current day (Option A)
+    let daysElapsed = new Date().getDate();
+    try {
+      const sample = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+      if (sample && sample.daysElapsed > 0) daysElapsed = sample.daysElapsed;
+    } catch(e) {}
+    const dayRatio = Math.min(daysElapsed, 30) / 30; // 0–1
+
+    const p1Groups = [];
+    const p3Groups = [];
+
+    Object.keys(kamData).forEach(accountId => {
+      const acctGroups = kamData[accountId];
+      const acctBaseline = baselineSet[accountId] || new Set();
+
+      Object.keys(acctGroups).forEach(groupKey => {
+        const monthData = acctGroups[groupKey];
+        const currRow = monthData[currLabel];
+        if (!currRow) return; // no current month data for this group
+
+        const rawTotalGmv = currRow.totalGmv || 0;
+        const rawExistingGmv = currRow.existingGmv || 0;
+        const rawNewGmv = currRow.newGmv || 0;
+        const rawComebackGmv = currRow.comebackGmv || 0;
+
+        const isP1 = !acctBaseline.has(groupKey);
+
+        if (isP1) {
+          // P1: new group_key for this account — all GMV (any outlet) × 3%
+          // Gate: total_gmv_30d must exceed ฿2,500
+          // P1: actual MTD gate — early month = stricter gate, monotonic growth
+          if (rawTotalGmv >= p1MinGmv) {
+            const comm = rawTotalGmv * p1Rate;
+            p1Groups.push({ accountId, groupKey, total_gmv: rawTotalGmv, commission: comm });
+          }
+        } else {
+          // P3: existing group_key — check growth in existing outlets only
+          // Compute MAX_baseline from 3 lookback months (normalized to 30d each)
+          let maxBaseline = 0;
+          let maxBaselineMonth = baseLabel;
+          for (let i = 1; i <= 3; i++) {
+            const lbl = _commMonthLabelOffset(i);
+            const lRow = monthData[lbl];
+            if (!lRow) continue;
+            const d = _commDaysInLabel(lbl);
+            const norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
+            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = lbl; }
+          }
+
+          // P3 Option A — compare actual MTD vs prorated baseline
+          // scaledBaseline = what KAM "should have" sold by this day based on best prior month
+          const scaledBaseline = maxBaseline * dayRatio;
+
+          if (rawExistingGmv > scaledBaseline * p3Thresh) {
+            const incremental = rawExistingGmv - scaledBaseline;
+            if (incremental >= p3MinIncr) {
+              const comm = incremental * p3Rate;
+              p3Groups.push({ accountId, groupKey,
+                existing_curr: rawExistingGmv,
+                max_baseline: maxBaseline, scaled_baseline: scaledBaseline,
+                max_baseline_month: maxBaselineMonth,
+                day_ratio: dayRatio,
+                incremental, commission: comm });
+            }
+          }
+        }
+      });
+    });
+
+    const p1Gmv  = p1Groups.reduce((s,g) => s + g.total_gmv, 0);
+    const p1Comm = p1Groups.reduce((s,g) => s + g.commission, 0);
+    const p3Incr = p3Groups.reduce((s,g) => s + g.incremental, 0);
+    const p3Comm = p3Groups.reduce((s,g) => s + g.commission, 0);
+
+    return {
+      p1: { gmv: p1Gmv, comm: p1Comm, groups: p1Groups },
+      p3: { gmv_incremental: p3Incr, comm: p3Comm, groups: p3Groups },
+      total_comm: p1Comm + p3Comm,
+      total_gmv_eligible: p1Gmv + p3Incr,
+      tl_upsell_base: p1Gmv + p3Incr  // TL multiplier uses P1+P3 incremental only
+    };
+  } catch(e) {
+    console.warn('[CommEngine] _commComputeUpsellSku error', e);
+    return { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
+             total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
+  }
+}
+
+// ── Upsell Outlet Engine ────────────────────────────────────────
+// Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
+// Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
+function _commComputeUpsellOutlet(kamEmail) {
+  const EMPTY = { outlet_gmv:0, commission:0, new_gmv:0, comeback_gmv:0 };
+  try {
+    if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
+    const _pvRow2 = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const _kamKey2 = (_pvRow2 && _pvRow2.kamName) ? _pvRow2.kamName : kamEmail;
+    const kamData = (bulkUpsellData.byKam || {})[_kamKey2] || (bulkUpsellData.byKam || {})[kamEmail] || {};
+    if (!Object.keys(kamData).length) return EMPTY;
+    const baselineGroups = bulkUpsellData.baselineGroups || {};
+    const baselineSet = baselineGroups[_kamKey2] || baselineGroups[kamEmail] || {};
+    const currLabel = _commCurrentMonthLabel();
+    const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
+
+    let newGmv = 0, comebackGmv = 0;
+
+    // MTD mode — actual GMV, no projection
+    Object.keys(kamData).forEach(accountId => {
+      const acctGroups = kamData[accountId];
+      const acctBaseline = baselineSet[accountId] || new Set();
+      Object.keys(acctGroups).forEach(groupKey => {
+        if (!acctBaseline.has(groupKey)) return; // skip P1 — already counted
+        const currRow = (acctGroups[groupKey] || {})[currLabel];
+        if (!currRow) return;
+        newGmv      += (currRow.newGmv      || 0); // actual MTD
+        comebackGmv += (currRow.comebackGmv || 0); // actual MTD
+      });
+    });
+
+    const outletGmv = newGmv + comebackGmv;
+    return { outlet_gmv: outletGmv, commission: outletGmv * rate, new_gmv: newGmv, comeback_gmv: comebackGmv };
+  } catch(e) {
+    console.warn('[CommEngine] _commComputeUpsellOutlet error', e);
+    return EMPTY;
+  }
+}
+
+// ── Handover Retention Engine ───────────────────────────────────
+// Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
+// Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail[] }
+function _commComputeHandoverRetention(kamEmail) {
+  const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
+                  tier:0, payout:0, detail:[] };
+  try {
+    if (!bulkHandoverData || !bulkHandoverData.byNewKamName) return EMPTY;
+    // Q10 stores by kamName (display name), not email — match via portviewBulkData
+    const kamRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const kamName = kamRow ? kamRow.kamName : null;
+    if (!kamName) return EMPTY;
+
+    const accounts = bulkHandoverData.byNewKamName[kamName] || [];
+    if (!accounts.length) return EMPTY;
+
+    const t2Pct    = _commGetConfig('handover', 'tier2_pct',    100);
+    const t3Pct    = _commGetConfig('handover', 'tier3_pct',    120);
+    const t2Pay    = _commGetConfig('handover', 'tier2_payout', 2500);
+    const t3Bonus  = _commGetConfig('handover', 'tier3_bonus',  2500);
+
+    let baselineGmv = 0, currentGmv = 0;
+    const detail = [];
+    accounts.forEach(a => {
+      baselineGmv += a.lastMonthGmv || 0;
+      currentGmv  += a.curMonthGmv  || 0;
+      detail.push({ account_id: a.accountId, name: a.accountName,
+                    baseline: a.lastMonthGmv, current: a.curMonthGmv });
+    });
+
+    const retentionPct = baselineGmv > 0 ? (currentGmv / baselineGmv * 100) : 0;
+
+    let tier = 1, payout = 0;
+    if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
+    else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
+
+    return { accounts: accounts.length, baseline_gmv: baselineGmv, current_gmv: currentGmv,
+             retention_pct: Math.round(retentionPct * 10) / 10, tier, payout, detail };
+  } catch(e) {
+    console.warn('[CommEngine] _commComputeHandoverRetention error', e);
+    return EMPTY;
+  }
+}
+
+// ── GMV Gate Engine ─────────────────────────────────────────────
+// Returns { ach_pct, cap_multiplier, gate_active }
+// KAM-only: TL does not have GMV Gate
+function _commComputeGmvGate(kamEmail) {
+  try {
+    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 95); // %
+    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 90);
+    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.70);
+    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0.35);
+
+    // Get KAM run-rate and target for current period
+    const period = _nrrExclusionCurrentPeriod(); // "2026-05"
+    const target = _tgtGet(period, 'kam', kamEmail);
+
+    // Run-rate GMV from portviewBulkData
+    const pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const runrate = pvRow ? (pvRow.runrate || 0) : 0;
+
+    if (!target || target <= 0) return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
+
+    const achPct = runrate / target * 100;
+    let cap = 1.0;
+    if (achPct < t2)      cap = c2;
+    else if (achPct < t1) cap = c1;
+
+    return {
+      ach_pct: Math.round(achPct * 10) / 10,
+      kam_runrate: runrate,
+      kam_target: target,
+      cap_multiplier: cap,
+      gate_active: cap < 1.0
+    };
+  } catch(e) {
+    console.warn('[CommEngine] _commComputeGmvGate error', e);
+    return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
+  }
+}
+
+// ── TL Upsell Multiplier Engine ────────────────────────────────
+// team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
+// team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
+// multiplier determined by tier table from commission_rules
+function _commComputeTeamUpsellMult(tlEmail) {
+  const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
+  try {
+    // Get all KAMs under this TL from portviewBulkData
+    const kamEmails = Array.from(new Set(
+      (portviewBulkData || [])
+        .filter(r => r.tlEmail === tlEmail && r.kamEmail)
+        .map(r => r.kamEmail)
+    ));
+    if (!kamEmails.length) return EMPTY;
+
+    let teamUpsellGmv = 0;
+    let teamBaselineGmv = 0;
+
+    const period = _nrrExclusionCurrentPeriod();
+
+    kamEmails.forEach(ke => {
+      const upsell = _commComputeUpsellSku(ke);
+      teamUpsellGmv += upsell.tl_upsell_base; // P1 + P3 incremental only
+
+      // NRR baseline GMV for this KAM
+      const raw = _tgtComputeKamNRR(ke, null);
+      teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
+    });
+
+    const upsellPct = teamBaselineGmv > 0 ? (teamUpsellGmv / teamBaselineGmv * 100) : 0;
+
+    // Tier lookup from commission_rules tl_upsell_mult tiers
+    // Default tiers per spec: <2%=1.0x, 2-2.9%=1.2x, 3-3.9%=1.35x, 4-4.9%=1.5x, ≥5%=1.8x
+    let multiplier = 1.0, tier = 1;
+    try {
+      const rules = (_commRuleConfig && _commRuleConfig.rules && _commRuleConfig.rules['tl_upsell_mult']) || [];
+      const tiers = (rules[0] && rules[0].tiers) ? rules[0].tiers : [
+        { min_pct:0, max_pct:1.99, multiplier:1.00 },
+        { min_pct:2, max_pct:2.99, multiplier:1.20 },
+        { min_pct:3, max_pct:3.99, multiplier:1.35 },
+        { min_pct:4, max_pct:4.99, multiplier:1.50 },
+        { min_pct:5, max_pct:null, multiplier:1.80 }
+      ];
+      tiers.sort((a,b) => Number(a.min_pct||0) - Number(b.min_pct||0));
+      for (let i = tiers.length - 1; i >= 0; i--) {
+        if (upsellPct >= Number(tiers[i].min_pct || 0)) {
+          multiplier = Number(tiers[i].multiplier || 1.0);
+          tier = i + 1;
+          break;
+        }
+      }
+    } catch(e) {}
+
+    return { team_upsell_gmv: teamUpsellGmv, team_baseline_gmv: teamBaselineGmv,
+             team_upsell_pct: Math.round(upsellPct * 100) / 100, multiplier, tier,
+             kam_count: kamEmails.length };
+  } catch(e) {
+    console.warn('[CommEngine] _commComputeTeamUpsellMult error', e);
+    return EMPTY;
+  }
+}
+
+// ── KAM Full Payout Builder ─────────────────────────────────────
+// Returns complete breakdown for one KAM
+function _commBuildKamPayout(kamEmail) {
+  try {
+    const period = _nrrExclusionCurrentPeriod();
+    const raw = _tgtComputeKamNRR(kamEmail, null);
+    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const governedPct = _nrrGovernedPct(raw, kamEmail, null);
+    const pct = governedPct !== null ? governedPct : rawPct;
+    const planCode = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
+    const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
+
+    const upsellSku     = _commComputeUpsellSku(kamEmail);
+    const upsellOutlet  = _commComputeUpsellOutlet(kamEmail);
+    const handover      = _commComputeHandoverRetention(kamEmail);
+    const gate          = _commComputeGmvGate(kamEmail);
+
+    const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
+    const finalPayout = Math.round(subtotal * gate.cap_multiplier);
+
+    return {
+      period, kamEmail,
+      nrr_pct: pct,
+      nrr_payout: nrrPayout,
+      upsell_sku: upsellSku,
+      upsell_outlet: upsellOutlet,
+      handover,
+      gate,
+      subtotal,
+      gate_cap: gate.cap_multiplier,
+      final_payout: finalPayout
+    };
+  } catch(e) {
+    console.warn('[CommEngine] _commBuildKamPayout error', e);
+    return { nrr_payout:0, upsell_sku:{total_comm:0}, upsell_outlet:{commission:0},
+             handover:{payout:0}, gate:{cap_multiplier:1,gate_active:false},
+             subtotal:0, gate_cap:1, final_payout:0 };
+  }
+}
+
+// ── TL Full Payout Builder ──────────────────────────────────────
+function _commBuildTlPayout(tlEmail) {
+  try {
+    const period = _nrrExclusionCurrentPeriod();
+    const raw = _tgtComputeKamNRR(null, tlEmail);
+    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const governedPct = _nrrGovernedPct(raw, null, tlEmail);
+    const pct = governedPct !== null ? governedPct : rawPct;
+    const planCode = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
+    const nrrPayout = _commPayoutForPctByCode(planCode, 'tl', pct);
+
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail);
+    const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
+
+    return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
+             upsell_mult: upsellMult, final_payout: finalPayout };
+  } catch(e) {
+    console.warn('[CommEngine] _commBuildTlPayout error', e);
+    return { nrr_payout:0, upsell_mult:{multiplier:1.0,tier:1}, final_payout:0 };
+  }
+}
+
+// Expose to window
+window._commGetConfig = _commGetConfig;
+window._commComputeUpsellSku = _commComputeUpsellSku;
+window._commComputeUpsellOutlet = _commComputeUpsellOutlet;
+window._commComputeHandoverRetention = _commComputeHandoverRetention;
+window._commComputeGmvGate = _commComputeGmvGate;
+window._commComputeTeamUpsellMult = _commComputeTeamUpsellMult;
+window._commBuildKamPayout = _commBuildKamPayout;
+window._commBuildTlPayout = _commBuildTlPayout;
+
 
 // SECTION:TARGETS
 async function loadTargets(quarter) {
@@ -1474,3 +2015,38 @@ function renderNrrPolicyTab() {
     }).join('')}`;
 }
 
+
+// SECTION:AUDIT_SQL_HELPERS
+// QC-13: Generate pre-filled BQ audit SQL for KAM upsell reconciliation
+function _commBuildKamAuditSql(kamEmail) {
+  try {
+    const pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const kamName = pvRow ? pvRow.kamName : kamEmail;
+    const period = _nrrExclusionCurrentPeriod(); // "2026-05"
+    const [yr, mo] = period.split('-');
+    const accountIds = (portviewBulkData || [])
+      .filter(r => r.kamEmail === kamEmail)
+      .map(r => `'${r.id}'`)
+      .slice(0, 50)
+      .join(',');
+    if (!accountIds) return null;
+    return `-- Audit: Upsell SKU detail for ${kamName} — ${period}\n` +
+      `-- commission_type: P1_new_item | Upsell_Outlet | P3_candidate\n` +
+      `-- Run in BigQuery → Export to Google Sheets to verify commission\n\n` +
+      `SELECT * FROM \`freshket-rn.commission_audit.upsell_sku_detail\`\n` +
+      `WHERE kam_email = '${kamName}'\n` +
+      `  AND account_id IN (${accountIds})\n` +
+      `ORDER BY commission_type, group_key, gmv_ex_vat DESC;`;
+  } catch(e) { return null; }
+}
+function _commCopyAuditSql(st) {
+  try {
+    const sql = _commBuildKamAuditSql(st && st.email);
+    if (!sql) { if(typeof showToast==='function') showToast('ไม่มีข้อมูลสำหรับ audit SQL','!'); return; }
+    navigator.clipboard.writeText(sql)
+      .then(() => { if(typeof showToast==='function') showToast('Audit SQL copied — paste ใน BigQuery','✓'); })
+      .catch(() => { if(typeof showToast==='function') showToast('Copy failed — ดู console','!'); console.log(sql); });
+  } catch(e) {}
+}
+window._commBuildKamAuditSql = _commBuildKamAuditSql;
+window._commCopyAuditSql = _commCopyAuditSql;
