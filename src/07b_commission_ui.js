@@ -2816,14 +2816,21 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var src=buildSources(st);
     if(!src) return '';
     if(src.loading){
-      return '<div class="pv-comm-strip v210k unpaid '+esc(st.cls||'')+'" data-v210k="1">'
-        +'<div class="pv-comm-title">\u0e04\u0e48\u0e32\u0e04\u0e2d\u0e21\u0e2f \u0e40\u0e14\u0e37\u0e2d\u0e19\u0e19\u0e35\u0e49</div>'
+      // Show NRR row immediately; dim Upsell/Handover until Q3C loads
+      var _cls="v210k "+(src.nrr>0?"paid":"unpaid")+" "+esc(st.cls||"");
+      var _st=st.status||(src.nrr>0?"ถึงเกณฑแล้ว":"ยังไม่ถึงเกณฑ");
+      return '<div class="'+_cls+'" data-v210k="1">'
+        +'<div class="pv-comm-title">ค่าคอมฯ เดือนนี้</div>'
         +'<div class="pv-comm-main">'+money(src.nrr)+'</div>'
-        +'<div class="pv-comm-chip">\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14...</div>'
+        +'<div class="pv-comm-chip" title="'+esc(_st)+'">'+esc(_st)+'</div>'
         +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
+        +'<div class="pv-comm-sources">'
+        +'<span><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">·</span>'
+        +'<span style="color:rgba(255,255,255,.3)"><b>Upsell</b> —</span><span class="pv-comm-sep">·</span>'
+        +'<span style="color:rgba(255,255,255,.3)"><b>Handover</b> —</span>'
+        +'</div>'
         +'</div>';
     }
-    var finalAmt=src.final;
     var paid=finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
     var status=st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11');
