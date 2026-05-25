@@ -10626,9 +10626,12 @@ async function _fetchUpsellBundle(kamEmail){
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       if(ok){
         _upsellBundleLoaded.add(safeKey);
-        // Clear strip cache so it re-renders with real upsell values
-        try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
-        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        // Clear strip cache and force full re-render pipeline
+        setTimeout(()=>{
+          try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+          try{ if(typeof _commGatedRender==='function') _commGatedRender(); }catch(e){}
+          try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        }, 100);
       }
       return ok;
     }catch(e){
@@ -29097,6 +29100,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var uplift=Number((p.upsell_sku&&p.upsell_sku.total_comm)||0)+Number((p.upsell_outlet&&p.upsell_outlet.commission)||0);
       var hv=Number((p.handover&&p.handover.payout)||0);
       var cap=Number(p.gate_cap||1.0);
+      // final = governance NRR (st.payout) + upsell + handover, then gate applied
+      // Do NOT use p.nrr_payout which may be 0 if plan lookup fails
       return {loading:false,nrr:nrr,uplift:uplift,handover:hv,
         gate_cap:cap,gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
         upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,
