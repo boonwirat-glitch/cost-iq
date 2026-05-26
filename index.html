@@ -1,4 +1,4 @@
-<!-- Freshket Sense v232: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v233: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v232',
+      version: 'v233',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -22041,7 +22041,11 @@ function renderTeamviewKamList(){
 const _kamPayoutCache = {};
 let _kamPayoutCacheKey = '';
 function _getCachedKamPayout(kamEmail) {
-  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'');
+  // v232-fix: include bulkUpsellTeamData size in key.
+  // Bug: fast-path uses bulkUpsellTeamData but key only tracked bulkUpsellData.loaded
+  // → cache hit after upsell_team loads → stale result (NRR only, no upsell) returned forever.
+  const _utN = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
+  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN;
   if (_kamPayoutCacheKey !== cacheKey) {
     Object.keys(_kamPayoutCache).forEach(k => delete _kamPayoutCache[k]);
     _kamPayoutCacheKey = cacheKey;
