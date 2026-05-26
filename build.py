@@ -33,6 +33,11 @@ out = (shell
              f'<script id="target-module-js">\n{commission_js}</script>\n')
     .replace('<script id="freshket-patches-consolidated">\n<!-- INJECT_PATCHES -->\n</script>\n',
              f'<script id="freshket-patches-consolidated">\n{patches_js}</script>\n')
+    # Inject build version — keeps currentBuild() accurate in console
+    .replace("version: 'v212c-diagnostics-counter-fix'",
+             f"version: '{VERSION}'")
+    .replace('<!-- Freshket Sense v224d:',
+             f'<!-- Freshket Sense {VERSION}:')
 )
 
 os.makedirs('dist', exist_ok=True)
