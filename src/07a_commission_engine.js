@@ -271,8 +271,8 @@ function _tgtRenderTeamGovCard() {
       </div>
       <div class="tv-signal-card commission" style="cursor:pointer" onclick="event.stopPropagation();_commOpenTlDetailSheet()">
         <div class="tv-signal-label">Commission ${multBadge}</div>
-        <div class="tv-signal-value">${_commFmtPayout(commissionMain)}</div>
-        <div class="tv-signal-meta">${commMeta2}</div>
+        <div class="tv-signal-value">${isTLRole(role)&&!_teamUpsellReady?'<span class="skel" style="display:inline-block;width:72px;height:22px;border-radius:6px;vertical-align:middle"></span>':_commFmtPayout(commissionMain)}</div>
+        <div class="tv-signal-meta">${isTLRole(role)&&!_teamUpsellReady?'&nbsp;':commMeta2}</div>
       </div>
       <div class="tv-signal-card ${pending ? 'warn' : 'ok'}">
         <div class="tv-signal-label">Exceptions</div>
