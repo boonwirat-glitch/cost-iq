@@ -1580,14 +1580,24 @@ function _commBuildKamPayout(kamEmail) {
       (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
     const upsellLoading = !_bundleLoaded && !_teamRow; // v228-fix: flag when upsell data unavailable
     if (!_bundleLoaded && _teamRow) {
-      // Fast path: use pre-computed totals from team summary
-      const p1Rate    = _commGetConfig('upsell_sku',  'p1_rate',  0.03);
-      const p3Rate    = _commGetConfig('upsell_sku',  'p3_rate',  0.03);
-      const outRate   = _commGetConfig('upsell_outlet','rate',    0.015);
-      const skuComm   = (_teamRow.p1_gmv * p1Rate) + (_teamRow.p3_incr * p3Rate);
-      const outComm   = (_teamRow.outlet_gmv * outRate);
-      upsellSku    = { total_comm: skuComm, p1_comm: _teamRow.p1_gmv * p1Rate,
-                       p3_comm: _teamRow.p3_incr * p3Rate, p1_groups: [], p3_groups: [] };
+      // Fast path: use pre-computed totals from team summary (sense_upsell_team.csv)
+      // v230fix2: return full p1/p3 sub-objects matching _commComputeUpsellSku structure
+      // so _commBuildSnapshotRows can safely access .p1.gmv / .p3.gmv_incremental
+      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.03);
+      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.03);
+      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.015);
+      const p1Comm  = _teamRow.p1_gmv   * p1Rate;
+      const p3Comm  = _teamRow.p3_incr  * p3Rate;
+      const outComm = _teamRow.outlet_gmv * outRate;
+      upsellSku = {
+        p1: { gmv: _teamRow.p1_gmv,  comm: p1Comm, groups: [] },
+        p3: { gmv_incremental: _teamRow.p3_incr, comm: p3Comm, groups: [] },
+        total_comm: p1Comm + p3Comm,
+        p1_comm: p1Comm, p3_comm: p3Comm,
+        p1_groups: [], p3_groups: [],
+        total_gmv_eligible: _teamRow.p1_gmv + _teamRow.p3_incr,
+        tl_upsell_base: _teamRow.tl_upsell_base || 0
+      };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
       upsellSku    = _commComputeUpsellSku(kamEmail);
