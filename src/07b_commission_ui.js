@@ -3103,8 +3103,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     return outletId;
   };
 
-  // ── v235: Outlet drill sheet ──
-──────────────────────────────────────────────
+  // ── v235: Outlet drill sheet ────────────────────────────────────────────────
   function _commOpenUpsellDrill(type){
     var ov=document.getElementById('pv-comm-sheet-overlay');
     var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
