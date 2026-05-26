@@ -1,4 +1,4 @@
-<!-- Freshket Sense v239: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v240: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v239',
+      version: 'v240',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30653,8 +30653,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // Clean component row builder
     function cRow(dot,label,sub,amt,amtColor,drillFn){
       var hasAmt=Number(amt||0)>0;
+      var drillAttr=drillFn?' onclick="'+drillFn+'"':'';
       return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.07);'+(drillFn?'cursor:pointer':'')+'"'
-        +(drillFn?' onclick="'+drillFn+'" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'"':'')+'>'
+        +drillAttr+'>'
         +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px;background:'+dot+'"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88);line-height:1.25">'+label+'</div>'
