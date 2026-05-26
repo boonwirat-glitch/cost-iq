@@ -890,36 +890,54 @@ function handleFileUpload(type,input){
         const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
         // Build two indexes in one pass:
         //   byKam[kamEmail][accountId][group_key][month_label] = {existing_gmv,new_gmv,comeback_gmv,total_gmv}
-        //   baselineGroups[kamEmail][accountId] = Set of group_keys present in baseline month (prev month)
+        //   baselineGroups[kamEmail][accountId][outletId] = Set<groupKey> (v2: outlet-level, 3-month lookback)
         const byKam={};
         const baselineGroups={};
-        // Determine baseline month label (prev calendar month, Thai format)
         const _now=new Date();
-        const _bm=new Date(_now.getFullYear(),_now.getMonth()-1,1);
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-        const _baselineLabel=_thMonths[_bm.getMonth()]+' '+(_bm.getFullYear()+543);
+        const _baselineLabel=_thMonths[new Date(_now.getFullYear(),_now.getMonth()-1,1).getMonth()]+' '+(new Date(_now.getFullYear(),_now.getMonth()-1,1).getFullYear()+543);
+        // v2: current month label — any row NOT current month = lookback → baseline
+        const _currLabel=_thMonths[_now.getMonth()]+' '+(_now.getFullYear()+543);
+        // v2: detect CSV format — 9 cols = new (has outlet_id), 8 cols = legacy
+        const _sampleCols=(lines[0]||'').split(',').length;
+        const _hasOutlet=_sampleCols>=9;
         let rowCount=0;
         lines.forEach(l=>{
           const p=parseCSVRow(l);
           const kamEmail=(p[0]||'').trim();
           const accountId=(p[1]||'').trim();
-          const monthLabel=(p[2]||'').trim();
-          const groupKey=(p[3]||'').trim();
-          const existingGmv=parseFloat(p[4])||0;
-          const newGmv=parseFloat(p[5])||0;
-          const comebackGmv=parseFloat(p[6])||0;
-          const totalGmv=parseFloat(p[7])||0;
+          let outletId,monthLabel,groupKey,existingGmv,newGmv,comebackGmv,totalGmv;
+          if(_hasOutlet){
+            outletId=(p[2]||'').trim();
+            monthLabel=(p[3]||'').trim();
+            groupKey=(p[4]||'').trim();
+            existingGmv=parseFloat(p[5])||0;
+            newGmv=parseFloat(p[6])||0;
+            comebackGmv=parseFloat(p[7])||0;
+            totalGmv=parseFloat(p[8])||0;
+          }else{
+            outletId='_all'; // legacy: aggregate at account level
+            monthLabel=(p[2]||'').trim();
+            groupKey=(p[3]||'').trim();
+            existingGmv=parseFloat(p[4])||0;
+            newGmv=parseFloat(p[5])||0;
+            comebackGmv=parseFloat(p[6])||0;
+            totalGmv=parseFloat(p[7])||0;
+          }
           if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
-          // byKam index
+          // byKam: kamEmail → accountId → outletId → groupKey → monthLabel
           if(!byKam[kamEmail])byKam[kamEmail]={};
           if(!byKam[kamEmail][accountId])byKam[kamEmail][accountId]={};
-          if(!byKam[kamEmail][accountId][groupKey])byKam[kamEmail][accountId][groupKey]={};
-          byKam[kamEmail][accountId][groupKey][monthLabel]={existingGmv,newGmv,comebackGmv,totalGmv};
-          // baselineGroups index — group_key present in baseline month with any GMV
-          if(monthLabel===_baselineLabel && totalGmv>0){
+          if(!byKam[kamEmail][accountId][outletId])byKam[kamEmail][accountId][outletId]={};
+          if(!byKam[kamEmail][accountId][outletId][groupKey])byKam[kamEmail][accountId][outletId][groupKey]={};
+          byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,newGmv,comebackGmv,totalGmv};
+          // v2 baselineGroups: outlet-level, 3-month lookback
+          // any row that is NOT current month = lookback row → marks as baseline for P1 detection
+          if(monthLabel!==_currLabel && totalGmv>0){
             if(!baselineGroups[kamEmail])baselineGroups[kamEmail]={};
-            if(!baselineGroups[kamEmail][accountId])baselineGroups[kamEmail][accountId]=new Set();
-            baselineGroups[kamEmail][accountId].add(groupKey);
+            if(!baselineGroups[kamEmail][accountId])baselineGroups[kamEmail][accountId]={};
+            if(!baselineGroups[kamEmail][accountId][outletId])baselineGroups[kamEmail][accountId][outletId]=new Set();
+            baselineGroups[kamEmail][accountId][outletId].add(groupKey);
           }
           rowCount++;
         });
