@@ -24480,6 +24480,7 @@ function _tgtRenderTeamGovCard() {
     ? `KAM team ${_commFmtPayout(summary.kamPayout)}${_tlMultText}`
     : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
   // Upsell Mult — folded into Commission card meta (not a separate card)
+  const _teamUpsellReady = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0; // hoisted to fn scope
   let multBadge = '';
   let umData = null;
   if ((isTLRole(role) || isAdminRole(role)) && typeof _commComputeTeamUpsellMult === 'function') {
@@ -24488,7 +24489,6 @@ function _tgtRenderTeamGovCard() {
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
       umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
-      const _teamUpsellReady = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
       if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
