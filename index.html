@@ -1,4 +1,4 @@
-<!-- Freshket Sense v241: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v242: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v241',
+      version: 'v242',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30680,7 +30680,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
     var ncSub='สาขาใหม่/comeback × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
-    var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff',src.upsell_outlet>0?'_commDrillNewComeback()':null);
+    var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
 
     // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
     var hoSub=(function(){
@@ -30937,7 +30937,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 
   // ── v235: Drill helper — push content into existing sheet ──────────────────
-  function _pvPushDrill(html){
+  window._pvPushDrill=function _pvPushDrill(html){
     var ov=document.getElementById('pv-comm-sheet-overlay');
     var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
     if(!sheetEl)return;
@@ -30985,32 +30985,41 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   window._commDrillUpsellChooser=function(){
     var p1g=window._pvCommP1Groups||[];
     var p3g=window._pvCommP3Groups||[];
-    function mon(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000)return'฿'+(n/1000).toFixed(0)+'K';return'฿'+Math.round(n).toLocaleString('en-US');}
+    function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     var p1comm=p1g.reduce(function(s,g){return s+(g.commission||0);},0);
     var p3comm=p3g.reduce(function(s,g){return s+(g.commission||0);},0);
-    // If only one type has data, go directly
     if(p1g.length&&!p3g.length){window._commOpenUpsellDrill('p1');return;}
     if(p3g.length&&!p1g.length){window._commOpenUpsellDrill('p3');return;}
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
-      +_pvDrillHeader('กลุ่มสินค้าใหม่ + ยอดเติบโต','','','')
+      +window._pvDrillHeader('กลุ่มสินค้าใหม่ + ยอดเติบโต','','','')
       +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:16px 18px;display:flex;flex-direction:column;gap:10px">'
-      +(p1g.length?'<div onclick="_commOpenUpsellDrill(\'p1\')" style="padding:16px;border-radius:12px;background:rgba(77,220,151,.08);border:1px solid rgba(77,220,151,.2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
-        +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
-        +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
-        +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
-        +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
-        +'</div>':'')
-      +(p3g.length?'<div onclick="_commOpenUpsellDrill(\'p3\')" style="padding:16px;border-radius:12px;background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.18);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
-        +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">ยอดเติบโต</div>'
-        +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p3g.length+' outlet × group · Incr × 3%</div></div>'
-        +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(p3comm)+'</div>'
-        +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
-        +'</div>':'')
+      +(p1g.length
+        ?'<div id="pvChooseP1" style="padding:16px;border-radius:12px;background:rgba(77,220,151,.08);border:1px solid rgba(77,220,151,.2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+          +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
+          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
+          +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
+          +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
+          +'</div>'
+        :'')
+      +(p3g.length
+        ?'<div id="pvChooseP3" style="padding:16px;border-radius:12px;background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.18);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+          +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">ยอดเติบโต</div>'
+          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p3g.length+' outlet × group · Incr × 3%</div></div>'
+          +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(p3comm)+'</div>'
+          +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
+          +'</div>'
+        :'')
       +'</div></div>';
-    _pvPushDrill(html);
+    window._pvPushDrill(html);
+    // attach listeners after DOM is ready (no inline onclick = no quote hell)
+    requestAnimationFrame(function(){
+      var b1=document.getElementById('pvChooseP1');
+      var b3=document.getElementById('pvChooseP3');
+      if(b1)b1.addEventListener('click',function(){window._commOpenUpsellDrill('p1');});
+      if(b3)b3.addEventListener('click',function(){window._commOpenUpsellDrill('p3');});
+    });
   };
 
-  // New/Comeback drill — outlet breakdown
   window._commDrillNewComeback=function(){
     var src=window._pvCommDrillSrc||{};
     var st=window._pvCommDrillSt||{};
