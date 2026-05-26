@@ -1,4 +1,4 @@
-<!-- Freshket Sense v243: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v243b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v243',
+      version: 'v243b',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30762,8 +30762,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     return outletId;
   };
 
-  // ── v235: Outlet drill sheet ──
-──────────────────────────────────────────────
+  // ── v235: Outlet drill sheet ────────────────────────────────────────────────
   function _commOpenUpsellDrill(type){
     var ov=document.getElementById('pv-comm-sheet-overlay');
     var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
