@@ -11114,8 +11114,7 @@ function allCriticalReady(){
   try{
     return _cloudLoadedTabs.has('portview') &&
            _cloudLoadedTabs.has('history') &&
-           _cloudLoadedTabs.has('handover') &&
-           _cloudLoadedTabs.has('upsell_team'); // v231: gate on upsell_team so commission renders complete on first paint
+           _cloudLoadedTabs.has('handover');
   }catch(e){return false;}
 }
 
@@ -22134,7 +22133,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const _kp1UL=_kp1&&_kp1.upsell_loading; // shimmer while upsell loading
+    const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
+    const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
@@ -22165,7 +22165,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const _kp1UL=_kp1&&_kp1.upsell_loading; // shimmer while upsell loading
+    const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
+    const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
@@ -22196,7 +22197,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
     const _kamFinalC=_kpC?_kpC.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const _kpCUL=_kpC&&_kpC.upsell_loading; // shimmer while upsell loading
+    const _teamUpsellReadyC=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
+    const _kpCUL=!_teamUpsellReadyC; // shimmer only until team summary loaded
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>

@@ -1816,8 +1816,7 @@ function allCriticalReady(){
   try{
     return _cloudLoadedTabs.has('portview') &&
            _cloudLoadedTabs.has('history') &&
-           _cloudLoadedTabs.has('handover') &&
-           _cloudLoadedTabs.has('upsell_team'); // v231: gate on upsell_team so commission renders complete on first paint
+           _cloudLoadedTabs.has('handover');
   }catch(e){return false;}
 }
 
