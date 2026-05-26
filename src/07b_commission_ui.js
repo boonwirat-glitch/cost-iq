@@ -2994,8 +2994,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // Clean component row builder
     function cRow(dot,label,sub,amt,amtColor,drillFn){
       var hasAmt=Number(amt||0)>0;
+      var drillAttr=drillFn?' onclick="'+drillFn+'"':'';
       return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.07);'+(drillFn?'cursor:pointer':'')+'"'
-        +(drillFn?' onclick="'+drillFn+'" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'"':'')+'>'
+        +drillAttr+'>'
         +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px;background:'+dot+'"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88);line-height:1.25">'+label+'</div>'
