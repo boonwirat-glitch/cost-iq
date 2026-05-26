@@ -955,18 +955,22 @@ function _commOpenTlDetailSheet() {
     const detailParts = ['NRR '+fmtP(nrrP)];
     if (upsell > 0) detailParts.push('Uplift '+fmtP(upsell));
     if (ho > 0)     detailParts.push('HO '+fmtP(ho));
-    const amberStyle = finalAmt > 0 ? 'color:#f0b000;font-weight:700' : 'color:rgba(255,255,255,.4)';
+    // v228-fix: show — when upsell not loaded and NRR payout is 0
+    const upsellNotLoaded = r.breakdown && r.breakdown.upsell_loading;
+    const displayAmt = (upsellNotLoaded && nrrP === 0) ? null : finalAmt;
+    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:700' : 'color:rgba(255,255,255,.4)';
+    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.3);font-size:11px">— โหลด...</span>' : fmtP(displayAmt);
     return `<div class="pv-comm-tl-kam-row">
       <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
       <div class="pv-comm-tl-kam-nrr">${nrr}</div>
-      <div class="pv-comm-tl-kam-pay" style="${amberStyle}">${fmtP(finalAmt)}</div>
+      <div class="pv-comm-tl-kam-pay" style="${amberStyle}">${payText}</div>
       <div class="pv-comm-tl-kam-detail">${detailParts.join(' · ')}</div>
     </div>`;
   }).join('');
 
   const multSection = multLoaded
     ? `<div class="pv-comm-tl-mult">
-        <span style="color:#f0b000;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
+        <span style="color:#ffe08a;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
         <span style="color:rgba(255,255,255,.6);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
        </div>`
     : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
@@ -1013,9 +1017,9 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
   s.id = '_comm_tl_styles';
   s.textContent = `
     .tv-mult-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
-    .tv-mult-badge.ok{background:rgba(240,176,0,.18);color:#f0b000}
+    .tv-mult-badge.ok{background:rgba(255,224,138,.15);color:#ffe08a}
     .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
-    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(240,176,0,.07);border:1px solid rgba(240,176,0,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
+    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
     .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
     .pv-comm-tl-kam-list{display:flex;flex-direction:column;max-height:320px;overflow-y:auto;margin-top:2px}
     .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 44px 76px;grid-template-rows:auto auto;gap:1px 4px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
@@ -1548,6 +1552,7 @@ function _commBuildKamPayout(kamEmail) {
     const _kamDisplayName = _pvRow ? (_pvRow.kamName || '') : '';
     const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData &&
       (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
+    const upsellLoading = !_bundleLoaded && !_teamRow; // v228-fix: flag when upsell data unavailable
     if (!_bundleLoaded && _teamRow) {
       // Fast path: use pre-computed totals from team summary
       const p1Rate    = _commGetConfig('upsell_sku',  'p1_rate',  0.03);
@@ -1578,6 +1583,7 @@ function _commBuildKamPayout(kamEmail) {
       gate,
       subtotal,
       gate_cap: gate.cap_multiplier,
+      upsell_loading: upsellLoading, // v228-fix: true when upsell CSV not loaded in session
       final_payout: finalPayout
     };
   } catch(e) {

@@ -1991,7 +1991,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_kamFinal1)}</span>`:'';
+    const _kp1UL=_kp1&&_kp1.upsell_loading&&(_kp1.nrr_payout||0)===0; // v228-fix
+    const _kamPillTxt=_kp1UL?'—':_commFmtPayout(_kamFinal1);
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -2020,7 +2022,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_kamFinal1)}</span>`:'';
+    const _kp1UL=_kp1&&_kp1.upsell_loading&&(_kp1.nrr_payout||0)===0; // v228-fix
+    const _kamPillTxt=_kp1UL?'—':_commFmtPayout(_kamFinal1);
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -2049,6 +2053,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
     const _kamFinalC=_kpC?_kpC.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
+    const _kpCUL=_kpC&&_kpC.upsell_loading&&(_kpC.nrr_payout||0)===0; // v228-fix
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -2056,7 +2061,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
         </div>
       </div>
-      ${nrrPct!==null?`<span class="tv-chip-comm">${_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
+      ${nrrPct!==null?`<span class="tv-chip-comm">${_kpCUL?'—':_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
       <span class="tv-chip-pace">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;

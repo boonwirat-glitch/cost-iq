@@ -2840,9 +2840,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
       +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
       +'<div class="pv-comm-sources">'
-      +'<span style="color:'+(src.nrr>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
+      +'<span style="color:'+(src.nrr>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
       +'</div>'
       +'</div>';
   }
@@ -2984,7 +2984,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       gateRow=srcRow(gRowCls,"NRR Gate"+(src.gate_active?" ⚠":""),"NRR "+gPct+"% · "+gRule,"<span class=\""+(src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
     }
 
-    var loadNote=src.loading?"<div style=\"font-size:11px;color:#FFBB00;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
+    var loadNote=src.loading?"<div style=\"font-size:11px;color:#ffe08a;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
     var kpiCls=finalAmt>0?"val-bonus":"";
     var safeEmail=(st.email||"").replace(/'/g,"\\'");
     var auditBtn=typeof _commBuildKamAuditSql==="function"&&st.email
