@@ -2938,11 +2938,12 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var nrrRow=srcRow(src.nrr>0?"paid":"","NRR","เกณฑ์ ≥"+nrrMinPct+"% · "+esc(st.ruleName||"—"),money(src.nrr),"");
 
     // Upsell SKU row — v235: renamed P1→กลุ่มสินค้าใหม่, P3→ยอดเติบโต; added outlet drill
-    var p1Detail=[],p3Detail=[];
+    // v239-fix: declare p1g/p3g OUTSIDE if block so upsellHasDrill can see them
+    var p1Detail=[],p3Detail=[],p1g=[],p3g=[];
     if(src.upsell_sku_detail){
       var d=src.upsell_sku_detail;
-      var p1g=d.p1&&d.p1.groups?d.p1.groups:[];
-      var p3g=d.p3&&d.p3.groups?d.p3.groups:[];
+      p1g=d.p1&&d.p1.groups?d.p1.groups:[];
+      p3g=d.p3&&d.p3.groups?d.p3.groups:[];
       window._pvCommP1Groups=p1g; window._pvCommP3Groups=p3g; // store for drill
       p1Detail=[ruleLine(p1g.length>0,"กลุ่มสินค้าใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
       if(p1g.length) p1Detail.push(ruleIndent("<span onclick=\"_commOpenUpsellDrill('p1')\" style=\"color:#bcd7ff;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:2px\">"+p1g.length+" รายการ — ดูทั้งหมด ›</span>"));
@@ -3019,7 +3020,14 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var ncSub='สาขาใหม่/comeback × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
     var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff',src.upsell_outlet>0?'_commDrillNewComeback()':null);
 
-    var hoSub=src.handover_detail?'retention '+src.handover_detail.retention_pct+'% · '+src.handover_detail.accounts+' ร้าน':'≥'+hoT2+'% = ฿'+hoT2Pay+' · ≥'+hoT3+'% = +฿'+hoT3Bon;
+    // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
+    var hoSub=(function(){
+      if(!src.handover_detail||!src.handover_detail.accounts)return'≥'+hoT2+'% = ฿'+hoT2Pay+' · ≥'+hoT3+'% = +฿'+hoT3Bon;
+      var hd=src.handover_detail;
+      var baseMon=hd.baseline_gmv>=1000?'฿'+(hd.baseline_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.baseline_gmv);
+      var currMon=hd.current_gmv>=1000?'฿'+(hd.current_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.current_gmv);
+      return hd.accounts+' ร้าน · '+baseMon+' → '+currMon+' ('+hd.retention_pct+'%)';
+    })();
     var hoRowHtml=cRow('#bcd7ff','Handover',hoSub,src.handover,'#bcd7ff','_commDrillHandover()');
 
     var subtotalAmt=(src.nrr||0)+(src.upsell_sku||0)+(src.upsell_outlet||0)+(src.handover||0);
