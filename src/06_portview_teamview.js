@@ -1899,7 +1899,11 @@ function renderTeamviewKamList(){
 const _kamPayoutCache = {};
 let _kamPayoutCacheKey = '';
 function _getCachedKamPayout(kamEmail) {
-  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'');
+  // v232-fix: include bulkUpsellTeamData size in key.
+  // Bug: fast-path uses bulkUpsellTeamData but key only tracked bulkUpsellData.loaded
+  // → cache hit after upsell_team loads → stale result (NRR only, no upsell) returned forever.
+  const _utN = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
+  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN;
   if (_kamPayoutCacheKey !== cacheKey) {
     Object.keys(_kamPayoutCache).forEach(k => delete _kamPayoutCache[k]);
     _kamPayoutCacheKey = cacheKey;
