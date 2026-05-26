@@ -25654,16 +25654,31 @@ function _commComputeUpsellOutlet(kamEmail) {
 
     let newGmv = 0, comebackGmv = 0;
 
-    // MTD mode — actual GMV, no projection
+    // v2: outlet-level loop (account → outlet → groupKey)
+    // legacy fallback: if structure is old (account → groupKey), wrap outlet as _all
     Object.keys(kamData).forEach(accountId => {
-      const acctGroups = kamData[accountId];
-      const acctBaseline = baselineSet[accountId] || new Set();
-      Object.keys(acctGroups).forEach(groupKey => {
-        if (!acctBaseline.has(groupKey)) return; // skip P1 — already counted
-        const currRow = (acctGroups[groupKey] || {})[currLabel];
-        if (!currRow) return;
-        newGmv      += (currRow.newGmv      || 0); // actual MTD
-        comebackGmv += (currRow.comebackGmv || 0); // actual MTD
+      const acctData = kamData[accountId];
+      const baselineByOutlet = baselineSet[accountId] || {};
+      const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
+
+      const firstVal = acctData[Object.keys(acctData)[0]];
+      const isNewFormat = firstVal && typeof firstVal === 'object' &&
+                          !Object.values(firstVal)[0]?.[currLabel] &&
+                          Object.values(firstVal)[0] && typeof Object.values(Object.values(firstVal)[0])[0] === 'object';
+      const outletMap = isNewFormat ? acctData : { _all: acctData };
+
+      Object.keys(outletMap).forEach(outletId => {
+        const outletGroups = outletMap[outletId];
+        const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set
+          ? baselineByOutlet[outletId] : new Set());
+
+        Object.keys(outletGroups).forEach(groupKey => {
+          if (!outletBaseline.has(groupKey)) return; // skip P1 — already counted at 3%
+          const currRow = (outletGroups[groupKey] || {})[currLabel];
+          if (!currRow) return;
+          newGmv      += (currRow.newGmv      || 0);
+          comebackGmv += (currRow.comebackGmv || 0);
+        });
       });
     });
 
