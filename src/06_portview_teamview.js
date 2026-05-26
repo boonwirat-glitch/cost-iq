@@ -1926,6 +1926,33 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
     }
   }
 
+  // v231-fix: if upsell_team not in memory, backfill from R2 before rendering.
+  // Root cause: IDB-FAST path skips upsell_team when not in IDB cache, and R2 fetch
+  // can silently fail (AbortSignal / timeout) with no retry in teamview.
+  // The v230-fix in _commOpenTlDetailSheet handles this only on commission cockpit open.
+  // This fix gives teamview its own one-shot self-heal so shimmer resolves automatically.
+  const _upsellTeamNow = typeof bulkUpsellTeamData !== 'undefined' &&
+                         bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
+  if (!_upsellTeamNow && !window._tvUpsellFetchInFlight) {
+    window._tvUpsellFetchInFlight = true;
+    const _canFetch = typeof _fetchCloudflareFile === 'function' &&
+                      typeof R2_SPECS !== 'undefined' && R2_SPECS && R2_SPECS['upsell_team'];
+    if (_canFetch) {
+      _fetchCloudflareFile(R2_SPECS['upsell_team'], {force:true}).finally(function(){
+        window._tvUpsellFetchInFlight = false;
+        // ingestCSVText callback already calls renderTeamview() — this is a safety-net
+        // for cases where the tab wasn't active during the callback.
+        try{
+          if(typeof renderTeamviewKamList==='function' &&
+             document.getElementById('scr-teamview')?.classList.contains('on'))
+            renderTeamviewKamList();
+        }catch(e){}
+      });
+    } else {
+      window._tvUpsellFetchInFlight = false;
+    }
+  }
+
   const groups=_buildKamGroups();
   // Pre-fetch visit data from Supabase for TL/Admin (so "ทำการบ้าน" shows KAM's actual visits)
   const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin');
