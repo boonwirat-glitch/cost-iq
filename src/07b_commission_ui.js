@@ -3093,11 +3093,11 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     function mon(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'฿'+(n/1000).toFixed(0)+'K';return'฿'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
-    // Group by outletId
+    // Group by outletId — include account for name lookup
     var byOutlet={};
     groups.forEach(function(g){
       var key=g.outletId||'_all';
-      if(!byOutlet[key])byOutlet[key]={outletId:key,items:[],totalComm:0,totalPrimary:0};
+      if(!byOutlet[key])byOutlet[key]={outletId:key,accountId:g.accountId||'',items:[],totalComm:0,totalPrimary:0};
       byOutlet[key].items.push(g);
       byOutlet[key].totalComm+=g.commission||0;
       byOutlet[key].totalPrimary+=type==='p1'?(g.total_gmv||0):(g.incremental||0);
@@ -3105,63 +3105,86 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var outlets=Object.values(byOutlet).sort(function(a,b){return b.totalComm-a.totalComm;});
     var totalComm=groups.reduce(function(s,g){return s+(g.commission||0);},0);
     var totalOutlets=outlets.length;
-    var primaryLabel=type==='p1'?'GMV':'Incr';
 
-    var outletRows=outlets.map(function(o,i){
-      var oid='pvd'+i;
-      var skuRows=o.items.map(function(g){
-        if(type==='p1'){
-          return '<div style="display:grid;grid-template-columns:1fr 60px 56px;padding:7px 16px 7px 28px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center">'
-            +'<span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</span>'
-            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.total_gmv)+'</span>'
-            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
-            +'</div>';
-        } else {
-          return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 28px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center;gap:2px">'
-            +'<div><div style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</div>'
-            +(g.max_baseline_month?'<div style="font-size:9px;color:rgba(225,238,255,.28);margin-top:1px">Base: '+es(g.max_baseline_month)+'</div>':'')+'</div>'
-            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.55)">'+mon(g.max_baseline||0)+'</span>'
-            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.incremental)+'</span>'
-            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
-            +'</div>';
-        }
+    var allExpandedInitially=totalOutlets<=5; // auto-expand if few
+    var expandState={}; // outletId → bool
+    outlets.forEach(function(o,i){expandState['pvd'+i]=allExpandedInitially;});
+    window._pvDrillExpandState=expandState;
+
+    function buildRows(expanded){
+      return outlets.map(function(o,i){
+        var oid='pvd'+i;
+        var oName=_pvOutletName(o.outletId, o.accountId);
+        var isOpen=expanded?true:(window._pvDrillExpandState[oid]||false);
+        var skuRows=o.items.map(function(g){
+          if(type==='p1'){
+            return '<div style="display:grid;grid-template-columns:1fr 64px 56px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center">'
+              +'<span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.total_gmv)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
+              +'</div>';
+          } else {
+            return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center;gap:2px">'
+              +'<div><div style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</div>'
+              +(g.max_baseline_month?'<div style="font-size:9px;color:rgba(225,238,255,.28);margin-top:1px">Base: '+es(g.max_baseline_month)+'</div>':'')+'</div>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.50)">'+mon(g.max_baseline||0)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.incremental)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
+              +'</div>';
+          }
+        }).join('');
+        var colsHd=type==='p1'?'grid-template-columns:1fr 64px 56px':'grid-template-columns:1fr 52px 56px 52px';
+        var amtCols=type==='p1'
+          ?('<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+            +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>')
+          :('<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;color:rgba(188,215,255,.35)">—</span>'
+            +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+            +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>');
+        return '<div>'
+          +'<div style="display:grid;'+colsHd+' 20px;padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.03)" '
+          +'onclick="_commToggleDrillOutlet(\''+oid+'\')">'
+          +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(oName)+'</div>'
+          +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+o.items.length+' กลุ่มสินค้า</div></div>'
+          +amtCols
+          +'<span id="pvdchev'+i+'" style="font-size:14px;color:rgba(188,215,255,.28);transition:transform 150ms;text-align:right'+(isOpen?';transform:rotate(90deg);color:rgba(188,215,255,.55)':'')+'">›</span>'
+          +'</div>'
+          +'<div id="'+oid+'" style="display:'+(isOpen?'block':'none')+'">'+skuRows+'</div>'
+          +'</div>';
       }).join('');
-      var colsHd=type==='p1'?'grid-template-columns:1fr 60px 56px':'grid-template-columns:1fr 52px 56px 52px';
-      return '<div>'
-        +'<div style="display:grid;'+colsHd+';padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.03)" onclick="_commToggleDrillOutlet(\''+oid+'\')">'
-        +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(o.outletId!=='_all'?o.outletId:'Outlet ไม่ระบุ')+'</div>'
-        +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+o.items.length+' กลุ่มสินค้า</div></div>'
-        +(type==='p1'
-          ?'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
-          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>'
-          :'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.35)">—</span>'
-          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
-          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>')
-        +'<span id="pvdchev'+i+'" style="font-size:14px;color:rgba(188,215,255,.28);transition:transform 150ms;text-align:right;grid-column:none">›</span>'
-        +'</div>'
-        +'<div id="'+oid+'" style="display:none">'+skuRows+'</div>'
-        +'</div>';
-    }).join('');
+    }
+
+    window._pvDrillRebuild=function(expandAll){
+      outlets.forEach(function(_,i){window._pvDrillExpandState['pvd'+i]=expandAll;});
+      var list=document.getElementById('pvDrillList');
+      if(list)list.innerHTML=buildRows(expandAll);
+      var btn=document.getElementById('pvDrillToggleBtn');
+      if(btn){
+        var anyOpen=expandAll||outlets.some(function(_,i){return window._pvDrillExpandState['pvd'+i];});
+        btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+      }
+    };
 
     var colsHdStr=type==='p1'
       ?'<span>Outlet</span><span style="text-align:right">GMV</span><span style="text-align:right">Comm</span>'
       :'<span>Outlet</span><span style="text-align:right">Base</span><span style="text-align:right">Incr</span><span style="text-align:right">Comm</span>';
-    var colsHdGrid=type==='p1'?'grid-template-columns:1fr 60px 56px':'grid-template-columns:1fr 52px 56px 52px';
+    var colsHdGrid=type==='p1'?'grid-template-columns:1fr 64px 56px 20px':'grid-template-columns:1fr 52px 56px 52px 20px';
 
-    var html='<div class="pv-comm-sheet">'
-      +'<div class="pv-comm-sheet-handle"></div>'
-      +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
+      +'<div style="flex-shrink:0"><div class="pv-comm-sheet-handle"></div>'
+      +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<button onclick="_commDrillBack()" style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.78);font-size:15px;cursor:pointer;font-family:inherit">‹</button>'
       +'<div style="flex:1"><div style="font-size:15px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px">'+es(titleLabel)
       +'<span style="font-size:9px;font-weight:850;padding:3px 8px;border-radius:999px;background:'+badgeColor+';color:'+badgeText+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">× 3%</span></div></div>'
       +'<button onclick="_commCloseKamSelfSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.42);font-size:13px;cursor:pointer;font-family:inherit">✕</button>'
       +'</div>'
-      +'<div style="padding:10px 16px;display:flex;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
-      +'<div style="flex:1;text-align:center"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+totalOutlets+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">outlet</div></div>'
-      +'<div style="flex:1;text-align:center;border-left:1px solid rgba(188,215,255,.08)"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(totalComm)+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">commission</div></div>'
+      +'<div style="padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid rgba(188,215,255,.10)">'
+      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+totalOutlets+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">outlet</div></div>'
+      +'<div style="flex:1;text-align:center"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(totalComm)+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">commission</div></div>'
+      +'<button id="pvDrillToggleBtn" onclick="_pvDrillRebuild(this.textContent===\'ขยายทั้งหมด\')" style="flex-shrink:0;margin-left:12px;padding:5px 10px;border-radius:8px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.65);font-size:11px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">'+(allExpandedInitially?'ย่อทั้งหมด':'ขยายทั้งหมด')+'</button>'
       +'</div>'
-      +'<div style="display:grid;'+colsHdGrid+';padding:6px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(188,215,255,.10);font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:rgba(225,238,255,.35);font-family:\'IBM Plex Mono\',monospace;flex-shrink:0">'+colsHdStr+'</div>'
-      +'<div style="overflow-y:auto;flex:1">'+outletRows+'</div>'
+      +'<div style="display:grid;'+colsHdGrid+';padding:6px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(188,215,255,.10);font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:rgba(225,238,255,.35);font-family:\'IBM Plex Mono\',monospace">'+colsHdStr+'<span></span></div>'
+      +'</div>'
+      +'<div id="pvDrillList" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+buildRows(false)+'</div>'
       +'<div style="display:flex;gap:8px;padding:10px 16px 16px;flex-shrink:0;border-top:1px solid rgba(188,215,255,.10)">'
       +'<button onclick="_commExportAuditCSV(\''+type+'\')" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.78);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↓ ดาวน์โหลด CSV</button>'
       +'</div>'
@@ -3189,9 +3212,17 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(!el)return;
     var open=el.style.display!=='none';
     el.style.display=open?'none':'block';
-    // find chevron by sibling (last element in parent row)
-    var row=el.previousElementSibling;
-    if(row){var chev=row.querySelector('[id^="pvdchev"]');if(chev){chev.style.transform=open?'':'rotate(90deg)';chev.style.color=open?'rgba(188,215,255,.28)':'rgba(188,215,255,.55)';}}
+    if(window._pvDrillExpandState)window._pvDrillExpandState[oid]=!open;
+    // update chevron
+    var idx=oid.replace('pvd','');
+    var chev=document.getElementById('pvdchev'+idx);
+    if(chev){chev.style.transform=open?'':'rotate(90deg)';chev.style.color=open?'rgba(188,215,255,.28)':'rgba(188,215,255,.55)';}
+    // update toggle button label
+    var btn=document.getElementById('pvDrillToggleBtn');
+    if(btn&&window._pvDrillExpandState){
+      var anyOpen=Object.values(window._pvDrillExpandState).some(function(v){return v;});
+      btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+    }
   };
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
@@ -3289,9 +3320,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // If only one type has data, go directly
     if(p1g.length&&!p3g.length){window._commOpenUpsellDrill('p1');return;}
     if(p3g.length&&!p1g.length){window._commOpenUpsellDrill('p3');return;}
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
       +_pvDrillHeader('กลุ่มสินค้าใหม่ + ยอดเติบโต','','','')
-      +'<div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">'
+      +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:16px 18px;display:flex;flex-direction:column;gap:10px">'
       +(p1g.length?'<div onclick="_commOpenUpsellDrill(\'p1\')" style="padding:16px;border-radius:12px;background:rgba(77,220,151,.08);border:1px solid rgba(77,220,151,.2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
         +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
         +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
@@ -3308,29 +3339,84 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     _pvPushDrill(html);
   };
 
-  // New/Comeback drill
+  // New/Comeback drill — outlet breakdown
   window._commDrillNewComeback=function(){
     var src=window._pvCommDrillSrc||{};
+    var st=window._pvCommDrillSt||{};
     var cfg=window._pvCommDrillCfg||{};
     var od=src.upsell_outlet_detail||{};
     function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column">'
-      +_pvDrillHeader('New/Comeback','× '+cfg.outRate+'%','rgba(188,215,255,.10)','#bcd7ff')
-      +'<div style="padding:14px 18px">'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
+
+    // Build outlet-level breakdown from kamData + baselineGroups
+    var kamEmail=st.email||'';
+    var ncRows=[];
+    try{
+      if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&bulkUpsellData.byKam){
+        var _pvRow=portviewBulkData&&portviewBulkData.find(function(r){return r.kamEmail===kamEmail;});
+        var _kamKey=(_pvRow&&_pvRow.kamName)?_pvRow.kamName:kamEmail;
+        var kamData=bulkUpsellData.byKam[_kamKey]||bulkUpsellData.byKam[kamEmail]||{};
+        if(!Object.keys(kamData).length){
+          var fk=Object.keys(bulkUpsellData.byKam).find(function(k){return k.startsWith(_kamKey)||_kamKey.startsWith(k);});
+          if(fk)kamData=bulkUpsellData.byKam[fk];
+        }
+        var baselineGroups=bulkUpsellData.baselineGroups||{};
+        var baselineSet=baselineGroups[_kamKey]||baselineGroups[kamEmail]||{};
+        if(!Object.keys(baselineSet).length){
+          var fk2=Object.keys(baselineGroups).find(function(k){return k.startsWith(_kamKey)||_kamKey.startsWith(k);});
+          if(fk2)baselineSet=baselineGroups[fk2];
+        }
+        var currLabel=(typeof _commCurrentMonthLabel==='function'?_commCurrentMonthLabel():'');
+        Object.keys(kamData).forEach(function(accountId){
+          var acctData=kamData[accountId];
+          var baselineByOutlet=baselineSet[accountId]||{};
+          var legacySet=baselineByOutlet instanceof Set?baselineByOutlet:null;
+          var firstVal=acctData[Object.keys(acctData)[0]];
+          var isNew=firstVal&&typeof firstVal==='object'&&!Object.values(firstVal)[0]?.[currLabel]&&Object.values(firstVal)[0]&&typeof Object.values(Object.values(firstVal)[0])[0]==='object';
+          var outletMap=isNew?acctData:{_all:acctData};
+          Object.keys(outletMap).forEach(function(outletId){
+            var outletGroups=outletMap[outletId];
+            var outletBs=legacySet||(baselineByOutlet[outletId] instanceof Set?baselineByOutlet[outletId]:new Set());
+            var oNew=0,oCome=0;
+            Object.keys(outletGroups).forEach(function(groupKey){
+              if(!outletBs.has(groupKey))return;
+              var cr=(outletGroups[groupKey]||{})[currLabel];
+              if(!cr)return;
+              oNew+=(cr.newGmv||0);oCome+=(cr.comebackGmv||0);
+            });
+            if(oNew+oCome>0) ncRows.push({outletId:outletId,accountId:accountId,newGmv:oNew,comebackGmv:oCome});
+          });
+        });
+        ncRows.sort(function(a,b){return(b.newGmv+b.comebackGmv)-(a.newGmv+a.comebackGmv);});
+      }
+    }catch(e){console.warn('nc drill',e);}
+
+    var rowsHtml=ncRows.map(function(r){
+      var oName=_pvOutletName(r.outletId,r.accountId);
+      var total=r.newGmv+r.comebackGmv;
+      var types=[];
+      if(r.newGmv>0)types.push('<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(77,220,151,.12);color:#4ddc97;font-weight:700">New '+mon(r.newGmv)+'</span>');
+      if(r.comebackGmv>0)types.push('<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(255,224,138,.10);color:#ffe08a;font-weight:700">Comeback '+mon(r.comebackGmv)+'</span>');
+      return '<div style="padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.07);display:flex;align-items:center;justify-content:space-between">'
+        +'<div><div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.88)">'+es(oName)+'</div>'
+        +'<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'+types.join('')+'</div></div>'
+        +'<div style="text-align:right;flex-shrink:0;margin-left:12px">'
+        +'<div style="font-size:13px;font-weight:900;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(total)+'</div>'
+        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'0.015'))||0.015)))+'</div>'
+        +'</div></div>';
+    }).join('');
+
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
+      +_pvDrillHeader('New/Comeback','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
+      +'<div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">New GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.new_gmv||0)+'</div></div>'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Comeback GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.comeback_gmv||0)+'</div></div>'
       +'</div>'
-      +'<div style="background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:10px;padding:12px 14px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-      +'<span style="font-size:12px;color:rgba(225,238,255,.65)">GMV รวม</span>'
-      +'<span style="font-size:14px;font-weight:700;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(od.outlet_gmv||0)+'</span>'
-      +'</div>'
-      +'<div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<span style="font-size:12px;color:rgba(225,238,255,.65)">Commission (× '+cfg.outRate+'%)</span>'
-      +'<span style="font-size:15px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(src.upsell_outlet||0)+'</span>'
-      +'</div></div>'
-      +'<div style="font-size:11px;color:rgba(225,238,255,.35);margin-top:10px;line-height:1.6">นับเฉพาะ new_gmv และ comeback_gmv ของ group_key ที่ไม่ใช่กลุ่มสินค้าใหม่ (P1)</div>'
+      +(ncRows.length?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:\'IBM Plex Mono\',monospace;flex-shrink:0">รายละเอียด outlet</div>':'')
+      +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+rowsHtml+'</div>'
+      +'<div style="padding:10px 16px;border-top:1px solid rgba(188,215,255,.10);display:flex;justify-content:space-between;flex-shrink:0">'
+      +'<span style="font-size:13px;color:rgba(225,238,255,.75)">Commission (× '+(cfg.outRate||'1.5')+'%)</span>'
+      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(src.upsell_outlet||0)+'</span>'
       +'</div></div>';
     _pvPushDrill(html);
   };
