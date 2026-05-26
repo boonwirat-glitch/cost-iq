@@ -925,6 +925,25 @@ function _commCloseKamSelfSheet() {
 function _commOpenTlDetailSheet() {
   const role = getCurrentRole ? getCurrentRole() : '';
   if (!isTLRole(role) && !isAdminRole(role)) return;
+  // v229-fix: if upsell_team not yet loaded (first session, not in IDB cache),
+  // await _cloudInitialPromise so kamRows include upsell before rendering
+  const _upsellTeamReady = typeof bulkUpsellTeamData !== 'undefined' &&
+                           bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
+  if (!_upsellTeamReady && typeof _cloudInitialPromise !== 'undefined' && _cloudInitialPromise) {
+    Promise.resolve(_cloudInitialPromise).then(() => _commOpenTlDetailSheet()).catch(() => _commOpenTlDetailSheet());
+    // Show brief loading overlay while waiting
+    let _tmpOv = document.getElementById('pv-comm-tl-sheet-overlay');
+    if (!_tmpOv) {
+      _tmpOv = document.createElement('div');
+      _tmpOv.id = 'pv-comm-tl-sheet-overlay';
+      _tmpOv.className = 'pv-comm-sheet-overlay';
+      _tmpOv.onclick = function(e){ if(e.target===_tmpOv) _commCloseTlDetailSheet(); };
+      document.body.appendChild(_tmpOv);
+    }
+    _tmpOv.innerHTML = '<div class="pv-comm-sheet"><div class="pv-comm-sheet-handle"></div><div class="pv-comm-sheet-body" style="display:flex;align-items:center;justify-content:center;min-height:160px"><div style="text-align:center;color:rgba(188,215,255,.7);font-size:13px">กำลังโหลดข้อมูล upsell...<br><span style="font-size:11px;opacity:.6">ใช้เวลาไม่กี่วินาที</span></div></div></div>';
+    requestAnimationFrame(() => _tmpOv.classList.add('on'));
+    return;
+  }
   let ov = document.getElementById('pv-comm-tl-sheet-overlay');
   if (!ov) {
     ov = document.createElement('div');
@@ -984,7 +1003,7 @@ function _commOpenTlDetailSheet() {
           <div class="pv-comm-sheet-kpi-label">TL ได้</div>
           <div class="pv-comm-sheet-kpi-val">${fmtP(tlPayout.final_payout)}</div>
         </div>
-        <div class="pv-comm-sheet-kpi">
+        <div class="pv-comm-sheet-kpi val-bonus">
           <div class="pv-comm-sheet-kpi-label">KAM ทีมรวม</div>
           <div class="pv-comm-sheet-kpi-val">${fmtP(summary.kamPayout)}</div>
         </div>
@@ -1027,7 +1046,7 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
     .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;grid-column:1}
     .pv-comm-tl-kam-nrr{font-size:11px;color:rgba(255,255,255,.55);text-align:right;grid-row:1;grid-column:2}
     .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;text-align:right;grid-row:1;grid-column:3}
-    .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:10px;color:rgba(255,255,255,.48);line-height:1.4}
+    .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:10px;color:rgba(255,255,255,.72);line-height:1.4}
   `;
   (document.head || document.body).appendChild(s);
 })();
