@@ -22100,11 +22100,12 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     var _tvCommN=(typeof window._tgtCache!=='undefined'&&window._tgtCache)?Object.keys(window._tgtCache).length:0;
     var _tvVisitN=window._tvVisitMap
       ?Object.values(window._tvVisitMap).reduce(function(s,v){return s+Object.keys(v||{}).length;},0):-1;
+    var _tvUpsellN=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
     var _tvKey=[
       typeof tvViewMode!=='undefined'?tvViewMode:'full',
       typeof teamviewLevel!=='undefined'?(teamviewLevel||''):'',
       typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
-      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN
+      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN
     ].join('|');
     if(el._lastTvListKey===_tvKey&&el.children.length>0){
       try{window._senseDataLog('TEAMVIEW','⚡ value guard — skip repaint (unchanged)');}catch(e){}
