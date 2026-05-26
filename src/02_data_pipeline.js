@@ -899,6 +899,10 @@ function handleFileUpload(type,input){
         const _baselineLabel=_thMonths[new Date(_now.getFullYear(),_now.getMonth()-1,1).getMonth()]+' '+(new Date(_now.getFullYear(),_now.getMonth()-1,1).getFullYear()+543);
         // v2: current month label — any row NOT current month = lookback → baseline
         const _currLabel=_thMonths[_now.getMonth()]+' '+(_now.getFullYear()+543);
+        // v233-fix: P1 baseline = exactly 3 months (M-1, M-2, M-3) matching P3 window.
+        // Bug: previously used ALL non-current months → ม.ค. (4 months ago) was included
+        // → outlet that bought in ม.ค. then stopped 3 months was wrongly classified as existing.
+        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
         // v2: detect CSV format — 9 cols = new (has outlet_id), 8 cols = legacy
         const _sampleCols=(lines[0]||'').split(',').length;
         const _hasOutlet=_sampleCols>=9;
@@ -932,9 +936,8 @@ function handleFileUpload(type,input){
           if(!byKam[kamEmail][accountId][outletId])byKam[kamEmail][accountId][outletId]={};
           if(!byKam[kamEmail][accountId][outletId][groupKey])byKam[kamEmail][accountId][outletId][groupKey]={};
           byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,newGmv,comebackGmv,totalGmv};
-          // v2 baselineGroups: outlet-level, 3-month lookback
-          // any row that is NOT current month = lookback row → marks as baseline for P1 detection
-          if(monthLabel!==_currLabel && totalGmv>0){
+          // v233-fix: only months within 3-month window qualify as P1 baseline
+          if(monthLabel!==_currLabel && totalGmv>0 && _p1BaselineLabels.has(monthLabel)){
             if(!baselineGroups[kamEmail])baselineGroups[kamEmail]={};
             if(!baselineGroups[kamEmail][accountId])baselineGroups[kamEmail][accountId]={};
             if(!baselineGroups[kamEmail][accountId][outletId])baselineGroups[kamEmail][accountId][outletId]=new Set();
