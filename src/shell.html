@@ -4543,7 +4543,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
         skus: 'bulk_skus.csv',
         alternatives: 'bulk_alternatives.csv',
         price: 'bulk_price.csv',
-        handover: 'portview_handover.csv'
+        handover: 'portview_handover.csv',
+        upsell_team: 'sense_upsell_team.csv'
       }),
       r2Specs: Object.freeze({
         portview: Object.freeze({type:'portview-bulk',tab:'portview',cache:false,freshness:'network-first'}),
@@ -4554,7 +4555,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
         skus: Object.freeze({type:'bulk-skus',tab:'skus',cache:false,heavy:true}),
         alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true}),
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
-        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true}) // v224d: cache:true so IDB fast path works
+        handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true}), // v224d: cache:true so IDB fast path works
+        upsell_team: Object.freeze({type:'bulk-upsell-team',tab:'upsell_team',cache:true}) // v230: was missing from config → R2_SPECS['upsell_team'] was undefined
       })
     }),
     legacySheets: Object.freeze({
@@ -8344,7 +8346,7 @@ flex-wrap:wrap;}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.10);
 }
 .tv-signal-card.commission::before{
-  content:'฿';position:absolute;right:12px;top:10px;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:rgba(255,224,138,.30);
+  content:none;display:none;
 }
 .tv-signal-card.commission .tv-signal-label{color:rgba(255,224,138,.80)}
 .tv-signal-card.commission .tv-signal-value{color:#ffe08a}
