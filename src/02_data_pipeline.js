@@ -865,8 +865,9 @@ function handleFileUpload(type,input){
         const cnt=Object.keys(team).length;
         const b=document.getElementById('badge-bulk-upsell-team');
         if(b){b.textContent='✓ '+cnt+' KAMs';b.className='dp-slot-badge ok';}
-        // TL multiplier card can now render
-        try{ if(typeof _tgtRenderTeamGovCard==='function' && typeof renderTeamview==='function')renderTeamview(); }catch(e){}
+        // TL multiplier card — only render directly if splash is already gone
+        // (if splash active, RenderBus will fire one consolidated render after doFade)
+        try{ if(typeof renderTeamview==='function' && !window._senseSplashActive)renderTeamview(); }catch(e){}
       }catch(err){
         console.warn('[Q3C team] parse error',err);
         bulkUpsellTeamData={};
@@ -1815,7 +1816,8 @@ function allCriticalReady(){
   try{
     return _cloudLoadedTabs.has('portview') &&
            _cloudLoadedTabs.has('history') &&
-           _cloudLoadedTabs.has('handover');
+           _cloudLoadedTabs.has('handover') &&
+           _cloudLoadedTabs.has('upsell_team'); // v231: gate on upsell_team so commission renders complete on first paint
   }catch(e){return false;}
 }
 
