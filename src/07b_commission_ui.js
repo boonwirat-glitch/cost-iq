@@ -2980,41 +2980,96 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(src.gate&&src.gate.ach_pct!==null&&src.gate.ach_pct!==undefined){
       var gPct=src.gate.ach_pct;
       var gCapPct=Math.round(src.gate_cap*100);
-      var gRule=gPct>=gT1?"≥"+gT1+"% → ไม่มี cap":gPct>=gT2?gT2+"–"+gT1+"% → cap "+gC1+"%":"<"+gT2+"% → cap "+gC2+"%";
-      var gRowCls="pv-comm-source-row"+(src.gate_active?" gate-warn":"");
-      gateRow=srcRow(gRowCls,"NRR Gate"+(src.gate_active?" ⚠":""),"NRR "+gPct+"% · "+gRule,"<span class=\""+(src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
+    }else{ var gPct=st.pct||null; var gCapPct=100; }
+
+    var loadNote=src.loading?'<div style="font-size:11px;color:#ffe08a;padding:6px 18px">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>':'';
+    var kpiCls=finalAmt>0?'val-bonus':'';
+    var nowStr=(function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();})();
+
+    // Store drill data for drill functions
+    window._pvCommDrillSt=st; window._pvCommDrillSrc=src;
+    window._pvCommDrillCfg={p1Rate:p1Rate,p3Rate:p3Rate,p3ThreshPct:p3ThreshPct,outRate:outRate,hoT2:hoT2,hoT3:hoT3,hoT2Pay:hoT2Pay,hoT3Bon:hoT3Bon,tierRows:tierRows,action:action};
+
+    // Clean component row builder
+    function cRow(dot,label,sub,amt,amtColor,drillFn){
+      var hasAmt=Number(amt||0)>0;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.07);'+(drillFn?'cursor:pointer':'')+'"'
+        +(drillFn?' onclick="'+drillFn+'" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'"':'')+'>'
+        +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px;background:'+dot+'"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88);line-height:1.25">'+label+'</div>'
+        +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:2px">'+sub+'</div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">'
+        +'<span style="font-size:14px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.02em;color:'+(hasAmt?amtColor:'rgba(225,238,255,.25)')+'">'+money(amt||0)+'</span>'
+        +(drillFn?'<span style="font-size:16px;color:rgba(188,215,255,.28)">›</span>':'')
+        +'</div></div>';
     }
 
-    var loadNote=src.loading?"<div style=\"font-size:11px;color:#ffe08a;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
-    var kpiCls=finalAmt>0?"val-bonus":"";
-    var safeEmail=(st.email||"").replace(/'/g,"\\'");
-    var auditBtn=typeof _commBuildKamAuditSql==="function"&&st.email
-      ?'<button class="comm-secondary" style="font-size:11px;padding:5px 10px;margin-left:8px" onclick="_commCopyAuditSql({email:\''+safeEmail+'\'})">ตรวจรายละเอียด</button>'
+    // Row definitions
+    var nrrSub='NRR '+pctText+' · '+esc(st.tierLabel||st.ruleName||'—');
+    if(st.next)nrrSub+=' · ต้องอีก +'+(Number(st.next.min_value)-Number(st.pct||0)).toFixed(1)+'pts';
+    var nrrRowHtml=cRow('#4ddc97','NRR Commission',nrrSub,src.nrr,'#4ddc97','_commDrillNRR()');
+
+    var upsellSub=(p1g&&p1g.length?'กลุ่มสินค้าใหม่ '+p1g.length+' รายการ':'')+(p1g&&p1g.length&&p3g&&p3g.length?' · ':'')+(p3g&&p3g.length?'ยอดเติบโต '+p3g.length+' รายการ':'');
+    if(!upsellSub)upsellSub='กลุ่มสินค้าใหม่ '+p1Rate+'% · ยอดเติบโต >'+p3ThreshPct+'% → '+p3Rate+'%';
+    var upsellHasDrill=!!(p1g&&p1g.length||p3g&&p3g.length);
+    var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
+
+    var ncSub='สาขาใหม่/comeback × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
+    var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff',src.upsell_outlet>0?'_commDrillNewComeback()':null);
+
+    var hoSub=src.handover_detail?'retention '+src.handover_detail.retention_pct+'% · '+src.handover_detail.accounts+' ร้าน':'≥'+hoT2+'% = ฿'+hoT2Pay+' · ≥'+hoT3+'% = +฿'+hoT3Bon;
+    var hoRowHtml=cRow('#bcd7ff','Handover',hoSub,src.handover,'#bcd7ff','_commDrillHandover()');
+
+    var subtotalAmt=(src.nrr||0)+(src.upsell_sku||0)+(src.upsell_outlet||0)+(src.handover||0);
+    var gateOk2=!src.gate_active;
+    var gateCardHtml='<div style="margin:0 18px 12px;background:'+(gateOk2?'rgba(77,220,151,.08)':'rgba(240,80,0,.08)')+';border:1px solid '+(gateOk2?'rgba(77,220,151,.2)':'rgba(240,80,0,.2)')+';border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">'
+      +'<div><div style="font-size:12px;color:rgba(225,238,255,.78)">NRR Gate</div>'
+      +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct||'—')+'% '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
+      +'<span style="font-size:13px;font-weight:900;color:'+(gateOk2?'#4ddc97':'#ff6b3d')+';font-family:\'IBM Plex Mono\',monospace">× '+gCapPct+'% '+(gateOk2?'✓':'⚠')+'</span></div>';
+
+    var heroHtml='<div style="padding:18px;text-align:center">'
+      +'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.12em;color:rgba(188,215,255,.55);font-family:\'IBM Plex Mono\',monospace;margin-bottom:5px">Final Payout</div>'
+      +'<div style="font-size:36px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.025em;text-shadow:0 0 24px rgba(255,224,138,.15);line-height:1.1">'+money(finalAmt)+'</div>'
+      +(!src.loading?'<div style="font-size:11px;color:#4ddc97;margin-top:5px;font-weight:700">ตรงกับ commission panel ✓</div>':'')
+      +'</div>';
+
+    var exportBtnHtml=(src.upsell_sku>0||src.upsell_outlet>0)
+      ?'<button onclick="_commExportAuditCSV()" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:12px;border-radius:10px;background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.78);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">↓ Export audit CSV</button>'
       :'';
 
     var html=[
-      "<div class=\"pv-comm-sheet\">",
-      "<div class=\"pv-comm-sheet-handle\"></div>",
-      "<div class=\"pv-comm-sheet-body\">",
-      "<div class=\"pv-comm-sheet-title\">วิธีคิดค่าคอมฯ</div>",
-      "<div class=\"pv-comm-sheet-sub\">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา · คำนวณ "+(function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();})()+"</div>",
+      '<div class="pv-comm-sheet">',
+      '<div class="pv-comm-sheet-handle"></div>',
+      '<div style="overflow-y:auto">',
       loadNote,
-      "<div class=\"pv-comm-sheet-kpis\">",
-      "<div class=\"pv-comm-sheet-kpi ",kpiCls,"\"><div class=\"pv-comm-sheet-kpi-label\">ค่าคอมฯ สุทธิ์</div><div class=\"pv-comm-sheet-kpi-val\">",money(finalAmt),"</div></div>",
-      "<div class=\"pv-comm-sheet-kpi\"><div class=\"pv-comm-sheet-kpi-label\">NRR</div><div class=\"pv-comm-sheet-kpi-val\">",esc(pctText),"</div></div>",
-      "</div>",
-      "<div class=\"pv-comm-source-table\">",nrrRow,upsellSkuRow,upsellOutRow,handoverRow,gateRow,"</div>",
-      "<div class=\"pv-comm-section-label\" style=\"margin-top:12px\">เกณฑ์ NRR</div>",
-      "<div class=\"pv-comm-tier-table\">",tierRows,"</div>",
-      "<div class=\"pv-comm-action-note\">",esc(action),"</div>",
-      "<div class=\"pv-comm-sheet-close-row\">",
-      "<button class=\"pv-comm-sheet-close\" onclick=\"_commCloseKamSelfSheet()\">ปิด</button>",
-      (src.upsell_sku>0||src.upsell_outlet>0)?"<button class=\"comm-secondary\" style=\"font-size:11px;padding:5px 10px;margin-left:8px\" onclick=\"_commExportAuditCSV()\">↓ Export CSV</button>":"",
-      auditBtn,"</div>",
-      "</div></div>"
-    ].join("");
+      '<div style="padding:14px 18px 0;display:flex;align-items:flex-start;justify-content:space-between">',
+      '<div><div style="font-size:17px;font-weight:900;color:#fff">วิธีคิดค่าคอมฯ</div>',
+      '<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">สรุปตามแหล่งที่มา · คำนวณ '+nowStr+'</div></div>',
+      '<button onclick="_commCloseKamSelfSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.42);font-size:13px;cursor:pointer;flex-shrink:0;font-family:inherit;margin-top:2px">✕</button>',
+      '</div>',
+      '<div class="pv-comm-sheet-kpis" style="margin:12px 18px 14px">',
+      '<div class="pv-comm-sheet-kpi '+kpiCls+'"><div class="pv-comm-sheet-kpi-label">ค่าคอมฯ สุทธิ์</div><div class="pv-comm-sheet-kpi-val">'+money(finalAmt)+'</div></div>',
+      '<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">NRR</div><div class="pv-comm-sheet-kpi-val">'+esc(pctText)+'</div></div>',
+      '</div>',
+      '<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:2px 18px 6px;font-family:\'IBM Plex Mono\',monospace">ที่มาของยอด</div>',
+      nrrRowHtml,upsellRowHtml,ncRowHtml,hoRowHtml,
+      '<div style="height:1px;background:rgba(188,215,255,.10);margin:4px 18px"></div>',
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px">',
+      '<span style="font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.38);font-family:\'IBM Plex Mono\',monospace">Subtotal</span>',
+      '<span style="font-size:15px;font-weight:900;color:rgba(225,238,255,.88);font-family:\'IBM Plex Mono\',monospace">'+money(subtotalAmt)+'</span>',
+      '</div>',
+      gateCardHtml,
+      '<div style="height:1px;background:rgba(188,215,255,.10);margin:0 18px"></div>',
+      heroHtml,
+      '<div style="font-size:10px;color:rgba(225,238,255,.22);text-align:center;padding:0 18px 12px;font-family:\'IBM Plex Mono\',monospace">คำนวณจาก CSV ที่โหลดอยู่ · v235 · '+nowStr+'</div>',
+      exportBtnHtml,
+      '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ปิด</button></div>',
+      '</div></div>',
+    ].join('');
     ov.innerHTML=html;
-    requestAnimationFrame(function(){ov.classList.add("on");});
+    requestAnimationFrame(function(){ov.classList.add('on');});
   }
   function closeCompactSheet(){
     var ov=document.getElementById('pv-comm-sheet-overlay');
@@ -3177,6 +3232,146 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var a=document.createElement('a');
     a.href=url;a.download=filename;a.click();
     setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  };
+
+  // ── v235: Drill helper — push content into existing sheet ──────────────────
+  function _pvPushDrill(html){
+    var ov=document.getElementById('pv-comm-sheet-overlay');
+    var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
+    if(!sheetEl)return;
+    window._pvCommDrillSaved=sheetEl.outerHTML;
+    var tmp=document.createElement('div');tmp.innerHTML=html;
+    var el=tmp.firstElementChild;
+    if(el)sheetEl.parentNode.replaceChild(el,sheetEl);
+  }
+  function _pvDrillHeader(title,badge,badgeBg,badgeColor){
+    return '<div style="flex-shrink:0"><div class="pv-comm-sheet-handle"></div>'
+      +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10)">'
+      +'<button onclick="window._commDrillBack()" style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.78);font-size:15px;cursor:pointer;font-family:inherit">‹</button>'
+      +'<div style="flex:1;font-size:15px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px">'+title
+      +(badge?'<span style="font-size:9px;font-weight:850;padding:3px 8px;border-radius:999px;background:'+badgeBg+';color:'+badgeColor+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">'+badge+'</span>':'')
+      +'</div>'
+      +'<button onclick="_commCloseKamSelfSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.42);font-size:13px;cursor:pointer;font-family:inherit">✕</button>'
+      +'</div></div>';
+  }
+
+  // NRR drill — tier table + action note
+  window._commDrillNRR=function(){
+    var st=window._pvCommDrillSt||{};
+    var cfg=window._pvCommDrillCfg||{};
+    var src=window._pvCommDrillSrc||{};
+    function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;max-height:88vh">'
+      +_pvDrillHeader('NRR Commission','','','')
+      +'<div style="overflow-y:auto;flex:1">'
+      +'<div style="padding:14px 18px 10px">'
+      +'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);margin-bottom:8px;font-family:\'IBM Plex Mono\',monospace">เกณฑ์ NRR</div>'
+      +(cfg.tierRows||'')
+      +'</div>'
+      +'<div style="padding:10px 18px;background:rgba(77,220,151,.06);border-top:1px solid rgba(77,220,151,.12);border-bottom:1px solid rgba(77,220,151,.12)">'
+      +'<div style="font-size:12px;color:rgba(225,238,255,.75);line-height:1.6">'+(cfg.action?cfg.action:'')+'</div>'
+      +'</div>'
+      +(src.nrr>0?'<div style="padding:14px 18px"><div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:13px;color:rgba(225,238,255,.75)">NRR Payout</span>'
+        +'<span style="font-size:18px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(src.nrr)+'</span>'
+        +'</div></div>':'')
+      +'</div></div>';
+    _pvPushDrill(html);
+  };
+
+  // Upsell chooser — pick กลุ่มสินค้าใหม่ or ยอดเติบโต
+  window._commDrillUpsellChooser=function(){
+    var p1g=window._pvCommP1Groups||[];
+    var p3g=window._pvCommP3Groups||[];
+    function mon(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000)return'฿'+(n/1000).toFixed(0)+'K';return'฿'+Math.round(n).toLocaleString('en-US');}
+    var p1comm=p1g.reduce(function(s,g){return s+(g.commission||0);},0);
+    var p3comm=p3g.reduce(function(s,g){return s+(g.commission||0);},0);
+    // If only one type has data, go directly
+    if(p1g.length&&!p3g.length){window._commOpenUpsellDrill('p1');return;}
+    if(p3g.length&&!p1g.length){window._commOpenUpsellDrill('p3');return;}
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column">'
+      +_pvDrillHeader('กลุ่มสินค้าใหม่ + ยอดเติบโต','','','')
+      +'<div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">'
+      +(p1g.length?'<div onclick="_commOpenUpsellDrill(\'p1\')" style="padding:16px;border-radius:12px;background:rgba(77,220,151,.08);border:1px solid rgba(77,220,151,.2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+        +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
+        +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
+        +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
+        +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
+        +'</div>':'')
+      +(p3g.length?'<div onclick="_commOpenUpsellDrill(\'p3\')" style="padding:16px;border-radius:12px;background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.18);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+        +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">ยอดเติบโต</div>'
+        +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p3g.length+' outlet × group · Incr × 3%</div></div>'
+        +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(p3comm)+'</div>'
+        +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
+        +'</div>':'')
+      +'</div></div>';
+    _pvPushDrill(html);
+  };
+
+  // New/Comeback drill
+  window._commDrillNewComeback=function(){
+    var src=window._pvCommDrillSrc||{};
+    var cfg=window._pvCommDrillCfg||{};
+    var od=src.upsell_outlet_detail||{};
+    function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column">'
+      +_pvDrillHeader('New/Comeback','× '+cfg.outRate+'%','rgba(188,215,255,.10)','#bcd7ff')
+      +'<div style="padding:14px 18px">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+      +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">New GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.new_gmv||0)+'</div></div>'
+      +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Comeback GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.comeback_gmv||0)+'</div></div>'
+      +'</div>'
+      +'<div style="background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:10px;padding:12px 14px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+      +'<span style="font-size:12px;color:rgba(225,238,255,.65)">GMV รวม</span>'
+      +'<span style="font-size:14px;font-weight:700;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(od.outlet_gmv||0)+'</span>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:12px;color:rgba(225,238,255,.65)">Commission (× '+cfg.outRate+'%)</span>'
+      +'<span style="font-size:15px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(src.upsell_outlet||0)+'</span>'
+      +'</div></div>'
+      +'<div style="font-size:11px;color:rgba(225,238,255,.35);margin-top:10px;line-height:1.6">นับเฉพาะ new_gmv และ comeback_gmv ของ group_key ที่ไม่ใช่กลุ่มสินค้าใหม่ (P1)</div>'
+      +'</div></div>';
+    _pvPushDrill(html);
+  };
+
+  // Handover drill
+  window._commDrillHandover=function(){
+    var src=window._pvCommDrillSrc||{};
+    var cfg=window._pvCommDrillCfg||{};
+    var hd=src.handover_detail||{};
+    function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
+    var hit2=hd.retention_pct>=cfg.hoT2;
+    var hit3=hd.retention_pct>=cfg.hoT3;
+    var detailRows=(hd.detail||[]).slice(0,8).map(function(a){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07)">'
+        +'<div><div style="font-size:12px;font-weight:700;color:rgba(225,238,255,.82)">'+String(a.name||a.account_id||'—').slice(0,30)+'</div>'
+        +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:1px">Base '+mon(a.baseline)+' → MTD '+mon(a.current)+'</div></div>'
+        +'</div>';
+    }).join('');
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column">'
+      +_pvDrillHeader('Handover','','','')
+      +'<div style="overflow-y:auto;flex:1;padding:14px 18px">'
+      +(hd.accounts?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+        +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Accounts</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.accounts||0)+'</div></div>'
+        +'<div class="pv-comm-sheet-kpi '+(hit2?'val-good':'')+'"><div class="pv-comm-sheet-kpi-label">Retention</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.retention_pct||0)+'%</div></div>'
+        +'</div>':'')
+      +'<div style="background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
+      +'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(188,215,255,.08)">'
+      +'<span style="font-size:12px;color:'+(hit2?'rgba(225,238,255,.78)':'rgba(225,238,255,.35)')+'">≥'+cfg.hoT2+'% → ฿'+cfg.hoT2Pay+'</span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+(hit2?'#4ddc97':'rgba(225,238,255,.25)')+'">'+(hit2?'✓ '+mon(Number(String(cfg.hoT2Pay).replace(/,/g,''))||0):'—')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(188,215,255,.08)">'
+      +'<span style="font-size:12px;color:'+(hit3?'rgba(225,238,255,.78)':'rgba(225,238,255,.35)')+'">≥'+cfg.hoT3+'% → +฿'+cfg.hoT3Bon+' (bonus)</span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+(hit3?'#4ddc97':'rgba(225,238,255,.25)')+'">'+(hit3?'✓ '+mon(Number(String(cfg.hoT3Bon).replace(/,/g,''))||0):'—')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;padding:6px 0">'
+      +'<span style="font-size:13px;font-weight:700;color:rgba(225,238,255,.78)">Handover Payout</span>'
+      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(src.handover||0)+'</span>'
+      +'</div></div>'
+      +(detailRows?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);margin-bottom:8px;font-family:\'IBM Plex Mono\',monospace">รายชื่อร้าน</div>'+detailRows:'')
+      +'</div></div>';
+    _pvPushDrill(html);
   };
   window._commRenderKamSelfStrip=renderCompactStrip;
   window._commOpenKamSelfSheet=openCompactSheet;
