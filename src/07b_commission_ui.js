@@ -1641,6 +1641,9 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     const prevDailyRate=prevDays>0?baselinePrevGmv/prevDays:0;
     const currDailyRate=daysElapsed>0?baseCurrGmv/daysElapsed:0;
     const nrr=prevDailyRate>0?currDailyRate/prevDailyRate:null;
+    // v241-fix: rawRetention = actual MTD ÷ baseline (no day-normalization)
+    // used for handover/new-sales display to be consistent with _commComputeHandoverRetention
+    const rawRetention=baselinePrevGmv>0?baseCurrGmv/baselinePrevGmv:null;
     const nonCohortIds=currentIds.filter(id=>!prevGmvByOutlet[id]);
     const comebackIds=nonCohortIds.filter(id=>everSeen.has(id));
     const expansionIds=nonCohortIds.filter(id=>!everSeen.has(id));
@@ -1669,7 +1672,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     const comebackDetail=_buildDetail(comebackIds,'cb');
     const expansionDetail=_buildDetail(expansionIds,'ex');
     return {
-      nrr, cohortCount:cohort.length, cohortGmv:baseCurrGmv, baselinePrevGmv,
+      nrr, rawRetention, cohortCount:cohort.length, cohortGmv:baseCurrGmv, baselinePrevGmv,
       comebackGmv:comebackIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
       comebackCount:comebackIds.length,
       expansionGmv:expansionIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
@@ -1741,7 +1744,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     newFromSales: {
       count: newFromSalesAccounts.length,
       gmv:   _movementGmv(newFromSalesResult),
-      nrr:   newFromSalesResult?.nrr ?? null,
+      nrr:   newFromSalesResult?.rawRetention ?? null,
       cohortGmv: newFromSalesResult?.cohortGmv || 0,
       comebackGmv: newFromSalesResult?.comebackGmv || 0,
       expansionGmv: newFromSalesResult?.expansionGmv || 0,
@@ -2994,9 +2997,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // Clean component row builder
     function cRow(dot,label,sub,amt,amtColor,drillFn){
       var hasAmt=Number(amt||0)>0;
-      var drillAttr=drillFn?' onclick="'+drillFn+'"':'';
       return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.07);'+(drillFn?'cursor:pointer':'')+'"'
-        +drillAttr+'>'
+        +(drillFn?' onclick="'+drillFn+'" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'"':'')+'>'
         +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px;background:'+dot+'"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88);line-height:1.25">'+label+'</div>'
