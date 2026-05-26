@@ -1,4 +1,4 @@
-<!-- Freshket Sense v234: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v235: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v234',
+      version: 'v235',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30596,19 +30596,20 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var nrrMinPct=firstPayTier&&firstPayTier.min_value!==null?firstPayTier.min_value:"—";
     var nrrRow=srcRow(src.nrr>0?"paid":"","NRR","เกณฑ์ ≥"+nrrMinPct+"% · "+esc(st.ruleName||"—"),money(src.nrr),"");
 
-    // Upsell SKU row
+    // Upsell SKU row — v235: renamed P1→กลุ่มสินค้าใหม่, P3→ยอดเติบโต; added outlet drill
     var p1Detail=[],p3Detail=[];
     if(src.upsell_sku_detail){
       var d=src.upsell_sku_detail;
       var p1g=d.p1&&d.p1.groups?d.p1.groups:[];
       var p3g=d.p3&&d.p3.groups?d.p3.groups:[];
-      p1Detail=[ruleLine(p1g.length>0,"หมวดใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
-      if(p1g.length) p1Detail.push(ruleIndent(p1g.slice(0,3).map(function(g){return esc(g.group_key)+" "+money(g.total_gmv);}).join(" · ")+(p1g.length>3?" +"+(p1g.length-3)+" more":"")));
-      p3Detail=[ruleLine(p3g.length>0,"ขายเพิ่ม >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
-      if(p3g.length) p3Detail.push(ruleIndent(p3g.slice(0,3).map(function(g){return esc(g.group_key)+" incr "+money(g.incremental);}).join(" · ")+(p3g.length>3?" +"+(p3g.length-3)+" more":"")));
+      window._pvCommP1Groups=p1g; window._pvCommP3Groups=p3g; // store for drill
+      p1Detail=[ruleLine(p1g.length>0,"กลุ่มสินค้าใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
+      if(p1g.length) p1Detail.push(ruleIndent("<span onclick=\"_commOpenUpsellDrill('p1')\" style=\"color:#bcd7ff;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:2px\">"+p1g.length+" รายการ — ดูทั้งหมด ›</span>"));
+      p3Detail=[ruleLine(p3g.length>0,"ยอดเติบโต >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
+      if(p3g.length) p3Detail.push(ruleIndent("<span onclick=\"_commOpenUpsellDrill('p3')\" style=\"color:#bcd7ff;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:2px\">"+p3g.length+" รายการ — ดูทั้งหมด ›</span>"));
     }
     var upsellSkuDetail=p1Detail.length||p3Detail.length?ruleBox(p1Detail.concat(p3Detail)):"";
-    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","Upsell SKU","หมวดใหม่ "+p1Rate+"% · ขายเพิ่ม >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
+    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","กลุ่มสินค้าใหม่ + ยอดเติบโต","กลุ่มสินค้าใหม่ "+p1Rate+"% · ยอดเติบโต >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
 
     // Upsell Outlet row
     var outDetail="";
@@ -30617,7 +30618,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       outDetail=ruleBox([ruleLine(od.outlet_gmv>0,"ใหม่ "+money(od.new_gmv)+" · comeback "+money(od.comeback_gmv)," × "+outRate+"%"),
                           ruleIndent("ไม่นับ item ที่ได้ P1 ไปแล้ว")]);
     }
-    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Upsell Outlet","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
+    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","New/Comeback","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
 
     // Handover row — 2-line tier breakdown
     var hoDetail="";
@@ -30655,7 +30656,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       "<div class=\"pv-comm-sheet-handle\"></div>",
       "<div class=\"pv-comm-sheet-body\">",
       "<div class=\"pv-comm-sheet-title\">วิธีคิดค่าคอมฯ</div>",
-      "<div class=\"pv-comm-sheet-sub\">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา</div>",
+      "<div class=\"pv-comm-sheet-sub\">สรุปค่าคอมฯ เดือนนี้ แยกตามแหล่งที่มา · คำนวณ "+(function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();})()+"</div>",
       loadNote,
       "<div class=\"pv-comm-sheet-kpis\">",
       "<div class=\"pv-comm-sheet-kpi ",kpiCls,"\"><div class=\"pv-comm-sheet-kpi-label\">ค่าคอมฯ สุทธิ์</div><div class=\"pv-comm-sheet-kpi-val\">",money(finalAmt),"</div></div>",
@@ -30667,6 +30668,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       "<div class=\"pv-comm-action-note\">",esc(action),"</div>",
       "<div class=\"pv-comm-sheet-close-row\">",
       "<button class=\"pv-comm-sheet-close\" onclick=\"_commCloseKamSelfSheet()\">ปิด</button>",
+      (src.upsell_sku>0||src.upsell_outlet>0)?"<button class=\"comm-secondary\" style=\"font-size:11px;padding:5px 10px;margin-left:8px\" onclick=\"_commExportAuditCSV()\">↓ Export CSV</button>":"",
       auditBtn,"</div>",
       "</div></div>"
     ].join("");
@@ -30679,6 +30681,162 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     ov.classList.remove('on');
     setTimeout(function(){ov.innerHTML='';},260);
   }
+
+  // ── v235: Outlet drill sheet ────────────────────────────────────────────────
+  function _commOpenUpsellDrill(type){
+    var ov=document.getElementById('pv-comm-sheet-overlay');
+    var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
+    if(!sheetEl)return;
+    window._pvCommDrillSaved=sheetEl.outerHTML;
+
+    var groups=type==='p1'?(window._pvCommP1Groups||[]):(window._pvCommP3Groups||[]);
+    var titleLabel=type==='p1'?'กลุ่มสินค้าใหม่':'ยอดเติบโต';
+    var badgeColor=type==='p1'?'rgba(77,220,151,.15)':'rgba(255,224,138,.15)';
+    var badgeText=type==='p1'?'#4ddc97':'#ffe08a';
+
+    function mon(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'฿'+(n/1000).toFixed(0)+'K';return'฿'+Math.round(n).toLocaleString('en-US');}
+    function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
+
+    // Group by outletId
+    var byOutlet={};
+    groups.forEach(function(g){
+      var key=g.outletId||'_all';
+      if(!byOutlet[key])byOutlet[key]={outletId:key,items:[],totalComm:0,totalPrimary:0};
+      byOutlet[key].items.push(g);
+      byOutlet[key].totalComm+=g.commission||0;
+      byOutlet[key].totalPrimary+=type==='p1'?(g.total_gmv||0):(g.incremental||0);
+    });
+    var outlets=Object.values(byOutlet).sort(function(a,b){return b.totalComm-a.totalComm;});
+    var totalComm=groups.reduce(function(s,g){return s+(g.commission||0);},0);
+    var totalOutlets=outlets.length;
+    var primaryLabel=type==='p1'?'GMV':'Incr';
+
+    var outletRows=outlets.map(function(o,i){
+      var oid='pvd'+i;
+      var skuRows=o.items.map(function(g){
+        if(type==='p1'){
+          return '<div style="display:grid;grid-template-columns:1fr 60px 56px;padding:7px 16px 7px 28px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center">'
+            +'<span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</span>'
+            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.total_gmv)+'</span>'
+            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
+            +'</div>';
+        } else {
+          return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 28px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center;gap:2px">'
+            +'<div><div style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</div>'
+            +(g.max_baseline_month?'<div style="font-size:9px;color:rgba(225,238,255,.28);margin-top:1px">Base: '+es(g.max_baseline_month)+'</div>':'')+'</div>'
+            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.55)">'+mon(g.max_baseline||0)+'</span>'
+            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.incremental)+'</span>'
+            +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
+            +'</div>';
+        }
+      }).join('');
+      var colsHd=type==='p1'?'grid-template-columns:1fr 60px 56px':'grid-template-columns:1fr 52px 56px 52px';
+      return '<div>'
+        +'<div style="display:grid;'+colsHd+';padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.03)" onclick="_commToggleDrillOutlet(\''+oid+'\')">'
+        +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(o.outletId!=='_all'?o.outletId:'Outlet ไม่ระบุ')+'</div>'
+        +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+o.items.length+' กลุ่มสินค้า</div></div>'
+        +(type==='p1'
+          ?'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>'
+          :'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.35)">—</span>'
+          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+          +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>')
+        +'<span id="pvdchev'+i+'" style="font-size:14px;color:rgba(188,215,255,.28);transition:transform 150ms;text-align:right;grid-column:none">›</span>'
+        +'</div>'
+        +'<div id="'+oid+'" style="display:none">'+skuRows+'</div>'
+        +'</div>';
+    }).join('');
+
+    var colsHdStr=type==='p1'
+      ?'<span>Outlet</span><span style="text-align:right">GMV</span><span style="text-align:right">Comm</span>'
+      :'<span>Outlet</span><span style="text-align:right">Base</span><span style="text-align:right">Incr</span><span style="text-align:right">Comm</span>';
+    var colsHdGrid=type==='p1'?'grid-template-columns:1fr 60px 56px':'grid-template-columns:1fr 52px 56px 52px';
+
+    var html='<div class="pv-comm-sheet">'
+      +'<div class="pv-comm-sheet-handle"></div>'
+      +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
+      +'<button onclick="_commDrillBack()" style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.78);font-size:15px;cursor:pointer;font-family:inherit">‹</button>'
+      +'<div style="flex:1"><div style="font-size:15px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px">'+es(titleLabel)
+      +'<span style="font-size:9px;font-weight:850;padding:3px 8px;border-radius:999px;background:'+badgeColor+';color:'+badgeText+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">× 3%</span></div></div>'
+      +'<button onclick="_commCloseKamSelfSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.42);font-size:13px;cursor:pointer;font-family:inherit">✕</button>'
+      +'</div>'
+      +'<div style="padding:10px 16px;display:flex;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
+      +'<div style="flex:1;text-align:center"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+totalOutlets+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">outlet</div></div>'
+      +'<div style="flex:1;text-align:center;border-left:1px solid rgba(188,215,255,.08)"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(totalComm)+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">commission</div></div>'
+      +'</div>'
+      +'<div style="display:grid;'+colsHdGrid+';padding:6px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(188,215,255,.10);font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:rgba(225,238,255,.35);font-family:\'IBM Plex Mono\',monospace;flex-shrink:0">'+colsHdStr+'</div>'
+      +'<div style="overflow-y:auto;flex:1">'+outletRows+'</div>'
+      +'<div style="display:flex;gap:8px;padding:10px 16px 16px;flex-shrink:0;border-top:1px solid rgba(188,215,255,.10)">'
+      +'<button onclick="_commExportAuditCSV(\''+type+'\')" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.78);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↓ ดาวน์โหลด CSV</button>'
+      +'</div>'
+      +'</div>';
+
+    sheetEl.outerHTML=html;
+  }
+  window._commOpenUpsellDrill=_commOpenUpsellDrill;
+
+  window._commDrillBack=function(){
+    var ov=document.getElementById('pv-comm-sheet-overlay');
+    if(!ov||!window._pvCommDrillSaved)return;
+    var tmp=document.createElement('div');
+    tmp.innerHTML=window._pvCommDrillSaved;
+    var restored=tmp.firstElementChild;
+    if(restored){
+      var old=ov.querySelector('.pv-comm-sheet');
+      if(old)old.parentNode.replaceChild(restored,old);
+    }
+    window._pvCommDrillSaved=null;
+  };
+
+  window._commToggleDrillOutlet=function(oid){
+    var el=document.getElementById(oid);
+    if(!el)return;
+    var open=el.style.display!=='none';
+    el.style.display=open?'none':'block';
+    // find chevron by sibling (last element in parent row)
+    var row=el.previousElementSibling;
+    if(row){var chev=row.querySelector('[id^="pvdchev"]');if(chev){chev.style.transform=open?'':'rotate(90deg)';chev.style.color=open?'rgba(188,215,255,.28)':'rgba(188,215,255,.55)';}}
+  };
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  window._commExportAuditCSV=function(type){
+    var groups=[];
+    var filename='audit_upsell.csv';
+    var header='';
+    if(!type||type==='p1'){
+      groups=groups.concat((window._pvCommP1Groups||[]).map(function(g){return Object.assign({},g,{audit_type:'กลุ่มสินค้าใหม่'});}));
+    }
+    if(!type||type==='p3'){
+      groups=groups.concat((window._pvCommP3Groups||[]).map(function(g){return Object.assign({},g,{audit_type:'ยอดเติบโต'});}));
+    }
+    if(type==='p1'){header='audit_type,outlet_id,group_key,gmv,commission\n';filename='audit_กลุ่มสินค้าใหม่.csv';}
+    else if(type==='p3'){header='audit_type,outlet_id,group_key,base,incr,commission,base_month\n';filename='audit_ยอดเติบโต.csv';}
+    else{header='audit_type,outlet_id,group_key,gmv,base,incr,commission,base_month\n';filename='audit_upsell.csv';}
+
+    var rows=groups.map(function(g){
+      var cols=[
+        g.audit_type||'',
+        g.outletId||g.outlet_id||'',
+        g.groupKey||g.group_key||'',
+        type==='p3'?'':(g.total_gmv||0),
+        type==='p1'?'':(g.max_baseline||0),
+        type==='p1'?'':(g.incremental||0),
+        g.commission||0,
+        g.max_baseline_month||''
+      ].filter(function(_,i){
+        if(type==='p1')return[0,1,2,3,6].indexOf(i)>=0;
+        if(type==='p3')return[0,1,2,4,5,6,7].indexOf(i)>=0;
+        return true;
+      });
+      return cols.map(function(v){return typeof v==='string'&&v.indexOf(',')>=0?'"'+v+'"':v;}).join(',');
+    }).join('\n');
+
+    var blob=new Blob(['\ufeff'+header+rows],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=filename;a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  };
   window._commRenderKamSelfStrip=renderCompactStrip;
   window._commOpenKamSelfSheet=openCompactSheet;
   window._commCloseKamSelfSheet=closeCompactSheet;
