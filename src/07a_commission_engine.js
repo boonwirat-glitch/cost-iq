@@ -922,26 +922,33 @@ function _commCloseKamSelfSheet() {
   setTimeout(()=>{ ov.innerHTML=''; }, 260);
 }
 // ── TL Commission Detail Sheet ────────────────────────────────
-function _commOpenTlDetailSheet() {
+function _commOpenTlDetailSheet(opts) {
+  opts = opts || {};
   const role = getCurrentRole ? getCurrentRole() : '';
   if (!isTLRole(role) && !isAdminRole(role)) return;
-  // v229-fix: if upsell_team not yet loaded (first session, not in IDB cache),
-  // await _cloudInitialPromise so kamRows include upsell before rendering
+  // v230-fix: force-fetch upsell_team from R2 on first open if not in memory.
+  // Root cause: _cloudInitialPromise is nulled after FOREGROUND load, and upsell_team
+  // fetch silently fails (not in IDB cache + R2 fetch error) → bulkUpsellTeamData stays empty.
   const _upsellTeamReady = typeof bulkUpsellTeamData !== 'undefined' &&
                            bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
-  if (!_upsellTeamReady && typeof _cloudInitialPromise !== 'undefined' && _cloudInitialPromise) {
-    Promise.resolve(_cloudInitialPromise).then(() => _commOpenTlDetailSheet()).catch(() => _commOpenTlDetailSheet());
-    // Show brief loading overlay while waiting
-    let _tmpOv = document.getElementById('pv-comm-tl-sheet-overlay');
-    if (!_tmpOv) {
-      _tmpOv = document.createElement('div');
-      _tmpOv.id = 'pv-comm-tl-sheet-overlay';
-      _tmpOv.className = 'pv-comm-sheet-overlay';
-      _tmpOv.onclick = function(e){ if(e.target===_tmpOv) _commCloseTlDetailSheet(); };
-      document.body.appendChild(_tmpOv);
+  if (!_upsellTeamReady && !opts._skipUpsellFetch) {
+    let _loadOv = document.getElementById('pv-comm-tl-sheet-overlay');
+    if (!_loadOv) {
+      _loadOv = document.createElement('div');
+      _loadOv.id = 'pv-comm-tl-sheet-overlay';
+      _loadOv.className = 'pv-comm-sheet-overlay';
+      _loadOv.onclick = function(e){ if(e.target===_loadOv) _commCloseTlDetailSheet(); };
+      document.body.appendChild(_loadOv);
     }
-    _tmpOv.innerHTML = '<div class="pv-comm-sheet"><div class="pv-comm-sheet-handle"></div><div class="pv-comm-sheet-body" style="display:flex;align-items:center;justify-content:center;min-height:160px"><div style="text-align:center;color:rgba(188,215,255,.7);font-size:13px">กำลังโหลดข้อมูล upsell...<br><span style="font-size:11px;opacity:.6">ใช้เวลาไม่กี่วินาที</span></div></div></div>';
-    requestAnimationFrame(() => _tmpOv.classList.add('on'));
+    _loadOv.innerHTML = '<div class="pv-comm-sheet"><div class="pv-comm-sheet-handle"></div><div class="pv-comm-sheet-body" style="display:flex;align-items:center;justify-content:center;min-height:160px"><div style="text-align:center;color:rgba(188,215,255,.7);font-size:13px">กำลังโหลดข้อมูล upsell...<br><span style="font-size:11px;opacity:.6">ใช้เวลาไม่กี่วินาที</span></div></div></div>';
+    requestAnimationFrame(function(){ _loadOv.classList.add('on'); });
+    var _doFetch = typeof _fetchCloudflareFile === 'function' && typeof R2_SPECS !== 'undefined' && R2_SPECS && R2_SPECS['upsell_team'];
+    var _fp = _doFetch ? _fetchCloudflareFile(R2_SPECS['upsell_team'], {force:true}) : Promise.resolve(false);
+    _fp.finally(function() {
+      var _ov2 = document.getElementById('pv-comm-tl-sheet-overlay');
+      if (_ov2) { _ov2.classList.remove('on'); _ov2.innerHTML = ''; }
+      setTimeout(function(){ _commOpenTlDetailSheet({_skipUpsellFetch:true}); }, 60);
+    });
     return;
   }
   let ov = document.getElementById('pv-comm-tl-sheet-overlay');
