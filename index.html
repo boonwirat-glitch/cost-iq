@@ -22112,7 +22112,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_kamFinal1)}</span>`:'';
+    const _kp1UL=_kp1&&_kp1.upsell_loading&&(_kp1.nrr_payout||0)===0; // v228-fix
+    const _kamPillTxt=_kp1UL?'—':_commFmtPayout(_kamFinal1);
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -22141,7 +22143,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_commFmtPayout(_kamFinal1)}</span>`:'';
+    const _kp1UL=_kp1&&_kp1.upsell_loading&&(_kp1.nrr_payout||0)===0; // v228-fix
+    const _kamPillTxt=_kp1UL?'—':_commFmtPayout(_kamFinal1);
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
     const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
@@ -22170,6 +22174,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
     const _kamFinalC=_kpC?_kpC.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
+    const _kpCUL=_kpC&&_kpC.upsell_loading&&(_kpC.nrr_payout||0)===0; // v228-fix
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -22177,7 +22182,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
         </div>
       </div>
-      ${nrrPct!==null?`<span class="tv-chip-comm">${_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
+      ${nrrPct!==null?`<span class="tv-chip-comm">${_kpCUL?'—':_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
       <span class="tv-chip-pace">${g.pace||'—'}%</span>
       <span class="tv-chip-arrow">›</span>
     </div>`;
@@ -25189,18 +25194,22 @@ function _commOpenTlDetailSheet() {
     const detailParts = ['NRR '+fmtP(nrrP)];
     if (upsell > 0) detailParts.push('Uplift '+fmtP(upsell));
     if (ho > 0)     detailParts.push('HO '+fmtP(ho));
-    const amberStyle = finalAmt > 0 ? 'color:#f0b000;font-weight:700' : 'color:rgba(255,255,255,.4)';
+    // v228-fix: show — when upsell not loaded and NRR payout is 0
+    const upsellNotLoaded = r.breakdown && r.breakdown.upsell_loading;
+    const displayAmt = (upsellNotLoaded && nrrP === 0) ? null : finalAmt;
+    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:700' : 'color:rgba(255,255,255,.4)';
+    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.3);font-size:11px">— โหลด...</span>' : fmtP(displayAmt);
     return `<div class="pv-comm-tl-kam-row">
       <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
       <div class="pv-comm-tl-kam-nrr">${nrr}</div>
-      <div class="pv-comm-tl-kam-pay" style="${amberStyle}">${fmtP(finalAmt)}</div>
+      <div class="pv-comm-tl-kam-pay" style="${amberStyle}">${payText}</div>
       <div class="pv-comm-tl-kam-detail">${detailParts.join(' · ')}</div>
     </div>`;
   }).join('');
 
   const multSection = multLoaded
     ? `<div class="pv-comm-tl-mult">
-        <span style="color:#f0b000;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
+        <span style="color:#ffe08a;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
         <span style="color:rgba(255,255,255,.6);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
        </div>`
     : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
@@ -25247,9 +25256,9 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
   s.id = '_comm_tl_styles';
   s.textContent = `
     .tv-mult-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
-    .tv-mult-badge.ok{background:rgba(240,176,0,.18);color:#f0b000}
+    .tv-mult-badge.ok{background:rgba(255,224,138,.15);color:#ffe08a}
     .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
-    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(240,176,0,.07);border:1px solid rgba(240,176,0,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
+    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
     .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
     .pv-comm-tl-kam-list{display:flex;flex-direction:column;max-height:320px;overflow-y:auto;margin-top:2px}
     .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 44px 76px;grid-template-rows:auto auto;gap:1px 4px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
@@ -25782,6 +25791,7 @@ function _commBuildKamPayout(kamEmail) {
     const _kamDisplayName = _pvRow ? (_pvRow.kamName || '') : '';
     const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData &&
       (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
+    const upsellLoading = !_bundleLoaded && !_teamRow; // v228-fix: flag when upsell data unavailable
     if (!_bundleLoaded && _teamRow) {
       // Fast path: use pre-computed totals from team summary
       const p1Rate    = _commGetConfig('upsell_sku',  'p1_rate',  0.03);
@@ -25812,6 +25822,7 @@ function _commBuildKamPayout(kamEmail) {
       gate,
       subtotal,
       gate_cap: gate.cap_multiplier,
+      upsell_loading: upsellLoading, // v228-fix: true when upsell CSV not loaded in session
       final_payout: finalPayout
     };
   } catch(e) {
@@ -29266,9 +29277,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
       +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
       +'<div class="pv-comm-sources">'
-      +'<span style="color:'+(src.nrr>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#FFBB00':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
+      +'<span style="color:'+(src.nrr>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
       +'</div>'
       +'</div>';
   }
@@ -29410,7 +29421,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       gateRow=srcRow(gRowCls,"NRR Gate"+(src.gate_active?" ⚠":""),"NRR "+gPct+"% · "+gRule,"<span class=\""+(src.gate_active?"pv-comm-gate-warn":"")+"\">×"+gCapPct+"%</span>","");
     }
 
-    var loadNote=src.loading?"<div style=\"font-size:11px;color:#FFBB00;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
+    var loadNote=src.loading?"<div style=\"font-size:11px;color:#ffe08a;padding:3px 0 6px\">⚠ กำลังโหลด upsell — ตัวเลขจะอับเดตอัตโนมัติ</div>":"";
     var kpiCls=finalAmt>0?"val-bonus":"";
     var safeEmail=(st.email||"").replace(/'/g,"\\'");
     var auditBtn=typeof _commBuildKamAuditSql==="function"&&st.email
