@@ -1,4 +1,4 @@
-<!-- Freshket Sense v231: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v232: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v231',
+      version: 'v232',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -22065,6 +22065,33 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
   if(typeof _tgtLoaded !== 'undefined' && !_tgtLoaded){
     if(typeof loadTargets === 'function' && typeof _tgtCurrentQuarter === 'function'){
       try{ await loadTargets(_tgtCurrentQuarter()); }catch(e){}
+    }
+  }
+
+  // v231-fix: if upsell_team not in memory, backfill from R2 before rendering.
+  // Root cause: IDB-FAST path skips upsell_team when not in IDB cache, and R2 fetch
+  // can silently fail (AbortSignal / timeout) with no retry in teamview.
+  // The v230-fix in _commOpenTlDetailSheet handles this only on commission cockpit open.
+  // This fix gives teamview its own one-shot self-heal so shimmer resolves automatically.
+  const _upsellTeamNow = typeof bulkUpsellTeamData !== 'undefined' &&
+                         bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
+  if (!_upsellTeamNow && !window._tvUpsellFetchInFlight) {
+    window._tvUpsellFetchInFlight = true;
+    const _canFetch = typeof _fetchCloudflareFile === 'function' &&
+                      typeof R2_SPECS !== 'undefined' && R2_SPECS && R2_SPECS['upsell_team'];
+    if (_canFetch) {
+      _fetchCloudflareFile(R2_SPECS['upsell_team'], {force:true}).finally(function(){
+        window._tvUpsellFetchInFlight = false;
+        // ingestCSVText callback already calls renderTeamview() — this is a safety-net
+        // for cases where the tab wasn't active during the callback.
+        try{
+          if(typeof renderTeamviewKamList==='function' &&
+             document.getElementById('scr-teamview')?.classList.contains('on'))
+            renderTeamviewKamList();
+        }catch(e){}
+      });
+    } else {
+      window._tvUpsellFetchInFlight = false;
     }
   }
 
