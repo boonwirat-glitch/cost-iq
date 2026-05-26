@@ -3090,7 +3090,21 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     setTimeout(function(){ov.innerHTML='';},260);
   }
 
-  // ── v235: Outlet drill sheet ────────────────────────────────────────────────
+  // v237+v243: helper functions exposed to window for cross-scope calls
+  window._pvOutletName=function(outletId,accountId){
+    if(!outletId||outletId==='_all')return'—';
+    if(typeof bulkOutletsData!=='undefined'&&bulkOutletsData&&accountId){
+      var months=bulkOutletsData[accountId];
+      if(months){var labels=Object.keys(months);for(var li=0;li<labels.length;li++){var arr=months[labels[li]];if(!arr)continue;for(var oi=0;oi<arr.length;oi++){var o=arr[oi];var oid=o.outlet_id||o.outletId||o.id;if(String(oid)===String(outletId)&&(o.outlet_name||o.outletName))return o.outlet_name||o.outletName;}}}
+    }
+    if(typeof bulkOutletsData!=='undefined'&&bulkOutletsData){
+      var accts=Object.keys(bulkOutletsData);for(var ai=0;ai<accts.length;ai++){var months2=bulkOutletsData[accts[ai]];if(!months2)continue;var labels2=Object.keys(months2);for(var li2=0;li2<labels2.length;li2++){var arr2=months2[labels2[li2]];if(!arr2)continue;for(var oi2=0;oi2<arr2.length;oi2++){var o2=arr2[oi2];var oid2=o2.outlet_id||o2.outletId||o2.id;if(String(oid2)===String(outletId)&&(o2.outlet_name||o2.outletName))return o2.outlet_name||o2.outletName;}}}
+    }
+    return outletId;
+  };
+
+  // ── v235: Outlet drill sheet ──
+──────────────────────────────────────────────
   function _commOpenUpsellDrill(type){
     var ov=document.getElementById('pv-comm-sheet-overlay');
     var sheetEl=ov&&ov.querySelector('.pv-comm-sheet');
@@ -3287,7 +3301,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var el=tmp.firstElementChild;
     if(el)sheetEl.parentNode.replaceChild(el,sheetEl);
   }
-  function _pvDrillHeader(title,badge,badgeBg,badgeColor){
+  window._pvDrillHeader=function _pvDrillHeader(title,badge,badgeBg,badgeColor){
     return '<div style="flex-shrink:0"><div class="pv-comm-sheet-handle"></div>'
       +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<button onclick="window._commDrillBack()" style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.78);font-size:15px;cursor:pointer;font-family:inherit">‹</button>'
