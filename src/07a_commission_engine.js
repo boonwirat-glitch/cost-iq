@@ -230,7 +230,7 @@ function _tgtRenderTeamGovCard() {
   try {
     if (isTLRole(role)) {
       const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
-      const _um2 = typeof _commComputeTeamUpsellMult==='function' && bulkUpsellData && bulkUpsellData.loaded
+      const _um2 = typeof _commComputeTeamUpsellMult==='function' && (typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0)
         ? _commComputeTeamUpsellMult(_govEm2) : null;
       if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
     }
@@ -247,7 +247,8 @@ function _tgtRenderTeamGovCard() {
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
       umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
-      if (umData && (typeof bulkUpsellData !== 'undefined') && bulkUpsellData && bulkUpsellData.loaded) {
+      const _teamUpsellReady = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
+      if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
       } else if (isTLRole(role) || isAdminRole(role)) {
@@ -256,7 +257,7 @@ function _tgtRenderTeamGovCard() {
     } catch(e) {}
   }
   const commMeta2 = isTLRole(role)
-    ? (umData && (typeof bulkUpsellData !== 'undefined') && bulkUpsellData && bulkUpsellData.loaded
+    ? (umData && _teamUpsellReady
         ? `KAM team ${_commFmtPayout(summary.kamPayout)} · ${umData.team_upsell_pct.toFixed(1)}% upsell`
         : `KAM team ${_commFmtPayout(summary.kamPayout)}`)
     : `TL ${_commFmtPayout(summary.tlPayout)} · KAM ${_commFmtPayout(summary.kamPayout)}`;
@@ -963,7 +964,7 @@ function _commOpenTlDetailSheet(opts) {
   const tlPayout = _commBuildTlPayout(tlEmail);
   const summary = _commBuildPayoutSummary('tl');
   const um = typeof _commComputeTeamUpsellMult === 'function' ? _commComputeTeamUpsellMult(tlEmail) : {multiplier:1.0,tier:1,team_upsell_pct:0};
-  const multLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
+  const multLoaded = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0; // v230fix3: use team summary, not full bundle
   function fmtP(n){ return _commFmtPayout(n||0); }
 
   // KAM rows — single line per KAM, amber payout, readable detail
