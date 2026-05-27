@@ -3932,7 +3932,7 @@ function openCommissionRulebook() {
     ])
   ].join('');
 
-  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9101;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'+
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9101;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'+
     '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0f1b2f;z-index:1">'+
       '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
@@ -3948,7 +3948,7 @@ function openCommissionRulebook() {
     ov.style.background='rgba(5,14,28,.72)';
     ov.style.pointerEvents='all';
     var sh=ov.querySelector('div');
-    if(sh){ sh.style.transform='translateY(0)'; }
+    if(sh){ sh.style.transform='translateX(-50%) translateY(0)'; }
   });
 }
 
@@ -3956,8 +3956,9 @@ function closeCommissionRulebook() {
   var ov = document.getElementById('comm-rulebook-overlay');
   if (!ov) return;
   var sh = ov.querySelector('div');
-  if (sh) sh.style.transform = 'translateY(100%)';
+  if (sh) sh.style.transform = 'translateX(-50%) translateY(100%)';
   ov.style.background = 'rgba(5,14,28,.0)';
+  ov.style.pointerEvents = 'none';
   setTimeout(function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }, 310);
 }
 
@@ -3980,7 +3981,7 @@ function openCommissionHistory() {
   }
 
   // Loading state
-  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9201;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9201;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
     + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
     + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.45);font-size:13px">กำลังโหลด...</div>'
@@ -3990,7 +3991,7 @@ function openCommissionHistory() {
     ov.style.background='rgba(5,14,28,.75)';
     ov.style.pointerEvents='all';
     var sh=ov.querySelector('div');
-    if(sh){ sh.style.transform='translateY(0)'; }
+    if(sh){ sh.style.transform='translateX(-50%) translateY(0)'; }
   });
 
   var role = getCurrentRole ? getCurrentRole() : '';
@@ -4071,7 +4072,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   // Store rows globally for detail lookup
   window._commHistoryAllRows = allRows;
 
-  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9201;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(0);transition:transform .30s cubic-bezier(.32,.72,0,1)">'
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(0);width:100%;max-width:440px;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9201;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0f1b2f;z-index:1">'
       +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
@@ -4185,8 +4186,9 @@ function closeCommissionHistory() {
   var ov = document.getElementById('comm-history-overlay');
   if (!ov) return;
   var sh = ov.querySelector('div');
-  if (sh) sh.style.transform = 'translateY(100%)';
+  if (sh) sh.style.transform = 'translateX(-50%) translateY(100%)';
   ov.style.background = 'rgba(5,14,28,.0)';
+  ov.style.pointerEvents = 'none';
   setTimeout(function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }, 310);
 }
 
