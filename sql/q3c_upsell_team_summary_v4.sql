@@ -164,24 +164,19 @@ baseline_groups AS (
 ),
 
 -- Max baseline 3 months normalize 30 days (for P3 on existing outlets)
-lookback_agg AS (
+-- Split into 2 CTEs to avoid referencing o.delivery_date outside GROUP BY
+lookback_monthly AS (
   SELECT
-    ka.kam_email, o.account_id,
+    ka.kam_email,
+    o.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
            AND TRIM(COALESCE(i.item_family,'')) != ''
       THEN i.item_family ELSE i.subclass_name
     END AS group_key,
-    MAX(
-      SUM(i.gmv_ex_vat) /
-      DATE_DIFF(DATE_TRUNC(DATE_ADD(o.delivery_date, INTERVAL 1 MONTH), MONTH),
-                DATE_TRUNC(o.delivery_date, MONTH), DAY) * 30
-    ) OVER (PARTITION BY ka.kam_email, o.account_id, CAST(o.user_id AS STRING),
-      CASE WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-                AND TRIM(COALESCE(i.item_family,'')) != ''
-           THEN i.item_family ELSE i.subclass_name END
-    ) AS max_baseline_30d
+    DATE_TRUNC(o.delivery_date, MONTH) AS month_start,
+    SUM(i.gmv_ex_vat) AS monthly_gmv
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   CROSS JOIN dates d
@@ -189,11 +184,15 @@ lookback_agg AS (
   WHERE o.delivery_date >= d.lookback_start
     AND o.delivery_date <  d.current_mo
     AND i.gmv_ex_vat > 0
-  GROUP BY 1, 2, 3, 4, DATE_TRUNC(o.delivery_date, MONTH)
+  GROUP BY 1, 2, 3, 4, 5
 ),
 max_baseline AS (
-  SELECT kam_email, account_id, outlet_id, group_key, MAX(max_baseline_30d) AS max_bl
-  FROM lookback_agg
+  SELECT
+    kam_email, account_id, outlet_id, group_key,
+    MAX(
+      monthly_gmv / DATE_DIFF(DATE_ADD(month_start, INTERVAL 1 MONTH), month_start, DAY) * 30
+    ) AS max_bl
+  FROM lookback_monthly
   GROUP BY 1, 2, 3, 4
 ),
 
