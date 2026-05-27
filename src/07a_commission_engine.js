@@ -755,8 +755,8 @@ function _commBuildSnapshotRows() {
         config_snapshot: {
           upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
           upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
-          upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',1.50),
-          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',2500),
+          upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
+          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
           upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
           upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
           gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
@@ -1283,8 +1283,8 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     // Config (admin-configurable, with spec defaults)
     const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
     const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.03);
-    const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 1.50); // 150% = 50% growth
-    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 2500);
+    const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
+    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 5000);
     const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 2500);       // ฿2,500 gate for P1
 
     // MTD mode — commission on actual amounts, no projection
@@ -2949,8 +2949,8 @@ function _commBuildSnapshotRows() {
         config_snapshot: {
           upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
           upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
-          upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',1.50),
-          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',2500),
+          upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
+          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
           upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
           upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
           gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
