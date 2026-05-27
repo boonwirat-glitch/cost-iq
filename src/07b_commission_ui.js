@@ -3932,7 +3932,8 @@ function openCommissionRulebook() {
     ])
   ].join('');
 
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
+  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
     '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'+
       '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
@@ -3944,7 +3945,11 @@ function openCommissionRulebook() {
     '<div style="overflow-y:auto;padding:0 18px 32px;-webkit-overflow-scrolling:touch;flex:1">'+html+'</div>'+
   '</div>';
 
-  requestAnimationFrame(function(){ ov.style.opacity='1'; });
+  requestAnimationFrame(function(){
+    ov.style.opacity='1';
+    var sh=ov.querySelector('div');
+    if(sh) sh.style.maxHeight=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.85))+'px';
+  });
 }
 
 function closeCommissionRulebook() {
@@ -3973,13 +3978,18 @@ function openCommissionHistory() {
   }
 
   // Loading state
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
     + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.45);font-size:13px">กำลังโหลด...</div>'
     + '</div>';
 
-  requestAnimationFrame(function(){ ov.style.opacity='1'; });
+  requestAnimationFrame(function(){
+    ov.style.opacity='1';
+    var sh=ov.querySelector('div');
+    if(sh) sh.style.maxHeight=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  });
 
   var role = getCurrentRole ? getCurrentRole() : '';
   var email = (currentUserProfile && currentUserProfile.email) || '';
@@ -4059,7 +4069,8 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   // Store rows globally for detail lookup
   window._commHistoryAllRows = allRows;
 
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'
       +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
@@ -4125,7 +4136,8 @@ window._commOpenHistoryDetail = function(period) {
     return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(g.groupKey||'')+'</span><span style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+money(g.commission)+'</span></div>';
   }).join('');
 
-  var detailHtml = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  var _mxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  var detailHtml = '<div style="width:100%;max-width:520px;max-height:'+_mxH+';height:'+_mxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px">'
       +'<div>'
