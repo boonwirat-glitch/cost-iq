@@ -24501,7 +24501,6 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
       const firstKey = Object.keys(acctData)[0] || '';
       const firstVal = acctData[firstKey];
       const isNewFormat = firstVal && typeof firstVal === 'object' &&
-                          !Object.values(firstVal)[0]?.[currLabel] &&
                           Object.values(firstVal)[0] && typeof Object.values(Object.values(firstVal)[0])[0] === 'object';
       const outletMap = isNewFormat ? acctData : { _all: acctData };
       const baselineByOutlet = baselineSet[accountId] || {};
