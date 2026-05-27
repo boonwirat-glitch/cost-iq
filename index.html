@@ -1,4 +1,4 @@
-<!-- Freshket Sense v248a: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v248b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v248a',
+      version: 'v248b',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -28090,13 +28090,13 @@ function _renderComponentRatesEditor() {
       <div class="comm-grid2" style="gap:8px">
         ${fld('P1 rate (item ใหม่ บัญชีนี้)','upsell_sku','p1_rate',0.03,0.005,'pct-d')}
         ${fld('P3 rate (growth existing item)','upsell_sku','p3_rate',0.03,0.005,'pct-d')}
-        ${fld('P3 growth threshold ×','upsell_sku','p3_threshold_pct',1.50,0.05,'mul')}
+        ${fld('P3 growth threshold ×','upsell_sku','p3_threshold_pct',2.00,0.05,'mul')}
         ${fld('P1 & P3 min GMV (gate)','upsell_sku','p1_min_gmv',2500,100,'฿')}
-        ${fld('P3 min incremental (gate)','upsell_sku','p3_min_incremental',2500,100,'฿')}
+        ${fld('P3 min incremental (gate)','upsell_sku','p3_min_incremental',5000,100,'฿')}
       </div>
       <div class="comm-formula-note">
         <b>P1</b>: item ใหม่ที่บัญชีนี้ไม่เคยซื้อ (เดือนก่อน) · GMV ≥ ฿${cfg('upsell_sku','p1_min_gmv',2500).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p1_rate',0.03)*100)}% ทุก outlet<br>
-        <b>P3</b>: item เดิม existing outlet · ยอดปัจจุบัน > baseline × ${cfg('upsell_sku','p3_threshold_pct',1.50).toFixed(2)} AND incremental ≥ ฿${cfg('upsell_sku','p3_min_incremental',2500).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p3_rate',0.03)*100)}% × incremental
+        <b>P3</b>: item เดิม existing outlet · ยอดปัจจุบัน > baseline × ${cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(2)} AND incremental ≥ ฿${cfg('upsell_sku','p3_min_incremental',5000).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p3_rate',0.03)*100)}% × incremental
       </div>
     </div>
     <div class="comm-component-section" style="margin-top:14px">
@@ -30616,9 +30616,9 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     function cfg(k,p,d){try{return typeof _commGetConfig==="function"?_commGetConfig(k,p,d):d;}catch(e){return d;}}
     var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*100);
     var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*100);
-    var p3Thresh=cfg("upsell_sku","p3_threshold_pct",1.50);
+    var p3Thresh=cfg("upsell_sku","p3_threshold_pct",2.00);
     var p3ThreshPct=Math.round((p3Thresh-1)*100);
-    var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",2500)).toLocaleString("en-US");
+    var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",5000)).toLocaleString("en-US");
     var p1MinGmv=Number(cfg("upsell_sku","p1_min_gmv",2500)).toLocaleString("en-US");
     var outRate=Math.round(cfg("upsell_outlet","rate",0.015)*1000)/10;
     var hoT2=cfg("handover","tier2_pct",100);
@@ -31578,9 +31578,9 @@ function openCommissionRulebook() {
   // Read live config
   var p1Rate     = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
   var p3Rate     = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
-  var p3Thresh   = Math.round((cfg('upsell_sku','p3_threshold_pct',1.50)-1)*100);
+  var p3Thresh   = Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100);
   var p1MinGmv   = fmtB(cfg('upsell_sku','p1_min_gmv',2500));
-  var p3MinIncr  = fmtB(cfg('upsell_sku','p3_min_incremental',2500));
+  var p3MinIncr  = fmtB(cfg('upsell_sku','p3_min_incremental',5000));
   var outRate    = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
   var hoT2Pct    = cfg('handover','tier2_pct',100);
   var hoT3Pct    = cfg('handover','tier3_pct',120);
