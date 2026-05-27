@@ -1,4 +1,4 @@
-<!-- Freshket Sense v243b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v244: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v243b',
+      version: 'v244',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -4531,7 +4531,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
       r2Base: R2_BASE,
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover']),
       // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
-      criticalKeys: Object.freeze(['portview','history','handover']),
+      criticalKeys: Object.freeze(['portview','history','handover','outlets']),
       enhancementKeys: Object.freeze(['categories','sku_current','outlets']),
       backgroundKeys: Object.freeze([]),  // v207b: no global bulk SKU auto-load; Sense uses per-KAM bundle on demand
       r2Files: Object.freeze({
@@ -25540,7 +25540,10 @@ function _commDaysInLabel(label) {
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
-function _commComputeUpsellSku(kamEmail) {
+function _commComputeUpsellSku(kamEmail, expansionIds) {
+  // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
+  // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
+  const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
   try {
@@ -25594,6 +25597,8 @@ function _commComputeUpsellSku(kamEmail) {
       const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
 
       Object.keys(outletMap).forEach(outletId => {
+        // v244: skip expansion outlets — earn 1.5% via outlet commission, not P1/P3
+        if (_expIds.has(String(outletId))) return;
         const outletGroups = outletMap[outletId];
         // outlet-level baseline: 3-month lookback
         const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set
@@ -25671,59 +25676,40 @@ function _commComputeUpsellSku(kamEmail) {
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
 function _commComputeUpsellOutlet(kamEmail) {
-  const EMPTY = { outlet_gmv:0, commission:0, new_gmv:0, comeback_gmv:0 };
+  // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
+  // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
+  // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
+  const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
-    const _pvRow2 = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
-    const _kamKey2 = (_pvRow2 && _pvRow2.kamName) ? _pvRow2.kamName : kamEmail;
-    const byKam2 = bulkUpsellData.byKam || {};
-    let kamData = byKam2[_kamKey2] || byKam2[kamEmail] || {};
-    if (!Object.keys(kamData).length && _kamKey2) {
-      const _fk = Object.keys(byKam2).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
-      if (_fk) kamData = byKam2[_fk];
-    }
-    if (!Object.keys(kamData).length) return EMPTY;
-    const baselineGroups = bulkUpsellData.baselineGroups || {};
-    let baselineSet = baselineGroups[_kamKey2] || baselineGroups[kamEmail] || {};
-    if (!Object.keys(baselineSet).length && _kamKey2) {
-      const _fk2 = Object.keys(baselineGroups).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
-      if (_fk2) baselineSet = baselineGroups[_fk2];
-    }
-    const currLabel = _commCurrentMonthLabel();
+    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
+    const nrrResult = _tgtComputeKamNRR(kamEmail, null);
+    if (!nrrResult) return EMPTY;
 
-    let newGmv = 0, comebackGmv = 0;
+    // Sum expansion GMV across all cohorts (core + transferIn + newFromSales)
+    const expansionGmv = (nrrResult.expansionGmv || 0)
+      + (nrrResult.transferIn  && nrrResult.transferIn.expansionGmv  || 0)
+      + (nrrResult.newFromSales && nrrResult.newFromSales.expansionGmv || 0);
 
-    // v2: outlet-level loop (account → outlet → groupKey)
-    // legacy fallback: if structure is old (account → groupKey), wrap outlet as _all
-    Object.keys(kamData).forEach(accountId => {
-      const acctData = kamData[accountId];
-      const baselineByOutlet = baselineSet[accountId] || {};
-      const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
+    // Build expansion outlet ID set — used by _commComputeUpsellSku to exclude from P1/P3
+    const expansionIds = new Set();
+    const addExpansionIds = (detail) => {
+      if (!detail) return;
+      (detail.expansionDetail || []).forEach(g =>
+        (g.outlets || []).forEach(o => { if(o.outletId) expansionIds.add(String(o.outletId)); })
+      );
+    };
+    addExpansionIds(nrrResult);
+    addExpansionIds(nrrResult.transferIn);
+    addExpansionIds(nrrResult.newFromSales);
 
-      const firstVal = acctData[Object.keys(acctData)[0]];
-      const isNewFormat = firstVal && typeof firstVal === 'object' &&
-                          !Object.values(firstVal)[0]?.[currLabel] &&
-                          Object.values(firstVal)[0] && typeof Object.values(Object.values(firstVal)[0])[0] === 'object';
-      const outletMap = isNewFormat ? acctData : { _all: acctData };
-
-      Object.keys(outletMap).forEach(outletId => {
-        const outletGroups = outletMap[outletId];
-        const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set
-          ? baselineByOutlet[outletId] : new Set());
-
-        Object.keys(outletGroups).forEach(groupKey => {
-          if (!outletBaseline.has(groupKey)) return; // skip P1 — already counted at 3%
-          const currRow = (outletGroups[groupKey] || {})[currLabel];
-          if (!currRow) return;
-          newGmv      += (currRow.newGmv      || 0);
-          comebackGmv += (currRow.comebackGmv || 0);
-        });
-      });
-    });
-
-    const outletGmv = newGmv + comebackGmv;
-    return { outlet_gmv: outletGmv, commission: outletGmv * rate, new_gmv: newGmv, comeback_gmv: comebackGmv };
+    return {
+      outlet_gmv: expansionGmv,
+      commission: expansionGmv * rate,
+      expansion_gmv: expansionGmv,
+      expansion_outlets: [],
+      _expansionIds: expansionIds
+    };
   } catch(e) {
     console.warn('[CommEngine] _commComputeUpsellOutlet error', e);
     return EMPTY;
@@ -25930,8 +25916,8 @@ function _commBuildKamPayout(kamEmail) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellSku    = _commComputeUpsellSku(kamEmail);
       upsellOutlet = _commComputeUpsellOutlet(kamEmail);
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds);
     }
     const handover      = _commComputeHandoverRetention(kamEmail);
     const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
@@ -30622,7 +30608,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       outDetail=ruleBox([ruleLine(od.outlet_gmv>0,"ใหม่ "+money(od.new_gmv)+" · comeback "+money(od.comeback_gmv)," × "+outRate+"%"),
                           ruleIndent("ไม่นับ item ที่ได้ P1 ไปแล้ว")]);
     }
-    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","New/Comeback","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
+    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Expansion","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
 
     // Handover row — 2-line tier breakdown
     var hoDetail="";
@@ -30679,8 +30665,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var upsellHasDrill=!!(p1g&&p1g.length||p3g&&p3g.length);
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
-    var ncSub='สาขาใหม่/comeback × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
-    var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
+    var ncSub='สาขาใหม่ × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
+    var ncRowHtml=cRow('rgba(188,215,255,.45)','Expansion',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
 
     // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
     var hoSub=(function(){
@@ -30889,6 +30875,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(old)old.parentNode.replaceChild(restored,old);
     }
     window._pvCommDrillSaved=null;
+    // v244-fix: re-attach chooser listeners if restored sheet is the chooser
+    requestAnimationFrame(function(){
+      var b1=document.getElementById('pvChooseP1');
+      var b3=document.getElementById('pvChooseP3');
+      if(b1)b1.addEventListener('click',function(){window._commOpenUpsellDrill('p1');});
+      if(b3)b3.addEventListener('click',function(){window._commOpenUpsellDrill('p3');});
+    });
   };
 
   window._commToggleDrillOutlet=function(oid){
@@ -31095,12 +31088,12 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
         +'<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'+types.join('')+'</div></div>'
         +'<div style="text-align:right;flex-shrink:0;margin-left:12px">'
         +'<div style="font-size:13px;font-weight:900;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(total)+'</div>'
-        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'0.015'))||0.015)))+'</div>'
+        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'1.5'))/100||0.015)))+'</div>'
         +'</div></div>';
     }).join('');
 
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
-      +_pvDrillHeader('New/Comeback','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
+      +_pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
       +'<div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">New GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.new_gmv||0)+'</div></div>'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Comeback GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.comeback_gmv||0)+'</div></div>'
