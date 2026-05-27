@@ -1202,7 +1202,7 @@ function renderCommissionPreviewTab() {
     </div>
     <div class="tgt-preview-section-title">
       <span>KAM payout estimate</span>
-      <span style="font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.42)">${model.kamRows.length} KAM</span>
+      <span style="font-family:monospace;color:rgba(255,255,255,.42)">${model.kamRows.length} KAM</span>
     </div>
     ${model.kamRows.map(r => {
       const cls = r.pct === null ? '' : (r.pct >= (_tgtSettings.nrr_threshold || 98) ? 'ok' : 'warn');
@@ -3403,7 +3403,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
           totalGmv+=o.currGmv||0;
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px 8px 28px;border-bottom:1px solid rgba(188,215,255,.05)">'
             +'<span style="font-size:12px;color:rgba(225,238,255,.72)">'+es(o.outletName||o.outletId||'—')+'</span>'
-            +'<span style="font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#ffe08a">'+mon(o.currGmv||0)+'</span>'
+            +'<span style="font-size:12px;font-weight:700;font-family:monospace;color:#ffe08a">'+mon(o.currGmv||0)+'</span>'
             +'</div>';
         }).join('');
         if(!outletRows)return;
@@ -3412,7 +3412,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
           +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(255,255,255,.03)">'
           +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(g.acctName||g.acctId||'—')+'</div>'
           +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+(g.outlets||[]).length+' สาขา</div></div>'
-          +'<span style="font-size:13px;font-weight:900;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(acctTotal)+'</span>'
+          +'<span style="font-size:13px;font-weight:900;color:#ffe08a;font-family:monospace">'+mon(acctTotal)+'</span>'
           +'</div>'
           +outletRows
           +'</div>'
@@ -3430,23 +3430,23 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(255,224,138,.12)','#ffe08a')
       +'<div style="padding:10px 16px;display:flex;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
       +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+allOutlets.length+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">account</div></div>'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+allOutlets.length+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">account</div></div>'
       +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(totalGmv)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">expansion GMV</div></div>'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+mon(totalGmv)+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">expansion GMV</div></div>'
       +'<div style="flex:1;text-align:center">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(comm)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">commission</div></div>'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+mon(comm)+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">commission</div></div>'
       +'</div>'
       +(allOutlets.length
-        ?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:'IBM Plex Mono',monospace;flex-shrink:0">สาขาใหม่ที่เปิดเดือนนี้</div>'
+        ?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:monospace;flex-shrink:0">สาขาใหม่ที่เปิดเดือนนี้</div>'
           +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+allOutlets.join('')+'</div>'
         :'<div style="padding:24px;text-align:center;color:rgba(225,238,255,.35);font-size:13px">ไม่มีสาขาใหม่เดือนนี้</div>'
       )
       +'<div style="padding:10px 16px;border-top:1px solid rgba(188,215,255,.10);display:flex;justify-content:space-between;flex-shrink:0">'
       +'<span style="font-size:13px;color:rgba(225,238,255,.75)">Commission (× '+(cfg.outRate||'1.5')+'%)</span>'
-      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:'IBM Plex Mono',monospace;text-shadow:0 0 14px rgba(255,224,138,.15)">'+mon(comm)+'</span>'
+      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:monospace;text-shadow:0 0 14px rgba(255,224,138,.15)">'+mon(comm)+'</span>'
       +'</div></div>';
     window._pvPushDrill(html);
   };
