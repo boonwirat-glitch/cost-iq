@@ -3021,7 +3021,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
     var ncSub='สาขาใหม่ × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
-    var ncRowHtml=cRow('rgba(188,215,255,.45)','Expansion',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
+    var ncRowHtml=cRow('rgba(255,224,138,.8)','Expansion',ncSub,src.upsell_outlet,'#ffe08a','_commDrillExpansion()');
 
     // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
     var hoSub=(function(){
@@ -3381,88 +3381,76 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     });
   };
 
-  window._commDrillNewComeback=function(){
-    var src=window._pvCommDrillSrc||{};
+  window._commDrillExpansion=function(){
+    // v244: use expansion data directly from _tgtComputeKamNRR — same source as portview Expansion tab
     var st=window._pvCommDrillSt||{};
     var cfg=window._pvCommDrillCfg||{};
-    var od=src.upsell_outlet_detail||{};
-    function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
+    function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000000)return'\u0e3f'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
-    // Build outlet-level breakdown from kamData + baselineGroups
-    var kamEmail=st.email||'';
-    var ncRows=[];
-    try{
-      if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&bulkUpsellData.byKam){
-        var _pvRow=portviewBulkData&&portviewBulkData.find(function(r){return r.kamEmail===kamEmail;});
-        var _kamKey=(_pvRow&&_pvRow.kamName)?_pvRow.kamName:kamEmail;
-        var kamData=bulkUpsellData.byKam[_kamKey]||bulkUpsellData.byKam[kamEmail]||{};
-        if(!Object.keys(kamData).length){
-          var fk=Object.keys(bulkUpsellData.byKam).find(function(k){return k.startsWith(_kamKey)||_kamKey.startsWith(k);});
-          if(fk)kamData=bulkUpsellData.byKam[fk];
-        }
-        var baselineGroups=bulkUpsellData.baselineGroups||{};
-        var baselineSet=baselineGroups[_kamKey]||baselineGroups[kamEmail]||{};
-        if(!Object.keys(baselineSet).length){
-          var fk2=Object.keys(baselineGroups).find(function(k){return k.startsWith(_kamKey)||_kamKey.startsWith(k);});
-          if(fk2)baselineSet=baselineGroups[fk2];
-        }
-        var currLabel=(typeof _commCurrentMonthLabel==='function'?_commCurrentMonthLabel():'');
-        Object.keys(kamData).forEach(function(accountId){
-          var acctData=kamData[accountId];
-          var baselineByOutlet=baselineSet[accountId]||{};
-          var legacySet=baselineByOutlet instanceof Set?baselineByOutlet:null;
-          var firstVal=acctData[Object.keys(acctData)[0]];
-          var isNew=firstVal&&typeof firstVal==='object'&&!Object.values(firstVal)[0]?.[currLabel]&&Object.values(firstVal)[0]&&typeof Object.values(Object.values(firstVal)[0])[0]==='object';
-          var outletMap=isNew?acctData:{_all:acctData};
-          Object.keys(outletMap).forEach(function(outletId){
-            var outletGroups=outletMap[outletId];
-            var outletBs=legacySet||(baselineByOutlet[outletId] instanceof Set?baselineByOutlet[outletId]:new Set());
-            var oNew=0,oCome=0;
-            Object.keys(outletGroups).forEach(function(groupKey){
-              if(!outletBs.has(groupKey))return;
-              var cr=(outletGroups[groupKey]||{})[currLabel];
-              if(!cr)return;
-              oNew+=(cr.newGmv||0);oCome+=(cr.comebackGmv||0);
-            });
-            if(oNew+oCome>0) ncRows.push({outletId:outletId,accountId:accountId,newGmv:oNew,comebackGmv:oCome});
-          });
-        });
-        ncRows.sort(function(a,b){return(b.newGmv+b.comebackGmv)-(a.newGmv+a.comebackGmv);});
-      }
-    }catch(e){console.warn('nc drill',e);}
+    var nrrResult=typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null;
+    var rate=Number(String(cfg.outRate||'1.5'))/100||0.015;
 
-    var rowsHtml=ncRows.map(function(r){
-      var oName=_pvOutletName(r.outletId,r.accountId);
-      var total=r.newGmv+r.comebackGmv;
-      var types=[];
-      if(r.newGmv>0)types.push('<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(77,220,151,.12);color:#4ddc97;font-weight:700">New '+mon(r.newGmv)+'</span>');
-      if(r.comebackGmv>0)types.push('<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(255,224,138,.10);color:#ffe08a;font-weight:700">Comeback '+mon(r.comebackGmv)+'</span>');
-      return '<div style="padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.07);display:flex;align-items:center;justify-content:space-between">'
-        +'<div><div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.88)">'+es(oName)+'</div>'
-        +'<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'+types.join('')+'</div></div>'
-        +'<div style="text-align:right;flex-shrink:0;margin-left:12px">'
-        +'<div style="font-size:13px;font-weight:900;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(total)+'</div>'
-        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'1.5'))/100||0.015)))+'</div>'
-        +'</div></div>';
-    }).join('');
+    // Collect expansion outlets from all cohorts
+    var allOutlets=[];
+    var totalGmv=0;
+    function addExpansion(result){
+      if(!result)return;
+      (result.expansionDetail||[]).forEach(function(g){
+        var acctTotal=0;
+        var outletRows=(g.outlets||[]).map(function(o){
+          acctTotal+=o.currGmv||0;
+          totalGmv+=o.currGmv||0;
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px 8px 28px;border-bottom:1px solid rgba(188,215,255,.05)">'
+            +'<span style="font-size:12px;color:rgba(225,238,255,.72)">'+es(o.outletName||o.outletId||'—')+'</span>'
+            +'<span style="font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#ffe08a">'+mon(o.currGmv||0)+'</span>'
+            +'</div>';
+        }).join('');
+        if(!outletRows)return;
+        allOutlets.push(
+          '<div style="border-bottom:1px solid rgba(188,215,255,.09)">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(255,255,255,.03)">'
+          +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(g.acctName||g.acctId||'—')+'</div>'
+          +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+(g.outlets||[]).length+' สาขา</div></div>'
+          +'<span style="font-size:13px;font-weight:900;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(acctTotal)+'</span>'
+          +'</div>'
+          +outletRows
+          +'</div>'
+        );
+      });
+    }
+    if(nrrResult){
+      addExpansion(nrrResult);
+      addExpansion(nrrResult.transferIn);
+      addExpansion(nrrResult.newFromSales);
+    }
 
+    var comm=Math.round(totalGmv*rate);
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
-      +_pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
-      +'<div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;border-bottom:1px solid rgba(188,215,255,.10)">'
-      +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">New GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.new_gmv||0)+'</div></div>'
-      +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Comeback GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.comeback_gmv||0)+'</div></div>'
+      +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(255,224,138,.12)','#ffe08a')
+      +'<div style="padding:10px 16px;display:flex;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
+      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+allOutlets.length+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">account</div></div>'
+      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(totalGmv)+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">expansion GMV</div></div>'
+      +'<div style="flex:1;text-align:center">'
+      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:'IBM Plex Mono',monospace">'+mon(comm)+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace">commission</div></div>'
       +'</div>'
-      +(ncRows.length?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:\'IBM Plex Mono\',monospace;flex-shrink:0">รายละเอียด outlet</div>':'')
-      +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+rowsHtml+'</div>'
+      +(allOutlets.length
+        ?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:'IBM Plex Mono',monospace;flex-shrink:0">สาขาใหม่ที่เปิดเดือนนี้</div>'
+          +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+allOutlets.join('')+'</div>'
+        :'<div style="padding:24px;text-align:center;color:rgba(225,238,255,.35);font-size:13px">ไม่มีสาขาใหม่เดือนนี้</div>'
+      )
       +'<div style="padding:10px 16px;border-top:1px solid rgba(188,215,255,.10);display:flex;justify-content:space-between;flex-shrink:0">'
       +'<span style="font-size:13px;color:rgba(225,238,255,.75)">Commission (× '+(cfg.outRate||'1.5')+'%)</span>'
-      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(src.upsell_outlet||0)+'</span>'
+      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:'IBM Plex Mono',monospace;text-shadow:0 0 14px rgba(255,224,138,.15)">'+mon(comm)+'</span>'
       +'</div></div>';
-    _pvPushDrill(html);
+    window._pvPushDrill(html);
   };
-
-  // Handover drill
+  window._commDrillNewComeback=window._commDrillExpansion; // alias for back-compat
   window._commDrillHandover=function(){
     var src=window._pvCommDrillSrc||{};
     var cfg=window._pvCommDrillCfg||{};
