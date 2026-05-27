@@ -14,7 +14,7 @@ dates AS (
   SELECT
     DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) AS baseline_mo,
     DATE_TRUNC(CURRENT_DATE(), MONTH)                              AS current_mo,
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 4 MONTH), MONTH) AS lookback_start
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH) AS lookback_start
 ),
 
 -- Active KAM whitelist
