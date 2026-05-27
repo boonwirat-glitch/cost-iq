@@ -27,6 +27,7 @@ function ensureCommissionCockpitOverlay() {
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
         <button class="comm-secondary" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">Close</button>
+        <button class="comm-secondary" onclick="openCommissionRulebook()" style="color:rgba(225,238,255,.55)">กฎค่าคอมฯ</button>
         <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
       </div>
     </div>
@@ -3076,6 +3077,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       heroHtml,
       '<div style="font-size:10px;color:rgba(225,238,255,.22);text-align:center;padding:0 18px 12px;font-family:\'IBM Plex Mono\',monospace">คำนวณจาก CSV ที่โหลดอยู่ · v235 · '+nowStr+'</div>',
       exportBtnHtml,
+      '<div style="padding:0 18px 8px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button></div>',
       '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ปิด</button></div>',
       '</div>',
       '</div></div>',
@@ -3811,5 +3813,134 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
 
 //////////////////////////////////////////////////////////////////////////////
+
+// ── Commission Rulebook — v247d ──────────────────────────────────────────────
+// Opens a standalone bottom sheet explaining all commission rules in plain language.
+// Entry points: KAM compact sheet · TL commission sheet · Admin cockpit footer
+// All numeric values read live from _commGetConfig() to stay in sync with admin config.
+
+function openCommissionRulebook() {
+  var ov = document.getElementById('comm-rulebook-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'comm-rulebook-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(5,14,28,.72);display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .22s';
+    ov.onclick = function(e){ if(e.target===ov) closeCommissionRulebook(); };
+    document.body.appendChild(ov);
+  }
+  function cfg(k,p,d){ try{ return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){ return d; } }
+  function fmtPct(n){ return Math.round(Number(n||0)*100)+'%'; }
+  function fmtB(n){ var v=Number(n||0); return '฿'+v.toLocaleString('en-US'); }
+  function fmtPctRaw(n){ return Number(n||0)+'%'; }
+
+  // Read live config
+  var p1Rate     = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
+  var p3Rate     = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
+  var p3Thresh   = Math.round((cfg('upsell_sku','p3_threshold_pct',1.50)-1)*100);
+  var p1MinGmv   = fmtB(cfg('upsell_sku','p1_min_gmv',2500));
+  var p3MinIncr  = fmtB(cfg('upsell_sku','p3_min_incremental',2500));
+  var outRate    = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
+  var hoT2Pct    = cfg('handover','tier2_pct',100);
+  var hoT3Pct    = cfg('handover','tier3_pct',120);
+  var hoT2Pay    = fmtB(cfg('handover','tier2_payout',2500));
+  var hoT3Bon    = fmtB(cfg('handover','tier3_bonus',2500));
+  var gT1        = cfg('gmv_gate','threshold_1',95);
+  var gT2        = cfg('gmv_gate','threshold_2',90);
+  var gC1        = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
+  var gC2        = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
+
+  function sec(title, color, rows) {
+    var rowHtml = rows.map(function(r) {
+      return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07)">'+
+        '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.45);min-width:90px;flex-shrink:0;padding-top:1px">'+r[0]+'</div>'+
+        '<div style="font-size:12px;color:rgba(225,238,255,.80);line-height:1.55">'+r[1]+'</div>'+
+        '</div>';
+    }).join('');
+    return '<div style="margin-bottom:14px">'+
+      '<div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:'+color+';padding:12px 0 6px;font-family:'+"'IBM Plex Mono',monospace"+'">'+title+'</div>'+
+      rowHtml+
+      '</div>';
+  }
+
+  var html = [
+    sec('NRR', '#4ddc97', [
+      ['วัดอะไร', 'ยอด GMV ของร้านในกลุ่ม cohort (ร้านที่ซื้อเดือนที่แล้ว) เทียบกับเดือนที่แล้ว'],
+      ['เดือนฐาน', 'เดือนล่าสุดในไฟล์ประวัติ (rolling MoM โดย default)'],
+      ['วิธีคำนวณ', 'Daily rate ทั้งสองฝั่ง: NRR = (GMV MTD ÷ วันที่ผ่านมา) ÷ (GMV เดือนฐาน ÷ วันในเดือนฐาน)'],
+      ['cohort คือ', 'outlet ที่มี GMV ในเดือนฐาน — ไม่นับ comeback, expansion ใน cohort หลัก'],
+      ['Transfer In', 'ร้านที่โอนมาจาก KAM อื่นเดือนนี้ — NRR แยกแสดง ไม่นับในยอด commission'],
+      ['Exclusion', 'ถ้ามี exclusion approved จะหักฐานก่อนคำนวณ NRR ด้วย daily rate เหมือนกัน']
+    ]),
+    sec('Expansion (สาขาใหม่)', '#00c8b0', [
+      ['นิยาม', 'outlet ที่ซื้อเดือนนี้ แต่ไม่เคยปรากฏใน history ย้อนหลัง 6 เดือน (ก่อนเดือนที่แล้ว)'],
+      ['ไม่ใช่ expansion', 'Comeback (เคยซื้อ→หาย→กลับมา) ไม่ได้ค่าคอมฯ'],
+      ['อัตรา', outRate+'% ของ GMV ทั้งหมดของ outlet นั้น (flat rate, ไม่แบ่ง P1/P3)'],
+      ['ข้อมูล', 'sense_outlets_monthly.csv (everSeen set ย้อนหลัง 6 เดือนจาก bulk_outlets)']
+    ]),
+    sec('P1 — กลุ่มสินค้าใหม่', '#ffe08a', [
+      ['เงื่อนไข', 'outlet ที่ไม่ใช่ expansion + ไม่เคยซื้อ group_key นี้ใน 3 เดือนที่ผ่านมา (M-1, M-2, M-3)'],
+      ['ระดับ', 'วัดที่ระดับ outlet × group_key (ไม่ใช่ account)'],
+      ['เกณฑ์ขั้นต่ำ', 'GMV เดือนนี้ใน group_key นั้น ≥ '+p1MinGmv],
+      ['อัตรา', p1Rate+'% ของ GMV รวมของ group_key นั้น (actual MTD)'],
+      ['ข้อยกเว้น', 'Expansion outlets ถูก exclude ก่อน — ได้แค่ '+outRate+'% flat ผ่าน expansion']
+    ]),
+    sec('P3 — ยอดเติบโต', '#ffe08a', [
+      ['เงื่อนไข', 'outlet ที่เคยซื้อ group_key นี้ใน 3 เดือนที่ผ่านมา + ยอดเดือนนี้โตเกิน '+p3Thresh+'% จาก max baseline'],
+      ['max baseline', 'เอา GMV ของ M-1, M-2, M-3 มา normalize เป็น 30 วัน แล้วเอาค่าสูงสุด'],
+      ['incremental', 'GMV existing เดือนนี้ (actual MTD) − max baseline (normalized)'],
+      ['เกณฑ์ขั้นต่ำ', 'incremental ≥ '+p3MinIncr],
+      ['อัตรา', p3Rate+'% ของ incremental'],
+      ['MTD note', 'ฝั่ง current = actual MTD (ไม่ normalized) → ต้นเดือนมักยังไม่ผ่านเกณฑ์ ยอดจะค่อยๆ ขึ้นปลายเดือน'],
+      ['ข้อยกเว้น', 'Expansion outlets ถูก exclude เช่นเดียวกับ P1']
+    ]),
+    sec('Handover (จาก Sales)', '#bcd7ff', [
+      ['นิยาม', 'ร้านที่เพิ่งย้ายมาอยู่กับ KAM เดือนนี้ + ไม่ได้มาจาก KAM คนอื่น (มาจาก Sales/PM)'],
+      ['ต่างจาก Transfer In', 'Transfer In = มาจาก KAM อื่น (มีบันทึกใน handover CSV) → ไม่ได้ค่าคอม Handover'],
+      ['เดือนฐาน', 'GMV เดือนที่แล้วของร้านนั้น (ยอดสุดท้ายที่ทำกับ Sales)'],
+      ['วิธีวัด', 'Retention = GMV MTD เดือนนี้ ÷ GMV เดือนฐาน × 100 (actual, ไม่ normalize)'],
+      ['Tier', '≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT2Pay+' + '+hoT3Bon+' bonus · < '+hoT2Pct+'% → ฿0']
+    ]),
+    sec('NRR Gate (KAM)', 'rgba(255,107,61,.9)', [
+      ['ทำงานยังไง', 'ถ้า NRR ต่ำเกินเกณฑ์ จะ cap ค่าคอมฯ ทุกส่วน (NRR + upsell + handover) รวมกัน'],
+      ['เกณฑ์', 'NRR < '+gT1+'% → ×'+gC1+'% · NRR < '+gT2+'% → ×'+gC2+'% · NRR ≥ '+gT1+'% → ×100%'],
+      ['ใครโดน', 'KAM เท่านั้น — TL ไม่มี gate']
+    ]),
+    sec('TL NRR', '#c084fc', [
+      ['วัดอะไร', 'NRR รวมของทุก account ในทีม (aggregate ทุก KAM ในทีม)'],
+      ['tier', '< 98.5% = ฿0 · 98.5–99% = ฿5K · 99–100% = ฿8K · 100–102% = ฿12K · 102–103% = ฿30K · ≥103% = ฿50K'],
+      ['Upsell Mult', 'NRR payout ถูก × ด้วย multiplier จาก upsell performance ของทีม (ดูด้านล่าง)']
+    ]),
+    sec('TL Upsell Multiplier', '#c084fc', [
+      ['สูตร', 'team_upsell_pct = Σ(P1 + P3 incr ทุก KAM) ÷ Σ(baseline GMV ทุก KAM) × 100'],
+      ['Tier', '< 2% = ×1.00 · 2–2.99% = ×1.20 · 3–3.99% = ×1.35 · 4–4.99% = ×1.50 · ≥5% = ×1.80'],
+      ['หมายเหตุ', 'Expansion outlets ไม่นับใน upsell base ของ TL (P1+P3 ที่ existing outlets เท่านั้น)'],
+      ['Final TL', 'TL final = NRR payout × multiplier (ไม่มี gate, ไม่มี expansion commission โดยตรง)']
+    ])
+  ].join('');
+
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
+    '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'+
+      '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<div style="font-size:10px;color:rgba(188,215,255,.35);font-family:'+"'IBM Plex Mono',monospace"+'">live config</div>'+
+        '<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="overflow-y:auto;padding:0 18px 24px;-webkit-overflow-scrolling:touch">'+html+'</div>'+
+  '</div>';
+
+  requestAnimationFrame(function(){ ov.style.opacity='1'; });
+}
+
+function closeCommissionRulebook() {
+  var ov = document.getElementById('comm-rulebook-overlay');
+  if (!ov) return;
+  ov.style.opacity = '0';
+  setTimeout(function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }, 230);
+}
+
+window.openCommissionRulebook = openCommissionRulebook;
+window.closeCommissionRulebook = closeCommissionRulebook;
 
 console.log('[Target Module v1] loaded');
