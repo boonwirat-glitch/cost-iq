@@ -217,8 +217,8 @@ commission_items AS (
     CASE
       WHEN c.outlet_type = 'existing'
         AND bg.group_key IS NOT NULL
-        AND c.existing_gmv > COALESCE(mb.max_bl, 0) * 1.50
-        AND c.existing_gmv - COALESCE(mb.max_bl, 0) >= 2500
+        AND c.existing_gmv > COALESCE(mb.max_bl, 0) * 2.00
+        AND c.existing_gmv - COALESCE(mb.max_bl, 0) >= 5000
       THEN 1 ELSE 0
     END AS is_p3
   FROM current_agg c
