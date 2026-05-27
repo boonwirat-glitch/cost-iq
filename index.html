@@ -1,4 +1,4 @@
-<!-- Freshket Sense v245c: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v246: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v245c',
+      version: 'v246',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30642,7 +30642,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // Clean component row builder
     function cRow(dot,label,sub,amt,amtColor,drillFn){
       var hasAmt=Number(amt||0)>0;
-      return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.07);'+(drillFn?'cursor:pointer':'')+'"'
+      return '<div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.09);'+(drillFn?'cursor:pointer':'')+'"'
         +(drillFn?' onclick="'+drillFn+'" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'"':'')+'>'
         +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:2px;background:'+dot+'"></div>'
         +'<div style="flex:1;min-width:0">'
@@ -30788,13 +30788,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
         var isOpen=expanded?true:(window._pvDrillExpandState[oid]||false);
         var skuRows=o.items.map(function(g){
           if(type==='p1'){
-            return '<div style="display:grid;grid-template-columns:1fr 64px 56px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center">'
+            return '<div style="display:grid;grid-template-columns:1fr 64px 56px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.08);align-items:center">'
               +'<span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</span>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.total_gmv)+'</span>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
               +'</div>';
           } else {
-            return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.05);align-items:center;gap:2px">'
+            return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.08);align-items:center;gap:2px">'
               +'<div><div style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</div>'
               +(g.max_baseline_month?'<div style="font-size:9px;color:rgba(225,238,255,.28);margin-top:1px">Base: '+es(g.max_baseline_month)+'</div>':'')+'</div>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.50)">'+mon(g.max_baseline||0)+'</span>'
@@ -30811,7 +30811,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
             +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
             +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>');
         return '<div>'
-          +'<div style="display:grid;'+colsHd+' 20px;padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.03)" '
+          +'<div style="display:grid;'+colsHd+' 20px;padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.05)" '
           +'onclick="_commToggleDrillOutlet(\''+oid+'\')">'
           +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(oName)+'</div>'
           +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+o.items.length+' กลุ่มสินค้า</div></div>'
@@ -31027,41 +31027,28 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 
   window._commDrillExpansion=function(){
-    // v244: use expansion data directly from _tgtComputeKamNRR — same source as portview Expansion tab
     var st=window._pvCommDrillSt||{};
     var cfg=window._pvCommDrillCfg||{};
+    var EX='#00c8b0'; // portview expansion teal
     function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000000)return'\u0e3f'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
     var nrrResult=typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null;
     var rate=Number(String(cfg.outRate||'1.5'))/100||0.015;
 
-    // Collect expansion outlets from all cohorts
-    var allOutlets=[];
+    var allAccounts=[];
     var totalGmv=0;
+    var expandState={};
     function addExpansion(result){
       if(!result)return;
       (result.expansionDetail||[]).forEach(function(g){
-        var acctTotal=0;
-        var outletRows=(g.outlets||[]).map(function(o){
-          acctTotal+=o.currGmv||0;
-          totalGmv+=o.currGmv||0;
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px 8px 28px;border-bottom:1px solid rgba(188,215,255,.05)">'
-            +'<span style="font-size:12px;color:rgba(225,238,255,.72)">'+es(o.outletName||o.outletId||'—')+'</span>'
-            +'<span style="font-size:12px;font-weight:700;font-family:monospace;color:#ffe08a">'+mon(o.currGmv||0)+'</span>'
-            +'</div>';
-        }).join('');
-        if(!outletRows)return;
-        allOutlets.push(
-          '<div style="border-bottom:1px solid rgba(188,215,255,.09)">'
-          +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(255,255,255,.03)">'
-          +'<div><div style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(g.acctName||g.acctId||'—')+'</div>'
-          +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">'+(g.outlets||[]).length+' สาขา</div></div>'
-          +'<span style="font-size:13px;font-weight:900;color:#ffe08a;font-family:monospace">'+mon(acctTotal)+'</span>'
-          +'</div>'
-          +outletRows
-          +'</div>'
-        );
+        var acctGmv=0;
+        var outlets=(g.outlets||[]);
+        outlets.forEach(function(o){acctGmv+=o.currGmv||0;totalGmv+=o.currGmv||0;});
+        if(!outlets.length)return;
+        var aid='pvExAcct'+allAccounts.length;
+        expandState[aid]=false;
+        allAccounts.push({aid:aid,name:g.acctName||g.acctId||'—',gmv:acctGmv,outlets:outlets});
       });
     }
     if(nrrResult){
@@ -31071,28 +31058,72 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     }
 
     var comm=Math.round(totalGmv*rate);
+
+    function buildRows(forceExpand){
+      return allAccounts.map(function(a){
+        var isOpen=forceExpand!==undefined?forceExpand:(expandState[a.aid]||false);
+        var outletRows=a.outlets.map(function(o){
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px 8px 24px;border-bottom:1px solid rgba(0,200,176,.06)">'
+            +'<span style="font-size:12px;color:rgba(225,238,255,.75)">'+es(o.outletName||o.outletId||'—')+'</span>'
+            +'<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:'+EX+';font-family:monospace">'+mon(o.currGmv||0)+'</div>'
+            +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:1px">MTD</div>'
+            +'</div></div>';
+        }).join('');
+        return '<div>'
+          +'<div onclick="_pvExToggle(\''+a.aid+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(0,200,176,.10);cursor:pointer;background:rgba(0,200,176,.04)">'
+          +'<span style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(a.name)+'</span>'
+          +'<div style="display:flex;align-items:center;gap:10px">'
+          +'<div style="text-align:right"><div style="font-size:13px;font-weight:900;color:'+EX+';font-family:monospace">'+mon(a.gmv)+'</div>'
+          +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:1px;text-align:right">MTD</div></div>'
+          +'<span id="pvExChev'+a.aid+'" style="font-size:14px;color:rgba(0,200,176,.4);transition:transform 150ms'+(isOpen?';transform:rotate(90deg)':'')+'">›</span>'
+          +'</div></div>'
+          +'<div id="'+a.aid+'" style="display:'+(isOpen?'block':'none')+'">'+outletRows+'</div>'
+          +'</div>';
+      }).join('');
+    }
+
+    window._pvExToggle=function(aid){
+      var el=document.getElementById(aid);
+      if(!el)return;
+      var open=el.style.display!=='none';
+      el.style.display=open?'none':'block';
+      expandState[aid]=!open;
+      var chev=document.getElementById('pvExChev'+aid);
+      if(chev){chev.style.transform=open?'':'rotate(90deg)';chev.style.color=open?'rgba(0,200,176,.4)':'rgba(0,200,176,.8)';}
+      var btn=document.getElementById('pvExToggleBtn');
+      if(btn){var anyOpen=Object.values(expandState).some(Boolean);btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';}
+    };
+    window._pvExToggleAll=function(){
+      var anyOpen=Object.values(expandState).some(Boolean);
+      Object.keys(expandState).forEach(function(k){expandState[k]=!anyOpen;});
+      var list=document.getElementById('pvExList');
+      if(list)list.innerHTML=buildRows(!anyOpen);
+      var btn=document.getElementById('pvExToggleBtn');
+      if(btn)btn.textContent=anyOpen?'ขยายทั้งหมด':'ย่อทั้งหมด';
+    };
+
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
-      +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(255,224,138,.12)','#ffe08a')
-      +'<div style="padding:10px 16px;display:flex;border-bottom:1px solid rgba(188,215,255,.10);flex-shrink:0">'
-      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+allOutlets.length+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">account</div></div>'
-      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+mon(totalGmv)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">expansion GMV</div></div>'
+      +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(0,200,176,.12)','#00c8b0')
+      +'<div style="padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid rgba(0,200,176,.10);flex-shrink:0">'
+      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(0,200,176,.08)">'
+      +'<div style="font-size:15px;font-weight:950;color:'+EX+';font-family:monospace">'+allAccounts.length+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">ACCOUNT</div></div>'
+      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(0,200,176,.08)">'
+      +'<div style="font-size:15px;font-weight:950;color:'+EX+';font-family:monospace">'+mon(totalGmv)+'</div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">MTD</div></div>'
       +'<div style="flex:1;text-align:center">'
       +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+mon(comm)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:monospace">commission</div></div>'
+      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">COMMISSION</div></div>'
       +'</div>'
-      +(allOutlets.length
-        ?'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);padding:10px 16px 4px;font-family:monospace;flex-shrink:0">สาขาใหม่ที่เปิดเดือนนี้</div>'
-          +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+allOutlets.join('')+'</div>'
+      +(allAccounts.length
+        ?'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;flex-shrink:0;border-bottom:1px solid rgba(0,200,176,.08)">'
+          +'<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35)">สาขาใหม่เดือนนี้</span>'
+          +'<button id="pvExToggleBtn" onclick="window._pvExToggleAll()" style="padding:4px 10px;border-radius:8px;background:rgba(0,200,176,.08);border:1px solid rgba(0,200,176,.18);color:rgba(0,200,176,.8);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">ขยายทั้งหมด</button>'
+          +'</div>'
+          +'<div id="pvExList" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+buildRows()+'</div>'
         :'<div style="padding:24px;text-align:center;color:rgba(225,238,255,.35);font-size:13px">ไม่มีสาขาใหม่เดือนนี้</div>'
       )
-      +'<div style="padding:10px 16px;border-top:1px solid rgba(188,215,255,.10);display:flex;justify-content:space-between;flex-shrink:0">'
-      +'<span style="font-size:13px;color:rgba(225,238,255,.75)">Commission (× '+(cfg.outRate||'1.5')+'%)</span>'
-      +'<span style="font-size:16px;font-weight:900;color:#ffe08a;font-family:monospace;text-shadow:0 0 14px rgba(255,224,138,.15)">'+mon(comm)+'</span>'
-      +'</div></div>';
+      +'</div>';
     window._pvPushDrill(html);
   };
   window._commDrillNewComeback=window._commDrillExpansion; // alias for back-compat
@@ -31104,7 +31135,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var hit2=hd.retention_pct>=cfg.hoT2;
     var hit3=hd.retention_pct>=cfg.hoT3;
     var detailRows=(hd.detail||[]).slice(0,8).map(function(a){
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07)">'
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.09)">'
         +'<div><div style="font-size:12px;font-weight:700;color:rgba(225,238,255,.82)">'+String(a.name||a.account_id||'—').slice(0,30)+'</div>'
         +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:1px">Base '+mon(a.baseline)+' → MTD '+mon(a.current)+'</div></div>'
         +'</div>';
