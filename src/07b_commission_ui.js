@@ -3230,14 +3230,14 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(old)old.parentNode.replaceChild(restored,old);
     }
     window._pvCommDrillSaved=null;
-    // v246: slide-in restored sheet from left
+    // v247c: fade restored sheet — no translateX overflow
     var restored2=document.querySelector('#pv-comm-sheet-overlay .pv-comm-sheet');
     if(restored2){
-      restored2.style.transform='translateX(-20px)';
       restored2.style.opacity='0';
-      restored2.style.transition='transform 200ms cubic-bezier(.25,.8,.25,1), opacity 160ms ease';
+      restored2.style.transition='opacity 160ms ease';
       requestAnimationFrame(function(){requestAnimationFrame(function(){
-        restored2.style.transform='translateX(0)';restored2.style.opacity='1';
+        restored2.style.opacity='1';
+        setTimeout(function(){restored2.style.transition='';restored2.style.opacity='';},180);
       });});
     }
     // v244-fix: re-attach chooser listeners if restored sheet is the chooser
@@ -3316,15 +3316,15 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var tmp=document.createElement('div');tmp.innerHTML=html;
     var el=tmp.firstElementChild;
     if(!el)return;
-    // v246: slide-in animation — new sheet starts offset right, slides to 0
-    el.style.transform='translateX(32px)';
+    // v247c: fade only — translateX caused sheet to overflow overlay bounds
     el.style.opacity='0';
-    el.style.transition='transform 220ms cubic-bezier(.25,.8,.25,1), opacity 180ms ease';
+    el.style.transition='opacity 180ms ease';
     sheetEl.parentNode.replaceChild(el,sheetEl);
     requestAnimationFrame(function(){
       requestAnimationFrame(function(){
-        el.style.transform='translateX(0)';
         el.style.opacity='1';
+        // clear transition after done so it doesnt affect content
+        setTimeout(function(){el.style.transition='';el.style.opacity='';},200);
       });
     });
   }
@@ -3503,7 +3503,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'</div>'
       +'</div>';
 
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y;max-height:88dvh;overflow:hidden">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y;overflow:hidden">'
       +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(0,200,176,.12)','#00c8b0')
       +scorecard
       +(allAccounts.length
