@@ -29604,7 +29604,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   var _pvL1Pages = ['_pvBuildNRRPage','_pvBuildP1Page','_pvBuildP3Page','_pvBuildExpansionPage','_pvBuildHandoverPage'];
   var _pvL1Titles = ['NRR','สินค้าใหม่','ยอดเติบโต','Expansion','Handover'];
 
-  function _pvSwipeToPage(idx) {
+  window._pvSwipeToPage = function _pvSwipeToPage(idx) {
     var ov = document.getElementById('pv-comm-sheet-overlay');
     if (!ov) return;
     var sheetEl = ov.querySelector('.pv-comm-sheet');
@@ -29958,7 +29958,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
     function cRow(dot,label,sub,amt,amtColor,drillIdx) {
       var hasAmt=Number(amt||0)>0;
-      return '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(188,215,255,.08);cursor:pointer" onclick="_pvSwipeToPage('+drillIdx+')" onmouseenter="this.style.background=\'rgba(188,215,255,.03)\'" onmouseleave="this.style.background=\'\'">'
+      return '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(188,215,255,.08);cursor:pointer" onclick="window._pvSwipeToPage('+drillIdx+')" onmouseenter="this.style.background=\'rgba(188,215,255,.03)\'" onmouseleave="this.style.background=\'\'">'
         +'<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+dot+'"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.88)">'+esc(label)+'</div>'
