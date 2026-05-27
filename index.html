@@ -1,4 +1,4 @@
-<!-- Freshket Sense v246: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v247: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v246',
+      version: 'v247',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30875,6 +30875,16 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(old)old.parentNode.replaceChild(restored,old);
     }
     window._pvCommDrillSaved=null;
+    // v246: slide-in restored sheet from left
+    var restored2=document.querySelector('#pv-comm-sheet-overlay .pv-comm-sheet');
+    if(restored2){
+      restored2.style.transform='translateX(-20px)';
+      restored2.style.opacity='0';
+      restored2.style.transition='transform 200ms cubic-bezier(.25,.8,.25,1), opacity 160ms ease';
+      requestAnimationFrame(function(){requestAnimationFrame(function(){
+        restored2.style.transform='translateX(0)';restored2.style.opacity='1';
+      });});
+    }
     // v244-fix: re-attach chooser listeners if restored sheet is the chooser
     requestAnimationFrame(function(){
       var b1=document.getElementById('pvChooseP1');
@@ -30950,7 +30960,18 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     window._pvCommDrillSaved=sheetEl.outerHTML;
     var tmp=document.createElement('div');tmp.innerHTML=html;
     var el=tmp.firstElementChild;
-    if(el)sheetEl.parentNode.replaceChild(el,sheetEl);
+    if(!el)return;
+    // v246: slide-in animation — new sheet starts offset right, slides to 0
+    el.style.transform='translateX(32px)';
+    el.style.opacity='0';
+    el.style.transition='transform 220ms cubic-bezier(.25,.8,.25,1), opacity 180ms ease';
+    sheetEl.parentNode.replaceChild(el,sheetEl);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        el.style.transform='translateX(0)';
+        el.style.opacity='1';
+      });
+    });
   }
   window._pvDrillHeader=function _pvDrillHeader(title,badge,badgeBg,badgeColor){
     return '<div style="flex-shrink:0"><div class="pv-comm-sheet-handle"></div>'
@@ -31029,7 +31050,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   window._commDrillExpansion=function(){
     var st=window._pvCommDrillSt||{};
     var cfg=window._pvCommDrillCfg||{};
-    var EX='#00c8b0'; // portview expansion teal
+    var EX='#00c8b0';
     function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000000)return'\u0e3f'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
@@ -31037,7 +31058,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var rate=Number(String(cfg.outRate||'1.5'))/100||0.015;
 
     var allAccounts=[];
-    var totalGmv=0;
+    var totalGmv=0, totalOutlets=0;
     var expandState={};
     function addExpansion(result){
       if(!result)return;
@@ -31045,39 +31066,34 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
         var acctGmv=0;
         var outlets=(g.outlets||[]);
         outlets.forEach(function(o){acctGmv+=o.currGmv||0;totalGmv+=o.currGmv||0;});
+        totalOutlets+=outlets.length;
         if(!outlets.length)return;
         var aid='pvExAcct'+allAccounts.length;
         expandState[aid]=false;
         allAccounts.push({aid:aid,name:g.acctName||g.acctId||'—',gmv:acctGmv,outlets:outlets});
       });
     }
-    if(nrrResult){
-      addExpansion(nrrResult);
-      addExpansion(nrrResult.transferIn);
-      addExpansion(nrrResult.newFromSales);
-    }
+    if(nrrResult){addExpansion(nrrResult);addExpansion(nrrResult.transferIn);addExpansion(nrrResult.newFromSales);}
 
     var comm=Math.round(totalGmv*rate);
 
-    function buildRows(forceExpand){
+    function buildRows(forceOpen){
       return allAccounts.map(function(a){
-        var isOpen=forceExpand!==undefined?forceExpand:(expandState[a.aid]||false);
+        var isOpen=forceOpen!==undefined?forceOpen:(expandState[a.aid]||false);
         var outletRows=a.outlets.map(function(o){
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px 8px 24px;border-bottom:1px solid rgba(0,200,176,.06)">'
-            +'<span style="font-size:12px;color:rgba(225,238,255,.75)">'+es(o.outletName||o.outletId||'—')+'</span>'
-            +'<div style="text-align:right"><div style="font-size:12px;font-weight:700;color:'+EX+';font-family:monospace">'+mon(o.currGmv||0)+'</div>'
-            +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:1px">MTD</div>'
-            +'</div></div>';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 16px 9px 24px;border-bottom:1px solid rgba(0,200,176,.06)">'
+            +'<span style="font-size:12px;color:rgba(225,238,255,.72)">'+es(o.outletName||o.outletId||'—')+'</span>'
+            +'<span style="font-size:12px;font-weight:700;color:'+EX+';font-family:monospace">'+mon(o.currGmv||0)+'</span>'
+            +'</div>';
         }).join('');
         return '<div>'
-          +'<div onclick="_pvExToggle(\''+a.aid+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(0,200,176,.10);cursor:pointer;background:rgba(0,200,176,.04)">'
+          +'<div onclick="_pvExToggle(\''+a.aid+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(0,200,176,.10);cursor:pointer;background:rgba(0,200,176,.04);transition:background 120ms">'
           +'<span style="font-size:13px;font-weight:900;color:rgba(225,238,255,.92)">'+es(a.name)+'</span>'
           +'<div style="display:flex;align-items:center;gap:10px">'
-          +'<div style="text-align:right"><div style="font-size:13px;font-weight:900;color:'+EX+';font-family:monospace">'+mon(a.gmv)+'</div>'
-          +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:1px;text-align:right">MTD</div></div>'
-          +'<span id="pvExChev'+a.aid+'" style="font-size:14px;color:rgba(0,200,176,.4);transition:transform 150ms'+(isOpen?';transform:rotate(90deg)':'')+'">›</span>'
+          +'<span style="font-size:13px;font-weight:900;color:'+EX+';font-family:monospace">'+mon(a.gmv)+'</span>'
+          +'<span id="pvExChev'+a.aid+'" style="font-size:14px;color:rgba(0,200,176,.45);transition:transform 200ms ease'+(isOpen?';transform:rotate(90deg)':'')+'">›</span>'
           +'</div></div>'
-          +'<div id="'+a.aid+'" style="display:'+(isOpen?'block':'none')+'">'+outletRows+'</div>'
+          +'<div id="'+a.aid+'" style="overflow:hidden;transition:max-height 250ms ease;max-height:'+(isOpen?'600px':'0')+'">'+outletRows+'</div>'
           +'</div>';
       }).join('');
     }
@@ -31085,36 +31101,56 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     window._pvExToggle=function(aid){
       var el=document.getElementById(aid);
       if(!el)return;
-      var open=el.style.display!=='none';
-      el.style.display=open?'none':'block';
-      expandState[aid]=!open;
+      var isOpen=el.style.maxHeight!=='0px'&&el.style.maxHeight!=='';
+      el.style.maxHeight=isOpen?'0':'600px';
+      expandState[aid]=!isOpen;
       var chev=document.getElementById('pvExChev'+aid);
-      if(chev){chev.style.transform=open?'':'rotate(90deg)';chev.style.color=open?'rgba(0,200,176,.4)':'rgba(0,200,176,.8)';}
+      if(chev){chev.style.transform=isOpen?'':'rotate(90deg)';chev.style.color=isOpen?'rgba(0,200,176,.45)':'rgba(0,200,176,.85)';}
       var btn=document.getElementById('pvExToggleBtn');
       if(btn){var anyOpen=Object.values(expandState).some(Boolean);btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';}
     };
     window._pvExToggleAll=function(){
       var anyOpen=Object.values(expandState).some(Boolean);
-      Object.keys(expandState).forEach(function(k){expandState[k]=!anyOpen;});
-      var list=document.getElementById('pvExList');
-      if(list)list.innerHTML=buildRows(!anyOpen);
+      var target=!anyOpen;
+      Object.keys(expandState).forEach(function(k){expandState[k]=target;});
+      document.querySelectorAll('#pv-comm-sheet-overlay [id^="pvExAcct"]').forEach(function(el){
+        el.style.maxHeight=target?'600px':'0';
+        var chev=document.getElementById('pvExChev'+el.id);
+        if(chev){chev.style.transform=target?'rotate(90deg)':'';chev.style.color=target?'rgba(0,200,176,.85)':'rgba(0,200,176,.45)';}
+      });
       var btn=document.getElementById('pvExToggleBtn');
-      if(btn)btn.textContent=anyOpen?'ขยายทั้งหมด':'ย่อทั้งหมด';
+      if(btn)btn.textContent=target?'ย่อทั้งหมด':'ขยายทั้งหมด';
     };
+
+    // Scorecard: hero GMV + secondary account/outlet counts + commission
+    var scorecard='<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(0,200,176,.10);flex-shrink:0">'
+      // Hero row: GMV (large) + commission
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'
+      +'<div>'
+      +'<div style="font-size:28px;font-weight:950;color:'+EX+';font-family:monospace;line-height:1.1;letter-spacing:-.02em">'+mon(totalGmv)+'</div>'
+      +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(0,200,176,.6);margin-top:3px">Expansion GMV · MTD</div>'
+      +'</div>'
+      +'<div style="text-align:right">'
+      +'<div style="font-size:22px;font-weight:950;color:#ffe08a;font-family:monospace;line-height:1.1;text-shadow:0 0 16px rgba(255,224,138,.15)">'+mon(comm)+'</div>'
+      +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,224,138,.5);margin-top:3px">Commission</div>'
+      +'</div>'
+      +'</div>'
+      // Secondary: account + outlet counts
+      +'<div style="display:flex;gap:12px">'
+      +'<div style="display:flex;align-items:center;gap:5px;background:rgba(0,200,176,.08);border:1px solid rgba(0,200,176,.15);border-radius:20px;padding:3px 10px">'
+      +'<span style="font-size:12px;font-weight:700;color:'+EX+';font-family:monospace">'+allAccounts.length+'</span>'
+      +'<span style="font-size:11px;color:rgba(0,200,176,.65)">account</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:5px;background:rgba(0,200,176,.08);border:1px solid rgba(0,200,176,.15);border-radius:20px;padding:3px 10px">'
+      +'<span style="font-size:12px;font-weight:700;color:'+EX+';font-family:monospace">'+totalOutlets+'</span>'
+      +'<span style="font-size:11px;color:rgba(0,200,176,.65)">สาขา</span>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
 
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
       +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(0,200,176,.12)','#00c8b0')
-      +'<div style="padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid rgba(0,200,176,.10);flex-shrink:0">'
-      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(0,200,176,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:'+EX+';font-family:monospace">'+allAccounts.length+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">ACCOUNT</div></div>'
-      +'<div style="flex:1;text-align:center;border-right:1px solid rgba(0,200,176,.08)">'
-      +'<div style="font-size:15px;font-weight:950;color:'+EX+';font-family:monospace">'+mon(totalGmv)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">MTD</div></div>'
-      +'<div style="flex:1;text-align:center">'
-      +'<div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:monospace">'+mon(comm)+'</div>'
-      +'<div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">COMMISSION</div></div>'
-      +'</div>'
+      +scorecard
       +(allAccounts.length
         ?'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;flex-shrink:0;border-bottom:1px solid rgba(0,200,176,.08)">'
           +'<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35)">สาขาใหม่เดือนนี้</span>'
