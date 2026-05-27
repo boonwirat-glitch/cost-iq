@@ -3933,7 +3933,7 @@ function openCommissionRulebook() {
   ].join('');
 
   var _maxH=(window.innerHeight-80)+'px';
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
+  ov.innerHTML = '<div style="width:100%;max-width:100%;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
     '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'+
       '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
@@ -3979,7 +3979,7 @@ function openCommissionHistory() {
 
   // Loading state
   var _maxH=(window.innerHeight-80)+'px';
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  ov.innerHTML = '<div style="width:100%;max-width:100%;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
     + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.45);font-size:13px">กำลังโหลด...</div>'
@@ -4070,7 +4070,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   window._commHistoryAllRows = allRows;
 
   var _maxH=(window.innerHeight-80)+'px';
-  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  ov.innerHTML = '<div style="width:100%;max-width:100%;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'
       +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
@@ -4137,7 +4137,7 @@ window._commOpenHistoryDetail = function(period) {
   }).join('');
 
   var _mxH=(window.innerHeight-80)+'px';
-  var detailHtml = '<div style="width:100%;max-width:520px;max-height:'+_mxH+';height:'+_mxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+  var detailHtml = '<div style="width:100%;max-width:100%;max-height:'+_mxH+';height:'+_mxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px">'
       +'<div>'
