@@ -2963,7 +2963,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       outDetail=ruleBox([ruleLine(od.outlet_gmv>0,"ใหม่ "+money(od.new_gmv)+" · comeback "+money(od.comeback_gmv)," × "+outRate+"%"),
                           ruleIndent("ไม่นับ item ที่ได้ P1 ไปแล้ว")]);
     }
-    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","New/Comeback","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
+    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Expansion","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
 
     // Handover row — 2-line tier breakdown
     var hoDetail="";
@@ -3020,8 +3020,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var upsellHasDrill=!!(p1g&&p1g.length||p3g&&p3g.length);
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
-    var ncSub='สาขาใหม่/comeback × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
-    var ncRowHtml=cRow('rgba(188,215,255,.45)','New/Comeback',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
+    var ncSub='สาขาใหม่ × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
+    var ncRowHtml=cRow('rgba(188,215,255,.45)','Expansion',ncSub,src.upsell_outlet,'#bcd7ff','_commDrillNewComeback()');
 
     // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
     var hoSub=(function(){
@@ -3230,6 +3230,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(old)old.parentNode.replaceChild(restored,old);
     }
     window._pvCommDrillSaved=null;
+    // v244-fix: re-attach chooser listeners if restored sheet is the chooser
+    requestAnimationFrame(function(){
+      var b1=document.getElementById('pvChooseP1');
+      var b3=document.getElementById('pvChooseP3');
+      if(b1)b1.addEventListener('click',function(){window._commOpenUpsellDrill('p1');});
+      if(b3)b3.addEventListener('click',function(){window._commOpenUpsellDrill('p3');});
+    });
   };
 
   window._commToggleDrillOutlet=function(oid){
@@ -3436,12 +3443,12 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
         +'<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'+types.join('')+'</div></div>'
         +'<div style="text-align:right;flex-shrink:0;margin-left:12px">'
         +'<div style="font-size:13px;font-weight:900;color:#bcd7ff;font-family:\'IBM Plex Mono\',monospace">'+mon(total)+'</div>'
-        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'0.015'))||0.015)))+'</div>'
+        +'<div style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;margin-top:1px">'+mon(Math.round(total*(Number(String(cfg.outRate||'1.5'))/100||0.015)))+'</div>'
         +'</div></div>';
     }).join('');
 
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
-      +_pvDrillHeader('New/Comeback','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
+      +_pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(188,215,255,.10)','#bcd7ff')
       +'<div style="padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">New GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.new_gmv||0)+'</div></div>'
       +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Comeback GMV</div><div class="pv-comm-sheet-kpi-val" style="font-size:16px">'+mon(od.comeback_gmv||0)+'</div></div>'
