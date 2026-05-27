@@ -890,8 +890,9 @@ function handleFileUpload(type,input){
       try{
         const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
         // Build two indexes in one pass:
-        //   byKam[kamEmail][accountId][group_key][month_label] = {existing_gmv,new_gmv,comeback_gmv,total_gmv}
+        //   byKam[kamEmail][accountId][group_key][month_label] = {existing_gmv,total_gmv}
         //   baselineGroups[kamEmail][accountId][outletId] = Set<groupKey> (v2: outlet-level, 3-month lookback)
+        // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
         const _now=new Date();
@@ -903,30 +904,35 @@ function handleFileUpload(type,input){
         // Bug: previously used ALL non-current months → ม.ค. (4 months ago) was included
         // → outlet that bought in ม.ค. then stopped 3 months was wrongly classified as existing.
         const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
-        // v2: detect CSV format — 9 cols = new (has outlet_id), 8 cols = legacy
+        // v4: detect CSV format — 7 cols = v4 (outlet_id + no new/comeback), 9 cols = v3, 8 cols = legacy
         const _sampleCols=(lines[0]||'').split(',').length;
-        const _hasOutlet=_sampleCols>=9;
+        const _hasOutlet=_sampleCols>=7;
         let rowCount=0;
         lines.forEach(l=>{
           const p=parseCSVRow(l);
           const kamEmail=(p[0]||'').trim();
           const accountId=(p[1]||'').trim();
-          let outletId,monthLabel,groupKey,existingGmv,newGmv,comebackGmv,totalGmv;
-          if(_hasOutlet){
+          let outletId,monthLabel,groupKey,existingGmv,totalGmv;
+          if(_hasOutlet && _sampleCols<=7){
+            // v4 format: kam_email, account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
             outletId=(p[2]||'').trim();
             monthLabel=(p[3]||'').trim();
             groupKey=(p[4]||'').trim();
             existingGmv=parseFloat(p[5])||0;
-            newGmv=parseFloat(p[6])||0;
-            comebackGmv=parseFloat(p[7])||0;
+            totalGmv=parseFloat(p[6])||0;
+          }else if(_hasOutlet){
+            // v3 format: 9 cols with new_gmv + comeback_gmv (still supported for backwards compat)
+            outletId=(p[2]||'').trim();
+            monthLabel=(p[3]||'').trim();
+            groupKey=(p[4]||'').trim();
+            existingGmv=parseFloat(p[5])||0;
             totalGmv=parseFloat(p[8])||0;
           }else{
-            outletId='_all'; // legacy: aggregate at account level
+            // legacy 8-col: account-level (no outlet_id)
+            outletId='_all';
             monthLabel=(p[2]||'').trim();
             groupKey=(p[3]||'').trim();
             existingGmv=parseFloat(p[4])||0;
-            newGmv=parseFloat(p[5])||0;
-            comebackGmv=parseFloat(p[6])||0;
             totalGmv=parseFloat(p[7])||0;
           }
           if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
@@ -935,7 +941,7 @@ function handleFileUpload(type,input){
           if(!byKam[kamEmail][accountId])byKam[kamEmail][accountId]={};
           if(!byKam[kamEmail][accountId][outletId])byKam[kamEmail][accountId][outletId]={};
           if(!byKam[kamEmail][accountId][outletId][groupKey])byKam[kamEmail][accountId][outletId][groupKey]={};
-          byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,newGmv,comebackGmv,totalGmv};
+          byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,totalGmv};
           // v233-fix: only months within 3-month window qualify as P1 baseline
           if(monthLabel!==_currLabel && totalGmv>0 && _p1BaselineLabels.has(monthLabel)){
             if(!baselineGroups[kamEmail])baselineGroups[kamEmail]={};
