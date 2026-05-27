@@ -3503,7 +3503,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'</div>'
       +'</div>';
 
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y;max-height:88dvh;overflow:hidden">'
       +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(0,200,176,.12)','#00c8b0')
       +scorecard
       +(allAccounts.length
