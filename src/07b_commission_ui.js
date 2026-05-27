@@ -3077,7 +3077,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       heroHtml,
       '<div style="font-size:10px;color:rgba(225,238,255,.22);text-align:center;padding:0 18px 12px;font-family:\'IBM Plex Mono\',monospace">คำนวณจาก CSV ที่โหลดอยู่ · v235 · '+nowStr+'</div>',
       exportBtnHtml,
-      '<div style="padding:0 18px 4px;display:flex;gap:6px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionHistory,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ย้อนหลัง ›</button><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">กฎค่าคอมฯ ›</button></div>',
+      '<div style="padding:0 18px 4px;display:flex;gap:6px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionHistory,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(77,220,151,.10);border:1px solid rgba(77,220,151,.25);color:#4ddc97;font-size:12px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">History</button><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">Rules</button></div>',
       '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ปิด</button></div>',
       '</div>',
       '</div></div>',
@@ -3865,9 +3865,9 @@ function openCommissionRulebook() {
 
   function sec(title, color, rows) {
     var rowHtml = rows.map(function(r) {
-      return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07)">'+
-        '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.45);min-width:90px;flex-shrink:0;padding-top:1px">'+r[0]+'</div>'+
-        '<div style="font-size:12px;color:rgba(225,238,255,.80);line-height:1.55">'+r[1]+'</div>'+
+      return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.10)">'+
+        '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.70);min-width:90px;flex-shrink:0;padding-top:1px">'+r[0]+'</div>'+
+        '<div style="font-size:13px;color:rgba(225,238,255,.92);line-height:1.55">'+r[1]+'</div>'+
         '</div>';
     }).join('');
     return '<div style="margin-bottom:14px">'+
@@ -3941,7 +3941,7 @@ function openCommissionRulebook() {
         '<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'+
       '</div>'+
     '</div>'+
-    '<div style="overflow-y:auto;padding:0 18px 24px;-webkit-overflow-scrolling:touch">'+html+'</div>'+
+    '<div style="overflow-y:auto;padding:0 18px 32px;-webkit-overflow-scrolling:touch;flex:1">'+html+'</div>'+
   '</div>';
 
   requestAnimationFrame(function(){ ov.style.opacity='1'; });
