@@ -746,6 +746,11 @@ function _commBuildSnapshotRows() {
         final_payout: kamPayout.final_payout,
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
         account_count: g.total || ((g.accounts || []).length),
+        // v247e: NRR detail for reconcile — cohort + expansion outlet breakdown
+        nrr_cohort_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[] } catch(e){return []} })(),
+        expansion_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex; } catch(e){return []} })(),
+        lock_trigger: 'manual',
+        csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
         config_snapshot: {
           upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
@@ -1023,12 +1028,16 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
-      <div class="pv-comm-section-label" style="margin-top:12px">รายละเอียดต่อ KAM</div>
+      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
+      <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
-      <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button>
+      <div style="display:flex;gap:6px;margin:0 18px 8px">
+        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">ย้อนหลัง ›</button>
+        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ›</button>
+      </div>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
   </div>`;
@@ -2931,6 +2940,11 @@ function _commBuildSnapshotRows() {
         final_payout: kamPayout.final_payout,
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
         account_count: g.total || ((g.accounts || []).length),
+        // v247e: NRR detail for reconcile — cohort + expansion outlet breakdown
+        nrr_cohort_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[] } catch(e){return []} })(),
+        expansion_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex; } catch(e){return []} })(),
+        lock_trigger: 'manual',
+        csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
         config_snapshot: {
           upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
@@ -3208,12 +3222,16 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
-      <div class="pv-comm-section-label" style="margin-top:12px">รายละเอียดต่อ KAM</div>
+      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
+      <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
-      <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button>
+      <div style="display:flex;gap:6px;margin:0 18px 8px">
+        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">ย้อนหลัง ›</button>
+        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ›</button>
+      </div>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
   </div>`;
@@ -3356,3 +3374,51 @@ function _nrrReasonLabel(code) {
   return m[code] || code || '—';
 }
 
+// ── v247e: End-of-month lock status ────────────────────────────────────────
+function _commEomStatus() {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const today = now.getDate();
+  const daysLeft = lastDay - today;
+  const period = _nrrExclusionCurrentPeriod();
+  const hasLock = (_commissionSnapshots || []).some(r =>
+    r.period_month === period && String(r.snapshot_status||'').toLowerCase() === 'final'
+  );
+  const isGrace = today <= 3;
+  const prevD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevPeriod = `${prevD.getFullYear()}-${String(prevD.getMonth()+1).padStart(2,'0')}`;
+  const prevHasLock = (_commissionSnapshots || []).some(r =>
+    r.period_month === prevPeriod && String(r.snapshot_status||'').toLowerCase() === 'final'
+  );
+  return { daysLeft, period, hasLock, showEomBanner: daysLeft <= 3 && !hasLock,
+           isGrace, prevPeriod, prevHasLock, showGraceBanner: isGrace && !prevHasLock };
+}
+window._commEomStatus = _commEomStatus;
+
+// ── v247e: Commission History ────────────────────────────────────────────────
+let _commHistoryCache = {};
+const _HIST_TTL = 10 * 60 * 1000;
+
+async function _commLoadHistory(lookbackMonths) {
+  lookbackMonths = lookbackMonths || 6;
+  const now = new Date();
+  const periods = [];
+  for (let i = 1; i <= lookbackMonths; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    periods.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  try {
+    const { data, error } = await supa
+      .from('commission_payout_snapshots')
+      .select('period_month,beneficiary_role,beneficiary_email,team_lead_email,payout_amount,snapshot_status,governed_nrr_pct,updated_at,breakdown')
+      .in('period_month', periods)
+      .order('period_month', { ascending: false });
+    if (error) throw new Error(error.message);
+    periods.forEach(p => { _commHistoryCache[p] = { rows: (data||[]).filter(r=>r.period_month===p), ts: Date.now() }; });
+    return data || [];
+  } catch(e) {
+    console.warn('[CommHistory] load failed:', e.message);
+    return [];
+  }
+}
+window._commLoadHistory = _commLoadHistory;
