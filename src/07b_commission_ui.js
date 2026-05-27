@@ -3077,7 +3077,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       heroHtml,
       '<div style="font-size:10px;color:rgba(225,238,255,.22);text-align:center;padding:0 18px 12px;font-family:\'IBM Plex Mono\',monospace">คำนวณจาก CSV ที่โหลดอยู่ · v235 · '+nowStr+'</div>',
       exportBtnHtml,
-      '<div style="padding:0 18px 8px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button></div>',
+      '<div style="padding:0 18px 4px;display:flex;gap:6px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionHistory,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ย้อนหลัง ›</button><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">กฎค่าคอมฯ ›</button></div>',
       '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ปิด</button></div>',
       '</div>',
       '</div></div>',
@@ -3342,22 +3342,36 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   }
 
   // NRR drill — tier table + action note
+  // v247e: NRR drill rewritten to reuse _tgtShowCohortSheet design
+  // Injects NRR result for current KAM then opens the existing cohort sheet (tabs: NRR/Comeback/Expansion)
   window._commDrillNRR=function(){
     var st=window._pvCommDrillSt||{};
+    var email=st&&st.email;
+    // If cohort sheet available + NRR data computable → use rich design
+    if(email&&typeof _tgtComputeKamNRR==='function'&&typeof _tgtShowCohortSheet==='function'){
+      var nrrResult=null;
+      try{ nrrResult=_tgtComputeKamNRR(email,null); }catch(e){}
+      if(nrrResult){
+        window._ncsLastNrrResult=nrrResult;
+        // Label: prefer portview display name
+        var pvRow=(portviewBulkData||[]).find(function(r){return r.kamEmail===email;});
+        window._ncsKamLabel=(pvRow&&pvRow.kamName)||email.split('@')[0];
+        _tgtShowCohortSheet('nrr');
+        return;
+      }
+    }
+    // Fallback: minimal panel (no outlet data)
     var cfg=window._pvCommDrillCfg||{};
     var src=window._pvCommDrillSrc||{};
     function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;max-height:88vh">'
       +_pvDrillHeader('NRR Commission','','','')
       +'<div style="overflow-y:auto;flex:1">'
-      +'<div style="padding:14px 18px 10px">'
-      +'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35);margin-bottom:8px;font-family:\'IBM Plex Mono\',monospace">เกณฑ์ NRR</div>'
-      +(cfg.tierRows||'')
+      +'<div style="padding:14px 18px 10px">'+(cfg.tierRows||'')+'</div>'
+      +'<div style="padding:10px 18px;background:rgba(77,220,151,.06);border-top:1px solid rgba(77,220,151,.12)">'
+      +'<div style="font-size:12px;color:rgba(225,238,255,.75);line-height:1.6">'+(cfg.action||'')+'</div>'
       +'</div>'
-      +'<div style="padding:10px 18px;background:rgba(77,220,151,.06);border-top:1px solid rgba(77,220,151,.12);border-bottom:1px solid rgba(77,220,151,.12)">'
-      +'<div style="font-size:12px;color:rgba(225,238,255,.75);line-height:1.6">'+(cfg.action?cfg.action:'')+'</div>'
-      +'</div>'
-      +(src.nrr>0?'<div style="padding:14px 18px"><div style="display:flex;justify-content:space-between;align-items:center">'
+      +(src.nrr>0?'<div style="padding:14px 18px"><div style="display:flex;justify-content:space-between">'
         +'<span style="font-size:13px;color:rgba(225,238,255,.75)">NRR Payout</span>'
         +'<span style="font-size:18px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(src.nrr)+'</span>'
         +'</div></div>':'')
@@ -3942,5 +3956,226 @@ function closeCommissionRulebook() {
 
 window.openCommissionRulebook = openCommissionRulebook;
 window.closeCommissionRulebook = closeCommissionRulebook;
+
+// ── v247e: Commission History Sheet ─────────────────────────────────────────
+// Opens a bottom sheet showing locked commission snapshots for past 6 months.
+// All roles: KAM sees own rows, TL sees team, Admin sees all.
+// Tap a locked month → reconcile detail view (NRR cohort, P1/P3, expansion, handover).
+
+function openCommissionHistory() {
+  var ov = document.getElementById('comm-history-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'comm-history-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9200;background:rgba(5,14,28,.75);display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .22s';
+    ov.onclick = function(e){ if(e.target===ov) closeCommissionHistory(); };
+    document.body.appendChild(ov);
+  }
+
+  // Loading state
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+    + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
+    + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.45);font-size:13px">กำลังโหลด...</div>'
+    + '</div>';
+
+  requestAnimationFrame(function(){ ov.style.opacity='1'; });
+
+  var role = getCurrentRole ? getCurrentRole() : '';
+  var email = (currentUserProfile && currentUserProfile.email) || '';
+
+  if (typeof _commLoadHistory !== 'function') {
+    _commRenderHistoryList(ov, [], role, email);
+    return;
+  }
+
+  _commLoadHistory(6).then(function(allRows) {
+    _commRenderHistoryList(ov, allRows, role, email);
+  }).catch(function() {
+    _commRenderHistoryList(ov, [], role, email);
+  });
+}
+
+function _commRenderHistoryList(ov, allRows, role, email) {
+  function fmtPeriod(p) {
+    var parts = (p||'').split('-');
+    var mo = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(parts[1])-1]||parts[1];
+    return mo + ' ' + (parseInt(parts[0])+543);
+  }
+  function money(n){ var v=Number(n||0); if(!v)return'฿0'; if(v>=1000000)return'฿'+(v/1e6).toFixed(1)+'M'; if(v>=1000)return'฿'+Math.round(v/1000)+'K'; return'฿'+Math.round(v).toLocaleString('en-US'); }
+
+  // Scope rows to current user
+  var rows = allRows || [];
+  if (isRepRole(role)) {
+    rows = rows.filter(function(r){ return r.beneficiary_role==='kam' && (r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+  } else if (isTLRole(role)) {
+    rows = rows.filter(function(r){ return (r.team_lead_email||'').toLowerCase()===email.toLowerCase() || (r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+  }
+
+  // Group by period
+  var byPeriod = {};
+  rows.forEach(function(r) {
+    if (!byPeriod[r.period_month]) byPeriod[r.period_month] = [];
+    byPeriod[r.period_month].push(r);
+  });
+
+  // Build list of last 6 months
+  var now = new Date();
+  var periods = [];
+  for (var i = 1; i <= 6; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periods.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+
+  var listHtml = periods.map(function(p) {
+    var pRows = byPeriod[p] || [];
+    var hasLock = pRows.some(function(r){ return String(r.snapshot_status||'').toLowerCase()==='final'; });
+    var myRow = pRows.find(function(r){ return isRepRole(role) && r.beneficiary_role==='kam'; })
+              || pRows.find(function(r){ return isTLRole(role) && r.beneficiary_role==='tl'; })
+              || pRows[0];
+    var payout = myRow ? Number(myRow.payout_amount||0) : 0;
+    var nrr = myRow ? (myRow.governed_nrr_pct!==null&&myRow.governed_nrr_pct!==undefined ? myRow.governed_nrr_pct+'%' : '—') : '—';
+
+    if (!hasLock) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.06)">'
+        +'<div><div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.40)">'+fmtPeriod(p)+'</div>'
+        +'<div style="font-size:11px;color:rgba(225,238,255,.25);margin-top:2px">ไม่มี snapshot</div></div>'
+        +'<div style="font-size:11px;color:rgba(225,238,255,.25)">—</div>'
+        +'</div>';
+    }
+
+    var kamCount = isAdminRole(role) ? pRows.filter(function(r){return r.beneficiary_role==='kam';}).length : null;
+    var sub = isAdminRole(role) ? (kamCount+' KAM') : ('NRR '+nrr);
+
+    return '<div onclick="_commOpenHistoryDetail(\''+p+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid rgba(188,215,255,.06);cursor:pointer;-webkit-tap-highlight-color:rgba(188,215,255,.06)" onmouseenter="this.style.background=\'rgba(188,215,255,.04)\'" onmouseleave="this.style.background=\'\'">'
+      +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">'+fmtPeriod(p)+'</div>'
+      +'<div style="font-size:11px;color:rgba(188,215,255,.45);margin-top:2px">'+sub+' · ล็อกแล้ว</div></div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:14px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+money(payout)+'</span>'
+      +'<span style="color:rgba(188,215,255,.3);font-size:16px">›</span>'
+      +'</div></div>';
+  }).join('');
+
+  // Store rows globally for detail lookup
+  window._commHistoryAllRows = allRows;
+
+  ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'
+      +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
+      +'<button onclick="closeCommissionHistory()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
+    +'</div>'
+    +'<div style="font-size:10px;color:rgba(188,215,255,.35);padding:0 18px 10px;font-family:\'IBM Plex Mono\',monospace">6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
+    +'<div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">'+listHtml+'</div>'
+    +'</div>';
+}
+
+window._commOpenHistoryDetail = function(period) {
+  var ov = document.getElementById('comm-history-overlay');
+  if (!ov) return;
+  var allRows = window._commHistoryAllRows || [];
+  var role = getCurrentRole ? getCurrentRole() : '';
+  var email = (currentUserProfile && currentUserProfile.email) || '';
+  var pRows = allRows.filter(function(r){ return r.period_month===period; });
+
+  if (isRepRole(role)) pRows = pRows.filter(function(r){ return r.beneficiary_role==='kam'&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+  else if (isTLRole(role)) pRows = pRows.filter(function(r){ return (r.team_lead_email||'').toLowerCase()===email.toLowerCase()||(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+
+  function fmtPeriod(p){ var pts=(p||'').split('-'); var mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(pts[1])-1]||pts[1]; return mo+' '+(parseInt(pts[0])+543); }
+  function money(n){ var v=Number(n||0); if(!v)return'฿0'; if(v>=1e6)return'฿'+(v/1e6).toFixed(1)+'M'; if(v>=1000)return'฿'+Math.round(v/1e3)+'K'; return'฿'+Math.round(v).toLocaleString('en-US'); }
+  function secLabel(s,color){ return '<div style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:'+color+';padding:12px 18px 4px;font-family:\'IBM Plex Mono\',monospace">'+s+'</div>'; }
+  function kpiRow(label,val,color){ return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid rgba(188,215,255,.06)"><span style="font-size:12px;color:rgba(225,238,255,.60)">'+label+'</span><span style="font-size:13px;font-weight:900;color:'+(color||'rgba(225,238,255,.88)')+';font-family:\'IBM Plex Mono\',monospace">'+val+'</span></div>'; }
+
+  var myKam = pRows.find(function(r){return r.beneficiary_role==='kam';});
+  var myTl  = pRows.find(function(r){return r.beneficiary_role==='tl';});
+  var focusRow = myKam || myTl || pRows[0];
+  if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(188,215,255,.4)">ไม่มีข้อมูล</div>'; return; }
+
+  var bd = focusRow.breakdown || {};
+  var upsellTotal = (bd.upsell_sku ? (bd.upsell_sku.total_commission||bd.upsell_sku.total_comm||0) : 0)
+                  + (bd.upsell_outlet ? (bd.upsell_outlet.commission||0) : 0);
+
+  // NRR cohort detail for reconcile
+  var cohortDetail = bd.nrr_cohort_detail || [];
+  var expansionDetail = bd.expansion_detail || [];
+  var p1Groups = (bd.upsell_sku&&bd.upsell_sku.p1&&bd.upsell_sku.p1.groups) ? bd.upsell_sku.p1.groups : [];
+  var p3Groups = (bd.upsell_sku&&bd.upsell_sku.p3&&bd.upsell_sku.p3.groups) ? bd.upsell_sku.p3.groups : [];
+  var hoDetail = bd.handover || {};
+
+  var cohortHtml = '';
+  if (cohortDetail.length) {
+    cohortHtml = cohortDetail.slice(0,8).map(function(g){
+      var delta = g.outlets&&g.outlets.length ? Math.round(g.outlets.reduce(function(s,o){return s+(o.currGmv||0);},0)/Math.max(1,g.outlets.reduce(function(s,o){return s+(o.prevGmv||0);},0))*100) : null;
+      var dCls = delta===null?'':'';
+      var dStr = delta!==null?(delta>=100?'<span style="color:#4ddc97">'+delta+'%</span>':'<span style="color:rgba(255,107,61,.9)">'+delta+'%</span>'):'';
+      return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(g.acctName||g.acctId)+'</span><span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace">'+dStr+'</span></div>';
+    }).join('');
+    if (cohortDetail.length > 8) cohortHtml += '<div style="padding:7px 18px;font-size:10px;color:rgba(188,215,255,.35)">+' + (cohortDetail.length-8) + ' รายการ</div>';
+  }
+
+  var expHtml = expansionDetail.slice(0,5).map(function(o){
+    return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(o.outletName||o.outletId)+'</span><span style="font-size:11px;color:#00c8b0;font-family:\'IBM Plex Mono\',monospace">'+money(o.gmv)+'</span></div>';
+  }).join('');
+
+  var p1Html = p1Groups.slice(0,5).map(function(g){
+    return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(g.groupKey||'')+'</span><span style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+money(g.commission)+'</span></div>';
+  }).join('');
+
+  var p3Html = p3Groups.slice(0,5).map(function(g){
+    return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(g.groupKey||'')+'</span><span style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+money(g.commission)+'</span></div>';
+  }).join('');
+
+  var detailHtml = '<div style="width:100%;max-width:520px;max-height:88vh;background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px">'
+      +'<div>'
+        +'<div style="font-size:15px;font-weight:900;color:#fff">'+fmtPeriod(period)+'</div>'
+        +'<div style="font-size:10px;color:rgba(188,215,255,.4);font-family:\'IBM Plex Mono\',monospace;margin-top:2px">LOCKED SNAPSHOT</div>'
+      +'</div>'
+      +'<button onclick="_commOpenHistoryList()" style="font-size:11px;color:rgba(188,215,255,.5);background:none;border:none;cursor:pointer;padding:4px 6px">‹ ย้อนหลัง</button>'
+    +'</div>'
+    +'<div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">'
+    +secLabel('สรุป','rgba(188,215,255,.5)')
+    +kpiRow('NRR', (focusRow.governed_nrr_pct!==null&&focusRow.governed_nrr_pct!==undefined?focusRow.governed_nrr_pct+'%':'—'), '#4ddc97')
+    +kpiRow('NRR payout', money(bd.nrr_payout||0), '#4ddc97')
+    +(upsellTotal>0?kpiRow('Upsell (P1+P3+Expansion)', money(upsellTotal), '#ffe08a'):'')
+    +(hoDetail.payout?kpiRow('Handover', money(hoDetail.payout), '#bcd7ff'):'')
+    +(bd.gmv_gate&&bd.gmv_gate.gate_active?kpiRow('NRR Gate', '×'+Math.round(bd.gmv_gate.cap_multiplier*100)+'%', 'rgba(255,107,61,.9)'):'')
+    +kpiRow('Final payout', money(focusRow.payout_amount), '#ffe08a')
+    +(cohortDetail.length?secLabel('NRR Cohort ('+cohortDetail.length+' accounts)','#4ddc97')+cohortHtml:'')
+    +(expansionDetail.length?secLabel('Expansion ('+expansionDetail.length+' outlets)','#00c8b0')+expHtml:'')
+    +(p1Groups.length?secLabel('P1 — กลุ่มสินค้าใหม่ ('+p1Groups.length+' items)','#ffe08a')+p1Html:'')
+    +(p3Groups.length?secLabel('P3 — ยอดเติบโต ('+p3Groups.length+' items)','#ffe08a')+p3Html:'')
+    +(hoDetail.accounts?secLabel('Handover','#bcd7ff')
+      +kpiRow('จำนวนร้าน', hoDetail.accounts+' ร้าน')
+      +kpiRow('Retention', (hoDetail.retention_pct||0)+'%')
+      +kpiRow('Baseline', money(hoDetail.baseline_gmv))
+      +kpiRow('MTD', money(hoDetail.current_gmv))
+      :'')
+    +(bd.lock_trigger?'<div style="padding:12px 18px 20px;font-size:10px;color:rgba(188,215,255,.30);font-family:\'IBM Plex Mono\',monospace">lock: '+bd.lock_trigger+' · '+(bd.csv_data_as_of?bd.csv_data_as_of.split('T')[0]:'—')+'</div>':'<div style="height:20px"></div>')
+    +'</div>'
+    +'</div>';
+
+  ov.innerHTML = detailHtml;
+};
+
+window._commOpenHistoryList = function() {
+  var allRows = window._commHistoryAllRows || [];
+  var role = getCurrentRole ? getCurrentRole() : '';
+  var email = (currentUserProfile && currentUserProfile.email) || '';
+  var ov = document.getElementById('comm-history-overlay');
+  if (ov) _commRenderHistoryList(ov, allRows, role, email);
+};
+
+function closeCommissionHistory() {
+  var ov = document.getElementById('comm-history-overlay');
+  if (!ov) return;
+  ov.style.opacity = '0';
+  setTimeout(function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }, 230);
+}
+
+window.openCommissionHistory = openCommissionHistory;
+window.closeCommissionHistory = closeCommissionHistory;
+
 
 console.log('[Target Module v1] loaded');
