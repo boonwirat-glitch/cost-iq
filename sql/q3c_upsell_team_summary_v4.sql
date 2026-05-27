@@ -184,7 +184,16 @@ lookback_monthly AS (
   WHERE o.delivery_date >= d.lookback_start
     AND o.delivery_date <  d.current_mo
     AND i.gmv_ex_vat > 0
-  GROUP BY 1, 2, 3, 4, 5
+  GROUP BY
+    ka.kam_email,
+    o.account_id,
+    CAST(o.user_id AS STRING),
+    CASE
+      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+           AND TRIM(COALESCE(i.item_family,'')) != ''
+      THEN i.item_family ELSE i.subclass_name
+    END,
+    DATE_TRUNC(o.delivery_date, MONTH)
 ),
 max_baseline AS (
   SELECT
