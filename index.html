@@ -1,4 +1,4 @@
-<!-- Freshket Sense v247b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v247c: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4491,7 +4491,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v247b',
+      version: 'v247c',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30875,14 +30875,14 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       if(old)old.parentNode.replaceChild(restored,old);
     }
     window._pvCommDrillSaved=null;
-    // v246: slide-in restored sheet from left
+    // v247c: fade restored sheet — no translateX overflow
     var restored2=document.querySelector('#pv-comm-sheet-overlay .pv-comm-sheet');
     if(restored2){
-      restored2.style.transform='translateX(-20px)';
       restored2.style.opacity='0';
-      restored2.style.transition='transform 200ms cubic-bezier(.25,.8,.25,1), opacity 160ms ease';
+      restored2.style.transition='opacity 160ms ease';
       requestAnimationFrame(function(){requestAnimationFrame(function(){
-        restored2.style.transform='translateX(0)';restored2.style.opacity='1';
+        restored2.style.opacity='1';
+        setTimeout(function(){restored2.style.transition='';restored2.style.opacity='';},180);
       });});
     }
     // v244-fix: re-attach chooser listeners if restored sheet is the chooser
@@ -30961,15 +30961,15 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var tmp=document.createElement('div');tmp.innerHTML=html;
     var el=tmp.firstElementChild;
     if(!el)return;
-    // v246: slide-in animation — new sheet starts offset right, slides to 0
-    el.style.transform='translateX(32px)';
+    // v247c: fade only — translateX caused sheet to overflow overlay bounds
     el.style.opacity='0';
-    el.style.transition='transform 220ms cubic-bezier(.25,.8,.25,1), opacity 180ms ease';
+    el.style.transition='opacity 180ms ease';
     sheetEl.parentNode.replaceChild(el,sheetEl);
     requestAnimationFrame(function(){
       requestAnimationFrame(function(){
-        el.style.transform='translateX(0)';
         el.style.opacity='1';
+        // clear transition after done so it doesnt affect content
+        setTimeout(function(){el.style.transition='';el.style.opacity='';},200);
       });
     });
   }
@@ -31148,7 +31148,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'</div>'
       +'</div>';
 
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y;max-height:88dvh;overflow:hidden">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y;overflow:hidden">'
       +window._pvDrillHeader('Expansion','× '+(cfg.outRate||'1.5')+'%','rgba(0,200,176,.12)','#00c8b0')
       +scorecard
       +(allAccounts.length
