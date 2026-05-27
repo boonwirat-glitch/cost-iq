@@ -3364,7 +3364,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var cfg=window._pvCommDrillCfg||{};
     var src=window._pvCommDrillSrc||{};
     function mon(n){return'฿'+Math.round(n||0).toLocaleString('en-US');}
-    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;max-height:88vh">'
+    var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;max-height:80vh">'
       +_pvDrillHeader('NRR Commission','','','')
       +'<div style="overflow-y:auto;flex:1">'
       +'<div style="padding:14px 18px 10px">'+(cfg.tierRows||'')+'</div>'
@@ -3932,7 +3932,7 @@ function openCommissionRulebook() {
     ])
   ].join('');
 
-  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  var _maxH=(window.innerHeight-80)+'px';
   ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
     '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'+
@@ -3948,7 +3948,7 @@ function openCommissionRulebook() {
   requestAnimationFrame(function(){
     ov.style.opacity='1';
     var sh=ov.querySelector('div');
-    if(sh) sh.style.maxHeight=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.85))+'px';
+    if(sh){ sh.style.maxHeight=(window.innerHeight-80)+'px'; sh.style.height=(window.innerHeight-80)+'px'; }
   });
 }
 
@@ -3978,7 +3978,7 @@ function openCommissionHistory() {
   }
 
   // Loading state
-  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  var _maxH=(window.innerHeight-80)+'px';
   ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
@@ -3988,7 +3988,7 @@ function openCommissionHistory() {
   requestAnimationFrame(function(){
     ov.style.opacity='1';
     var sh=ov.querySelector('div');
-    if(sh) sh.style.maxHeight=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+    if(sh){ sh.style.maxHeight=(window.innerHeight-80)+'px'; sh.style.height=(window.innerHeight-80)+'px'; }
   });
 
   var role = getCurrentRole ? getCurrentRole() : '';
@@ -4069,7 +4069,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   // Store rows globally for detail lookup
   window._commHistoryAllRows = allRows;
 
-  var _maxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  var _maxH=(window.innerHeight-80)+'px';
   ov.innerHTML = '<div style="width:100%;max-width:520px;max-height:'+_maxH+';height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">'
@@ -4136,7 +4136,7 @@ window._commOpenHistoryDetail = function(period) {
     return '<div style="padding:7px 18px;border-bottom:1px solid rgba(188,215,255,.05);display:flex;justify-content:space-between"><span style="font-size:11px;color:rgba(225,238,255,.70)">'+(g.groupKey||'')+'</span><span style="font-size:11px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+money(g.commission)+'</span></div>';
   }).join('');
 
-  var _mxH=Math.min(window.innerHeight-20,Math.round(window.innerHeight*.88))+'px';
+  var _mxH=(window.innerHeight-80)+'px';
   var detailHtml = '<div style="width:100%;max-width:520px;max-height:'+_mxH+';height:'+_mxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
     +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px">'
