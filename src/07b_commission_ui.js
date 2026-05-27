@@ -3838,7 +3838,7 @@ function openCommissionRulebook() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'comm-rulebook-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(5,14,28,.0);display:flex;align-items:flex-end;justify-content:center;transition:background .28s';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(5,14,28,.0);transition:background .28s;pointer-events:none';
     ov.onclick = function(e){ if(e.target===ov) closeCommissionRulebook(); };
     document.body.appendChild(ov);
   }
@@ -3932,21 +3932,21 @@ function openCommissionRulebook() {
     ])
   ].join('');
 
-  var _maxH=Math.min(window.innerHeight-80, Math.round(window.innerHeight*0.82))+'px';
-  ov.innerHTML = '<div style="width:100%;max-width:100%;height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'+
-    '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0;flex-shrink:0"></div>'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;flex-shrink:0">'+
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9101;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'+
+    '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0f1b2f;z-index:1">'+
       '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
       '<div style="display:flex;align-items:center;gap:8px">'+
         '<div style="font-size:10px;color:rgba(188,215,255,.35);font-family:'+"'IBM Plex Mono',monospace"+'">live config</div>'+
         '<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'+
       '</div>'+
     '</div>'+
-    '<div style="overflow-y:auto;padding:0 18px 32px;-webkit-overflow-scrolling:touch;flex:1;min-height:0">'+html+'</div>'+
+    '<div style="padding:0 18px 32px">'+html+'</div>'+
   '</div>';
 
   requestAnimationFrame(function(){
     ov.style.background='rgba(5,14,28,.72)';
+    ov.style.pointerEvents='all';
     var sh=ov.querySelector('div');
     if(sh){ sh.style.transform='translateY(0)'; }
   });
@@ -3974,21 +3974,21 @@ function openCommissionHistory() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'comm-history-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:9200;background:rgba(5,14,28,.0);display:flex;align-items:flex-end;justify-content:center;transition:background .28s';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9200;background:rgba(5,14,28,.0);transition:background .28s;pointer-events:none';
     ov.onclick = function(e){ if(e.target===ov) closeCommissionHistory(); };
     document.body.appendChild(ov);
   }
 
   // Loading state
-  var _maxH=Math.min(window.innerHeight-80, Math.round(window.innerHeight*0.82))+'px';
-  ov.innerHTML = '<div style="width:100%;max-width:100%;height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'
-    + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0;flex-shrink:0"></div>'
-    + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff;flex-shrink:0">Commission ย้อนหลัง</div>'
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9201;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .30s cubic-bezier(.32,.72,0,1)">'
+    + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
     + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.45);font-size:13px">กำลังโหลด...</div>'
     + '</div>';
 
   requestAnimationFrame(function(){
     ov.style.background='rgba(5,14,28,.75)';
+    ov.style.pointerEvents='all';
     var sh=ov.querySelector('div');
     if(sh){ sh.style.transform='translateY(0)'; }
   });
@@ -4071,17 +4071,15 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   // Store rows globally for detail lookup
   window._commHistoryAllRows = allRows;
 
-  var _maxH=Math.min(window.innerHeight-80, Math.round(window.innerHeight*0.82))+'px';
-  var sh=ov.querySelector('div');
-  var _curTransform = sh ? sh.style.transform : '';
-  ov.innerHTML = '<div style="width:100%;max-width:100%;height:'+_maxH+';background:#0f1b2f;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;transition:transform .30s cubic-bezier(.32,.72,0,1);transform:'+(_curTransform||'translateY(0)')+'">'
-    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0;flex-shrink:0"></div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;flex-shrink:0">'
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9201;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(0);transition:transform .30s cubic-bezier(.32,.72,0,1)">'
+    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0f1b2f;z-index:1">'
       +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
       +'<button onclick="closeCommissionHistory()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
     +'</div>'
-    +'<div style="font-size:10px;color:rgba(188,215,255,.35);padding:0 18px 10px;font-family:\'IBM Plex Mono\',monospace;flex-shrink:0">6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
-    +'<div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0">'+listHtml+'</div>'
+    +'<div style="font-size:10px;color:rgba(188,215,255,.35);padding:0 18px 10px;font-family:\'IBM Plex Mono\',monospace">6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
+    +listHtml
+    +'<div style="height:24px"></div>'
     +'</div>';
 }
 
