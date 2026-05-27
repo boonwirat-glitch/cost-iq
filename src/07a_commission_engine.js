@@ -1242,7 +1242,10 @@ function _commDaysInLabel(label) {
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
-function _commComputeUpsellSku(kamEmail) {
+function _commComputeUpsellSku(kamEmail, expansionIds) {
+  // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
+  // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
+  const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
   try {
@@ -1296,6 +1299,8 @@ function _commComputeUpsellSku(kamEmail) {
       const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
 
       Object.keys(outletMap).forEach(outletId => {
+        // v244: skip expansion outlets — earn 1.5% via outlet commission, not P1/P3
+        if (_expIds.has(String(outletId))) return;
         const outletGroups = outletMap[outletId];
         // outlet-level baseline: 3-month lookback
         const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set
@@ -1373,59 +1378,40 @@ function _commComputeUpsellSku(kamEmail) {
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
 function _commComputeUpsellOutlet(kamEmail) {
-  const EMPTY = { outlet_gmv:0, commission:0, new_gmv:0, comeback_gmv:0 };
+  // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
+  // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
+  // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
+  const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
-    const _pvRow2 = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
-    const _kamKey2 = (_pvRow2 && _pvRow2.kamName) ? _pvRow2.kamName : kamEmail;
-    const byKam2 = bulkUpsellData.byKam || {};
-    let kamData = byKam2[_kamKey2] || byKam2[kamEmail] || {};
-    if (!Object.keys(kamData).length && _kamKey2) {
-      const _fk = Object.keys(byKam2).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
-      if (_fk) kamData = byKam2[_fk];
-    }
-    if (!Object.keys(kamData).length) return EMPTY;
-    const baselineGroups = bulkUpsellData.baselineGroups || {};
-    let baselineSet = baselineGroups[_kamKey2] || baselineGroups[kamEmail] || {};
-    if (!Object.keys(baselineSet).length && _kamKey2) {
-      const _fk2 = Object.keys(baselineGroups).find(k => k.startsWith(_kamKey2) || _kamKey2.startsWith(k));
-      if (_fk2) baselineSet = baselineGroups[_fk2];
-    }
-    const currLabel = _commCurrentMonthLabel();
+    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
+    const nrrResult = _tgtComputeKamNRR(kamEmail, null);
+    if (!nrrResult) return EMPTY;
 
-    let newGmv = 0, comebackGmv = 0;
+    // Sum expansion GMV across all cohorts (core + transferIn + newFromSales)
+    const expansionGmv = (nrrResult.expansionGmv || 0)
+      + (nrrResult.transferIn  && nrrResult.transferIn.expansionGmv  || 0)
+      + (nrrResult.newFromSales && nrrResult.newFromSales.expansionGmv || 0);
 
-    // v2: outlet-level loop (account → outlet → groupKey)
-    // legacy fallback: if structure is old (account → groupKey), wrap outlet as _all
-    Object.keys(kamData).forEach(accountId => {
-      const acctData = kamData[accountId];
-      const baselineByOutlet = baselineSet[accountId] || {};
-      const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
+    // Build expansion outlet ID set — used by _commComputeUpsellSku to exclude from P1/P3
+    const expansionIds = new Set();
+    const addExpansionIds = (detail) => {
+      if (!detail) return;
+      (detail.expansionDetail || []).forEach(g =>
+        (g.outlets || []).forEach(o => { if(o.outletId) expansionIds.add(String(o.outletId)); })
+      );
+    };
+    addExpansionIds(nrrResult);
+    addExpansionIds(nrrResult.transferIn);
+    addExpansionIds(nrrResult.newFromSales);
 
-      const firstVal = acctData[Object.keys(acctData)[0]];
-      const isNewFormat = firstVal && typeof firstVal === 'object' &&
-                          !Object.values(firstVal)[0]?.[currLabel] &&
-                          Object.values(firstVal)[0] && typeof Object.values(Object.values(firstVal)[0])[0] === 'object';
-      const outletMap = isNewFormat ? acctData : { _all: acctData };
-
-      Object.keys(outletMap).forEach(outletId => {
-        const outletGroups = outletMap[outletId];
-        const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set
-          ? baselineByOutlet[outletId] : new Set());
-
-        Object.keys(outletGroups).forEach(groupKey => {
-          if (!outletBaseline.has(groupKey)) return; // skip P1 — already counted at 3%
-          const currRow = (outletGroups[groupKey] || {})[currLabel];
-          if (!currRow) return;
-          newGmv      += (currRow.newGmv      || 0);
-          comebackGmv += (currRow.comebackGmv || 0);
-        });
-      });
-    });
-
-    const outletGmv = newGmv + comebackGmv;
-    return { outlet_gmv: outletGmv, commission: outletGmv * rate, new_gmv: newGmv, comeback_gmv: comebackGmv };
+    return {
+      outlet_gmv: expansionGmv,
+      commission: expansionGmv * rate,
+      expansion_gmv: expansionGmv,
+      expansion_outlets: [],
+      _expansionIds: expansionIds
+    };
   } catch(e) {
     console.warn('[CommEngine] _commComputeUpsellOutlet error', e);
     return EMPTY;
@@ -1632,8 +1618,8 @@ function _commBuildKamPayout(kamEmail) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellSku    = _commComputeUpsellSku(kamEmail);
       upsellOutlet = _commComputeUpsellOutlet(kamEmail);
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds);
     }
     const handover      = _commComputeHandoverRetention(kamEmail);
     const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
