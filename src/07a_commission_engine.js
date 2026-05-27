@@ -625,8 +625,13 @@ function _nrrGovernedPct(rawResult, kamEmail, tlEmail) {
   const curr = Number(rawResult.cohortGmv || 0);
   const excludedBase = Math.min(base, _nrrExclusionBaseImpact(kamEmail, tlEmail));
   if (base <= 0 || excludedBase <= 0) return Math.round(rawResult.nrr * 100);
+  // v247d: normalize by daily rate (same as raw NRR) — prevents mid-month deflation when exclusion is approved
+  const prevDays = Number(rawResult.prevDays || 30);
+  const daysElapsed = Number(rawResult.daysElapsed || 30);
   const eligibleBase = Math.max(1, base - excludedBase);
-  return Math.round(curr / eligibleBase * 100);
+  const currRate = daysElapsed > 0 ? curr / daysElapsed : 0;
+  const baseRate = prevDays > 0 ? eligibleBase / prevDays : 0;
+  return baseRate > 0 ? Math.round(currRate / baseRate * 100) : Math.round(rawResult.nrr * 100);
 }
 function _nrrGovernanceForVisibleTeam() {
   const scope = _commVisibleTeamScope();
@@ -1023,6 +1028,7 @@ function _commOpenTlDetailSheet(opts) {
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
+      <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
   </div>`;
@@ -1314,8 +1320,7 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
 
           const rawTotalGmv = currRow.totalGmv || 0;
           const rawExistingGmv = currRow.existingGmv || 0;
-          const rawNewGmv = currRow.newGmv || 0;
-          const rawComebackGmv = currRow.comebackGmv || 0;
+          // v247d: rawNewGmv / rawComebackGmv removed — fields dropped from v4 CSV
 
           // v2 P1: outlet ไม่เคยซื้อ group_key นี้ใน 3 เดือนย้อนหลัง
           const isP1 = !outletBaseline.has(groupKey);
@@ -2805,8 +2810,13 @@ function _nrrGovernedPct(rawResult, kamEmail, tlEmail) {
   const curr = Number(rawResult.cohortGmv || 0);
   const excludedBase = Math.min(base, _nrrExclusionBaseImpact(kamEmail, tlEmail));
   if (base <= 0 || excludedBase <= 0) return Math.round(rawResult.nrr * 100);
+  // v247d: normalize by daily rate (same as raw NRR) — prevents mid-month deflation when exclusion is approved
+  const prevDays = Number(rawResult.prevDays || 30);
+  const daysElapsed = Number(rawResult.daysElapsed || 30);
   const eligibleBase = Math.max(1, base - excludedBase);
-  return Math.round(curr / eligibleBase * 100);
+  const currRate = daysElapsed > 0 ? curr / daysElapsed : 0;
+  const baseRate = prevDays > 0 ? eligibleBase / prevDays : 0;
+  return baseRate > 0 ? Math.round(currRate / baseRate * 100) : Math.round(rawResult.nrr * 100);
 }
 function _nrrGovernanceForVisibleTeam() {
   const scope = _commVisibleTeamScope();
@@ -3203,6 +3213,7 @@ function _commOpenTlDetailSheet(opts) {
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
+      <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(188,215,255,.10);color:rgba(225,238,255,.42);font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">กฎค่าคอมฯ ทั้งหมด ›</button>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
   </div>`;
