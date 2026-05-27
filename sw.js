@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v225
+// Freshket Sense — Service Worker v248
 // Strategy: Cache-first, background revalidate (stale-while-revalidate)
 //
 // v225 rewrite: fixed all redirect-related ERR_FAILED bugs.
@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'freshket-sense-v225';
+const CACHE_NAME = 'freshket-sense-v248';
 const APP_URL = '/index.html';
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
@@ -43,7 +43,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     fetchClean(APP_URL).then(response => {
       if (!response) return; // offline during install — SW still activates
-      return caches.open(CACHE_NAME).then(cache => cache.put(APP_URL, response));
+      return caches.open(CACHE_NAME).then(cache => cache.put(APP_URL, response.clone())).catch(()=>{});
     })
   );
   self.skipWaiting(); // activate immediately so new SW takes effect without waiting
@@ -57,7 +57,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== CACHE_NAME)
           .map(key => {
-            console.log('[SW v225] clearing old cache:', key);
+            console.log('[SW v248] clearing old cache:', key);
             return caches.delete(key);
           })
       )
@@ -82,7 +82,7 @@ async function handleNavigate() {
     if (cached && cached.ok && cached.status === 200) {
       // Background revalidate — updates cache for next visit
       fetchClean(APP_URL)
-        .then(fresh => { if (fresh) cache.put(APP_URL, fresh); })
+        .then(fresh => { if (fresh) cache.put(APP_URL, fresh.clone()).catch(()=>{}); })
         .catch(() => {});
       return cached;
     }
