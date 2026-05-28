@@ -389,7 +389,7 @@ function _renderComponentRatesEditor() {
         ${fld('Tier 3 bonus (เพิ่มเติมจาก T2)','handover','tier3_bonus',2500,500,'฿')}
       </div>
       <div class="comm-formula-note">
-        retention = ยอด MTD / ยอดเดือนสุดท้ายก่อนโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
+        retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 · Sales→KAM เท่านั้น · วัดเดือน M+1 หลังโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
       </div>
     </div>
     <div class="comm-component-section" style="margin-top:14px">
@@ -1574,14 +1574,22 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
 
   // ── Classify accounts into cohorts ─────────────────────────────
   // Core NRR: account อยู่กับ KAM นี้ก่อนเดือนปัจจุบัน
-  // Transfer in: ใหม่เดือนนี้ + มีใน bulkHandoverData (มาจาก KAM อื่น)
-  // New from Sales: ใหม่เดือนนี้ + ไม่มีใน bulkHandoverData (มาจาก Sales/PM)
+  // Transfer In:    ใหม่เดือนนี้ + มาจาก KAM/PM/ADMIN (prev_owner != SALE)
+  // New from Sales: ใหม่เดือนนี้ + มาจาก SALE เท่านั้น (prev_owner === SALE หรือไม่มีใน Q10)
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
   allAccounts.forEach(a => {
     const isNew = a.daysWithCurrentKam !== null && a.daysWithCurrentKam !== undefined && a.daysWithCurrentKam <= daysElapsed;
     if (!isNew) { coreAccounts.push(a); return; }
-    if (hd.byAccountId[a.id]) { transferInAccounts.push(a); }
-    else { newFromSalesAccounts.push(a); }
+    const hoRow = hd.byAccountId && hd.byAccountId[a.id];
+    if (hoRow) {
+      // มีใน Q10 — แยกด้วย prev_owner
+      const prevOwner = (hoRow.prevOwner || '').toUpperCase();
+      if (prevOwner === 'SALE') { newFromSalesAccounts.push(a); }   // Sales → KAM
+      else { transferInAccounts.push(a); }                           // KAM/PM/ADMIN → KAM
+    } else {
+      // ไม่มีใน Q10 = ไม่มีประวัติ ถือเป็น Sales
+      newFromSalesAccounts.push(a);
+    }
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
@@ -3929,7 +3937,7 @@ function _cdsFormulaContent(key) {
     p3: 'สินค้าเดิมแต่ยอดเพิ่ม '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'x vs baseline · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
-    ho:  'ร้านใหม่จาก Sales ยอดเป็นกี่ % เทียบเดือนก่อน<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
+    ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
   };
   return '<div class="cds-formula-dot"></div><div class="cds-formula-text">'+(texts[key]||'')+'</div>';
 }
@@ -4915,11 +4923,11 @@ function openCommissionRulebook() {
       ['MTD note', 'ฝั่ง current = actual MTD (ไม่ normalized) → ต้นเดือนมักยังไม่ผ่านเกณฑ์ ยอดจะค่อยๆ ขึ้นปลายเดือน'],
       ['ข้อยกเว้น', 'Expansion outlets ถูก exclude เช่นเดียวกับ P1']
     ]),
-    sec('Handover (จาก Sales)', '#bcd7ff', [
-      ['นิยาม', 'ร้านที่เพิ่งย้ายมาอยู่กับ KAM เดือนนี้ + ไม่ได้มาจาก KAM คนอื่น (มาจาก Sales/PM)'],
-      ['ต่างจาก Transfer In', 'Transfer In = มาจาก KAM อื่น (มีบันทึกใน handover CSV) → ไม่ได้ค่าคอม Handover'],
-      ['เดือนฐาน', 'GMV เดือนที่แล้วของร้านนั้น (ยอดสุดท้ายที่ทำกับ Sales)'],
-      ['วิธีวัด', 'Retention = GMV MTD เดือนนี้ ÷ GMV เดือนฐาน × 100 (actual, ไม่ normalize)'],
+    sec('Handover (จาก Sales เท่านั้น)', '#bcd7ff', [
+      ['นิยาม', 'ร้านที่โอนจาก Sales เข้า KAM เมื่อเดือนที่แล้ว — วัด performance เดือนนี้'],
+      ['ต่างจาก Transfer In', 'KAM/PM/ADMIN → KAM = Transfer In ไม่ได้ค่าคอม · Sales → KAM เท่านั้นที่ได้'],
+      ['เดือนฐาน', 'GMV เดือนที่โอน (ทั้งเดือน รวมช่วงที่ Sales ดูแล)'],
+      ['วิธีวัด', 'Retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 (normalize ทั้งคู่)'],
       ['Tier', '≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT2Pay+' + '+hoT3Bon+' bonus · < '+hoT2Pct+'% → ฿0']
     ]),
     sec('NRR Gate (KAM)', 'rgba(255,107,61,.9)', [
