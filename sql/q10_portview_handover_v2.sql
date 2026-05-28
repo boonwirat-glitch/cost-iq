@@ -157,8 +157,11 @@ prev_owner_lm AS (
   ) = 1
 ),
 
--- ── ร้านที่ old KAM มี GMV ใน M-1 (transfer month = M-1) ─────────────────
+-- ── ร้านที่โอนเข้า KAM ใน M-1 (transfer month = M-1) ────────────────────
+-- Source 1: มี order ใน M-1 ภายใต้ KAM (active transfers)
+-- Source 2: user_master บอกว่าเป็น KAM แล้ว แต่ยังไม่มี order ใน M-1 (new/no-order transfers)
 transfer_lm AS (
+  -- Source 1: มี order ใน M-1
   SELECT
     CAST(o.account_id AS STRING)                                                  AS account_id,
     ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]      AS account_name,
@@ -175,14 +178,52 @@ transfer_lm AS (
     AND o.ka_owner IS NOT NULL AND TRIM(o.ka_owner) != ''
     AND o.account_type IN ('SA', 'MC', 'Chain')
   GROUP BY CAST(o.account_id AS STRING), o.ka_owner, p.lm_label, p.lm_days
+
+  UNION ALL
+
+  -- Source 2: user_master บอกว่าเป็น KAM แล้ว แต่ยังไม่มี order ใน M-1
+  -- = ร้านที่โอนจาก Sales/PM/Admin มา KAM ใน M-1 แต่ยังสั่งอาหารไม่ได้เลย
+  SELECT
+    CAST(um.account_guid AS STRING)                                               AS account_id,
+    um.account_name                                                                AS account_name,
+    um.account_type                                                                AS account_type,
+    k.kam_name                                                                     AS old_kam_name,
+    0                                                                              AS last_month_gmv,
+    p.lm_end                                                                       AS last_order_date,
+    'user_master_no_order'                                                         AS transfer_basis,
+    p.lm_label                                                                     AS transfer_month,
+    p.lm_days                                                                      AS baseline_days
+  FROM `freshket-rn.dim.user_master` um, params p
+  JOIN current_kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  WHERE um.account_type IN ('SA', 'MC', 'Chain')
+    AND um.account_guid IS NOT NULL
+    AND um.commercial_owner = 'KAM'
+    -- ยังไม่มี order ใน M-1
+    AND CAST(um.account_guid AS STRING) NOT IN (
+      SELECT DISTINCT CAST(account_id AS STRING)
+      FROM `freshket-rn.dwh.order`
+      WHERE delivery_date BETWEEN p.lm_start AND p.lm_end
+        AND commercial_owner = 'KAM'
+        AND account_type IN ('SA', 'MC', 'Chain')
+    )
+    -- แต่เดือนก่อนหน้า (M-2) ไม่ได้อยู่กับ KAM = เพิ่งโอนมา
+    AND CAST(um.account_guid AS STRING) NOT IN (
+      SELECT DISTINCT CAST(account_id AS STRING)
+      FROM `freshket-rn.dwh.order`
+      WHERE delivery_date BETWEEN p.m2_start AND p.m2_end
+        AND commercial_owner = 'KAM'
+        AND account_type IN ('SA', 'MC', 'Chain')
+    )
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_id
-    ORDER BY SUM(o.gmv_ex_vat) DESC, MAX(o.delivery_date) DESC
+    PARTITION BY CAST(um.account_guid AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
   ) = 1
 ),
 
--- ── ร้านที่ old KAM มี GMV ใน M-2 (transfer month = M-2) ─────────────────
+-- ── ร้านที่โอนเข้า KAM ใน M-2 (transfer month = M-2) ────────────────────
 transfer_m2 AS (
+  -- Source 1: มี order ใน M-2
   SELECT
     CAST(o.account_id AS STRING)                                                  AS account_id,
     ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]      AS account_name,
@@ -199,9 +240,44 @@ transfer_m2 AS (
     AND o.ka_owner IS NOT NULL AND TRIM(o.ka_owner) != ''
     AND o.account_type IN ('SA', 'MC', 'Chain')
   GROUP BY CAST(o.account_id AS STRING), o.ka_owner, p.m2_label, p.m2_days
+
+  UNION ALL
+
+  -- Source 2: user_master บอกว่าเป็น KAM แล้ว แต่ยังไม่มี order ใน M-2
+  SELECT
+    CAST(um.account_guid AS STRING)                                               AS account_id,
+    um.account_name                                                                AS account_name,
+    um.account_type                                                                AS account_type,
+    k.kam_name                                                                     AS old_kam_name,
+    0                                                                              AS last_month_gmv,
+    p.m2_end                                                                       AS last_order_date,
+    'user_master_no_order'                                                         AS transfer_basis,
+    p.m2_label                                                                     AS transfer_month,
+    p.m2_days                                                                      AS baseline_days
+  FROM `freshket-rn.dim.user_master` um, params p
+  JOIN current_kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  WHERE um.account_type IN ('SA', 'MC', 'Chain')
+    AND um.account_guid IS NOT NULL
+    AND um.commercial_owner = 'KAM'
+    AND CAST(um.account_guid AS STRING) NOT IN (
+      SELECT DISTINCT CAST(account_id AS STRING)
+      FROM `freshket-rn.dwh.order`
+      WHERE delivery_date BETWEEN p.m2_start AND p.m2_end
+        AND commercial_owner = 'KAM'
+        AND account_type IN ('SA', 'MC', 'Chain')
+    )
+    AND CAST(um.account_guid AS STRING) NOT IN (
+      SELECT DISTINCT CAST(account_id AS STRING)
+      FROM `freshket-rn.dwh.order`
+      WHERE delivery_date < p.m2_start
+        AND commercial_owner = 'KAM'
+        AND delivery_date >= DATE_SUB(p.m2_start, INTERVAL 1 MONTH)
+        AND account_type IN ('SA', 'MC', 'Chain')
+    )
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_id
-    ORDER BY SUM(o.gmv_ex_vat) DESC, MAX(o.delivery_date) DESC
+    PARTITION BY CAST(um.account_guid AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
   ) = 1
 ),
 
