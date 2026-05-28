@@ -1,5 +1,11 @@
--- Q10_V5: portview_handover.csv
--- V5: ใช้ ka_owner เป็น key detect transfer, ไม่มี USING clause เลย
+-- Q10_V6: portview_handover.csv
+-- V6: ใช้ staff_owner เป็น source of truth detect transfer
+-- Logic:
+--   1. หาวันแรกที่ staff_owner เปลี่ยน = วันโอนจริง
+--   2. prev_owner = commercial_owner ของ order ล่าสุดก่อนวันโอน
+--   3. new_owner  = commercial_owner ของ order วันโอนและหลัง
+--   4. Sales→KAM = prev_owner=SALE และ new_owner=KAM
+-- Output schema (16 columns) — backward compatible
 
 WITH params AS (
   SELECT
@@ -41,6 +47,81 @@ current_kam_list AS (
   ])
 ),
 
+-- ── daily staff_owner per account ─────────────────────────────────────────
+-- เอา staff_owner ที่มี GMV มากสุดในแต่ละวัน
+daily AS (
+  SELECT
+    CAST(account_id AS STRING)                                                     AS aid,
+    delivery_date,
+    ARRAY_AGG(account_name     ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS account_name,
+    ARRAY_AGG(account_type     ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS account_type,
+    ARRAY_AGG(staff_owner      ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS staff_owner,
+    ARRAY_AGG(commercial_owner ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS commercial_owner
+  FROM `freshket-rn.dwh.order`, params
+  -- ดึง 3 เดือน ครอบทั้ง M-2 และ M
+  WHERE delivery_date BETWEEN m2_start AND cm_max_date
+    AND account_type IN ('SA', 'MC', 'Chain')
+    AND staff_owner IS NOT NULL AND TRIM(staff_owner) != ''
+  GROUP BY 1, 2
+),
+
+-- ── detect วันที่ staff_owner เปลี่ยน ────────────────────────────────────
+with_prev AS (
+  SELECT
+    aid,
+    delivery_date,
+    account_name,
+    account_type,
+    staff_owner,
+    commercial_owner,
+    LAG(staff_owner)      OVER (PARTITION BY aid ORDER BY delivery_date) AS prev_staff_owner,
+    LAG(commercial_owner) OVER (PARTITION BY aid ORDER BY delivery_date) AS prev_commercial_owner
+  FROM daily
+),
+
+-- ── วันโอน = วันแรกที่ staff_owner เปลี่ยน ───────────────────────────────
+transfer_days AS (
+  SELECT
+    aid,
+    delivery_date                                    AS transfer_date,
+    account_name,
+    account_type,
+    staff_owner                                      AS new_staff_owner,    -- KAM ใหม่ที่รับ
+    commercial_owner                                 AS new_commercial_owner,
+    prev_staff_owner                                 AS old_staff_owner,    -- KAM เดิม
+    prev_commercial_owner                            AS prev_commercial_owner -- owner ก่อนโอน
+  FROM with_prev
+  WHERE staff_owner != prev_staff_owner              -- เปลี่ยน staff = โอน
+    AND prev_staff_owner IS NOT NULL                 -- ไม่ใช่ order แรก
+),
+
+-- ── filter เฉพาะ KAM ที่อยู่ใน active list ───────────────────────────────
+transfer_to_active_kam AS (
+  SELECT
+    t.aid,
+    t.transfer_date,
+    t.account_name,
+    t.account_type,
+    t.new_staff_owner                                AS new_kam_name,
+    t.new_commercial_owner,
+    t.old_staff_owner                                AS old_kam_name,
+    t.prev_commercial_owner                          AS prev_owner,
+    FORMAT_DATE('%Y-%m', t.transfer_date)            AS transfer_month
+  FROM transfer_days t
+  JOIN current_kam_list k
+    ON LOWER(TRIM(t.new_staff_owner)) = LOWER(TRIM(k.kam_name))
+  -- เฉพาะ transfer ใน window 2 เดือน (M-1 และ M-2)
+  WHERE FORMAT_DATE('%Y-%m', t.transfer_date) IN (
+    (SELECT lm_label FROM params),
+    (SELECT m2_label FROM params)
+  )
+  -- เอา transfer แรกของแต่ละ account ต่อ KAM ต่อเดือน
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY t.aid, FORMAT_DATE('%Y-%m', t.transfer_date)
+    ORDER BY t.transfer_date ASC
+  ) = 1
+),
+
 -- ── GMV รายเดือน ──────────────────────────────────────────────────────────
 gmv_lm AS (
   SELECT CAST(account_id AS STRING) AS aid, SUM(gmv_ex_vat) AS gmv
@@ -64,59 +145,7 @@ gmv_cm AS (
   GROUP BY 1
 ),
 
--- ── ka_owner หลักต่อร้านต่อเดือน ─────────────────────────────────────────
-ka_lm AS (
-  SELECT
-    CAST(account_id AS STRING)                                               AS aid,
-    ARRAY_AGG(account_name    ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]  AS account_name,
-    ARRAY_AGG(account_type    ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]  AS account_type,
-    ARRAY_AGG(ka_owner        ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]  AS ka_owner,
-    MAX(delivery_date)                                                       AS last_order_date
-  FROM `freshket-rn.dwh.order`, params
-  WHERE delivery_date BETWEEN lm_start AND lm_end
-    AND account_type IN ('SA', 'MC', 'Chain')
-    AND ka_owner IS NOT NULL AND TRIM(ka_owner) != ''
-  GROUP BY 1
-),
-ka_m2 AS (
-  SELECT
-    CAST(account_id AS STRING)                                               AS aid,
-    ARRAY_AGG(ka_owner        ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]  AS ka_owner
-  FROM `freshket-rn.dwh.order`, params
-  WHERE delivery_date BETWEEN m2_start AND m2_end
-    AND account_type IN ('SA', 'MC', 'Chain')
-  GROUP BY 1
-),
-
--- ── prev_owner: order ล่าสุดก่อนเดือนที่โอน ──────────────────────────────
-prev_for_lm AS (
-  SELECT
-    CAST(account_id AS STRING) AS aid,
-    commercial_owner           AS prev_owner,
-    ka_owner                   AS prev_kam
-  FROM `freshket-rn.dwh.order`
-  WHERE account_type IN ('SA', 'MC', 'Chain')
-    AND delivery_date < (SELECT lm_start FROM params)
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY CAST(account_id AS STRING)
-    ORDER BY delivery_date DESC
-  ) = 1
-),
-prev_for_m2 AS (
-  SELECT
-    CAST(account_id AS STRING) AS aid,
-    commercial_owner           AS prev_owner,
-    ka_owner                   AS prev_kam
-  FROM `freshket-rn.dwh.order`
-  WHERE account_type IN ('SA', 'MC', 'Chain')
-    AND delivery_date < (SELECT m2_start FROM params)
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY CAST(account_id AS STRING)
-    ORDER BY delivery_date DESC
-  ) = 1
-),
-
--- ── user_master: current owner ────────────────────────────────────────────
+-- ── current owner จาก user_master ────────────────────────────────────────
 cur_owner AS (
   SELECT
     CAST(account_guid AS STRING)      AS aid,
@@ -136,109 +165,60 @@ cur_owner AS (
   ) = 1
 ),
 
--- ── M-1 transfers ─────────────────────────────────────────────────────────
-transfers_lm AS (
-  SELECT
-    lm.aid,
-    lm.account_name,
-    lm.account_type,
-    lm.ka_owner                                      AS new_kam_name,
-    COALESCE(m2.ka_owner, po.prev_kam, 'NEW')        AS old_kam_name,
-    COALESCE(po.prev_owner, 'NEW')                   AS prev_owner,
-    lm.last_order_date,
-    p.lm_label                                       AS transfer_month,
-    p.lm_days                                        AS baseline_days
-  FROM ka_lm lm
-  CROSS JOIN params p
-  LEFT JOIN ka_m2 m2
-    ON lm.aid = m2.aid
-  LEFT JOIN prev_for_lm po
-    ON lm.aid = po.aid
-  JOIN current_kam_list k
-    ON LOWER(TRIM(lm.ka_owner)) = LOWER(TRIM(k.kam_name))
-  WHERE
-    LOWER(TRIM(lm.ka_owner)) != LOWER(TRIM(COALESCE(m2.ka_owner, '')))
-    OR m2.aid IS NULL
-),
-
--- ── M-2 transfers ─────────────────────────────────────────────────────────
-transfers_m2 AS (
-  SELECT
-    m2.aid,
-    ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_name,
-    ARRAY_AGG(o.account_type ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_type,
-    m2.ka_owner                                      AS new_kam_name,
-    COALESCE(po.prev_kam, po.prev_owner, 'NEW')      AS old_kam_name,
-    COALESCE(po.prev_owner, 'NEW')                   AS prev_owner,
-    MAX(o.delivery_date)                             AS last_order_date,
-    p.m2_label                                       AS transfer_month,
-    p.m2_days                                        AS baseline_days
-  FROM ka_m2 m2
-  CROSS JOIN params p
-  JOIN `freshket-rn.dwh.order` o
-    ON CAST(o.account_id AS STRING) = m2.aid
-    AND o.delivery_date BETWEEN p.m2_start AND p.m2_end
-  LEFT JOIN prev_for_m2 po
-    ON m2.aid = po.aid
-  JOIN current_kam_list k
-    ON LOWER(TRIM(m2.ka_owner)) = LOWER(TRIM(k.kam_name))
-  WHERE
-    LOWER(TRIM(m2.ka_owner)) != LOWER(TRIM(COALESCE(po.prev_kam, '')))
-    OR po.prev_owner != 'KAM'
-    OR po.aid IS NULL
-  GROUP BY m2.aid, m2.ka_owner, po.prev_owner, po.prev_kam, p.m2_label, p.m2_days
-),
-
--- ── รวม ───────────────────────────────────────────────────────────────────
+-- ── รวม output ────────────────────────────────────────────────────────────
 combined AS (
+  -- M-1 window: โอนเดือน M-1 → baseline=GMV M-1, perf=GMV M
   SELECT
-    t.old_kam_name                                   AS kam_name,
-    t.aid                                            AS account_id,
+    t.old_kam_name                                    AS kam_name,
+    t.aid                                             AS account_id,
     t.account_name,
     t.account_type,
-    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)        AS last_month_gmv,
-    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)        AS cur_month_gmv,
-    COALESCE(co.current_owner_type, 'KAM')           AS new_owner_type,
+    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)         AS last_month_gmv,
+    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)         AS cur_month_gmv,
+    COALESCE(co.current_owner_type, t.new_commercial_owner) AS new_owner_type,
     t.new_kam_name,
-    'transfer_lm'                                    AS transfer_basis,
-    CAST(t.last_order_date AS STRING)                AS last_order_date,
+    'transfer_lm'                                     AS transfer_basis,
+    CAST(t.transfer_date AS STRING)                   AS last_order_date,
     t.prev_owner,
     t.transfer_month,
-    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)        AS baseline_gmv,
-    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)        AS perf_gmv,
-    p.cm_days                                        AS perf_days_in_month,
-    t.baseline_days                                  AS baseline_days_in_month
-  FROM transfers_lm t
+    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)         AS baseline_gmv,
+    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)         AS perf_gmv,
+    p.cm_days                                         AS perf_days_in_month,
+    p.lm_days                                         AS baseline_days_in_month
+  FROM transfer_to_active_kam t
   CROSS JOIN params p
   LEFT JOIN gmv_lm lm ON t.aid = lm.aid
   LEFT JOIN gmv_cm cm ON t.aid = cm.aid
   LEFT JOIN cur_owner co ON t.aid = co.aid
+  WHERE t.transfer_month = p.lm_label
 
   UNION ALL
 
+  -- M-2 window: โอนเดือน M-2 → baseline=GMV M-2, perf=GMV M-1
   SELECT
-    t.old_kam_name                                   AS kam_name,
-    t.aid                                            AS account_id,
+    t.old_kam_name                                    AS kam_name,
+    t.aid                                             AS account_id,
     t.account_name,
     t.account_type,
-    CAST(ROUND(COALESCE(m2.gmv, 0)) AS INT64)        AS last_month_gmv,
-    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)        AS cur_month_gmv,
-    COALESCE(co.current_owner_type, 'KAM')           AS new_owner_type,
+    CAST(ROUND(COALESCE(m2.gmv, 0)) AS INT64)         AS last_month_gmv,
+    CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)         AS cur_month_gmv,
+    COALESCE(co.current_owner_type, t.new_commercial_owner) AS new_owner_type,
     t.new_kam_name,
-    'transfer_m2'                                    AS transfer_basis,
-    CAST(t.last_order_date AS STRING)                AS last_order_date,
+    'transfer_m2'                                     AS transfer_basis,
+    CAST(t.transfer_date AS STRING)                   AS last_order_date,
     t.prev_owner,
     t.transfer_month,
-    CAST(ROUND(COALESCE(m2.gmv, 0)) AS INT64)        AS baseline_gmv,
-    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)        AS perf_gmv,
-    p.lm_days                                        AS perf_days_in_month,
-    t.baseline_days                                  AS baseline_days_in_month
-  FROM transfers_m2 t
+    CAST(ROUND(COALESCE(m2.gmv, 0)) AS INT64)         AS baseline_gmv,
+    CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)         AS perf_gmv,
+    p.lm_days                                         AS perf_days_in_month,
+    p.m2_days                                         AS baseline_days_in_month
+  FROM transfer_to_active_kam t
   CROSS JOIN params p
   LEFT JOIN gmv_m2 m2 ON t.aid = m2.aid
   LEFT JOIN gmv_lm lm ON t.aid = lm.aid
   LEFT JOIN gmv_cm cm ON t.aid = cm.aid
   LEFT JOIN cur_owner co ON t.aid = co.aid
+  WHERE t.transfer_month = p.m2_label
 )
 
 SELECT
@@ -250,8 +230,4 @@ SELECT
   baseline_gmv, perf_gmv,
   perf_days_in_month, baseline_days_in_month
 FROM combined
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY account_id, transfer_month
-  ORDER BY last_order_date DESC
-) = 1
 ORDER BY transfer_month DESC, new_kam_name, last_month_gmv DESC
