@@ -3696,7 +3696,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div class="cds-sub-rows'+(open?' open':'')+'" id="'+id+'-sub">';
       // sub-rows injected here by each tab renderer
   }
-  function _cdsChipRowClose(){ return '</div></div>'; }
+  function _cdsChipRowClose(){ return '</div>'; }
 
   // ── Zone C: sub-row (grid columns) ────────────────────────────────────
   // cells = [{text, cls}]
@@ -3913,87 +3913,88 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
 
 //////////////////////////////////////////////////////////////////////////////
-// ── CDS Session 3: P1 tab renderer (สินค้าใหม่) ──────────────────────────
+// ── CDS Session 4: P3 tab renderer (ยอดเติบโต) ───────────────────────────
 //////////////////////////////////////////////////////////////////////////////
 
-window._cdsRender_p1 = function(src, body, meta, totalEl) {
+window._cdsRender_p3 = function(src, body, meta, totalEl) {
   var h = window._cdsHtml;
   if (!h) return;
 
-  // ── Config ──────────────────────────────────────────────────────────
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
-  var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 2500));
+  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 100);
+  var p3Thresh    = cfg('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3ThreshPct = Math.round((p3Thresh - 1) * 100);
+  var p3MinIncr   = Number(cfg('upsell_sku', 'p3_min_incremental', 5000));
   var fmt = h.fmt;
   var esc = h.esc;
 
-  // ── Loading state ────────────────────────────────────────────────────
   if (src.loading) {
     if (meta) meta.innerHTML = '';
     body.innerHTML = '<div class="cds-empty">กำลังโหลด upsell...</div>';
-    if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', '—', 'v-amber');
+    if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', '—', 'v-amber');
     return;
   }
 
-  var d = src.upsell_sku_detail && src.upsell_sku_detail.p1;
+  var d = src.upsell_sku_detail && src.upsell_sku_detail.p3;
   var groups = (d && d.groups) ? d.groups : [];
   var totalComm = d ? Number(d.comm || 0) : 0;
 
-  // ── Empty state ──────────────────────────────────────────────────────
   if (!groups.length) {
     if (meta) meta.innerHTML = '';
-    body.innerHTML = '<div class="cds-empty">ไม่มีกลุ่มสินค้าใหม่เดือนนี้<br>'
-      + '<span style="font-size:10px;opacity:.5">เงื่อนไข: GMV ≥ ฿' + p1MinGmv.toLocaleString('en-US') + ' · ไม่เคยซื้อใน 3 เดือนย้อนหลัง</span></div>';
-    if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', '฿0', 'v-dim');
+    body.innerHTML = '<div class="cds-empty">ไม่มียอดเติบโตเดือนนี้<br>'
+      + '<span style="font-size:10px;opacity:.5">เงื่อนไข: เพิ่ม &gt;' + p3ThreshPct + '% vs baseline · ≥ ฿' + p3MinIncr.toLocaleString('en-US') + '</span></div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', '฿0', 'v-dim');
     return;
   }
 
-  // ── Group by outlet ──────────────────────────────────────────────────
+  // Group by outlet
   var byOutlet = {};
   groups.forEach(function(g) {
     var key = g.outletId || '_all';
-    if (!byOutlet[key]) byOutlet[key] = { outletId: key, accountId: g.accountId || '', items: [], totalComm: 0, totalGmv: 0 };
+    if (!byOutlet[key]) byOutlet[key] = { outletId: key, accountId: g.accountId || '', items: [], totalComm: 0, totalIncr: 0 };
     byOutlet[key].items.push(g);
-    byOutlet[key].totalComm += g.commission || 0;
-    byOutlet[key].totalGmv  += g.total_gmv  || 0;
+    byOutlet[key].totalComm += g.commission   || 0;
+    byOutlet[key].totalIncr += g.incremental  || 0;
   });
   var outlets = Object.values(byOutlet).sort(function(a, b) { return b.totalComm - a.totalComm; });
 
-  // ── Meta bar ─────────────────────────────────────────────────────────
   if (meta) {
     meta.innerHTML = '<div class="cds-meta">'
-      + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่มสินค้า · × ' + p1Rate + '%</span>'
+      + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่ม · &gt;' + p3ThreshPct + '% × ' + p3Rate + '%</span>'
       + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
       + '</div>';
   }
 
-  // ── Body rows ─────────────────────────────────────────────────────────
   var html = '';
   outlets.forEach(function(o, oi) {
-    var rowId   = 'p1r' + oi;
-    var oName   = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
-    var meta_   = o.items.length + ' กลุ่มสินค้า';
+    var rowId = 'p3r' + oi;
+    var oName = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
 
-    // Accordion header
-    html += h.chipRow(rowId, oName, meta_, fmt(o.totalComm), 'v-amber', oi < 3);
+    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
 
-    // Group sub-rows
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
+      // ฐาน = max_baseline (normalized), เพิ่ม = incremental
       html += h.subRow([
         { text: g.groupKey || g.group_key || '—', cls: 'cds-outlet-name' },
-        { text: fmt(g.total_gmv),  cls: 'cds-val v-muted' },
-        { text: fmt(g.commission), cls: 'cds-val v-amber' }
-      ], 'p1');
+        { text: fmt(g.max_baseline),  cls: 'cds-val v-muted' },
+        { text: fmt(g.incremental),   cls: 'cds-val v-green' },
+        { text: fmt(g.commission),    cls: 'cds-val v-amber' }
+      ], 'p3');
 
-      // Proof card (collapsed, opened on sub-row tap)
+      var baseMonth = g.max_baseline_month || '';
+      var growthPct = g.max_baseline > 0 ? Math.round(g.existing_curr / g.max_baseline * 100) : 0;
+      var passGrowth = growthPct > (p3ThreshPct + 100);
+      var passMinIncr = g.incremental >= p3MinIncr;
+
       html += h.proof(proofId, [
-        { label: 'GMV เดือนนี้',     result: fmt(g.total_gmv) },
-        { label: 'เกณฑ์ขั้นต่ำ',   result: '≥ ฿' + p1MinGmv.toLocaleString('en-US'), pass: g.total_gmv >= p1MinGmv },
-        { label: 'อัตราค่าคอมฯ',    result: p1Rate + '%' },
-        { label: 'commission',       result: fmt(g.total_gmv) + ' × ' + p1Rate + '% = ' + fmt(g.commission), pass: true }
+        { label: 'Baseline (' + esc(baseMonth) + ')',  result: fmt(g.max_baseline) },
+        { label: 'GMV เดือนนี้',                       result: fmt(g.existing_curr) + ' (' + growthPct + '%)' },
+        { label: 'ต้องเพิ่ม &gt;' + p3ThreshPct + '%', result: growthPct > (p3ThreshPct + 100) ? 'ผ่าน ✓' : 'ไม่ผ่าน ✗', pass: passGrowth },
+        { label: 'Incremental ≥ ฿' + p3MinIncr.toLocaleString('en-US'), result: fmt(g.incremental), pass: passMinIncr },
+        { label: 'commission', result: fmt(g.incremental) + ' × ' + p3Rate + '% = ' + fmt(g.commission), pass: true }
       ]);
     });
 
@@ -4002,19 +4003,15 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
 
   body.innerHTML = html;
 
-  // ── Wire sub-row tap → toggle proof ──────────────────────────────────
-  body.querySelectorAll('.cds-sub-row.p1-cols').forEach(function(row, idx) {
+  body.querySelectorAll('.cds-sub-row.p3-cols').forEach(function(row) {
     row.style.cursor = 'pointer';
     row.addEventListener('click', function() {
       var proof = row.nextElementSibling;
-      if (proof && proof.classList.contains('cds-proof')) {
-        proof.classList.toggle('open');
-      }
+      if (proof && proof.classList.contains('cds-proof')) proof.classList.toggle('open');
     });
   });
 
-  // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmt(totalComm), 'v-amber');
+  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmt(totalComm), 'v-amber');
 };
 
 
