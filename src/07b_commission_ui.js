@@ -4032,7 +4032,7 @@ window._cdsRenderL1 = function(src, st) {
     +'<div class="cds-l1-kpi-val gold">'+(src.loading?'…':fmtFull(finalAmt))+'</div>'
     +'</div>'
     +'<div class="cds-l1-kpi">'
-    +'<div class="cds-l1-kpi-label">NRR</div>'
+    +'<div class="cds-l1-kpi-label">NRR'+(gateOk?' ✓':'')+' </div>'
     +'<div class="cds-l1-kpi-val">'+esc(pctText)+'</div>'
     +'</div></div>';
 
@@ -4512,41 +4512,11 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     + '<div class="cds-nrr-ctx-payout">'
     + '<div class="cds-nrr-ctx-payout-lbl">Payout</div>'
     + '<div class="cds-nrr-ctx-payout-val">' + fmtFull(nrrPayout) + '</div>'
-    + (isTopTier ? '<div style="font-size:9px;color:rgba(77,220,151,.75);font-weight:700;margin-top:2px;font-family:\'IBM Plex Sans Thai\',sans-serif">โบนัสสูงสุด ✓</div>' : '')
+    + (isTopTier
+        ? '<div class="cds-nrr-ctx-next-inline">โบนัสสูงสุด ✓</div>'
+        : (nextNote ? '<div class="cds-nrr-ctx-next-inline">' + esc(nextNote) + '</div>' : ''))
     + '</div></div>'
-    + (nextNote ? '<div class="cds-nrr-ctx-next">' + esc(nextNote) + '</div>' : '')
     + '</div>';
-
-  // ── No NRR data fallback ──────────────────────────────────────────────
-  if (!nr) {
-    if (meta) meta.innerHTML = '';
-    body.innerHTML = ctxHtml
-      + '<div class="cds-empty" style="margin-top:16px;">โหลด portview.csv เพื่อดูรายละเอียด outlet</div>';
-    if (totalEl) totalEl.innerHTML = h.total('รวม NRR', '—', 'v-dim');
-    return;
-  }
-
-  // ── Days / run-rate helpers ───────────────────────────────────────────
-  var daysElapsed   = nr.daysElapsed > 0 ? nr.daysElapsed : 1;
-  var daysInMonth   = 30;
-  try {
-    var cp = (nr.currentMonthLabel || '').split(' ');
-    var moNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-    var mi = moNames.indexOf(cp[0]);
-    var yr = parseInt(cp[1] || '0') - 543;
-    if (mi >= 0 && yr > 1900) daysInMonth = new Date(yr, mi + 1, 0).getDate();
-  } catch(e) {}
-  var rr = function(v) { return Math.round(v / daysElapsed * daysInMonth); };
-
-  // ── Meta bar ──────────────────────────────────────────────────────────
-  if (meta) {
-    meta.innerHTML = '<div class="cds-meta">'
-      + '<span class="cds-meta-text">'
-      + nr.cohortCount + ' outlet · ' + fmt(nr.cohortGmv) + ' MTD · ฐาน ' + (nr.prevMonth || '—')
-      + '</span>'
-      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
-      + '</div>';
-  }
 
   // ── Outlet rows (reuse ncs-chip + ncs-outlet-row classes) ────────────
   var cohortData = nr.cohortDetail || [];
