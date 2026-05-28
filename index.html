@@ -1,4 +1,4 @@
-<!-- Freshket Sense v248f-clean: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v250: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v248f-clean',
+      version: 'v250',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -24997,62 +24997,80 @@ function _commComputeUpsellOutlet(kamEmail) {
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
 // Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail[] }
 function _commComputeHandoverRetention(kamEmail) {
+  // V3 Tactic B:
+  // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
+  // - Filter: prevOwner === 'SALE' เท่านั้น (PM/ADMIN/KAM ไม่นับ)
+  // - Baseline: baseline_gmv (GMV เต็มเดือนที่โอน) normalize ÷ baselineDays × 30
+  // - Current: perf_gmv (GMV เดือน M+1) normalize ÷ perfDays × 30
+  // - Window: transfer_month = เดือนก่อน (M-1) เท่านั้น
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
                   tier:0, payout:0, detail:[] };
   try {
-    // Handover = Sales→KAM: accounts new to this KAM this month, NOT transferred from another KAM
-    // Same classification logic as portview rendering (07b line ~1580):
-    //   isNew: daysWithCurrentKam <= daysElapsed
-    //   Handover: isNew AND NOT in byAccountId (byAccountId = KAM→KAM transfers from Q10)
     const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
-              ? bulkHandoverData : { byAccountId:{} };
+              ? bulkHandoverData : { byNewKamName:{} };
 
+    // หา KAM display name จาก portviewBulkData (byNewKamName index ใช้ชื่อ ไม่ใช่ email)
     const pvAccounts = (portviewBulkData || []).filter(r => r.kamEmail === kamEmail);
-    if (!pvAccounts.length) return EMPTY;
+    const kamName = pvAccounts.length ? (pvAccounts[0].kamName || '') : '';
+    if (!kamName) return EMPTY;
 
-    // Use daysElapsed from first portview row (consistent with NRR engine)
-    const daysElapsed = pvAccounts[0].daysElapsed > 0 ? pvAccounts[0].daysElapsed : new Date().getDate();
+    // current month label เพื่อระบุ transfer_month = เดือนก่อน
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthLabel = prevMonth.getFullYear() + '-' +
+                           String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
 
-    // Filter to Handover (Sales→KAM) accounts only
-    const handoverAccounts = pvAccounts.filter(a => {
-      const isNew = a.daysWithCurrentKam !== null &&
-                    a.daysWithCurrentKam !== undefined &&
-                    a.daysWithCurrentKam <= daysElapsed;
-      return isNew && !(hd.byAccountId && hd.byAccountId[a.id]);
-    });
+    // ดึงร้านที่โอนมาหา KAM นี้ จาก Q10 V3
+    const hoRows = (hd.byNewKamName && hd.byNewKamName[kamName]) || [];
 
-    if (!handoverAccounts.length) return EMPTY;
+    // Filter: SALE เท่านั้น + transfer_month = เดือนก่อน
+    const handoverRows = hoRows.filter(r =>
+      (r.prevOwner || '').toUpperCase() === 'SALE' &&
+      r.transferMonth === prevMonthLabel
+    );
+
+    if (!handoverRows.length) return EMPTY;
 
     const t2Pct   = _commGetConfig('handover', 'tier2_pct',    100);
     const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
     const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
     const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
 
-    let baselineGmv = 0, currentGmv = 0;
+    // Normalize: daily rate × 30 เพื่อให้จำนวนวันแฟร์ทั้งสองฝั่ง
+    let baselineNorm = 0, perfNorm = 0;
     const detail = [];
-    handoverAccounts.forEach(a => {
-      baselineGmv += a.lastGmv   || 0;  // lastGmv = last month GMV under Sales (baseline)
-      currentGmv  += a.gmvToDate || 0;  // gmvToDate = KAM's MTD this month
-      let oldKamName = '';
-      try {
-        if (typeof bulkHandoverData !== 'undefined' && bulkHandoverData && bulkHandoverData.byAccountId) {
-          const hRow = bulkHandoverData.byAccountId[a.id];
-          if (hRow) oldKamName = hRow.kamName || '';
-        }
-      } catch(e) {}
-      detail.push({ account_id: a.id, name: a.name,
-                    baseline: a.lastGmv || 0, current: a.gmvToDate || 0, oldKamName });
+    handoverRows.forEach(r => {
+      const bDays = r.baselineDays > 0 ? r.baselineDays : 30;
+      const pDays = r.perfDays     > 0 ? r.perfDays     : 30;
+      const bNorm = (r.baselineGmv || 0) / bDays * 30;
+      const pNorm = (r.perfGmv     || 0) / pDays * 30;
+      baselineNorm += bNorm;
+      perfNorm     += pNorm;
+      detail.push({
+        account_id:     r.accountId,
+        name:           r.accountName,
+        oldKamName:     r.kamName || '',
+        transfer_month: r.transferMonth,
+        baseline:       Math.round(bNorm),
+        current:        Math.round(pNorm),
+        baseline_raw:   r.baselineGmv || 0,
+        perf_raw:       r.perfGmv || 0
+      });
     });
 
-    const retentionPct = baselineGmv > 0 ? (currentGmv / baselineGmv * 100) : 0;
+    const retentionPct = baselineNorm > 0 ? (perfNorm / baselineNorm * 100) : 0;
 
     let tier = 1, payout = 0;
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
-    return { accounts: handoverAccounts.length, baseline_gmv: baselineGmv,
-             current_gmv: currentGmv,
-             retention_pct: Math.round(retentionPct * 10) / 10, tier, payout, detail };
+    return {
+      accounts:       handoverRows.length,
+      baseline_gmv:   Math.round(baselineNorm),
+      current_gmv:    Math.round(perfNorm),
+      retention_pct:  Math.round(retentionPct * 10) / 10,
+      tier, payout, detail
+    };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
     return EMPTY;
@@ -27386,7 +27404,7 @@ function _renderComponentRatesEditor() {
         ${fld('Tier 3 bonus (เพิ่มเติมจาก T2)','handover','tier3_bonus',2500,500,'฿')}
       </div>
       <div class="comm-formula-note">
-        retention = ยอด MTD / ยอดเดือนสุดท้ายก่อนโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
+        retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 · Sales→KAM เท่านั้น · วัดเดือน M+1 หลังโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
       </div>
     </div>
     <div class="comm-component-section" style="margin-top:14px">
@@ -28571,14 +28589,22 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
 
   // ── Classify accounts into cohorts ─────────────────────────────
   // Core NRR: account อยู่กับ KAM นี้ก่อนเดือนปัจจุบัน
-  // Transfer in: ใหม่เดือนนี้ + มีใน bulkHandoverData (มาจาก KAM อื่น)
-  // New from Sales: ใหม่เดือนนี้ + ไม่มีใน bulkHandoverData (มาจาก Sales/PM)
+  // Transfer In:    ใหม่เดือนนี้ + มาจาก KAM/PM/ADMIN (prev_owner != SALE)
+  // New from Sales: ใหม่เดือนนี้ + มาจาก SALE เท่านั้น (prev_owner === SALE หรือไม่มีใน Q10)
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
   allAccounts.forEach(a => {
     const isNew = a.daysWithCurrentKam !== null && a.daysWithCurrentKam !== undefined && a.daysWithCurrentKam <= daysElapsed;
     if (!isNew) { coreAccounts.push(a); return; }
-    if (hd.byAccountId[a.id]) { transferInAccounts.push(a); }
-    else { newFromSalesAccounts.push(a); }
+    const hoRow = hd.byAccountId && hd.byAccountId[a.id];
+    if (hoRow) {
+      // มีใน Q10 — แยกด้วย prev_owner
+      const prevOwner = (hoRow.prevOwner || '').toUpperCase();
+      if (prevOwner === 'SALE') { newFromSalesAccounts.push(a); }   // Sales → KAM
+      else { transferInAccounts.push(a); }                           // KAM/PM/ADMIN → KAM
+    } else {
+      // ไม่มีใน Q10 = ไม่มีประวัติ ถือเป็น Sales
+      newFromSalesAccounts.push(a);
+    }
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
@@ -30926,7 +30952,7 @@ function _cdsFormulaContent(key) {
     p3: 'สินค้าเดิมแต่ยอดเพิ่ม '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'x vs baseline · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
-    ho:  'ร้านใหม่จาก Sales ยอดเป็นกี่ % เทียบเดือนก่อน<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
+    ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
   };
   return '<div class="cds-formula-dot"></div><div class="cds-formula-text">'+(texts[key]||'')+'</div>';
 }
@@ -31912,11 +31938,11 @@ function openCommissionRulebook() {
       ['MTD note', 'ฝั่ง current = actual MTD (ไม่ normalized) → ต้นเดือนมักยังไม่ผ่านเกณฑ์ ยอดจะค่อยๆ ขึ้นปลายเดือน'],
       ['ข้อยกเว้น', 'Expansion outlets ถูก exclude เช่นเดียวกับ P1']
     ]),
-    sec('Handover (จาก Sales)', '#bcd7ff', [
-      ['นิยาม', 'ร้านที่เพิ่งย้ายมาอยู่กับ KAM เดือนนี้ + ไม่ได้มาจาก KAM คนอื่น (มาจาก Sales/PM)'],
-      ['ต่างจาก Transfer In', 'Transfer In = มาจาก KAM อื่น (มีบันทึกใน handover CSV) → ไม่ได้ค่าคอม Handover'],
-      ['เดือนฐาน', 'GMV เดือนที่แล้วของร้านนั้น (ยอดสุดท้ายที่ทำกับ Sales)'],
-      ['วิธีวัด', 'Retention = GMV MTD เดือนนี้ ÷ GMV เดือนฐาน × 100 (actual, ไม่ normalize)'],
+    sec('Handover (จาก Sales เท่านั้น)', '#bcd7ff', [
+      ['นิยาม', 'ร้านที่โอนจาก Sales เข้า KAM เมื่อเดือนที่แล้ว — วัด performance เดือนนี้'],
+      ['ต่างจาก Transfer In', 'KAM/PM/ADMIN → KAM = Transfer In ไม่ได้ค่าคอม · Sales → KAM เท่านั้นที่ได้'],
+      ['เดือนฐาน', 'GMV เดือนที่โอน (ทั้งเดือน รวมช่วงที่ Sales ดูแล)'],
+      ['วิธีวัด', 'Retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 (normalize ทั้งคู่)'],
       ['Tier', '≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT2Pay+' + '+hoT3Bon+' bonus · < '+hoT2Pct+'% → ฿0']
     ]),
     sec('NRR Gate (KAM)', 'rgba(255,107,61,.9)', [
@@ -33712,8 +33738,13 @@ console.log('[Target Module v1] loaded');
       var kamName=(p[0]||'').trim(), accountId=normId(p[1]), accountName=(p[2]||'').trim(), accountType=(p[3]||'').trim();
       var lastMonthGmv=Number(p[4]||0)||0, curMonthGmv=Number(p[5]||0)||0, newOwnerType=(p[6]||'').trim(), newKamName=(p[7]||'').trim();
       var transferBasis=(p[8]||'').trim(), lastOrderDate=(p[9]||'').trim();
+      // V3: new columns for prev_owner + commission tactic B
+      var prevOwner=(p[10]||'NEW').trim()||'NEW';
+      var transferMonth=(p[11]||'').trim();
+      var baselineGmv=Number(p[12]||0)||0, perfGmv=Number(p[13]||0)||0;
+      var perfDays=parseInt(p[14])||30, baselineDays=parseInt(p[15])||30;
       if(!kamName || !accountId) return;
-      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate};
+      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
       rows.push(row);
       byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
