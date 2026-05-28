@@ -4018,93 +4018,121 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
 
 
 //////////////////////////////////////////////////////////////////////////////
-// ── CDS Session 6: Handover tab renderer + oldKamName ────────────────────
+// ── CDS Session 7: NRR tab renderer ──────────────────────────────────────
 //////////////////////////////////////////////////////////////////////////////
 
-window._cdsRender_ho = function(src, body, meta, totalEl) {
-  var h = window._cdsHtml;
+window._cdsRender_nrr = function(src, body, meta, totalEl) {
+  var h   = window._cdsHtml;
+  var st  = window._cdsKamSt || {};
   if (!h) return;
-
-  function cfg(k, p, d) {
-    try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
-  }
-  var t2Pct  = cfg('handover', 'tier2_pct',    100);
-  var t3Pct  = cfg('handover', 'tier3_pct',    120);
-  var t2Pay  = Number(cfg('handover', 'tier2_payout', 2500));
-  var t3Bon  = Number(cfg('handover', 'tier3_bonus',  2500));
   var fmt = h.fmt;
   var esc = h.esc;
 
-  var hd = src.handover_detail || {};
-  var detail = hd.detail || [];
-  var retPct = hd.retention_pct || 0;
-  var hit2   = retPct >= t2Pct;
-  var hit3   = retPct >= t3Pct;
-  var payout = Number(src.handover || 0);
+  // ── Get NRR compute result ────────────────────────────────────────────
+  var nr = null;
+  try {
+    if (st.email && typeof _tgtComputeKamNRR === 'function') {
+      window._ncsLastNrrResult = window._ncsLastNrrResult || null;
+      nr = _tgtComputeKamNRR(st.email, null);
+      window._ncsLastNrrResult = nr;
+      window._ncsKamLabel = (st.kamName || st.email || '').split('@')[0];
+    }
+  } catch(e) { console.warn('[cds-nrr]', e); }
 
-  if (!hd.accounts) {
+  var nrrPayout = Number(src.nrr || 0);
+  var pctText   = st.pct !== null && st.pct !== undefined ? (st.pct + '%') : '—';
+
+  // ── Commission context card ───────────────────────────────────────────
+  var tierCls   = nrrPayout > 0 ? 'background:rgba(77,220,151,.09);border:1px solid rgba(77,220,151,.2);' :
+                                  'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);';
+  var nextNote  = st.next
+    ? 'ต้องอีก +' + (Number(st.next.min_value) - Number(st.pct || 0)).toFixed(1) + ' pts → tier ถัดไป'
+    : (nrrPayout > 0 ? 'อยู่ใน tier สูงสุดแล้ว' : 'ยังไม่ถึง tier แรก');
+
+  var ctxHtml = '<div style="margin:10px 16px 0;padding:10px 14px;border-radius:10px;' + tierCls + '">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+    + '<div>'
+    + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.5);margin-bottom:3px;">NRR Commission</div>'
+    + '<div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.85);">'
+    + esc(pctText) + ' &nbsp;·&nbsp; ' + esc(st.tierLabel || st.ruleName || '—')
+    + '</div>'
+    + '<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px;">' + esc(nextNote) + '</div>'
+    + '</div>'
+    + '<div style="text-align:right;flex-shrink:0;">'
+    + '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:18px;font-weight:900;color:'
+    + (nrrPayout > 0 ? '#4ddc97' : 'rgba(225,238,255,.3)') + ';">'
+    + fmt(nrrPayout) + '</div>'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+
+  // ── No NRR data fallback ──────────────────────────────────────────────
+  if (!nr) {
     if (meta) meta.innerHTML = '';
-    body.innerHTML = '<div class="cds-empty">ไม่มี account handover เดือนนี้</div>';
-    if (totalEl) totalEl.innerHTML = h.total('รวม Handover', '฿0', 'v-dim');
+    body.innerHTML = ctxHtml
+      + '<div class="cds-empty" style="margin-top:16px;">โหลด portview.csv เพื่อดูรายละเอียด outlet</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม NRR', '—', 'v-dim');
     return;
   }
 
-  // ── Meta bar: tier conditions inline ─────────────────────────────────
-  if (meta) {
-    var tierHtml =
-      '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
-      + (hit2 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
-      + '">≥' + t2Pct + '% ฿' + fmt(t2Pay) + '</span> '
-      + '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
-      + (hit3 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
-      + '">≥' + t3Pct + '% +฿' + fmt(t3Bon) + '</span>';
+  // ── Days / run-rate helpers ───────────────────────────────────────────
+  var daysElapsed   = nr.daysElapsed > 0 ? nr.daysElapsed : 1;
+  var daysInMonth   = 30;
+  try {
+    var cp = (nr.currentMonthLabel || '').split(' ');
+    var moNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var mi = moNames.indexOf(cp[0]);
+    var yr = parseInt(cp[1] || '0') - 543;
+    if (mi >= 0 && yr > 1900) daysInMonth = new Date(yr, mi + 1, 0).getDate();
+  } catch(e) {}
+  var rr = function(v) { return Math.round(v / daysElapsed * daysInMonth); };
 
-    meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
-      + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
-      + (hit2 ? '#4ddc97' : retPct >= (t2Pct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
-      + retPct + '%</b></span>'
-      + '<span style="display:flex;gap:5px;">' + tierHtml + '</span>'
+  // ── Meta bar ──────────────────────────────────────────────────────────
+  if (meta) {
+    meta.innerHTML = '<div class="cds-meta">'
+      + '<span class="cds-meta-text">'
+      + nr.cohortCount + ' outlet · ' + fmt(nr.cohortGmv) + ' MTD · ฐาน ' + (nr.prevMonth || '—')
+      + '</span>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
       + '</div>';
   }
 
-  // ── Account rows (flat — no accordion) ───────────────────────────────
-  var sorted = detail.slice().sort(function(a, b) { return (b.current || 0) - (a.current || 0); });
-  var html = '';
-
-  sorted.forEach(function(a, idx) {
-    var retA   = a.baseline > 0 ? Math.round(a.current / a.baseline * 100) : 0;
-    var retCls = retA >= t2Pct ? 'v-green' : retA >= (t2Pct * 0.85) ? 'v-amber' : 'v-dim';
-    var proofId = 'hor' + idx;
-
-    // Account row — tap to expand proof
-    html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'  + '\n'
-      + '<div style="min-width:0">'
-      + '<div class="cds-outlet-name">' + esc(String(a.name || a.account_id || '—').slice(0, 36)) + '</div>'
-      + (a.oldKamName ? '<div class="cds-outlet-meta">มาจาก: ' + esc(a.oldKamName) + '</div>' : '')
+  // ── Outlet rows (reuse ncs-chip + ncs-outlet-row classes) ────────────
+  var cohortData = nr.cohortDetail || [];
+  var rowsHtml = cohortData.map(function(g, gi) {
+    var autoOpen = gi < 3;
+    var chipRR   = fmt(rr(g.currTotal || 0));
+    var outletRows = (g.outlets || []).map(function(o) {
+      var rrVal = rr(o.currGmv || 0);
+      var rrCls = rrVal >= (o.prevGmv || 0) ? 'ncs-gmv rr-up' : 'ncs-gmv rr-dn';
+      return '<div class="ncs-outlet-row nrr-cols">'
+        + '<div class="ncs-outlet-name">' + esc((o.outletName || o.outletId || '—').slice(0, 38)) + '</div>'
+        + '<div class="ncs-gmv base">' + (o.prevGmv > 0 ? fmt(o.prevGmv) : '—') + '</div>'
+        + '<div class="' + rrCls + '">'  + fmt(rrVal) + '</div>'
+        + '<div class="ncs-gmv mtd">'    + fmt(o.currGmv || 0) + '</div>'
+        + '</div>';
+    }).join('');
+    return '<div class="ncs-chip' + (autoOpen ? ' open' : '') + '" data-ncs-chip="1">'
+      + '<span class="ncs-chip-chev">&#8250;</span>'
+      + '<span class="ncs-chip-name">' + esc(g.acctName || '—') + '</span>'
+      + '<span class="ncs-chip-rr" style="color:rgba(26,232,123,.7)">' + chipRR + '</span>'
       + '</div>'
-      + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
-      + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
-      + '<span class="cds-val ' + retCls + '">' + retA + '%</span>'
-      + '</div>'
-      + h.proof(proofId, [
-          { label: 'Baseline GMV', result: fmt(a.baseline) },
-          { label: 'MTD GMV',      result: fmt(a.current) },
-          { label: 'Retention',    result: retA + '%', pass: retA >= t2Pct }
-        ]);
-  });
+      + '<div class="ncs-outlet-rows' + (autoOpen ? ' open' : '') + '">' + outletRows + '</div>';
+  }).join('');
 
-  body.innerHTML = html;
+  body.innerHTML = ctxHtml + rowsHtml;
 
-  // Toggle per-row proof via event delegation (avoids inline onclick quote issues)
+  // Chip toggle via event delegation
   body.addEventListener('click', function(e) {
-    var row = e.target.closest('[data-hoid]');
-    if (!row) return;
-    var el = document.getElementById('proof-' + row.getAttribute('data-hoid'));
-    if (el) el.classList.toggle('open');
+    var chip = e.target.closest('[data-ncs-chip]');
+    if (!chip) return;
+    chip.classList.toggle('open');
+    var rows = chip.nextElementSibling;
+    if (rows && rows.classList.contains('ncs-outlet-rows')) rows.classList.toggle('open');
   });
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmt(payout), payout > 0 ? 'v-blue' : 'v-dim');
+  if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmt(nr.cohortGmv || 0), 'v-green');
 };
 
 
