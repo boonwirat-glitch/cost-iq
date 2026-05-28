@@ -4018,6 +4018,97 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
 
 
 //////////////////////////////////////////////////////////////////////////////
+// ── CDS Session 6: Handover tab renderer + oldKamName ────────────────────
+//////////////////////////////////////////////////////////////////////////////
+
+window._cdsRender_ho = function(src, body, meta, totalEl) {
+  var h = window._cdsHtml;
+  if (!h) return;
+
+  function cfg(k, p, d) {
+    try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
+  }
+  var t2Pct  = cfg('handover', 'tier2_pct',    100);
+  var t3Pct  = cfg('handover', 'tier3_pct',    120);
+  var t2Pay  = Number(cfg('handover', 'tier2_payout', 2500));
+  var t3Bon  = Number(cfg('handover', 'tier3_bonus',  2500));
+  var fmt = h.fmt;
+  var esc = h.esc;
+
+  var hd = src.handover_detail || {};
+  var detail = hd.detail || [];
+  var retPct = hd.retention_pct || 0;
+  var hit2   = retPct >= t2Pct;
+  var hit3   = retPct >= t3Pct;
+  var payout = Number(src.handover || 0);
+
+  if (!hd.accounts) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">ไม่มี account handover เดือนนี้</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม Handover', '฿0', 'v-dim');
+    return;
+  }
+
+  // ── Meta bar: tier conditions inline ─────────────────────────────────
+  if (meta) {
+    var tierHtml =
+      '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+      + (hit2 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + '">≥' + t2Pct + '% ฿' + fmt(t2Pay) + '</span> '
+      + '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+      + (hit3 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + '">≥' + t3Pct + '% +฿' + fmt(t3Bon) + '</span>';
+
+    meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
+      + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
+      + (hit2 ? '#4ddc97' : retPct >= (t2Pct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
+      + retPct + '%</b></span>'
+      + '<span style="display:flex;gap:5px;">' + tierHtml + '</span>'
+      + '</div>';
+  }
+
+  // ── Account rows (flat — no accordion) ───────────────────────────────
+  var sorted = detail.slice().sort(function(a, b) { return (b.current || 0) - (a.current || 0); });
+  var html = '';
+
+  sorted.forEach(function(a, idx) {
+    var retA   = a.baseline > 0 ? Math.round(a.current / a.baseline * 100) : 0;
+    var retCls = retA >= t2Pct ? 'v-green' : retA >= (t2Pct * 0.85) ? 'v-amber' : 'v-dim';
+    var proofId = 'hor' + idx;
+
+    // Account row — tap to expand proof
+    html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'  + '\n'
+      + '<div style="min-width:0">'
+      + '<div class="cds-outlet-name">' + esc(String(a.name || a.account_id || '—').slice(0, 36)) + '</div>'
+      + (a.oldKamName ? '<div class="cds-outlet-meta">มาจาก: ' + esc(a.oldKamName) + '</div>' : '')
+      + '</div>'
+      + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
+      + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
+      + '<span class="cds-val ' + retCls + '">' + retA + '%</span>'
+      + '</div>'
+      + h.proof(proofId, [
+          { label: 'Baseline GMV', result: fmt(a.baseline) },
+          { label: 'MTD GMV',      result: fmt(a.current) },
+          { label: 'Retention',    result: retA + '%', pass: retA >= t2Pct }
+        ]);
+  });
+
+  body.innerHTML = html;
+
+  // Toggle per-row proof via event delegation (avoids inline onclick quote issues)
+  body.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-hoid]');
+    if (!row) return;
+    var el = document.getElementById('proof-' + row.getAttribute('data-hoid'));
+    if (el) el.classList.toggle('open');
+  });
+
+  // ── Total bar ─────────────────────────────────────────────────────────
+  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmt(payout), payout > 0 ? 'v-blue' : 'v-dim');
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
 
 // ── [v211] Commission snapshot hardening + admin guards ─────────────
 // PATCH: freshket-v211-commission-snapshot-hardening-js

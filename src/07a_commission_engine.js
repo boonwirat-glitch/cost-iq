@@ -361,8 +361,15 @@ function _commComputeHandoverRetention(kamEmail) {
     handoverAccounts.forEach(a => {
       baselineGmv += a.lastGmv   || 0;  // lastGmv = last month GMV under Sales (baseline)
       currentGmv  += a.gmvToDate || 0;  // gmvToDate = KAM's MTD this month
+      let oldKamName = '';
+      try {
+        if (typeof bulkHandoverData !== 'undefined' && bulkHandoverData && bulkHandoverData.byAccountId) {
+          const hRow = bulkHandoverData.byAccountId[a.id];
+          if (hRow) oldKamName = hRow.kamName || '';
+        }
+      } catch(e) {}
       detail.push({ account_id: a.id, name: a.name,
-                    baseline: a.lastGmv || 0, current: a.gmvToDate || 0 });
+                    baseline: a.lastGmv || 0, current: a.gmvToDate || 0, oldKamName });
     });
 
     const retentionPct = baselineGmv > 0 ? (currentGmv / baselineGmv * 100) : 0;
