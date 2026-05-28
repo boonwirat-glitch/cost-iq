@@ -141,18 +141,20 @@ gmv_cm AS (   -- M MTD (perf สำหรับร้านที่โอน M-
   GROUP BY 1
 ),
 
--- ── prev_owner: owner ก่อนโอน ─────────────────────────────────────────────
--- ดูจาก commercial_owner ใน M-2 (สำหรับร้านที่โอน M-1)
--- และ commercial_owner ใน M-3 (สำหรับร้านที่โอน M-2) — ใช้ last_known_owner แทนได้
+-- ── prev_owner: commercial_owner ของร้านในเดือนก่อนหน้า transfer month ──
+-- Logic: โอนเข้า Tape ใน April → ดู March (เดือนก่อน April) → commercial_owner คืออะไร
+-- ใช้ order ล่าสุดก่อนต้นเดือนที่โอน (lm_start) เป็น source of truth
 prev_owner_lm AS (
-  -- prev owner สำหรับร้านที่เดือน M-1 เพิ่งเปลี่ยน: ดูจาก M-2
   SELECT
-    CAST(account_id AS STRING) AS account_id,
-    ARRAY_AGG(commercial_owner ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS prev_owner
-  FROM `freshket-rn.dwh.order`, params
-  WHERE delivery_date BETWEEN m2_start AND m2_end
-    AND account_type IN ('SA', 'MC', 'Chain')
-  GROUP BY 1
+    CAST(o.account_id AS STRING) AS account_id,
+    o.commercial_owner            AS prev_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.account_type IN ('SA', 'MC', 'Chain')
+    AND o.delivery_date < (SELECT lm_start FROM params)  -- order ก่อนต้นเดือนที่โอน
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(o.account_id AS STRING)
+    ORDER BY o.delivery_date DESC  -- เอา order ล่าสุดก่อนโอน
+  ) = 1
 ),
 
 -- ── ร้านที่ old KAM มี GMV ใน M-1 (transfer month = M-1) ─────────────────
