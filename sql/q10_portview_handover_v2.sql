@@ -186,21 +186,30 @@ transfers_lm AS (
 transfers_m2 AS (
   SELECT
     m2.account_id,
-    ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]   AS account_name,
-    ARRAY_AGG(o.account_type ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]   AS account_type,
+    ARRAY_AGG(ord.account_name ORDER BY ord.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_name,
+    ARRAY_AGG(ord.account_type ORDER BY ord.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)] AS account_type,
     m2.ka_owner                                    AS new_kam_name,
     COALESCE(po.prev_kam, po.prev_owner, 'NEW')    AS old_kam_name,
     COALESCE(po.prev_owner, 'NEW')                 AS prev_owner,
-    MAX(o.delivery_date)                           AS last_order_date,
+    MAX(ord.delivery_date)                         AS last_order_date,
     p.m2_label                                     AS transfer_month,
     p.m2_days                                      AS baseline_days
-  FROM ka_owner_m2 m2, params p
-  JOIN `freshket-rn.dwh.order` o
-    ON CAST(o.account_id AS STRING) = m2.account_id
-    AND o.delivery_date BETWEEN p.m2_start AND p.m2_end
+  FROM ka_owner_m2 m2
+  CROSS JOIN params p
+  JOIN (
+    SELECT
+      CAST(account_id AS STRING) AS ord_account_id,
+      account_name,
+      account_type,
+      delivery_date,
+      gmv_ex_vat
+    FROM `freshket-rn.dwh.order`
+  ) ord ON ord.ord_account_id = m2.account_id
+        AND ord.delivery_date BETWEEN p.m2_start AND p.m2_end
   LEFT JOIN prev_owner_for_m2 po
     ON m2.account_id = po.account_id
-  JOIN current_kam_list k ON LOWER(TRIM(m2.ka_owner)) = LOWER(TRIM(k.kam_name))
+  JOIN current_kam_list k
+    ON LOWER(TRIM(m2.ka_owner)) = LOWER(TRIM(k.kam_name))
   WHERE
     LOWER(TRIM(m2.ka_owner)) != LOWER(TRIM(COALESCE(po.prev_kam, '')))
     OR po.prev_owner != 'KAM'
