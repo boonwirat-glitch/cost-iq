@@ -4031,7 +4031,7 @@ window._cdsRenderL1 = function(src, st) {
     +'<div class="cds-l1-kpi-label">ค่าคอมฯ สูงสุด</div>'
     +'<div class="cds-l1-kpi-val gold">'+(src.loading?'…':fmtFull(finalAmt))+'</div>'
     +'</div>'
-    +'<div class="cds-l1-kpi">'
+    +'<div class="cds-l1-kpi'+(gateOk?' passed':'')+'">'
     +'<div class="cds-l1-kpi-label">NRR'+(gateOk?' ✓':'')+' </div>'
     +'<div class="cds-l1-kpi-val">'+esc(pctText)+'</div>'
     +'</div></div>';
@@ -4517,6 +4517,10 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
         : (nextNote ? '<div class="cds-nrr-ctx-next-inline">' + esc(nextNote) + '</div>' : ''))
     + '</div></div>'
     + '</div>';
+
+  // ── Run-rate helper (days-elapsed projection) ─────────────────────────
+  var daysInCurrMonth = nr && nr.daysInMonth ? nr.daysInMonth : 30;
+  function rr(v){ return (nr && nr.daysElapsed > 0) ? Math.round(v / nr.daysElapsed * daysInCurrMonth) : v; }
 
   // ── Outlet rows (reuse ncs-chip + ncs-outlet-row classes) ────────────
   var cohortData = nr.cohortDetail || [];

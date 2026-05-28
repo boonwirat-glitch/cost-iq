@@ -1,4 +1,4 @@
-<!-- Freshket Sense v248f-contrast: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v248f-nrr-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4852,7 +4852,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v248f-contrast',
+      version: 'v248f-nrr-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -31021,7 +31021,7 @@ window._cdsRenderL1 = function(src, st) {
     +'<div class="cds-l1-kpi-label">ค่าคอมฯ สูงสุด</div>'
     +'<div class="cds-l1-kpi-val gold">'+(src.loading?'…':fmtFull(finalAmt))+'</div>'
     +'</div>'
-    +'<div class="cds-l1-kpi">'
+    +'<div class="cds-l1-kpi'+(gateOk?' passed':'')+'">'
     +'<div class="cds-l1-kpi-label">NRR'+(gateOk?' ✓':'')+' </div>'
     +'<div class="cds-l1-kpi-val">'+esc(pctText)+'</div>'
     +'</div></div>';
@@ -31507,6 +31507,10 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
         : (nextNote ? '<div class="cds-nrr-ctx-next-inline">' + esc(nextNote) + '</div>' : ''))
     + '</div></div>'
     + '</div>';
+
+  // ── Run-rate helper (days-elapsed projection) ─────────────────────────
+  var daysInCurrMonth = nr && nr.daysInMonth ? nr.daysInMonth : 30;
+  function rr(v){ return (nr && nr.daysElapsed > 0) ? Math.round(v / nr.daysElapsed * daysInCurrMonth) : v; }
 
   // ── Outlet rows (reuse ncs-chip + ncs-outlet-row classes) ────────────
   var cohortData = nr.cohortDetail || [];
