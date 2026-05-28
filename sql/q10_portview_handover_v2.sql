@@ -1,30 +1,15 @@
--- Q10_V4: portview_handover.csv
+-- Q10_V5: portview_handover.csv
 -- ใช้ export เป็นไฟล์ portview_handover.csv แล้วอัปขึ้น R2
 --
--- V4 Changes (rewrite จาก V3):
---   - ใช้ user_master เป็น base (source of truth ว่าร้านอยู่กับใครตอนนี้)
---   - ไม่ใช้ commercial_owner จาก order table เป็น filter หลักอีกต่อไป
---     เพราะ 1 ร้าน 1 เดือน มี commercial_owner ปนกันได้ (ช่วงโอน)
+-- V5 Changes (rewrite จาก V4):
+--   - ใช้ ka_owner จาก order table เป็น key หลัก
+--     เพราะ ka_owner บอกว่า KAM คนไหนรับผิดชอบ order นั้น
+--     โดยไม่สนว่า commercial_owner เป็นอะไร (แก้ปัญหา SALE/KAM ปนกันใน transfer month)
+--   - Transfer detect: ka_owner ใน M-1 ต่างจาก ka_owner/commercial_owner ใน M-2
 --   - prev_owner = commercial_owner ของ order ล่าสุดก่อน transfer month
---   - window 2 เดือน: M-1 (commission เดือนนี้) + M-2 (commission เดือนที่แล้ว)
+--   - window 2 เดือน: M-1 + M-2
 --
--- Output schema (16 columns) — backward compatible:
---   [0]  kam_name               old KAM (ผู้ส่งออก / last KAM ก่อนโอน)
---   [1]  account_id
---   [2]  account_name
---   [3]  account_type
---   [4]  last_month_gmv         GMV เดือน M-1 (backward compat)
---   [5]  cur_month_gmv          GMV เดือน M MTD (backward compat)
---   [6]  new_owner_type         owner ปัจจุบัน จาก user_master
---   [7]  new_kam_name           KAM ปัจจุบัน จาก user_master
---   [8]  transfer_basis
---   [9]  last_order_date
---   [10] prev_owner             SALE/PM/ADMIN/KAM/NEW (order ล่าสุดก่อนโอน)
---   [11] transfer_month         YYYY-MM เดือนที่โอน
---   [12] baseline_gmv           GMV เต็มเดือน transfer_month
---   [13] perf_gmv               GMV เดือนถัดจาก transfer_month
---   [14] perf_days_in_month     จำนวนวันเดือนที่วัด performance
---   [15] baseline_days_in_month จำนวนวันเดือน baseline
+-- Output schema (16 columns) — backward compatible
 
 WITH params AS (
   SELECT
@@ -33,7 +18,6 @@ WITH params AS (
      WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH))                    AS cm_max_date,
     DATE_DIFF(DATE_ADD(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 MONTH),
               DATE_TRUNC(CURRENT_DATE(), MONTH), DAY)                              AS cm_days,
-    FORMAT_DATE('%Y-%m', CURRENT_DATE())                                           AS cm_label,
 
     DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)                 AS lm_start,
     DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY)                   AS lm_end,
@@ -46,10 +30,7 @@ WITH params AS (
              INTERVAL 1 DAY)                                                       AS m2_end,
     DATE_DIFF(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH),
               DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), MONTH), DAY) AS m2_days,
-    FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH))              AS m2_label,
-
-    -- M-3 start สำหรับ prev_owner ของ M-2 window
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)                 AS m3_start
+    FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH))              AS m2_label
 ),
 
 current_kam_list AS (
@@ -70,39 +51,6 @@ current_kam_list AS (
     STRUCT('Siriprapa (Pop) Piapeng'                AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email),
     STRUCT('Warissara (Ply) Chanaboon'              AS kam_name, 'warissara.c@freshket.co'    AS kam_email)
   ])
-),
-
--- ── user_master: source of truth ว่าตอนนี้ร้านอยู่กับใคร ─────────────────
-user_master_current AS (
-  SELECT
-    CAST(account_guid AS STRING)       AS account_id,
-    account_name,
-    account_type,
-    commercial_owner                   AS current_owner_type,
-    staff_owner                        AS current_staff_owner,
-    LOWER(TRIM(staff_owner_email))     AS current_staff_owner_email
-  FROM `freshket-rn.dim.user_master`
-  WHERE account_guid IS NOT NULL
-    AND account_type IN ('SA', 'MC', 'Chain')
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_guid
-    ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL
-                AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
-      lasted_order_date DESC NULLS LAST,
-      lead_created_at DESC NULLS LAST
-  ) = 1
-),
-
--- join กับ KAM list เพื่อได้ mapped_kam_name
-current_with_kam AS (
-  SELECT
-    um.*,
-    k.kam_name  AS mapped_kam_name,
-    k.kam_email AS mapped_kam_email
-  FROM user_master_current um
-  LEFT JOIN current_kam_list k
-    ON um.current_staff_owner_email = k.kam_email
 ),
 
 -- ── GMV รายเดือน ──────────────────────────────────────────────────────────
@@ -128,14 +76,38 @@ gmv_cm AS (
   GROUP BY 1
 ),
 
+-- ── ka_owner หลักของแต่ละร้านในแต่ละเดือน (เอา KAM ที่มี GMV มากสุด) ────
+ka_owner_lm AS (
+  SELECT
+    CAST(account_id AS STRING)                                                     AS account_id,
+    ARRAY_AGG(account_name ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]           AS account_name,
+    ARRAY_AGG(account_type ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]           AS account_type,
+    ARRAY_AGG(ka_owner    ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]            AS ka_owner,
+    ARRAY_AGG(commercial_owner ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS commercial_owner,
+    MAX(delivery_date)                                                             AS last_order_date
+  FROM `freshket-rn.dwh.order`, params
+  WHERE delivery_date BETWEEN lm_start AND lm_end
+    AND account_type IN ('SA', 'MC', 'Chain')
+    AND ka_owner IS NOT NULL AND TRIM(ka_owner) != ''
+  GROUP BY 1
+),
+ka_owner_m2 AS (
+  SELECT
+    CAST(account_id AS STRING)                                                     AS account_id,
+    ARRAY_AGG(ka_owner    ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]            AS ka_owner,
+    ARRAY_AGG(commercial_owner ORDER BY gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]       AS commercial_owner
+  FROM `freshket-rn.dwh.order`, params
+  WHERE delivery_date BETWEEN m2_start AND m2_end
+    AND account_type IN ('SA', 'MC', 'Chain')
+  GROUP BY 1
+),
+
 -- ── prev_owner: order ล่าสุดก่อนเดือนที่โอน ──────────────────────────────
--- M-1 window: ดู order ก่อน lm_start
 prev_owner_for_lm AS (
   SELECT
     CAST(account_id AS STRING) AS account_id,
     commercial_owner           AS prev_owner,
-    ka_owner                   AS prev_kam,
-    delivery_date              AS prev_order_date
+    ka_owner                   AS prev_kam
   FROM `freshket-rn.dwh.order`
   WHERE account_type IN ('SA', 'MC', 'Chain')
     AND delivery_date < (SELECT lm_start FROM params)
@@ -144,13 +116,11 @@ prev_owner_for_lm AS (
     ORDER BY delivery_date DESC
   ) = 1
 ),
--- M-2 window: ดู order ก่อน m2_start
 prev_owner_for_m2 AS (
   SELECT
     CAST(account_id AS STRING) AS account_id,
     commercial_owner           AS prev_owner,
-    ka_owner                   AS prev_kam,
-    delivery_date              AS prev_order_date
+    ka_owner                   AS prev_kam
   FROM `freshket-rn.dwh.order`
   WHERE account_type IN ('SA', 'MC', 'Chain')
     AND delivery_date < (SELECT m2_start FROM params)
@@ -160,96 +130,83 @@ prev_owner_for_m2 AS (
   ) = 1
 ),
 
--- ── last order date per account (สำหรับ last_order_date field) ────────────
-last_order AS (
+-- ── user_master: current owner สำหรับ new_kam_name field ─────────────────
+user_master_current AS (
   SELECT
-    CAST(account_id AS STRING) AS account_id,
-    MAX(delivery_date)         AS last_order_date
-  FROM `freshket-rn.dwh.order`
-  WHERE account_type IN ('SA', 'MC', 'Chain')
-  GROUP BY 1
-),
-
--- ── ร้านที่โอนเข้า KAM ใน M-1 ────────────────────────────────────────────
--- Base: user_master บอกว่าตอนนี้เป็น KAM แล้ว
--- Detect transfer: prev_owner (ก่อน lm_start) ไม่ใช่ KAM เดิม
--- หรือ prev_owner เป็น KAM แต่ ka_owner ต่างกัน (KAM→KAM transfer)
-transfers_lm AS (
-  SELECT
-    cw.account_id,
-    cw.account_name,
-    cw.account_type,
-    COALESCE(cw.mapped_kam_name, cw.current_staff_owner) AS new_kam_name,
-    cw.current_owner_type                                AS new_owner_type,
-    COALESCE(po.prev_kam, po.prev_owner, 'NEW')          AS old_kam_name,
-    COALESCE(po.prev_owner, 'NEW')                       AS prev_owner,
-    lo.last_order_date,
-    p.lm_label                                           AS transfer_month,
-    p.lm_days                                            AS baseline_days
-  FROM current_with_kam cw, params p
-  LEFT JOIN prev_owner_for_lm po USING (account_id)
-  LEFT JOIN last_order lo        USING (account_id)
-  -- เฉพาะร้านที่ตอนนี้เป็น KAM
-  WHERE cw.current_owner_type = 'KAM'
-    AND cw.mapped_kam_name IS NOT NULL  -- อยู่ใน active KAM list
-    AND (
-      -- โอนมาจาก non-KAM
-      COALESCE(po.prev_owner, 'NEW') != 'KAM'
-      OR (
-        -- KAM→KAM: prev_kam ต่างจาก new_kam
-        po.prev_owner = 'KAM'
-        AND LOWER(TRIM(COALESCE(po.prev_kam, '')))
-            != LOWER(TRIM(COALESCE(cw.mapped_kam_name, '')))
-      )
-    )
-    -- มี activity ใน M-1 หรือ M (ไม่ใช่ร้าน dormant นานมาก)
-    AND (
-      lo.last_order_date >= p.m2_start
-      OR lo.last_order_date IS NULL
-    )
-),
-
--- ── ร้านที่โอนเข้า KAM ใน M-2 ────────────────────────────────────────────
--- ต้องดูว่า M-2 เป็น KAM แต่ M-3 ไม่ใช่ — ใช้ snapshot จาก order table
--- เพราะ user_master บอกแค่ current state ไม่ใช่ historical
-transfers_m2 AS (
-  SELECT
-    CAST(o_lm.account_id AS STRING)                                 AS account_id,
-    MAX(o_lm.account_name)                                          AS account_name,
-    MAX(o_lm.account_type)                                          AS account_type,
-    -- new_kam ณ M-2 = ka_owner ที่มี GMV มากสุดใน M-2
-    ARRAY_AGG(o_lm.ka_owner
-              ORDER BY o_lm.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]    AS new_kam_name,
-    'KAM'                                                           AS new_owner_type,
-    COALESCE(po.prev_kam, po.prev_owner, 'NEW')                     AS old_kam_name,
-    COALESCE(po.prev_owner, 'NEW')                                  AS prev_owner,
-    MAX(o_lm.delivery_date)                                         AS last_order_date,
-    p.m2_label                                                      AS transfer_month,
-    p.m2_days                                                       AS baseline_days
-  FROM `freshket-rn.dwh.order` o_lm, params p
-  LEFT JOIN prev_owner_for_m2 po
-    ON CAST(o_lm.account_id AS STRING) = po.account_id
-  WHERE o_lm.delivery_date BETWEEN p.m2_start AND p.m2_end
-    AND o_lm.commercial_owner = 'KAM'
-    AND o_lm.ka_owner IS NOT NULL AND TRIM(o_lm.ka_owner) != ''
-    AND o_lm.account_type IN ('SA', 'MC', 'Chain')
-    AND (
-      COALESCE(po.prev_owner, 'NEW') != 'KAM'
-      OR (
-        po.prev_owner = 'KAM'
-        AND LOWER(TRIM(COALESCE(po.prev_kam, '')))
-            != LOWER(TRIM(o_lm.ka_owner))
-      )
-    )
-  GROUP BY CAST(o_lm.account_id AS STRING), po.prev_owner, po.prev_kam,
-           p.m2_label, p.m2_days
+    CAST(account_guid AS STRING)       AS account_id,
+    commercial_owner                   AS current_owner_type,
+    staff_owner                        AS current_staff_owner,
+    LOWER(TRIM(staff_owner_email))     AS current_staff_owner_email
+  FROM `freshket-rn.dim.user_master`
+  WHERE account_guid IS NOT NULL
+    AND account_type IN ('SA', 'MC', 'Chain')
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY CAST(o_lm.account_id AS STRING)
-    ORDER BY SUM(o_lm.gmv_ex_vat) DESC
+    PARTITION BY account_guid
+    ORDER BY
+      CASE WHEN staff_owner_email IS NOT NULL
+                AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
+      lasted_order_date DESC NULLS LAST
   ) = 1
 ),
+current_with_kam AS (
+  SELECT
+    um.account_id,
+    um.current_owner_type,
+    COALESCE(k.kam_name, um.current_staff_owner) AS mapped_kam_name
+  FROM user_master_current um
+  LEFT JOIN current_kam_list k ON um.current_staff_owner_email = k.kam_email
+),
 
--- ── รวม 2 windows ─────────────────────────────────────────────────────────
+-- ── M-1 transfers: ka_owner ใน M-1 ต่างจาก M-2 ──────────────────────────
+transfers_lm AS (
+  SELECT
+    lm.account_id,
+    lm.account_name,
+    lm.account_type,
+    lm.ka_owner                                    AS new_kam_name,  -- KAM ที่รับใน M-1
+    COALESCE(m2.ka_owner, po.prev_kam, 'NEW')      AS old_kam_name,  -- KAM เดิม
+    COALESCE(po.prev_owner, 'NEW')                 AS prev_owner,    -- commercial_owner ก่อนโอน
+    lm.last_order_date,
+    p.lm_label                                     AS transfer_month,
+    p.lm_days                                      AS baseline_days
+  FROM ka_owner_lm lm, params p
+  LEFT JOIN ka_owner_m2 m2    USING (account_id)
+  LEFT JOIN prev_owner_for_lm po USING (account_id)
+  -- เฉพาะ KAM ใน active list
+  JOIN current_kam_list k ON LOWER(TRIM(lm.ka_owner)) = LOWER(TRIM(k.kam_name))
+  WHERE
+    -- ka_owner เปลี่ยนจาก M-2
+    LOWER(TRIM(lm.ka_owner)) != LOWER(TRIM(COALESCE(m2.ka_owner, '')))
+    OR m2.account_id IS NULL  -- ไม่มีใน M-2 = ร้านใหม่/ไม่มี order ก่อนหน้า
+),
+
+-- ── M-2 transfers: ka_owner ใน M-2 ต่างจาก M-3 ──────────────────────────
+transfers_m2 AS (
+  SELECT
+    m2.account_id,
+    ARRAY_AGG(o.account_name ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]   AS account_name,
+    ARRAY_AGG(o.account_type ORDER BY o.gmv_ex_vat DESC LIMIT 1)[OFFSET(0)]   AS account_type,
+    m2.ka_owner                                    AS new_kam_name,
+    COALESCE(po.prev_kam, po.prev_owner, 'NEW')    AS old_kam_name,
+    COALESCE(po.prev_owner, 'NEW')                 AS prev_owner,
+    MAX(o.delivery_date)                           AS last_order_date,
+    p.m2_label                                     AS transfer_month,
+    p.m2_days                                      AS baseline_days
+  FROM ka_owner_m2 m2, params p
+  JOIN `freshket-rn.dwh.order` o
+    ON CAST(o.account_id AS STRING) = m2.account_id
+    AND o.delivery_date BETWEEN p.m2_start AND p.m2_end
+  LEFT JOIN prev_owner_for_m2 po USING (account_id)
+  JOIN current_kam_list k ON LOWER(TRIM(m2.ka_owner)) = LOWER(TRIM(k.kam_name))
+  WHERE
+    LOWER(TRIM(m2.ka_owner)) != LOWER(TRIM(COALESCE(po.prev_kam, '')))
+    OR po.prev_owner != 'KAM'
+    OR po.account_id IS NULL
+  GROUP BY m2.account_id, m2.ka_owner, po.prev_owner, po.prev_kam,
+           p.m2_label, p.m2_days
+),
+
+-- ── รวม + เพิ่ม GMV fields ────────────────────────────────────────────────
 combined AS (
   -- M-1 window
   SELECT
@@ -259,7 +216,7 @@ combined AS (
     t.account_type,
     CAST(ROUND(COALESCE(lm.gmv, 0)) AS INT64)             AS last_month_gmv,
     CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)             AS cur_month_gmv,
-    t.new_owner_type,
+    COALESCE(cw.current_owner_type, 'KAM')                AS new_owner_type,
     t.new_kam_name,
     'transfer_lm'                                         AS transfer_basis,
     CAST(t.last_order_date AS STRING)                     AS last_order_date,
@@ -272,6 +229,7 @@ combined AS (
   FROM transfers_lm t, params p
   LEFT JOIN gmv_lm lm USING (account_id)
   LEFT JOIN gmv_cm cm USING (account_id)
+  LEFT JOIN current_with_kam cw USING (account_id)
 
   UNION ALL
 
@@ -283,7 +241,7 @@ combined AS (
     t.account_type,
     CAST(ROUND(COALESCE(m2.gmv, 0)) AS INT64)             AS last_month_gmv,
     CAST(ROUND(COALESCE(cm.gmv, 0)) AS INT64)             AS cur_month_gmv,
-    t.new_owner_type,
+    COALESCE(cw.current_owner_type, 'KAM')                AS new_owner_type,
     t.new_kam_name,
     'transfer_m2'                                         AS transfer_basis,
     CAST(t.last_order_date AS STRING)                     AS last_order_date,
@@ -297,6 +255,7 @@ combined AS (
   LEFT JOIN gmv_m2 m2 USING (account_id)
   LEFT JOIN gmv_lm lm USING (account_id)
   LEFT JOIN gmv_cm cm USING (account_id)
+  LEFT JOIN current_with_kam cw USING (account_id)
 )
 
 SELECT
@@ -308,9 +267,8 @@ SELECT
   baseline_gmv, perf_gmv,
   perf_days_in_month, baseline_days_in_month
 FROM combined
--- dedupe: ถ้าร้านเดียวกันอยู่ใน 2 windows ให้เอาแค่ record ล่าสุด
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY account_id, transfer_month
   ORDER BY last_order_date DESC
 ) = 1
-ORDER BY transfer_month DESC, kam_name, last_month_gmv DESC
+ORDER BY transfer_month DESC, new_kam_name, last_month_gmv DESC
