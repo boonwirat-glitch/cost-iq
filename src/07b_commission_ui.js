@@ -3693,7 +3693,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div class="cds-sub-rows'+(open?' open':'')+'" id="'+id+'-sub">';
       // sub-rows injected here by each tab renderer
   }
-  function _cdsChipRowClose(){ return '</div>'; }
+  function _cdsChipRowClose(){ return '</div></div>'; }
 
   // ── Zone C: sub-row (grid columns) ────────────────────────────────────
   // cells = [{text, cls}]
@@ -3910,6 +3910,189 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
 
 //////////////////////////////////////////////////////////////////////////////
+// ── CDS Session 3: P1 tab renderer (สินค้าใหม่) ──────────────────────────
+//////////////////////////////////////////////////////////////////////////////
+
+window._cdsRender_p1 = function(src, body, meta, totalEl) {
+  var h = window._cdsHtml;
+  if (!h) return;
+
+  function cfg(k, p, d) {
+    try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
+  }
+  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
+  var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 2500));
+  var fmt = h.fmt;
+  var esc = h.esc;
+
+  if (src.loading) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">กำลังโหลด upsell...</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', '—', 'v-amber');
+    return;
+  }
+
+  var d = src.upsell_sku_detail && src.upsell_sku_detail.p1;
+  var groups = (d && d.groups) ? d.groups : [];
+  var totalComm = d ? Number(d.comm || 0) : 0;
+
+  if (!groups.length) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">ไม่มีกลุ่มสินค้าใหม่เดือนนี้<br>'
+      + '<span style="font-size:10px;opacity:.5">เงื่อนไข: GMV ≥ ฿' + p1MinGmv.toLocaleString('en-US') + ' · ไม่เคยซื้อใน 3 เดือนย้อนหลัง</span></div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', '฿0', 'v-dim');
+    return;
+  }
+
+  var byOutlet = {};
+  groups.forEach(function(g) {
+    var key = g.outletId || '_all';
+    if (!byOutlet[key]) byOutlet[key] = { outletId: key, accountId: g.accountId || '', items: [], totalComm: 0, totalGmv: 0 };
+    byOutlet[key].items.push(g);
+    byOutlet[key].totalComm += g.commission || 0;
+    byOutlet[key].totalGmv  += g.total_gmv  || 0;
+  });
+  var outlets = Object.values(byOutlet).sort(function(a, b) { return b.totalComm - a.totalComm; });
+
+  if (meta) {
+    meta.innerHTML = '<div class="cds-meta">'
+      + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่มสินค้า · × ' + p1Rate + '%</span>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
+      + '</div>';
+  }
+
+  var html = '';
+  outlets.forEach(function(o, oi) {
+    var rowId   = 'p1r' + oi;
+    var oName   = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
+    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    o.items.forEach(function(g, gi) {
+      var proofId = rowId + 'g' + gi;
+      html += h.subRow([
+        { text: g.groupKey || g.group_key || '—', cls: 'cds-outlet-name' },
+        { text: fmt(g.total_gmv),  cls: 'cds-val v-muted' },
+        { text: fmt(g.commission), cls: 'cds-val v-amber' }
+      ], 'p1');
+      html += h.proof(proofId, [
+        { label: 'GMV เดือนนี้',     result: fmt(g.total_gmv) },
+        { label: 'เกณฑ์ขั้นต่ำ',   result: '≥ ฿' + p1MinGmv.toLocaleString('en-US'), pass: g.total_gmv >= p1MinGmv },
+        { label: 'อัตราค่าคอมฯ',    result: p1Rate + '%' },
+        { label: 'commission',       result: fmt(g.total_gmv) + ' × ' + p1Rate + '% = ' + fmt(g.commission), pass: true }
+      ]);
+    });
+    html += h.chipRowClose();
+  });
+
+  body.innerHTML = html;
+
+  body.querySelectorAll('.cds-sub-row.p1-cols').forEach(function(row) {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function() {
+      var proof = row.nextElementSibling;
+      if (proof && proof.classList.contains('cds-proof')) proof.classList.toggle('open');
+    });
+  });
+
+  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmt(totalComm), 'v-amber');
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
+// ── CDS Session 4: P3 tab renderer (ยอดเติบโต) ───────────────────────────
+//////////////////////////////////////////////////////////////////////////////
+
+window._cdsRender_p3 = function(src, body, meta, totalEl) {
+  var h = window._cdsHtml;
+  if (!h) return;
+
+  function cfg(k, p, d) {
+    try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
+  }
+  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 100);
+  var p3Thresh    = cfg('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3ThreshPct = Math.round((p3Thresh - 1) * 100);
+  var p3MinIncr   = Number(cfg('upsell_sku', 'p3_min_incremental', 5000));
+  var fmt = h.fmt;
+  var esc = h.esc;
+
+  if (src.loading) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">กำลังโหลด upsell...</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', '—', 'v-amber');
+    return;
+  }
+
+  var d = src.upsell_sku_detail && src.upsell_sku_detail.p3;
+  var groups = (d && d.groups) ? d.groups : [];
+  var totalComm = d ? Number(d.comm || 0) : 0;
+
+  if (!groups.length) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">ไม่มียอดเติบโตเดือนนี้<br>'
+      + '<span style="font-size:10px;opacity:.5">เงื่อนไข: เพิ่ม &gt;' + p3ThreshPct + '% vs baseline · ≥ ฿' + p3MinIncr.toLocaleString('en-US') + '</span></div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', '฿0', 'v-dim');
+    return;
+  }
+
+  var byOutlet = {};
+  groups.forEach(function(g) {
+    var key = g.outletId || '_all';
+    if (!byOutlet[key]) byOutlet[key] = { outletId: key, accountId: g.accountId || '', items: [], totalComm: 0, totalIncr: 0 };
+    byOutlet[key].items.push(g);
+    byOutlet[key].totalComm += g.commission  || 0;
+    byOutlet[key].totalIncr += g.incremental || 0;
+  });
+  var outlets = Object.values(byOutlet).sort(function(a, b) { return b.totalComm - a.totalComm; });
+
+  if (meta) {
+    meta.innerHTML = '<div class="cds-meta">'
+      + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่ม · &gt;' + p3ThreshPct + '% × ' + p3Rate + '%</span>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
+      + '</div>';
+  }
+
+  var html = '';
+  outlets.forEach(function(o, oi) {
+    var rowId = 'p3r' + oi;
+    var oName = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
+    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    o.items.forEach(function(g, gi) {
+      var proofId = rowId + 'g' + gi;
+      var growthPct = g.max_baseline > 0 ? Math.round(g.existing_curr / g.max_baseline * 100) : 0;
+      var passGrowth = growthPct > (p3ThreshPct + 100);
+      var passMinIncr = g.incremental >= p3MinIncr;
+      html += h.subRow([
+        { text: g.groupKey || g.group_key || '—', cls: 'cds-outlet-name' },
+        { text: fmt(g.max_baseline),  cls: 'cds-val v-muted' },
+        { text: fmt(g.incremental),   cls: 'cds-val v-green' },
+        { text: fmt(g.commission),    cls: 'cds-val v-amber' }
+      ], 'p3');
+      html += h.proof(proofId, [
+        { label: 'Baseline (' + esc(g.max_baseline_month || '') + ')', result: fmt(g.max_baseline) },
+        { label: 'GMV เดือนนี้', result: fmt(g.existing_curr) + ' (' + growthPct + '%)' },
+        { label: 'ต้องเพิ่ม &gt;' + p3ThreshPct + '%', result: passGrowth ? 'ผ่าน ✓' : 'ไม่ผ่าน ✗', pass: passGrowth },
+        { label: 'Incremental ≥ ฿' + p3MinIncr.toLocaleString('en-US'), result: fmt(g.incremental), pass: passMinIncr },
+        { label: 'commission', result: fmt(g.incremental) + ' × ' + p3Rate + '% = ' + fmt(g.commission), pass: true }
+      ]);
+    });
+    html += h.chipRowClose();
+  });
+
+  body.innerHTML = html;
+
+  body.querySelectorAll('.cds-sub-row.p3-cols').forEach(function(row) {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function() {
+      var proof = row.nextElementSibling;
+      if (proof && proof.classList.contains('cds-proof')) proof.classList.toggle('open');
+    });
+  });
+
+  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmt(totalComm), 'v-amber');
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
 // ── CDS Session 5: Expansion tab renderer ────────────────────────────────
 //////////////////////////////////////////////////////////////////////////////
 
@@ -4011,6 +4194,91 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
 
   // ── Total bar ─────────────────────────────────────────────────────────
   if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmt(totalComm), 'v-teal');
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
+// ── CDS Session 6: Handover tab renderer ─────────────────────────────────
+//////////////////////////////////////////////////////////////////////////////
+
+window._cdsRender_ho = function(src, body, meta, totalEl) {
+  var h = window._cdsHtml;
+  if (!h) return;
+
+  function cfg(k, p, d) {
+    try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
+  }
+  var t2Pct  = cfg('handover', 'tier2_pct',    100);
+  var t3Pct  = cfg('handover', 'tier3_pct',    120);
+  var t2Pay  = Number(cfg('handover', 'tier2_payout', 2500));
+  var t3Bon  = Number(cfg('handover', 'tier3_bonus',  2500));
+  var fmt = h.fmt;
+  var esc = h.esc;
+
+  var hd = src.handover_detail || {};
+  var detail = hd.detail || [];
+  var retPct = hd.retention_pct || 0;
+  var hit2   = retPct >= t2Pct;
+  var hit3   = retPct >= t3Pct;
+  var payout = Number(src.handover || 0);
+
+  if (!hd.accounts) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">ไม่มี account handover เดือนนี้</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม Handover', '฿0', 'v-dim');
+    return;
+  }
+
+  if (meta) {
+    var tierHtml =
+      '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+      + (hit2 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + '">≥' + t2Pct + '% ฿' + fmt(t2Pay) + '</span> '
+      + '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+      + (hit3 ? 'background:rgba(77,220,151,.10);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + '">≥' + t3Pct + '% +฿' + fmt(t3Bon) + '</span>';
+
+    meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
+      + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
+      + (hit2 ? '#4ddc97' : retPct >= (t2Pct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
+      + retPct + '%</b></span>'
+      + '<span style="display:flex;gap:5px;">' + tierHtml + '</span>'
+      + '</div>';
+  }
+
+  var sorted = detail.slice().sort(function(a, b) { return (b.current || 0) - (a.current || 0); });
+  var html = '';
+
+  sorted.forEach(function(a, idx) {
+    var retA   = a.baseline > 0 ? Math.round(a.current / a.baseline * 100) : 0;
+    var retCls = retA >= t2Pct ? 'v-green' : retA >= (t2Pct * 0.85) ? 'v-amber' : 'v-dim';
+    var proofId = 'hor' + idx;
+    html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'
+      + '<div style="min-width:0">'
+      + '<div class="cds-outlet-name">' + esc(String(a.name || a.account_id || '—').slice(0, 36)) + '</div>'
+      + (a.oldKamName ? '<div class="cds-outlet-meta">มาจาก: ' + esc(a.oldKamName) + '</div>' : '')
+      + '</div>'
+      + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
+      + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
+      + '<span class="cds-val ' + retCls + '">' + retA + '%</span>'
+      + '</div>'
+      + h.proof(proofId, [
+          { label: 'Baseline GMV', result: fmt(a.baseline) },
+          { label: 'MTD GMV',      result: fmt(a.current) },
+          { label: 'Retention',    result: retA + '%', pass: retA >= t2Pct }
+        ]);
+  });
+
+  body.innerHTML = html;
+
+  body.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-hoid]');
+    if (!row) return;
+    var el = document.getElementById('proof-' + row.getAttribute('data-hoid'));
+    if (el) el.classList.toggle('open');
+  });
+
+  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmt(payout), payout > 0 ? 'v-blue' : 'v-dim');
 };
 
 
