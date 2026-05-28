@@ -1486,8 +1486,13 @@
       var kamName=(p[0]||'').trim(), accountId=normId(p[1]), accountName=(p[2]||'').trim(), accountType=(p[3]||'').trim();
       var lastMonthGmv=Number(p[4]||0)||0, curMonthGmv=Number(p[5]||0)||0, newOwnerType=(p[6]||'').trim(), newKamName=(p[7]||'').trim();
       var transferBasis=(p[8]||'').trim(), lastOrderDate=(p[9]||'').trim();
+      // V3: new columns for prev_owner + commission tactic B
+      var prevOwner=(p[10]||'NEW').trim()||'NEW';
+      var transferMonth=(p[11]||'').trim();
+      var baselineGmv=Number(p[12]||0)||0, perfGmv=Number(p[13]||0)||0;
+      var perfDays=parseInt(p[14])||30, baselineDays=parseInt(p[15])||30;
       if(!kamName || !accountId) return;
-      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate};
+      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
       rows.push(row);
       byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
