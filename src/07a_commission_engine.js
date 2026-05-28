@@ -325,62 +325,80 @@ function _commComputeUpsellOutlet(kamEmail) {
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
 // Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail[] }
 function _commComputeHandoverRetention(kamEmail) {
+  // V3 Tactic B:
+  // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
+  // - Filter: prevOwner === 'SALE' เท่านั้น (PM/ADMIN/KAM ไม่นับ)
+  // - Baseline: baseline_gmv (GMV เต็มเดือนที่โอน) normalize ÷ baselineDays × 30
+  // - Current: perf_gmv (GMV เดือน M+1) normalize ÷ perfDays × 30
+  // - Window: transfer_month = เดือนก่อน (M-1) เท่านั้น
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
                   tier:0, payout:0, detail:[] };
   try {
-    // Handover = Sales→KAM: accounts new to this KAM this month, NOT transferred from another KAM
-    // Same classification logic as portview rendering (07b line ~1580):
-    //   isNew: daysWithCurrentKam <= daysElapsed
-    //   Handover: isNew AND NOT in byAccountId (byAccountId = KAM→KAM transfers from Q10)
     const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
-              ? bulkHandoverData : { byAccountId:{} };
+              ? bulkHandoverData : { byNewKamName:{} };
 
+    // หา KAM display name จาก portviewBulkData (byNewKamName index ใช้ชื่อ ไม่ใช่ email)
     const pvAccounts = (portviewBulkData || []).filter(r => r.kamEmail === kamEmail);
-    if (!pvAccounts.length) return EMPTY;
+    const kamName = pvAccounts.length ? (pvAccounts[0].kamName || '') : '';
+    if (!kamName) return EMPTY;
 
-    // Use daysElapsed from first portview row (consistent with NRR engine)
-    const daysElapsed = pvAccounts[0].daysElapsed > 0 ? pvAccounts[0].daysElapsed : new Date().getDate();
+    // current month label เพื่อระบุ transfer_month = เดือนก่อน
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthLabel = prevMonth.getFullYear() + '-' +
+                           String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
 
-    // Filter to Handover (Sales→KAM) accounts only
-    const handoverAccounts = pvAccounts.filter(a => {
-      const isNew = a.daysWithCurrentKam !== null &&
-                    a.daysWithCurrentKam !== undefined &&
-                    a.daysWithCurrentKam <= daysElapsed;
-      return isNew && !(hd.byAccountId && hd.byAccountId[a.id]);
-    });
+    // ดึงร้านที่โอนมาหา KAM นี้ จาก Q10 V3
+    const hoRows = (hd.byNewKamName && hd.byNewKamName[kamName]) || [];
 
-    if (!handoverAccounts.length) return EMPTY;
+    // Filter: SALE เท่านั้น + transfer_month = เดือนก่อน
+    const handoverRows = hoRows.filter(r =>
+      (r.prevOwner || '').toUpperCase() === 'SALE' &&
+      r.transferMonth === prevMonthLabel
+    );
+
+    if (!handoverRows.length) return EMPTY;
 
     const t2Pct   = _commGetConfig('handover', 'tier2_pct',    100);
     const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
     const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
     const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
 
-    let baselineGmv = 0, currentGmv = 0;
+    // Normalize: daily rate × 30 เพื่อให้จำนวนวันแฟร์ทั้งสองฝั่ง
+    let baselineNorm = 0, perfNorm = 0;
     const detail = [];
-    handoverAccounts.forEach(a => {
-      baselineGmv += a.lastGmv   || 0;  // lastGmv = last month GMV under Sales (baseline)
-      currentGmv  += a.gmvToDate || 0;  // gmvToDate = KAM's MTD this month
-      let oldKamName = '';
-      try {
-        if (typeof bulkHandoverData !== 'undefined' && bulkHandoverData && bulkHandoverData.byAccountId) {
-          const hRow = bulkHandoverData.byAccountId[a.id];
-          if (hRow) oldKamName = hRow.kamName || '';
-        }
-      } catch(e) {}
-      detail.push({ account_id: a.id, name: a.name,
-                    baseline: a.lastGmv || 0, current: a.gmvToDate || 0, oldKamName });
+    handoverRows.forEach(r => {
+      const bDays = r.baselineDays > 0 ? r.baselineDays : 30;
+      const pDays = r.perfDays     > 0 ? r.perfDays     : 30;
+      const bNorm = (r.baselineGmv || 0) / bDays * 30;
+      const pNorm = (r.perfGmv     || 0) / pDays * 30;
+      baselineNorm += bNorm;
+      perfNorm     += pNorm;
+      detail.push({
+        account_id:     r.accountId,
+        name:           r.accountName,
+        oldKamName:     r.kamName || '',
+        transfer_month: r.transferMonth,
+        baseline:       Math.round(bNorm),
+        current:        Math.round(pNorm),
+        baseline_raw:   r.baselineGmv || 0,
+        perf_raw:       r.perfGmv || 0
+      });
     });
 
-    const retentionPct = baselineGmv > 0 ? (currentGmv / baselineGmv * 100) : 0;
+    const retentionPct = baselineNorm > 0 ? (perfNorm / baselineNorm * 100) : 0;
 
     let tier = 1, payout = 0;
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
-    return { accounts: handoverAccounts.length, baseline_gmv: baselineGmv,
-             current_gmv: currentGmv,
-             retention_pct: Math.round(retentionPct * 10) / 10, tier, payout, detail };
+    return {
+      accounts:       handoverRows.length,
+      baseline_gmv:   Math.round(baselineNorm),
+      current_gmv:    Math.round(perfNorm),
+      retention_pct:  Math.round(retentionPct * 10) / 10,
+      tier, payout, detail
+    };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
     return EMPTY;
