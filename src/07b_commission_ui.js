@@ -3572,11 +3572,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     _pvPushDrill(html);
   };
   window._commRenderKamSelfStrip=renderCompactStrip;
-  window._commOpenKamSelfSheet=openCompactSheet;
-  window._commCloseKamSelfSheet=closeCompactSheet;
+  // _commOpenKamSelfSheet + _commCloseKamSelfSheet wired by CDS block below
   try{ _commRenderKamSelfStrip=renderCompactStrip; }catch(e){}
-  try{ _commOpenKamSelfSheet=openCompactSheet; }catch(e){}
-  try{ _commCloseKamSelfSheet=closeCompactSheet; }catch(e){}
   // v224e render-gate: DOMContentLoaded timers removed — renderCompactStrip called via _commGatedRender
 })();
 
@@ -4122,14 +4119,33 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
 
   body.innerHTML = ctxHtml + rowsHtml;
 
-  // Chip toggle via event delegation
+  // Chip toggle via event delegation (ncs-chip uses data-ncs-chip)
   body.addEventListener('click', function(e) {
     var chip = e.target.closest('[data-ncs-chip]');
     if (!chip) return;
     chip.classList.toggle('open');
     var rows = chip.nextElementSibling;
     if (rows && rows.classList.contains('ncs-outlet-rows')) rows.classList.toggle('open');
+    // keep toggle-btn label in sync
+    var btn = document.getElementById('cds-toggle-btn');
+    if (btn) {
+      var anyOpen = body.querySelectorAll('.ncs-outlet-rows.open').length > 0;
+      btn.textContent = anyOpen ? 'ย่อทั้งหมด' : 'ขยายทั้งหมด';
+    }
   });
+
+  // Toggle-all for NRR tab (ncs- classes, not cds- classes)
+  var nrrToggleBtn = document.getElementById('cds-toggle-btn');
+  if (nrrToggleBtn) {
+    nrrToggleBtn.onclick = function() {
+      var chips   = Array.from(body.querySelectorAll('[data-ncs-chip]'));
+      var outlets = Array.from(body.querySelectorAll('.ncs-outlet-rows'));
+      var anyOpen = outlets.some(function(r) { return r.classList.contains('open'); });
+      chips.forEach(function(c)   { c.classList.toggle('open', !anyOpen); });
+      outlets.forEach(function(r) { r.classList.toggle('open', !anyOpen); });
+      nrrToggleBtn.textContent = anyOpen ? 'ขยายทั้งหมด' : 'ย่อทั้งหมด';
+    };
+  }
 
   // ── Total bar ─────────────────────────────────────────────────────────
   if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmt(nr.cohortGmv || 0), 'v-green');
