@@ -1,4 +1,4 @@
-<!-- Freshket Sense v250: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v251: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v250',
+      version: 'v251',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -33746,7 +33746,10 @@ console.log('[Target Module v1] loaded');
       if(!kamName || !accountId) return;
       var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
       rows.push(row);
-      byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
+      // ถ้า account นี้มีหลาย outlet: ให้ SALE prevOwner มาก่อนเสมอ (ไม่ overwrite ด้วย non-SALE)
+      if (!byAccountId[accountId] || (row.prevOwner||'').toUpperCase()==='SALE') {
+        byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
+      }
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
       if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
     });
