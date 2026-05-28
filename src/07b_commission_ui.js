@@ -3765,24 +3765,44 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(btn)btn.textContent=anyOpen?'ขยายทั้งหมด':'ย่อทั้งหมด';
   };
 
-  // ── Tab switch ────────────────────────────────────────────────────────
+  // ── Tab switch (L1 → L2 entry, or L2 tab switch) ────────────────────────
   window._cdsSetTab=function(key){
     window._cdsActiveTab=key;
+
+    if(window._cdsLevel!==2){
+      // Transition Level 1 → Level 2
+      window._cdsLevel=2;
+      var src=window._cdsSrc||{loading:true,final:0,nrr:0,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false};
+      var sheet=document.querySelector('#cds-overlay .cds-sheet');
+      if(!sheet)return;
+      var handle=sheet.querySelector('.cds-handle');
+      var handleHtml=handle?handle.outerHTML:'<div class="cds-handle"><div></div></div>';
+      sheet.innerHTML=handleHtml
+        +window._cdsRenderL2Header(key,src)
+        +'<div id="cds-meta-slot"></div>'
+        +'<div class="cds-tbl-head" id="cds-tbl-head-slot"></div>'
+        +'<div class="cds-body" id="cds-body"></div>'
+        +'<div id="cds-total-slot"></div>'
+        +_cdsFooterHtml(src.upsell_sku>0||src.upsell_outlet>0,'_cdsExportCSV&&_cdsExportCSV()');
+      _cdsRenderZoneC(key,src);
+      var body=document.getElementById('cds-body');
+      if(body){void body.offsetWidth;body.classList.add('cds-body-enter');}
+      return;
+    }
+
+    // Already Level 2 — switch tabs
     var ov=document.getElementById('cds-overlay');
     if(!ov)return;
-    // update chips active
-    ov.querySelectorAll('.cds-chip').forEach(function(c){
+    ov.querySelectorAll('.cds-tab-card').forEach(function(c){
       c.classList.toggle('active',c.classList.contains('t-'+key));
     });
-    // update tabs active
-    ov.querySelectorAll('.cds-tab').forEach(function(c){
-      c.classList.toggle('active',c.classList.contains('t-'+key));
-    });
-    // re-render Zone C
+    // update formula bar
+    var fb=document.getElementById('cds-formula-bar');
+    if(fb){fb.className='cds-formula t-'+key;fb.innerHTML=_cdsFormulaContent(key);}
     var src=window._cdsSrc||{loading:true,final:0,nrr:0,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false};
-    _cdsRenderZoneC(key, src);
+    _cdsRenderZoneC(key,src);
     var body=document.getElementById('cds-body');
-    if(body)body.scrollTop=0;
+    if(body){body.classList.remove('cds-body-enter');void body.offsetWidth;body.classList.add('cds-body-enter');body.scrollTop=0;}
   };
 
   // ── Zone C dispatcher (stubs replaced per session) ────────────────────
@@ -3816,13 +3836,12 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(total)total.innerHTML=_cdsTotalHtml('รวม '+t.label,'—',t.valCls);
   }
 
-  // ── Main open ──────────────────────────────────────────────────────────
+  // ── Main open: renders Level 1 summary ────────────────────────────────
   function _cdsOpen(){
     if(typeof _commBuildKamSelfState!=='function')return;
     var st=_commBuildKamSelfState();
     if(!st)return;
 
-    // Build src (same logic as v210k buildSources)
     var nrr=Number(st.payout||0);
     var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
     if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&typeof _commBuildKamPayout==='function'){
@@ -3848,39 +3867,27 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
     window._cdsSrc=src;
     window._cdsKamSt=st;
-    var activeKey=window._cdsActiveTab||'p1';
+    window._cdsLevel=1;
+    window._cdsActiveTab=window._cdsActiveTab||'p1';
 
-    // Build overlay + sheet HTML
-    var html='<div class="cds-overlay on" id="cds-overlay" onclick="if(event.target===this)_cdsClose()">'
-      +'<div class="cds-sheet">'
-      +'<div class="cds-handle"><div></div></div>'
-      +_cdsSummaryHtml(src, activeKey)
-      +_cdsTabBarHtml(src, activeKey)
-      // Zone C slots (id hooks for _cdsRenderZoneC)
-      +'<div id="cds-meta-slot"></div>'
-      +'<div class="cds-tbl-head" id="cds-tbl-head-slot"></div>'
+    // Minimal shell: handle + scrollable body (L1 fills it)
+    var html='<div class="cds-overlay" id="cds-overlay" onclick="if(event.target===this)_cdsClose()">'
+      +'<div class="cds-sheet"><div class="cds-handle"><div></div></div>'
       +'<div class="cds-body" id="cds-body"></div>'
-      +'<div id="cds-total-slot"></div>'
-      +_cdsFooterHtml(
-          src.upsell_sku>0||src.upsell_outlet>0,
-          '_cdsExportCSV&&_cdsExportCSV()'
-        )
       +'</div></div>';
 
-    // Inject into DOM
     var existing=document.getElementById('cds-overlay');
     if(existing)existing.remove();
     var tmp=document.createElement('div');
     tmp.innerHTML=html;
     document.body.appendChild(tmp.firstElementChild);
 
-    // Render Zone C
-    _cdsRenderZoneC(activeKey, src);
+    // Render Level 1 summary
+    window._cdsRenderL1(src,st);
 
-    // Animate in
     requestAnimationFrame(function(){
       var ov=document.getElementById('cds-overlay');
-      if(ov)ov.classList.add('on');
+      if(ov){ov.classList.add('on');}
     });
   }
 
@@ -3907,6 +3914,148 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   };
 
 })();
+
+
+//////////////////////////////////////////////////////////////////////////////
+// ── CDS: Level 1 Summary + Level 2 Header + Formula Bar ─────────────────
+//////////////////////////////////////////////////////////////////////////////
+
+// ── Formula bar content (config-aware) ────────────────────────────────────
+function _cdsFormulaContent(key) {
+  function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
+  var texts = {
+    p1: 'ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',2500)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
+    p3: 'เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'% vs baseline · ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
+    nrr: 'tier-based payout จาก NRR% ทั้งพอร์ต · ไม่นับรายร้าน',
+    exp: 'outlet ใหม่ / comeback · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
+    ho:  '≥'+cfg('handover','tier2_pct',100)+'% retention → ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% → +฿'+Number(cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')+' bonus'
+  };
+  return '<div class="cds-formula-dot"></div><div class="cds-formula-text">'+(texts[key]||'')+'</div>';
+}
+
+// ── Level 2 header: back button + tab cards + formula bar ─────────────────
+window._cdsRenderL2Header = function(key, src) {
+  var fmt = window._cdsHtml ? window._cdsHtml.fmt : function(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000)return'฿'+Math.round(n/1000)+'K';return'฿'+Math.round(n);};
+  var amounts = {
+    p1: src.upsell_sku_detail&&src.upsell_sku_detail.p1 ? Number(src.upsell_sku_detail.p1.comm||0) : 0,
+    p3: src.upsell_sku_detail&&src.upsell_sku_detail.p3 ? Number(src.upsell_sku_detail.p3.comm||0) : 0,
+    nrr: Number(src.nrr||0),
+    exp: Number(src.upsell_outlet||0),
+    ho:  Number(src.handover||0)
+  };
+  var tabs=[{key:'p1',label:'สินค้าใหม่'},{key:'p3',label:'ยอดเติบโต'},{key:'nrr',label:'NRR'},{key:'exp',label:'Expansion'},{key:'ho',label:'Handover'}];
+  var tabCards=tabs.map(function(t){
+    var active=t.key===key?'active':'';
+    return '<button class="cds-tab-card t-'+t.key+' '+active+'" onclick="_cdsSetTab(\'' + t.key + '\')">'
+      +'<span class="tc-name">'+t.label+'</span>'
+      +'<span class="tc-amt">'+(src.loading?'—':fmt(amounts[t.key]||0))+'</span>'
+      +'</button>';
+  }).join('');
+  return '<div class="cds-l2-header">'
+    +'<div class="cds-l2-back">'
+    +'<button class="cds-l2-back-btn" onclick="_cdsBackToSummary()">&#8249;</button>'
+    +'<span class="cds-l2-back-title">ค่าคอมฯ เดือนนี้</span>'
+    +'</div>'
+    +'<div class="cds-tab-bar">'+tabCards+'</div>'
+    +'<div class="cds-formula t-'+key+'" id="cds-formula-bar">'+_cdsFormulaContent(key)+'</div>'
+    +'</div>';
+};
+
+// ── Back to Level 1 ────────────────────────────────────────────────────────
+window._cdsBackToSummary = function() {
+  window._cdsLevel = 1;
+  var sheet = document.querySelector('#cds-overlay .cds-sheet');
+  if(!sheet) return;
+  var handle = sheet.querySelector('.cds-handle');
+  var handleHtml = handle ? handle.outerHTML : '<div class="cds-handle"><div></div></div>';
+  sheet.innerHTML = handleHtml + '<div class="cds-body" id="cds-body"></div>';
+  window._cdsRenderL1(window._cdsSrc, window._cdsKamSt);
+  var body = document.getElementById('cds-body');
+  if(body){void body.offsetWidth; body.classList.add('cds-body-enter'); body.scrollTop=0;}
+};
+
+// ── Level 1 summary (replicates old "วิธีคิดค่าคอมฯ" design) ────────────────
+window._cdsRenderL1 = function(src, st) {
+  var body = document.getElementById('cds-body');
+  if(!body) return;
+  src = src || {};
+  st  = st  || {};
+  var h = window._cdsHtml;
+  var fmt = h ? h.fmt : function(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'฿'+Math.round(n/1000)+'K';return'฿'+Math.round(n);};
+  var esc = h ? h.esc : function(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});};
+
+  var nrrAmt    = Number(src.nrr||0);
+  var p1amt     = src.upsell_sku_detail&&src.upsell_sku_detail.p1 ? Number(src.upsell_sku_detail.p1.comm||0) : 0;
+  var p3amt     = src.upsell_sku_detail&&src.upsell_sku_detail.p3 ? Number(src.upsell_sku_detail.p3.comm||0) : 0;
+  var upsellAmt = p1amt + p3amt;
+  var expAmt    = Number(src.upsell_outlet||0);
+  var hoAmt     = Number(src.handover||0);
+  var subtotal  = nrrAmt + upsellAmt + expAmt + hoAmt;
+  var finalAmt  = src.loading ? null : src.final;
+  var gateOk    = !src.gate_active;
+  var gatePct   = Math.round((src.gate_cap||1)*100);
+
+  // Subtitles per row
+  var pctText = (st.pct!==null&&st.pct!==undefined) ? 'NRR '+st.pct+'% · ' : '';
+  var nrrSub  = esc(pctText + (st.tierLabel||st.ruleName||'—'));
+  var p1cnt   = src.upsell_sku_detail&&src.upsell_sku_detail.p1&&src.upsell_sku_detail.p1.groups ? src.upsell_sku_detail.p1.groups.length : 0;
+  var p3cnt   = src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.groups ? src.upsell_sku_detail.p3.groups.length : 0;
+  var upsellSub = (p1cnt?'สินค้าใหม่ '+p1cnt+' รายการ':'') + (p1cnt&&p3cnt?' · ':'') + (p3cnt?'ยอดเติบโต '+p3cnt+' รายการ':'');
+  if(!upsellSub) upsellSub = 'กลุ่มสินค้าใหม่ + ยอดเติบโต';
+  var ed      = src.upsell_outlet_detail;
+  var expSub  = ed&&ed.outlet_gmv>0 ? 'GMV '+fmt(ed.outlet_gmv)+' · outlet ใหม่/comeback × 1.5%' : 'outlet ใหม่/comeback × 1.5%';
+  var hd      = src.handover_detail||{};
+  var hoSub   = hd.accounts ? hd.accounts+' account · retention '+(hd.retention_pct||0)+'%' : '≥100% = ฿2,500 · ≥120% = +฿2,500 bonus';
+  var nowStr  = (function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);})();
+
+  function srcRow(tabKey, dotColor, name, sub, amt) {
+    var earned = amt > 0;
+    return '<div class="cds-src-row" data-tab="'+tabKey+'">'
+      +'<div class="cds-src-dot" style="background:'+dotColor+';box-shadow:'+(earned?'0 0 8px '+dotColor.replace(')',', .4)'):'none')+'"></div>'
+      +'<div class="cds-src-body"><div class="cds-src-name">'+esc(name)+'</div>'
+      +'<div class="cds-src-sub">'+sub+'</div></div>'
+      +'<div class="cds-src-right">'
+      +'<span class="cds-src-amt'+(earned?' earned':'')+'" style="color:'+(earned?'#ffe08a':'rgba(225,238,255,.28)')+'">'+fmt(amt)+'</span>'
+      +'<span class="cds-src-chevron">&#8250;</span>'
+      +'</div></div>';
+  }
+
+  var loadNote = src.loading ? '<div style="font-size:11px;color:#ffe08a;padding:6px 18px 0;">⚠ กำลังโหลด upsell...</div>' : '';
+
+  body.innerHTML =
+    '<div class="cds-l1-hero">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between">'
+    +'<div><div class="cds-l1-label">ค่าคอมฯ เดือนนี้</div>'
+    +'<div class="cds-l1-payout">'+(src.loading?'…':fmt(finalAmt))
+    +(src.gate?'<span class="cds-l1-gate '+(gateOk?'ok':'warn')+'">× '+gatePct+'% '+(gateOk?'✓':'⚠')+'</span>':'')
+    +'</div></div>'
+    +'<button class="cds-summary-close" onclick="_cdsClose()">✕</button>'
+    +'</div>'
+    +'<div style="font-size:10px;color:rgba(188,215,255,.32);margin-top:6px">สรุปตามแหล่งที่มา · คำนวณ '+nowStr+'</div>'
+    +'</div>'
+    +loadNote
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(225,238,255,.28);padding:8px 18px 2px">ที่มาของยอด</div>'
+    +srcRow('nrr',  '#4ddc97', 'NRR Commission', nrrSub, nrrAmt)
+    +srcRow('p1',   '#ffe08a', 'สินค้าใหม่ + ยอดเติบโต', upsellSub, upsellAmt)
+    +srcRow('exp',  '#00c8b0', 'Expansion', expSub, expAmt)
+    +srcRow('ho',   '#bcd7ff', 'Handover', hoSub, hoAmt)
+    +'<div style="height:1px;background:rgba(188,215,255,.08);margin:2px 18px 0"></div>'
+    +'<div class="cds-l1-subtotal">'
+    +'<span class="cds-l1-subtotal-lbl">Subtotal</span>'
+    +'<span class="cds-l1-subtotal-val">'+fmt(subtotal)+'</span>'
+    +'</div>'
+    +'<div style="padding:0 18px 18px;display:flex;gap:7px;margin-top:8px">'
+    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">History</button>'
+    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
+    +'</div>';
+
+  // Wire row taps
+  body.querySelectorAll('.cds-src-row').forEach(function(row){
+    row.addEventListener('click', function(){ _cdsSetTab(row.getAttribute('data-tab')); });
+  });
+
+  body.classList.add('cds-body-enter');
+};
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -4307,28 +4456,22 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   var nrrPayout = Number(src.nrr || 0);
   var pctText   = st.pct !== null && st.pct !== undefined ? (st.pct + '%') : '—';
 
-  // ── Commission context card ───────────────────────────────────────────
-  var tierCls   = nrrPayout > 0 ? 'background:rgba(77,220,151,.09);border:1px solid rgba(77,220,151,.2);' :
-                                  'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);';
-  var nextNote  = st.next
+  // ── Commission context card (uses .cds-nrr-ctx CSS) ──────────────────
+  var nextNote = st.next
     ? 'ต้องอีก +' + (Number(st.next.min_value) - Number(st.pct || 0)).toFixed(1) + ' pts → tier ถัดไป'
     : (nrrPayout > 0 ? 'อยู่ใน tier สูงสุดแล้ว' : 'ยังไม่ถึง tier แรก');
 
-  var ctxHtml = '<div style="margin:10px 16px 0;padding:10px 14px;border-radius:10px;' + tierCls + '">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-    + '<div>'
-    + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.5);margin-bottom:3px;">NRR Commission</div>'
-    + '<div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.85);">'
-    + esc(pctText) + ' &nbsp;·&nbsp; ' + esc(st.tierLabel || st.ruleName || '—')
+  var ctxHtml = '<div class="cds-nrr-ctx' + (nrrPayout > 0 ? '' : ' no-tier') + '">'
+    + '<div class="cds-nrr-ctx-top">'
+    + '<div><div class="cds-nrr-ctx-eyebrow">NRR Commission</div>'
+    + '<div class="cds-nrr-ctx-pct">' + esc(pctText) + '</div>'
+    + '<div class="cds-nrr-ctx-tier">' + esc(st.tierLabel || st.ruleName || '—') + '</div>'
     + '</div>'
-    + '<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px;">' + esc(nextNote) + '</div>'
-    + '</div>'
-    + '<div style="text-align:right;flex-shrink:0;">'
-    + '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:18px;font-weight:900;color:'
-    + (nrrPayout > 0 ? '#4ddc97' : 'rgba(225,238,255,.3)') + ';">'
-    + fmt(nrrPayout) + '</div>'
-    + '</div>'
-    + '</div>'
+    + '<div class="cds-nrr-ctx-payout">'
+    + '<div class="cds-nrr-ctx-payout-lbl">Payout</div>'
+    + '<div class="cds-nrr-ctx-payout-val">' + fmt(nrrPayout) + '</div>'
+    + '</div></div>'
+    + '<div class="cds-nrr-ctx-next">' + esc(nextNote) + '</div>'
     + '</div>';
 
   // ── No NRR data fallback ──────────────────────────────────────────────

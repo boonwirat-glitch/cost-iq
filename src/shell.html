@@ -4226,9 +4226,8 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 .cds-chip-chev{font-size:12px;color:rgba(188,215,255,.32);transition:transform .20s cubic-bezier(.34,1.1,.64,1),color .15s;flex-shrink:0;width:12px;display:inline-block;}
 .cds-chip-row.open .cds-chip-chev{transform:rotate(90deg);color:rgba(188,215,255,.60);}
 /* sub-row expand: smooth height */
-.cds-sub-rows{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s cubic-bezier(.34,1.1,.64,1);}
-.cds-sub-rows.open{grid-template-rows:1fr;}
-.cds-sub-rows > *{overflow:hidden;}
+.cds-sub-rows{max-height:0;overflow:hidden;transition:max-height .25s cubic-bezier(.4,0,.2,1);}
+.cds-sub-rows.open{max-height:2000px;}
 /* proof card: smooth height */
 .cds-proof{max-height:0;overflow:hidden;transition:max-height .20s cubic-bezier(.34,1.1,.64,1);}
 .cds-proof.open{max-height:200px;}
