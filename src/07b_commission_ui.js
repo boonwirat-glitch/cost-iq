@@ -3600,6 +3600,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(n>=1000)return'฿'+Math.round(n/1000)+'K';
     return'฿'+Math.round(n).toLocaleString('en-US');
   }
+  function fmtFull(n){ n=Number(n||0); return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0'; }
 
   // ── Chip labels (single-row abbreviations) ────────────────────────────
   var CDS_TABS=[
@@ -3668,7 +3669,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   // ── Zone C: column header templates ──────────────────────────────────
   var CDS_COL_DEFS={
     p1: [{l:'OUTLET'},{l:'GMV',r:1},{l:'COMM',r:1}],
-    p3: [{l:'OUTLET'},{l:'ฐาน',r:1},{l:'เพิ่ม',r:1},{l:'COMM',r:1}],
+    p3: [{l:'OUTLET'},{l:'ฐาน',r:1},{l:'โต',r:1},{l:'COMM',r:1}],
     nrr:[{l:'OUTLET'},{l:'ฐาน',r:1},{l:'RUN RATE',r:1},{l:'MTD',r:1}],
     exp:[{l:'OUTLET/ACCOUNT'},{l:'สาขา',r:1},{l:'GMV',r:1},{l:'COMM',r:1}],
     ho: [{l:'ACCOUNT'},{l:'ฐาน',r:1},{l:'MTD',r:1},{l:'RET%',r:1}]
@@ -3910,7 +3911,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     chipRow:_cdsChipRowHtml,chipRowClose:_cdsChipRowClose,
     subRow:_cdsSubRowHtml,proof:_cdsProofHtml,
     total:_cdsTotalHtml,footer:_cdsFooterHtml,
-    fmt:fmt,esc:esc,tabs:CDS_TABS,colDefs:CDS_COL_DEFS
+    fmt:fmt,esc:esc,fmtFull:fmtFull,tabs:CDS_TABS,colDefs:CDS_COL_DEFS
   };
 
 })();
@@ -3928,7 +3929,7 @@ function _cdsFormulaContent(key) {
     p3: 'สินค้าเดิมแต่ยอดเพิ่ม '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'x vs baseline · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
-    ho:  'ร้านใหม่จาก Sales ยอดเป็นกี่ % เทียบเดือนก่อน · ≥'+cfg('handover','tier2_pct',100)+'% → ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% → +฿'+Number(cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')
+    ho:  'ร้านใหม่จาก Sales ยอดเป็นกี่ % เทียบเดือนก่อน<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
   };
   return '<div class="cds-formula-dot"></div><div class="cds-formula-text">'+(texts[key]||'')+'</div>';
 }
@@ -3946,9 +3947,12 @@ window._cdsRenderL2Header = function(key, src) {
   var tabs=[{key:'p1',label:'สินค้าใหม่'},{key:'p3',label:'ยอดเติบโต'},{key:'nrr',label:'NRR'},{key:'exp',label:'Expansion'},{key:'ho',label:'Handover'}];
   var tabCards=tabs.map(function(t){
     var active=t.key===key?'active':'';
+    var amt=amounts[t.key]||0;
+    var amtStr=src.loading?'—':('฿'+Math.round(amt).toLocaleString('en-US'));
+    var tcFontSize=amtStr.length>8?'font-size:11px;':'font-size:14px;';
     return '<button class="cds-tab-card t-'+t.key+' '+active+'" onclick="_cdsSetTab(\'' + t.key + '\')">'
       +'<span class="tc-name">'+t.label+'</span>'
-      +'<span class="tc-amt">'+(src.loading?'—':fmt(amounts[t.key]||0))+'</span>'
+      +'<span class="tc-amt" style="'+tcFontSize+'">'+amtStr+'</span>'
       +'</button>';
   }).join('');
   return '<div class="cds-l2-header">'
@@ -4014,7 +4018,7 @@ window._cdsRenderL1 = function(src, st) {
       +'<div class="cds-src-body"><div class="cds-src-name">'+esc(name)+'</div>'
       +'<div class="cds-src-sub">'+sub+'</div></div>'
       +'<div class="cds-src-right">'
-      +'<span class="cds-src-amt'+(earned?' earned':'')+'" style="color:'+(earned?'#ffe08a':'rgba(225,238,255,.28)')+'">'+fmt(amt)+'</span>'
+      +'<span class="cds-src-amt'+(earned?' earned':'')+'" style="color:'+(earned?'#ffe08a':'rgba(225,238,255,.28)')+'">'+fmtFull(amt)+'</span>'
       +'<span class="cds-src-chevron">&#8250;</span>'
       +'</div></div>';
   }
@@ -4023,7 +4027,7 @@ window._cdsRenderL1 = function(src, st) {
   var kpiHtml = '<div class="cds-l1-kpis">'
     +'<div class="cds-l1-kpi">'
     +'<div class="cds-l1-kpi-label">ค่าคอมฯ สูงสุด</div>'
-    +'<div class="cds-l1-kpi-val gold">'+(src.loading?'…':fmt(finalAmt))+'</div>'
+    +'<div class="cds-l1-kpi-val gold">'+(src.loading?'…':fmtFull(finalAmt))+'</div>'
     +'</div>'
     +'<div class="cds-l1-kpi">'
     +'<div class="cds-l1-kpi-label">NRR</div>'
@@ -4045,7 +4049,7 @@ window._cdsRenderL1 = function(src, st) {
   // ── Final payout hero ─────────────────────────────────────────────────────
   var heroHtml = '<div class="cds-l1-final">'
     +'<div class="cds-l1-final-label">Final Payout</div>'
-    +'<div class="cds-l1-final-amt">'+(src.loading?'…':fmt(finalAmt))+'</div>'
+    +'<div class="cds-l1-final-amt">'+(src.loading?'…':fmtFull(finalAmt))+'</div>'
     +(!src.loading?'<div class="cds-l1-final-check">ตรงกับ commission panel ✓</div>':'')
     +'<div class="cds-l1-final-ts">คำนวณจาก CSV ที่โหลดอยู่ · '+nowStr+'</div>'
     +'</div>';
@@ -4071,7 +4075,7 @@ window._cdsRenderL1 = function(src, st) {
     +srcRow('ho',   '#bcd7ff', 'Handover', hoSub, hoAmt)
     +'<div style="height:1px;background:rgba(188,215,255,.08);margin:2px 18px 0"></div>'
     +'<div class="cds-l1-subtotal"><span class="cds-l1-subtotal-lbl">Subtotal</span>'
-    +'<span class="cds-l1-subtotal-val">'+fmt(subtotal)+'</span></div>'
+    +'<span class="cds-l1-subtotal-val">'+fmtFull(subtotal)+'</span></div>'
     +gateHtml
     +'<div style="height:1px;background:rgba(188,215,255,.08);margin:0 18px 0"></div>'
     +heroHtml
@@ -4172,7 +4176,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmt(totalComm), 'v-amber');
+  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmtFull(totalComm), 'v-amber');
 };
 
 
@@ -4267,7 +4271,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmt(totalComm), 'v-amber');
+  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmtFull(totalComm), 'v-amber');
 };
 
 
@@ -4323,7 +4327,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
     body.innerHTML = '<div class="cds-empty">โหลด portview.csv เพื่อดูรายละเอียด outlet<br>'
       + '<span style="font-size:10px;opacity:.5">commission รวม: '
       + fmt(Number(src.upsell_outlet || 0)) + '</span></div>';
-    if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmt(Number(src.upsell_outlet || 0)), 'v-teal');
+    if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmtFull(Number(src.upsell_outlet || 0)), 'v-teal');
     return;
   }
 
@@ -4372,7 +4376,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   body.innerHTML = html;
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmt(totalComm), 'v-teal');
+  if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmtFull(totalComm), 'v-teal');
 };
 
 
@@ -4457,7 +4461,7 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
     if (el) el.classList.toggle('open');
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmt(payout), payout > 0 ? 'v-blue' : 'v-dim');
+  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmtFull(payout), payout > 0 ? 'v-blue' : 'v-dim');
 };
 
 
@@ -4487,9 +4491,10 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   var pctText   = st.pct !== null && st.pct !== undefined ? (st.pct + '%') : '—';
 
   // ── Commission context card (uses .cds-nrr-ctx CSS) ──────────────────
+  var isTopTier = !st.next && nrrPayout > 0;
   var nextNote = st.next
     ? 'ต้องอีก +' + (Number(st.next.min_value) - Number(st.pct || 0)).toFixed(1) + ' pts → tier ถัดไป'
-    : (nrrPayout > 0 ? 'อยู่ใน tier สูงสุดแล้ว' : 'ยังไม่ถึง tier แรก');
+    : (nrrPayout > 0 ? '' : 'ยังไม่ถึง tier แรก');
 
   var ctxHtml = '<div class="cds-nrr-ctx' + (nrrPayout > 0 ? '' : ' no-tier') + '">'
     + '<div class="cds-nrr-ctx-top">'
@@ -4499,9 +4504,10 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     + '</div>'
     + '<div class="cds-nrr-ctx-payout">'
     + '<div class="cds-nrr-ctx-payout-lbl">Payout</div>'
-    + '<div class="cds-nrr-ctx-payout-val">' + fmt(nrrPayout) + '</div>'
+    + '<div class="cds-nrr-ctx-payout-val">' + fmtFull(nrrPayout) + '</div>'
+    + (isTopTier ? '<div style="font-size:9px;color:rgba(77,220,151,.75);font-weight:700;margin-top:2px;font-family:\'IBM Plex Sans Thai\',sans-serif">โบนัสสูงสุด ✓</div>' : '')
     + '</div></div>'
-    + '<div class="cds-nrr-ctx-next">' + esc(nextNote) + '</div>'
+    + (nextNote ? '<div class="cds-nrr-ctx-next">' + esc(nextNote) + '</div>' : '')
     + '</div>';
 
   // ── No NRR data fallback ──────────────────────────────────────────────
@@ -4589,7 +4595,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmt(nr.cohortGmv || 0), 'v-green');
+  if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmtFull(nr.cohortGmv || 0), 'v-green');
 };
 
 

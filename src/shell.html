@@ -3990,7 +3990,7 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 .cds-overlay.on{opacity:1;pointer-events:all;}
 
 /* Sheet */
-.cds-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:linear-gradient(180deg,#10213c 0%,#0b172b 100%);border:1px solid rgba(140,180,255,.18);border-radius:22px 22px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.44);transition:transform .30s cubic-bezier(.34,1.1,.64,1);max-height:86dvh;display:flex;flex-direction:column;overflow:hidden;z-index:321;}
+.cds-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:linear-gradient(180deg,#10213c 0%,#0b172b 100%);border:1px solid rgba(140,180,255,.18);border-radius:22px 22px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.44);transition:transform .30s cubic-bezier(.34,1.1,.64,1);height:84dvh;max-height:84dvh;display:flex;flex-direction:column;overflow:hidden;z-index:321;}
 .cds-overlay.on .cds-sheet{transform:translateX(-50%) translateY(0);}
 
 /* Handle */
@@ -4105,8 +4105,8 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 .cds-shimmer{height:14px;border-radius:6px;background:linear-gradient(90deg,rgba(255,255,255,.06) 25%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.06) 75%);background-size:400px 100%;animation:shimmer 1.4s ease infinite;}
 
 /* ── Zone D: Total + Footer ─────────────────────────────────────────────── */
-.cds-total{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,.25);border-top:1px solid rgba(255,255,255,.09);flex-shrink:0;}
-.cds-total-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.42);}
+.cds-total{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,.25);border-top:1px solid rgba(255,255,255,.12);flex-shrink:0;}
+.cds-total-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.65);}
 .cds-total-val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:900;}
 .cds-footer{display:flex;gap:7px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));}
 .cds-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;font-family:'IBM Plex Sans Thai',sans-serif;transition:opacity .15s;white-space:nowrap;}
@@ -4204,7 +4204,7 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 /* chip-row amounts: always full brightness per component, not dim */
 .cds-chip-val{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:900;flex-shrink:0;letter-spacing:-.01em;}
 .cds-chip-name{font-size:13px;font-weight:700;color:rgba(255,255,255,.92);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-.cds-chip-meta{font-size:10px;color:rgba(188,215,255,.45);margin-top:2px;}
+.cds-chip-meta{font-size:10px;color:rgba(188,215,255,.68);margin-top:2px;font-weight:600;}
 /* sub-row text: higher contrast */
 .cds-outlet-name{font-size:12px;font-weight:600;color:rgba(245,250,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .cds-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;text-align:right;}
