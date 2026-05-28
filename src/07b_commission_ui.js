@@ -3582,6 +3582,337 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
 
 //////////////////////////////////////////////////////////////////////////////
+// ── Commission Detail Sheet (cds) ────────────────────────────────────────
+// Single-sheet stack: Zone A summary · Zone B tabs · Zone C body · Zone D footer
+// Session 2: HTML template functions + open/close/tab-switch skeleton
+// Zone C content filled per-tab in Sessions 3–7
+//////////////////////////////////////////////////////////////////////////////
+
+(function(){
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function esc(v){
+    return String(v==null?'':v).replace(/[&<>'"]/g,function(c){
+      return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
+    });
+  }
+  function fmt(n){
+    n=Number(n||0);
+    if(!n)return'฿0';
+    if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';
+    if(n>=1000)return'฿'+Math.round(n/1000)+'K';
+    return'฿'+Math.round(n).toLocaleString('en-US');
+  }
+
+  // ── Chip labels (single-row abbreviations) ────────────────────────────
+  var CDS_TABS=[
+    {key:'p1', label:'สินค้าใหม่', short:'ใหม่',   cls:'t-p1',  valCls:'v-amber'},
+    {key:'p3', label:'ยอดเติบโต', short:'โต',     cls:'t-p3',  valCls:'v-amber'},
+    {key:'nrr',label:'NRR',       short:'NRR',    cls:'t-nrr', valCls:'v-green'},
+    {key:'exp',label:'Expansion', short:'Exp',    cls:'t-exp', valCls:'v-teal'},
+    {key:'ho', label:'Handover',  short:'H/O',    cls:'t-ho',  valCls:'v-blue'}
+  ];
+
+  // ── Zone A: Summary bar ───────────────────────────────────────────────
+  function _cdsSummaryHtml(src, activeKey){
+    var payout=src.loading?null:src.final;
+    var gateOk=!src.gate_active;
+    var gatePct=Math.round((src.gate_cap||1)*100);
+    var gateHtml=(!src.loading&&src.gate&&src.gate.ach_pct!==null)
+      ?'<span class="cds-gate-pill '+(gateOk?'ok':'warn')+'">× '+gatePct+'% '+(gateOk?'✓':'⚠')+'</span>'
+      :'';
+    var amtHtml=src.loading
+      ?'<span class="cds-shimmer" style="display:inline-block;width:80px;height:22px;vertical-align:-4px"></span>'
+      :esc(fmt(payout));
+
+    var amounts={
+      p1: src.upsell_sku  ? Math.round(Number((src.upsell_sku_detail&&src.upsell_sku_detail.p1&&src.upsell_sku_detail.p1.comm)||0)) : 0,
+      p3: src.upsell_sku  ? Math.round(Number((src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.comm)||0)) : 0,
+      nrr:Number(src.nrr||0),
+      exp:Number(src.upsell_outlet||0),
+      ho: Number(src.handover||0)
+    };
+
+    var chipsHtml=CDS_TABS.map(function(t){
+      var active=t.key===activeKey?'active':'';
+      var amt=src.loading?'—':fmt(amounts[t.key]||0);
+      return '<button class="cds-chip '+t.cls+' '+active+'" onclick="_cdsSetTab(\''+t.key+'\')">'
+        +'<span class="cds-chip-dot"></span>'+esc(t.short)+' '+esc(amt)
+        +'</button>';
+    }).join('');
+
+    return '<div class="cds-summary">'
+      +'<div class="cds-summary-head">'
+      +'<div><div class="cds-summary-label">ค่าคอมฯ เดือนนี้</div>'
+      +'<div class="cds-summary-payout">'+amtHtml+gateHtml+'</div></div>'
+      +'<button class="cds-summary-close" onclick="_cdsClose()">✕</button>'
+      +'</div>'
+      +'<div class="cds-chips">'+chipsHtml+'</div>'
+      +'</div>';
+  }
+
+  // ── Zone B: Tab bar ───────────────────────────────────────────────────
+  function _cdsTabBarHtml(src, activeKey){
+    var counts={
+      p1:(src.upsell_sku_detail&&src.upsell_sku_detail.p1&&src.upsell_sku_detail.p1.groups)?src.upsell_sku_detail.p1.groups.length:0,
+      p3:(src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.groups)?src.upsell_sku_detail.p3.groups.length:0,
+      nrr:null,
+      exp:src.upsell_outlet_detail?src.upsell_outlet_detail.outlet_gmv||0:null,
+      ho: src.handover_detail?src.handover_detail.accounts:0
+    };
+    return '<div class="cds-tabs">'+CDS_TABS.map(function(t){
+      var active=t.key===activeKey?'active':'';
+      var sub=counts[t.key]!==null?'<br><span style="font-size:8px;opacity:.6">'+counts[t.key]+'</span>':'';
+      return '<button class="cds-tab '+t.cls+' '+active+'" onclick="_cdsSetTab(\''+t.key+'\')">'
+        +esc(t.label)+sub+'</button>';
+    }).join('')+'</div>';
+  }
+
+  // ── Zone C: column header templates ──────────────────────────────────
+  var CDS_COL_DEFS={
+    p1: [{l:'OUTLET'},{l:'GMV',r:1},{l:'COMM',r:1}],
+    p3: [{l:'OUTLET'},{l:'ฐาน',r:1},{l:'เพิ่ม',r:1},{l:'COMM',r:1}],
+    nrr:[{l:'OUTLET'},{l:'ฐาน',r:1},{l:'RUN RATE',r:1},{l:'MTD',r:1}],
+    exp:[{l:'OUTLET/ACCOUNT'},{l:'สาขา',r:1},{l:'GMV',r:1},{l:'COMM',r:1}],
+    ho: [{l:'ACCOUNT'},{l:'ฐาน',r:1},{l:'MTD',r:1},{l:'RET%',r:1}]
+  };
+  function _cdsTblHeadHtml(tabKey){
+    var cols=CDS_COL_DEFS[tabKey]||CDS_COL_DEFS.p1;
+    return '<div class="cds-tbl-head '+tabKey+'-cols">'
+      +cols.map(function(c){return'<span class="cds-th'+(c.r?' r':'')+'">'+(c.l||'')+'</span>';}).join('')
+      +'</div>';
+  }
+
+  // ── Zone C: accordion chip row ────────────────────────────────────────
+  function _cdsChipRowHtml(id, name, meta, val, valCls, open){
+    return '<div class="cds-chip-row'+(open?' open':'')+'" id="'+id+'" onclick="_cdsToggleRow(\''+id+'\')">'
+      +'<span class="cds-chip-chev">&#8250;</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div class="cds-chip-name">'+esc(name)+'</div>'
+      +(meta?'<div class="cds-chip-meta">'+esc(meta)+'</div>':'')
+      +'</div>'
+      +'<span class="cds-chip-val '+valCls+'">'+esc(val)+'</span>'
+      +'</div>'
+      +'<div class="cds-sub-rows'+(open?' open':'')+'" id="'+id+'-sub">';
+      // sub-rows injected here by each tab renderer
+  }
+  function _cdsChipRowClose(){ return '</div>'; }
+
+  // ── Zone C: sub-row (grid columns) ────────────────────────────────────
+  // cells = [{text, cls}]
+  function _cdsSubRowHtml(cells, tabKey){
+    return '<div class="cds-sub-row '+tabKey+'-cols">'
+      +cells.map(function(c){
+        return'<span class="'+(c.cls||'cds-val v-muted')+'">'+esc(c.text||'')+'</span>';
+      }).join('')
+      +'</div>';
+  }
+
+  // ── Zone C: proof card ────────────────────────────────────────────────
+  // rows = [{label, result, pass}]  pass=true/false/null(neutral)
+  function _cdsProofHtml(id, rows){
+    return '<div class="cds-proof" id="proof-'+id+'">'
+      +rows.map(function(r){
+        var resCls='cds-proof-result'+(r.pass===true?' pass':r.pass===false?' fail':'');
+        return'<div class="cds-proof-row">'
+          +'<span class="cds-proof-label">'+esc(r.label)+'</span>'
+          +'<span class="'+resCls+'">'+esc(r.result)+'</span>'
+          +'</div>';
+      }).join('')
+      +'</div>';
+  }
+
+  // ── Zone D: Total + Footer ─────────────────────────────────────────────
+  function _cdsTotalHtml(label, val, valCls){
+    return '<div class="cds-total">'
+      +'<span class="cds-total-label">'+esc(label)+'</span>'
+      +'<span class="cds-total-val '+valCls+'">'+esc(val)+'</span>'
+      +'</div>';
+  }
+  function _cdsFooterHtml(showExport, exportFn){
+    return '<div class="cds-footer">'
+      +(showExport?'<button class="cds-btn primary" onclick="'+esc(exportFn||'')+'">↓ Export CSV</button>':'')
+      +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
+      +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">History</button>'
+      +'</div>';
+  }
+
+  // ── Zone C: placeholder (shown while tab renderer not yet built) ──────
+  function _cdsTabPlaceholder(label){
+    return '<div class="cds-empty">'+esc(label)+'<br>'
+      +'<span style="font-size:10px;opacity:.5">coming next session</span></div>';
+  }
+
+  // ── Row toggle (accordion) ────────────────────────────────────────────
+  window._cdsToggleRow=function(id){
+    var row=document.getElementById(id);
+    var sub=document.getElementById(id+'-sub');
+    if(!row||!sub)return;
+    var open=row.classList.toggle('open');
+    sub.classList.toggle('open',open);
+    var btn=document.getElementById('cds-toggle-btn');
+    if(btn){
+      var anyOpen=document.getElementById('cds-body').querySelectorAll('.cds-sub-rows.open').length>0;
+      btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+    }
+  };
+  window._cdsToggleAll=function(){
+    var body=document.getElementById('cds-body');
+    if(!body)return;
+    var chips=Array.from(body.querySelectorAll('.cds-chip-row'));
+    var subs=Array.from(body.querySelectorAll('.cds-sub-rows'));
+    var anyOpen=subs.some(function(s){return s.classList.contains('open');});
+    chips.forEach(function(c){c.classList.toggle('open',!anyOpen);});
+    subs.forEach(function(s){s.classList.toggle('open',!anyOpen);});
+    var btn=document.getElementById('cds-toggle-btn');
+    if(btn)btn.textContent=anyOpen?'ขยายทั้งหมด':'ย่อทั้งหมด';
+  };
+
+  // ── Tab switch ────────────────────────────────────────────────────────
+  window._cdsSetTab=function(key){
+    window._cdsActiveTab=key;
+    var ov=document.getElementById('cds-overlay');
+    if(!ov)return;
+    // update chips active
+    ov.querySelectorAll('.cds-chip').forEach(function(c){
+      c.classList.toggle('active',c.classList.contains('t-'+key));
+    });
+    // update tabs active
+    ov.querySelectorAll('.cds-tab').forEach(function(c){
+      c.classList.toggle('active',c.classList.contains('t-'+key));
+    });
+    // re-render Zone C
+    var src=window._cdsSrc||{loading:true,final:0,nrr:0,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false};
+    _cdsRenderZoneC(key, src);
+    var body=document.getElementById('cds-body');
+    if(body)body.scrollTop=0;
+  };
+
+  // ── Zone C dispatcher (stubs replaced per session) ────────────────────
+  function _cdsRenderZoneC(key, src){
+    var head=document.getElementById('cds-tbl-head-slot');
+    var meta=document.getElementById('cds-meta-slot');
+    var body=document.getElementById('cds-body');
+    var total=document.getElementById('cds-total-slot');
+    if(!body)return;
+
+    var t=CDS_TABS.find(function(x){return x.key===key;})||CDS_TABS[0];
+
+    // Column header — update class + innerHTML in place
+    if(head){
+      var cols=CDS_COL_DEFS[key]||CDS_COL_DEFS.p1;
+      head.className='cds-tbl-head '+key+'-cols';
+      head.innerHTML=cols.map(function(c){
+        return'<span class="cds-th'+(c.r?' r':'')+'">'+(c.l||'')+'</span>';
+      }).join('');
+    }
+
+    // Delegate to tab-specific renderer when available
+    var fn=window['_cdsRender_'+key];
+    if(typeof fn==='function'){
+      fn(src, body, meta, total);
+      return;
+    }
+    // Placeholder
+    if(meta)meta.innerHTML='';
+    body.innerHTML=_cdsTabPlaceholder(t.label);
+    if(total)total.innerHTML=_cdsTotalHtml('รวม '+t.label,'—',t.valCls);
+  }
+
+  // ── Main open ──────────────────────────────────────────────────────────
+  function _cdsOpen(){
+    if(typeof _commBuildKamSelfState!=='function')return;
+    var st=_commBuildKamSelfState();
+    if(!st)return;
+
+    // Build src (same logic as v210k buildSources)
+    var nrr=Number(st.payout||0);
+    var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
+    if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&typeof _commBuildKamPayout==='function'){
+      try{
+        var p=_commBuildKamPayout(st.email);
+        if(p){
+          src.upsell_sku=Number((p.upsell_sku&&p.upsell_sku.total_comm)||0);
+          src.upsell_outlet=Number((p.upsell_outlet&&p.upsell_outlet.commission)||0);
+          src.handover=Number((p.handover&&p.handover.payout)||0);
+          src.gate_cap=Number(p.gate_cap||1);
+          src.gate_active=!!(p.gate&&p.gate.gate_active);
+          src.gate=p.gate;
+          src.upsell_sku_detail=p.upsell_sku;
+          src.upsell_outlet_detail=p.upsell_outlet;
+          src.handover_detail=p.handover;
+          src.final=Math.round((nrr+src.upsell_sku+src.upsell_outlet+src.handover)*src.gate_cap);
+        }
+      }catch(e){ console.warn('[cds] buildSrc error',e); }
+    }else if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
+      src.loading=true;
+      if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
+    }
+
+    window._cdsSrc=src;
+    window._cdsKamSt=st;
+    var activeKey=window._cdsActiveTab||'p1';
+
+    // Build overlay + sheet HTML
+    var html='<div class="cds-overlay on" id="cds-overlay" onclick="if(event.target===this)_cdsClose()">'
+      +'<div class="cds-sheet">'
+      +'<div class="cds-handle"><div></div></div>'
+      +_cdsSummaryHtml(src, activeKey)
+      +_cdsTabBarHtml(src, activeKey)
+      // Zone C slots (id hooks for _cdsRenderZoneC)
+      +'<div id="cds-meta-slot"></div>'
+      +'<div class="cds-tbl-head" id="cds-tbl-head-slot"></div>'
+      +'<div class="cds-body" id="cds-body"></div>'
+      +'<div id="cds-total-slot"></div>'
+      +_cdsFooterHtml(
+          src.upsell_sku>0||src.upsell_outlet>0,
+          '_cdsExportCSV&&_cdsExportCSV()'
+        )
+      +'</div></div>';
+
+    // Inject into DOM
+    var existing=document.getElementById('cds-overlay');
+    if(existing)existing.remove();
+    var tmp=document.createElement('div');
+    tmp.innerHTML=html;
+    document.body.appendChild(tmp.firstElementChild);
+
+    // Render Zone C
+    _cdsRenderZoneC(activeKey, src);
+
+    // Animate in
+    requestAnimationFrame(function(){
+      var ov=document.getElementById('cds-overlay');
+      if(ov)ov.classList.add('on');
+    });
+  }
+
+  // ── Close ──────────────────────────────────────────────────────────────
+  function _cdsClose(){
+    var ov=document.getElementById('cds-overlay');
+    if(!ov)return;
+    ov.classList.remove('on');
+    setTimeout(function(){ov.remove();},280);
+  }
+
+  // ── Wire up: replace old openCompactSheet ────────────────────────────
+  window._commOpenKamSelfSheet=_cdsOpen;
+  window._cdsOpen=_cdsOpen;
+  window._cdsClose=_cdsClose;
+  try{ _commOpenKamSelfSheet=_cdsOpen; }catch(e){}
+
+  // Expose template helpers for later sessions
+  window._cdsHtml={
+    chipRow:_cdsChipRowHtml,chipRowClose:_cdsChipRowClose,
+    subRow:_cdsSubRowHtml,proof:_cdsProofHtml,
+    total:_cdsTotalHtml,footer:_cdsFooterHtml,
+    fmt:fmt,esc:esc,tabs:CDS_TABS,colDefs:CDS_COL_DEFS
+  };
+
+})();
+
+
+//////////////////////////////////////////////////////////////////////////////
 
 // ── [v211] Commission snapshot hardening + admin guards ─────────────
 // PATCH: freshket-v211-commission-snapshot-hardening-js
