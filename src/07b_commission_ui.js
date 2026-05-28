@@ -3937,6 +3937,7 @@ function _cdsFormulaContent(key) {
 // ── Level 2 header: back button + tab cards + formula bar ─────────────────
 window._cdsRenderL2Header = function(key, src) {
   var fmt = window._cdsHtml ? window._cdsHtml.fmt : function(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000)return'฿'+Math.round(n/1000)+'K';return'฿'+Math.round(n);};
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   var amounts = {
     p1: src.upsell_sku_detail&&src.upsell_sku_detail.p1 ? Number(src.upsell_sku_detail.p1.comm||0) : 0,
     p3: src.upsell_sku_detail&&src.upsell_sku_detail.p3 ? Number(src.upsell_sku_detail.p3.comm||0) : 0,
@@ -3984,6 +3985,7 @@ window._cdsRenderL1 = function(src, st) {
   if(!body) return;
   src = src || {}; st = st || {};
   var h   = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   var fmt = h ? h.fmt : function(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'฿'+Math.round(n/1000)+'K';return'฿'+Math.round(n);};
   var esc = h ? h.esc : function(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});};
 
@@ -4098,6 +4100,7 @@ window._cdsRenderL1 = function(src, st) {
 
 window._cdsRender_p1 = function(src, body, meta, totalEl) {
   var h = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   if (!h) return;
 
   function cfg(k, p, d) {
@@ -4186,6 +4189,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
 
 window._cdsRender_p3 = function(src, body, meta, totalEl) {
   var h = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   if (!h) return;
 
   function cfg(k, p, d) {
@@ -4281,6 +4285,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
 
 window._cdsRender_exp = function(src, body, meta, totalEl) {
   var h = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   if (!h) return;
 
   function cfg(k, p, d) {
@@ -4386,6 +4391,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
 
 window._cdsRender_ho = function(src, body, meta, totalEl) {
   var h = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   if (!h) return;
 
   function cfg(k, p, d) {
@@ -4471,6 +4477,7 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
 
 window._cdsRender_nrr = function(src, body, meta, totalEl) {
   var h   = window._cdsHtml;
+  var fmtFull = (window._cdsHtml && window._cdsHtml.fmtFull) ? window._cdsHtml.fmtFull : function(n){n=Number(n||0);return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0';};
   var st  = window._cdsKamSt || {};
   if (!h) return;
   var fmt = h.fmt;
