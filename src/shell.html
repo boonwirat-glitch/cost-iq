@@ -4042,8 +4042,8 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 /* ── Zone C: Meta + Table ───────────────────────────────────────────────── */
 .cds-meta{display:flex;align-items:center;gap:8px;padding:7px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
 .cds-meta-text{font-size:11px;color:rgba(225,238,255,.72);flex:1;font-weight:600;}
-.cds-toggle-btn{font-size:11px;font-weight:700;color:rgba(225,238,255,.65);background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:8px;padding:5px 10px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s;}
-.cds-toggle-btn:hover{background:rgba(188,215,255,.14);color:rgba(225,238,255,.88);}
+.cds-toggle-btn{font-size:11px;font-weight:700;color:rgba(225,238,255,.65);background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:8px;padding:5px 10px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap;flex-shrink:0;transition:background .15s;}
+.cds-toggle-btn:hover{background:rgba(188,215,255,.14);}
 
 /* column header */
 .cds-tbl-head{display:grid;padding:6px 16px;border-bottom:1px solid rgba(255,255,255,.09);flex-shrink:0;background:rgba(255,255,255,.02);}
@@ -4342,10 +4342,10 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 /* NRR ctx next-note: right-aligned under payout */
 .cds-nrr-ctx-next-inline{font-size:9px;font-weight:700;color:rgba(255,224,138,.72);margin-top:3px;text-align:right;line-height:1.3;font-family:'IBM Plex Sans Thai',sans-serif;}
 
-/* ── NRR chip: account-level summary (visible collapsed, hidden expanded) ── */
-.ncs-chip-summary{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px;}
-.ncs-chip-summary span{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(225,238,255,.55);white-space:nowrap;}
-.ncs-chip-summary span b{color:rgba(225,238,255,.80);font-weight:700;}
+/* NRR chip: account summary (visible collapsed, hidden expanded) */
+.ncs-chip-summary{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:6px;}
+.ncs-chip-summary span{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(225,238,255,.58);white-space:nowrap;}
+.ncs-chip-summary span b{font-weight:700;}
 .ncs-chip.open .ncs-chip-summary{display:none;}
 
 /* 4) Native-app containment. */
