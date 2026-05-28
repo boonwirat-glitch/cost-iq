@@ -82,19 +82,6 @@ const _TGT_CACHE_TTL = 5 * 60 * 1000; // 5 min TTL — fresh enough for a sessio
 // ══════════════════════════════════════════════════════════════
 
 // ── Config helpers ──────────────────────────────────────────────
-// ── Design tokens: commission component colors (single source of truth) ──────
-const _COMM_TOKENS = {
-  nrr:       { hero:'#4ddc97', border:'rgba(77,220,151,.2)',   fill:'rgba(77,220,151,.06)',  dot:'rgba(77,220,151,.9)'  },
-  uplift:    { hero:'#ffe08a', border:'rgba(255,224,138,.2)',  fill:'rgba(255,224,138,.06)', dot:'rgba(255,224,138,.9)' },
-  expansion: { hero:'#00c8b0', border:'rgba(0,200,176,.2)',    fill:'rgba(0,200,176,.06)',   dot:'rgba(0,200,176,.9)'   },
-  handover:  { hero:'#70a8ff', border:'rgba(112,168,255,.2)', fill:'rgba(112,168,255,.05)', dot:'rgba(112,168,255,.8)' },
-  comm:      '#ffe08a',
-  muted:     'rgba(188,215,255,.35)',
-  text:      'rgba(225,238,255,.88)',
-  sub:       'rgba(225,238,255,.40)',
-};
-window._COMM_TOKENS = _COMM_TOKENS;
-
 // _commGetConfig: read component param from target_settings (loaded in _tgtSettings).
 // Key pattern: '{metricCode}_params' → JSON object → paramName
 // Falls back to hardcoded default so the app never returns NaN.
