@@ -170,8 +170,10 @@ transfers_lm AS (
     p.lm_label                                     AS transfer_month,
     p.lm_days                                      AS baseline_days
   FROM ka_owner_lm lm, params p
-  LEFT JOIN ka_owner_m2 m2    USING (account_id)
-  LEFT JOIN prev_owner_for_lm po USING (account_id)
+  LEFT JOIN ka_owner_m2 m2
+    ON lm.account_id = m2.account_id
+  LEFT JOIN prev_owner_for_lm po
+    ON lm.account_id = po.account_id
   -- เฉพาะ KAM ใน active list
   JOIN current_kam_list k ON LOWER(TRIM(lm.ka_owner)) = LOWER(TRIM(k.kam_name))
   WHERE
@@ -196,7 +198,8 @@ transfers_m2 AS (
   JOIN `freshket-rn.dwh.order` o
     ON CAST(o.account_id AS STRING) = m2.account_id
     AND o.delivery_date BETWEEN p.m2_start AND p.m2_end
-  LEFT JOIN prev_owner_for_m2 po USING (account_id)
+  LEFT JOIN prev_owner_for_m2 po
+    ON m2.account_id = po.account_id
   JOIN current_kam_list k ON LOWER(TRIM(m2.ka_owner)) = LOWER(TRIM(k.kam_name))
   WHERE
     LOWER(TRIM(m2.ka_owner)) != LOWER(TRIM(COALESCE(po.prev_kam, '')))
@@ -227,9 +230,9 @@ combined AS (
     p.cm_days                                             AS perf_days_in_month,
     t.baseline_days                                       AS baseline_days_in_month
   FROM transfers_lm t, params p
-  LEFT JOIN gmv_lm lm USING (account_id)
-  LEFT JOIN gmv_cm cm USING (account_id)
-  LEFT JOIN current_with_kam cw USING (account_id)
+  LEFT JOIN gmv_lm lm ON t.account_id = lm.account_id
+  LEFT JOIN gmv_cm cm ON t.account_id = cm.account_id
+  LEFT JOIN current_with_kam cw ON t.account_id = cw.account_id
 
   UNION ALL
 
@@ -252,10 +255,10 @@ combined AS (
     p.lm_days                                             AS perf_days_in_month,
     t.baseline_days                                       AS baseline_days_in_month
   FROM transfers_m2 t, params p
-  LEFT JOIN gmv_m2 m2 USING (account_id)
-  LEFT JOIN gmv_lm lm USING (account_id)
-  LEFT JOIN gmv_cm cm USING (account_id)
-  LEFT JOIN current_with_kam cw USING (account_id)
+  LEFT JOIN gmv_m2 m2 ON t.account_id = m2.account_id
+  LEFT JOIN gmv_lm lm ON t.account_id = lm.account_id
+  LEFT JOIN gmv_cm cm ON t.account_id = cm.account_id
+  LEFT JOIN current_with_kam cw ON t.account_id = cw.account_id
 )
 
 SELECT
