@@ -1494,7 +1494,10 @@
       if(!kamName || !accountId) return;
       var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
       rows.push(row);
-      byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
+      // ถ้า account นี้มีหลาย outlet: ให้ SALE prevOwner มาก่อนเสมอ (ไม่ overwrite ด้วย non-SALE)
+      if (!byAccountId[accountId] || (row.prevOwner||'').toUpperCase()==='SALE') {
+        byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
+      }
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
       if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
     });
