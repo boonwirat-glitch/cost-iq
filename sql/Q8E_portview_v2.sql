@@ -69,7 +69,13 @@ kam_outlets AS (
 -- ใช้ staff_owner_email prefix เพื่อ map TL (ถ้ามี tl_email field ให้เปลี่ยนตรงนี้)
 -- ปัจจุบัน map จาก kam_email → tl_email ผ่าน logic ที่รู้
 tl_map AS (
-  SELECT kam_name, kam_email, tl_email FROM UNNEST([
+  SELECT kam_name, kam_email, tl_email,
+    CASE
+      WHEN tl_email = 'nitipat.s@freshket.co'   THEN 'Nitipat (Art) Sriwichai'
+      WHEN tl_email = 'pavarisa.mu@freshket.co' THEN 'Pavarisa (Ploiiy) Muangtaeng'
+      ELSE ''
+    END AS tl_name
+  FROM UNNEST([
     STRUCT('Anusorn (Bookbig) Khamphasuk'         AS kam_name, 'anusorn.k@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Chaklid (Dent) Nimraor'               AS kam_name, 'chaklid.n@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Duangruedee (Ning) Bulalom'           AS kam_name, 'duangruedee.bu@freshket.co' AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
