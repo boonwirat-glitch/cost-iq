@@ -10491,7 +10491,9 @@ function handleFileUpload(type,input){
           const row={movementMonth,movementType,userId,accountId,accountName,accountType,
                      kamName,kamEmail,ownerFromType,ownerFromName,baselineGmv,currentGmv,confidence};
           rows.push(row);
-          byAccountId[accountId]=row;
+          // v252: transfer_in wins — account ที่มีทั้ง transfer_in และ transfer_out outlet
+          // ให้ classify เป็น transfer_in เสมอ (รับเข้ามาแล้ว บางส่วนออกไปก็ยังนับว่า transfer_in)
+          if(!byAccountId[accountId] || row.movementType==='transfer_in'){byAccountId[accountId]=row;}
           if(!byMovementType[movementType])byMovementType[movementType]=[];
           byMovementType[movementType].push(row);
           if(kamName){if(!byKamName[kamName])byKamName[kamName]=[];byKamName[kamName].push(row);}
