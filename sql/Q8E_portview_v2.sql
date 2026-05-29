@@ -69,21 +69,22 @@ kam_outlets AS (
 -- ใช้ staff_owner_email prefix เพื่อ map TL (ถ้ามี tl_email field ให้เปลี่ยนตรงนี้)
 -- ปัจจุบัน map จาก kam_email → tl_email ผ่าน logic ที่รู้
 tl_map AS (
-  SELECT kam_email, tl_email, tl_name FROM UNNEST([
-    STRUCT('anusorn.k@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('chaklid.n@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('duangruedee.bu@freshket.co' AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('guntinun.t@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('intuon.y@freshket.co'       AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('napat.k@freshket.co'        AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co'    AS tl_email, 'Pavarisa (Ploiiy) Muangtaeng'         AS tl_name),
-    STRUCT('nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name),
-    STRUCT('ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name),
-    STRUCT('puttipong.w@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name),
-    STRUCT('rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name),
-    STRUCT('siriprapa.p@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name),
-    STRUCT('warissara.c@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'      AS tl_email, 'Nitipat (Art) Sriwichai'              AS tl_name)
+  SELECT kam_name, kam_email, tl_email FROM UNNEST([
+    STRUCT('Anusorn (Bookbig) Khamphasuk'         AS kam_name, 'anusorn.k@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Chaklid (Dent) Nimraor'               AS kam_name, 'chaklid.n@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Duangruedee (Ning) Bulalom'           AS kam_name, 'duangruedee.bu@freshket.co' AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Guntinun (Monet) Thanoochan'          AS kam_name, 'guntinun.t@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Intuon (Jane) Yanakit'                AS kam_name, 'intuon.y@freshket.co'       AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Napat (To) Kaikaew'                   AS kam_name, 'napat.k@freshket.co'        AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Natchita (Foam) Bunkong'              AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Niracha (Cream) Sangka'               AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Nuttawan (Kwang) Mahaporn'            AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Pavarisa (Ploiiy) Muangtaeng'         AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon' AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Puttipong (Tape) Wanithaweewat'       AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Rinlaphat (Mild) Setthasiriwuti'      AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email)
   ])
 ),
 
