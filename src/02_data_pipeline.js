@@ -796,6 +796,53 @@ function handleFileUpload(type,input){
     };reader.readAsText(file);return;
   }
   // Unknown type — ignore silently
+  
+  // ── bulk-current-movements (Q11: portview_current_movements.csv) ──
+  // Source for Portview movement cards: new_sales, transfer_in, sales_to_kam, transfer_out
+  // Non-critical: Portview shows graceful fallback if not loaded
+  if(type==='bulk-current-movements'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        const byAccountId={},byMovementType={},byKamName={},byKamEmail={},rows=[];
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          const movementMonth=(p[0]||'').trim();
+          const movementType=(p[1]||'').trim();
+          const userId=(p[2]||'').trim();
+          const accountId=normId(p[3]);
+          const accountName=(p[4]||'').trim();
+          const accountType=(p[5]||'').trim();
+          const kamName=(p[6]||'').trim();
+          const kamEmail=(p[7]||'').trim();
+          const ownerFromType=(p[8]||'').trim();
+          const ownerFromName=(p[9]||'').trim();
+          const baselineGmv=parseFloat(p[12])||0;
+          const currentGmv=parseFloat(p[13])||0;
+          const confidence=(p[19]||'').trim();
+          if(!movementType||!accountId) return;
+          const row={movementMonth,movementType,userId,accountId,accountName,accountType,
+                     kamName,kamEmail,ownerFromType,ownerFromName,baselineGmv,currentGmv,confidence};
+          rows.push(row);
+          byAccountId[accountId]=row;
+          if(!byMovementType[movementType])byMovementType[movementType]=[];
+          byMovementType[movementType].push(row);
+          if(kamName){if(!byKamName[kamName])byKamName[kamName]=[];byKamName[kamName].push(row);}
+          if(kamEmail){if(!byKamEmail[kamEmail])byKamEmail[kamEmail]=[];byKamEmail[kamEmail].push(row);}
+        });
+        window.bulkCurrentMovementData={rows,byAccountId,byMovementType,byKamName,byKamEmail,
+                                        loadedAt:Date.now(),version:DATA_VERSION};
+        const b2=document.getElementById('badge-current_movements');
+        if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
+        const sl2=document.getElementById('slot-current_movements');
+        if(sl2)sl2.style.borderColor='var(--g500)';
+        console.log('[Freshket Sense] current movements loaded',{rows:rows.length,types:Object.keys(byMovementType)});
+        try{if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(200);}catch(e){}
+      }catch(err){console.warn('[Freshket Sense] current_movements parse failed',err);}
+      _done();
+    };reader.readAsText(file);return;
+  }
   // ── bulk-handover (Q10: portview_handover.csv) ──
   if(type==='bulk-handover'){
     const reader=new FileReader();
@@ -1098,7 +1145,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',current_movements:'portview_current_movements.csv'};
 const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
   portview:{type:'portview-bulk',tab:'portview',cache:false}, // Level 3: always fetch — changes daily
@@ -1113,6 +1160,7 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   price:{type:'bulk-price',tab:'price',cache:false,heavy:false},
   // Q10: transfer-out per KAM
   handover:{type:'bulk-handover',tab:'handover',cache:true},
+  current_movements:{type:'bulk-current-movements',tab:'current_movements',cache:true},
   // Q3C team summary: pre-computed P1/P3 totals per KAM for TL multiplier
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
 };
