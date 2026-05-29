@@ -1559,8 +1559,8 @@
       else acc.push(Object.assign({prevTotal:0,currTotal:0,outlets:[]},g));
       return acc;
     },[]).map(function(g){
-      var h=lookupHandover(g.acctId);
-      if(h && key!=='mv-new'){g.prevTotal=Number(h.lastMonthGmv||g.prevTotal||0); if(!g.currTotal)g.currTotal=Number(h.curMonthGmv||0);}
+      // v251: removed lookupHandover GMV override — portview_handover.csv is Apr commission data
+      // Portview movement prevTotal comes from actual order GMV, not Apr commission baseline
       return g;
     }).sort(function(a,b){return (b.currTotal||0)-(a.currTotal||0);});
     return{kind:'movement',title:title,thai:thai,color:color,count:grp.count||0,gmv:grp.gmv||0,nrr:grp.nrr,groups:groups};
