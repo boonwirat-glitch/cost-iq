@@ -126,8 +126,7 @@ gmv_baseline AS (
 
 -- ── Final output ──────────────────────────────────────────────
 SELECT
-  ko.res_id,
-  ko.account_id,
+  ko.account_id,   -- p[0]: account_guid — app key (res_id used internally for JOIN only)
   ko.account_name,
   ko.res_name,
   ko.account_type,
