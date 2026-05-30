@@ -29,7 +29,6 @@ kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'              AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'               AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'            AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'         AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'       AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'      AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
     STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email),
@@ -55,29 +54,11 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, k.kam_email, 2 AS _pri
-  FROM `freshket-rn.dwh.order` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL
-         OR um.staff_owner_email IS NULL
-         OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_accounts AS (
   SELECT account_id, kam_email
-  FROM (
-    SELECT * FROM master_kam_accounts
-    UNION ALL
-    SELECT * FROM order_fallback_accounts
-  )
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  FROM master_kam_accounts
 ),
 
 -- Outlet status (existing / expansion / comeback)
