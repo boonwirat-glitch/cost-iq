@@ -48,8 +48,7 @@ master_kam_accounts AS (
     AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
-  SELECT account_id FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  SELECT account_id FROM master_kam_accounts
 ),
 
 raw AS (

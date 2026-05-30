@@ -1,4 +1,4 @@
-<!-- Freshket Sense v253: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v254: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v253',
+      version: 'v254',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -13543,8 +13543,7 @@ master_kam_accounts AS (
     AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
-  SELECT account_id FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  SELECT account_id FROM master_kam_accounts
 ),
 mtd_items AS (
   SELECT
@@ -13703,8 +13702,7 @@ master_kam_accounts AS (
     AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
-  SELECT account_id FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  SELECT account_id FROM master_kam_accounts
 ),
 
 raw AS (
@@ -14043,8 +14041,7 @@ master_kam_accounts AS (
     AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
-  SELECT account_id FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  SELECT account_id FROM master_kam_accounts
 ),
 
 raw AS (
@@ -14161,8 +14158,7 @@ master_kam_accounts AS (
     AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
-  SELECT account_id FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  SELECT account_id FROM master_kam_accounts
 ),
 
 
