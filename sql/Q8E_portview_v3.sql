@@ -75,7 +75,7 @@ kam_outlets AS (
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
     AND um.res_id IS NOT NULL
     AND um.account_guid IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (
@@ -131,7 +131,7 @@ last_order_owner_outlet AS (
   SELECT CAST(user_id AS STRING) AS res_id,
          ka_owner AS last_order_kam
   FROM `freshket-rn.dwh.order`
-  WHERE account_type IN ('SA','MC','Chain')
+  WHERE account_type IN ('SA','MC','Chain','Unknown')
   QUALIFY ROW_NUMBER() OVER (PARTITION BY CAST(user_id AS STRING) ORDER BY delivery_date DESC) = 1
 ),
 
