@@ -1275,7 +1275,6 @@ kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
@@ -1303,28 +1302,11 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, k.kam_name, k.kam_email, k.tl_email, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
-  FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  FROM master_kam_accounts
 ),
 
 -- Last month GMV — เฉพาะ accounts ใน mapping
@@ -1448,7 +1430,7 @@ last_known_order_owner AS (
     ka_owner AS last_order_kam,
     delivery_date AS last_order_date
   FROM \`dwh.order\`
-  WHERE account_type IN ('SA','MC','Chain')
+  WHERE account_type IN ('SA','MC','Chain','Unknown')
   QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY delivery_date DESC) = 1
 )
 
@@ -1514,7 +1496,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
@@ -1542,28 +1523,11 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, k.kam_name, k.kam_email, k.tl_email, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
-  FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  FROM master_kam_accounts
 ),
 
 -- res_primary: for each (KAM, res_name), find the primary account_id
@@ -1628,7 +1592,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
@@ -1656,23 +1619,7 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id FROM kam_map_src
@@ -1722,7 +1669,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
@@ -1750,28 +1696,11 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, k.kam_name, k.kam_email, k.tl_email, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
-  FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  FROM master_kam_accounts
 ),
 -- v3: max_date caps current month at latest pipeline data (avoids 1-day lag overcounting)
 params AS (
@@ -1823,7 +1752,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
@@ -1851,23 +1779,7 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id FROM kam_map_src
@@ -2010,7 +1922,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
@@ -2038,28 +1949,11 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, k.kam_name, k.kam_email, k.tl_email, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id, kam_name, kam_email, tl_email
-  FROM kam_map_src
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY _pri ASC) = 1
+  FROM master_kam_accounts
 ),
 
 account_items AS (
@@ -2198,7 +2092,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
@@ -2226,23 +2119,7 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id FROM kam_map_src
@@ -2333,7 +2210,6 @@ WITH kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
@@ -2361,23 +2237,7 @@ master_kam_accounts AS (
   FROM user_master_current um
   JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain')
-),
-order_fallback_accounts AS (
-  SELECT o.account_id, 2 AS _pri
-  FROM \`freshket-rn.dwh.order\` o
-  JOIN kam_list k ON o.ka_owner = k.kam_name
-  LEFT JOIN user_master_current um ON um.account_guid = o.account_id
-  WHERE o.account_type IN ('SA','MC','Chain')
-    AND o.commercial_owner = 'KAM'
-    AND o.delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
-    AND (um.account_guid IS NULL OR um.staff_owner_email IS NULL OR TRIM(um.staff_owner_email) = '')
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id ORDER BY o.delivery_date DESC) = 1
-),
-kam_map_src AS (
-  SELECT * FROM master_kam_accounts
-  UNION ALL
-  SELECT * FROM order_fallback_accounts
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
 ),
 kam_map AS (
   SELECT account_id FROM kam_map_src
@@ -2452,7 +2312,6 @@ current_kam_list AS (
     STRUCT('Natchita (Foam) Bunkong'                AS kam_name, 'natchita.b@freshket.co'     AS kam_email),
     STRUCT('Niracha (Cream) Sangka'                 AS kam_name, 'niracha.s@freshket.co'      AS kam_email),
     STRUCT('Nuttawan (Kwang) Mahaporn'              AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email),
-    STRUCT('Pavarisa (Ploiiy) Muangtaeng'           AS kam_name, 'pavarisa.mu@freshket.co'    AS kam_email),
     STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon'   AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email),
     STRUCT('Puttipong (Tape) Wanithaweewat'         AS kam_name, 'puttipong.w@freshket.co'    AS kam_email),
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'        AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email),
@@ -2490,7 +2349,7 @@ current_master_owner AS (
   FROM user_master_current um
   LEFT JOIN current_kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
-  WHERE um.account_type IN ('SA', 'MC', 'Chain')
+  WHERE um.account_type IN ('SA', 'MC', 'Chain', 'Unknown')
 ),
 
 last_month_kam AS (
@@ -2507,7 +2366,7 @@ last_month_kam AS (
     AND o.commercial_owner = 'KAM'
     AND o.ka_owner IS NOT NULL
     AND TRIM(o.ka_owner) != ''
-    AND o.account_type IN ('SA', 'MC', 'Chain')
+    AND o.account_type IN ('SA', 'MC', 'Chain', 'Unknown')
   GROUP BY CAST(o.account_id AS STRING), o.ka_owner
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY account_id
@@ -2521,7 +2380,7 @@ cur_month_gmv AS (
     SUM(o.gmv_ex_vat) AS cur_month_gmv
   FROM \`freshket-rn.dwh.order\` o, params p
   WHERE o.delivery_date BETWEEN p.cm_start AND p.cm_max_date
-    AND o.account_type IN ('SA', 'MC', 'Chain')
+    AND o.account_type IN ('SA', 'MC', 'Chain', 'Unknown')
   GROUP BY CAST(o.account_id AS STRING)
 ),
 
@@ -2534,7 +2393,7 @@ last_known_owner AS (
     o.ka_owner AS last_ka_owner,
     o.delivery_date AS last_order_date
   FROM \`freshket-rn.dwh.order\` o
-  WHERE o.account_type IN ('SA', 'MC', 'Chain')
+  WHERE o.account_type IN ('SA', 'MC', 'Chain', 'Unknown')
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY CAST(o.account_id AS STRING)
     ORDER BY o.delivery_date DESC
