@@ -46,7 +46,7 @@ kam_name_list AS (
     'Duangruedee (Ning) Bulalom','Guntinun (Monet) Thanoochan',
     'Intuon (Jane) Yanakit','Napat (To) Kaikaew',
     'Natchita (Foam) Bunkong','Niracha (Cream) Sangka',
-    'Nuttawan (Kwang) Mahaporn','Pavarisa (Ploiiy) Muangtaeng',
+    'Nuttawan (Kwang) Mahaporn',
     'Ploynitcha (Nitcha) Rujipiromthagoon','Puttipong (Tape) Wanithaweewat',
     'Rinlaphat (Mild) Setthasiriwuti','Siriprapa (Pop) Piapeng',
     'Warissara (Ply) Chanaboon'
@@ -75,7 +75,7 @@ user_master_latest AS (
   FROM `freshket-rn.dim.user_master` um
   WHERE um.res_id IS NOT NULL
     AND um.account_guid IS NOT NULL
-    AND um.account_type IN ('SA','MC','Chain')
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY CAST(um.res_id AS STRING)
     ORDER BY DATE(um.lasted_order_date) DESC NULLS LAST
@@ -101,7 +101,7 @@ order_base AS (
     TRIM(COALESCE(o.staff_owner,'')) AS staff_owner,
     SAFE_CAST(o.gmv_ex_vat AS FLOAT64) AS gmv_ex_vat
   FROM `freshket-rn.dwh.order` o
-  WHERE o.account_type IN ('SA','MC','Chain')
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
     AND o.account_id IS NOT NULL
     AND o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH)
@@ -162,7 +162,7 @@ first_kam_order AS (
     CAST(o.user_id AS STRING) AS user_id,
     MIN(o.delivery_date)      AS first_kam_date
   FROM `freshket-rn.dwh.order` o
-  WHERE o.account_type IN ('SA','MC','Chain')
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
     AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
   GROUP BY 1
@@ -175,7 +175,7 @@ first_any_order AS (
     CAST(o.user_id AS STRING) AS user_id,
     MIN(o.delivery_date)      AS first_any_order_date
   FROM `freshket-rn.dwh.order` o
-  WHERE o.account_type IN ('SA','MC','Chain')
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
   GROUP BY 1
 ),
