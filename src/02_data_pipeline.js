@@ -659,6 +659,17 @@ function handleFileUpload(type,input){
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
         fileStatus.history=true;if(window.RenderBus)window.RenderBus.signal('history'); // v223
       }
+      // History load summary log
+      const _histMonths=new Set();
+      Object.values(bulkHistoryData).forEach(arr=>(arr||[]).forEach(h=>{if(h.m)_histMonths.add(h.m);}));
+      const _mo2=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const _moS=m=>{const p=(m||'').split(' ');return(parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]);};
+      const _sortedHM=Array.from(_histMonths).sort((a,b)=>_moS(a)-_moS(b));
+      const _latestHM=_sortedHM[_sortedHM.length-1]||'—';
+      console.log('%c[Sense] history loaded','color:#4ddc97',
+        {accounts:count, months:_sortedHM.length, latest_month:_latestHM,
+         all_months:_sortedHM.join(', '),
+         note:_latestHM==='พ.ค. 2569'?'⚠️ May in history — NRR gate will FAIL if current=May':'✓'});
       // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
@@ -678,6 +689,12 @@ function handleFileUpload(type,input){
       portviewBulkData=parsePortviewBulk(e.target.result);
       const _pvSample=portviewBulkData.length?portviewBulkData[0].kamEmail:'(none)';
       _senseLog('%c[v206d debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
+      const _pvNonZero=portviewBulkData.filter(a=>a.gmvToDate>0).length;
+      console.log('%c[Sense] portview loaded','color:#4ddc97',
+        {accounts:portviewBulkData.length, gmv_to_date_nonzero:_pvNonZero,
+         days_elapsed:(portviewBulkData[0]&&portviewBulkData[0].daysElapsed)||0,
+         days_in_month:(portviewBulkData[0]&&portviewBulkData[0].daysInMonth)||0,
+         warn:_pvNonZero===0?'⚠️ ALL gmv_to_date=0':'✓'});
       const b=document.getElementById('badge-portview-bulk');
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
@@ -874,6 +891,8 @@ function handleFileUpload(type,input){
         }
       });
       bulkHandoverData={byAccountId,byKamName,byNewKamName};
+      console.log('%c[Sense] handover loaded','color:#4ddc97',{accounts:Object.keys(byAccountId).length,
+        kams:Object.keys(byKamName).length});
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
@@ -1405,9 +1424,11 @@ async function _fetchUpsellBundle(kamEmail){
   const p=(async()=>{
     try{
       const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+      console.log('%c[Sense] upsell bundle fetch','color:#f0b000','→',kamEmail);
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       if(ok){
         _upsellBundleLoaded.add(safeKey);
+        console.log('%c[Sense] upsell bundle ✓','color:#4ddc97',kamEmail);
         // Clear strip cache and force full re-render pipeline
         setTimeout(()=>{
           try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
