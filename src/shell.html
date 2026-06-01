@@ -4897,7 +4897,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     }),
     data: Object.freeze({
       r2Base: R2_BASE,
-      foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover']),
+      foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements']),  // v261: add current_movements
       // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
       criticalKeys: Object.freeze(['portview','history','handover']),
       enhancementKeys: Object.freeze(['categories','sku_current','outlets']),
