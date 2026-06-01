@@ -50,8 +50,11 @@ kam_map AS (
 ),
 -- v3: max_date caps current month at latest pipeline data (avoids 1-day lag overcounting)
 params AS (
-  SELECT (SELECT MAX(delivery_date) FROM `dwh.order`
-          WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)) AS max_date
+  SELECT COALESCE(
+    (SELECT MAX(delivery_date) FROM `dwh.order`
+     WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)),
+    DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)  -- fallback: day-1 lag on month boundary
+  ) AS max_date
 )
 
 SELECT
