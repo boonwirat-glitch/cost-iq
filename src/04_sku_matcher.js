@@ -630,6 +630,9 @@ function setAiProvider(p){
         if(!text){
           const files = getFiles();
           let url = `${getBase()}/${files[tab] || tab + '.csv'}`;
+          if(tab==='current_movements'){
+            console.log('%c[Sense DEBUG] current_movements fetch start','color:#ff0;background:#333',{url, useCache, cached:!!cached});
+          }
           if(networkFirst) url = v212FreshUrl(url, tab);
           try{
             text = await baseData.fetchTextWithTimeout(url, fetchTimeout(spec));
@@ -651,7 +654,14 @@ function setAiProvider(p){
             }
           }
         }
+        if(spec.tab==='current_movements'){
+          console.log('%c[Sense DEBUG] current_movements ingest start','color:#ff0;background:#333',
+            {type:spec.type, textLen:text?text.length:0, source});
+        }
         const ok = await ingestCSVText(spec.type, text, { timeoutMs: ingestTimeout(spec) });
+        if(spec.tab==='current_movements'){
+          console.log('%c[Sense DEBUG] current_movements ingest result','color:#ff0;background:#333',{ok, tab});
+        }
         if(ok){
           markLoaded(tab);
           v212RecordFreshness(tab, { source, bytes:text ? text.length : 0, networkFirst, force, ageMs: source === 'cache' || source === 'offline-cache' ? (cached && cached.ts ? Date.now() - cached.ts : null) : 0 });
