@@ -405,6 +405,12 @@ function _commComputeHandoverRetention(kamEmail) {
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
+    console.log('%c[Sense Handover] retention','color:'+(tier>=2?'#4ddc97':'#aaa')+';font-weight:bold',
+      {kamEmail, accounts:handoverRows.length,
+       baseline_gmv:Math.round(baselineNorm), current_gmv:Math.round(perfNorm),
+       retention_pct:Math.round(retentionPct*10)/10+'%',
+       tier, payout,
+       detail:detail.map(d=>d.name+'  base='+d.baseline+'  curr='+d.current)});
     return {
       accounts:       handoverRows.length,
       baseline_gmv:   Math.round(baselineNorm),
@@ -612,6 +618,12 @@ function _commBuildTlPayout(tlEmail) {
     const upsellMult = _commComputeTeamUpsellMult(tlEmail);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
+    console.log('%c[Sense Comm] ✓ TL payout','color:#b794f4;font-weight:bold',
+      {tlEmail, nrr_pct:pct!==null?pct+'%':'null',
+       nrr_payout:Math.round(nrrPayout||0),
+       upsell_mult:upsellMult.multiplier+'x (tier '+upsellMult.tier+')',
+       team_upsell_pct:(upsellMult.team_upsell_pct||0).toFixed(1)+'%',
+       FINAL:finalPayout});
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
              upsell_mult: upsellMult, final_payout: finalPayout };
   } catch(e) {
