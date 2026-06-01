@@ -1,4 +1,4 @@
-<!-- Freshket Sense v263: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v264: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v263',
+      version: 'v264',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -15525,6 +15525,10 @@ function setAiProvider(p){
     const criticalLoaded = opts.criticalLoaded || 0;
     const specs = getSpecs();
     const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
+    console.log('%c[Sense DEBUG] ENHANCEMENT keys','color:#ff0;background:#333',
+      {ENHANCEMENT:ENHANCEMENT.slice(), keys:keys.slice(), 
+       has_current_movements: ENHANCEMENT.indexOf('current_movements')>=0,
+       spec_current_movements: !!specs['current_movements']});
     if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
     record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
     baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
