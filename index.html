@@ -1,4 +1,4 @@
-<!-- Freshket Sense v256: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v257: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v256',
+      version: 'v257',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -10325,6 +10325,17 @@ function handleFileUpload(type,input){
         if(!D.meta.accountName&&bulkAccountNames[currentAccountId])D.meta.accountName=bulkAccountNames[currentAccountId];
         fileStatus.history=true;if(window.RenderBus)window.RenderBus.signal('history'); // v223
       }
+      // History load summary log
+      const _histMonths=new Set();
+      Object.values(bulkHistoryData).forEach(arr=>(arr||[]).forEach(h=>{if(h.m)_histMonths.add(h.m);}));
+      const _mo2=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const _moS=m=>{const p=(m||'').split(' ');return(parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]);};
+      const _sortedHM=Array.from(_histMonths).sort((a,b)=>_moS(a)-_moS(b));
+      const _latestHM=_sortedHM[_sortedHM.length-1]||'—';
+      console.log('%c[Sense] history loaded','color:#4ddc97',
+        {accounts:count, months:_sortedHM.length, latest_month:_latestHM,
+         all_months:_sortedHM.join(', '),
+         note:_latestHM==='พ.ค. 2569'?'⚠️ May in history — NRR gate will FAIL if current=May':'✓'});
       // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
@@ -10344,6 +10355,12 @@ function handleFileUpload(type,input){
       portviewBulkData=parsePortviewBulk(e.target.result);
       const _pvSample=portviewBulkData.length?portviewBulkData[0].kamEmail:'(none)';
       _senseLog('%c[v206d debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
+      const _pvNonZero=portviewBulkData.filter(a=>a.gmvToDate>0).length;
+      console.log('%c[Sense] portview loaded','color:#4ddc97',
+        {accounts:portviewBulkData.length, gmv_to_date_nonzero:_pvNonZero,
+         days_elapsed:(portviewBulkData[0]&&portviewBulkData[0].daysElapsed)||0,
+         days_in_month:(portviewBulkData[0]&&portviewBulkData[0].daysInMonth)||0,
+         warn:_pvNonZero===0?'⚠️ ALL gmv_to_date=0':'✓'});
       const b=document.getElementById('badge-portview-bulk');
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
@@ -10540,6 +10557,8 @@ function handleFileUpload(type,input){
         }
       });
       bulkHandoverData={byAccountId,byKamName,byNewKamName};
+      console.log('%c[Sense] handover loaded','color:#4ddc97',{accounts:Object.keys(byAccountId).length,
+        kams:Object.keys(byKamName).length});
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
@@ -11071,9 +11090,11 @@ async function _fetchUpsellBundle(kamEmail){
   const p=(async()=>{
     try{
       const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+      console.log('%c[Sense] upsell bundle fetch','color:#f0b000','→',kamEmail);
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       if(ok){
         _upsellBundleLoaded.add(safeKey);
+        console.log('%c[Sense] upsell bundle ✓','color:#4ddc97',kamEmail);
         // Clear strip cache and force full re-render pipeline
         setTimeout(()=>{
           try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
@@ -24752,6 +24773,8 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
 
     const currLabel  = _commCurrentMonthLabel();
     const baseLabel  = _commBaselineMonthLabel();
+    console.log('%c[Sense Upsell] compute','color:#f0b000',
+      {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
     // Config (admin-configurable, with spec defaults)
     const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
@@ -24845,6 +24868,11 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const p1Comm = p1Groups.reduce((s,g) => s + g.commission, 0);
     const p3Incr = p3Groups.reduce((s,g) => s + g.incremental, 0);
     const p3Comm = p3Groups.reduce((s,g) => s + g.commission, 0);
+    console.log('%c[Sense Upsell] ✓ result','color:'+((p1Comm+p3Comm)>0?'#4ddc97':'#aaa')+';font-weight:bold',
+      {kamEmail, currLabel, p1_groups:p1Groups.length, p1_gmv:Math.round(p1Gmv), p1_comm:Math.round(p1Comm),
+       p3_groups:p3Groups.length, p3_incr:Math.round(p3Incr), p3_comm:Math.round(p3Comm),
+       total_comm:Math.round(p1Comm+p3Comm),
+       warn:(p1Groups.length+p3Groups.length)===0?'⚠️ no groups — currLabel not in CSV?':''});
 
     return {
       p1: { gmv: p1Gmv, comm: p1Comm, groups: p1Groups },
@@ -25137,6 +25165,15 @@ function _commBuildKamPayout(kamEmail) {
 
     const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
+    console.log('%c[Sense Comm] ✓ KAM payout','color:#b794f4;font-weight:bold',
+      {kamEmail, nrr_pct:pct!==null?pct+'%':'null',
+       nrr_payout:Math.round(nrrPayout||0),
+       p1_comm:Math.round(upsellSku&&upsellSku.p1&&upsellSku.p1.comm||0),
+       p3_comm:Math.round(upsellSku&&upsellSku.p3&&upsellSku.p3.comm||0),
+       handover_payout:Math.round(handover&&handover.payout||0),
+       subtotal:Math.round(subtotal||0),
+       gate_cap:gate&&gate.cap_multiplier||1,
+       FINAL:finalPayout});
 
     return {
       period, kamEmail,
@@ -27147,8 +27184,7 @@ function _commBuildTeamPreviewGroups() {
 window.debugCommissionRules = function(){
   const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {});
   const assignments = ((_commRuleConfig && _commRuleConfig.assignments) || []);
-  console.table(plans.map(p=>({plan_code:p.plan_code, name:p.plan_name, role:p.beneficiary_role, id:p.id, status:p.status})));
-  console.log('assignments', assignments);
+  // plan/assignment dump removed — use Commission Cockpit UI instead
   return { plans, assignments, pending:_commRulePending };
 };
 
@@ -28491,8 +28527,15 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       currentMonthLabel = _moN[_nd.getMonth()] + ' ' + _yr;
     }
   }
-  if (!currentMonthLabel || !daysElapsed) return null;
-  if (moSort(currentMonthLabel) <= moSort(prevMonth)) return null;
+  if (!currentMonthLabel || !daysElapsed) {
+    console.warn('%c[Sense NRR] ⚠️ no label/days','color:#f08000',{kamEmail,tlEmail,currentMonthLabel,daysElapsed});
+    return null;
+  }
+  const _nrrGatePass = moSort(currentMonthLabel) > moSort(prevMonth);
+  console.log('%c[Sense NRR] gate','color:'+(_nrrGatePass?'#4ddc97':'#ff6b6b')+';font-weight:bold',
+    {scope:kamEmail||('TL:'+tlEmail), currentMonth:currentMonthLabel, prevMonth,
+     gate:_nrrGatePass?'✓ PASS':'✗ FAIL — NRR=null', daysElapsed, accounts:allAccounts.length});
+  if (!_nrrGatePass) return null;
 
   const prevDays = getThaiMonthDays(prevMonth);
   const hasOutlets = typeof bulkOutletsData !== 'undefined' && bulkOutletsData;
@@ -28625,6 +28668,10 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     };
   }
 
+  console.log('%c[Sense NRR] cohort split','color:#4ddc97',
+    {scope:kamEmail||('TL:'+tlEmail), core:coreAccounts.length,
+     transfer_in:transferInAccounts.length, new_sales:newFromSalesAccounts.length,
+     prevMonth, currentMonth:currentMonthLabel, daysElapsed});
   const coreResult = _groupNRR(coreAccounts);
   const transferInResult = _groupNRR(transferInAccounts);
   const newFromSalesResult = _groupNRR(newFromSalesAccounts);
@@ -28679,6 +28726,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
 
   // ── Build return value (core fields stay backward-compatible) ───
   const core = coreResult || {};
+  const _nrrFinalPct = core.nrr!==null&&core.nrr!==undefined ? Math.round(core.nrr*100) : null;
+  console.log(
+    '%c[Sense NRR] ✓ result', 'color:'+(_nrrFinalPct===null?'#f08000':_nrrFinalPct>=95?'#4ddc97':'#ffb347')+';font-weight:bold',
+    { scope: kamEmail||('TL:'+tlEmail),
+      nrr: _nrrFinalPct!==null ? _nrrFinalPct+'%' : 'null',
+      cohort_gmv:    Math.round(core.cohortGmv||0),
+      comeback_gmv:  Math.round(core.comebackGmv||0),
+      expansion_gmv: Math.round(core.expansionGmv||0),
+      transfer_in_gmv: Math.round(_movementGmv(transferInResult)),
+      new_sales_gmv:   Math.round(_movementGmv(newFromSalesResult)),
+      cohort_accounts: core.cohortCount||0,
+      prevMonth, currentMonth: currentMonthLabel });
   return {
     // Core NRR (backward-compatible fields)
     nrr: core.nrr ?? null,
@@ -31796,7 +31855,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     window._commRenderKamSelfStrip=function(){ var r=oldRenderStrip.apply(this,arguments); try{ var el=document.querySelector('.pv-comm-strip.v210k'); if(el && isLocked()) el.classList.add('locked'); }catch(e){} return r; };
     try{ _commRenderKamSelfStrip=window._commRenderKamSelfStrip; }catch(e){}
   }
-  console.log('[Freshket Sense '+VERSION+'] Commission snapshot + permission hardening QA cleanup loaded');
+  // boot log removed
 })();
 
 
@@ -32170,7 +32229,7 @@ window.openCommissionHistory = openCommissionHistory;
 window.closeCommissionHistory = closeCommissionHistory;
 
 
-console.log('[Target Module v1] loaded');
+// target module loaded
 </script>
 <!-- NCS cohort drill-down sheet (v206) — pre-injected for position:fixed reliability -->
 <div class="ncs-overlay" id="ncs-overlay" onclick="_ncsClose()"></div>
