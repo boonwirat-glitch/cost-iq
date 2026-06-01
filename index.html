@@ -1,4 +1,4 @@
-<!-- Freshket Sense v255: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v256: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v255',
+      version: 'v256',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -24691,20 +24691,26 @@ function _commGetConfig(metricCode, paramName, defaultVal) {
 const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                     'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-function _commCurrentMonthLabel() {
+// ── lag anchor: วันที่ 1 มิ.ย. → lag = 31 พ.ค. → label = "พ.ค." ตรงกับ upsell CSV ──
+function _commLagDate() {
   const n = new Date();
+  n.setDate(n.getDate() - 1);  // day-1 lag: same anchor as portview/NRR/Q7B
+  return n;
+}
+function _commCurrentMonthLabel() {
+  const n = _commLagDate();
   return _TH_MONTHS[n.getMonth()] + ' ' + (n.getFullYear() + 543);
 }
 
 function _commBaselineMonthLabel() {
-  const n = new Date();
+  const n = _commLagDate();
   const b = new Date(n.getFullYear(), n.getMonth() - 1, 1);
   return _TH_MONTHS[b.getMonth()] + ' ' + (b.getFullYear() + 543);
 }
 
-// Generate Thai month label N months before current
+// Generate Thai month label N months before current (lag-anchored)
 function _commMonthLabelOffset(monthsBack) {
-  const n = new Date();
+  const n = _commLagDate();
   const d = new Date(n.getFullYear(), n.getMonth() - monthsBack, 1);
   return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
 }
