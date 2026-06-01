@@ -4900,7 +4900,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements']),  // v261: add current_movements
       // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
       criticalKeys: Object.freeze(['portview','history','handover']),
-      enhancementKeys: Object.freeze(['categories','sku_current','outlets']),
+      enhancementKeys: Object.freeze(['categories','sku_current','outlets','upsell_team','current_movements']),  // v264: add upsell_team+current_movements
       backgroundKeys: Object.freeze([]),  // v207b: no global bulk SKU auto-load; Sense uses per-KAM bundle on demand
       r2Files: Object.freeze({
         portview: 'portview.csv',
