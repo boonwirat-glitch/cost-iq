@@ -582,7 +582,7 @@ function setAiProvider(p){
   function ingestTimeout(spec){ return spec && spec.heavy ? 240000 : 90000; }
 
   const V212_DATA_EPOCH = '2026-05-22-v212-data-freshness';
-  const V212_NETWORK_FIRST_TABS = { portview:true, history:true, handover:true };
+  const V212_NETWORK_FIRST_TABS = { portview:true, history:true, handover:true, current_movements:true };
   function v212ShouldNetworkFirst(tab, spec, force){
     return !!force || !!V212_NETWORK_FIRST_TABS[tab] || (spec && spec.freshness === 'network-first');
   }
