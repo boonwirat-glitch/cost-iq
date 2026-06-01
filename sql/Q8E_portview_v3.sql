@@ -27,8 +27,11 @@ WITH params AS (
     DATE_TRUNC(CURRENT_DATE(), MONTH)                                AS cur_month_start,
     DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)    AS last_month_start,
     DATE_TRUNC(CURRENT_DATE(), YEAR)                                 AS ytd_start,   -- 1 Jan ปีนี้
-    (SELECT MAX(delivery_date) FROM `freshket-rn.dwh.order`
-     WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH))       AS max_date,
+    COALESCE(
+      (SELECT MAX(delivery_date) FROM `freshket-rn.dwh.order`
+       WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)),
+      DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)                       -- fallback: วันที่ 1 ของเดือน (day-1 lag)
+    )                                                                 AS max_date,
     EXTRACT(DAY FROM DATE_SUB(
       DATE_TRUNC(DATE_ADD(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH),
       INTERVAL 1 DAY))                                               AS days_in_month
