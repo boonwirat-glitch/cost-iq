@@ -86,7 +86,7 @@ INNER JOIN kam_map km ON o.account_id = km.account_id
 LEFT JOIN res_primary rp ON km.kam_name = rp.kam_name AND o.res_name = rp.res_name
 
 WHERE o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
-  AND o.delivery_date <  DATE_TRUNC(CURRENT_DATE(), MONTH)
+  AND o.delivery_date <  DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH)  -- lag anchor: exclude current lag-month from history
   AND i.gmv_ex_vat > 0
 
 GROUP BY 1, 3
