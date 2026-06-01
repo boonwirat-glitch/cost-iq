@@ -1759,6 +1759,13 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     _seenTransferOut.add(key); return true;
   });
   const transferOutGmv = transferOutList.reduce((s,a)=>s+(a.lastMonthGmv||0),0);
+  if (transferOutList.length > 0) {
+    console.log('%c[Sense NRR] transfer_out','color:#ff9f7f',
+      {scope:kamEmail||('TL:'+tlEmail), count:transferOutList.length,
+       total_gmv:Math.round(transferOutGmv),
+       accounts:transferOutList.map(a=>a.accountName||a.accountId).slice(0,5).join(', ')
+                +(transferOutList.length>5?' …+'+( transferOutList.length-5):'')});
+  }
   const _movementGmv = r => (r ? ((r.cohortGmv||0)+(r.comebackGmv||0)+(r.expansionGmv||0)) : 0);
 
   // ── Build return value (core fields stay backward-compatible) ───
