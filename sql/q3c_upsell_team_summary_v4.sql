@@ -14,9 +14,10 @@
 WITH
 dates AS (
   SELECT
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) AS baseline_mo,
-    DATE_TRUNC(CURRENT_DATE(), MONTH)                              AS current_mo,
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 3 MONTH), MONTH) AS lookback_start
+    -- lag_date anchor: day-1 ensures month boundary (Jun 1) sees May as current, not empty June
+    DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH) AS baseline_mo,
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)                              AS current_mo,
+    DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 3 MONTH), MONTH) AS lookback_start
 ),
 
 -- Active KAM whitelist (อัปเดตเมื่อมีการเปลี่ยนทีม)
