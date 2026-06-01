@@ -175,6 +175,8 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
 
     const currLabel  = _commCurrentMonthLabel();
     const baseLabel  = _commBaselineMonthLabel();
+    console.log('%c[Sense Upsell] compute','color:#f0b000',
+      {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
     // Config (admin-configurable, with spec defaults)
     const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
@@ -268,6 +270,11 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const p1Comm = p1Groups.reduce((s,g) => s + g.commission, 0);
     const p3Incr = p3Groups.reduce((s,g) => s + g.incremental, 0);
     const p3Comm = p3Groups.reduce((s,g) => s + g.commission, 0);
+    console.log('%c[Sense Upsell] ✓ result','color:'+((p1Comm+p3Comm)>0?'#4ddc97':'#aaa')+';font-weight:bold',
+      {kamEmail, currLabel, p1_groups:p1Groups.length, p1_gmv:Math.round(p1Gmv), p1_comm:Math.round(p1Comm),
+       p3_groups:p3Groups.length, p3_incr:Math.round(p3Incr), p3_comm:Math.round(p3Comm),
+       total_comm:Math.round(p1Comm+p3Comm),
+       warn:(p1Groups.length+p3Groups.length)===0?'⚠️ no groups — currLabel not in CSV?':''});
 
     return {
       p1: { gmv: p1Gmv, comm: p1Comm, groups: p1Groups },
@@ -560,6 +567,15 @@ function _commBuildKamPayout(kamEmail) {
 
     const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
+    console.log('%c[Sense Comm] ✓ KAM payout','color:#b794f4;font-weight:bold',
+      {kamEmail, nrr_pct:pct!==null?pct+'%':'null',
+       nrr_payout:Math.round(nrrPayout||0),
+       p1_comm:Math.round(upsellSku&&upsellSku.p1&&upsellSku.p1.comm||0),
+       p3_comm:Math.round(upsellSku&&upsellSku.p3&&upsellSku.p3.comm||0),
+       handover_payout:Math.round(handover&&handover.payout||0),
+       subtotal:Math.round(subtotal||0),
+       gate_cap:gate&&gate.cap_multiplier||1,
+       FINAL:finalPayout});
 
     return {
       period, kamEmail,
