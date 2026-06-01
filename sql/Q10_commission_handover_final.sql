@@ -16,21 +16,27 @@ WITH
 
 params AS (
   SELECT
-    DATE_TRUNC(CURRENT_DATE(), MONTH)                                        AS perf_month_start,
-    DATE_SUB(DATE_TRUNC(DATE_ADD(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), INTERVAL 1 DAY)
+    -- lag_date: day-1 anchor (data pipeline lag = 1 day always)
+    -- ensures month boundary (e.g. Jun 1) sees May as perf_month, not empty June
+    DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)                                AS lag_date,
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)             AS perf_month_start,
+    DATE_SUB(DATE_TRUNC(DATE_ADD(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH), INTERVAL 1 DAY)
                                                                              AS perf_month_end,
-    FORMAT_DATE('%Y-%m', CURRENT_DATE())                                     AS perf_month_label,
+    FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))          AS perf_month_label,
     DATE_DIFF(
-      DATE_TRUNC(DATE_ADD(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH),
-      DATE_TRUNC(CURRENT_DATE(), MONTH), DAY
+      DATE_TRUNC(DATE_ADD(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH),
+      DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), DAY
     )                                                                        AS perf_days_in_month,
 
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)           AS prev_month_start,
-    DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 1 DAY)             AS prev_month_end,
-    FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))        AS prev_month_label,
+    DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH)
+                                                                             AS prev_month_start,
+    DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), INTERVAL 1 DAY)
+                                                                             AS prev_month_end,
+    FORMAT_DATE('%Y-%m', DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH))
+                                                                             AS prev_month_label,
     DATE_DIFF(
-      DATE_TRUNC(CURRENT_DATE(), MONTH),
-      DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH), DAY
+      DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH),
+      DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH), DAY
     )                                                                        AS prev_days_in_month
 ),
 
