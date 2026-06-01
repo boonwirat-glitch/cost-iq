@@ -1,4 +1,4 @@
-<!-- Freshket Sense v254: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v255: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v254',
+      version: 'v255',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -9699,8 +9699,8 @@ function parsePortviewBulk(csv){
       const runrate=parseFloat(p[6])||0;
       // Normalized expected: use last month's DAILY RATE × days elapsed this month
       // avoids inflation when months have different lengths (e.g. Apr 30d vs May 31d)
-      const _now=new Date();
-      const lastMonthDays=new Date(_now.getFullYear(),_now.getMonth(),0).getDate();
+      const _now=new Date();const _lagD=new Date(_now);_lagD.setDate(_lagD.getDate()-1);
+      const lastMonthDays=new Date(_lagD.getFullYear(),_lagD.getMonth(),0).getDate(); // day-1 lag: ensures correct prev-month days on month boundary
       const dailyRate=lastMonthDays>0?lastGmv/lastMonthDays:lastGmv/30;
       const expected=dailyRate*daysElapsed;
       const pct=expected>0?Math.round(gmvToDate/expected*100):0;
@@ -10348,7 +10348,7 @@ function handleFileUpload(type,input){
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
       const moNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      const _now=new Date();const _curMonthLabel=moNames[_now.getMonth()]+' '+(_now.getFullYear()+543);
+      const _now=new Date();const _lagNow=new Date(_now);_lagNow.setDate(_lagNow.getDate()-1);const _curMonthLabel=moNames[_lagNow.getMonth()]+' '+(_lagNow.getFullYear()+543); // day-1 lag: label matches CSV data month
       const idxRaw=JSON.parse(localStorage.getItem('ciq_index')||'[]');const idxMap=new Map(idxRaw.map(x=>[x.id,x]));
       portviewBulkData.forEach(row=>{
         if(!row.id)return;
@@ -10610,15 +10610,15 @@ function handleFileUpload(type,input){
         // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
-        const _now=new Date();
+        const _now=new Date();const _lagU=new Date(_now);_lagU.setDate(_lagU.getDate()-1); // day-1 lag anchor
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-        const _baselineLabel=_thMonths[new Date(_now.getFullYear(),_now.getMonth()-1,1).getMonth()]+' '+(new Date(_now.getFullYear(),_now.getMonth()-1,1).getFullYear()+543);
+        const _baselineLabel=_thMonths[new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getMonth()]+' '+(new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getFullYear()+543);
         // v2: current month label — any row NOT current month = lookback → baseline
-        const _currLabel=_thMonths[_now.getMonth()]+' '+(_now.getFullYear()+543);
+        const _currLabel=_thMonths[_lagU.getMonth()]+' '+(_lagU.getFullYear()+543);
         // v233-fix: P1 baseline = exactly 3 months (M-1, M-2, M-3) matching P3 window.
         // Bug: previously used ALL non-current months → ม.ค. (4 months ago) was included
         // → outlet that bought in ม.ค. then stopped 3 months was wrongly classified as existing.
-        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
+        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_lagU.getFullYear(),_lagU.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
         // v4: detect CSV format — 7 cols = v4 (outlet_id + no new/comeback), 9 cols = v3, 8 cols = legacy
         const _sampleCols=(lines[0]||'').split(',').length;
         const _hasOutlet=_sampleCols>=7;
@@ -29178,8 +29178,8 @@ async function renderPortviewTargetBar() {
     const allM2 = new Set();
     accounts.forEach(a => (bulkHistoryData[a.id]||[]).forEach(h => { if(h.m) allM2.add(h.m); }));
     // v205c: exclude current month from baseline (same as _tgtKamBaseline3mo — avoids partial MTD skew)
-    const _nowBS = new Date();
-    const _curMoBS = _mo2[_nowBS.getMonth()] + ' ' + (_nowBS.getFullYear() + 543);
+    const _nowBS = new Date();const _lagBS=new Date(_nowBS);_lagBS.setDate(_lagBS.getDate()-1); // day-1 lag
+    const _curMoBS = _mo2[_lagBS.getMonth()] + ' ' + (_lagBS.getFullYear() + 543);
     const last3m = Array.from(allM2).filter(m => m !== _curMoBS).sort((a,b)=>_ms2(a)-_ms2(b)).slice(-3);
     const hasOutlets2 = typeof bulkOutletsData !== 'undefined' && bulkOutletsData;
     if (last3m.length) {
@@ -29385,8 +29385,8 @@ function _tgtKamBaseline3mo(kamEmail, tlEmail, mode) {
   const allMonths = new Set();
   accounts.forEach(a => (bulkHistoryData[a.id] || []).forEach(h => { if (h.m) allMonths.add(h.m); }));
   // v205c: exclude current month (MTD partial data skews daily rate down)
-  const _now3mo = new Date();
-  const _curMonthLabel3mo = mo[_now3mo.getMonth()] + ' ' + (_now3mo.getFullYear() + 543);
+  const _now3mo = new Date();const _lag3mo=new Date(_now3mo);_lag3mo.setDate(_lag3mo.getDate()-1); // day-1 lag
+  const _curMonthLabel3mo = mo[_lag3mo.getMonth()] + ' ' + (_lag3mo.getFullYear() + 543);
   const last3 = Array.from(allMonths)
     .filter(m => m !== _curMonthLabel3mo)
     .sort((a,b) => moSort(a)-moSort(b))

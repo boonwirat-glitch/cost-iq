@@ -2258,8 +2258,8 @@ async function renderPortviewTargetBar() {
     const allM2 = new Set();
     accounts.forEach(a => (bulkHistoryData[a.id]||[]).forEach(h => { if(h.m) allM2.add(h.m); }));
     // v205c: exclude current month from baseline (same as _tgtKamBaseline3mo — avoids partial MTD skew)
-    const _nowBS = new Date();
-    const _curMoBS = _mo2[_nowBS.getMonth()] + ' ' + (_nowBS.getFullYear() + 543);
+    const _nowBS = new Date();const _lagBS=new Date(_nowBS);_lagBS.setDate(_lagBS.getDate()-1); // day-1 lag
+    const _curMoBS = _mo2[_lagBS.getMonth()] + ' ' + (_lagBS.getFullYear() + 543);
     const last3m = Array.from(allM2).filter(m => m !== _curMoBS).sort((a,b)=>_ms2(a)-_ms2(b)).slice(-3);
     const hasOutlets2 = typeof bulkOutletsData !== 'undefined' && bulkOutletsData;
     if (last3m.length) {
@@ -2465,8 +2465,8 @@ function _tgtKamBaseline3mo(kamEmail, tlEmail, mode) {
   const allMonths = new Set();
   accounts.forEach(a => (bulkHistoryData[a.id] || []).forEach(h => { if (h.m) allMonths.add(h.m); }));
   // v205c: exclude current month (MTD partial data skews daily rate down)
-  const _now3mo = new Date();
-  const _curMonthLabel3mo = mo[_now3mo.getMonth()] + ' ' + (_now3mo.getFullYear() + 543);
+  const _now3mo = new Date();const _lag3mo=new Date(_now3mo);_lag3mo.setDate(_lag3mo.getDate()-1); // day-1 lag
+  const _curMonthLabel3mo = mo[_lag3mo.getMonth()] + ' ' + (_lag3mo.getFullYear() + 543);
   const last3 = Array.from(allMonths)
     .filter(m => m !== _curMonthLabel3mo)
     .sort((a,b) => moSort(a)-moSort(b))

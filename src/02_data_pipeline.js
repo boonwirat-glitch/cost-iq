@@ -33,8 +33,8 @@ function parsePortviewBulk(csv){
       const runrate=parseFloat(p[6])||0;
       // Normalized expected: use last month's DAILY RATE × days elapsed this month
       // avoids inflation when months have different lengths (e.g. Apr 30d vs May 31d)
-      const _now=new Date();
-      const lastMonthDays=new Date(_now.getFullYear(),_now.getMonth(),0).getDate();
+      const _now=new Date();const _lagD=new Date(_now);_lagD.setDate(_lagD.getDate()-1);
+      const lastMonthDays=new Date(_lagD.getFullYear(),_lagD.getMonth(),0).getDate(); // day-1 lag: ensures correct prev-month days on month boundary
       const dailyRate=lastMonthDays>0?lastGmv/lastMonthDays:lastGmv/30;
       const expected=dailyRate*daysElapsed;
       const pct=expected>0?Math.round(gmvToDate/expected*100):0;
@@ -682,7 +682,7 @@ function handleFileUpload(type,input){
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
       const moNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      const _now=new Date();const _curMonthLabel=moNames[_now.getMonth()]+' '+(_now.getFullYear()+543);
+      const _now=new Date();const _lagNow=new Date(_now);_lagNow.setDate(_lagNow.getDate()-1);const _curMonthLabel=moNames[_lagNow.getMonth()]+' '+(_lagNow.getFullYear()+543); // day-1 lag: label matches CSV data month
       const idxRaw=JSON.parse(localStorage.getItem('ciq_index')||'[]');const idxMap=new Map(idxRaw.map(x=>[x.id,x]));
       portviewBulkData.forEach(row=>{
         if(!row.id)return;
@@ -944,15 +944,15 @@ function handleFileUpload(type,input){
         // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
-        const _now=new Date();
+        const _now=new Date();const _lagU=new Date(_now);_lagU.setDate(_lagU.getDate()-1); // day-1 lag anchor
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-        const _baselineLabel=_thMonths[new Date(_now.getFullYear(),_now.getMonth()-1,1).getMonth()]+' '+(new Date(_now.getFullYear(),_now.getMonth()-1,1).getFullYear()+543);
+        const _baselineLabel=_thMonths[new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getMonth()]+' '+(new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getFullYear()+543);
         // v2: current month label — any row NOT current month = lookback → baseline
-        const _currLabel=_thMonths[_now.getMonth()]+' '+(_now.getFullYear()+543);
+        const _currLabel=_thMonths[_lagU.getMonth()]+' '+(_lagU.getFullYear()+543);
         // v233-fix: P1 baseline = exactly 3 months (M-1, M-2, M-3) matching P3 window.
         // Bug: previously used ALL non-current months → ม.ค. (4 months ago) was included
         // → outlet that bought in ม.ค. then stopped 3 months was wrongly classified as existing.
-        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
+        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_lagU.getFullYear(),_lagU.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
         // v4: detect CSV format — 7 cols = v4 (outlet_id + no new/comeback), 9 cols = v3, 8 cols = legacy
         const _sampleCols=(lines[0]||'').split(',').length;
         const _hasOutlet=_sampleCols>=7;
