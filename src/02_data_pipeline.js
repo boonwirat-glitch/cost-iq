@@ -851,7 +851,7 @@ function handleFileUpload(type,input){
           if(kamEmail){if(!byKamEmail[kamEmail])byKamEmail[kamEmail]=[];byKamEmail[kamEmail].push(row);}
         });
         window.bulkCurrentMovementData={rows,byAccountId,byMovementType,byKamName,byKamEmail,
-                                        loadedAt:Date.now(),version:DATA_VERSION};
+                                        loadedAt:Date.now()};
         const b2=document.getElementById('badge-current_movements');
         if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
         const sl2=document.getElementById('slot-current_movements');
