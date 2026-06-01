@@ -221,8 +221,7 @@ function _commBuildTeamPreviewGroups() {
 window.debugCommissionRules = function(){
   const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {});
   const assignments = ((_commRuleConfig && _commRuleConfig.assignments) || []);
-  console.table(plans.map(p=>({plan_code:p.plan_code, name:p.plan_name, role:p.beneficiary_role, id:p.id, status:p.status})));
-  console.log('assignments', assignments);
+  // plan/assignment dump removed — use Commission Cockpit UI instead
   return { plans, assignments, pending:_commRulePending };
 };
 
@@ -1565,8 +1564,15 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       currentMonthLabel = _moN[_nd.getMonth()] + ' ' + _yr;
     }
   }
-  if (!currentMonthLabel || !daysElapsed) return null;
-  if (moSort(currentMonthLabel) <= moSort(prevMonth)) return null;
+  if (!currentMonthLabel || !daysElapsed) {
+    console.warn('%c[Sense NRR] ⚠️ no label/days','color:#f08000',{kamEmail,tlEmail,currentMonthLabel,daysElapsed});
+    return null;
+  }
+  const _nrrGatePass = moSort(currentMonthLabel) > moSort(prevMonth);
+  console.log('%c[Sense NRR] gate','color:'+(_nrrGatePass?'#4ddc97':'#ff6b6b')+';font-weight:bold',
+    {scope:kamEmail||('TL:'+tlEmail), currentMonth:currentMonthLabel, prevMonth,
+     gate:_nrrGatePass?'✓ PASS':'✗ FAIL — NRR=null', daysElapsed, accounts:allAccounts.length});
+  if (!_nrrGatePass) return null;
 
   const prevDays = getThaiMonthDays(prevMonth);
   const hasOutlets = typeof bulkOutletsData !== 'undefined' && bulkOutletsData;
@@ -1699,6 +1705,10 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     };
   }
 
+  console.log('%c[Sense NRR] cohort split','color:#4ddc97',
+    {scope:kamEmail||('TL:'+tlEmail), core:coreAccounts.length,
+     transfer_in:transferInAccounts.length, new_sales:newFromSalesAccounts.length,
+     prevMonth, currentMonth:currentMonthLabel, daysElapsed});
   const coreResult = _groupNRR(coreAccounts);
   const transferInResult = _groupNRR(transferInAccounts);
   const newFromSalesResult = _groupNRR(newFromSalesAccounts);
@@ -1753,6 +1763,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
 
   // ── Build return value (core fields stay backward-compatible) ───
   const core = coreResult || {};
+  const _nrrFinalPct = core.nrr!==null&&core.nrr!==undefined ? Math.round(core.nrr*100) : null;
+  console.log(
+    '%c[Sense NRR] ✓ result', 'color:'+(_nrrFinalPct===null?'#f08000':_nrrFinalPct>=95?'#4ddc97':'#ffb347')+';font-weight:bold',
+    { scope: kamEmail||('TL:'+tlEmail),
+      nrr: _nrrFinalPct!==null ? _nrrFinalPct+'%' : 'null',
+      cohort_gmv:    Math.round(core.cohortGmv||0),
+      comeback_gmv:  Math.round(core.comebackGmv||0),
+      expansion_gmv: Math.round(core.expansionGmv||0),
+      transfer_in_gmv: Math.round(_movementGmv(transferInResult)),
+      new_sales_gmv:   Math.round(_movementGmv(newFromSalesResult)),
+      cohort_accounts: core.cohortCount||0,
+      prevMonth, currentMonth: currentMonthLabel });
   return {
     // Core NRR (backward-compatible fields)
     nrr: core.nrr ?? null,
@@ -4870,7 +4892,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     window._commRenderKamSelfStrip=function(){ var r=oldRenderStrip.apply(this,arguments); try{ var el=document.querySelector('.pv-comm-strip.v210k'); if(el && isLocked()) el.classList.add('locked'); }catch(e){} return r; };
     try{ _commRenderKamSelfStrip=window._commRenderKamSelfStrip; }catch(e){}
   }
-  console.log('[Freshket Sense '+VERSION+'] Commission snapshot + permission hardening QA cleanup loaded');
+  // boot log removed
 })();
 
 
@@ -5244,4 +5266,4 @@ window.openCommissionHistory = openCommissionHistory;
 window.closeCommissionHistory = closeCommissionHistory;
 
 
-console.log('[Target Module v1] loaded');
+// target module loaded
