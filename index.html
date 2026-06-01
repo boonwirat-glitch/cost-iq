@@ -1,4 +1,4 @@
-<!-- Freshket Sense v260: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v261: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v260',
+      version: 'v261',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -4912,7 +4912,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
         alternatives: 'bulk_alternatives.csv',
         price: 'bulk_price.csv',
         handover: 'portview_handover.csv',
-        upsell_team: 'sense_upsell_team.csv'
+        upsell_team: 'sense_upsell_team.csv',
+        current_movements: 'portview_current_movements.csv'  // v260: movement classification
       }),
       r2Specs: Object.freeze({
         portview: Object.freeze({type:'portview-bulk',tab:'portview',cache:false,freshness:'network-first'}),
@@ -4924,7 +4925,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
         alternatives: Object.freeze({type:'bulk-alternatives',tab:'alternatives',cache:false,heavy:true}),
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
         handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true}), // v224d: cache:true so IDB fast path works
-        upsell_team: Object.freeze({type:'bulk-upsell-team',tab:'upsell_team',cache:true}) // v230: was missing from config → R2_SPECS['upsell_team'] was undefined
+        upsell_team: Object.freeze({type:'bulk-upsell-team',tab:'upsell_team',cache:true}), // v230: was missing from config → R2_SPECS['upsell_team'] was undefined
+        current_movements: Object.freeze({type:'bulk-current-movements',tab:'current_movements',cache:true}) // v260: transfer_in classification
       })
     }),
     legacySheets: Object.freeze({
