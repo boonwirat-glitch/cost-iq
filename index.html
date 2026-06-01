@@ -1,4 +1,4 @@
-<!-- Freshket Sense v266: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v267: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v266',
+      version: 'v267',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -10524,7 +10524,7 @@ function handleFileUpload(type,input){
           if(kamEmail){if(!byKamEmail[kamEmail])byKamEmail[kamEmail]=[];byKamEmail[kamEmail].push(row);}
         });
         window.bulkCurrentMovementData={rows,byAccountId,byMovementType,byKamName,byKamEmail,
-                                        loadedAt:Date.now(),version:DATA_VERSION};
+                                        loadedAt:Date.now()};
         const b2=document.getElementById('badge-current_movements');
         if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
         const sl2=document.getElementById('slot-current_movements');
