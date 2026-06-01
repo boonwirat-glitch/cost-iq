@@ -1360,6 +1360,7 @@ async function _fetchKamFile({url,type,tab}){
     const _t0=Date.now();
     const text=await _fetchTextWithTimeout(url,90000);
     if(!text){console.warn('[v202 bundle] empty response:',url);return false;}
+    console.log('%c[Sense] R2 fetch','color:#4ddc97',{tab, kb:Math.round(text.length/1024), url:url.split('/').pop()});
     const _kb=Math.round(text.length/1024);
     const _ms=Date.now()-_t0;
     _senseLog('%c[v206d bundle] R2 fetch OK:','color:#00d070',tab,_kb+'KB in '+_ms+'ms');
