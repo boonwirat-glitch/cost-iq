@@ -22,25 +22,27 @@
 --   • churn / missing_cat               → compute ที่ account level (หลัง roll-up)
 -- ════════════════════════════════════════════════════════════
 
+-- ════════════════════════════════════════════════════════════
+-- FIX (v256): day-1 lag anchor — ตรงกับ Q7B และ SQL อื่นทั้งหมด
+-- ปัญหาเดิม: cur_month_start = CURRENT_DATE → วันที่ 1 มิ.ย. ชี้เดือน "มิ.ย."
+--   แต่ max_date fallback = 31 พ.ค. → ขอ month=มิ.ย. AND date<=31พ.ค. = ว่าง
+--   → gmv_to_date = 0 ทุก account
+-- แก้: anchor ทุก month boundary ที่ lag_date (เมื่อวาน) เหมือน Q7B
+--   วันที่ 1 มิ.ย. → lag_date=31พ.ค. → current month = "พ.ค." (เต็มเดือน) ✓
+--   max_date = lag_date เสมอ (ไม่ fallback) → range เป็นไปได้เสมอ
+-- ════════════════════════════════════════════════════════════
 WITH params AS (
-  SELECT
-    DATE_TRUNC(CURRENT_DATE(), MONTH)                                AS cur_month_start,
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)    AS last_month_start,
-    DATE_TRUNC(CURRENT_DATE(), YEAR)                                 AS ytd_start,   -- 1 Jan ปีนี้
-    COALESCE(
-      (SELECT MAX(delivery_date) FROM `freshket-rn.dwh.order`
-       WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)),
-      DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)                       -- fallback: วันที่ 1 ของเดือน (day-1 lag)
-    )                                                                 AS max_date
+  SELECT DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)     AS lag_date
 ),
 params_derived AS (
-  SELECT *,
-    DATE_DIFF(max_date, DATE_TRUNC(max_date, MONTH), DAY) + 1        AS days_elapsed,
-    -- days_in_month คำนวณจาก max_date ไม่ใช่ CURRENT_DATE
-    -- กัน cross-month mismatch: ถ้า max_date=May31 → days_in_month=31 (May) ไม่ใช่ 30 (June)
-    EXTRACT(DAY FROM DATE_SUB(
-      DATE_TRUNC(DATE_ADD(max_date, INTERVAL 1 MONTH), MONTH),
-      INTERVAL 1 DAY))                                               AS days_in_month
+  SELECT
+    lag_date,
+    DATE_TRUNC(lag_date, MONTH)                                     AS cur_month_start,
+    DATE_TRUNC(DATE_SUB(lag_date, INTERVAL 1 MONTH), MONTH)         AS last_month_start,
+    DATE_TRUNC(lag_date, YEAR)                                      AS ytd_start,
+    lag_date                                                         AS max_date,  -- ceiling = lag_date เสมอ
+    DATE_DIFF(lag_date, DATE_TRUNC(lag_date, MONTH), DAY) + 1       AS days_elapsed,
+    EXTRACT(DAY FROM LAST_DAY(lag_date))                            AS days_in_month
   FROM params
 ),
 
@@ -129,7 +131,7 @@ kam_since_outlet AS (
   FROM `freshket-rn.dwh.order`
   WHERE ka_owner IS NOT NULL
     AND ka_owner NOT IN ('ka.sa.admin','Admin Freshket')
-    AND delivery_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
+    AND delivery_date >= DATE_SUB((SELECT max_date FROM params_derived), INTERVAL 12 MONTH)
   GROUP BY 1, 2
 ),
 last_order_owner_outlet AS (
@@ -156,7 +158,7 @@ outlet_enriched AS (
       WHEN loo.last_order_kam IS NOT NULL
         AND LOWER(TRIM(loo.last_order_kam)) != LOWER(TRIM(ko.kam_name)) THEN 0
       WHEN ks.first_order_date IS NOT NULL
-        THEN DATE_DIFF(CURRENT_DATE(), ks.first_order_date, DAY)
+        THEN DATE_DIFF((SELECT max_date FROM params_derived), ks.first_order_date, DAY)
       ELSE NULL
     END AS days_with_current_kam
   FROM kam_outlets ko
