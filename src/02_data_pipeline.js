@@ -837,7 +837,7 @@ function handleFileUpload(type,input){
           const ownerFromName=(p[9]||'').trim();
           const baselineGmv=parseFloat(p[12])||0;
           const currentGmv=parseFloat(p[13])||0;
-          const confidence=(p[19]||'').trim();
+          const confidence=(p[18]||'').trim();
           if(!movementType||!accountId) return;
           const row={movementMonth,movementType,userId,accountId,accountName,accountType,
                      kamName,kamEmail,ownerFromType,ownerFromName,baselineGmv,currentGmv,confidence};
