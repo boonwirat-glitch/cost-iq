@@ -488,6 +488,11 @@ function showSenseSplash(onDone){
                     '🔴 COLD — MIN=1650ms MAX=5000ms',
     _lastReady ? ('last_critical_ready: '+Math.round((Date.now()-_lastReady)/60000)+'min ago') : 'first load'
   );
+  // Boot version stamp — always visible at top of console
+  const _appVer = (typeof FreshketSenseConfig!=='undefined'&&FreshketSenseConfig.app&&FreshketSenseConfig.app.version)||'unknown';
+  console.log('%c[Sense] v'+_appVer+' boot','color:#fff;background:#006050;padding:2px 8px;border-radius:4px;font-weight:bold',
+    {cache_state: _cacheWarm?'WARM':_idbPreloaded?'IDB':_isWarmBoot?'WARM-BOOT':'COLD',
+     user_agent: navigator.userAgent.split(' ').slice(-1)[0]});
   // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
   const MAX_SHOW=_cacheWarm ? 400 : (_idbPreloaded ? 1500 : (_isWarmBoot ? 5000 : 5000)); // v224e: reduced — splash never blocks beyond 5s
   const startMs=Date.now();
@@ -1681,7 +1686,7 @@ function loadFromStorage(targetId){
 function switchAccount(accountId){
   if(accountId===currentAccountId){closeDataPanel();return;}
   const _swKam=_getKamEmailForAccount&&_getKamEmailForAccount(accountId);
-  console.log('[v202 debug] switchAccount:',accountId,'| KAM:',_swKam||'(unknown)');
+  // switchAccount debug log removed (v257)
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
   churnExpanded=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
