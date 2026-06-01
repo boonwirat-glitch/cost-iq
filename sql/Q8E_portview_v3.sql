@@ -31,13 +31,16 @@ WITH params AS (
       (SELECT MAX(delivery_date) FROM `freshket-rn.dwh.order`
        WHERE delivery_date >= DATE_TRUNC(CURRENT_DATE(), MONTH)),
       DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)                       -- fallback: วันที่ 1 ของเดือน (day-1 lag)
-    )                                                                 AS max_date,
-    EXTRACT(DAY FROM DATE_SUB(
-      DATE_TRUNC(DATE_ADD(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH),
-      INTERVAL 1 DAY))                                               AS days_in_month
+    )                                                                 AS max_date
 ),
 params_derived AS (
-  SELECT *, DATE_DIFF(max_date, DATE_TRUNC(max_date, MONTH), DAY) + 1 AS days_elapsed
+  SELECT *,
+    DATE_DIFF(max_date, DATE_TRUNC(max_date, MONTH), DAY) + 1        AS days_elapsed,
+    -- days_in_month คำนวณจาก max_date ไม่ใช่ CURRENT_DATE
+    -- กัน cross-month mismatch: ถ้า max_date=May31 → days_in_month=31 (May) ไม่ใช่ 30 (June)
+    EXTRACT(DAY FROM DATE_SUB(
+      DATE_TRUNC(DATE_ADD(max_date, INTERVAL 1 MONTH), MONTH),
+      INTERVAL 1 DAY))                                               AS days_in_month
   FROM params
 ),
 
