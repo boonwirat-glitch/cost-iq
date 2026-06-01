@@ -976,32 +976,31 @@ function handleFileUpload(type,input){
         const _sampleCols=(lines[0]||'').split(',').length;
         const _hasOutlet=_sampleCols>=7;
         let rowCount=0;
+        // v259: per-KAM bundle CSV has NO kam_email column
+        // Format: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+        // _upsellIngestEmail is set by _fetchUpsellBundle before calling ingestCSVText
+        const _bundleEmail = (window._upsellIngestEmail||'').trim();
+        // Detect if first column is email (legacy bulk) or UUID (per-KAM bundle)
+        const _firstColIsEmail = !_bundleEmail || ((lines[0]||'').split(',')[0]||'').includes('@');
         lines.forEach(l=>{
           const p=parseCSVRow(l);
-          const kamEmail=(p[0]||'').trim();
-          const accountId=(p[1]||'').trim();
-          let outletId,monthLabel,groupKey,existingGmv,totalGmv;
-          if(_hasOutlet && _sampleCols<=7){
-            // v4 format: kam_email, account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
-            outletId=(p[2]||'').trim();
-            monthLabel=(p[3]||'').trim();
-            groupKey=(p[4]||'').trim();
-            existingGmv=parseFloat(p[5])||0;
-            totalGmv=parseFloat(p[6])||0;
-          }else if(_hasOutlet){
-            // v3 format: 9 cols with new_gmv + comeback_gmv (still supported for backwards compat)
-            outletId=(p[2]||'').trim();
-            monthLabel=(p[3]||'').trim();
-            groupKey=(p[4]||'').trim();
-            existingGmv=parseFloat(p[5])||0;
-            totalGmv=parseFloat(p[8])||0;
-          }else{
-            // legacy 8-col: account-level (no outlet_id)
-            outletId='_all';
+          let kamEmail, accountId, outletId, monthLabel, groupKey, existingGmv, totalGmv;
+          if(_firstColIsEmail){
+            // Legacy bulk format: kam_email, account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            kamEmail=(p[0]||'').trim();
+            accountId=(p[1]||'').trim();
+            if(_hasOutlet && _sampleCols<=7){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[6])||0;}
+            else if(_hasOutlet){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[8])||0;}
+            else{outletId='_all';monthLabel=(p[2]||'').trim();groupKey=(p[3]||'').trim();existingGmv=parseFloat(p[4])||0;totalGmv=parseFloat(p[7])||0;}
+          } else {
+            // Per-KAM bundle: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            kamEmail=_bundleEmail;
+            accountId=(p[0]||'').trim();
+            outletId=(p[1]||'').trim();
             monthLabel=(p[2]||'').trim();
             groupKey=(p[3]||'').trim();
             existingGmv=parseFloat(p[4])||0;
-            totalGmv=parseFloat(p[7])||0;
+            totalGmv=parseFloat(p[5])||0;
           }
           if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
           // byKam: kamEmail → accountId → outletId → groupKey → monthLabel
@@ -1426,7 +1425,9 @@ async function _fetchUpsellBundle(kamEmail){
     try{
       const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
       console.log('%c[Sense] upsell bundle fetch','color:#f0b000','→',kamEmail);
+      window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+      window._upsellIngestEmail = '';
       if(ok){
         _upsellBundleLoaded.add(safeKey);
         console.log('%c[Sense] upsell bundle ✓','color:#4ddc97',kamEmail);
@@ -1576,7 +1577,7 @@ async function loadFromCloudflareR2(){
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team'];
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'];
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
@@ -1853,7 +1854,7 @@ function _senseDataLog(){
 // Extra 3 are a bonus — eliminate the post-splash debounced batch render on warm boot.
 async function _preloadFromIndexedDB(){
   var CRITICAL=['portview','history','handover'];
-  var EXTRA=['categories','sku_current','outlets','upsell_team']; // v222+v226: also preload — cache:true in IDB
+  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
   var TABS=[...CRITICAL,...EXTRA];
   var loaded=0; var criticalLoaded=0;
   try{
