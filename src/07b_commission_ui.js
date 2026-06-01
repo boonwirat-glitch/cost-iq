@@ -1589,7 +1589,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     const isNew = a.daysWithCurrentKam !== null && a.daysWithCurrentKam !== undefined && a.daysWithCurrentKam <= daysElapsed;
     if (!isNew) { coreAccounts.push(a); return; }
     // ลอง Q11 ก่อน fallback Q10
-    const cmRows = cm && cm.byAccountId && cm.byAccountId[normId(a.id)];
+    const cmRows = cm && cm.byAccountId && cm.byAccountId[String(a.id==null?'':a.id).trim()];
     if (cmRows) {
       const mvType = (cmRows.movementType || '').toLowerCase();
       if (mvType === 'transfer_in') { transferInAccounts.push(a); }
