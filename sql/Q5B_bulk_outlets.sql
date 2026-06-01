@@ -66,7 +66,7 @@ raw AS (
   JOIN kam_map ON o.account_id = kam_map.account_id
   WHERE TRUE
     AND o.delivery_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH), INTERVAL 6 MONTH)
-    AND o.delivery_date <= CURRENT_DATE('Asia/Bangkok')
+    AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)  -- day-1 lag guard
 ),
 
 agg AS (
