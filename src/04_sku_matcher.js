@@ -722,6 +722,10 @@ function setAiProvider(p){
     const criticalLoaded = opts.criticalLoaded || 0;
     const specs = getSpecs();
     const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
+    console.log('%c[Sense DEBUG] ENHANCEMENT keys','color:#ff0;background:#333',
+      {ENHANCEMENT:ENHANCEMENT.slice(), keys:keys.slice(), 
+       has_current_movements: ENHANCEMENT.indexOf('current_movements')>=0,
+       spec_current_movements: !!specs['current_movements']});
     if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
     record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
     baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
