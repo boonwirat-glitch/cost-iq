@@ -1,4 +1,4 @@
-<!-- Freshket Sense v264: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v265: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v264',
+      version: 'v265',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -4900,7 +4900,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
       foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements']),  // v261: add current_movements
       // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
       criticalKeys: Object.freeze(['portview','history','handover']),
-      enhancementKeys: Object.freeze(['categories','sku_current','outlets']),
+      enhancementKeys: Object.freeze(['categories','sku_current','outlets','upsell_team','current_movements']),  // v264: add upsell_team+current_movements
       backgroundKeys: Object.freeze([]),  // v207b: no global bulk SKU auto-load; Sense uses per-KAM bundle on demand
       r2Files: Object.freeze({
         portview: 'portview.csv',
