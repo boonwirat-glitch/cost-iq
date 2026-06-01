@@ -114,20 +114,26 @@ function _commGetConfig(metricCode, paramName, defaultVal) {
 const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                     'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-function _commCurrentMonthLabel() {
+// ── lag anchor: วันที่ 1 มิ.ย. → lag = 31 พ.ค. → label = "พ.ค." ตรงกับ upsell CSV ──
+function _commLagDate() {
   const n = new Date();
+  n.setDate(n.getDate() - 1);  // day-1 lag: same anchor as portview/NRR/Q7B
+  return n;
+}
+function _commCurrentMonthLabel() {
+  const n = _commLagDate();
   return _TH_MONTHS[n.getMonth()] + ' ' + (n.getFullYear() + 543);
 }
 
 function _commBaselineMonthLabel() {
-  const n = new Date();
+  const n = _commLagDate();
   const b = new Date(n.getFullYear(), n.getMonth() - 1, 1);
   return _TH_MONTHS[b.getMonth()] + ' ' + (b.getFullYear() + 543);
 }
 
-// Generate Thai month label N months before current
+// Generate Thai month label N months before current (lag-anchored)
 function _commMonthLabelOffset(monthsBack) {
-  const n = new Date();
+  const n = _commLagDate();
   const d = new Date(n.getFullYear(), n.getMonth() - monthsBack, 1);
   return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
 }
