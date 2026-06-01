@@ -856,8 +856,13 @@ function handleFileUpload(type,input){
         if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
         const sl2=document.getElementById('slot-current_movements');
         if(sl2)sl2.style.borderColor='var(--g500)';
-        console.log('[Freshket Sense] current movements loaded',{rows:rows.length,types:Object.keys(byMovementType)});
-        try{if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(200);}catch(e){}
+        const _mvSummary=Object.entries(byMovementType).map(([t,r])=>t+'='+r.length).join(', ');
+        console.log('%c[Sense] movements loaded','color:#4ddc97',{total:rows.length, breakdown:_mvSummary,
+          transfer_in:(byMovementType.transfer_in||[]).length, new_sales:(byMovementType.new_sales||[]).length,
+          sales_to_kam:(byMovementType.sales_to_kam||[]).length});
+        // v259: signal RenderBus so NRR cohort split re-classifies with movement data
+        if(window.RenderBus) window.RenderBus.signal('current_movements');
+        else try{if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(200);}catch(e){}
       }catch(err){console.warn('[Freshket Sense] current_movements parse failed',err);}
       _done();
     };reader.readAsText(file);return;
