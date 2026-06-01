@@ -61,8 +61,8 @@ mtd_items AS (
   CROSS JOIN UNNEST(o.item) AS i
   JOIN kam_map ON o.account_id = kam_map.account_id
   WHERE TRUE
-    AND o.delivery_date >= DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH)
-    AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)  -- day-1 lag guard
+    AND o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH)
+    AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)  -- day-1 lag: both bounds use lag_date so range is never impossible
 )
 SELECT
   account_id,
