@@ -1,4 +1,4 @@
-<!-- Freshket Sense v265: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v266: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v265',
+      version: 'v266',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -10501,7 +10501,7 @@ function handleFileUpload(type,input){
           const movementMonth=(p[0]||'').trim();
           const movementType=(p[1]||'').trim();
           const userId=(p[2]||'').trim();
-          const accountId=normId(p[3]);
+          const accountId=String(p[3]==null?'':p[3]).trim();
           const accountName=(p[4]||'').trim();
           const accountType=(p[5]||'').trim();
           const kamName=(p[6]||'').trim();
