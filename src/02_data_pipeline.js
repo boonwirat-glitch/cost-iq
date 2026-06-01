@@ -828,7 +828,7 @@ function handleFileUpload(type,input){
           const movementMonth=(p[0]||'').trim();
           const movementType=(p[1]||'').trim();
           const userId=(p[2]||'').trim();
-          const accountId=normId(p[3]);
+          const accountId=String(p[3]==null?'':p[3]).trim();
           const accountName=(p[4]||'').trim();
           const accountType=(p[5]||'').trim();
           const kamName=(p[6]||'').trim();
