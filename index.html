@@ -1,4 +1,4 @@
-<!-- Freshket Sense v280: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v281: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -587,7 +587,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .kav-status-label.great,.kav-status-label.safe{color:#4ddc97}
 .kav-status-label.warn{color:#f0b000}
 .kav-status-label.danger{color:#ff5050}
-.kav-status-label.early{color:rgba(255,255,255,.45);letter-spacing:.4px}
+.kav-status-label.early{color:rgba(140,180,255,.85);letter-spacing:.4px}
 
 /* stat row: 3 cells — MTD | ควรได้ | RUN RATE/BASELINE */
 .kav-stat-row{display:flex;border-top:1px solid rgba(255,255,255,.06);padding:10px 0 12px;gap:0}
@@ -2281,7 +2281,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .pv-status-label.great,.pv-status-label.safe,.pv-status-label.ok{color:rgba(77,220,151,.5)}
 .pv-status-label.warn{color:rgba(240,176,0,.5)}
 .pv-status-label.danger{color:rgba(229,83,62,.5)}
-.pv-status-label.early{color:rgba(255,255,255,.3);letter-spacing:.3px}
+.pv-status-label.early{color:rgba(140,180,255,.8);letter-spacing:.3px}
 .pv-sparkline{display:flex;align-items:flex-end;gap:2px;height:14px;margin-top:3px}
 .pv-sp-bar{border-radius:2px 2px 0 0;flex-shrink:0}
 .pv-sku-seg{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;border:1px solid}
@@ -5013,7 +5013,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v280',
+      version: 'v281',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -19093,7 +19093,7 @@ function _renderKamZone1Status(){
   if(daysEl){
     if(_isEarlyMonth){
       const _updateDay = 6; // pace reliable after day 5, shows on day 6
-      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.55">· อัพเดทวันที่ ${_updateDay}</span>`;
+      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.85;color:rgba(140,180,255,.9)">· อัพเดทวันที่ ${_updateDay}</span>`;
     } else {
       daysEl.textContent=`${sig.daysElapsed} / ${sig.daysInMonth} วัน`;
     }
