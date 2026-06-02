@@ -1,4 +1,4 @@
-<!-- Freshket Sense v271: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v272: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4859,7 +4859,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v271',
+      version: 'v272',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -22471,11 +22471,12 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     var _tvVisitN=window._tvVisitMap
       ?Object.values(window._tvVisitMap).reduce(function(s,v){return s+Object.keys(v||{}).length;},0):-1;
     var _tvUpsellN=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
+    var _tvDaysEl=(typeof portviewBulkData!=='undefined'&&portviewBulkData&&portviewBulkData[0])?portviewBulkData[0].daysElapsed||0:0;
     var _tvKey=[
       typeof tvViewMode!=='undefined'?tvViewMode:'full',
       typeof teamviewLevel!=='undefined'?(teamviewLevel||''):'',
       typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
-      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN
+      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN,_tvDaysEl
     ].join('|');
     if(el._lastTvListKey===_tvKey&&el.children.length>0){
       try{window._senseDataLog('TEAMVIEW','⚡ value guard — skip repaint (unchanged)');}catch(e){}
