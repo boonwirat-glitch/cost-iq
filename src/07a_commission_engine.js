@@ -2375,3 +2375,180 @@ async function _commLoadHistory(lookbackMonths) {
   }
 }
 window._commLoadHistory = _commLoadHistory;
+
+
+// ============================================================
+// Folded from 08_patches.js — Step 2 dissolve
+// ============================================================
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v212b-panel-target-ui-js
+//////////////////////////////////////////////////////////////////////////////
+
+// v212b — Data panel counter sync + target comma formatting + redundant badge cleanup.
+// Scope: UI/freshness visibility only. No NRR, commission, owner, or movement formula changes.
+(function(global){
+  'use strict';
+  var VERSION = 'v212b-pwa-freshness-ui-fix';
+  var FOREGROUND_KEYS = ['portview','history','categories','sku_current','outlets','handover'];
+
+  function countObj(o){ try{ return o && typeof o === 'object' ? Object.keys(o).length : 0; }catch(e){ return 0; } }
+  function loadedTabs(){ try{ if(typeof _cloudLoadedTabs !== 'undefined' && _cloudLoadedTabs && typeof _cloudLoadedTabs.has === 'function') return _cloudLoadedTabs; }catch(e){} return null; }
+  function hasTab(tab){ var t=loadedTabs(); return !!(t && t.has(tab)); }
+  function dataLoaded(key){
+    try{
+      if(key === 'portview') return hasTab('portview') || (Array.isArray(global.portviewBulkData) && global.portviewBulkData.length > 0);
+      if(key === 'history') return hasTab('history') || countObj(global.bulkHistoryData) > 0;
+      if(key === 'categories') return hasTab('categories') || countObj(global.bulkCatsData) > 0 || countObj(global.bulkCategoriesData) > 0;
+      if(key === 'sku_current') return hasTab('sku_current') || countObj(global.bulkSkuCurrentData) > 0;
+      if(key === 'outlets') return hasTab('outlets') || countObj(global.bulkOutletsData) > 0;
+      if(key === 'handover'){
+        var h = global.bulkHandoverData || {};
+        return hasTab('handover') || countObj(h.byAccountId) > 0 || countObj(h.byKamName) > 0;
+      }
+    }catch(e){}
+    return false;
+  }
+  function keyToTab(key){ return key === 'sku_current' ? 'sku_current' : key; }
+  function styleChip(key, ok){
+    try{
+      var id = 'sp-' + keyToTab(key);
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.style.background = ok ? 'rgba(0,208,112,.18)' : 'rgba(0,0,0,.06)';
+      el.style.color = ok ? 'var(--g700)' : 'var(--n500)';
+      el.style.fontWeight = ok ? '800' : '600';
+    }catch(e){}
+  }
+  function syncPanelCounter(){
+    var loaded = 0;
+    FOREGROUND_KEYS.forEach(function(k){ var ok = dataLoaded(k); if(ok) loaded++; styleChip(k, ok); });
+    var counter = document.getElementById('sheets-loaded-count');
+    if(counter){
+      counter.style.display = 'inline-block';
+      counter.textContent = loaded >= FOREGROUND_KEYS.length ? (loaded + '/' + FOREGROUND_KEYS.length) : (loaded >= 3 ? 'Core 3/3' : (loaded + '/' + FOREGROUND_KEYS.length));
+      counter.title = loaded >= FOREGROUND_KEYS.length
+        ? 'Foreground data loaded: portview, history, handover, categories, sku_current, outlets'
+        : 'Core data is ready. Enhancement files may still load in background.';
+      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'rgba(0,208,112,.16)' : 'rgba(38,96,200,.15)';
+      counter.style.color = loaded >= FOREGROUND_KEYS.length ? 'var(--g700)' : 'rgba(38,96,200,.85)';
+    }
+    return {loaded:loaded,total:FOREGROUND_KEYS.length,keys:FOREGROUND_KEYS.slice()};
+  }
+
+  function parseTargetNumber(v){
+    try{
+      if(typeof global._tgtParseInput === 'function') return global._tgtParseInput(String(v||''));
+    }catch(e){}
+    var s = String(v||'').replace(/,/g,'').replace(/฿/g,'').trim().toLowerCase();
+    if(!s || s === '—') return 0;
+    if(s.endsWith('m')) return Math.round((parseFloat(s)||0)*1000000);
+    if(s.endsWith('k')) return Math.round((parseFloat(s)||0)*1000);
+    return Math.round(parseFloat(s)||0);
+  }
+  function fmtComma(n){
+    n = Number(n||0);
+    if(!Number.isFinite(n) || n <= 0) return '';
+    return Math.round(n).toLocaleString('en-US');
+  }
+  function formatTargetInput(el){
+    if(!el || !el.classList || !el.classList.contains('tgt-month-input')) return;
+    var v = parseTargetNumber(el.value);
+    el.value = v > 0 ? fmtComma(v) : '';
+    try{ el.classList.toggle('changed', v > 0); }catch(e){}
+  }
+  function formatAllTargetInputs(root){
+    try{ (root||document).querySelectorAll('.tgt-month-input').forEach(formatTargetInput); }catch(e){}
+  }
+
+  // Override display helper so freshly rendered target sheets use comma format.
+  try{
+    global._tgtFmtInput = function(n){ return fmtComma(n); };
+    try{ _tgtFmtInput = global._tgtFmtInput; }catch(e){}
+  }catch(e){}
+
+  // Wrap target render so existing raw-number targets become readable immediately.
+  try{
+    var oldRenderTargetSheetBody = global.renderTargetSheetBody;
+    if(typeof oldRenderTargetSheetBody === 'function' && !oldRenderTargetSheetBody.__v212bWrapped){
+      var wrappedRenderTargetSheetBody = function(){
+        var r = oldRenderTargetSheetBody.apply(this, arguments);
+        setTimeout(function(){ formatAllTargetInputs(document); }, 0);
+        return r;
+      };
+      wrappedRenderTargetSheetBody.__v212bWrapped = true;
+      global.renderTargetSheetBody = wrappedRenderTargetSheetBody;
+      try{ renderTargetSheetBody = wrappedRenderTargetSheetBody; }catch(e){}
+    }
+  }catch(e){}
+
+  // Format on blur, but don't fight the cursor on every keypress.
+  document.addEventListener('blur', function(e){
+    var el = e && e.target;
+    if(el && el.classList && el.classList.contains('tgt-month-input')) formatTargetInput(el);
+  }, true);
+  document.addEventListener('focus', function(e){
+    var el = e && e.target;
+    if(el && el.classList && el.classList.contains('tgt-month-input')){
+      try{ el.inputMode = 'decimal'; }catch(x){}
+    }
+  }, true);
+
+  // Keep the panel counter honest after any load/status render, and after opening the panel.
+  try{
+    var oldUpdateDataStatus = global.updateDataStatus;
+    if(typeof oldUpdateDataStatus === 'function' && !oldUpdateDataStatus.__v212bWrapped){
+      var wrappedUpdateDataStatus = function(){
+        var r = oldUpdateDataStatus.apply(this, arguments);
+        setTimeout(syncPanelCounter, 0);
+        return r;
+      };
+      wrappedUpdateDataStatus.__v212bWrapped = true;
+      global.updateDataStatus = wrappedUpdateDataStatus;
+      try{ updateDataStatus = wrappedUpdateDataStatus; }catch(e){}
+    }
+  }catch(e){}
+  try{
+    var oldOpenDataPanel = global.openDataPanel;
+    if(typeof oldOpenDataPanel === 'function' && !oldOpenDataPanel.__v212bWrapped){
+      var wrappedOpenDataPanel = function(){
+        var r = oldOpenDataPanel.apply(this, arguments);
+        setTimeout(syncPanelCounter, 80);
+        setTimeout(syncPanelCounter, 800);
+        return r;
+      };
+      wrappedOpenDataPanel.__v212bWrapped = true;
+      global.openDataPanel = wrappedOpenDataPanel;
+      try{ openDataPanel = wrappedOpenDataPanel; }catch(e){}
+    }
+  }catch(e){}
+
+  // Also resync after foreground/enhancement loads, without forcing network.
+  [1200, 3000, 6000, 12000].forEach(function(ms){ setTimeout(syncPanelCounter, ms); });
+
+  var api = Object.freeze({
+    version: VERSION,
+    syncPanelCounter: syncPanelCounter,
+    formatTargetInputs: function(){ formatAllTargetInputs(document); },
+    parseTargetNumber: parseTargetNumber,
+    formatComma: fmtComma
+  });
+  global.FreshketSenseV212b = api;
+  try{
+    var prevA = global.FreshketSenseV212a;
+    if(prevA && typeof prevA === 'object'){
+      // Do not mutate frozen v212a object; expose v212b separately.
+    }
+  }catch(e){}
+})(window);
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
