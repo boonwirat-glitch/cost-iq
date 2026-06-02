@@ -554,7 +554,7 @@
       var btn=document.getElementById('pvDrillToggleBtn');
       if(btn){
         var anyOpen=expandAll||outlets.some(function(_,i){return window._pvDrillExpandState['pvd'+i];});
-        btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+        btn.innerHTML=anyOpen?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
       }
     };
 
@@ -574,7 +574,7 @@
       +'<div style="padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<div style="flex:1;text-align:center;border-right:1px solid rgba(188,215,255,.08)"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+totalOutlets+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">outlet</div></div>'
       +'<div style="flex:1;text-align:center"><div style="font-size:15px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(totalComm)+'</div><div style="font-size:9px;color:rgba(225,238,255,.35);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">commission</div></div>'
-      +'<button id="pvDrillToggleBtn" onclick="_pvDrillRebuild(this.textContent===\'ขยายทั้งหมด\')" style="flex-shrink:0;margin-left:12px;padding:5px 10px;border-radius:8px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.65);font-size:11px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">'+(allExpandedInitially?'ย่อทั้งหมด':'ขยายทั้งหมด')+'</button>'
+      +'<button id="pvDrillToggleBtn" onclick="window._pvDrillRebuild(this.dataset.exp!==\'1\')" data-exp="'+(allExpandedInitially?'1':'0')+'" title="ขยาย/ย่อ" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:rgba(255,255,255,.06);border-radius:7px;cursor:pointer;color:rgba(255,255,255,.55);flex-shrink:0">'+(allExpandedInitially?'<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>':'<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor"/></svg>')+'</button>'
       +'</div>'
       +'<div style="display:grid;'+colsHdGrid+';padding:6px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(188,215,255,.10);font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:rgba(225,238,255,.35);font-family:\'IBM Plex Mono\',monospace">'+colsHdStr+'<span></span></div>'
       +'</div>'
@@ -632,7 +632,7 @@
     var btn=document.getElementById('pvDrillToggleBtn');
     if(btn&&window._pvDrillExpandState){
       var anyOpen=Object.values(window._pvDrillExpandState).some(function(v){return v;});
-      btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+      btn.innerHTML=anyOpen?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
     }
   };
 
@@ -845,7 +845,7 @@
       var chev=document.getElementById('pvExChev'+aid);
       if(chev){chev.style.transform=isOpen?'':'rotate(90deg)';chev.style.color=isOpen?'rgba(0,200,176,.45)':'rgba(0,200,176,.85)';}
       var btn=document.getElementById('pvExToggleBtn');
-      if(btn){var anyOpen=Object.values(expandState).some(Boolean);btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';}
+      if(btn){var anyOpen=Object.values(expandState).some(Boolean);btn.innerHTML=anyOpen?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';}
     };
     window._pvExToggleAll=function(){
       var anyOpen=Object.values(expandState).some(Boolean);
@@ -857,7 +857,7 @@
         if(chev){chev.style.transform=target?'rotate(90deg)':'';chev.style.color=target?'rgba(0,200,176,.85)':'rgba(0,200,176,.45)';}
       });
       var btn=document.getElementById('pvExToggleBtn');
-      if(btn)btn.textContent=target?'ย่อทั้งหมด':'ขยายทั้งหมด';
+      if(btn)btn.innerHTML=target?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
     };
 
     // Scorecard: hero GMV + secondary account/outlet counts + commission
@@ -892,7 +892,7 @@
       +(allAccounts.length
         ?'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;flex-shrink:0;border-bottom:1px solid rgba(0,200,176,.08)">'
           +'<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(225,238,255,.35)">สาขาใหม่เดือนนี้</span>'
-          +'<button id="pvExToggleBtn" onclick="window._pvExToggleAll()" style="padding:4px 10px;border-radius:8px;background:rgba(0,200,176,.08);border:1px solid rgba(0,200,176,.18);color:rgba(0,200,176,.8);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">ขยายทั้งหมด</button>'
+          +'<button id="pvExToggleBtn" onclick="window._pvExToggleAll()" title="ขยาย/ย่อ" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:rgba(255,255,255,.06);border-radius:7px;cursor:pointer;color:rgba(255,255,255,.55);flex-shrink:0"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
           +'</div>'
           +'<div id="pvExList" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+buildRows()+'</div>'
         :'<div style="padding:24px;text-align:center;color:rgba(225,238,255,.35);font-size:13px">ไม่มีสาขาใหม่เดือนนี้</div>'
@@ -1118,7 +1118,7 @@
     var btn=document.getElementById('cds-toggle-btn');
     if(btn){
       var anyOpen=document.getElementById('cds-body').querySelectorAll('.cds-sub-rows.open').length>0;
-      btn.textContent=anyOpen?'ย่อทั้งหมด':'ขยายทั้งหมด';
+      btn.innerHTML=anyOpen?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
     }
   };
   window._cdsToggleAll=function(){
@@ -1130,7 +1130,7 @@
     chips.forEach(function(c){c.classList.toggle('open',!anyOpen);});
     subs.forEach(function(s){s.classList.toggle('open',!anyOpen);});
     var btn=document.getElementById('cds-toggle-btn');
-    if(btn)btn.textContent=anyOpen?'ขยายทั้งหมด':'ย่อทั้งหมด';
+    if(btn)btn.innerHTML=anyOpen?'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>':'<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>';
   };
 
   // ── Tab switch (L1 → L2 entry, or L2 tab switch) ────────────────────────
@@ -1510,7 +1510,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   if (meta) {
     meta.innerHTML = '<div class="cds-meta">'
       + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่มสินค้า · × ' + p1Rate + '%</span>'
-      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()" title="ขยาย/ย่อ"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
       + '</div>';
   }
 
@@ -1601,7 +1601,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   if (meta) {
     meta.innerHTML = '<div class="cds-meta">'
       + '<span class="cds-meta-text">' + outlets.length + ' outlet · ' + groups.length + ' กลุ่ม · &gt;' + p3ThreshPct + '% × ' + p3Rate + '%</span>'
-      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()" title="ขยาย/ย่อ"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
       + '</div>';
   }
 
@@ -1717,7 +1717,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   if (meta) {
     meta.innerHTML = '<div class="cds-meta">'
       + '<span class="cds-meta-text">' + allAccounts.length + ' account · ' + totalOutlets + ' outlet · × ' + ratePct + '%</span>'
-      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()">ขยายทั้งหมด</button>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()" title="ขยาย/ย่อ"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
       + '</div>';
   }
 
@@ -1730,7 +1730,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
     html += h.chipRow(rowId,
       esc(a.name),
       a.outlets.length + ' outlet',
-      fmt(acctComm), 'v-teal', ai < 3);
+      fmt(acctComm), 'v-amber', ai < 3);
 
     a.outlets.forEach(function(o, oi) {
       var outletComm = Math.round((o.currGmv || 0) * rate);
@@ -1907,7 +1907,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     var prevAcct = (g.outlets||[]).reduce(function(s,o){return s+(o.prevGmv||0);},0);
     var rrAcct = rr(g.currTotal||0);
     var mtdAcct = g.currTotal||0;
-    return '<div class="ncs-chip' + (autoOpen ? ' open' : '') + '" data-ncs-chip="1">'      + '<span class="ncs-chip-chev">&#8250;</span>'      + '<span class="ncs-chip-name">' + esc(g.acctName || '—') + '</span>'      + '<span class="ncs-chip-summary">'      + '<span><b>' + fmt(prevAcct) + '</b></span>'      + '<span style="color:rgba(255,165,50,.75)"><b>' + fmt(rrAcct) + '</b></span>'      + '<span><b>' + fmt(mtdAcct) + '</b></span>'      + '</span>'      + '</div>'
+    return '<div class="ncs-chip nrr-cols' + (autoOpen ? ' open' : '') + '" data-ncs-chip="1">'      + '<div class="ncs-outlet-name" style="display:flex;align-items:center;gap:5px"><span class="ncs-chip-chev" style="flex-shrink:0">&#8250;</span><span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.82)">' + esc(g.acctName || '—') + '</span></div>'      + '<div class="ncs-gmv base" style="font-size:11px">' + (prevAcct > 0 ? fmt(prevAcct) : '—') + '</div>'      + '<div class="ncs-gmv" style="font-size:11px;color:rgba(255,165,50,.85)">' + fmt(rrAcct) + '</div>'      + '<div class="ncs-gmv mtd" style="font-size:11px">' + fmt(mtdAcct) + '</div>'      + '</div>'
       + '<div class="ncs-outlet-rows' + (autoOpen ? ' open' : '') + '">' + outletRows + '</div>';
   }).join('');
 
@@ -1918,7 +1918,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     + (baseMonthLabel ? ' · ฐาน ' + esc(baseMonthLabel) : '');
   if (meta) meta.innerHTML = '<div class="cds-meta">'
     + '<span class="cds-meta-text">' + metaBarText + '</span>'
-    + '<button class="cds-toggle-btn" id="cds-toggle-btn">ขยายทั้งหมด</button>'
+    + '<button class="cds-toggle-btn" id="cds-toggle-btn" title="ขยาย/ย่อ"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
     + '</div>'
     + ctxHtml;
   body.innerHTML = rowsHtml;
@@ -1934,7 +1934,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     var btn = document.getElementById('cds-toggle-btn');
     if (btn) {
       var anyOpen = body.querySelectorAll('.ncs-outlet-rows.open').length > 0;
-      btn.textContent = anyOpen ? 'ย่อทั้งหมด' : 'ขยายทั้งหมด';
+      btn.innerHTML = anyOpen ? '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>' : '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
     }
   });
 
@@ -1947,7 +1947,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
       var anyOpen = outlets.some(function(r) { return r.classList.contains('open'); });
       chips.forEach(function(c)   { c.classList.toggle('open', !anyOpen); });
       outlets.forEach(function(r) { r.classList.toggle('open', !anyOpen); });
-      nrrToggleBtn.textContent = anyOpen ? 'ขยายทั้งหมด' : 'ย่อทั้งหมด';
+      nrrToggleBtn.innerHTML = anyOpen ? '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>' : '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>';
     };
   }
 
