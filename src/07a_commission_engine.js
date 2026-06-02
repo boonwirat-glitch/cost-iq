@@ -2260,8 +2260,13 @@ function _commSnapshotCsv(rows) {
   return [header, ...dataRows].join('\n');
 }
 // SECTION:SNAPSHOT_LOCK
-function exportCommissionSnapshotCsv() {
-  const rows = _commBuildSnapshotRows();
+function exportCommissionSnapshotCsv(periodOverride) {
+  // v288: export from stored snapshot (draft or final) — not live recompute
+  // This ensures CSV matches what was locked, not a re-run at export time.
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
+  const stored = (_commissionSnapshots || []).filter(r => r.period_month === period);
+  const rows = stored.length ? stored : _commBuildSnapshotRows();
+  const source = stored.length ? (stored.some(r => r.snapshot_status === 'final') ? 'final' : 'draft') : 'live';
   if (!rows.length) {
     if (typeof showToast === 'function') showToast('ยังไม่มีข้อมูล snapshot ให้ export', '!');
     return;
@@ -2271,40 +2276,98 @@ function exportCommissionSnapshotCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `freshket_commission_snapshot_${_nrrExclusionCurrentPeriod()}.csv`;
+  a.download = `freshket_commission_${source}_${period}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  console.log(`[CommExport] exported ${rows.length} rows from ${source} snapshot for ${period}`);
 }
-async function lockCommissionSnapshot() {
+// v288: computeCommissionDraft — บันทึก draft ก่อน lock
+// Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
+async function computeCommissionDraft(periodOverride) {
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
   const rows = _commBuildSnapshotRows();
   if (!rows.length) {
-    if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ lock', '!');
-    return;
+    if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ compute', '!');
+    return false;
   }
-  const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
-  if (pending > 0 && !confirm(`ยังมี exclusion pending ${pending} รายการ ต้องการ lock ต่อเลยหรือไม่?`)) return;
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   try {
     const payload = rows.map(r => ({
       ...r,
+      period_month: period,
+      snapshot_status: 'draft',
       breakdown: r.breakdown || {},
+      lock_note: periodOverride ? 'retroactive' : 'manual',
       updated_at: new Date().toISOString(),
       updated_by: actor,
-      created_by: r.created_by || actor,
-      locked_at: new Date().toISOString(),
-      locked_by: actor
+      created_by: r.created_by || actor
     }));
     const { data, error } = await supa.from('commission_payout_snapshots')
       .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
       .select('*');
     if (error) throw new Error(error.message);
-    _commissionSnapshots = data || payload;
-    if (typeof showToast === 'function') showToast('Lock commission snapshot สำเร็จ', 'ok');
-    renderCommissionLockTab();
+    // Merge into _commissionSnapshots — keep rows for other periods intact
+    const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
+    _commissionSnapshots = [...others, ...(data || payload)];
+    if (typeof showToast === 'function') showToast('Compute สำเร็จ — ตรวจก่อนกด Lock', 'ok');
+    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    console.log(`[CommDraft] saved ${payload.length} draft rows for ${period}`);
+    return true;
   } catch (e) {
-    console.error('[Commission lock] failed:', e);
+    console.error('[CommDraft] failed:', e);
+    if (typeof showToast === 'function') showToast('Compute ไม่สำเร็จ: ' + (e.message || ''), '!');
+    return false;
+  }
+}
+window.computeCommissionDraft = computeCommissionDraft;
+
+// v288: lockCommissionSnapshot — เปลี่ยน draft → final (ไม่ recompute)
+// ถ้ายังไม่มี draft → auto-compute ก่อน แล้ว lock ต่อ
+async function lockCommissionSnapshot(periodOverride) {
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
+  const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
+  if (pending > 0 && !confirm(`ยังมี exclusion pending ${pending} รายการ ต้องการ lock ต่อเลยหรือไม่?`)) return;
+  const actor = (currentUserProfile && currentUserProfile.email) || '';
+
+  // Use stored draft if available — otherwise compute now
+  let draftRows = (_commissionSnapshots || []).filter(r =>
+    r.period_month === period && r.snapshot_status === 'draft'
+  );
+  if (!draftRows.length) {
+    if (typeof showToast === 'function') showToast('กำลัง compute ก่อน lock...', 'ok');
+    const ok = await computeCommissionDraft(periodOverride);
+    if (!ok) return;
+    draftRows = (_commissionSnapshots || []).filter(r =>
+      r.period_month === period && r.snapshot_status === 'draft'
+    );
+  }
+  if (!draftRows.length) {
+    if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ lock', '!');
+    return;
+  }
+
+  try {
+    const payload = draftRows.map(r => ({
+      ...r,
+      snapshot_status: 'final',
+      locked_at: new Date().toISOString(),
+      locked_by: actor,
+      updated_at: new Date().toISOString(),
+      updated_by: actor
+    }));
+    const { data, error } = await supa.from('commission_payout_snapshots')
+      .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
+      .select('*');
+    if (error) throw new Error(error.message);
+    const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
+    _commissionSnapshots = [...others, ...(data || payload)];
+    if (typeof showToast === 'function') showToast('🔒 Lock commission สำเร็จ', 'ok');
+    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    console.log(`[CommLock] locked ${payload.length} rows for ${period}`);
+  } catch (e) {
+    console.error('[CommLock] failed:', e);
     if (typeof showToast === 'function') showToast('Lock ไม่สำเร็จ: ' + (e.message || ''), '!');
   }
 }
