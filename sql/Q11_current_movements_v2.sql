@@ -5,7 +5,7 @@
 -- Grain   :
 --   new_sales   = outlet level (Q10 logic ชี้ perf_month)
 --   transfer_in = account level (Apr commercial_owner ≠ SALE → May KAM ใหม่)
---   transfer_out= outlet level (Apr KAM order แต่ May owner เปลี่ยน)
+--   transfer_out= account level (aggregated from outlet grain, baseline_gmv = sum across all outlets)
 --
 -- Source of truth: commercial_owner + staff_owner จาก dwh.order
 -- ka_owner / sales_owner เป็นข้อมูลเสริมเท่านั้น
@@ -368,6 +368,38 @@ transfer_in_gmv AS (
   FROM transfer_in_outlets tio
   LEFT JOIN gmv_by_outlet prev ON prev.user_id=tio.user_id AND prev.month_label=tio.prev_label
   LEFT JOIN gmv_by_outlet curr ON curr.user_id=tio.user_id AND curr.month_label=tio.perf_label
+,
+
+transfer_out_account AS (
+  -- Aggregate outlet-grain transfer_out_filtered → account grain
+  -- baseline_gmv = SUM across all outlets of the account
+  -- email joined from user_master dim (prev KAM name lookup)
+  SELECT
+    tof.perf_label,
+    tof.account_id,
+    MAX(tof.account_name)                                AS account_name,
+    MAX(tof.account_type)                                AS account_type,
+    tof.prev_kam_name,
+    COALESCE(MAX(umk_prev.staff_owner_email),
+             MAX(umk_prev.kam_owner_email), '')          AS kam_email,
+    MAX(tof.current_commercial_owner)                    AS current_commercial_owner,
+    MAX(tof.current_kam_name)                            AS current_kam_name,
+    CAST(ROUND(SUM(tof.baseline_gmv)) AS INT64)          AS baseline_gmv,
+    MAX(tof.last_order_date)                             AS last_order_date,
+    MAX(tof.perf_days_in_month)                          AS perf_days_in_month,
+    MAX(tof.prev_days_in_month)                          AS prev_days_in_month,
+    MAX(tof.days_elapsed)                                AS days_elapsed,
+    MAX(tof.prev_label)                                  AS prev_label
+  FROM transfer_out_filtered tof
+  LEFT JOIN (
+    SELECT DISTINCT
+      TRIM(COALESCE(NULLIF(um.staff_owner,''), NULLIF(um.kam_owner,''), NULLIF(um.ka_owner,''))) AS kam_name,
+      NULLIF(um.staff_owner_email,'')  AS staff_owner_email,
+      NULLIF(um.kam_owner_email,'')    AS kam_owner_email
+    FROM `freshket-rn.dim.user_master` um
+    WHERE um.res_id IS NOT NULL
+  ) umk_prev ON TRIM(umk_prev.kam_name) = tof.prev_kam_name
+  GROUP BY tof.account_id, tof.prev_kam_name, tof.perf_label
 )
 
 -- ── Final output ──────────────────────────────────────────────
@@ -428,17 +460,17 @@ UNION ALL
 SELECT
   perf_label                                           AS movement_month,
   'transfer_out'                                       AS movement_type,
-  user_id,
+  NULL                                                 AS user_id,
   account_id,
   account_name,
   account_type,
   prev_kam_name                                        AS kam_name,
-  ''                                                   AS kam_email,
+  kam_email,
   'KAM'                                                AS owner_from_type,
   prev_kam_name                                        AS owner_from_name,
-  COALESCE(current_commercial_owner,'')               AS owner_to_type,
+  COALESCE(current_commercial_owner,'')                AS owner_to_type,
   COALESCE(current_kam_name,'')                        AS owner_to_name,
-  CAST(ROUND(baseline_gmv) AS INT64)                   AS baseline_gmv,
+  baseline_gmv,
   0                                                    AS current_gmv,
   perf_days_in_month                                   AS current_days_in_month,
   prev_days_in_month                                   AS baseline_days_in_month,
@@ -447,6 +479,7 @@ SELECT
   'high'                                               AS confidence,
   NULL                                                 AS new_user_exp_date,
   NULL                                                 AS first_dollar_date
-FROM transfer_out_filtered
+FROM transfer_out_account
 
 ORDER BY movement_type, kam_name, baseline_gmv DESC;
+
