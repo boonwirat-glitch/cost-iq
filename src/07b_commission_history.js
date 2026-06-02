@@ -102,6 +102,31 @@ function _commRenderHistoryList(ov, allRows, role, email) {
       +'</div></div>';
   }).join('');
 
+  // v288 B: current month row
+  var _cp=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})();
+  var _cr=(allRows||[]).filter(function(r){return r.period_month===_cp;});
+  var _cf=_cr.some(function(r){return r.snapshot_status==='final';});
+  var _cd=!_cf&&_cr.some(function(r){return r.snapshot_status==='draft';});
+  var _ca=null,_cn=null;
+  try{
+    if(isRepRole(role)&&typeof _commBuildKamPayout==='function'){var _zz=_commBuildKamPayout(email);if(_zz){_ca=_zz.final_payout;_cn=_zz.nrr_pct;}}
+    else if(isTLRole(role)&&typeof _commBuildTlPayout==='function'){var _zz=_commBuildTlPayout(email);if(_zz){_ca=_zz.final_payout;_cn=_zz.nrr_pct;}}
+  }catch(e){}
+  var _cmr=_cr.find(function(r){return isRepRole(role)?r.beneficiary_role==='kam':r.beneficiary_role==='tl';})||_cr[0];
+  if(_cmr){_ca=Number(_cmr.payout_amount||0);_cn=_cmr.governed_nrr_pct;}
+  var _cl=_cf?'🔒 ล็อกแล้ว':_cd?'Draft · รอ lock':'Live · ยังไม่ lock';
+  var _cc=_cf?'#ffe08a':_cd?'rgba(255,224,138,.55)':'rgba(225,238,255,.40)';
+  var _cns=_cn!=null?_cn+'%':'—';
+  var currentMonthHtml='<div style="padding:13px 18px 12px;border-bottom:2px solid rgba(188,215,255,.12);background:rgba(188,215,255,.03)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between">'
+    +'<div><div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.88)">'+fmtPeriod(_cp)+'</div>'
+    +'<div style="font-size:10px;margin-top:2px;color:'+_cc+'">'+_cl+'</div></div>'
+    +'<div style="text-align:right">'
+    +(_ca!=null?'<div style="font-size:14px;font-weight:900;color:'+_cc+';font-family:\'IBM Plex Mono\',monospace">'+money(_ca)+'</div>':'<div style="font-size:13px;color:rgba(225,238,255,.25)">—</div>')
+    +(_cns!=='—'?'<div style="font-size:10px;color:rgba(188,215,255,.40);margin-top:2px">NRR '+_cns+'</div>':'')
+    +'</div></div></div>';
+
+
   // Store rows globally for detail lookup
   window._commHistoryAllRows = allRows;
 
@@ -111,7 +136,8 @@ function _commRenderHistoryList(ov, allRows, role, email) {
       +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
       +'<button onclick="closeCommissionHistory()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
     +'</div>'
-    +'<div style="font-size:10px;color:rgba(188,215,255,.35);padding:0 18px 10px;font-family:\'IBM Plex Mono\',monospace">6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
+    +'<div style="font-size:10px;color:rgba(188,215,255,.35);padding:0 18px 10px;font-family:\'IBM Plex Mono\',monospace">เดือนนี้ + 6 เดือนย้อนหลั๧ · tap เพื่อดู reconcile</div>'
+    +currentMonthHtml
     +listHtml
     +'<div style="height:24px"></div>'
     +'</div>';
