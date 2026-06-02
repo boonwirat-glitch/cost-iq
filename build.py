@@ -2,11 +2,11 @@
 """
 Freshket Sense build script
 Usage: python build.py [version]
-Example: python build.py v225
+Example: python build.py v255
 """
 import os, sys
 
-VERSION = sys.argv[1] if len(sys.argv) > 1 else 'v225'
+VERSION = sys.argv[1] if len(sys.argv) > 1 else 'v255'
 
 MAIN_MODULES = [
     '01_core',
@@ -25,20 +25,34 @@ shell         = read('src/shell.html')
 main_js       = ''.join(read(f'src/{m}.js') for m in MAIN_MODULES)
 commission_js = read('src/07a_commission_engine.js') + read('src/07b_commission_ui.js')
 patches_js    = read('src/08_patches.js')
+styles_main   = read('src/styles_main.css')
+styles_comm   = read('src/styles_commission.css')
 
 out = (shell
+    # ── CSS injections ──
+    .replace('<style>\n<!-- INJECT_STYLES_MAIN -->\n</style>',
+             f'<style>\n{styles_main}</style>')
+    .replace('<style id="target-module-css">\n<!-- INJECT_STYLES_COMMISSION -->\n</style>',
+             f'<style id="target-module-css">\n{styles_comm}</style>')
+    # ── JS injections ──
     .replace('<script>\n<!-- INJECT_MAIN_SCRIPT -->\n</script>\n',
              f'<script>\n{main_js}</script>\n')
     .replace('<script id="target-module-js">\n<!-- INJECT_COMMISSION -->\n</script>\n',
              f'<script id="target-module-js">\n{commission_js}</script>\n')
     .replace('<script id="freshket-patches-consolidated">\n<!-- INJECT_PATCHES -->\n</script>\n',
              f'<script id="freshket-patches-consolidated">\n{patches_js}</script>\n')
-    # Inject build version — keeps currentBuild() accurate in console
+    # ── Build version ──
     .replace("version: 'v212c-diagnostics-counter-fix'",
              f"version: '{VERSION}'")
     .replace('<!-- Freshket Sense v224d:',
              f'<!-- Freshket Sense {VERSION}:')
 )
+
+# Verify no unresolved placeholders remain
+for p in ['INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION',
+          'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES']:
+    if p in out:
+        print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
 os.makedirs('dist', exist_ok=True)
 path = f'dist/sense_{VERSION}.html'
