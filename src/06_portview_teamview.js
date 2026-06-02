@@ -1096,8 +1096,13 @@ function _pvBuildCompactStrip(){
   const accounts=getPortviewAccounts();
   if(!accounts||!accounts.length){strip.innerHTML='';return;}
   const fK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n);
-  const acctWithPace=accounts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
-  const portfolioPace=acctWithPace.length>0?Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100):0;
+  const acctWithPace=accounts.filter(a=>a.paceSignal&&(a.paceSignal.histMonths>0||a.paceSignal.isNew===false));
+  const _earlyMonth=acctWithPace.length>0&&(acctWithPace[0].paceSignal.daysElapsed||0)<5;
+  const portfolioPace=acctWithPace.length>0
+    ?(_earlyMonth
+      ?Math.round(acctWithPace.reduce((s,a)=>s+(a.paceSignal.lastGmv||0),0)/Math.max(1,acctWithPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0))*100)
+      :Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100))
+    :0;
   const ppCls=portfolioPace>=100?'great':portfolioPace>=95?'safe':portfolioPace>=85?'warn':'danger';
   const paceColor=ppCls==='great'||ppCls==='safe'?'#4ddc97':ppCls==='warn'?'var(--amb)':'#ff8888';
   const okA=accounts.filter(a=>!a.paceSignal||(a.paceSignal.cls==='great'||a.paceSignal.cls==='safe'));
@@ -1796,12 +1801,15 @@ function renderTeamviewSummary(){
 function __legacyRenderTeamviewSummaryFallback(){
   const groups=_buildKamGroups();
   const allAccts=groups.flatMap(g=>g.accounts);
-  const withPace=allAccts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
-  const _tvTotalRunRate=withPace.reduce((s,a)=>s+(a.paceSignal.runrate||0),0);
+  const withPace=allAccts.filter(a=>a.paceSignal&&(a.paceSignal.histMonths>0||a.paceSignal.isNew===false));
+  const _tvEarlyMonth=withPace.length>0&&(withPace[0].paceSignal.daysElapsed||0)<5;
+  const _tvTotalRunRate=_tvEarlyMonth
+    ?withPace.reduce((s,a)=>s+(a.paceSignal.lastGmv||0),0)
+    :withPace.reduce((s,a)=>s+(a.paceSignal.runrate||0),0);
   const _tvTotalBaseline=groups.reduce((s,g)=>s+(g.baseline||0),0) || withPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0);
   const _tvTeamTargetInfo=_tvResolveTeamDenominator(groups,allAccts);
   const _tvDenominator=_tvTeamTargetInfo.denominator||_tvTotalBaseline;
-  const teamPace=_tvDenominator>0?Math.round(_tvTotalRunRate/_tvDenominator*100):(withPace.length?Math.round(withPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,withPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100):0);
+  const teamPace=_tvDenominator>0?Math.round(_tvTotalRunRate/_tvDenominator*100):(withPace.length?Math.round(withPace.reduce((s,a)=>s+(a.paceSignal.lastGmv||0),0)/Math.max(1,withPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0))*100):0);
   const teamPaceCls=teamPace>=105?'star':teamPace>=100?'great':teamPace>=95?'safe':teamPace>=90?'warn':'danger';
   const totalDanger=groups.filter(g=>g.paceCls==='danger').length;
   const totalWarn=groups.filter(g=>g.paceCls==='warn').length;
