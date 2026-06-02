@@ -85,12 +85,15 @@
 .ncs-meta{display:flex;align-items:center;gap:8px;padding:7px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
 .ncs-meta-text{font-size:12px;color:rgba(255,255,255,.75);flex:1;line-height:1.4}
 .ncs-sort-btn{font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap}
+.cds-toggle-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:rgba(255,255,255,.06);border-radius:7px;cursor:pointer;color:rgba(255,255,255,.55);flex-shrink:0;transition:background .15s}
+.cds-toggle-btn:hover{background:rgba(255,255,255,.11);color:rgba(255,255,255,.85)}
 .ncs-tbl-head{display:grid;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0}
 .ncs-tbl-head.nrr-cols{grid-template-columns:minmax(0,1fr) 54px 60px 54px}
 .ncs-tbl-head.simple-cols{grid-template-columns:minmax(0,1fr) 88px}
-.ncs-th{font-size:10px;font-weight:700;letter-spacing:.05em;color:rgba(255,255,255,.55);text-transform:uppercase}
+.ncs-th{font-size:10px;font-weight:700;letter-spacing:.05em;color:rgba(255,255,255,.82);text-transform:uppercase}
 .ncs-th.r{text-align:right}
 .ncs-chip{display:flex;align-items:center;gap:8px;padding:5px 14px;background:rgba(255,255,255,.055);border-top:1px solid rgba(255,255,255,.09);border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;user-select:none}
+.ncs-chip.nrr-cols{display:grid;grid-template-columns:minmax(0,1fr) 54px 60px 54px;gap:0}
 .ncs-chip-chev{font-size:10px;color:rgba(255,255,255,.3);transition:transform .15s;flex-shrink:0;width:10px}
 .ncs-chip.open .ncs-chip-chev{transform:rotate(90deg)}
 .ncs-chip-name{font-size:10px;font-weight:700;color:rgba(255,255,255,.6);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;letter-spacing:.01em}
