@@ -942,7 +942,8 @@ function __legacyRenderPortviewListFallback(){
     return`<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
   }
 
-  const _statusLabel=cls=>{
+  const _statusLabel=(cls,daysElapsed)=>{
+    if(cls==='safe' && daysElapsed>0 && daysElapsed<5)return'รอข้อมูล';
     if(cls==='great'||cls==='safe'||cls==='ok'||cls==='')return'ON TRACK';
     if(cls==='warn')return'MONITOR';
     if(cls==='danger')return'AT RISK';
@@ -978,7 +979,8 @@ function __legacyRenderPortviewListFallback(){
         </div>
       </div>`;
     }
-    const pctStr=sig?sig.pct+'%':'—';
+    const _earlyMonth=sig&&sig.cls==='safe'&&sig.daysElapsed<5;
+    const pctStr=_earlyMonth?`วันที่ ${sig.daysElapsed}`:(sig?sig.pct+'%':'—');
     const rrHtml=sig?(sig.runrate
       ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
@@ -992,7 +994,7 @@ function __legacyRenderPortviewListFallback(){
         </div>
         <div class="pv-right-block">
           <div class="portview-acct-pace ${cls}">${pctStr}</div>
-          <div class="pv-status-label ${cls}">${_statusLabel(cls)}</div>
+          <div class="pv-status-label ${cls==='safe'&&sig&&sig.daysElapsed<5?'early':cls}">${_statusLabel(cls,sig&&sig.daysElapsed||0)}</div>
           <div class="pv-sparkline">${spark}</div>
         </div>
       </div>
