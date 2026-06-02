@@ -77,8 +77,7 @@ kam_outlets AS (
     um.account_type,
     um.account_class,
     k.kam_name, k.kam_email, k.tl_email,
-    DATE(um.lasted_order_date)       AS lasted_order_date,
-    DATE(um.new_user_exp_date)       AS new_user_exp_date
+    DATE(um.lasted_order_date)       AS lasted_order_date
   FROM `freshket-rn.dim.user_master` um
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
@@ -154,7 +153,6 @@ outlet_enriched AS (
     COALESCE(gc.cur_gmv,0)        AS cur_gmv,
     COALESCE(gc.orders_to_date,0) AS orders_to_date,
     COALESCE(gc.cur_sku_count,0)  AS cur_sku_count,
-    ko.new_user_exp_date,
     -- days_with_current_kam ต่อ outlet (v207h logic: transfer pending = 0)
     CASE
       WHEN loo.last_order_kam IS NOT NULL
@@ -191,7 +189,6 @@ account_rolled AS (
     SUM(oe.cur_sku_count)             AS cur_sku_count,
     SUM(oe.orders_to_date)            AS orders_to_date,
     MAX(oe.days_with_current_kam)     AS days_with_current_kam,  -- outlet ที่อยู่นานสุด
-    MAX(oe.new_user_exp_date)         AS new_user_exp_date,       -- handover flag
     COUNT(*)                          AS outlet_count
   FROM outlet_enriched oe
   GROUP BY 1
@@ -280,8 +277,7 @@ SELECT
   alo.kam_name,                                                             -- [16]
   alo.kam_email,                                                            -- [17]
   alo.tl_email,                                                             -- [18]
-  ar.days_with_current_kam,                                                 -- [19]
-  ar.new_user_exp_date                                                      -- [20]
+  ar.days_with_current_kam                                                  -- [19]
 FROM account_rolled ar
 JOIN account_latest_outlet alo ON alo.account_id = ar.account_id
 LEFT JOIN churn_summary ch     ON ch.account_id  = ar.account_id
