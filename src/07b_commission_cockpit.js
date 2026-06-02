@@ -714,7 +714,7 @@ function renderCommLockStep(body) {
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?`ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ`:'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
-      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
+      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
     </div>
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
@@ -975,46 +975,60 @@ async function saveCommissionAssignments() {
 }
 
 
+// v288: renderCommissionLockTab — shows stored draft/final rows from Supabase
+// Compute button = _commBuildSnapshotRows() → save draft
+// Lock button    = draft → final (no recompute)
 function renderCommissionLockTab() {
   const body = document.getElementById('tgt-sheet-body');
   if (!body) return;
   const period = _nrrExclusionCurrentPeriod();
-  const rows = _commBuildSnapshotRows();
-  const finalRows = (_commissionSnapshots || []).filter(r => r.period_month === period && r.snapshot_status === 'final');
+  // Prefer stored rows — live compute only if nothing stored yet
+  const storedRows = (_commissionSnapshots || []).filter(r => r.period_month === period);
+  const finalRows  = storedRows.filter(r => r.snapshot_status === 'final');
+  const draftRows  = storedRows.filter(r => r.snapshot_status === 'draft');
+  const displayRows = finalRows.length ? finalRows : draftRows.length ? draftRows : [];
   const pending = (_nrrExclusions || []).filter(r => r.period_month === period && (r.status === 'submitted' || r.status === 'pending')).length;
-  const total = rows.reduce((s,r)=>s+Number(r.payout_amount || 0),0);
-  const finalTotal = finalRows.reduce((s,r)=>s+Number(r.payout_amount || 0),0);
   const isLocked = finalRows.length > 0;
+  const isDraft  = !isLocked && draftRows.length > 0;
+  const total    = displayRows.reduce((s,r)=>s+Number(r.payout_amount||0),0);
+  // Status label
+  const statusLabel = isLocked
+    ? `🔒 Locked · ${finalRows.length} rows · ${_commFmtPayout(total)}`
+    : isDraft
+      ? `Draft · ${draftRows.length} rows · ${_commFmtPayout(total)} · ยังไม่ได้ lock`
+      : 'ยังไม่มี snapshot — กด Compute ก่อน';
+  const statusCls = isLocked ? 'final' : isDraft ? 'draft' : '';
   body.innerHTML = `
     <div class="tgt-lock-hero">
       <div class="tgt-lock-title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(188,215,255,.95)" stroke-width="2.3" stroke-linecap="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         Period Lock & Snapshot
       </div>
-      <div class="tgt-lock-sub">Freeze current governed NRR + payout estimate into commission_payout_snapshots. ใช้เป็นฐานสำหรับ export / dispute / revision ต่อไป</div>
-      <span class="tgt-lock-status ${isLocked ? 'final' : ''}">${isLocked ? `Locked · ${finalRows.length} rows · ${_commFmtPayout(finalTotal)}` : `Draft preview · ${rows.length} rows · ${_commFmtPayout(total)}`}</span>
-      ${pending ? `<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้ รายการ pending จะไม่ถูกนับใน governed NRR final</div>` : ''}
+      <div class="tgt-lock-sub">${period} · Compute เพื่อ freeze ตัวเลข → ตรวจ → Lock เพื่อ confirm จ่ายเงิน</div>
+      <span class="tgt-lock-status ${statusCls}">${statusLabel}</span>
+      ${pending ? `<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ — approve ก่อน lock จะได้ตัวเลขถูกต้อง</div>` : ''}
       <div class="tgt-lock-actions">
-        <button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button>
-        <button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">${isLocked ? 'Re-lock / revise snapshot' : 'Lock snapshot'}</button>
+        <button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()" ${!displayRows.length?'disabled':''}>Export CSV</button>
+        <button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">↻ Compute</button>
+        <button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()" ${!isDraft&&!isLocked?'disabled':''}>${isLocked ? 'Re-lock' : 'Lock Final'}</button>
       </div>
     </div>
-    ${rows.length ? `<div class="tgt-snap-table-wrap">
+    ${displayRows.length ? `<div class="tgt-snap-table-wrap">
       <table class="tgt-snap-table">
-        <thead><tr><th>Role</th><th>Beneficiary</th><th>TL</th><th>Raw</th><th>Governed</th><th>Payout</th></tr></thead>
+        <thead><tr><th>Role</th><th>Beneficiary</th><th>TL</th><th>NRR%</th><th>Payout</th><th>Status</th></tr></thead>
         <tbody>
-          ${rows.map(r => `<tr>
+          ${displayRows.map(r => `<tr>
             <td><span class="tgt-snap-role ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</span></td>
             <td><div class="tgt-snap-name">${r.breakdown?.kam_name || r.breakdown?.team_lead_name || r.beneficiary_email}</div><div class="tgt-preview-meta">${r.beneficiary_email}</div></td>
             <td>${r.team_lead_email || '—'}</td>
-            <td class="tgt-snap-mono">${r.raw_nrr_pct !== null && r.raw_nrr_pct !== undefined ? r.raw_nrr_pct + '%' : '—'}</td>
             <td class="tgt-snap-mono">${r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct + '%' : '—'}</td>
             <td class="tgt-snap-mono">${_commFmtPayout(r.payout_amount)}</td>
+            <td><span class="tgt-snap-status ${r.snapshot_status||''}">${r.snapshot_status==='final'?'🔒':'Draft'}</span></td>
           </tr>`).join('')}
         </tbody>
       </table>
-    </div>` : `<div class="tgt-lock-empty">ยังไม่มีข้อมูลสำหรับ snapshot</div>`}
-    <div class="tgt-rule-note">v208e ยังเป็น snapshot layer — ถ้าต้องแก้หลัง lock จะใช้ re-lock/revision log ใน phase ถัดไป</div>
+    </div>` : `<div class="tgt-lock-empty">กด Compute เพื่อสร้าง snapshot</div>`}
+    <div class="tgt-rule-note">Compute = บันทึก draft · Lock = confirm final · Export ดึงจาก stored rows ไม่ recompute</div>
   `;
 }
 
