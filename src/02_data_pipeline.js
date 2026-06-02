@@ -835,12 +835,15 @@ function handleFileUpload(type,input){
           const kamEmail=(p[7]||'').trim();
           const ownerFromType=(p[8]||'').trim();
           const ownerFromName=(p[9]||'').trim();
+          const ownerToType=(p[10]||'').trim();
+          const ownerToName=(p[11]||'').trim();
           const baselineGmv=parseFloat(p[12])||0;
           const currentGmv=parseFloat(p[13])||0;
           const confidence=(p[18]||'').trim();
           if(!movementType||!accountId) return;
           const row={movementMonth,movementType,userId,accountId,accountName,accountType,
-                     kamName,kamEmail,ownerFromType,ownerFromName,baselineGmv,currentGmv,confidence};
+                     kamName,kamEmail,ownerFromType,ownerFromName,ownerToType,ownerToName,
+                     baselineGmv,currentGmv,confidence};
           rows.push(row);
           // v252: transfer_in wins — account ที่มีทั้ง transfer_in และ transfer_out outlet
           // ให้ classify เป็น transfer_in เสมอ (รับเข้ามาแล้ว บางส่วนออกไปก็ยังนับว่า transfer_in)
