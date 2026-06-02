@@ -380,8 +380,19 @@ function _renderKamZone1Status(){
   if(pctEl){pctEl.textContent=sig.pct!==null?sig.pct+'%':'—';pctEl.className='kav-pace-num '+(sig.cls||'');}
   // plain-text label matching portview: ON TRACK / MONITOR / AT RISK
   const _labelMap={great:'ON TRACK',safe:'ON TRACK',warn:'MONITOR',danger:'AT RISK',new:'NEW'};
-  if(chipEl){chipEl.textContent=_labelMap[sig.cls]||sig.label;chipEl.className='kav-status-label '+(sig.cls||'');}
-  if(daysEl)daysEl.textContent=`${sig.daysElapsed} / ${sig.daysInMonth} วัน`;
+  const _isEarlyMonth = sig.cls==='safe' && sig.daysElapsed < 5;
+  if(chipEl){
+    chipEl.textContent = _isEarlyMonth ? 'รอข้อมูล' : (_labelMap[sig.cls]||sig.label);
+    chipEl.className='kav-status-label '+(_isEarlyMonth?'early':sig.cls||'');
+  }
+  if(daysEl){
+    if(_isEarlyMonth){
+      const _updateDay = 6; // pace reliable after day 5, shows on day 6
+      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.55">· อัพเดทวันที่ ${_updateDay}</span>`;
+    } else {
+      daysEl.textContent=`${sig.daysElapsed} / ${sig.daysInMonth} วัน`;
+    }
+  }
   if(barEl){const _r=38,_c=2*Math.PI*_r,_d=_c*Math.min((sig.pct||0)/100,1);barEl.style.strokeDasharray=_d+' '+(_c-_d);barEl.setAttribute('class','kav-ring-fill '+(sig.cls||''));}
   const daysArcEl=document.getElementById('kav-days-arc-fill');
   if(daysArcEl&&sig.daysInMonth>0){const _dr=28,_dc=2*Math.PI*_dr,_dd=_dc*Math.min((sig.daysElapsed||0)/sig.daysInMonth,1);daysArcEl.style.strokeDasharray=_dd+' '+(_dc-_dd);}
