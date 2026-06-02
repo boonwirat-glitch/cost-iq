@@ -1923,8 +1923,9 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   if (meta) meta.innerHTML = ctxHtml + meta.innerHTML;
   body.innerHTML = rowsHtml;
 
-  // Chip toggle via event delegation (ncs-chip uses data-ncs-chip)
-  body.addEventListener('click', function(e) {
+  // Chip toggle via event delegation — use named fn to prevent listener stacking on tab re-entry
+  if (body._nrrChipHandler) body.removeEventListener('click', body._nrrChipHandler);
+  body._nrrChipHandler = function(e) {
     var chip = e.target.closest('[data-ncs-chip]');
     if (!chip) return;
     chip.classList.toggle('open');
@@ -1936,7 +1937,8 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
       var anyOpen = body.querySelectorAll('.ncs-outlet-rows.open').length > 0;
       btn.innerHTML = anyOpen ? '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><line x1=\"1\" y1=\"3.5\" x2=\"13\" y2=\"3.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"7\" x2=\"13\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"1\" y1=\"10.5\" x2=\"13\" y2=\"10.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>' : '<svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg>';
     }
-  });
+  };
+  body.addEventListener('click', body._nrrChipHandler);
 
   // Toggle-all for NRR tab (ncs- classes, not cds- classes)
   var nrrToggleBtn = document.getElementById('cds-toggle-btn');
