@@ -2614,56 +2614,6 @@ function _updateRestSwipe(grp,idx,opts){
 // NOTE: CSS for these lives in styles_main.css (PATCH CSS section).
 // Step 2b will dissolve dead code after per-patch mobile verification.
 // ══════════════════════════════════════════════════════════════
-
-// PATCH: freshket-v213c-pwa-teamview-responsive-repair-js
-//////////////////////////////////////////////////////////////////////////////
-
-// v213c — PWA Teamview responsive repair. UI only; no data/NRR/commission formula change.
-(function(global){
-  'use strict';
-  var VERSION='v213c-pwa-teamview-responsive-repair';
-  var DATA_EPOCH='2026-05-22-v213c-pwa-teamview-responsive-repair';
-  function log(){try{console.log.apply(console,['[Sense v213c]'].concat([].slice.call(arguments)));}catch(e){}}
-  function setVersion(){
-    try{ global.FRESHKET_BUILD='v213c'; }catch(e){}
-    try{ if(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app) global.FRESHKET_CONFIG.app.version=VERSION; }catch(e){}
-    try{ global.currentBuild=function(){return 'v213c';}; }catch(e){}
-    try{ if(global.FreshketSenseDebug){ var old=global.FreshketSenseDebug.version; global.FreshketSenseDebug.version=function(){
-      var base={}; try{base=typeof old==='function'?old():{};}catch(e){}
-      base.build=VERSION; base.dataEpoch=DATA_EPOCH; base.configVersion=(global.FRESHKET_CONFIG&&global.FRESHKET_CONFIG.app&&global.FRESHKET_CONFIG.app.version)||VERSION; base.currentBuild='v213c';
-      base.objects=Object.assign({},base.objects||{},{v213c:true}); return base;
-    }; } }catch(e){}
-  }
-  function isTeamview(){try{return !!document.getElementById('scr-teamview')?.classList.contains('on');}catch(e){return false;}}
-  function isSmall(){try{return global.matchMedia&&global.matchMedia('(max-width: 430px)').matches;}catch(e){return false;}}
-  function repairTeamview(){
-    try{
-      document.body.classList.toggle('v213c-teamview-active', isTeamview());
-      if(isTeamview() && isSmall()){
-        var fab=document.getElementById('aifab'); if(fab) fab.style.display='none';
-      }else{
-        var fab2=document.getElementById('aifab'); if(fab2 && fab2.style.display==='none') fab2.style.display='';
-      }
-    }catch(e){}
-  }
-  function wrapRenderers(){
-    ['renderTeamview','renderTeamviewSummary','renderTeamviewKamList','showScreen','setTvView'].forEach(function(name){
-      try{ var old=global[name]; if(typeof old==='function'&&!old.__v213cTeamRepair){
-        var wrapped=function(){ var r=old.apply(this,arguments); setTimeout(repairTeamview,0); setTimeout(repairTeamview,80); return r; };
-        wrapped.__v213cTeamRepair=true; global[name]=wrapped; try{ eval(name+'=wrapped'); }catch(e){}
-      }}catch(e){}
-    });
-  }
-  setVersion();
-  wrapRenderers();
-  try{ document.addEventListener('DOMContentLoaded',function(){setTimeout(repairTeamview,120);}); }catch(e){}
-  try{ global.addEventListener('resize',function(){setTimeout(repairTeamview,60);},{passive:true}); }catch(e){}
-  try{ global.addEventListener('pageshow',function(){setTimeout(repairTeamview,180);},{passive:true}); }catch(e){}
-  global.FreshketSenseV213c={version:VERSION,dataEpoch:DATA_EPOCH,repairTeamview:repairTeamview};
-  setTimeout(function(){repairTeamview();log('installed');},250);
-})(window);
-
-
 //////////////////////////////////////////////////////////////////////////////
 // PATCH: freshket-v213d-teamview-rail-cleanup-js
 //////////////////////////////////////////////////////////////////////////////
