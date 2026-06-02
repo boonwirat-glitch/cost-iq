@@ -2638,3 +2638,36 @@ function getThaiMonthDays(label){
 // Why normalize? Apr has 30 days, May has 31 — raw GMV totals
 //   are not directly comparable without day normalization.
 // ════════════════════════════════════════
+
+
+// ============================================================
+// Folded from 08_patches.js — Step 2 dissolve
+// ============================================================
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v207a-sense-opportunity-patch
+//////////////////////////////////////////////////////////////////////////////
+
+(function(global){
+  global.getFreshketV207aSenseFlowState=function(){
+    const grp=document.getElementById('swipe-grp-b');
+    const bnav=document.querySelector('.bnav');
+    return {
+      version: typeof VERSION!=='undefined'?VERSION:'v207a',
+      kamSenseActive: document.body.classList.contains('kam-sense-active'),
+      planExpanded: document.body.classList.contains('sense-plan-expanded'),
+      bodyOverflow: document.body.style.overflow||'',
+      opportunityCount: Array.isArray(global.OPPS)?global.OPPS.length:null,
+      selectedCount: (global.sel&&typeof global.sel.size==='number')?global.sel.size:null,
+      topImpact: Array.isArray(global.OPPS)?global.OPPS.slice().sort(function(a,b){
+        try{return (getAlt(b).save||0)-(getAlt(a).save||0);}catch(e){return 0;}
+      }).slice(0,8).map(function(o){return {name:o.curName, cat:o.cat, save:(getAlt(o)||{}).save||0};}):[],
+      grpB:{top:grp?grp.scrollTop:null, bottomCss:grp?getComputedStyle(grp).bottom:null},
+      bnav:{height:bnav?Math.round(bnav.getBoundingClientRect().height):null, paddingBottom:bnav?getComputedStyle(bnav).paddingBottom:null}
+    };
+  };
+})(window);
+
+
+//////////////////////////////////////////////////////////////////////////////
