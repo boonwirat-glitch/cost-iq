@@ -2284,3 +2284,226 @@ function _renderOverviewPaceAndStrip(){
   stripWrap.style.display='';
 }
 
+
+// ============================================================
+// Folded from 08_patches.js — Step 2 dissolve
+// ============================================================
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v212-data-freshness-js
+//////////////////////////////////////////////////////////////////////////////
+
+// v212 — Data Freshness & Loader Correctness patch.
+// Scope: loader/cache/PWA freshness only. No commission, owner-source, movement-attribution, or schema changes.
+(function(global){
+  'use strict';
+  var VERSION = 'v212-data-freshness-loader';
+  var DATA_EPOCH = '2026-05-22-v212-data-freshness';
+  var CRITICAL = ['portview','history','handover'];
+  var validateTimer = null;
+  var validateInFlight = null;
+  var lastValidateAt = Date.now(); // avoid double-validating immediately after first boot/pageshow
+
+  function debugOn(){ try{return localStorage.getItem('senseDebug')==='1'||localStorage.getItem('freshketDebug')==='1';}catch(e){return false;} }
+  function log(){ if(debugOn()) try{ console.log.apply(console, ['[v212 freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function warn(){ try{ console.warn.apply(console, ['[v212 freshness]'].concat([].slice.call(arguments))); }catch(e){} }
+  function now(){ return Date.now ? Date.now() : +new Date(); }
+  function isLoggedIn(){ try{return !!currentUser;}catch(e){return false;} }
+  function hasCoreData(){ try{return Array.isArray(portviewBulkData) && portviewBulkData.length>0;}catch(e){return false;} }
+  function onVisibleDataSurface(){
+    try{
+      return !!(document.getElementById('scr-portview')?.classList.contains('on') || document.getElementById('scr-teamview')?.classList.contains('on') || document.getElementById('scr-kam-overview')?.classList.contains('on'));
+    }catch(e){ return false; }
+  }
+  function hydrate(reason){
+    try{ if(typeof updateDataStatus==='function') updateDataStatus(); }catch(e){}
+    try{ if(typeof updateMatcherPreStatus==='function') updateMatcherPreStatus(); }catch(e){}
+    try{
+      if(typeof _senseHydrateVisiblePortfolio==='function') _senseHydrateVisiblePortfolio('v212-'+reason,{full:true,delay:120});
+      else {
+        if(typeof renderPortview==='function' && document.getElementById('scr-portview')?.classList.contains('on')) renderPortview();
+        if(typeof renderTeamview==='function' && document.getElementById('scr-teamview')?.classList.contains('on')) renderTeamview();
+      }
+    }catch(e){}
+    try{ if(typeof renderKamOverview==='function' && document.getElementById('scr-kam-overview')?.classList.contains('on')) renderKamOverview(); }catch(e){}
+  }
+  function summarizeFreshness(){
+    try{
+      var f=global.FreshketSenseDataFreshness||{};
+      return CRITICAL.map(function(k){ var x=f[k]||{}; return k+':'+(x.source||'unknown'); }).join(' · ');
+    }catch(e){ return ''; }
+  }
+  async function validateFreshnessOnResume(reason, opts){
+    opts = opts || {};
+    var minGap = opts.force ? 0 : 180000;
+    if(validateInFlight) return validateInFlight;
+    if(!isLoggedIn()) return false;
+    if(!opts.force && !hasCoreData()) return false;
+    if(!opts.force && now()-lastValidateAt < minGap) return false;
+    lastValidateAt = now();
+    validateInFlight = (async function(){
+      try{
+        if(navigator && navigator.onLine===false){
+          try{ if(typeof showToast==='function') showToast('ใช้ข้อมูล cached — offline','⚠'); }catch(e){}
+          return false;
+        }
+        if(typeof ensureCloudflareFiles !== 'function') return false;
+        log('validate start', reason, {surface:onVisibleDataSurface(), core:hasCoreData()});
+        try{ if(typeof _setDataPillText==='function') _setDataPillText('ตรวจข้อมูลล่าสุด','0/'+CRITICAL.length); }catch(e){}
+        var ok = await ensureCloudflareFiles(CRITICAL, {label:'ตรวจข้อมูลล่าสุด', force:true});
+        if(ok){
+          hydrate(reason||'resume');
+          try{ if(typeof showToast==='function') showToast('ข้อมูลล่าสุดแล้ว','✓'); }catch(e){}
+        }else{
+          try{ if(typeof showToast==='function') showToast('ตรวจข้อมูลล่าสุดไม่ครบ — ใช้ข้อมูลที่มีอยู่','⚠'); }catch(e){}
+        }
+        log('validate done', reason, {ok:ok, freshness:summarizeFreshness()});
+        return !!ok;
+      }catch(e){ warn('validate failed', reason, e&&e.message?e.message:e); return false; }
+      finally{ validateInFlight = null; }
+    })();
+    return validateInFlight;
+  }
+  function schedule(reason, opts){
+    opts = opts || {};
+    if(validateTimer) clearTimeout(validateTimer);
+    validateTimer = setTimeout(function(){
+      validateTimer = null;
+      validateFreshnessOnResume(reason, opts);
+    }, opts.delay == null ? 1200 : opts.delay);
+  }
+
+  // v225: visibilitychange/pageshow/focus/online listeners REMOVED from v212.
+  // Handled by ResumeCoordinator at end of 08_patches.js.
+
+  global.FreshketSenseV212 = {
+    version: VERSION,
+    dataEpoch: DATA_EPOCH,
+    criticalKeys: CRITICAL.slice(),
+    validateFreshnessOnResume: validateFreshnessOnResume,
+    getFreshness: function(){ try{return JSON.parse(JSON.stringify(global.FreshketSenseDataFreshness||{}));}catch(e){return global.FreshketSenseDataFreshness||{};} }
+  };
+})(window);
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: freshket-v225-resume-coordinator
+//////////////////////////////////////////////////////////////////////////////
+//
+// v225 ResumeCoordinator — Single entry point for all resume events.
+//
+// REPLACES: 12 individual event listeners from v206f, v212, v212a
+//   (visibilitychange × 3, pageshow × 3, focus × 3, online × 3)
+//
+// PROBLEM SOLVED: 3 independent patches each added their own listeners,
+// firing at t=1200/1600/2400ms on every screen wake → 3 renders per resume.
+//
+// DESIGN:
+//   - ONE set of event listeners for all resume triggers
+//   - Gate I11: skip if login form is visible (user may be typing)
+//   - Gate: skip if not logged in
+//   - Dedup: MIN_GAP 60s — no repeat check within 1 minute
+//   - Delegates to v212a.validateFreshnessOnResume (most comprehensive)
+//     which handles ETag check (CSV) + governance reload (Supabase)
+//   - If stale data found → ETag fetch → result goes through RenderBus
+//     (not direct renderXxx calls)
+//
+// INVARIANTS ENFORCED:
+//   I5: visibilitychange/pageshow → coordinator only
+//   I8: resume + data unchanged + <60s → zero render
+//   I11: login overlay visible → zero trigger
+
+(function(global){
+  'use strict';
+  var VERSION = 'v225-resume-coordinator';
+  var MIN_GAP_MS = 60000; // 60s — minimum gap between freshness checks
+  var _lastRunAt = Date.now(); // v225d: init to now — prevents initial pageshow from triggering ETag check (already runs via background timer)
+  var _timer = null;
+  var _inFlight = null;
+
+  function _isLoginVisible(){
+    try{
+      var ov = document.getElementById('login-overlay');
+      if(!ov) return false;
+      // Overlay is visible if display is not 'none' and doesn't have hidden class
+      return ov.style.display !== 'none' && !ov.classList.contains('lgi-hidden');
+    }catch(e){ return false; }
+  }
+
+  function _isLoggedIn(){
+    try{ return !!global.currentUser; }catch(e){ return false; }
+  }
+
+  function _schedule(reason, delayMs){
+    clearTimeout(_timer);
+    _timer = setTimeout(function(){
+      _timer = null;
+      _run(reason);
+    }, delayMs || 1200);
+  }
+
+  function _run(reason){
+    // Gate I11: don't disturb login form (user may be typing password)
+    if(_isLoginVisible()) return;
+    // Gate: not logged in yet — auth will handle data load
+    if(!_isLoggedIn()) return;
+    // Dedup: already checked recently
+    if(_inFlight) return;
+    var now = Date.now();
+    if(now - _lastRunAt < MIN_GAP_MS) return;
+    _lastRunAt = now;
+
+    _inFlight = (function(){
+      // Use v212a's unified validator (handles CSV ETag + governance/commission reload).
+      // Call with force:true to bypass its internal 180s dedup — coordinator owns timing.
+      var validator = null;
+      try{
+        if(global.FreshketSenseV212a && typeof global.FreshketSenseV212a.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212a.validateFreshnessOnResume;
+        } else if(global.FreshketSenseV212 && typeof global.FreshketSenseV212.validateFreshnessOnResume === 'function'){
+          validator = global.FreshketSenseV212.validateFreshnessOnResume;
+        }
+      }catch(e){}
+
+      var p = validator
+        ? validator(reason, {force: true})
+        : Promise.resolve(false);
+
+      p.catch(function(){}).finally
+        ? p.catch(function(){}).finally(function(){ _inFlight = null; })
+        : p.then(function(){ _inFlight = null; }, function(){ _inFlight = null; });
+
+      return p;
+    })();
+  }
+
+  // ── Single set of listeners (replaces 12 from v206f/v212/v212a) ──────────
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') _schedule('visibility-visible', 1200);
+  });
+  global.addEventListener('pageshow', function(event){
+    // bfcache restore (faster): 900ms; normal page show: 1800ms
+    _schedule(event && event.persisted ? 'pageshow-bfcache' : 'pageshow',
+              event && event.persisted ? 900 : 1800);
+  });
+  global.addEventListener('focus', function(){ _schedule('window-focus', 1400); });
+  global.addEventListener('online', function(){
+    // Network restored — check immediately (but still respect MIN_GAP)
+    _schedule('online', 450);
+  });
+
+  // Expose for diagnostics
+  global.FreshketSenseResumeCoordinator = {
+    version: VERSION,
+    getLastRunAt: function(){ return _lastRunAt; },
+    getState: function(){ return {lastRunAt: _lastRunAt, inFlight: !!_inFlight, timer: !!_timer}; }
+  };
+
+  try{ console.log('[Sense v225] ResumeCoordinator installed — replaces 12 resume listeners'); }catch(e){}
+})(window);
