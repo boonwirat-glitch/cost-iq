@@ -980,7 +980,7 @@ function __legacyRenderPortviewListFallback(){
       </div>`;
     }
     const _earlyMonth=sig&&sig.cls==='safe'&&sig.daysElapsed<5;
-    const pctStr=_earlyMonth?`วันที่ ${sig.daysElapsed}`:(sig?sig.pct+'%':'—');
+    const pctStr=sig?sig.pct+'%':'—';
     const rrHtml=sig?(sig.runrate
       ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
