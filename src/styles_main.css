@@ -305,7 +305,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .kav-status-label.great,.kav-status-label.safe{color:#4ddc97}
 .kav-status-label.warn{color:#f0b000}
 .kav-status-label.danger{color:#ff5050}
-.kav-status-label.early{color:rgba(255,255,255,.45);letter-spacing:.4px}
+.kav-status-label.early{color:rgba(140,180,255,.85);letter-spacing:.4px}
 
 /* stat row: 3 cells — MTD | ควรได้ | RUN RATE/BASELINE */
 .kav-stat-row{display:flex;border-top:1px solid rgba(255,255,255,.06);padding:10px 0 12px;gap:0}
@@ -1999,7 +1999,7 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .pv-status-label.great,.pv-status-label.safe,.pv-status-label.ok{color:rgba(77,220,151,.5)}
 .pv-status-label.warn{color:rgba(240,176,0,.5)}
 .pv-status-label.danger{color:rgba(229,83,62,.5)}
-.pv-status-label.early{color:rgba(255,255,255,.3);letter-spacing:.3px}
+.pv-status-label.early{color:rgba(140,180,255,.8);letter-spacing:.3px}
 .pv-sparkline{display:flex;align-items:flex-end;gap:2px;height:14px;margin-top:3px}
 .pv-sp-bar{border-radius:2px 2px 0 0;flex-shrink:0}
 .pv-sku-seg{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;border:1px solid}
