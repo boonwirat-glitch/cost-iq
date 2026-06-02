@@ -23,7 +23,13 @@ def read(p):
 
 shell         = read('src/shell.html')
 main_js       = ''.join(read(f'src/{m}.js') for m in MAIN_MODULES)
-commission_js = read('src/07a_commission_engine.js') + read('src/07b_commission_ui.js')
+commission_js = (
+    read('src/07a_commission_engine.js') +
+    read('src/07b_commission_cockpit.js') +
+    read('src/07b_nrr_target.js') +
+    read('src/07b_cds.js') +
+    read('src/07b_commission_history.js')
+)
 patches_js    = read('src/08_patches.js')
 styles_main   = read('src/styles_main.css')
 styles_comm   = read('src/styles_commission.css')
