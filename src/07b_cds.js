@@ -215,6 +215,9 @@
       +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
       +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
       +'</div>'
+      +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(188,215,255,.08);display:flex;justify-content:flex-end">'
+      +'<button style="font-size:10px;font-weight:700;color:rgba(188,215,255,.55);background:none;border:none;padding:2px 0;cursor:pointer;letter-spacing:.04em" onclick="event.stopPropagation();if(typeof openCommissionHistory===\'function\')openCommissionHistory();">ย้อนหลัง ›</button>'
+      +'</div>'
       +'</div>';
   }
   function renderCompactStrip(){
@@ -1098,7 +1101,7 @@
     return '<div class="cds-footer">'
       +(showExport?'<button class="cds-btn primary" onclick="'+esc(exportFn||'')+'">↓ Export CSV</button>':'')
       +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
-      +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">History</button>'
+      +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">Commission ย้อนหลัง</button>'
       +'</div>';
   }
 
@@ -1450,7 +1453,7 @@ window._cdsRenderL1 = function(src, st) {
     +heroHtml
     +exportBtn
     +'<div style="padding:0 18px 18px;display:flex;gap:7px;margin-top:6px">'
-    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">History</button>'
+    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">Commission ย้อนหลัง</button>'
     +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
     +'</div>';
 
