@@ -2732,3 +2732,264 @@ function _updateRestSwipe(grp,idx,opts){
 
 
 //////////////////////////////////////////////////////////////////////////////
+
+
+// ============================================================
+// Folded from 08_patches.js — Step 2 dissolve
+// ============================================================
+// PATCH: freshket-v213-guided-intelligence-ux-js
+//////////////////////////////////////////////////////////////////////////////
+
+(function(global){
+  'use strict';
+  var VERSION='v213-guided-intelligence-ux';
+  var SKU_FORCE=false;
+  function $(id){return document.getElementById(id);}
+  function log(){try{console.log.apply(console, ['[Freshket Sense v213]'].concat([].slice.call(arguments)));}catch(e){}}
+
+  function setBuildMetadata(){
+    try{ global.FRESHKET_BUILD=VERSION; }catch(e){}
+    try{ global.currentBuild=function(){return 'v213';}; }catch(e){}
+    try{
+      var cfg=global.FRESHKET_CONFIG || global.FreshketSenseConfig || {};
+      cfg.app=cfg.app||{}; cfg.app.version=VERSION;
+      global.FRESHKET_CONFIG=cfg;
+      if(global.FreshketSenseConfig){ global.FreshketSenseConfig.app=global.FreshketSenseConfig.app||{}; global.FreshketSenseConfig.app.version=VERSION; }
+    }catch(e){}
+    try{
+      var debug=global.FreshketSenseDebug;
+      if(debug && !debug.__v213Wrapped){
+        var oldVersion=debug.version;
+        var wrapped=Object.assign({}, debug, {version:function(){
+          var base={}; try{ base=oldVersion?oldVersion():{}; }catch(e){}
+          return Object.assign({}, base, {build:VERSION,currentBuild:'v213',uxPatch:'guided-intelligence'});
+        }});
+        wrapped.__v213Wrapped=true;
+        global.FreshketSenseDebug=wrapped;
+      }
+    }catch(e){}
+  }
+
+  function installViewportReset(){
+    try{
+      var meta=document.querySelector('meta[name="viewport"]');
+      if(meta){
+        var c=meta.getAttribute('content')||'';
+        if(!/maximum-scale/.test(c)) c += ', maximum-scale=1.0';
+        if(!/user-scalable/.test(c)) c += ', user-scalable=no';
+        meta.setAttribute('content', c.replace(/\s*,\s*/g, ', '));
+      }
+    }catch(e){}
+    function reset(reason){
+      try{ document.documentElement.classList.add('v213-app-entry-reset'); }catch(e){}
+      try{ if(document.activeElement && typeof document.activeElement.blur==='function') document.activeElement.blur(); }catch(e){}
+      try{ document.body.style.transform=''; document.body.style.zoom=''; }catch(e){}
+      [0,80,240,520].forEach(function(ms){ setTimeout(function(){ try{ if(reason==='entry'||reason==='login'||reason==='pageshow') global.scrollTo(0,0); }catch(e){} }, ms); });
+      setTimeout(function(){ try{ document.documentElement.classList.remove('v213-app-entry-reset'); }catch(e){} }, 750);
+    }
+    global.FreshketSenseV213_resetViewport=reset;
+    ['hideLoginOverlay','_autoRouteAfterLogin','checkSession'].forEach(function(name){
+      try{
+        var old=global[name];
+        if(typeof old==='function' && !old.__v213ViewportWrapped){
+          var wrapped=function(){ var ret=old.apply(this,arguments); setTimeout(function(){reset(name==='hideLoginOverlay'?'login':'entry');},60); return ret; };
+          wrapped.__v213ViewportWrapped=true; global[name]=wrapped; try{ eval(name+'=global[name]'); }catch(e){}
+        }
+      }catch(e){}
+    });
+    try{ global.addEventListener('pageshow', function(){ reset('pageshow'); }, {passive:true}); }catch(e){}
+  }
+
+  function installSkuPriceDefault(){
+    function markToggle(){ try{ var t=document.querySelector('.sku-view-toggle'); if(t) t.classList.add('v213-price-default'); }catch(e){} }
+    function forcePrice(reason){
+      try{
+        var screen=$('scr-portfolio');
+        if(!screen || !screen.classList.contains('on')) return false;
+        if(global._v213SkuManualChoice) return false;
+        if(typeof global.setSkuView==='function'){
+          SKU_FORCE=true; global.setSkuView('price'); SKU_FORCE=false;
+          markToggle();
+          return true;
+        }
+        var btn=$('svt-price'); if(btn){ btn.click(); markToggle(); return true; }
+      }catch(e){ SKU_FORCE=false; }
+      return false;
+    }
+    try{
+      var oldSet=global.setSkuView;
+      if(typeof oldSet==='function' && !oldSet.__v213Wrapped){
+        var wrappedSet=function(v){ if(!SKU_FORCE) global._v213SkuManualChoice=true; return oldSet.apply(this,arguments); };
+        wrappedSet.__v213Wrapped=true; global.setSkuView=wrappedSet; try{ setSkuView=wrappedSet; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldShow=global.showScreen;
+      if(typeof oldShow==='function' && !oldShow.__v213SkuWrapped){
+        var wrappedShow=function(name){ var ret=oldShow.apply(this,arguments); if(name==='portfolio'){ setTimeout(function(){ forcePrice('showScreen'); },80); setTimeout(function(){ forcePrice('showScreen-late'); },360); } return ret; };
+        wrappedShow.__v213SkuWrapped=true; global.showScreen=wrappedShow; try{ showScreen=wrappedShow; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldOverlay=global._overlayNav;
+      if(typeof oldOverlay==='function' && !oldOverlay.__v213SkuWrapped){
+        var wrappedOverlay=function(name){ var ret=oldOverlay.apply(this,arguments); if(name==='portfolio'){ setTimeout(function(){ forcePrice('overlay'); },80); setTimeout(function(){ forcePrice('overlay-late'); },360); } return ret; };
+        wrappedOverlay.__v213SkuWrapped=true; global._overlayNav=wrappedOverlay; try{ _overlayNav=wrappedOverlay; }catch(e){}
+      }
+    }catch(e){}
+    [250,800,1800].forEach(function(ms){ setTimeout(function(){ markToggle(); forcePrice('boot'); },ms); });
+  }
+
+  function installRestaurantDrillCoach(){
+    function ensureCoachEl(){
+      var el=$('v213-drill-coach'); if(el) return el;
+      el=document.createElement('div'); el.id='v213-drill-coach';
+      el.innerHTML='<div class="v213-coach-star">✦</div><div class="v213-coach-copy">แตะ <strong>รายร้าน</strong> เพื่อเจาะรายละเอียดแต่ละสาขาใน account นี้</div><button type="button" aria-label="ปิด">×</button>';
+      document.body.appendChild(el);
+      el.querySelector('button').addEventListener('click',function(){ hideCoach(true); });
+      return el;
+    }
+    function hideCoach(persist){
+      var el=$('v213-drill-coach'); if(el) el.classList.remove('show');
+      var nav=$('nav-restaurant'); if(nav) nav.classList.remove('v213-coach-pulse');
+      if(persist){ try{ localStorage.setItem('sense_hint_restaurant_drill_seen','1'); }catch(e){} }
+    }
+    function canShow(){
+      try{
+        if(localStorage.getItem('sense_hint_restaurant_drill_seen')==='1') return false;
+        if(!document.body.classList.contains('kam-mode')) return false;
+        if(document.body.classList.contains('restaurant-sheet')) return false;
+        var nav=$('nav-restaurant'); if(!nav || !nav.getClientRects().length) return false;
+        return true;
+      }catch(e){ return false; }
+    }
+    function showCoachSoon(){
+      setTimeout(function(){
+        if(!canShow()) return;
+        var el=ensureCoachEl();
+        var nav=$('nav-restaurant'); if(nav) nav.classList.add('v213-coach-pulse');
+        el.classList.add('show');
+        setTimeout(function(){ hideCoach(false); }, 3600);
+      }, 850);
+    }
+    function relabel(){
+      var lab=$('nav-restaurant-label'); if(lab) lab.textContent='รายร้าน';
+      var nav=$('nav-restaurant'); if(nav){ nav.setAttribute('aria-label','เปิดมุมมองรายร้าน'); nav.title='เปิดมุมมองรายร้านใน account นี้'; }
+    }
+    relabel(); showCoachSoon();
+    try{
+      var oldToggle=global.toggleRestaurantSheet;
+      if(typeof oldToggle==='function' && !oldToggle.__v213DrillWrapped){
+        var wrapped=function(){ hideCoach(true); var ret=oldToggle.apply(this,arguments); setTimeout(relabel,0); return ret; };
+        wrapped.__v213DrillWrapped=true; global.toggleRestaurantSheet=wrapped; try{ toggleRestaurantSheet=wrapped; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldOpen=global.openRestaurantSheet;
+      if(typeof oldOpen==='function' && !oldOpen.__v213DrillWrapped){
+        var wrappedOpen=function(){ hideCoach(true); return oldOpen.apply(this,arguments); };
+        wrappedOpen.__v213DrillWrapped=true; global.openRestaurantSheet=wrappedOpen; try{ openRestaurantSheet=wrappedOpen; }catch(e){}
+      }
+    }catch(e){}
+    try{
+      var oldShow=global.showScreen;
+      if(typeof oldShow==='function' && !oldShow.__v213CoachWrapped){
+        var wrappedShow=function(){ var ret=oldShow.apply(this,arguments); setTimeout(function(){ relabel(); showCoachSoon(); },500); return ret; };
+        wrappedShow.__v213CoachWrapped=true; global.showScreen=wrappedShow; try{ showScreen=wrappedShow; }catch(e){}
+      }
+    }catch(e){}
+    setTimeout(relabel,600); setTimeout(relabel,1800);
+  }
+
+  function applyCommissionClasses(){
+    try{
+      var el=document.querySelector('.pv-comm-strip.v210k');
+      if(!el) return;
+      el.classList.remove('v213-locked','v213-near','v213-unlocked');
+      var st=null; try{ if(typeof global._commBuildKamSelfState==='function') st=global._commBuildKamSelfState(); }catch(e){}
+      var payout=st?Number(st.payout||0):0;
+      var pct=st&&st.pct!=null?Number(st.pct):NaN;
+      var threshold=98; try{ threshold=Number((global._tgtSettings&&global._tgtSettings.nrr_threshold)||threshold); }catch(e){}
+      if(payout>0){ el.classList.add('v213-unlocked'); }
+      else if(Number.isFinite(pct) && (threshold-pct)<=3 && pct<threshold){ el.classList.add('v213-near'); }
+      else{ el.classList.add('v213-locked'); }
+      var chip=el.querySelector('.pv-comm-chip');
+      if(chip && !chip.dataset.v213Copy){
+        var current=(chip.textContent||'').trim();
+        if(payout>0) chip.textContent='ถึงเกณฑ์แล้ว';
+        else if(Number.isFinite(pct) && pct<threshold && (threshold-pct)<=3) chip.textContent='ใกล้ปลดล็อก';
+        else if(/ยังไม่ถึง/.test(current) || !current) chip.textContent='ยังไม่ถึงเกณฑ์';
+        chip.dataset.v213Copy='1';
+      }
+    }catch(e){}
+  }
+  function installCommissionReward(){
+    try{
+      var old=global._commRenderKamSelfStrip;
+      if(typeof old==='function' && !old.__v213RewardWrapped){
+        var wrapped=function(){ var ret=old.apply(this,arguments); setTimeout(applyCommissionClasses,0); setTimeout(applyCommissionClasses,250); return ret; };
+        wrapped.__v213RewardWrapped=true; global._commRenderKamSelfStrip=wrapped; try{ _commRenderKamSelfStrip=wrapped; }catch(e){}
+      }
+    }catch(e){}
+    [400,1200,2600,5200].forEach(function(ms){ setTimeout(applyCommissionClasses,ms); });
+  }
+
+  function installFabSafeZone(){
+    var key='fs_aifab_pos_v1';
+    try{ key=(global.FreshketSenseConfig&&global.FreshketSenseConfig.storage&&global.FreshketSenseConfig.storage.chatFabPositionKey)||key; }catch(e){}
+    function bounds(fab){
+      var r=fab.getBoundingClientRect(); var w=r.width||54,h=r.height||54;
+      var vv=global.visualViewport; var vw=(vv&&vv.width)||global.innerWidth||440; var vh=(vv&&vv.height)||global.innerHeight||700; var ox=(vv&&vv.offsetLeft)||0, oy=(vv&&vv.offsetTop)||0;
+      var topbar=document.querySelector('.topbar'); var top=96+oy;
+      try{ if(topbar){ var tr=topbar.getBoundingClientRect(); top=Math.max(top,tr.bottom+12); } }catch(e){}
+      var bnav=document.querySelector('.bnav'); var bottom=vh+oy-h-18;
+      try{ if(bnav){ var br=bnav.getBoundingClientRect(); if(br.top>0) bottom=Math.min(bottom,br.top-h-14); } }catch(e){}
+      var left=ox+12,right=ox+vw-w-12;
+      if(bottom<top) bottom=top+8;
+      return {left:left,right:right,top:top,bottom:bottom,w:w,h:h};
+    }
+    function clampAndSnap(persist, animate){
+      var fab=$('aifab'); if(!fab) return null;
+      var r=fab.getBoundingClientRect(); var b=bounds(fab);
+      var x=Math.max(b.left,Math.min(r.left,b.right)); var y=Math.max(b.top,Math.min(r.top,b.bottom));
+      var mid=(b.left+b.right)/2; x=(x<mid?b.left:b.right);
+      if(animate) fab.classList.add('v213-safe-correcting');
+      fab.style.left=Math.round(x)+'px'; fab.style.top=Math.round(y)+'px'; fab.style.right='auto'; fab.style.bottom='auto'; fab.classList.add('moved','v213-edge-snapped');
+      if(persist){ try{ localStorage.setItem(key,JSON.stringify({x:Math.round(x),y:Math.round(y)})); }catch(e){} }
+      if(animate) setTimeout(function(){ try{ fab.classList.remove('v213-safe-correcting'); }catch(e){} },320);
+      return {x:x,y:y,bounds:b};
+    }
+    global.FreshketSenseV213_clampAssistantFab=clampAndSnap;
+    function resetFab(){
+      var fab=$('aifab'); if(!fab) return;
+      try{ localStorage.removeItem(key); }catch(e){}
+      fab.style.left=''; fab.style.top=''; fab.style.right='16px'; fab.style.bottom='150px'; fab.classList.remove('moved','v213-edge-snapped');
+      setTimeout(function(){ clampAndSnap(true,true); },80);
+      try{ if(typeof showToast==='function') showToast('รีเซ็ตตำแหน่ง Olive แล้ว','ok'); }catch(e){}
+    }
+    global.FreshketSenseV213_resetAssistantFab=resetFab;
+    function installLongPress(){
+      var fab=$('aifab'); if(!fab || fab.dataset.v213LongPress==='1') return;
+      fab.dataset.v213LongPress='1'; var t=null, moved=false, sx=0, sy=0;
+      fab.addEventListener('pointerdown',function(e){ moved=false; sx=e.clientX; sy=e.clientY; clearTimeout(t); t=setTimeout(function(){ if(!moved) resetFab(); },950); },{passive:true});
+      fab.addEventListener('pointermove',function(e){ if(Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)>10) moved=true; },{passive:true});
+      ['pointerup','pointercancel','lostpointercapture'].forEach(function(ev){ fab.addEventListener(ev,function(){ clearTimeout(t); setTimeout(function(){ clampAndSnap(true,true); },30); },{passive:true}); });
+    }
+    [300,900,1800,4000].forEach(function(ms){ setTimeout(function(){ installLongPress(); clampAndSnap(true,ms>800); },ms); });
+    try{ global.addEventListener('resize',function(){ setTimeout(function(){ clampAndSnap(true,true); },100); },{passive:true}); }catch(e){}
+    try{ global.addEventListener('pageshow',function(){ setTimeout(function(){ clampAndSnap(true,true); },500); },{passive:true}); }catch(e){}
+    try{ document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') setTimeout(function(){ clampAndSnap(true,true); },500); },{passive:true}); }catch(e){}
+  }
+
+  function boot(){
+    setBuildMetadata();
+    installViewportReset();
+    installSkuPriceDefault();
+    installRestaurantDrillCoach();
+    installCommissionReward();
+    installFabSafeZone();
+    try{ log('Guided Intelligence UX installed'); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  global.FreshketSenseV213={version:VERSION, applyCommissionClasses:applyCommissionClasses, clampAssistantFab:function(){return global.FreshketSenseV213_clampAssistantFab&&global.FreshketSenseV213_clampAssistantFab(true,true);}, resetAssistantFab:function(){return global.FreshketSenseV213_resetAssistantFab&&global.FreshketSenseV213_resetAssistantFab();}};
+})(window);
