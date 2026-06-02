@@ -1907,7 +1907,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
     var prevAcct = (g.outlets||[]).reduce(function(s,o){return s+(o.prevGmv||0);},0);
     var rrAcct = rr(g.currTotal||0);
     var mtdAcct = g.currTotal||0;
-    return '<div class="ncs-chip nrr-cols' + (autoOpen ? ' open' : '') + '" data-ncs-chip="1">'      + '<div class="ncs-outlet-name" style="display:flex;align-items:center;gap:5px"><span class="ncs-chip-chev" style="flex-shrink:0">&#8250;</span><span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.82)">' + esc(g.acctName || '—') + '</span></div>'      + '<div class="ncs-gmv base" style="font-size:11px">' + (prevAcct > 0 ? fmt(prevAcct) : '—') + '</div>'      + '<div class="ncs-gmv" style="font-size:11px;color:rgba(255,165,50,.85)">' + fmt(rrAcct) + '</div>'      + '<div class="ncs-gmv mtd" style="font-size:11px">' + fmt(mtdAcct) + '</div>'      + '</div>'
+    return '<div class="ncs-chip nrr-cols' + (autoOpen ? ' open' : '') + '" data-ncs-chip="1" style="position:relative">'      + '<span class="ncs-chip-chev" style="position:absolute;left:14px;top:50%;transform:translateY(-50%)">&#8250;</span>'      + '<div class="ncs-outlet-name" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.82);padding-left:16px">' + esc(g.acctName || '—') + '</div>'      + '<div class="ncs-gmv base" style="font-size:11px">' + (prevAcct > 0 ? fmt(prevAcct) : '—') + '</div>'      + '<div class="' + (rrAcct >= prevAcct ? 'ncs-gmv rr-up' : 'ncs-gmv rr-dn') + '" style="font-size:11px">' + fmt(rrAcct) + '</div>'      + '<div class="ncs-gmv mtd" style="font-size:11px">' + fmt(mtdAcct) + '</div>'      + '</div>'
       + '<div class="ncs-outlet-rows' + (autoOpen ? ' open' : '') + '">' + outletRows + '</div>';
   }).join('');
 
@@ -1919,8 +1919,8 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   if (meta) meta.innerHTML = '<div class="cds-meta">'
     + '<span class="cds-meta-text">' + metaBarText + '</span>'
     + '<button class="cds-toggle-btn" id="cds-toggle-btn" title="ขยาย/ย่อ"><svg width=\"12\" height=\"12\" viewBox=\"0 0 14 14\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"1\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"1\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/><rect x=\"8\" y=\"8\" width=\"5\" height=\"5\" rx=\"1\" fill=\"currentColor\"/></svg></button>'
-    + '</div>'
-    + ctxHtml;
+    + '</div>';
+  if (meta) meta.innerHTML = ctxHtml + meta.innerHTML;
   body.innerHTML = rowsHtml;
 
   // Chip toggle via event delegation (ncs-chip uses data-ncs-chip)
