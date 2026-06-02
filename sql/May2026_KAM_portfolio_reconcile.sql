@@ -210,53 +210,64 @@ SELECT
   COALESCE(mg.may_orders, 0)        AS may_orders,
 
   -- ── Movement classification ───────────────────────────────────────────
+  -- Priority order สำคัญมาก: movement types ต้องมาก่อน core_nrr เสมอ
+  -- เพราะ transfer_in อาจมี apr_gmv > 0 (outlet เคยมียอดแต่ไม่มี KAM owner)
+  -- ถ้า core_nrr มาก่อน outlet เช่น 205038 จะถูกนับผิดเป็น NRR cohort
   CASE
-    -- Transfer Out: Apr เป็น KAM นี้ แต่ May เปลี่ยน KAM หรือเปลี่ยน commercial_owner
+    -- [1] Transfer Out: Apr เป็น KAM นี้ แต่ May เปลี่ยน KAM
     WHEN oo.apr_kam_email IS NOT NULL
-      AND oo.may_kam_email IS NOT NULL
-      AND oo.apr_kam_email != oo.may_kam_email
+      AND (oo.may_kam_email IS NULL OR oo.apr_kam_email != oo.may_kam_email)
       THEN 'transfer_out'
 
-    -- Transfer Out to non-KAM: Apr KAM แต่ May ไม่ใช่ KAM แล้ว
-    WHEN oo.apr_kam_email IS NOT NULL
-      AND oo.may_kam_email IS NULL
-      AND oo.may_commercial_owner IS NOT NULL
-      AND oo.may_commercial_owner != 'KAM'
-      THEN 'transfer_out'
-
-    -- New Sales: Apr เป็น SALE → May เป็น KAM นี้
-    WHEN oo.apr_commercial_owner = 'SALE'
-      AND oo.may_kam_email IS NOT NULL
+    -- [2] New Sales: Apr เป็น SALE (หรือไม่มี KAM owner) → May เป็น KAM นี้
+    -- ครอบคลุม outlet ที่ Apr ไม่มี owner (limbo) แล้วโอนมาให้ KAM ใน May
+    WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email IS NULL
+      AND oo.apr_commercial_owner = 'SALE'
       THEN 'new_sales'
 
-    -- Transfer In: Apr เป็น KAM อื่น → May เป็น KAM นี้
-    WHEN oo.apr_kam_email IS NOT NULL
-      AND oo.may_kam_email IS NOT NULL
+    -- [3] Transfer In: Apr เป็น KAM อื่น → May เป็น KAM นี้
+    WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email IS NOT NULL
       AND oo.apr_kam_email != oo.may_kam_email
       THEN 'transfer_in'
 
-    -- Expansion: ไม่เคยปรากฏใน history เลย
+    -- [4] Limbo Transfer In: Apr ไม่มี KAM owner เลย (ไม่ใช่ SALE) → May เป็น KAM นี้
+    -- เช่น outlet ที่อยู่ระหว่างรอโอน, self-order, no owner
+    -- ไม่นับใน NRR cohort เพราะ KAM เพิ่งรับมา ทำอะไรใน Apr ไม่ได้
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
+      AND (oo.apr_commercial_owner IS NULL OR oo.apr_commercial_owner != 'SALE')
+      AND oo.may_commercial_owner = 'KAM'
+      THEN 'transfer_in'  -- นับรวมกับ transfer_in ไม่นับ NRR base
+
+    -- [5] Expansion: ไม่เคยปรากฏใน history 18 เดือนเลย → ร้านใหม่แท้
+    WHEN oo.may_kam_email IS NOT NULL
+      AND COALESCE(ag.apr_gmv, 0) = 0
       AND es.outlet_id IS NULL
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'expansion'
 
-    -- Comeback: ไม่มี Apr GMV แต่เคยซื้อก่อน May
+    -- [6] Comeback: ไม่มี Apr GMV แต่เคยซื้อใน history → กลับมา
     WHEN oo.may_kam_email IS NOT NULL
       AND COALESCE(ag.apr_gmv, 0) = 0
       AND es.outlet_id IS NOT NULL
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'comeback'
 
-    -- Core NRR cohort: อยู่พอร์ต KAM นี้ + มี Apr GMV + มี May GMV
+    -- [7] Core NRR cohort: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี GMV ทั้งคู่
+    -- เงื่อนไขสำคัญ: apr_kam_email = may_kam_email (same KAM ทั้งสองเดือน)
     WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email IS NOT NULL
+      AND oo.apr_kam_email = oo.may_kam_email
       AND COALESCE(ag.apr_gmv, 0) > 0
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'core_nrr'
 
-    -- Core churn: อยู่พอร์ต KAM นี้ + มี Apr GMV + ไม่มี May GMV
+    -- [8] Core churn: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี Apr GMV + ไม่มี May GMV
     WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email IS NOT NULL
+      AND oo.apr_kam_email = oo.may_kam_email
       AND COALESCE(ag.apr_gmv, 0) > 0
       AND COALESCE(mg.may_gmv, 0) = 0
       THEN 'core_nrr_churn'
@@ -265,9 +276,20 @@ SELECT
   END AS movement_type,
 
   -- ── Commission components ─────────────────────────────────────────────
-  -- NRR: เฉพาะ core_nrr (cohort Apr → วัด May)
-  CASE WHEN COALESCE(ag.apr_gmv,0) > 0 THEN COALESCE(ag.apr_gmv,0) END AS nrr_base_apr_gmv,
-  CASE WHEN COALESCE(ag.apr_gmv,0) > 0 THEN COALESCE(mg.may_gmv,0) END AS nrr_curr_may_gmv,
+  -- NRR base: เฉพาะ core_nrr เท่านั้น (same KAM Apr+May, มี Apr GMV)
+  -- transfer_in ไม่นับ ตรงกับ app logic (coreResult only, ไม่รวม transferInResult)
+  CASE
+    WHEN oo.apr_kam_email IS NOT NULL
+      AND oo.apr_kam_email = oo.may_kam_email
+      AND COALESCE(ag.apr_gmv,0) > 0
+    THEN COALESCE(ag.apr_gmv,0)
+  END AS nrr_base_apr_gmv,
+  CASE
+    WHEN oo.apr_kam_email IS NOT NULL
+      AND oo.apr_kam_email = oo.may_kam_email
+      AND COALESCE(ag.apr_gmv,0) > 0
+    THEN COALESCE(mg.may_gmv,0)
+  END AS nrr_curr_may_gmv,
 
   -- Handover retention: เฉพาะ new_sales (Apr baseline vs May perf, daily-rate)
   CASE
