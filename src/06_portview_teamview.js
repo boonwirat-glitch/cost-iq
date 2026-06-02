@@ -1097,7 +1097,7 @@ function _pvBuildCompactStrip(){
   if(!accounts||!accounts.length){strip.innerHTML='';return;}
   const fK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n);
   const acctWithPace=accounts.filter(a=>a.paceSignal&&a.paceSignal.pct>0);
-  const portfolioPace=window._tgtPortviewPct||(acctWithPace.length>0?Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100):0);
+  const portfolioPace=acctWithPace.length>0?Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100):0;
   const ppCls=portfolioPace>=100?'great':portfolioPace>=95?'safe':portfolioPace>=85?'warn':'danger';
   const paceColor=ppCls==='great'||ppCls==='safe'?'#4ddc97':ppCls==='warn'?'var(--amb)':'#ff8888';
   const okA=accounts.filter(a=>!a.paceSignal||(a.paceSignal.cls==='great'||a.paceSignal.cls==='safe'));
