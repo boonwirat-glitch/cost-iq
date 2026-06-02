@@ -368,7 +368,7 @@ transfer_in_gmv AS (
   FROM transfer_in_outlets tio
   LEFT JOIN gmv_by_outlet prev ON prev.user_id=tio.user_id AND prev.month_label=tio.prev_label
   LEFT JOIN gmv_by_outlet curr ON curr.user_id=tio.user_id AND curr.month_label=tio.perf_label
-,
+),
 
 transfer_out_account AS (
   -- Aggregate outlet-grain transfer_out_filtered → account grain
