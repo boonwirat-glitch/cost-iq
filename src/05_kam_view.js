@@ -388,7 +388,7 @@ function _renderKamZone1Status(){
   if(daysEl){
     if(_isEarlyMonth){
       const _updateDay = 6; // pace reliable after day 5, shows on day 6
-      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.55">· อัพเดทวันที่ ${_updateDay}</span>`;
+      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.85;color:rgba(140,180,255,.9)">· อัพเดทวันที่ ${_updateDay}</span>`;
     } else {
       daysEl.textContent=`${sig.daysElapsed} / ${sig.daysInMonth} วัน`;
     }
