@@ -217,9 +217,9 @@ transfer_in_outlets AS (
   SELECT
     um.outlet_id,
     um.account_id,
-    ao.apr_staff_owner AS prev_kam_name,
-    um.kam_email       AS new_kam_email,
-    um.kam_name        AS new_kam_name,
+    ao.apr_owner_info.staff_owner AS prev_kam_name,  -- fixed: flatten STRUCT field
+    um.kam_email                  AS new_kam_email,
+    um.kam_name                   AS new_kam_name,
     um.tl_email
   FROM user_master_snap um
   JOIN apr_owner ao ON um.account_id = ao.account_id
