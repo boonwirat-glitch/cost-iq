@@ -586,13 +586,14 @@ function __legacyRenderKamThisMonthFallback(){
       const hasCycle=cycle>=3&&!isMonthly;   // orders≥2: show urgency
       const clr=hasCycle&&daysEl>cycle*1.5?'rgba(255,130,130,.9)':'rgba(240,176,0,.85)';
       const ind=hasCycle&&daysEl>cycle*1.5?'neg':'warn';
-      if(hasCycle||isMonthly){
+      if(hasCycle||isMonthly||o.orders===0){
         const cycleLabel=isMonthly
           ?`<div style="font-size:10px;color:rgba(255,255,255,.28);margin-top:1px">ปกติ 1 ครั้ง/เดือน</div>`
+          :o.orders===0?''
           :`<div style="font-size:10px;color:rgba(255,255,255,.32);margin-top:1px">ปกติ ${o.orders} ครั้ง/เดือน · ผ่านมา ${daysEl} วันแล้ว</div>`;
-        const statusClr=isMonthly?'rgba(255,255,255,.3)':clr;
+        const statusClr=isMonthly?'rgba(255,255,255,.3)':o.orders===0?'rgba(255,255,255,.3)':clr;
         html+=`<div class="kam-sku-row" style="align-items:flex-start;padding:5px 0">
-          <span class="kam-sku-ind ${isMonthly?'neg':ind}" style="margin-top:2px">−</span>
+          <span class="kam-sku-ind ${isMonthly||o.orders===0?'neg':ind}" style="margin-top:2px">−</span>
           <div style="flex:1;min-width:0">
             <div class="kam-sku-name">${o.name||'—'}</div>
             ${cycleLabel}
@@ -602,8 +603,6 @@ function __legacyRenderKamThisMonthFallback(){
             <div style="font-size:11px;font-weight:700;color:${statusClr}">ยังไม่สั่ง</div>
           </div>
         </div>`;
-      } else {
-        html+=`<div class="kam-sku-row"><span class="kam-sku-ind neg">−</span><span class="kam-sku-name">${o.name||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:rgba(255,255,255,.75)">${o.gmv?fmt(o.gmv):''}</span><span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:4px">ยังไม่สั่ง</span></div></div>`;
       }
     });
     html+=`</div></div>`;
