@@ -68,7 +68,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
   allAccounts.forEach(a => {
     const isNew = a.daysWithCurrentKam !== null && a.daysWithCurrentKam !== undefined && a.daysWithCurrentKam <= daysElapsed;
-    if (!isNew) { coreAccounts.push(a); return; }
+    if (!isNew) {
+      // v287: ถ้า daysWithCurrentKam = null (ยังไม่มี order เลย) อาจเป็น handover ใหม่
+      // เช็ค Q10 ก่อน — ถ้าอยู่ใน handover list → newFromSales ไม่ใช่ core
+      const hoRowNull = hd.byAccountId && hd.byAccountId[a.id];
+      if (hoRowNull) {
+        const prevOwnerNull = (hoRowNull.prevOwner || '').toUpperCase();
+        if (prevOwnerNull === 'SALE') { newFromSalesAccounts.push(a); }
+        else { transferInAccounts.push(a); }
+        return;
+      }
+      coreAccounts.push(a); return;
+    }
     // ลอง Q11 ก่อน fallback Q10
     const cmRows = cm && cm.byAccountId && cm.byAccountId[String(a.id==null?'':a.id).trim()];
     if (cmRows) {
