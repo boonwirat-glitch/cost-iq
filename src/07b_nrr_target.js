@@ -66,37 +66,36 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // Transfer In:    ใหม่เดือนนี้ + มาจาก KAM/PM/ADMIN (Q11 transfer_in)
   // New from Sales: ใหม่เดือนนี้ + มาจาก SALE (Q11 new_sales)
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
+  // v292: Q11 and Q10 are explicit "not-core" lists — check them FIRST regardless of
+  // daysWithCurrentKam. This mirrors SQL backfill logic: carve out transfer_in/handover
+  // first, whatever remains is core. Fixes edge case where KAM previously owned an account,
+  // it was transferred out, then transferred back — daysWithCurrentKam would be high (old
+  // first-order date) causing app to skip Q11 and wrongly classify as core.
   allAccounts.forEach(a => {
-    const isNew = a.daysWithCurrentKam !== null && a.daysWithCurrentKam !== undefined && a.daysWithCurrentKam <= daysElapsed;
-    if (!isNew) {
-      // v287: ถ้า daysWithCurrentKam = null (ยังไม่มี order เลย) อาจเป็น handover ใหม่
-      // เช็ค Q10 ก่อน — ถ้าอยู่ใน handover list → newFromSales ไม่ใช่ core
-      const hoRowNull = hd.byAccountId && hd.byAccountId[a.id];
-      if (hoRowNull) {
-        const prevOwnerNull = (hoRowNull.prevOwner || '').toUpperCase();
-        if (prevOwnerNull === 'SALE') { newFromSalesAccounts.push(a); }
-        else { transferInAccounts.push(a); }
-        return;
-      }
-      coreAccounts.push(a); return;
-    }
-    // ลอง Q11 ก่อน fallback Q10
-    const cmRows = cm && cm.byAccountId && cm.byAccountId[String(a.id==null?'':a.id).trim()];
-    if (cmRows) {
-      const mvType = (cmRows.movementType || '').toLowerCase();
+    const acctId = String(a.id==null?'':a.id).trim();
+
+    // [1] Q11 explicit movement — highest priority source of truth (dwh.order based)
+    const cmRow = cm && cm.byAccountId && cm.byAccountId[acctId];
+    if (cmRow) {
+      const mvType = (cmRow.movementType || '').toLowerCase();
       if (mvType === 'transfer_in') { transferInAccounts.push(a); }
       else { newFromSalesAccounts.push(a); }  // new_sales, sales_to_kam
-    } else {
-      // fallback: ใช้ Q10
-      const hoRow = hd.byAccountId && hd.byAccountId[a.id];
-      if (hoRow) {
-        const prevOwner = (hoRow.prevOwner || '').toUpperCase();
-        if (prevOwner === 'SALE') { newFromSalesAccounts.push(a); }
-        else { transferInAccounts.push(a); }
-      } else {
-        newFromSalesAccounts.push(a);
-      }
+      return;
     }
+
+    // [2] Q10 explicit handover list — second priority (user_master new_user_exp_date based)
+    const hoRow = hd.byAccountId && hd.byAccountId[a.id];
+    if (hoRow) {
+      const prevOwner = (hoRow.prevOwner || '').toUpperCase();
+      if (prevOwner === 'SALE') { newFromSalesAccounts.push(a); }
+      else { transferInAccounts.push(a); }
+      return;
+    }
+
+    // [3] Not in Q11 or Q10 → core (daysWithCurrentKam used only as tiebreaker signal for logging)
+    // daysWithCurrentKam is no longer used for classification — it can be stale due to
+    // user_master 12-month window and does not override explicit movement data
+    coreAccounts.push(a);
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
