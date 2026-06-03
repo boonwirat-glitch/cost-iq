@@ -69,7 +69,8 @@ apr_ownership AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner)             AS staff_owner
+    TRIM(o.staff_owner)             AS staff_owner,
+    DATE(o.new_user_exp_date)       AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.prev_start AND p.prev_end
