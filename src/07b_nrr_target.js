@@ -102,7 +102,11 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // ── Helper: compute NRR for a group of accounts ─────────────────
   function _groupNRR(group) {
     if (!group.length) return null;
-    let prevGmvByOutlet={}, currGmvByOutlet={}, everSeen=new Set();
+    let prevGmvByOutlet={}, currGmvByOutlet={};
+    // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
+    // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
+    // Falls back to everSeen (6-month window) if firstDollarDate not present in CSV (old format)
+    const firstDollarMap={}, everSeen=new Set(); // everSeen kept as fallback for old CSV format
     // v206: track outlet→account mapping for drill-down detail
     const outletToAcct={}, outletName={};
     group.forEach(a => {
@@ -111,7 +115,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       if (outletMonths && typeof outletMonths === 'object' && !Array.isArray(outletMonths)) {
         Object.entries(outletMonths).forEach(([mLabel,entries]) => {
           if (moSort(mLabel) >= moSort(prevMonth)) return;
-          (entries||[]).forEach(o => { const oid=o.outlet_id||o.outletId||o.id; if(oid) everSeen.add(oid); });
+          (entries||[]).forEach(o => {
+            const oid=o.outlet_id||o.outletId||o.id;
+            if(oid) {
+              everSeen.add(oid);
+              // store first_dollar_date if available (Q5B v3+)
+              if(o.firstDollarDate && !firstDollarMap[oid]) firstDollarMap[oid]=o.firstDollarDate;
+            }
+          });
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
@@ -161,8 +172,32 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     // used for handover/new-sales display to be consistent with _commComputeHandoverRetention
     const rawRetention=baselinePrevGmv>0?baseCurrGmv/baselinePrevGmv:null;
     const nonCohortIds=currentIds.filter(id=>!prevGmvByOutlet[id]);
-    const comebackIds=nonCohortIds.filter(id=>everSeen.has(id));
-    const expansionIds=nonCohortIds.filter(id=>!everSeen.has(id));
+    // v_fdd: use first_dollar_date for comeback vs expansion when available (all-time history)
+    // prevMonthStart = YYYY-MM-01 derived from prevMonth label e.g. 'พ.ค. 2569'
+    const _mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const _pmParts=(prevMonth||'').split(' ');
+    const _pmMonthIdx=_mo.indexOf(_pmParts[0])+1; // 1-12
+    const _pmYear=parseInt(_pmParts[1]||'0');
+    const _pmYearCE=_pmYear>2500?_pmYear-543:_pmYear;
+    const _pmM=String(_pmMonthIdx).padStart(2,'0');
+    const prevMonthStart=(_pmMonthIdx>0&&_pmYearCE>0)?(_pmYearCE+'-'+_pmM+'-01'):null;
+    const hasFddData=Object.keys(firstDollarMap).length>0;
+    const comebackIds=nonCohortIds.filter(function(id){
+      if(hasFddData){
+        var fdd=firstDollarMap[id];
+        // comeback = has all-time purchase history before prevMonth
+        return fdd && prevMonthStart && fdd < prevMonthStart;
+      }
+      return everSeen.has(id); // fallback: old CSV without firstDollarDate
+    });
+    const expansionIds=nonCohortIds.filter(function(id){
+      if(hasFddData){
+        var fdd=firstDollarMap[id];
+        // expansion = no purchase history before prevMonth (true new customer)
+        return !fdd || !prevMonthStart || fdd >= prevMonthStart;
+      }
+      return !everSeen.has(id); // fallback: old CSV without firstDollarDate
+    });
     // ── v206: build grouped detail arrays ────────────────────────
     function _buildDetail(ids,type){
       // group by account, sort each account's outlets by delta (NRR) or currGmv (CB/EX)
