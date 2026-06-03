@@ -153,6 +153,7 @@ outlet_ownership AS (
     k_apr.kam_name      AS apr_kam_name,
     COALESCE(m.new_user_exp_date, a.new_user_exp_date)                       AS new_user_exp_date,
     FORMAT_DATE('%Y-%m', COALESCE(m.new_user_exp_date, a.new_user_exp_date)) AS exp_month
+    COALESCE(m.first_dollar_date, a.first_dollar_date)  AS first_dollar_date
 
   FROM may_ownership m
   FULL OUTER JOIN apr_ownership   a   ON m.outlet_id = a.outlet_id
@@ -446,4 +447,3 @@ ORDER BY
 -- GROUP BY 1,2,3
 -- ORDER BY tl_email, raw_nrr_pct DESC;
 ;
-    COALESCE(m.first_dollar_date, a.first_dollar_date)  AS first_dollar_date,
