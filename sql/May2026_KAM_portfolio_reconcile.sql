@@ -18,7 +18,8 @@
 --   core_nrr_churn — อยู่พอร์ต KAM นี้, มี GMV Apr (cohort), ไม่มี GMV May
 --   comeback       — ไม่มี Apr GMV แต่เคยซื้อก่อน May + ยังอยู่พอร์ต KAM นี้
 --   expansion      — ไม่เคยปรากฏใน history เลย (ร้านใหม่แท้) + อยู่พอร์ต KAM นี้
---   new_sales      — รับโอนจาก Sales ใน May (prev commercial_owner=SALE)
+--   handover_perf  — รับจาก Sales ใน April, วัด retention ใน May (exp_month=2026-04)
+--   new_sales      — รับจาก Sales ใน May (exp_month=2026-05, รอวัด June)
 --   transfer_in    — รับโอนจาก KAM/PM อื่น ใน May
 --   transfer_out   — ออกจากพอร์ต KAM นี้ใน May (แสดงใน KAM เดิม)
 -- ══════════════════════════════════════════════════════════════════════════
@@ -223,11 +224,20 @@ SELECT
       AND (oo.may_kam_email IS NULL OR oo.apr_kam_email != oo.may_kam_email)
       THEN 'transfer_out'
 
-    -- [2] New Sales: Apr เป็น SALE (หรือไม่มี KAM owner) → May เป็น KAM นี้
-    -- ครอบคลุม outlet ที่ Apr ไม่มี owner (limbo) แล้วโอนมาให้ KAM ใน May
+    -- [2] Handover perf: Sales→KAM ใน April, วัด retention ใน May
+    --     exp_month='2026-04' | 243439 = ตัวอย่าง
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
       AND oo.apr_commercial_owner = 'SALE'
+      AND oo.exp_month = '2026-04'
+      THEN 'handover_perf'
+
+    -- [3] New Sales: Sales→KAM ใน May, รอวัด June | exp_month='2026-05'
+    --     243819 = ตัวอย่าง
+    WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email IS NULL
+      AND oo.apr_commercial_owner = 'SALE'
+      AND (oo.exp_month IS NULL OR oo.exp_month != '2026-04')
       THEN 'new_sales'
 
     -- [3] Transfer In: Apr เป็น KAM อื่น → May เป็น KAM นี้
@@ -295,7 +305,8 @@ SELECT
     THEN COALESCE(mg.may_gmv,0)
   END AS nrr_curr_may_gmv,
 
-  -- Handover retention: เฉพาะ new_sales (Apr baseline vs May perf, daily-rate)
+  -- Handover retention%: เฉพาะ handover_perf (exp_month=2026-04 = โอนใน Apr, วัด May)
+  --   243439=handover_perf | 243819=new_sales (exp=May, ยังไม่วัด)
   CASE
     WHEN oo.apr_commercial_owner = 'SALE'
       AND oo.may_kam_email IS NOT NULL
