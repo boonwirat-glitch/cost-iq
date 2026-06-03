@@ -135,7 +135,8 @@ outlet_ownership AS (
     FORMAT_DATE('%Y-%m', COALESCE(m.new_user_exp_date, a.new_user_exp_date)) AS exp_month
 
   FROM may_ownership m
-  FULL OUTER JOIN apr_ownership a ON m.outlet_id = a.outlet_id
+  FULL OUTER JOIN apr_ownership   a   ON m.outlet_id = a.outlet_id
+  LEFT JOIN       last_sale_order lso ON COALESCE(m.outlet_id, a.outlet_id) = lso.outlet_id
 
   -- Match May owner to kam_list
   LEFT JOIN kam_list k_may
@@ -185,6 +186,45 @@ ever_seen AS (
     AND o.delivery_date <  p.cur_start
     AND o.gmv_ex_vat > 0
     AND o.account_type IN ('SA','MC','Chain','Unknown')
+),
+
+-- ── Fallback: last SALE order date per outlet (Q10 PATH B) ───────────────
+-- ใช้แยก handover_perf vs new_sales เมื่อ new_user_exp_date IS NULL
+-- 243439 = outlet ที่ไม่มี new_user_exp_date แต่ handover Apr (last SALE ใน Apr)
+last_sale_order AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    MAX(CASE WHEN o.delivery_date BETWEEN p.prev_start AND p.prev_end
+              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
+             THEN o.delivery_date END) AS last_sale_in_apr,
+    MAX(CASE WHEN o.delivery_date BETWEEN p.cur_start AND p.cur_end
+              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
+             THEN o.delivery_date END) AS last_sale_in_may
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.prev_start AND p.cur_end
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  GROUP BY 1
+),
+
+-- ── current_kam_snapshot: user_master ณ ขณะรัน SQL ───────────────────────
+-- แยก transfer_out (owner เปลี่ยนแล้ว) vs core_nrr_churn (เงียบแต่ยังอยู่พอร์ต)
+-- ⚠ Known limitation: outlet โอนใน June จะถูก flag เป็น transfer_out ใน May backfill
+--   แต่ commission ไม่กระทบ เพราะ may_gmv=0 ไม่เข้า NRR numerator อยู่แล้ว
+current_kam_snapshot AS (
+  SELECT
+    CAST(um.res_id AS STRING) AS outlet_id,
+    k.kam_email               AS current_kam_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  WHERE um.commercial_owner = 'KAM'
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
+    AND um.res_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 )
 
 -- ══════════════════════════════════════════════════════════════════════════
@@ -219,9 +259,18 @@ SELECT
   -- เพราะ transfer_in อาจมี apr_gmv > 0 (outlet เคยมียอดแต่ไม่มี KAM owner)
   -- ถ้า core_nrr มาก่อน outlet เช่น 205038 จะถูกนับผิดเป็น NRR cohort
   CASE
-    -- [1] Transfer Out: Apr เป็น KAM นี้ แต่ May เปลี่ยน KAM
+    -- [1] Transfer Out A: ไม่มี May order + user_master เปลี่ยน KAM แล้ว
+    -- ⚠ outlet โอนใน June ก็จะถูก flag ที่นี่ แต่ commission ไม่กระทบ (may_gmv=0)
     WHEN oo.apr_kam_email IS NOT NULL
-      AND (oo.may_kam_email IS NULL OR oo.apr_kam_email != oo.may_kam_email)
+      AND oo.may_kam_email IS NULL
+      AND COALESCE(mg.may_gmv, 0) = 0
+      AND (cks.current_kam_email IS NULL OR cks.current_kam_email != oo.apr_kam_email)
+      THEN 'transfer_out'
+
+    -- [1b] Transfer Out B: มี May order แต่ KAM เปลี่ยน (โอนระหว่างเดือน)
+    WHEN oo.apr_kam_email IS NOT NULL
+      AND oo.may_kam_email IS NOT NULL
+      AND oo.apr_kam_email != oo.may_kam_email
       THEN 'transfer_out'
 
     -- [2] Handover perf: Sales→KAM ใน April, วัด retention ใน May
@@ -278,12 +327,15 @@ SELECT
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'core_nrr'
 
-    -- [9] Core churn: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี Apr GMV + ไม่มี May GMV
-    WHEN oo.may_kam_email IS NOT NULL
-      AND oo.apr_kam_email IS NOT NULL
-      AND oo.apr_kam_email = oo.may_kam_email
+    -- [9] Core churn: Apr อยู่กับ KAM นี้ + มี Apr GMV + ไม่มี May GMV
+    --     รวม outlet ที่ silent May แต่ user_master ยังเป็น KAM เดิม
+    WHEN oo.apr_kam_email IS NOT NULL
       AND COALESCE(ag.apr_gmv, 0) > 0
       AND COALESCE(mg.may_gmv, 0) = 0
+      AND (
+        (oo.may_kam_email IS NOT NULL AND oo.apr_kam_email = oo.may_kam_email)
+        OR (oo.may_kam_email IS NULL AND cks.current_kam_email = oo.apr_kam_email)
+      )
       THEN 'core_nrr_churn'
 
     ELSE 'other'
@@ -342,10 +394,11 @@ SELECT
   oo.exp_month,
   CAST(oo.new_user_exp_date AS STRING) AS new_user_exp_date
 
-FROM outlet_ownership oo
-LEFT JOIN apr_gmv   ag ON oo.outlet_id = ag.outlet_id
-LEFT JOIN may_gmv   mg ON oo.outlet_id = mg.outlet_id
-LEFT JOIN ever_seen es ON oo.outlet_id = es.outlet_id
+FROM outlet_ownership      oo
+LEFT JOIN apr_gmv          ag  ON oo.outlet_id = ag.outlet_id
+LEFT JOIN may_gmv          mg  ON oo.outlet_id = mg.outlet_id
+LEFT JOIN ever_seen        es  ON oo.outlet_id = es.outlet_id
+LEFT JOIN current_kam_snapshot cks ON oo.outlet_id = cks.outlet_id
 
 -- เก็บเฉพาะ outlet ที่มี KAM owner ใน May หรือ April (กรอง noise)
 WHERE oo.may_kam_email IS NOT NULL OR oo.apr_kam_email IS NOT NULL
