@@ -417,18 +417,74 @@ FROM outlet_ownership      oo
 LEFT JOIN apr_gmv          ag  ON oo.outlet_id = ag.outlet_id
 LEFT JOIN current_kam_snapshot cks ON oo.outlet_id = cks.outlet_id
 
--- LEG B: outlet ที่ apr_kam มีค่า และแตกต่างจาก may_kam
--- รวม: [1] ไม่มี May order + user_master เปลี่ยน
---       [1b] มี May order แต่ KAM เปลี่ยน
+-- LEG B: outlet ที่ apr_kam มีค่า และ KAM เปลี่ยนจริงใน May
+-- [1b] มี May order แต่ KAM เปลี่ยน (เช่น 171090: Dent→Pop)
+-- [1]  ไม่มี May order + user_master ยืนยันว่าโอนออกจริง
+--
+-- ⚠ ไม่รวม core_nrr_churn:
+--    outlet ที่ไม่มี May order แต่ current_kam ยังเป็น apr_kam = churn ไม่ใช่ transfer_out
+--    จัดการโดย LEG A (may_kam_email IS NOT NULL) ผ่าน current_kam_snapshot หรือ
+--    โดย LEG A case [9] สำหรับ outlet ที่ยังมี may_kam
 WHERE oo.apr_kam_email IS NOT NULL
   AND (
     -- [1b] มี May order แต่ KAM เปลี่ยน
-    (oo.may_kam_email IS NOT NULL AND oo.may_kam_email != oo.apr_kam_email)
+    (oo.may_kam_email IS NOT NULL
+     AND oo.may_kam_email != oo.apr_kam_email)
     OR
-    -- [1] ไม่มี May order + user_master เปลี่ยน KAM
+    -- [1] ไม่มี May order + user_master เปลี่ยน KAM ออกไปแล้ว
+    -- ต้องแน่ใจว่าไม่ใช่ churn (current_kam ยังเป็น apr_kam = churn ไม่ใช่ transfer_out)
     (oo.may_kam_email IS NULL
-     AND (cks.current_kam_email IS NULL OR cks.current_kam_email != oo.apr_kam_email))
+     AND cks.current_kam_email IS NOT NULL
+     AND cks.current_kam_email != oo.apr_kam_email)
   )
+
+UNION ALL
+
+-- ── LEG C: core_nrr_churn silent-May ─────────────────────────────────────
+-- outlet ที่ไม่มี order May เลย แต่ยังอยู่กับ KAM เดิม (current_kam = apr_kam)
+-- = ร้านเงียบ ไม่โอนออก ยังอยู่ในพอร์ต → core_nrr_churn
+-- ไม่ถูกจับโดย LEG A (ไม่มี may_kam_email) และไม่ควรเข้า LEG B (ไม่ได้โอนออก)
+SELECT
+  oo.apr_kam_name  AS kam_name,
+  oo.apr_kam_email AS kam_email,
+  (SELECT tl_email FROM kam_list WHERE kam_email = oo.apr_kam_email LIMIT 1) AS tl_email,
+
+  oo.account_id,
+  oo.account_name,
+  oo.account_type,
+  oo.outlet_id,
+
+  oo.apr_staff_owner,
+  oo.may_staff_owner,
+
+  ROUND(COALESCE(ag.apr_gmv, 0), 0) AS apr_gmv,
+  0                                  AS may_gmv,
+  COALESCE(ag.apr_orders, 0)        AS apr_orders,
+  0                                  AS may_orders,
+
+  'core_nrr_churn' AS movement_type,
+
+  -- NRR base: นับ apr_gmv เป็น cohort base (ร้านยังอยู่ แต่ไม่ซื้อ May)
+  COALESCE(ag.apr_gmv, 0) AS nrr_base_apr_gmv,
+  0                        AS nrr_curr_may_gmv,  -- may_gmv=0 ทำให้ NRR ลด
+
+  NULL AS handover_retention_pct,
+  NULL AS expansion_commission,
+  NULL AS handover_commission,
+
+  oo.sales_handover_month,
+  CAST(oo.new_user_exp_date AS STRING) AS new_user_exp_date,
+  FORMAT_DATE('%Y-%m', oo.first_dollar_date) AS first_order_month
+
+FROM outlet_ownership      oo
+LEFT JOIN apr_gmv          ag  ON oo.outlet_id = ag.outlet_id
+LEFT JOIN current_kam_snapshot cks ON oo.outlet_id = cks.outlet_id
+
+WHERE oo.apr_kam_email IS NOT NULL
+  AND oo.may_kam_email IS NULL           -- ไม่มี order May
+  AND COALESCE(ag.apr_gmv, 0) > 0       -- มียอด Apr (cohort)
+  AND cks.current_kam_email IS NOT NULL
+  AND cks.current_kam_email = oo.apr_kam_email  -- user_master ยังเป็น KAM เดิม = churn ไม่ใช่ transfer_out
 
 ORDER BY
   tl_email,
