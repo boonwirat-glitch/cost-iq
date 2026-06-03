@@ -91,9 +91,22 @@ apr_gmv AS (
   GROUP BY 1
 ),
 
+-- ── 5b. GMV May per outlet ────────────────────────────────────────────────
+may_gmv AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    SUM(o.gmv_ex_vat)          AS may_gmv
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.cur_start AND p.cur_end
+    AND o.gmv_ex_vat > 0
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+  GROUP BY 1
+),
+
 -- ── 6. Core NRR outlet list ────────────────────────────────────────────────
 -- same KAM Apr=May + apr_gmv>0 + may_gmv>0
--- นี่คือ universe ของ upsell — ไม่มี outlet นอก list นี้เข้า P1/P3
+-- ตรงกับ CASE [8] ใน May2026_KAM_portfolio_reconcile.sql ทุก condition
 core_nrr_outlets AS (
   SELECT
     m.outlet_id,
@@ -101,7 +114,8 @@ core_nrr_outlets AS (
     k_may.tl_email
   FROM may_ownership m
   JOIN apr_ownership  a   ON m.outlet_id = a.outlet_id
-  JOIN apr_gmv        ag  ON m.outlet_id = ag.outlet_id
+  JOIN apr_gmv        ag  ON m.outlet_id = ag.outlet_id  -- apr_gmv > 0
+  JOIN may_gmv        mg  ON m.outlet_id = mg.outlet_id  -- may_gmv > 0
   JOIN kam_list       k_may
     ON m.commercial_owner = 'KAM'
    AND TRIM(m.staff_owner) = TRIM(k_may.kam_name)
@@ -110,9 +124,6 @@ core_nrr_outlets AS (
     ON a.commercial_owner = 'KAM'
    AND TRIM(a.staff_owner) = TRIM(k_apr.kam_name)
    AND k_apr.kam_email = k_may.kam_email
-  -- ต้องมี May GMV ด้วย (join กับ may_gmv ด้านล่างตอน final)
-  -- เช็คแค่ว่า outlet มี May order (มี row ใน may_ownership ก็พอ)
-  -- May GMV > 0 จะ filter ใน commission_items
 ),
 
 -- ── 7. May GMV per outlet × group_key — เฉพาะ core_nrr outlets ───────────
@@ -211,8 +222,6 @@ commission_items AS (
       ELSE 0
     END AS is_p3
   FROM current_gmv_by_group c
-  -- เช็คว่า may_gmv > 0 (กรอง outlet ที่ silent ใน May)
-  WHERE c.may_gmv > 0
   LEFT JOIN baseline_groups bg
     ON c.kam_email = bg.kam_email
    AND c.outlet_id = bg.outlet_id
@@ -221,35 +230,58 @@ commission_items AS (
     ON c.kam_email = mb.kam_email
    AND c.outlet_id = mb.outlet_id
    AND c.group_key = mb.group_key
+  WHERE c.may_gmv > 0
 )
 
--- ── Final: per KAM summary ────────────────────────────────────────────────
+-- ── Final: outlet × group_key level (raw สำหรับ Google Sheet) ───────────
 SELECT
-  ci.kam_email,
   kl.tl_email,
   kl.kam_name,
+  ci.kam_email,
+  ci.outlet_id,
+  ci.group_key,
 
-  -- P1
-  ROUND(SUM(CASE WHEN ci.is_p1 = 1 THEN ci.may_gmv   ELSE 0 END), 0) AS p1_gmv,
-  ROUND(SUM(CASE WHEN ci.is_p1 = 1 THEN ci.may_gmv   ELSE 0 END) * 0.03, 0) AS p1_comm,
+  -- GMV
+  ROUND(ci.may_gmv, 0)  AS may_gmv,
+  ROUND(ci.max_bl, 0)   AS max_baseline_30d,
 
-  -- P3
-  ROUND(SUM(CASE WHEN ci.is_p3 = 1 THEN ci.may_gmv - ci.max_bl ELSE 0 END), 0) AS p3_incremental,
-  ROUND(SUM(CASE WHEN ci.is_p3 = 1 THEN ci.may_gmv - ci.max_bl ELSE 0 END) * 0.03, 0) AS p3_comm,
+  -- ── P1 เงื่อนไขแต่ละข้อ ──────────────────────────────────────────────────
+  -- P1 = กลุ่มสินค้าที่ outlet ไม่เคยซื้อใน 3 เดือนก่อน (Feb/Mar/Apr) + may_gmv >= 2,500
+  ci.is_p1,
+  CASE WHEN ci.max_bl = 0 THEN 'ใช่' ELSE 'ไม่' END           AS p1_new_group,      -- ไม่เคยซื้อ 3 เดือนก่อน?
+  ROUND(ci.may_gmv, 0)                                          AS p1_check_gmv,      -- GMV ที่ต้องการ >= 2,500
+  CASE WHEN ci.may_gmv >= 2500 THEN 'ผ่าน' ELSE 'ไม่ผ่าน' END AS p1_gmv_threshold,  -- ผ่าน 2,500 ไหม?
 
-  -- Total upsell commission
-  ROUND(
-    SUM(CASE WHEN ci.is_p1 = 1 THEN ci.may_gmv ELSE 0 END) * 0.03 +
-    SUM(CASE WHEN ci.is_p3 = 1 THEN ci.may_gmv - ci.max_bl ELSE 0 END) * 0.03
-  , 0) AS total_upsell_comm,
+  -- ── P3 เงื่อนไขแต่ละข้อ ──────────────────────────────────────────────────
+  -- P3 = กลุ่มสินค้าที่เคยซื้อ + may_gmv > max_baseline × 200% + ส่วนเกิน >= 5,000
+  ci.is_p3,
+  CASE WHEN ci.max_bl > 0 THEN 'ใช่' ELSE 'ไม่' END            AS p3_existing_group,  -- เคยซื้อ 3 เดือนก่อน?
+  ROUND(ci.max_bl, 0)                                            AS p3_baseline,        -- baseline (max 30d)
+  ROUND(ci.max_bl * 2.0, 0)                                     AS p3_threshold_200pct, -- เกณฑ์ 200% = baseline × 2
+  ROUND(ci.may_gmv / NULLIF(ci.max_bl, 0) * 100, 1)            AS p3_growth_pct,       -- โตจริง (%)
+  CASE WHEN ci.may_gmv > ci.max_bl * 2.0
+       THEN 'ผ่าน' ELSE 'ไม่ผ่าน' END                          AS p3_200pct_check,    -- ผ่าน 200% ไหม?
+  ROUND(ci.may_gmv - ci.max_bl, 0)                              AS p3_incremental,      -- ส่วนเกินจริง (฿)
+  CASE WHEN (ci.may_gmv - ci.max_bl) >= 5000
+       THEN 'ผ่าน' ELSE 'ไม่ผ่าน' END                          AS p3_5000_check,      -- ส่วนเกิน >= 5,000 ไหม?
 
-  -- TL upsell base (ไม่คูณ rate — ใช้เป็นฐานคำนวณ multiplier ของ TL)
-  ROUND(
-    SUM(CASE WHEN ci.is_p1 = 1 THEN ci.may_gmv ELSE 0 END) +
-    SUM(CASE WHEN ci.is_p3 = 1 THEN ci.may_gmv - ci.max_bl ELSE 0 END)
-  , 0) AS tl_upsell_base
+  -- ── Commission per row ───────────────────────────────────────────────────
+  ROUND(CASE WHEN ci.is_p1 = 1 THEN ci.may_gmv * 0.03 ELSE 0 END, 0)              AS p1_comm,
+  ROUND(CASE WHEN ci.is_p3 = 1 THEN (ci.may_gmv - ci.max_bl) * 0.03 ELSE 0 END, 0) AS p3_comm,
+
+  -- ── สรุปผล ───────────────────────────────────────────────────────────────
+  CASE
+    WHEN ci.is_p1 = 1 THEN 'P1 ✓'
+    WHEN ci.is_p3 = 1 THEN 'P3 ✓'
+    WHEN ci.max_bl = 0 AND ci.may_gmv < 2500
+      THEN CONCAT('P1 ✗ GMV=', CAST(ROUND(ci.may_gmv,0) AS STRING), ' (ต้องการ ≥2,500)')
+    WHEN ci.max_bl > 0 AND ci.may_gmv <= ci.max_bl * 2.0
+      THEN CONCAT('P3 ✗ โต=', CAST(ROUND(ci.may_gmv/ci.max_bl*100,1) AS STRING), '% (ต้องการ >200%)')
+    WHEN ci.max_bl > 0 AND ci.may_gmv > ci.max_bl * 2.0 AND (ci.may_gmv - ci.max_bl) < 5000
+      THEN CONCAT('P3 ✗ ส่วนเกิน=', CAST(ROUND(ci.may_gmv-ci.max_bl,0) AS STRING), ' (ต้องการ ≥5,000)')
+    ELSE 'ไม่ผ่านเงื่อนไขใด'
+  END AS result
 
 FROM commission_items ci
 JOIN kam_list kl ON ci.kam_email = kl.kam_email
-GROUP BY 1, 2, 3
-ORDER BY kl.tl_email, total_upsell_comm DESC
+ORDER BY kl.tl_email, kl.kam_name, ci.outlet_id, ci.group_key
