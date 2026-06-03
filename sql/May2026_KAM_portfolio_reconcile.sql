@@ -307,20 +307,30 @@ SELECT
       AND oo.apr_kam_email != oo.may_kam_email
       THEN 'transfer_in'
 
-    -- [6] Transfer In (no prev KAM): apr_staff_owner มีค่าแต่ไม่ใช่ KAM ใน list
+    -- [6] Transfer In (no prev KAM in list): apr_staff_owner มีค่า (KAM อาจลาออกแล้ว)
+    --     หรือ apr_commercial_owner=KAM แม้ staff_owner จะว่าง (เช่น Fang กรณี 170447)
+    --     ทั้งสองกรณี = เคยมี KAM ดูแล แค่ระบบไม่รู้ว่าใคร → transfer_in ไม่ใช่ comeback
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
-      AND oo.apr_staff_owner IS NOT NULL
-      AND TRIM(oo.apr_staff_owner) != ''
       AND (oo.apr_commercial_owner IS NULL OR oo.apr_commercial_owner != 'SALE')
+      AND (
+        -- มี staff_owner จริง (KAM ลาออกแต่ยังมีชื่อใน order)
+        (oo.apr_staff_owner IS NOT NULL AND TRIM(oo.apr_staff_owner) != '')
+        OR
+        -- apr_commercial_owner=KAM แม้ staff_owner ว่าง → มี KAM ดูแลแต่ไม่รู้ชื่อ
+        oo.apr_commercial_owner = 'KAM'
+      )
       THEN 'transfer_in'
 
-    -- [7] Comeback: first_dollar_date ก่อน May + ไม่มี Apr GMV + มี May GMV
+    -- [7] Comeback: ร้านเคยซื้อ (first_dollar_date ก่อน May) + ไม่มี Apr GMV
+    --     ต้องไม่มี KAM ดูแลใน Apr เลย (apr_commercial_owner != KAM)
+    --     ถ้า Apr มี commercial_owner=KAM แม้ staff_owner ว่าง → CASE [6] transfer_in แทน
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.first_dollar_date IS NOT NULL
       AND oo.first_dollar_date < '2026-05-01'
       AND COALESCE(ag.apr_gmv, 0) = 0
       AND COALESCE(mg.may_gmv, 0) > 0
+      AND (oo.apr_commercial_owner IS NULL OR oo.apr_commercial_owner != 'KAM')
       THEN 'comeback'
 
     -- [8] Core NRR cohort: same KAM Apr=May + มี GMV ทั้งคู่
