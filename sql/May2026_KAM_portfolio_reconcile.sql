@@ -136,7 +136,7 @@ outlet_ownership AS (
 
   FROM may_ownership m
   FULL OUTER JOIN apr_ownership   a   ON m.outlet_id = a.outlet_id
-  LEFT JOIN       last_sale_order lso ON COALESCE(m.outlet_id, a.outlet_id) = lso.outlet_id
+  LEFT JOIN       sale_dates_per_outlet lso ON COALESCE(m.outlet_id, a.outlet_id) = lso.outlet_id
 
   -- Match May owner to kam_list
   LEFT JOIN kam_list k_may
@@ -191,7 +191,7 @@ ever_seen AS (
 -- ── Fallback: last SALE order date per outlet (Q10 PATH B) ───────────────
 -- ใช้แยก handover_perf vs new_sales เมื่อ new_user_exp_date IS NULL
 -- 243439 = outlet ที่ไม่มี new_user_exp_date แต่ handover Apr (last SALE ใน Apr)
-last_sale_order AS (
+sale_dates_per_outlet AS (
   SELECT
     CAST(o.user_id AS STRING) AS outlet_id,
     MAX(CASE WHEN o.delivery_date BETWEEN p.prev_start AND p.prev_end
