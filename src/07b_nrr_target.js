@@ -253,12 +253,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       transferOutList = allToRows;
     }
     // map Q11 fields → Q10-compatible shape for downstream rendering
+    // v293: keep ownerToType + ownerToName for breakdown display
     transferOutList = transferOutList.map(r => ({
       accountId:    r.accountId,
       accountName:  r.accountName,
       accountType:  r.accountType,
       kamName:      r.ownerFromName,
       newKamName:   r.ownerToName,
+      ownerToType:  r.ownerToType || '',
       lastMonthGmv: r.baselineGmv || 0,
       prevOwner:    'KAM',
       transferMonth: r.movementMonth,
@@ -857,7 +859,19 @@ async function renderPortviewTargetBar() {
   }
   if (nrrResult && nrrResult.transferOut && nrrResult.transferOut.count > 0) {
     const to = nrrResult.transferOut;
-    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.3)">—</span></div>`);
+    // v293: build per-account breakdown with destination label
+    const _toDestLabel = r => {
+      const t = (r.ownerToType||'').toUpperCase();
+      if (t === 'SALE' || t === 'SALES') return 'Sales';
+      if (t === 'KAM' || t === 'PM' || t === 'ADMIN') return r.newKamName || 'KAM อื่น';
+      if (!t || t === '' || t === 'NONE') return 'ไม่มี owner';
+      return r.newKamName || t;
+    };
+    const _toRows = (to.detail||[]).slice(0,8).map(r =>
+      `<div class="tgt-mv-sub"><span class="tgt-mv-sub-name">${r.accountName||r.accountId}</span><span class="tgt-mv-sub-dest">→ ${_toDestLabel(r)}</span><span class="tgt-mv-sub-gmv">−${fmtK(r.lastMonthGmv||0)}</span></div>`
+    ).join('');
+    const _toMore = (to.detail||[]).length > 8 ? `<div class="tgt-mv-sub tgt-mv-sub-more">+${(to.detail||[]).length-8} ร้านอื่น</div>` : '';
+    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.3)">—</span></div>${_toRows}${_toMore}`);
   }
   const mvSection = mvRows.length ? `<div class="tgt-mv-wrap">
     <div class="tgt-mv-header"><span class="tgt-mv-label">การเคลื่อนไหวพอร์ต</span><span class="tgt-mv-count">ร้าน</span><span class="tgt-mv-gmv">GMV</span><span class="tgt-mv-nrr">NRR</span></div>
@@ -880,7 +894,7 @@ async function renderPortviewTargetBar() {
         <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:9px;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;padding:0;font-family:'IBM Plex Sans Thai',sans-serif">▾ ดูนิยาม</button>
       </div>
       <div style="display:none">
-        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:#4ddc97">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนต้นเดือน (daysWithKAM &gt; daysElapsed) — วัด retention จริง</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:#4ddc97">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนเดือนนี้ และไม่อยู่ใน transfer_in/handover list — วัด retention จริง</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(140,180,255,.9)">Transfer in</span><span class="tgt-fml-eq" style="font-size:10px">account ที่โอนมาจาก KAM อื่นในเดือนนี้ — วัด NRR ต่อเนื่องหลังรับโอน</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(0,200,176,.9)">New (Sales)</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ Sales ปิดดีล แล้วโอนมา KAM เดือนนี้ — วัด onboarding success</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(255,140,100,.8)">Transfer out</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ออกจากพอร์ตนี้ไปเดือนนี้ — GMV เดือนก่อนของ account เหล่านั้น</span></div>
