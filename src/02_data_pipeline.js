@@ -793,9 +793,10 @@ function handleFileUpload(type,input){
         const p=parseCSVRow(l);const aid=(p[0]||'').trim();const mo=(p[1]||'').trim();const outletId=(p[2]||'').trim();const outletName=(p[3]||'').trim();
         const gmv=parseFloat(p[4])||0;const orders=parseInt(p[5])||0;const shipping=parseFloat(p[6])||0;const timeslot=parseFloat(p[7])||0;
         const lastOrderDate=(p[8]||'').trim()||null; // Q5B v2: last_order_date (YYYY-MM-DD), null if old format
+        const firstDollarDate=(p[9]||'').trim()||null; // Q5B v3: first_dollar_date all-time (YYYY-MM-DD)
         if(!aid||!mo||!outletId||!gmv)return;
         if(!byAccount[aid])byAccount[aid]={};if(!byAccount[aid][mo])byAccount[aid][mo]=[];
-        byAccount[aid][mo].push({outlet_id:outletId,outlet_name:outletName,gmv,orders,shipping,timeslot,lastOrderDate});
+        byAccount[aid][mo].push({outlet_id:outletId,outlet_name:outletName,gmv,orders,shipping,timeslot,lastOrderDate,firstDollarDate});
       });
       Object.entries(byAccount).forEach(([aid,months])=>{bulkOutletsData[aid]=months;});
       const cnt=Object.keys(byAccount).length;
