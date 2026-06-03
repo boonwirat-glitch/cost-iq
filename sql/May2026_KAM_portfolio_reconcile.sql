@@ -275,16 +275,17 @@ SELECT
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'expansion'
 
-    -- [3] Handover perf
-    WHEN oo.apr_kam_email IS NULL
-      AND oo.apr_commercial_owner = 'SALE'
-      AND oo.sales_handover_month = '2026-04'
+    -- [3] Handover perf: โอนมาจาก SALE ใน April → วัด retention ใน May
+    -- ไม่ต้อง check apr_kam_email IS NULL เพราะ outlet อาจมี order Apr
+    -- ทั้งจาก KAM (ก่อนโอน) และ SALE — ใช้ sales_handover_month เป็น source of truth
+    -- 243001: มี apr order จาก Ning แต่ new_user_exp_date='2026-04' → handover_perf ✓
+    WHEN oo.sales_handover_month = '2026-04'
+      AND oo.may_kam_email IS NOT NULL
       THEN 'handover_perf'
 
-    -- [4] New Sales
-    WHEN oo.apr_kam_email IS NULL
-      AND oo.apr_commercial_owner = 'SALE'
-      AND (oo.sales_handover_month IS NULL OR oo.sales_handover_month != '2026-04')
+    -- [4] New Sales: โอนมาจาก SALE ใน May → รอวัด June
+    WHEN oo.sales_handover_month = '2026-05'
+      AND oo.may_kam_email IS NOT NULL
       THEN 'new_sales'
 
     -- [5] Transfer In: รับจาก KAM อื่นใน roster
