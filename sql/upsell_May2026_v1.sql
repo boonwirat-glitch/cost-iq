@@ -124,6 +124,14 @@ core_nrr_outlets AS (
     ON a.commercial_owner = 'KAM'
    AND TRIM(a.staff_owner) = TRIM(k_apr.kam_name)
    AND k_apr.kam_email = k_may.kam_email
+  -- ⚠ ตัด handover_perf outlets ออก:
+  --   outlet ที่มี new_user_exp_date ใน Apr/May = โอนมาจาก SALE
+  --   แม้ Apr order ล่าสุดจะเป็น KAM แล้ว ก็ไม่ควรนับใน P1/P3
+  --   (6 outlets เช่น 212303, 242162, 243001, 244739, 245589, 242699)
+  WHERE (
+    a.new_user_exp_date IS NULL
+    OR DATE(a.new_user_exp_date) < '2026-04-01'  -- โอนก่อน Apr = core_nrr จริง
+  )
 ),
 
 -- ── 7. May GMV per outlet × group_key — เฉพาะ core_nrr outlets ───────────
