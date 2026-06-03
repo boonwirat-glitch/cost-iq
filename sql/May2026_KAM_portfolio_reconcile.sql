@@ -104,6 +104,24 @@ apr_ownership AS (
   ) = 1
 ),
 
+-- ── 4b. Last SALE order per outlet (PATH B fallback for handover_perf vs new_sales)
+sale_dates_per_outlet AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    MAX(CASE WHEN o.delivery_date BETWEEN p.prev_start AND p.prev_end
+              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
+             THEN o.delivery_date END) AS last_sale_in_apr,
+    MAX(CASE WHEN o.delivery_date BETWEEN p.cur_start AND p.cur_end
+              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
+             THEN o.delivery_date END) AS last_sale_in_may
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.prev_start AND p.cur_end
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  GROUP BY 1
+),
+
 -- ── 5. Determine each outlet's KAM in May (primary) and April (for movement) ──
 -- Priority: May order owner → Apr order owner (outlet อาจ silent ใน May)
 -- "belongs_to_kam_in_may" = outlet ที่นับอยู่ใน portfolio ของ KAM ใน May
@@ -191,23 +209,6 @@ ever_seen AS (
 -- ── Fallback: last SALE order date per outlet (Q10 PATH B) ───────────────
 -- ใช้แยก handover_perf vs new_sales เมื่อ new_user_exp_date IS NULL
 -- 243439 = outlet ที่ไม่มี new_user_exp_date แต่ handover Apr (last SALE ใน Apr)
-sale_dates_per_outlet AS (
-  SELECT
-    CAST(o.user_id AS STRING) AS outlet_id,
-    MAX(CASE WHEN o.delivery_date BETWEEN p.prev_start AND p.prev_end
-              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
-             THEN o.delivery_date END) AS last_sale_in_apr,
-    MAX(CASE WHEN o.delivery_date BETWEEN p.cur_start AND p.cur_end
-              AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
-             THEN o.delivery_date END) AS last_sale_in_may
-  FROM `freshket-rn.dwh.order` o
-  CROSS JOIN params p
-  WHERE o.delivery_date BETWEEN p.prev_start AND p.cur_end
-    AND o.account_type IN ('SA','MC','Chain','Unknown')
-    AND o.user_id IS NOT NULL
-  GROUP BY 1
-),
-
 -- ── current_kam_snapshot: user_master ณ ขณะรัน SQL ───────────────────────
 -- แยก transfer_out (owner เปลี่ยนแล้ว) vs core_nrr_churn (เงียบแต่ยังอยู่พอร์ต)
 -- ⚠ Known limitation: outlet โอนใน June จะถูก flag เป็น transfer_out ใน May backfill
