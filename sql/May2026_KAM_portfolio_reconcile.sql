@@ -68,7 +68,8 @@ may_ownership AS (
     o.account_type,
     UPPER(TRIM(o.commercial_owner))  AS commercial_owner,
     TRIM(o.staff_owner)              AS staff_owner,
-    o.delivery_date
+    o.delivery_date,
+    DATE(o.new_user_exp_date) AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.cur_start AND p.cur_end
@@ -89,7 +90,8 @@ apr_ownership AS (
     o.account_type,
     UPPER(TRIM(o.commercial_owner))  AS commercial_owner,
     TRIM(o.staff_owner)              AS staff_owner,
-    o.delivery_date
+    o.delivery_date,
+    DATE(o.new_user_exp_date) AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.prev_start AND p.prev_end
@@ -127,7 +129,9 @@ outlet_ownership AS (
 
     -- KAM ที่เป็นเจ้าของใน April
     k_apr.kam_email     AS apr_kam_email,
-    k_apr.kam_name      AS apr_kam_name
+    k_apr.kam_name      AS apr_kam_name,
+    COALESCE(m.new_user_exp_date, a.new_user_exp_date)                       AS new_user_exp_date,
+    FORMAT_DATE('%Y-%m', COALESCE(m.new_user_exp_date, a.new_user_exp_date)) AS exp_month
 
   FROM may_ownership m
   FULL OUTER JOIN apr_ownership a ON m.outlet_id = a.outlet_id
@@ -241,21 +245,21 @@ SELECT
       AND oo.may_commercial_owner = 'KAM'
       THEN 'transfer_in'  -- นับรวมกับ transfer_in ไม่นับ NRR base
 
-    -- [5] Expansion: ไม่เคยปรากฏใน history 18 เดือนเลย → ร้านใหม่แท้
+    -- [6] Expansion: ไม่เคยปรากฏใน history 18 เดือนเลย → ร้านใหม่แท้
     WHEN oo.may_kam_email IS NOT NULL
       AND COALESCE(ag.apr_gmv, 0) = 0
       AND es.outlet_id IS NULL
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'expansion'
 
-    -- [6] Comeback: ไม่มี Apr GMV แต่เคยซื้อใน history → กลับมา
+    -- [7] Comeback: ไม่มี Apr GMV แต่เคยซื้อใน history → กลับมา
     WHEN oo.may_kam_email IS NOT NULL
       AND COALESCE(ag.apr_gmv, 0) = 0
       AND es.outlet_id IS NOT NULL
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'comeback'
 
-    -- [7] Core NRR cohort: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี GMV ทั้งคู่
+    -- [8] Core NRR cohort: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี GMV ทั้งคู่
     -- เงื่อนไขสำคัญ: apr_kam_email = may_kam_email (same KAM ทั้งสองเดือน)
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NOT NULL
@@ -264,7 +268,7 @@ SELECT
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'core_nrr'
 
-    -- [8] Core churn: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี Apr GMV + ไม่มี May GMV
+    -- [9] Core churn: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี Apr GMV + ไม่มี May GMV
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NOT NULL
       AND oo.apr_kam_email = oo.may_kam_email
@@ -308,7 +312,24 @@ SELECT
       AND es.outlet_id IS NULL
       AND COALESCE(mg.may_gmv, 0) > 0
     THEN ROUND(mg.may_gmv * 0.015, 0)
-  END AS expansion_commission
+  END AS expansion_commission,
+
+  -- Handover commission (default tiers: <100%→0, 100-119%→฿2,500, ≥120%→฿5,000)
+  CASE
+    WHEN oo.may_kam_email IS NOT NULL
+      AND oo.apr_commercial_owner = 'SALE'
+      AND oo.exp_month = '2026-04'
+      AND COALESCE(ag.apr_gmv, 0) > 0
+    THEN CASE
+      WHEN ROUND((COALESCE(mg.may_gmv,0)/31.0)/(ag.apr_gmv/30.0)*100, 2) >= 120 THEN 5000
+      WHEN ROUND((COALESCE(mg.may_gmv,0)/31.0)/(ag.apr_gmv/30.0)*100, 2) >= 100 THEN 2500
+      ELSE 0
+    END
+  END AS handover_commission,
+
+  -- Audit trail
+  oo.exp_month,
+  CAST(oo.new_user_exp_date AS STRING) AS new_user_exp_date
 
 FROM outlet_ownership oo
 LEFT JOIN apr_gmv   ag ON oo.outlet_id = ag.outlet_id
