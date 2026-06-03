@@ -1,7 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Q5B — Bulk Outlets Monthly (KAM Cost IQ)
--- Columns (9): account_id, month_label, outlet_id, outlet_name,
---              gmv_ex_vat, orders, shipping_incvat, mode_timeslot, last_order_date
+-- Columns (10): account_id, month_label, outlet_id, outlet_name,
+--               gmv_ex_vat, orders, shipping_incvat, mode_timeslot, last_order_date,
+--               first_dollar_date (all-time MIN delivery_date for this outlet)
 -- Window: last 6 complete months + current month MTD (for outlet cycle signals)
 -- Note: outlet card renders only for accounts with 2+ outlets (Chain)
 --       Single-outlet SA/MC accounts will be skipped by the app automatically
@@ -90,6 +91,19 @@ agg AS (
   GROUP BY account_id, month_date, outlet_id
 )
 
+-- v_fdd: all-time first order date per outlet — for comeback vs expansion classification
+-- Intentionally NOT filtered by 6-month window or kam_map: we want all-time history
+first_order_per_outlet AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    MIN(o.delivery_date)      AS first_dollar_date
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+    AND o.gmv_ex_vat > 0
+  GROUP BY 1
+)
+
 SELECT
   a.account_id,
   CONCAT(
@@ -108,6 +122,8 @@ SELECT
   a.orders,
   a.shipping_incvat,
   a.mode_timeslot,
-  FORMAT_DATE('%Y-%m-%d', a.last_order_date) AS last_order_date
+  FORMAT_DATE('%Y-%m-%d', a.last_order_date)       AS last_order_date,
+  FORMAT_DATE('%Y-%m-%d', fdo.first_dollar_date)   AS first_dollar_date
 FROM agg a
+LEFT JOIN first_order_per_outlet fdo ON a.outlet_id = fdo.outlet_id
 ORDER BY a.account_id, a.month_date DESC, a.gmv_ex_vat DESC;
