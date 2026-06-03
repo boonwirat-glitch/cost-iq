@@ -70,7 +70,8 @@ may_ownership AS (
     UPPER(TRIM(o.commercial_owner))  AS commercial_owner,
     TRIM(o.staff_owner)              AS staff_owner,
     o.delivery_date,
-    DATE(o.new_user_exp_date) AS new_user_exp_date
+    DATE(o.new_user_exp_date) AS new_user_exp_date,
+    DATE(o.first_dollar_date)        AS first_dollar_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.cur_start AND p.cur_end
@@ -92,7 +93,8 @@ apr_ownership AS (
     UPPER(TRIM(o.commercial_owner))  AS commercial_owner,
     TRIM(o.staff_owner)              AS staff_owner,
     o.delivery_date,
-    DATE(o.new_user_exp_date) AS new_user_exp_date
+    DATE(o.new_user_exp_date) AS new_user_exp_date,
+    DATE(o.first_dollar_date)        AS first_dollar_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.prev_start AND p.prev_end
@@ -256,25 +258,34 @@ SELECT
   COALESCE(mg.may_orders, 0)        AS may_orders,
 
   -- ── Movement classification ───────────────────────────────────────────
-  -- Priority order สำคัญมาก: movement types ต้องมาก่อน core_nrr เสมอ
-  -- เพราะ transfer_in อาจมี apr_gmv > 0 (outlet เคยมียอดแต่ไม่มี KAM owner)
-  -- ถ้า core_nrr มาก่อน outlet เช่น 205038 จะถูกนับผิดเป็น NRR cohort
+  -- นิยาม:
+  --   expansion   = first_dollar_date ใน May 2026 + commercial_owner=KAM
+  --   comeback    = first_dollar_date ก่อน May + apr_gmv=0 + may_gmv>0
+  --   transfer_in = apr_staff_owner มีค่า (มี KAM เดิม) → May เป็น KAM นี้
   CASE
-    -- [1] Transfer Out A: ไม่มี May order + user_master เปลี่ยน KAM แล้ว
-    -- ⚠ outlet โอนใน June ก็จะถูก flag ที่นี่ แต่ commission ไม่กระทบ (may_gmv=0)
+
+    -- [1] Transfer Out A: ไม่มี order May + user_master เปลี่ยน KAM
     WHEN oo.apr_kam_email IS NOT NULL
       AND oo.may_kam_email IS NULL
       AND COALESCE(mg.may_gmv, 0) = 0
       AND (cks.current_kam_email IS NULL OR cks.current_kam_email != oo.apr_kam_email)
       THEN 'transfer_out'
 
-    -- [1b] Transfer Out B: มี May order แต่ KAM เปลี่ยน (โอนระหว่างเดือน)
+    -- [1b] Transfer Out B: มี order May แต่ KAM เปลี่ยน
     WHEN oo.apr_kam_email IS NOT NULL
       AND oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email != oo.may_kam_email
       THEN 'transfer_out'
 
-    -- [2] Handover perf: Sales→KAM ใน April, วัด retention ใน May
+    -- [2] Expansion: first_dollar_date อยู่ใน May 2026 + commercial_owner=KAM
+    --     ร้านเปิดสาขาใหม่ ซื้อ Freshket ครั้งแรกเดือน May ภายใต้ KAM
+    WHEN oo.may_kam_email IS NOT NULL
+      AND oo.may_commercial_owner = 'KAM'
+      AND oo.first_dollar_date BETWEEN '2026-05-01' AND '2026-05-31'
+      AND COALESCE(mg.may_gmv, 0) > 0
+      THEN 'expansion'
+
+    -- [3] Handover perf: Sales→KAM ใน April, วัด retention ใน May
     --     exp_month='2026-04' | 243439 = ตัวอย่าง
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
@@ -282,45 +293,36 @@ SELECT
       AND oo.exp_month = '2026-04'
       THEN 'handover_perf'
 
-    -- [3] New Sales: Sales→KAM ใน May, รอวัด June | exp_month='2026-05'
-    --     243819 = ตัวอย่าง
+    -- [4] New Sales: Sales→KAM ใน May, รอวัด June | 243819 = ตัวอย่าง
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
       AND oo.apr_commercial_owner = 'SALE'
       AND (oo.exp_month IS NULL OR oo.exp_month != '2026-04')
       THEN 'new_sales'
 
-    -- [3] Transfer In: Apr เป็น KAM อื่น → May เป็น KAM นี้
+    -- [5] Transfer In: Apr เป็น KAM อื่น (apr_staff_owner มีค่า) → May เป็น KAM นี้
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NOT NULL
       AND oo.apr_kam_email != oo.may_kam_email
       THEN 'transfer_in'
 
-    -- [4] Limbo Transfer In: Apr ไม่มี KAM owner เลย (ไม่ใช่ SALE) → May เป็น KAM นี้
-    -- เช่น outlet ที่อยู่ระหว่างรอโอน, self-order, no owner
-    -- ไม่นับใน NRR cohort เพราะ KAM เพิ่งรับมา ทำอะไรใน Apr ไม่ได้
+    -- [6] Transfer In (no prev KAM): apr_staff_owner มีค่าแต่ไม่ใช่ KAM ใน list
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NULL
+      AND oo.apr_staff_owner IS NOT NULL
+      AND TRIM(oo.apr_staff_owner) != ''
       AND (oo.apr_commercial_owner IS NULL OR oo.apr_commercial_owner != 'SALE')
-      AND oo.may_commercial_owner = 'KAM'
-      THEN 'transfer_in'  -- นับรวมกับ transfer_in ไม่นับ NRR base
+      THEN 'transfer_in'
 
-    -- [6] Expansion: ไม่เคยปรากฏใน history 18 เดือนเลย → ร้านใหม่แท้
+    -- [7] Comeback: first_dollar_date ก่อน May + ไม่มี Apr GMV + มี May GMV
     WHEN oo.may_kam_email IS NOT NULL
+      AND oo.first_dollar_date IS NOT NULL
+      AND oo.first_dollar_date < '2026-05-01'
       AND COALESCE(ag.apr_gmv, 0) = 0
-      AND es.outlet_id IS NULL
-      AND COALESCE(mg.may_gmv, 0) > 0
-      THEN 'expansion'
-
-    -- [7] Comeback: ไม่มี Apr GMV แต่เคยซื้อใน history → กลับมา
-    WHEN oo.may_kam_email IS NOT NULL
-      AND COALESCE(ag.apr_gmv, 0) = 0
-      AND es.outlet_id IS NOT NULL
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'comeback'
 
-    -- [8] Core NRR cohort: อยู่กับ KAM คนเดียวกันทั้ง Apr AND May + มี GMV ทั้งคู่
-    -- เงื่อนไขสำคัญ: apr_kam_email = may_kam_email (same KAM ทั้งสองเดือน)
+    -- [8] Core NRR cohort: same KAM Apr=May + มี GMV ทั้งคู่
     WHEN oo.may_kam_email IS NOT NULL
       AND oo.apr_kam_email IS NOT NULL
       AND oo.apr_kam_email = oo.may_kam_email
@@ -328,8 +330,7 @@ SELECT
       AND COALESCE(mg.may_gmv, 0) > 0
       THEN 'core_nrr'
 
-    -- [9] Core churn: Apr อยู่กับ KAM นี้ + มี Apr GMV + ไม่มี May GMV
-    --     รวม outlet ที่ silent May แต่ user_master ยังเป็น KAM เดิม
+    -- [9] Core churn: same KAM Apr=May + มี Apr GMV + ไม่มี May GMV
     WHEN oo.apr_kam_email IS NOT NULL
       AND COALESCE(ag.apr_gmv, 0) > 0
       AND COALESCE(mg.may_gmv, 0) = 0
@@ -370,10 +371,11 @@ SELECT
   END AS handover_retention_pct,
 
   -- Expansion commission (1.5% flat)
+  -- Expansion commission (1.5%)
   CASE
     WHEN oo.may_kam_email IS NOT NULL
-      AND COALESCE(ag.apr_gmv, 0) = 0
-      AND es.outlet_id IS NULL
+      AND oo.may_commercial_owner = 'KAM'
+      AND oo.first_dollar_date BETWEEN '2026-05-01' AND '2026-05-31'
       AND COALESCE(mg.may_gmv, 0) > 0
     THEN ROUND(mg.may_gmv * 0.015, 0)
   END AS expansion_commission,
@@ -398,7 +400,6 @@ SELECT
 FROM outlet_ownership      oo
 LEFT JOIN apr_gmv          ag  ON oo.outlet_id = ag.outlet_id
 LEFT JOIN may_gmv          mg  ON oo.outlet_id = mg.outlet_id
-LEFT JOIN ever_seen        es  ON oo.outlet_id = es.outlet_id
 LEFT JOIN current_kam_snapshot cks ON oo.outlet_id = cks.outlet_id
 
 -- เก็บเฉพาะ outlet ที่มี KAM owner ใน May หรือ April (กรอง noise)
@@ -445,3 +446,4 @@ ORDER BY
 -- GROUP BY 1,2,3
 -- ORDER BY tl_email, raw_nrr_pct DESC;
 ;
+    COALESCE(m.first_dollar_date, a.first_dollar_date)  AS first_dollar_date,
