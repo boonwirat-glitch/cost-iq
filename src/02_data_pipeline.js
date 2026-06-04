@@ -881,6 +881,7 @@ function handleFileUpload(type,input){
     reader.onload=e=>{
       const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
       const byAccountId={};
+      const byOutletId={};   // v299: Q10 is outlet-grain (user_id=p[16])
       const byKamName={};
       const byNewKamName={}; // commission: index by receiving KAM for Handover retention calc
       lines.forEach(l=>{
@@ -893,8 +894,10 @@ function handleFileUpload(type,input){
         const curMonthGmv=parseFloat(p[5])||0;
         const newOwnerType=(p[6]||'').trim();
         const newKamName=(p[7]||'').trim();
+        const outletId=(p[16]||'').trim();  // v299: user_id (res_id)
         if(!kamName||!accountId)return;
-        byAccountId[accountId]={kamName,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName};
+        if(!byAccountId[accountId]){byAccountId[accountId]={kamName,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName,outletIds:[]};}
+        if(outletId){ byOutletId[outletId]={kamName,accountId,accountName,prevOwner:(p[10]||'').trim(),newKamName}; (byAccountId[accountId].outletIds=byAccountId[accountId].outletIds||[]).push(outletId); }
         if(!byKamName[kamName])byKamName[kamName]=[];
         byKamName[kamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName});
         // index by NEW KAM name (receiving) for Handover commission
@@ -903,7 +906,7 @@ function handleFileUpload(type,input){
           byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
         }
       });
-      bulkHandoverData={byAccountId,byKamName,byNewKamName};
+      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
       console.log('%c[Sense] handover loaded','color:#4ddc97',{accounts:Object.keys(byAccountId).length,
         kams:Object.keys(byKamName).length});
       const cnt=Object.keys(byKamName).length;
