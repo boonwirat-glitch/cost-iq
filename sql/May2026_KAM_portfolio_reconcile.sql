@@ -487,6 +487,59 @@ WHERE oo.apr_kam_email IS NOT NULL
   AND cks.current_kam_email IS NOT NULL
   AND cks.current_kam_email = oo.apr_kam_email  -- user_master ยังเป็น KAM เดิม = churn ไม่ใช่ transfer_out
 
+UNION ALL
+
+-- ── LEG D: handover_perf ที่ churn ใน May (ไม่มี May order) ─────────────
+-- outlet โอนจาก SALE ใน Apr (sales_handover_month='2026-04')
+-- แต่ไม่มี order ใน May เลย → churn → retention=0% → commission=฿0
+-- ต้องแสดงเพื่อ reconcile ครบ (243179 = ตัวอย่าง)
+SELECT
+  cks.current_kam_email                          AS kam_email,
+  k.kam_name,
+  k.tl_email,
+
+  oo.account_id,
+  oo.account_name,
+  oo.account_type,
+  oo.outlet_id,
+
+  oo.apr_staff_owner,
+  NULL                                           AS may_staff_owner,
+
+  ROUND(COALESCE(ag.apr_gmv, 0), 0)             AS apr_gmv,
+  0                                              AS may_gmv,
+  COALESCE(ag.apr_orders, 0)                    AS apr_orders,
+  0                                              AS may_orders,
+
+  'handover_perf'                                AS movement_type,
+
+  NULL AS nrr_base_apr_gmv,
+  NULL AS nrr_curr_may_gmv,
+
+  -- retention = 0% (churn)
+  ROUND((0.0 / 31.0) / (ag.apr_gmv / 30.0) * 100, 2) AS handover_retention_pct,
+
+  NULL AS expansion_commission,
+
+  -- commission = ฿0 (retention < 100%)
+  0 AS handover_commission,
+
+  oo.sales_handover_month,
+  CAST(oo.new_user_exp_date AS STRING) AS new_user_exp_date,
+  FORMAT_DATE('%Y-%m', oo.first_dollar_date) AS first_order_month
+
+FROM outlet_ownership      oo
+LEFT JOIN apr_gmv          ag  ON oo.outlet_id = ag.outlet_id
+LEFT JOIN current_kam_snapshot cks ON oo.outlet_id = cks.outlet_id
+JOIN kam_list k ON cks.current_kam_email = k.kam_email
+
+WHERE oo.may_kam_email IS NULL                  -- ไม่มี May order
+  AND oo.apr_kam_email IS NULL                  -- Apr ไม่ใช่ KAM (เป็น SALE)
+  AND oo.apr_commercial_owner = 'SALE'          -- Apr เป็น SALE
+  AND oo.sales_handover_month = '2026-04'       -- โอนใน Apr
+  AND cks.current_kam_email IS NOT NULL         -- user_master มี KAM ปัจจุบัน
+  AND COALESCE(ag.apr_gmv, 0) > 0              -- มียอด Apr (cohort base)
+
 ORDER BY
   tl_email,
   kam_email,
