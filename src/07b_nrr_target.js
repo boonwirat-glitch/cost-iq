@@ -774,8 +774,9 @@ async function renderPortviewTargetBar() {
     nrrBarW = barFill; cbBarW = 0; exBarW = 0;
   }
   const segFull = nrrBarW > 0 && cbBarW === 0 && exBarW === 0 ? ' seg-full' : '';
-  // Store pct globally so compact strip can sync — both KAM and TL views
+  // Store pct + fbMode globally so compact strips can sync — KAM, TL, Admin all use same value
   window._tgtPortviewPct = pct;
+  window._tgtFbMode = fbMode; // null=real target, 'team'=allocated, 'base'=baseline avg
   // Refresh compact strips so they show identical % as the full widget
   if (typeof _pvBuildCompactStrip === 'function') setTimeout(_pvBuildCompactStrip, 0);
   if (typeof _tvBuildCompactStrip === 'function') setTimeout(_tvBuildCompactStrip, 0);
