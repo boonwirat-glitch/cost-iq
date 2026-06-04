@@ -859,19 +859,7 @@ async function renderPortviewTargetBar() {
   }
   if (nrrResult && nrrResult.transferOut && nrrResult.transferOut.count > 0) {
     const to = nrrResult.transferOut;
-    // v293: build per-account breakdown with destination label
-    const _toDestLabel = r => {
-      const t = (r.ownerToType||'').toUpperCase();
-      if (t === 'SALE' || t === 'SALES') return 'Sales';
-      if (t === 'KAM' || t === 'PM' || t === 'ADMIN') return r.newKamName || 'KAM อื่น';
-      if (!t || t === '' || t === 'NONE') return 'ไม่มี owner';
-      return r.newKamName || t;
-    };
-    const _toRows = (to.detail||[]).slice(0,8).map(r =>
-      `<div class="tgt-mv-sub"><span class="tgt-mv-sub-name">${r.accountName||r.accountId}</span><span class="tgt-mv-sub-dest">→ ${_toDestLabel(r)}</span><span class="tgt-mv-sub-gmv">−${fmtK(r.lastMonthGmv||0)}</span></div>`
-    ).join('');
-    const _toMore = (to.detail||[]).length > 8 ? `<div class="tgt-mv-sub tgt-mv-sub-more">+${(to.detail||[]).length-8} ร้านอื่น</div>` : '';
-    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.3)">—</span></div>${_toRows}${_toMore}`);
+    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.3)">—</span></div>`);
   }
   const mvSection = mvRows.length ? `<div class="tgt-mv-wrap">
     <div class="tgt-mv-header"><span class="tgt-mv-label">การเคลื่อนไหวพอร์ต</span><span class="tgt-mv-count">ร้าน</span><span class="tgt-mv-gmv">GMV</span><span class="tgt-mv-nrr">NRR</span></div>
