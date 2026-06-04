@@ -171,6 +171,12 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
           }
         });
       } else {
+        // v298: account-level fallback (no outlet breakdown). A positive outletFilter
+        // (movement groups) can't match account-id keys, so skip fallback there — those
+        // groups always have outlet data from Q11. Core (exclude-only filter) keeps fallback
+        // unless this account id itself is a moved outlet (rare; res_id≠account_guid).
+        if (_useFilter) return; // positive filter active → no account-level fallback rows
+        if (_useExclude && excludeFilter.has(String(a.id))) return;
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
