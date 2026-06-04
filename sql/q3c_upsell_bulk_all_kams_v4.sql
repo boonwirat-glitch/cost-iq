@@ -62,7 +62,52 @@ kam_accounts AS (
   FROM master_kam_accounts
 ),
 
+-- ── NRR Core ownership CTEs (same KAM baseline→current, no handover) ───
+-- v5: align upsell scope with NRR core (same as May backfill + q3c_team_v5)
+apr_outlet_ownership AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    TRIM(o.staff_owner)             AS staff_owner,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    DATE(o.new_user_exp_date)       AS new_user_exp_date
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN dates d
+  WHERE o.delivery_date >= d.baseline_mo
+    AND o.delivery_date <  DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+may_outlet_ownership AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    TRIM(o.staff_owner)             AS staff_owner,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN dates d
+  WHERE o.delivery_date >= d.current_mo
+    AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+nrr_core_outlets AS (
+  SELECT m.outlet_id
+  FROM may_outlet_ownership m
+  JOIN apr_outlet_ownership a ON m.outlet_id = a.outlet_id
+  JOIN kam_list k_may ON m.commercial_owner = 'KAM'
+    AND TRIM(m.staff_owner) = TRIM(k_may.kam_name)
+  JOIN kam_list k_apr ON a.commercial_owner = 'KAM'
+    AND TRIM(a.staff_owner) = TRIM(k_apr.kam_name)
+    AND k_apr.kam_email = k_may.kam_email
+  WHERE (
+    a.new_user_exp_date IS NULL
+    OR a.new_user_exp_date < (SELECT baseline_mo FROM dates)
+  )
+),
+
 -- Outlet status (existing / expansion / comeback)
+-- existing = in baseline month AND same KAM both months (NRR core)
 outlet_history AS (
   SELECT
     o.account_id,
@@ -80,13 +125,15 @@ outlet_history AS (
   GROUP BY 1, 2
 ),
 outlet_status AS (
-  SELECT account_id, outlet_id,
+  SELECT oh.account_id, oh.outlet_id,
     CASE
-      WHEN in_baseline = 1                                                   THEN 'existing'
-      WHEN in_current  = 1 AND first_seen >= (SELECT current_mo FROM dates)  THEN 'expansion'
-      WHEN in_current  = 1 AND first_seen <  (SELECT current_mo FROM dates)  THEN 'comeback'
+      WHEN oh.in_baseline = 1 AND nc.outlet_id IS NOT NULL                    THEN 'existing'
+      WHEN oh.in_current  = 1 AND oh.first_seen >= (SELECT current_mo FROM dates)  THEN 'expansion'
+      WHEN oh.in_current  = 1 AND oh.first_seen <  (SELECT current_mo FROM dates)  THEN 'comeback'
     END AS outlet_type
-  FROM outlet_history WHERE in_current = 1
+  FROM outlet_history oh
+  LEFT JOIN nrr_core_outlets nc ON oh.outlet_id = nc.outlet_id
+  WHERE oh.in_current = 1
 ),
 
 -- Current month: outlet × group_key
