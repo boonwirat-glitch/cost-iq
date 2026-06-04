@@ -823,7 +823,7 @@ function handleFileUpload(type,input){
     reader.onload=e=>{
       try{
         const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
-        const byAccountId={},byMovementType={},byKamName={},byKamEmail={},rows=[];
+        const byAccountId={},byOutletId={},byMovementType={},byKamName={},byKamEmail={},rows=[];
         lines.forEach(l=>{
           const p=parseCSVRow(l);
           const movementMonth=(p[0]||'').trim();
@@ -849,12 +849,16 @@ function handleFileUpload(type,input){
           // v252: transfer_in wins — account ที่มีทั้ง transfer_in และ transfer_out outlet
           // ให้ classify เป็น transfer_in เสมอ (รับเข้ามาแล้ว บางส่วนออกไปก็ยังนับว่า transfer_in)
           if(!byAccountId[accountId] || row.movementType==='transfer_in'){byAccountId[accountId]=row;}
+          // v298: outlet-level index — Q11 IS outlet-grain (new_sales). Keep every outlet row
+          // so classification can be done per-outlet, not per-account. byAccountId collapses
+          // to 1 row/account which wrongly drags whole multi-outlet accounts into new_sales.
+          if(userId){ byOutletId[userId]=row; }
           if(!byMovementType[movementType])byMovementType[movementType]=[];
           byMovementType[movementType].push(row);
           if(kamName){if(!byKamName[kamName])byKamName[kamName]=[];byKamName[kamName].push(row);}
           if(kamEmail){if(!byKamEmail[kamEmail])byKamEmail[kamEmail]=[];byKamEmail[kamEmail].push(row);}
         });
-        window.bulkCurrentMovementData={rows,byAccountId,byMovementType,byKamName,byKamEmail,
+        window.bulkCurrentMovementData={rows,byAccountId,byOutletId,byMovementType,byKamName,byKamEmail,
                                         loadedAt:Date.now()};
         const b2=document.getElementById('badge-current_movements');
         if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
