@@ -366,7 +366,7 @@ function _renderComponentRatesEditor() {
         ${fld('P1 rate (item ใหม่ บัญชีนี้)','upsell_sku','p1_rate',0.03,0.005,'pct-d')}
         ${fld('P3 rate (growth existing item)','upsell_sku','p3_rate',0.03,0.005,'pct-d')}
         ${fld('P3 growth threshold ×','upsell_sku','p3_threshold_pct',2.00,0.05,'mul')}
-        ${fld('P1 & P3 min GMV (gate)','upsell_sku','p1_min_gmv',2500,100,'฿')}
+        ${fld('P1 & P3 min GMV (gate)','upsell_sku','p1_min_gmv',5000,100,'฿')}
         ${fld('P3 min incremental (gate)','upsell_sku','p3_min_incremental',5000,100,'฿')}
       </div>
       <div class="comm-formula-note">
