@@ -224,6 +224,7 @@ new_sales_candidates AS (
         AND TRIM(COALESCE(umk.sales_owner,'')) != ''
         AND fk.first_kam_date BETWEEN p.perf_start AND p.perf_end
         AND fao.first_any_order_date < p.perf_start
+        AND oe.may_last_sale IS NOT NULL  -- v2b: must have an actual SALE order in prev month (Gallery=ADMIN, CMC=PM had none → were false new_sales)
         THEN 'path_c_first_kam_in_may'
       ELSE NULL
     END AS handover_path,
@@ -260,7 +261,8 @@ new_sales_candidates AS (
     (umk.new_user_exp_date IS NULL
       AND umk.sales_owner != ''
       AND fk.first_kam_date BETWEEN p.perf_start AND p.perf_end
-      AND fao.first_any_order_date < p.perf_start)
+      AND fao.first_any_order_date < p.perf_start
+      AND oe.may_last_sale IS NOT NULL)  -- v2b: require real SALE order in prev month
 ),
 
 new_sales_filtered AS (
