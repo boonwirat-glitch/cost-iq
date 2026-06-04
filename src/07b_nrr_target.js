@@ -120,10 +120,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // set are included. Used for outlet-level movement groups (new_sales/transfer_in/handover)
   // where Q11 says only SPECIFIC outlets of an account moved, not the whole account.
   // When omitted (core path), all outlets of each account are included as before.
-  function _groupNRR(group, outletFilter) {
+  function _groupNRR(group, outletFilter, excludeFilter) {
     if (!group.length) return null;
     const _useFilter = outletFilter instanceof Set && outletFilter.size > 0;
-    const _passFilter = oid => !_useFilter || outletFilter.has(String(oid));
+    const _useExclude = excludeFilter instanceof Set && excludeFilter.size > 0;
+    // positive filter: outlet must be IN outletFilter. negative filter: outlet must NOT be
+    // in excludeFilter. Core group uses excludeFilter=movedOutlets so moved outlets drop out.
+    const _passFilter = oid => {
+      const k = String(oid);
+      if (_useFilter && !outletFilter.has(k)) return false;
+      if (_useExclude && excludeFilter.has(k)) return false;
+      return true;
+    };
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
