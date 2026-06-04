@@ -1375,7 +1375,7 @@ function __legacyRenderPortviewSummaryFallback(){
   // ── Tier grid: proportional widths clamped 45-70% for ปกติ ─
   const totalAccts = ok + warn + danger;
   const okRatio = totalAccts > 0 ? ok / totalAccts : 0.6;
-  const okColW = Math.round(Math.min(70, Math.max(45, okRatio * 100)));
+  const okColW = Math.round(Math.min(55, Math.max(40, okRatio * 100)));
 
   // ── At-risk mini card helper (compact) ───────────────────────
   const _tierBox=(cls,pf,lbl,runRate,count,diffVal,diffLbl,diffColor,isDashed)=>{
