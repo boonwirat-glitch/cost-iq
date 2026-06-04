@@ -322,16 +322,41 @@ transfer_in_outlets AS (
 -- ── 3. TRANSFER OUT ───────────────────────────────────────────
 -- outlet level: Apr KAM order อยู่กับ KAM ในทีม
 -- แต่ปัจจุบัน staff_owner เปลี่ยนไปแล้ว
+-- ── end-of-month owner per outlet in prev_month ─────────────
+-- "เจ้าของ ณ สิ้นเดือน" = staff_owner ของ order ล่าสุดของ outlet นั้น
+-- ถ้า Dent ดูแล May 1-11 แต่ Pop รับ May 12-31:
+--   last order = Pop → prev_kam = Pop → Pop=current_um → ไม่ขึ้น transfer_out ✓
+-- ถ้า Pop ดูแล May 1-11 แต่ Foam รับ May 12-31:
+--   last order = Foam → prev_kam = Foam → Foam=current_um → ไม่ขึ้น transfer_out
+--   (Pop ส่งออกไปแล้วใน May report, June นับ Foam เป็น core) ✓
+eom_owner_prev AS (
+  SELECT
+    ob.user_id,
+    TRIM(ob.staff_owner) AS eom_kam
+  FROM order_base ob
+  CROSS JOIN params p
+  WHERE ob.commercial_owner = 'KAM'
+    AND ob.delivery_date BETWEEN p.prev_start AND p.prev_end
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY ob.user_id
+    ORDER BY ob.delivery_date DESC
+  ) = 1
+),
+
 transfer_out_raw AS (
+  -- v2e: prev_kam = end-of-month owner (last KAM order in prev_month)
+  -- 1 row per outlet — no false positives from mid-month handovers
+  -- baseline_gmv = full outlet GMV in prev_month (all orders)
   SELECT
     ob.user_id,
     ob.account_id,
-    MAX(ob.delivery_date)  AS last_order_date,
-    TRIM(ob.staff_owner)   AS prev_kam_name,
-    SUM(ob.gmv_ex_vat)     AS baseline_gmv
+    MAX(ob.delivery_date)   AS last_order_date,
+    eo.eom_kam              AS prev_kam_name,
+    SUM(ob.gmv_ex_vat)      AS baseline_gmv
   FROM order_base ob
+  JOIN eom_owner_prev eo ON eo.user_id = ob.user_id
+  JOIN kam_name_list k   ON TRIM(eo.eom_kam) = TRIM(k.kam_name)
   CROSS JOIN params p
-  JOIN kam_name_list k ON TRIM(ob.staff_owner) = TRIM(k.kam_name)
   WHERE ob.commercial_owner = 'KAM'
     AND ob.delivery_date BETWEEN p.prev_start AND p.prev_end
   GROUP BY 1, 2, 4
