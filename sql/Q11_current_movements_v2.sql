@@ -322,16 +322,38 @@ transfer_in_outlets AS (
 -- ── 3. TRANSFER OUT ───────────────────────────────────────────
 -- outlet level: Apr KAM order อยู่กับ KAM ในทีม
 -- แต่ปัจจุบัน staff_owner เปลี่ยนไปแล้ว
+-- ── dominant KAM per outlet in prev_month ────────────────────
+-- Uses QUALIFY to find the last order (by delivery_date) whose staff_owner
+-- is in the KAM roster. This is the "dominant" KAM for that outlet that month.
+-- Prevents false positives when an outlet had a brief mid-month assignment
+-- (e.g. Dent tagged on some May orders but Pop had the last May order → dominant=Pop).
+dominant_kam_prev AS (
+  SELECT
+    ob.user_id,
+    TRIM(ob.staff_owner) AS dominant_kam
+  FROM order_base ob
+  JOIN kam_name_list k ON TRIM(ob.staff_owner) = TRIM(k.kam_name)
+  CROSS JOIN params p
+  WHERE ob.commercial_owner = 'KAM'
+    AND ob.delivery_date BETWEEN p.prev_start AND p.prev_end
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY ob.user_id
+    ORDER BY ob.delivery_date DESC
+  ) = 1
+),
+
 transfer_out_raw AS (
+  -- v2d: 1 row per outlet, prev_kam = dominant KAM (last KAM-roster order in prev_month)
+  -- baseline_gmv = full outlet GMV in prev_month (all orders, any staff)
   SELECT
     ob.user_id,
     ob.account_id,
     MAX(ob.delivery_date)  AS last_order_date,
-    TRIM(ob.staff_owner)   AS prev_kam_name,
+    dk.dominant_kam        AS prev_kam_name,
     SUM(ob.gmv_ex_vat)     AS baseline_gmv
   FROM order_base ob
+  JOIN dominant_kam_prev dk ON dk.user_id = ob.user_id
   CROSS JOIN params p
-  JOIN kam_name_list k ON TRIM(ob.staff_owner) = TRIM(k.kam_name)
   WHERE ob.commercial_owner = 'KAM'
     AND ob.delivery_date BETWEEN p.prev_start AND p.prev_end
   GROUP BY 1, 2, 4
