@@ -323,18 +323,24 @@ transfer_in_outlets AS (
 -- outlet level: Apr KAM order อยู่กับ KAM ในทีม
 -- แต่ปัจจุบัน staff_owner เปลี่ยนไปแล้ว
 transfer_out_raw AS (
+  -- v2c: 1 row per outlet per prev_month — prev_kam = staff_owner of LAST order
+  -- Prevents false positives when outlet had >1 KAM in prev_month (e.g. temp reassignment)
+  -- baseline_gmv = full outlet GMV for prev_month (all staff combined)
   SELECT
     ob.user_id,
     ob.account_id,
     MAX(ob.delivery_date)  AS last_order_date,
-    TRIM(ob.staff_owner)   AS prev_kam_name,
+    ARRAY_AGG(
+      TRIM(ob.staff_owner)
+      ORDER BY ob.delivery_date DESC LIMIT 1
+    )[OFFSET(0)]           AS prev_kam_name,
     SUM(ob.gmv_ex_vat)     AS baseline_gmv
   FROM order_base ob
   CROSS JOIN params p
   JOIN kam_name_list k ON TRIM(ob.staff_owner) = TRIM(k.kam_name)
   WHERE ob.commercial_owner = 'KAM'
     AND ob.delivery_date BETWEEN p.prev_start AND p.prev_end
-  GROUP BY 1, 2, 4
+  GROUP BY 1, 2
 ),
 
 transfer_out_filtered AS (
@@ -484,4 +490,5 @@ SELECT
 FROM transfer_out_account
 
 ORDER BY movement_type, kam_name, baseline_gmv DESC;
+
 
