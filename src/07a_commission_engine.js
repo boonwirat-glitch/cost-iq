@@ -1958,8 +1958,12 @@ function _commTierRangeLabel(t) {
 // SECTION:COMMISSION_KAM_SELF
 function _commBuildKamSelfState() {
   const role = getCurrentRole ? getCurrentRole() : ((currentUserProfile && currentUserProfile.role) || '');
-  const email = (currentUserProfile && currentUserProfile.email) || '';
-  if (isTLRole(role) || isAdminRole(role) || !email || portviewLevel === 'rep-detail') return null;
+  const selfEmail = (currentUserProfile && currentUserProfile.email) || '';
+  // v305: TL/Admin drilling into a KAM portfolio (rep-detail) → show that KAM's commission strip
+  const isViewingKamPortfolio = (isTLRole(role) || isAdminRole(role)) && portviewLevel === 'rep-detail' && portviewRepEmail;
+  const email = isViewingKamPortfolio ? portviewRepEmail : selfEmail;
+  if (!isViewingKamPortfolio && (isTLRole(role) || isAdminRole(role))) return null;
+  if (!email) return null;
   const period = _nrrExclusionCurrentPeriod();
   const pct = _commKamNrrPct(email);
   const planCode = _commGetAssignmentPlan(period, 'kam', email, 'kam');
