@@ -118,6 +118,34 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     coreAccounts.push(a); // core candidate; non-moved outlets only (exclude filter)
   });
 
+  // ════ v299-DEBUG (TEMPORARY) — flat text, no collapsed objects ════
+  // Only logs for Monet to keep noise down. Remove after diagnosis.
+  if ((kamEmail||'').indexOf('guntinun') >= 0 || (email||'').indexOf('guntinun') >= 0) {
+    const _dbgOutlets = ['76321','246653','247815','243440','243542','243544'];
+    console.log('%c[v299-DBG] sources','color:#ff00ff;font-weight:bold',
+      'cm.byOutletId='+(cmByOutlet?Object.keys(cmByOutlet).length:'NULL')+
+      ' hd.byOutletId='+(hoByOutlet?Object.keys(hoByOutlet).length:'NULL')+
+      ' movedOutlets='+movedOutlets.size+
+      ' handoverOutlets='+handoverOutlets.size+
+      ' newFromSalesOutlets='+newFromSalesOutlets.size+
+      ' transferInOutlets='+transferInOutlets.size);
+    _dbgOutlets.forEach(oid => {
+      const inCm = cmByOutlet && cmByOutlet[oid];
+      const inHo = hoByOutlet && hoByOutlet[oid];
+      console.log('%c[v299-DBG] outlet '+oid,'color:#ff00ff',
+        'Q11='+(inCm?inCm.movementType:'no')+
+        ' Q10handover='+(inHo?'YES(prev='+inHo.prevOwner+')':'no')+
+        ' inMoved='+movedOutlets.has(oid)+
+        ' inNewSales='+newFromSalesOutlets.has(oid)+
+        ' inHandover='+handoverOutlets.has(oid));
+    });
+    console.log('%c[v299-DBG] groups','color:#ff00ff',
+      'core_accts='+coreAccounts.length+
+      ' newFromSales_accts='+newFromSalesAccounts.length+
+      ' transferIn_accts='+transferInAccounts.length);
+  }
+  // ════ end v299-DEBUG ════
+
   // ── Helper: compute NRR for a group of accounts ─────────────────
   // v298: outletFilter (optional Set of outlet_ids) — when provided, only outlets in the
   // set are included. Used for outlet-level movement groups (new_sales/transfer_in/handover)
