@@ -1,4 +1,4 @@
-<!-- Freshket Sense 307: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 308: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '307',
+      version: '308',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -34614,7 +34614,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   function normalizeSnapshotRow(r, opts){
     opts=opts||{};
     if(!r) return null;
-    var per=opts.period || r.period_month || period();
+    var per=r.period_month || opts.period || period();
     var br=benRole(r.beneficiary_role);
     var be=low(r.beneficiary_email);
     var tl=low(r.team_lead_email);
