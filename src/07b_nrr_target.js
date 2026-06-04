@@ -99,8 +99,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
-  function _groupNRR(group) {
+  // v298: outletFilter (optional Set of outlet_ids) — when provided, only outlets in the
+  // set are included. Used for outlet-level movement groups (new_sales/transfer_in/handover)
+  // where Q11 says only SPECIFIC outlets of an account moved, not the whole account.
+  // When omitted (core path), all outlets of each account are included as before.
+  function _groupNRR(group, outletFilter) {
     if (!group.length) return null;
+    const _useFilter = outletFilter instanceof Set && outletFilter.size > 0;
+    const _passFilter = oid => !_useFilter || outletFilter.has(String(oid));
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
@@ -125,7 +131,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
             outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -133,7 +139,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
         });
         (outletMonths[currentMonthLabel]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
             if(!outletToAcct[oid])outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
