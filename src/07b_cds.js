@@ -210,7 +210,7 @@
       +'<div class="pv-comm-main">'+mainHtml+'</div>'
       +'<div class="pv-comm-chip" title="'+esc(status)+'">'+esc(status)+'</div>'
       +'<button class="pv-comm-i" onclick="event.stopPropagation();_commOpenKamSelfSheet();">i</button>'
-      +'<button class="pv-comm-i" style="margin-left:4px;font-size:11px" title="ประวัติ commission" onclick="event.stopPropagation();if(typeof openCommissionHistory===\'function\')openCommissionHistory();">&#x1F552;</button>'
+      +'<button class="pv-comm-i" style="margin-left:4px" title="ประวัติ commission" onclick="event.stopPropagation();if(typeof openCommissionHistory===\'function\')openCommissionHistory();">'+'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+'</button>'
       +'<div class="pv-comm-sources">'
       +'<span style="color:'+(src.nrr>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
       +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
