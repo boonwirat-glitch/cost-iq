@@ -1991,7 +1991,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   function normalizeSnapshotRow(r, opts){
     opts=opts||{};
     if(!r) return null;
-    var per=opts.period || r.period_month || period();
+    var per=r.period_month || opts.period || period();
     var br=benRole(r.beneficiary_role);
     var be=low(r.beneficiary_email);
     var tl=low(r.team_lead_email);
