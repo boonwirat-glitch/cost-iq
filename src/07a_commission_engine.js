@@ -183,7 +183,7 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.03);
     const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
     const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 5000);
-    const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 2500);       // ฿2,500 gate for P1
+    const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
     // MTD mode — commission on actual amounts, no projection
     // MTD mode — actual MTD vs full month baseline, no day scaling
