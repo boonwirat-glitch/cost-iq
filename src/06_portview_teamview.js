@@ -1100,11 +1100,17 @@ function _pvBuildCompactStrip(){
   const fK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n);
   const acctWithPace=accounts.filter(a=>a.paceSignal&&(a.paceSignal.histMonths>0||a.paceSignal.isNew===false));
   const _earlyMonth=acctWithPace.length>0&&(acctWithPace[0].paceSignal.daysElapsed||0)<5;
-  const portfolioPace=acctWithPace.length>0
-    ?(_earlyMonth
-      ?Math.round(acctWithPace.reduce((s,a)=>s+(a.paceSignal.lastGmv||0),0)/Math.max(1,acctWithPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0))*100)
-      :Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100))
-    :0;
+  // v296: use _tgtPortviewPct (target/baseline-based, same as full portview widget)
+  // for consistency — compact strip must show identical % to expanded view
+  // Fall back to pace-vs-expected only when target widget hasn't rendered yet
+  const _tgtPct = (typeof window._tgtPortviewPct === 'number' && window._tgtPortviewPct > 0)
+    ? window._tgtPortviewPct : null;
+  const portfolioPace=_tgtPct !== null ? _tgtPct
+    : acctWithPace.length>0
+      ?(_earlyMonth
+        ?Math.round(acctWithPace.reduce((s,a)=>s+(a.paceSignal.lastGmv||0),0)/Math.max(1,acctWithPace.reduce((s,a)=>s+(a.paceSignal.baselineGmv||0),0))*100)
+        :Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100))
+      :0;
   const ppCls=portfolioPace>=100?'great':portfolioPace>=95?'safe':portfolioPace>=85?'warn':'danger';
   const paceColor=ppCls==='great'||ppCls==='safe'?'#4ddc97':ppCls==='warn'?'var(--amb)':'#ff8888';
   const okA=accounts.filter(a=>!a.paceSignal||(a.paceSignal.cls==='great'||a.paceSignal.cls==='safe'));
@@ -1749,7 +1755,11 @@ function _tvBuildCompactStrip(){
   const fK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+Math.round(n);
   const totalGmv=groups.reduce((s,g)=>s+(g.portfolioRunRate||0),0);
   const totalBaseline=groups.reduce((s,g)=>s+(g.portfolioBaseline||0),0);
-  const pace=totalBaseline>0?Math.round(totalGmv/totalBaseline*100):0;
+  // v296: use _tgtTeamviewPct (target-based, same as teamview widget) when available
+  const _tgtTeamPct = (typeof window._tgtTeamviewPct === 'number' && window._tgtTeamviewPct > 0)
+    ? window._tgtTeamviewPct : null;
+  const pace=_tgtTeamPct !== null ? _tgtTeamPct
+    : (totalBaseline>0?Math.round(totalGmv/totalBaseline*100):0);
   const cls=pace>=100?'great':pace>=95?'safe':pace>=85?'warn':'danger';
   const color=cls==='great'||cls==='safe'?'#4ddc97':cls==='warn'?'var(--amb)':'#ff8888';
   const danger=groups.filter(g=>g.cls==='danger');const warn=groups.filter(g=>g.cls==='warn');const ok=groups.filter(g=>g.cls==='safe'||g.cls==='great'||!g.cls);
