@@ -978,7 +978,7 @@ function __legacyRenderPortviewListFallback(){
       </div>`;
     }
     const _earlyMonth=sig&&(sig.daysElapsed||0)<5;
-    const pctStr=_earlyMonth?'รอข้อมูล':(sig?sig.pct+'%':'—');
+    const pctStr=sig?sig.pct+'%':'—';
     const rrHtml=sig?(sig.runrate
       ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
@@ -992,7 +992,7 @@ function __legacyRenderPortviewListFallback(){
         </div>
         <div class="pv-right-block">
           <div class="portview-acct-pace ${cls}">${pctStr}</div>
-          <div class="pv-status-label ${cls==='safe'&&sig&&sig.daysElapsed<5?'early':cls}">${_statusLabel(cls,sig&&sig.daysElapsed||0)}</div>
+          <div class="pv-status-label ${_earlyMonth?'early':cls}">${_earlyMonth?'รอข้อมูล':_statusLabel(cls,sig&&sig.daysElapsed||0)}</div>
           <div class="pv-sparkline">${spark}</div>
         </div>
       </div>
