@@ -774,10 +774,11 @@ async function renderPortviewTargetBar() {
     nrrBarW = barFill; cbBarW = 0; exBarW = 0;
   }
   const segFull = nrrBarW > 0 && cbBarW === 0 && exBarW === 0 ? ' seg-full' : '';
-  // Store pct globally so compact strip can sync
+  // Store pct globally so compact strip can sync — both KAM and TL views
   window._tgtPortviewPct = pct;
-  // Refresh compact strip so it shows the same % as widget
+  // Refresh compact strips so they show identical % as the full widget
   if (typeof _pvBuildCompactStrip === 'function') setTimeout(_pvBuildCompactStrip, 0);
+  if (typeof _tvBuildCompactStrip === 'function') setTimeout(_tvBuildCompactStrip, 0);
 
   // ── Pct legend (hide if 0; shimmer if outlets not yet loaded) ────
   // v225g: outlets not ready → show shimmer pill instead of wrong NRR%
