@@ -281,7 +281,7 @@ window.closeCommissionHistory = closeCommissionHistory;
   function parseHandoverText(text){
     var lines=String(text||'').trim().split(/\r?\n/).filter(function(l){return l.trim();});
     if(lines.length && /kam_name/i.test(lines[0])) lines=lines.slice(1);
-    var byAccountId={}, byAccountIdNorm={}, byKamName={}, byNewKamName={}, rows=[];
+    var byAccountId={}, byAccountIdNorm={}, byOutletId={}, byKamName={}, byNewKamName={}, rows=[];
     lines.forEach(function(l){
       var p=parseLine(l);
       var kamName=(p[0]||'').trim(), accountId=normId(p[1]), accountName=(p[2]||'').trim(), accountType=(p[3]||'').trim();
@@ -292,9 +292,12 @@ window.closeCommissionHistory = closeCommissionHistory;
       var transferMonth=(p[11]||'').trim();
       var baselineGmv=Number(p[12]||0)||0, perfGmv=Number(p[13]||0)||0;
       var perfDays=parseInt(p[14])||30, baselineDays=parseInt(p[15])||30;
+      var outletId=(p[16]||'').trim();  // v300: user_id (res_id) — outlet-level handover exclude
       if(!kamName || !accountId) return;
       var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
       rows.push(row);
+      // v300: outlet-level index so app can exclude handover outlets from NRR core
+      if(outletId){ byOutletId[outletId]={kamName:kamName,accountId:accountId,accountName:accountName,prevOwner:prevOwner,newKamName:newKamName}; }
       // ถ้า account นี้มีหลาย outlet: ให้ SALE prevOwner มาก่อนเสมอ (ไม่ overwrite ด้วย non-SALE)
       if (!byAccountId[accountId] || (row.prevOwner||'').toUpperCase()==='SALE') {
         byAccountId[accountId]=row; byAccountIdNorm[normId(accountId).toLowerCase()]=row;
@@ -302,7 +305,7 @@ window.closeCommissionHistory = closeCommissionHistory;
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
       if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
     });
-    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION};
+    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byOutletId:byOutletId,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION};
   }
   function schedulePortviewRefresh(){
     try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
