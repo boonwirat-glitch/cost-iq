@@ -1,4 +1,4 @@
-<!-- Freshket Sense v297: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v298: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5042,7 +5042,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v297',
+      version: 'v298',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -10543,7 +10543,7 @@ function handleFileUpload(type,input){
     reader.onload=e=>{
       try{
         const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
-        const byAccountId={},byMovementType={},byKamName={},byKamEmail={},rows=[];
+        const byAccountId={},byOutletId={},byMovementType={},byKamName={},byKamEmail={},rows=[];
         lines.forEach(l=>{
           const p=parseCSVRow(l);
           const movementMonth=(p[0]||'').trim();
@@ -10569,12 +10569,16 @@ function handleFileUpload(type,input){
           // v252: transfer_in wins — account ที่มีทั้ง transfer_in และ transfer_out outlet
           // ให้ classify เป็น transfer_in เสมอ (รับเข้ามาแล้ว บางส่วนออกไปก็ยังนับว่า transfer_in)
           if(!byAccountId[accountId] || row.movementType==='transfer_in'){byAccountId[accountId]=row;}
+          // v298: outlet-level index — Q11 IS outlet-grain (new_sales). Keep every outlet row
+          // so classification can be done per-outlet, not per-account. byAccountId collapses
+          // to 1 row/account which wrongly drags whole multi-outlet accounts into new_sales.
+          if(userId){ byOutletId[userId]=row; }
           if(!byMovementType[movementType])byMovementType[movementType]=[];
           byMovementType[movementType].push(row);
           if(kamName){if(!byKamName[kamName])byKamName[kamName]=[];byKamName[kamName].push(row);}
           if(kamEmail){if(!byKamEmail[kamEmail])byKamEmail[kamEmail]=[];byKamEmail[kamEmail].push(row);}
         });
-        window.bulkCurrentMovementData={rows,byAccountId,byMovementType,byKamName,byKamEmail,
+        window.bulkCurrentMovementData={rows,byAccountId,byOutletId,byMovementType,byKamName,byKamEmail,
                                         loadedAt:Date.now()};
         const b2=document.getElementById('badge-current_movements');
         if(b2){b2.textContent='✓ '+rows.length+' rows';b2.className='dp-slot-badge ok';}
@@ -31401,42 +31405,73 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // Core NRR: account อยู่กับ KAM นี้ก่อนเดือนปัจจุบัน
   // Transfer In:    ใหม่เดือนนี้ + มาจาก KAM/PM/ADMIN (Q11 transfer_in)
   // New from Sales: ใหม่เดือนนี้ + มาจาก SALE (Q11 new_sales)
+  // v298: OUTLET-LEVEL classification.
+  // Q11 (cm) is outlet-grain: each row = ONE outlet that moved. byOutletId keeps every
+  // outlet row (vs byAccountId which collapsed to 1 row/account and dragged whole
+  // multi-outlet accounts into new_sales). Build per-movement OUTLET SETS, then each
+  // account can appear in MULTIPLE groups — e.g. account with 2 core outlets + 1 handover
+  // outlet shows correctly as core(2) + handover(1), not all-3 in one bucket.
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
-  // v292: Q11 and Q10 are explicit "not-core" lists — check them FIRST regardless of
-  // daysWithCurrentKam. This mirrors SQL backfill logic: carve out transfer_in/handover
-  // first, whatever remains is core. Fixes edge case where KAM previously owned an account,
-  // it was transferred out, then transferred back — daysWithCurrentKam would be high (old
-  // first-order date) causing app to skip Q11 and wrongly classify as core.
+  const transferInOutlets=new Set(), newFromSalesOutlets=new Set(), movedOutlets=new Set();
+  const cmByOutlet = (cm && cm.byOutletId) ? cm.byOutletId : null;
+
+  // Build per-account membership from Q11 outlet rows (one pass over Q11)
+  const acctMoves = {}; // acctId → {ti:bool, ns:bool}
+  if (cmByOutlet) {
+    Object.keys(cmByOutlet).forEach(oid => {
+      const row = cmByOutlet[oid];
+      const mvType = (row.movementType || '').toLowerCase();
+      if (mvType === 'transfer_out') return; // not a current-cohort movement
+      const key = String(oid);
+      movedOutlets.add(key);
+      const aid = String(row.accountId==null?'':row.accountId).trim();
+      if (!acctMoves[aid]) acctMoves[aid] = {ti:false, ns:false};
+      if (mvType === 'transfer_in') { transferInOutlets.add(key); acctMoves[aid].ti=true; }
+      else { newFromSalesOutlets.add(key); acctMoves[aid].ns=true; }
+    });
+  }
+
   allAccounts.forEach(a => {
     const acctId = String(a.id==null?'':a.id).trim();
+    const mv = acctMoves[acctId];
+    const hasTI = !!(mv && mv.ti);
+    const hasNS = !!(mv && mv.ns);
 
-    // [1] Q11 explicit movement — highest priority source of truth (dwh.order based)
-    const cmRow = cm && cm.byAccountId && cm.byAccountId[acctId];
-    if (cmRow) {
-      const mvType = (cmRow.movementType || '').toLowerCase();
-      if (mvType === 'transfer_in') { transferInAccounts.push(a); }
-      else { newFromSalesAccounts.push(a); }  // new_sales, sales_to_kam
-      return;
+    // [2] Q10 explicit handover (account-level) — only if account has NO Q11 movement at all
+    let hoPrevOwner = null;
+    if (!hasTI && !hasNS) {
+      const hoRow = hd.byAccountId && hd.byAccountId[a.id];
+      if (hoRow) hoPrevOwner = (hoRow.prevOwner || '').toUpperCase();
     }
 
-    // [2] Q10 explicit handover list — second priority (user_master new_user_exp_date based)
-    const hoRow = hd.byAccountId && hd.byAccountId[a.id];
-    if (hoRow) {
-      const prevOwner = (hoRow.prevOwner || '').toUpperCase();
-      if (prevOwner === 'SALE') { newFromSalesAccounts.push(a); }
-      else { transferInAccounts.push(a); }
-      return;
+    if (hasTI) transferInAccounts.push(a);
+    if (hasNS) newFromSalesAccounts.push(a);
+    if (hoPrevOwner !== null) {
+      if (hoPrevOwner === 'SALE') newFromSalesAccounts.push(a);
+      else transferInAccounts.push(a);
     }
-
-    // [3] Not in Q11 or Q10 → core (daysWithCurrentKam used only as tiebreaker signal for logging)
-    // daysWithCurrentKam is no longer used for classification — it can be stale due to
-    // user_master 12-month window and does not override explicit movement data
+    // Every account is a core candidate — its non-moved outlets count as core
+    // (core path uses a negative filter = exclude movedOutlets).
     coreAccounts.push(a);
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
-  function _groupNRR(group) {
+  // v298: outletFilter (optional Set of outlet_ids) — when provided, only outlets in the
+  // set are included. Used for outlet-level movement groups (new_sales/transfer_in/handover)
+  // where Q11 says only SPECIFIC outlets of an account moved, not the whole account.
+  // When omitted (core path), all outlets of each account are included as before.
+  function _groupNRR(group, outletFilter, excludeFilter) {
     if (!group.length) return null;
+    const _useFilter = outletFilter instanceof Set && outletFilter.size > 0;
+    const _useExclude = excludeFilter instanceof Set && excludeFilter.size > 0;
+    // positive filter: outlet must be IN outletFilter. negative filter: outlet must NOT be
+    // in excludeFilter. Core group uses excludeFilter=movedOutlets so moved outlets drop out.
+    const _passFilter = oid => {
+      const k = String(oid);
+      if (_useFilter && !outletFilter.has(k)) return false;
+      if (_useExclude && excludeFilter.has(k)) return false;
+      return true;
+    };
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
@@ -31461,7 +31496,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
             outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -31469,13 +31504,19 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
         });
         (outletMonths[currentMonthLabel]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
             if(!outletToAcct[oid])outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
           }
         });
       } else {
+        // v298: account-level fallback (no outlet breakdown). A positive outletFilter
+        // (movement groups) can't match account-id keys, so skip fallback there — those
+        // groups always have outlet data from Q11. Core (exclude-only filter) keeps fallback
+        // unless this account id itself is a moved outlet (rare; res_id≠account_guid).
+        if (_useFilter) return; // positive filter active → no account-level fallback rows
+        if (_useExclude && excludeFilter.has(String(a.id))) return;
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
@@ -31571,9 +31612,11 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     {scope:kamEmail||('TL:'+tlEmail), core:coreAccounts.length,
      transfer_in:transferInAccounts.length, new_sales:newFromSalesAccounts.length,
      prevMonth, currentMonth:currentMonthLabel, daysElapsed});
-  const coreResult = _groupNRR(coreAccounts);
-  const transferInResult = _groupNRR(transferInAccounts);
-  const newFromSalesResult = _groupNRR(newFromSalesAccounts);
+  // v298: outlet filters per group. Core EXCLUDES moved outlets (negative filter);
+  // transfer_in / new_sales INCLUDE only their moved outlets (positive filter).
+  const coreResult = _groupNRR(coreAccounts, null, movedOutlets);
+  const transferInResult = _groupNRR(transferInAccounts, transferInOutlets);
+  const newFromSalesResult = _groupNRR(newFromSalesAccounts, newFromSalesOutlets);
 
   // ── Transfer out: Q11 current_movements (fallback Q10) ──────────
   // v251: ใช้ Q11 transfer_out rows แทน Q10 Apr handover
