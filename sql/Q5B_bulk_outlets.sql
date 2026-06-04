@@ -89,7 +89,7 @@ agg AS (
     MAX(delivery_date)                                           AS last_order_date
   FROM raw
   GROUP BY account_id, month_date, outlet_id
-)
+),
 
 -- v_fdd: all-time first order date per outlet — for comeback vs expansion classification
 -- Intentionally NOT filtered by 6-month window or kam_map: we want all-time history
