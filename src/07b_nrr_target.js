@@ -337,6 +337,17 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
                 +(transferOutList.length>5?' …+'+( transferOutList.length-5):'')});
   }
   const _movementGmv = r => (r ? ((r.cohortGmv||0)+(r.comebackGmv||0)+(r.expansionGmv||0)) : 0);
+  // v299: count distinct accounts that actually have qualifying outlets in the result
+  // (replaces account.length which counted accounts pushed before outlet-filtering — those
+  // could end up empty after filter, causing "4 ร้าน" header to mismatch 1 shown account).
+  const _movementAcctCount = r => {
+    if (!r) return 0;
+    const ids = new Set();
+    ['cohortDetail','comebackDetail','expansionDetail'].forEach(k => {
+      (r[k]||[]).forEach(g => { if (g && g.acctId != null) ids.add(String(g.acctId)); });
+    });
+    return ids.size;
+  };
 
   // ── Build return value (core fields stay backward-compatible) ───
   const core = coreResult || {};
@@ -369,7 +380,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     expansionDetail: core.expansionDetail || [],
     // Movement groups (v198)
     transferIn: {
-      count: transferInAccounts.length,
+      count: _movementAcctCount(transferInResult),
       // v207h: movement GMV = all current-month GMV in this movement group, not only NRR cohort GMV.
       // This keeps transfer-in with no prev-month cohort from showing as ฿0 when it has CB/EX current GMV.
       gmv:   _movementGmv(transferInResult),
@@ -382,7 +393,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       expansionDetail: transferInResult?.expansionDetail || []
     },
     newFromSales: {
-      count: newFromSalesAccounts.length,
+      count: _movementAcctCount(newFromSalesResult),
       gmv:   _movementGmv(newFromSalesResult),
       nrr:   newFromSalesResult?.rawRetention ?? null,
       cohortGmv: newFromSalesResult?.cohortGmv || 0,
