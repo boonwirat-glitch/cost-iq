@@ -1,4 +1,4 @@
-<!-- Freshket Sense v301: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 302: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5042,7 +5042,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v301',
+      version: '302',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -21861,9 +21861,7 @@ function computePaceSignal(cm,history){
 
   // ── SIGNAL CLASS ──────────────────────────────────────────────
   let cls='',label='';
-  if(daysElapsed<5){
-    cls='safe';label='ยังเร็วเกินไป ('+daysElapsed+' วัน)';
-  }else if(pct>=100){cls='great';label='ดีเยี่ยม';}
+  if(pct>=100){cls='great';label='ดีเยี่ยม';}
   else if(pct>=95){cls='safe';label='ปลอดภัย';}
   else if(pct>=90){cls='warn';label='MONITOR';}
   else{cls='danger';label='AT RISK';}
@@ -22804,8 +22802,8 @@ function __legacyRenderPortviewListFallback(){
         </div>
       </div>`;
     }
-    const _earlyMonth=sig&&sig.cls==='safe'&&sig.daysElapsed<5;
-    const pctStr=sig?sig.pct+'%':'—';
+    const _earlyMonth=sig&&(sig.daysElapsed||0)<5;
+    const pctStr=_earlyMonth?'รอข้อมูล':(sig?sig.pct+'%':'—');
     const rrHtml=sig?(sig.runrate
       ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
@@ -25553,6 +25551,7 @@ function _updateRestSwipe(grp,idx,opts){
   markGov({source:'boot', reason:'v212a-loaded'});
   log('loaded');
 })(window);
+
 </script>
 <!-- ══ VERIFY SHEET ══ -->
 <div class="verify-sheet-overlay" id="verifySheetOverlay" onclick="closeVerifySheet()"></div>
