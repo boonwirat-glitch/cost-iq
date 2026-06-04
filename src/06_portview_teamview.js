@@ -36,9 +36,7 @@ function computePaceSignal(cm,history){
 
   // ── SIGNAL CLASS ──────────────────────────────────────────────
   let cls='',label='';
-  if(daysElapsed<5){
-    cls='safe';label='ยังเร็วเกินไป ('+daysElapsed+' วัน)';
-  }else if(pct>=100){cls='great';label='ดีเยี่ยม';}
+  if(pct>=100){cls='great';label='ดีเยี่ยม';}
   else if(pct>=95){cls='safe';label='ปลอดภัย';}
   else if(pct>=90){cls='warn';label='MONITOR';}
   else{cls='danger';label='AT RISK';}
@@ -979,8 +977,8 @@ function __legacyRenderPortviewListFallback(){
         </div>
       </div>`;
     }
-    const _earlyMonth=sig&&sig.cls==='safe'&&sig.daysElapsed<5;
-    const pctStr=sig?sig.pct+'%':'—';
+    const _earlyMonth=sig&&(sig.daysElapsed||0)<5;
+    const pctStr=_earlyMonth?'รอข้อมูล':(sig?sig.pct+'%':'—');
     const rrHtml=sig?(sig.runrate
       ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
@@ -3728,3 +3726,4 @@ function _updateRestSwipe(grp,idx,opts){
   markGov({source:'boot', reason:'v212a-loaded'});
   log('loaded');
 })(window);
+
