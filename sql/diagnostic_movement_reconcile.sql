@@ -33,7 +33,7 @@ target_accounts AS (
 
 -- account_guid ที่ match ชื่อเป้าหมาย
 target_guids AS (
-  SELECT DISTINCT um.account_guid, um.account_name
+  SELECT DISTINCT CAST(um.account_guid AS STRING) AS account_guid, um.account_name
   FROM `freshket-rn.dim.user_master` um
   CROSS JOIN target_accounts ta
   WHERE um.account_name LIKE '%' || ta.name || '%'
@@ -55,7 +55,7 @@ um_current AS (
     DATE(um.lasted_order_date)       AS lasted_order_date
   FROM `freshket-rn.dim.user_master` um
   WHERE um.res_id IS NOT NULL
-    AND CAST(um.account_guid AS STRING) IN (SELECT account_id FROM target_guids)
+    AND CAST(um.account_guid AS STRING) IN (SELECT account_guid FROM target_guids)
   QUALIFY ROW_NUMBER() OVER (PARTITION BY CAST(um.res_id AS STRING) ORDER BY DATE(um.lasted_order_date) DESC NULLS LAST) = 1
 ),
 
@@ -92,7 +92,7 @@ order_ev AS (
   CROSS JOIN params p
   WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
-    AND CAST(o.account_id AS STRING) IN (SELECT account_id FROM target_guids)
+    AND CAST(o.account_id AS STRING) IN (SELECT account_guid FROM target_guids)
     AND o.delivery_date >= DATE_SUB(p.prev_start, INTERVAL 6 MONTH)
   GROUP BY 1
 )
