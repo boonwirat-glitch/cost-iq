@@ -1722,6 +1722,8 @@ function __legacyRenderTeamviewFallback(){
     document.getElementById('teamview-content').innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ยังไม่มีข้อมูลทีม</div><div class="portview-no-data-sub">อัปโหลด portview.csv (Q8E)<br>เพื่อดูพอร์ตของ KAM แต่ละคนในทีม</div></div>`;
     if(titleEl)titleEl.textContent='ภาพรวมทีม';
     if(backWrap)backWrap.style.display='none';
+    // v307: mark that teamview-content rendered with no data, so value guard forces re-render when data arrives
+    try{var _tvEl=document.getElementById('teamview-content');if(_tvEl)_tvEl._lastTvWasNoData=true;}catch(e){}
     renderTeamviewSummary();
     return;
   }
@@ -2019,6 +2021,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
       _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN,_tvDaysEl
     ].join('|');
+    // v307: if last render was no-data state but portview now loaded → force re-render
+    var _tvHasDataNow=portviewBulkData&&portviewBulkData.length>0;
+    if(el._lastTvWasNoData&&_tvHasDataNow){el._lastTvWasNoData=false;el._lastTvListKey='';}
     if(el._lastTvListKey===_tvKey&&el.children.length>0){
       try{window._senseDataLog('TEAMVIEW','⚡ value guard — skip repaint (unchanged)');}catch(e){}
       return;
