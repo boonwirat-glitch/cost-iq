@@ -494,8 +494,8 @@ UNION ALL
 -- แต่ไม่มี order ใน May เลย → churn → retention=0% → commission=฿0
 -- ต้องแสดงเพื่อ reconcile ครบ (243179 = ตัวอย่าง)
 SELECT
-  cks.current_kam_email                          AS kam_email,
   k.kam_name,
+  cks.current_kam_email                          AS kam_email,
   k.tl_email,
 
   oo.account_id,
