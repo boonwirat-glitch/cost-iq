@@ -1,4 +1,4 @@
-<!-- Freshket Sense 302: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 303: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5042,7 +5042,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '302',
+      version: '303',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -23200,7 +23200,7 @@ function __legacyRenderPortviewSummaryFallback(){
   // ── Tier grid: proportional widths clamped 45-70% for ปกติ ─
   const totalAccts = ok + warn + danger;
   const okRatio = totalAccts > 0 ? ok / totalAccts : 0.6;
-  const okColW = Math.round(Math.min(70, Math.max(45, okRatio * 100)));
+  const okColW = Math.round(Math.min(55, Math.max(40, okRatio * 100)));
 
   // ── At-risk mini card helper (compact) ───────────────────────
   const _tierBox=(cls,pf,lbl,runRate,count,diffVal,diffLbl,diffColor,isDashed)=>{
