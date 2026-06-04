@@ -73,9 +73,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // outlet shows correctly as core(2) + handover(1), not all-3 in one bucket.
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
   const transferInOutlets=new Set(), newFromSalesOutlets=new Set(), movedOutlets=new Set();
+  // v299: handoverOutlets are EXCLUDED from core (they belong to the Handover commission
+  // channel via Q10/CDS, not to the portview NRR cohort). They are NOT pushed into
+  // newFromSales — handover_perf (Sales→KAM previous month) is its own bucket.
+  const handoverOutlets=new Set();
   const cmByOutlet = (cm && cm.byOutletId) ? cm.byOutletId : null;
+  const hoByOutlet = (hd && hd.byOutletId) ? hd.byOutletId : null;
 
-  // Build per-account membership from Q11 outlet rows (one pass over Q11)
+  // Pass 1: Q11 outlet rows → per-outlet movement sets (transfer_in / new_sales)
   const acctMoves = {}; // acctId → {ti:bool, ns:bool}
   if (cmByOutlet) {
     Object.keys(cmByOutlet).forEach(oid => {
@@ -91,28 +96,26 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     });
   }
 
+  // Pass 2: Q10 handover outlet rows → exclude these outlets from core cohort.
+  // Skip any outlet already claimed by Q11 (Q11 is the higher-priority current-month source).
+  if (hoByOutlet) {
+    Object.keys(hoByOutlet).forEach(oid => {
+      const key = String(oid);
+      if (movedOutlets.has(key)) return; // Q11 already owns it
+      handoverOutlets.add(key);
+      movedOutlets.add(key); // exclude from core
+    });
+  }
+
+  // Pass 3: assign accounts to movement groups (outlet-level membership).
+  // An account appears in transfer_in / new_sales only for the outlets that actually moved.
+  // Core gets every account but with movedOutlets excluded → only its non-moved outlets count.
   allAccounts.forEach(a => {
     const acctId = String(a.id==null?'':a.id).trim();
     const mv = acctMoves[acctId];
-    const hasTI = !!(mv && mv.ti);
-    const hasNS = !!(mv && mv.ns);
-
-    // [2] Q10 explicit handover (account-level) — only if account has NO Q11 movement at all
-    let hoPrevOwner = null;
-    if (!hasTI && !hasNS) {
-      const hoRow = hd.byAccountId && hd.byAccountId[a.id];
-      if (hoRow) hoPrevOwner = (hoRow.prevOwner || '').toUpperCase();
-    }
-
-    if (hasTI) transferInAccounts.push(a);
-    if (hasNS) newFromSalesAccounts.push(a);
-    if (hoPrevOwner !== null) {
-      if (hoPrevOwner === 'SALE') newFromSalesAccounts.push(a);
-      else transferInAccounts.push(a);
-    }
-    // Every account is a core candidate — its non-moved outlets count as core
-    // (core path uses a negative filter = exclude movedOutlets).
-    coreAccounts.push(a);
+    if (mv && mv.ti) transferInAccounts.push(a);
+    if (mv && mv.ns) newFromSalesAccounts.push(a);
+    coreAccounts.push(a); // core candidate; non-moved outlets only (exclude filter)
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
