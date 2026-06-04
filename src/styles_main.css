@@ -3397,43 +3397,29 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   border-color:rgba(255,224,138,.36);
   background:rgba(255,224,138,.12);
 }
-/* v297: pill button group replaces single pv-comm-i in the info grid area */
-.pv-comm-strip.v210k .pv-comm-btn-group{
+/* v305: single history button replaces i|clock pill group */
+.pv-comm-hist-btn{
   grid-area:info;
   justify-self:end;
   display:inline-flex;
-  align-items:center;
-  border-radius:999px;
-  border:1px solid rgba(188,215,255,.28);
-  background:rgba(255,255,255,.06);
-  overflow:hidden;
-  height:26px;
-}
-.pv-comm-btn-group-item{
-  width:26px;
-  height:26px;
-  display:inline-flex;
+  flex-direction:column;
   align-items:center;
   justify-content:center;
-  background:none;
-  border:none;
+  gap:2px;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  border:1px solid rgba(188,215,255,.18);
+  background:rgba(255,255,255,.06);
   cursor:pointer;
-  color:rgba(225,238,255,.75);
-  font-family:Georgia,serif;
-  font-size:12px;
-  font-weight:800;
-  transition:background .14s,color .14s,transform .08s;
+  color:rgba(188,215,255,.55);
   padding:0;
-  line-height:1;
+  transition:background .14s,color .14s,transform .08s;
 }
-.pv-comm-btn-group-item:hover{background:rgba(255,255,255,.10);color:#fff;}
-.pv-comm-btn-group-item:active{transform:scale(.92);}
-.pv-comm-btn-group-div{
-  width:1px;
-  height:14px;
-  background:rgba(188,215,255,.22);
-  flex-shrink:0;
-}
+.pv-comm-hist-btn:hover{background:rgba(255,255,255,.10);color:rgba(188,215,255,.85);}
+.pv-comm-hist-btn:active{transform:scale(.92);}
+.pv-comm-hist-icon{display:block;flex-shrink:0;}
+.pv-comm-hist-lbl{font-size:7.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:inherit;font-family:'IBM Plex Sans Thai',sans-serif;}
 /* Keep pv-comm-i for backward compat (non-v210k strips) */
 .pv-comm-strip.v210k .pv-comm-i{
   display:none;
