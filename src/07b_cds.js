@@ -261,7 +261,7 @@
     var p3Thresh=cfg("upsell_sku","p3_threshold_pct",2.00);
     var p3ThreshPct=Math.round((p3Thresh-1)*100);
     var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",5000)).toLocaleString("en-US");
-    var p1MinGmv=Number(cfg("upsell_sku","p1_min_gmv",2500)).toLocaleString("en-US");
+    var p1MinGmv=Number(cfg("upsell_sku","p1_min_gmv",5000)).toLocaleString("en-US");
     var outRate=Math.round(cfg("upsell_outlet","rate",0.015)*1000)/10;
     var hoT2=cfg("handover","tier2_pct",100);
     var hoT3=cfg("handover","tier3_pct",120);
@@ -1477,7 +1477,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
   var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
-  var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 2500));
+  var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 5000));
   var fmt = h.fmt;
   var esc = h.esc;
 
@@ -2231,7 +2231,7 @@ function openCommissionRulebook() {
   var p1Rate     = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
   var p3Rate     = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
   var p3Thresh   = Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100);
-  var p1MinGmv   = fmtB(cfg('upsell_sku','p1_min_gmv',2500));
+  var p1MinGmv   = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
   var p3MinIncr  = fmtB(cfg('upsell_sku','p3_min_incremental',5000));
   var outRate    = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
   var hoT2Pct    = cfg('handover','tier2_pct',100);
