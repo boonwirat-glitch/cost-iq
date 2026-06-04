@@ -1,4 +1,4 @@
-<!-- Freshket Sense v298: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v299: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5042,7 +5042,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v298',
+      version: 'v299',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -10601,6 +10601,7 @@ function handleFileUpload(type,input){
     reader.onload=e=>{
       const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
       const byAccountId={};
+      const byOutletId={};   // v299: Q10 is outlet-grain (user_id=p[16])
       const byKamName={};
       const byNewKamName={}; // commission: index by receiving KAM for Handover retention calc
       lines.forEach(l=>{
@@ -10613,8 +10614,10 @@ function handleFileUpload(type,input){
         const curMonthGmv=parseFloat(p[5])||0;
         const newOwnerType=(p[6]||'').trim();
         const newKamName=(p[7]||'').trim();
+        const outletId=(p[16]||'').trim();  // v299: user_id (res_id)
         if(!kamName||!accountId)return;
-        byAccountId[accountId]={kamName,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName};
+        if(!byAccountId[accountId]){byAccountId[accountId]={kamName,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName,outletIds:[]};}
+        if(outletId){ byOutletId[outletId]={kamName,accountId,accountName,prevOwner:(p[10]||'').trim(),newKamName}; (byAccountId[accountId].outletIds=byAccountId[accountId].outletIds||[]).push(outletId); }
         if(!byKamName[kamName])byKamName[kamName]=[];
         byKamName[kamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,newOwnerType,newKamName});
         // index by NEW KAM name (receiving) for Handover commission
@@ -10623,7 +10626,7 @@ function handleFileUpload(type,input){
           byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
         }
       });
-      bulkHandoverData={byAccountId,byKamName,byNewKamName};
+      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
       console.log('%c[Sense] handover loaded','color:#4ddc97',{accounts:Object.keys(byAccountId).length,
         kams:Object.keys(byKamName).length});
       const cnt=Object.keys(byKamName).length;
@@ -31413,9 +31416,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   // outlet shows correctly as core(2) + handover(1), not all-3 in one bucket.
   const coreAccounts=[], transferInAccounts=[], newFromSalesAccounts=[];
   const transferInOutlets=new Set(), newFromSalesOutlets=new Set(), movedOutlets=new Set();
+  // v299: handoverOutlets are EXCLUDED from core (they belong to the Handover commission
+  // channel via Q10/CDS, not to the portview NRR cohort). They are NOT pushed into
+  // newFromSales — handover_perf (Sales→KAM previous month) is its own bucket.
+  const handoverOutlets=new Set();
   const cmByOutlet = (cm && cm.byOutletId) ? cm.byOutletId : null;
+  const hoByOutlet = (hd && hd.byOutletId) ? hd.byOutletId : null;
 
-  // Build per-account membership from Q11 outlet rows (one pass over Q11)
+  // Pass 1: Q11 outlet rows → per-outlet movement sets (transfer_in / new_sales)
   const acctMoves = {}; // acctId → {ti:bool, ns:bool}
   if (cmByOutlet) {
     Object.keys(cmByOutlet).forEach(oid => {
@@ -31431,28 +31439,26 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     });
   }
 
+  // Pass 2: Q10 handover outlet rows → exclude these outlets from core cohort.
+  // Skip any outlet already claimed by Q11 (Q11 is the higher-priority current-month source).
+  if (hoByOutlet) {
+    Object.keys(hoByOutlet).forEach(oid => {
+      const key = String(oid);
+      if (movedOutlets.has(key)) return; // Q11 already owns it
+      handoverOutlets.add(key);
+      movedOutlets.add(key); // exclude from core
+    });
+  }
+
+  // Pass 3: assign accounts to movement groups (outlet-level membership).
+  // An account appears in transfer_in / new_sales only for the outlets that actually moved.
+  // Core gets every account but with movedOutlets excluded → only its non-moved outlets count.
   allAccounts.forEach(a => {
     const acctId = String(a.id==null?'':a.id).trim();
     const mv = acctMoves[acctId];
-    const hasTI = !!(mv && mv.ti);
-    const hasNS = !!(mv && mv.ns);
-
-    // [2] Q10 explicit handover (account-level) — only if account has NO Q11 movement at all
-    let hoPrevOwner = null;
-    if (!hasTI && !hasNS) {
-      const hoRow = hd.byAccountId && hd.byAccountId[a.id];
-      if (hoRow) hoPrevOwner = (hoRow.prevOwner || '').toUpperCase();
-    }
-
-    if (hasTI) transferInAccounts.push(a);
-    if (hasNS) newFromSalesAccounts.push(a);
-    if (hoPrevOwner !== null) {
-      if (hoPrevOwner === 'SALE') newFromSalesAccounts.push(a);
-      else transferInAccounts.push(a);
-    }
-    // Every account is a core candidate — its non-moved outlets count as core
-    // (core path uses a negative filter = exclude movedOutlets).
-    coreAccounts.push(a);
+    if (mv && mv.ti) transferInAccounts.push(a);
+    if (mv && mv.ns) newFromSalesAccounts.push(a);
+    coreAccounts.push(a); // core candidate; non-moved outlets only (exclude filter)
   });
 
   // ── Helper: compute NRR for a group of accounts ─────────────────
@@ -31674,6 +31680,17 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
                 +(transferOutList.length>5?' …+'+( transferOutList.length-5):'')});
   }
   const _movementGmv = r => (r ? ((r.cohortGmv||0)+(r.comebackGmv||0)+(r.expansionGmv||0)) : 0);
+  // v299: count distinct accounts that actually have qualifying outlets in the result
+  // (replaces account.length which counted accounts pushed before outlet-filtering — those
+  // could end up empty after filter, causing "4 ร้าน" header to mismatch 1 shown account).
+  const _movementAcctCount = r => {
+    if (!r) return 0;
+    const ids = new Set();
+    ['cohortDetail','comebackDetail','expansionDetail'].forEach(k => {
+      (r[k]||[]).forEach(g => { if (g && g.acctId != null) ids.add(String(g.acctId)); });
+    });
+    return ids.size;
+  };
 
   // ── Build return value (core fields stay backward-compatible) ───
   const core = coreResult || {};
@@ -31706,7 +31723,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     expansionDetail: core.expansionDetail || [],
     // Movement groups (v198)
     transferIn: {
-      count: transferInAccounts.length,
+      count: _movementAcctCount(transferInResult),
       // v207h: movement GMV = all current-month GMV in this movement group, not only NRR cohort GMV.
       // This keeps transfer-in with no prev-month cohort from showing as ฿0 when it has CB/EX current GMV.
       gmv:   _movementGmv(transferInResult),
@@ -31719,7 +31736,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       expansionDetail: transferInResult?.expansionDetail || []
     },
     newFromSales: {
-      count: newFromSalesAccounts.length,
+      count: _movementAcctCount(newFromSalesResult),
       gmv:   _movementGmv(newFromSalesResult),
       nrr:   newFromSalesResult?.rawRetention ?? null,
       cohortGmv: newFromSalesResult?.cohortGmv || 0,
