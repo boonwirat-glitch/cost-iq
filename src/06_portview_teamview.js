@@ -1101,10 +1101,14 @@ function _pvBuildCompactStrip(){
   const acctWithPace=accounts.filter(a=>a.paceSignal&&(a.paceSignal.histMonths>0||a.paceSignal.isNew===false));
   const _earlyMonth=acctWithPace.length>0&&(acctWithPace[0].paceSignal.daysElapsed||0)<5;
   // v296: use _tgtPortviewPct (target/baseline-based, same as full portview widget)
-  // for consistency — compact strip must show identical % to expanded view
-  // Fall back to pace-vs-expected only when target widget hasn't rendered yet
+  // Single source of truth — compact strip must show identical % to expanded view always
+  // If not ready yet (async renderPortviewTargetBar still running), schedule retry
   const _tgtPct = (typeof window._tgtPortviewPct === 'number' && window._tgtPortviewPct > 0)
     ? window._tgtPortviewPct : null;
+  if(_tgtPct === null && !strip._v296Retried){
+    strip._v296Retried=true;
+    setTimeout(()=>{strip._v296Retried=false;_pvBuildCompactStrip();},600);
+  }
   const portfolioPace=_tgtPct !== null ? _tgtPct
     : acctWithPace.length>0
       ?(_earlyMonth
@@ -1126,7 +1130,7 @@ function _pvBuildCompactStrip(){
   ].filter(Boolean);
   const searchIconSvg=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg>`;
   strip.innerHTML=
-    `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${paceColor}">${portfolioPace}%</div><div class="pv-cs-pace-lbl">Pro Rate</div></div>`+
+    `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${paceColor}">${portfolioPace}%</div><div class="pv-cs-pace-lbl">${window._tgtFbMode==="base"?"Baseline":window._tgtFbMode==="team"?"Target":"Target"}</div></div>`+
     chips.map((c,i)=>{
       const isOn=portviewFilter===c.cls;
       const isDim=portviewFilter!=='all'&&!isOn;
@@ -1770,7 +1774,7 @@ function _tvBuildCompactStrip(){
     danger.length?{cls:'danger',lbl:'AT RISK',val:fK(danger.reduce((s,g)=>s+(g.portfolioRunRate||0),0)),sub:danger.length+' KAM'}:null,
   ].filter(Boolean);
   strip.innerHTML=
-    `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${color}">${pace}%</div><div class="pv-cs-pace-lbl">Pro Rate</div></div>`+
+    `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${color}">${pace}%</div><div class="pv-cs-pace-lbl">${window._tgtFbMode==="base"?"Baseline":window._tgtFbMode==="team"?"Target":"Target"}</div></div>`+
     chips.map((c,i)=>(i>0?'<div class="pv-cs-divider"></div>':'')+`<div class="pv-cs-chip ${c.cls}"><div class="pv-cs-label">${c.lbl}</div><div class="pv-cs-val">${c.val}</div><div class="pv-cs-sub">${c.sub}</div></div>`).join('')+
     `<button class="pv-cs-search" title="ค้นหา" onclick="(function(){const ex=document.getElementById('tv-sort-search-expand');const open=ex.style.display!=='none';ex.style.display=open?'none':'block';if(!open){const i=document.getElementById('tv-search-collapsed');if(i)i.focus();}else{const i=document.getElementById('tv-search-collapsed');if(i){i.value='';const ts=document.getElementById('tv-search');if(ts){ts.value='';renderTeamviewKamList();}}}}})()">${searchIconSvg}</button>`;
   const sc=document.getElementById('tv-sort-count');if(sc)sc.textContent=groups.length+' KAM';
