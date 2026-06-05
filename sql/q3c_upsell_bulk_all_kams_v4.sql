@@ -39,28 +39,22 @@ kam_list AS (
 ),
 
 -- KAM→account mapping (Q8E logic)
-user_master_current AS (
-  SELECT *
-  FROM `freshket-rn.dim.user_master`
-  WHERE account_guid IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_guid
-    ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
-      lasted_order_date DESC NULLS LAST,
-      lead_created_at   DESC NULLS LAST
-  ) = 1
-),
-master_kam_accounts AS (
-  SELECT um.account_guid AS account_id, k.kam_email, 1 AS _pri
-  FROM user_master_current um
-  JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+kam_outlets AS (
+  SELECT
+    CAST(um.res_id AS STRING)       AS res_id,
+    CAST(um.account_guid AS STRING) AS account_id,
+    k.kam_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
     AND um.account_type IN ('SA','MC','Chain','Unknown')
-),
-kam_accounts AS (
-  SELECT account_id, kam_email
-  FROM master_kam_accounts
+    AND um.res_id IS NOT NULL
+    AND um.account_guid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 ),
 
 -- ── NRR Core ownership CTEs (same KAM baseline→current, no handover) ───
@@ -111,7 +105,7 @@ nrr_core_outlets AS (
 -- existing = in baseline month AND same KAM both months (NRR core)
 outlet_history AS (
   SELECT
-    o.account_id,
+    ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     MIN(o.delivery_date)      AS first_seen,
     MAX(CASE WHEN o.delivery_date >= d.baseline_mo
@@ -120,7 +114,7 @@ outlet_history AS (
     MAX(CASE WHEN o.delivery_date >= d.current_mo THEN 1 ELSE 0 END) AS in_current
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN dates d
-  JOIN kam_accounts ka ON o.account_id = ka.account_id
+  JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= DATE_SUB((SELECT baseline_mo FROM dates), INTERVAL 5 MONTH)
     AND o.delivery_date <  DATE_ADD((SELECT current_mo FROM dates), INTERVAL 1 MONTH)
   GROUP BY 1, 2
@@ -143,7 +137,7 @@ outlet_status AS (
 current_items AS (
   SELECT
     ka.kam_email,
-    o.account_id,
+    ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
@@ -162,7 +156,7 @@ current_items AS (
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   CROSS JOIN dates d
-  JOIN kam_accounts ka ON o.account_id = ka.account_id
+  JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= d.current_mo
     AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
     AND i.gmv_ex_vat > 0
@@ -181,7 +175,7 @@ current_split AS (
 lookback AS (
   SELECT
     ka.kam_email,
-    o.account_id,
+    ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
@@ -201,7 +195,7 @@ lookback AS (
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   CROSS JOIN dates d
-  JOIN kam_accounts ka ON o.account_id = ka.account_id
+  JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= d.lookback_start
     AND o.delivery_date <  d.current_mo
     AND i.gmv_ex_vat > 0
