@@ -31,8 +31,7 @@ kam_outlets AS (
     CAST(um.account_guid AS STRING) AS account_id,
     um.account_name,
     k.kam_name,
-    k.kam_email,
-    k.tl_email
+    k.kam_email
   FROM `freshket-rn.dim.user_master` um
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
