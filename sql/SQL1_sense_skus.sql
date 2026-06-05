@@ -22,35 +22,30 @@ WITH kam_list AS (
     STRUCT('Warissara (Ply) Chanaboon'              AS kam_name, 'warissara.c@freshket.co'    AS kam_email)
   ])
 ),
--- v207g: current portfolio owner source-of-truth = user_master.staff_owner_email.
--- Fallback to latest order owner only when the master record has no owner email.
-user_master_current AS (
-  SELECT *
-  FROM `freshket-rn.dim.user_master`
-  WHERE account_guid IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_guid
-    ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
-      lasted_order_date DESC NULLS LAST,
-      lead_created_at DESC NULLS LAST
-  ) = 1
-),
-master_kam_accounts AS (
-  SELECT um.account_guid AS account_id, k.kam_name, k.kam_email, 1 AS _pri
-  FROM user_master_current um
-  JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+-- v4: join via res_id (เหมือน Q8E) รองรับ account rename
+kam_outlets AS (
+  SELECT
+    CAST(um.res_id AS STRING)       AS res_id,
+    CAST(um.account_guid AS STRING) AS account_id,
+    um.account_name,
+    k.kam_name,
+    k.kam_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
     AND um.account_type IN ('SA','MC','Chain','Unknown')
-),
-kam_map AS (
-  SELECT account_id, kam_name, kam_email
-  FROM master_kam_accounts
+    AND um.res_id IS NOT NULL
+    AND um.account_guid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 ),
 raw AS (
   SELECT
-    o.account_id,
-    km.kam_email,
+    ko.account_id,
+    ko.kam_email,
     DATE_TRUNC(o.delivery_date, MONTH)             AS month_date,
     CAST(i.item_id AS STRING)                      AS item_id,
     i.item_name_th,
@@ -65,7 +60,7 @@ raw AS (
     o.user_id
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
-  JOIN kam_map km ON o.account_id = km.account_id
+  JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
   WHERE o.delivery_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH), INTERVAL 2 MONTH)
     AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)  -- day-1 lag guard
     AND i.item_id IS NOT NULL
