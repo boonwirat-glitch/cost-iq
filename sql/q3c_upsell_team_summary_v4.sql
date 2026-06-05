@@ -143,7 +143,7 @@ outlet_status AS (
 -- Current month GMV at outlet × group_key, split by outlet type
 group_key_def AS (
   SELECT
-    ka.kam_email, o.account_id,
+    ka.kam_email, ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
@@ -175,7 +175,7 @@ current_agg AS (
 -- Baseline: outlet × group_key bought in any of 3 lookback months (for P1/P3 on existing outlets)
 baseline_groups AS (
   SELECT DISTINCT
-    ka.kam_email, o.account_id,
+    ka.kam_email, ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
