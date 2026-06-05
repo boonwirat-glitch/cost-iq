@@ -738,6 +738,10 @@ function renderCommLockStep(body) {
   const threshold = Number(_tgtSettings.nrr_threshold || 98);
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
   const ready = rows.length > 0 && pending === 0;
+  if (_commLockSubtab === 'retroactive') {
+    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div>` + _commRenderRetroactiveSection();
+    return;
+  }
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
@@ -753,10 +757,7 @@ function renderCommLockStep(body) {
       <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
       <div class="comm-lock-subtabs"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive</button></div>
     </div>
-`;
-  const _lockHeroHtml = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div>`;
-  if (_commLockSubtab === 'retroactive') { body.innerHTML = _lockHeroHtml + _commRenderRetroactiveSection(); return; }
-  body.innerHTML = _lockHeroHtml + `
+    <div id="comm-lock-detail-body">
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
       <div class="comm-preview-tl-band">
@@ -1071,6 +1072,7 @@ function renderCommissionLockTab() {
       </table>
     </div>` : `<div class="tgt-lock-empty">กด Compute เพื่อสร้าง snapshot</div>`}
     <div class="tgt-rule-note">Compute = บันทึก draft · Lock = confirm final · Export ดึงจาก stored rows ไม่ recompute</div>
+    </div>
   `;
 }
 
