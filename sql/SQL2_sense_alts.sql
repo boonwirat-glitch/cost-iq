@@ -61,36 +61,32 @@ WITH kam_list AS (
   ])
 ),
 -- v201f: dynamic KAM mapping (replaces hardcoded 623-row list) | 90d churn window
--- v207g: current portfolio owner source-of-truth = user_master.staff_owner_email.
--- Fallback to latest order owner only when the master record has no owner email.
-user_master_current AS (
-  SELECT *
-  FROM `freshket-rn.dim.user_master`
-  WHERE account_guid IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_guid
-    ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
-      lasted_order_date DESC NULLS LAST,
-      lead_created_at DESC NULLS LAST
-  ) = 1
-),
-master_kam_accounts AS (
-  SELECT um.account_guid AS account_id, k.kam_name, k.kam_email, k.tl_email, 1 AS _pri
-  FROM user_master_current um
-  JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+-- v4: join via res_id (เหมือน Q8E) รองรับ account rename
+kam_outlets AS (
+  SELECT
+    CAST(um.res_id AS STRING)       AS res_id,
+    CAST(um.account_guid AS STRING) AS account_id,
+    um.account_name,
+    k.kam_name,
+    k.kam_email,
+    k.tl_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
     AND um.account_type IN ('SA','MC','Chain','Unknown')
-),
-kam_map AS (
-  SELECT account_id, kam_name, kam_email, tl_email
-  FROM master_kam_accounts
+    AND um.res_id IS NOT NULL
+    AND um.account_guid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 ),
 
 account_items AS (
   SELECT
-    o.account_id,
-    km.kam_email,
+    ko.account_id,
+    ko.kam_email,
     item.item_id,
     item.item_name_th,
     item.subclass_name,
@@ -119,7 +115,7 @@ account_items AS (
     ROUND(SUM(item.qty)        OVER (PARTITION BY o.account_id, item.item_id), 2) AS monthly_qty,
     ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY o.account_id, item.item_id), 2) AS monthly_gmv
   FROM `freshket-rn.dwh.order` o, UNNEST(o.item) AS item
-  INNER JOIN kam_map km ON o.account_id = km.account_id
+  INNER JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
   WHERE DATE_TRUNC(o.delivery_date, MONTH) = DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
     AND item.gmv_ex_vat > 0
     AND item.category_high_level != 'DG Non-food'
