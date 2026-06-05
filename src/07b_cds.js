@@ -2228,115 +2228,226 @@ function openCommissionRulebook() {
     ov.onclick = function(e){ if(e.target===ov) closeCommissionRulebook(); };
     document.body.appendChild(ov);
   }
+
   function cfg(k,p,d){ try{ return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){ return d; } }
-  function fmtPct(n){ return Math.round(Number(n||0)*100)+'%'; }
-  function fmtB(n){ var v=Number(n||0); return '฿'+v.toLocaleString('en-US'); }
+  function fmtB(n){ var v=Math.round(Number(n||0)); return '฿'+v.toLocaleString('en-US'); }
   function fmtPctRaw(n){ return Number(n||0)+'%'; }
 
-  // Read live config
-  var p1Rate     = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
-  var p3Rate     = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
-  var p3Thresh   = Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100);
-  var p1MinGmv   = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
-  var p3MinIncr  = fmtB(cfg('upsell_sku','p3_min_incremental',5000));
-  var outRate    = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
-  var hoT2Pct    = cfg('handover','tier2_pct',100);
-  var hoT3Pct    = cfg('handover','tier3_pct',120);
-  var hoT2Pay    = fmtB(cfg('handover','tier2_payout',2500));
-  var hoT3Bon    = fmtB(cfg('handover','tier3_bonus',2500));
-  var gT1        = cfg('gmv_gate','threshold_1',95);
-  var gT2        = cfg('gmv_gate','threshold_2',90);
-  var gC1        = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
-  var gC2        = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
+  // Live config params
+  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
+  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
+  var p3Thresh  = cfg('upsell_sku','p3_threshold_pct',2.00);
+  var p1MinGmv  = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
+  var p3MinIncr = fmtB(cfg('upsell_sku','p3_min_incremental',8000));
+  var outRate   = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
+  var hoT2Pct   = cfg('handover','tier2_pct',100);
+  var hoT3Pct   = cfg('handover','tier3_pct',120);
+  var hoT2Pay   = fmtB(cfg('handover','tier2_payout',2500));
+  var hoT3Total = fmtB(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500));
+  var gT1       = cfg('gmv_gate','threshold_1',95);
+  var gT2       = cfg('gmv_gate','threshold_2',90);
+  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
+  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
 
-  function sec(title, color, rows) {
-    var rowHtml = rows.map(function(r) {
-      return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.10)">'+
-        '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.70);min-width:90px;flex-shrink:0;padding-top:1px">'+r[0]+'</div>'+
-        '<div style="font-size:13px;color:rgba(225,238,255,.92);line-height:1.55">'+r[1]+'</div>'+
-        '</div>';
-    }).join('');
-    return '<div style="margin-bottom:14px">'+
-      '<div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:'+color+';padding:12px 0 6px;font-family:'+"'IBM Plex Mono',monospace"+'">'+title+'</div>'+
-      rowHtml+
-      '</div>';
+  // Get current user's plan tiers
+  var role = typeof getCurrentRole==='function' ? getCurrentRole() : '';
+  var email = (currentUserProfile && currentUserProfile.email) || '';
+  var period = typeof _nrrExclusionCurrentPeriod==='function' ? _nrrExclusionCurrentPeriod() : '';
+  var isRep = typeof isRepRole==='function' ? isRepRole(role) : false;
+  var isTL  = typeof isTLRole==='function'  ? isTLRole(role)  : false;
+
+  function getMyTiers(myRole, myEmail) {
+    try {
+      var planCode = typeof _commGetAssignmentPlan==='function'
+        ? _commGetAssignmentPlan(period, myRole, myEmail, myRole)
+        : (myRole==='tl'?'TL_NRR_STD':'KAM_NRR_STD');
+      var draft = typeof _commGetDraftByCode==='function' ? _commGetDraftByCode(planCode, myRole) : null;
+      return (draft && draft.tiers && draft.tiers.length) ? draft.tiers : [];
+    } catch(e) { return []; }
   }
 
-  var html = [
-    sec('NRR', '#4ddc97', [
-      ['วัดอะไร', 'ยอด GMV ของร้านในกลุ่ม cohort (ร้านที่ซื้อเดือนที่แล้ว) เทียบกับเดือนที่แล้ว'],
-      ['เดือนฐาน', 'เดือนล่าสุดในไฟล์ประวัติ (rolling MoM โดย default)'],
-      ['วิธีคำนวณ', 'Daily rate ทั้งสองฝั่ง: NRR = (GMV MTD ÷ วันที่ผ่านมา) ÷ (GMV เดือนฐาน ÷ วันในเดือนฐาน)'],
-      ['cohort คือ', 'outlet ที่มี GMV ในเดือนฐาน — ไม่นับ comeback, expansion ใน cohort หลัก'],
-      ['Transfer In', 'ร้านที่โอนมาจาก KAM อื่นเดือนนี้ — NRR แยกแสดง ไม่นับในยอด commission'],
-      ['Exclusion', 'ถ้ามี exclusion approved จะหักฐานก่อนคำนวณ NRR ด้วย daily rate เหมือนกัน']
-    ]),
-    sec('Expansion (สาขาใหม่)', '#00c8b0', [
-      ['นิยาม', 'outlet ที่ซื้อเดือนนี้ แต่ไม่เคยปรากฏใน history ย้อนหลัง 6 เดือน (ก่อนเดือนที่แล้ว)'],
-      ['ไม่ใช่ expansion', 'Comeback (เคยซื้อ→หาย→กลับมา) ไม่ได้ค่าคอมฯ'],
-      ['อัตรา', outRate+'% ของ GMV ทั้งหมดของ outlet นั้น (flat rate, ไม่แบ่ง P1/P3)'],
-      ['ข้อมูล', 'sense_outlets_monthly.csv (everSeen set ย้อนหลัง 6 เดือนจาก bulk_outlets)']
-    ]),
-    sec('P1 — กลุ่มสินค้าใหม่', '#ffe08a', [
-      ['เงื่อนไข', 'outlet ที่ไม่ใช่ expansion + ไม่เคยซื้อ group_key นี้ใน 3 เดือนที่ผ่านมา (M-1, M-2, M-3)'],
-      ['ระดับ', 'วัดที่ระดับ outlet × group_key (ไม่ใช่ account)'],
-      ['เกณฑ์ขั้นต่ำ', 'GMV เดือนนี้ใน group_key นั้น ≥ '+p1MinGmv],
-      ['อัตรา', p1Rate+'% ของ GMV รวมของ group_key นั้น (actual MTD)'],
-      ['ข้อยกเว้น', 'Expansion outlets ถูก exclude ก่อน — ได้แค่ '+outRate+'% flat ผ่าน expansion']
-    ]),
-    sec('P3 — ยอดเติบโต', '#ffe08a', [
-      ['เงื่อนไข', 'outlet ที่เคยซื้อ group_key นี้ใน 3 เดือนที่ผ่านมา + ยอดเดือนนี้โตเกิน '+p3Thresh+'% จาก max baseline'],
-      ['max baseline', 'เอา GMV ของ M-1, M-2, M-3 มา normalize เป็น 30 วัน แล้วเอาค่าสูงสุด'],
-      ['incremental', 'GMV existing เดือนนี้ (actual MTD) − max baseline (normalized)'],
-      ['เกณฑ์ขั้นต่ำ', 'incremental ≥ '+p3MinIncr],
-      ['อัตรา', p3Rate+'% ของ incremental'],
-      ['MTD note', 'ฝั่ง current = actual MTD (ไม่ normalized) → ต้นเดือนมักยังไม่ผ่านเกณฑ์ ยอดจะค่อยๆ ขึ้นปลายเดือน'],
-      ['ข้อยกเว้น', 'Expansion outlets ถูก exclude เช่นเดียวกับ P1']
-    ]),
-    sec('Handover (จาก Sales เท่านั้น)', '#bcd7ff', [
-      ['นิยาม', 'ร้านที่โอนจาก Sales เข้า KAM เมื่อเดือนที่แล้ว — วัด performance เดือนนี้'],
-      ['ต่างจาก Transfer In', 'KAM/PM/ADMIN → KAM = Transfer In ไม่ได้ค่าคอม · Sales → KAM เท่านั้นที่ได้'],
-      ['เดือนฐาน', 'GMV เดือนที่โอน (ทั้งเดือน รวมช่วงที่ Sales ดูแล)'],
-      ['วิธีวัด', 'Retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 (normalize ทั้งคู่)'],
-      ['Tier', '≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT2Pay+' + '+hoT3Bon+' bonus · < '+hoT2Pct+'% → ฿0']
-    ]),
-    sec('NRR Gate (KAM)', 'rgba(255,107,61,.9)', [
-      ['ทำงานยังไง', 'ถ้า NRR ต่ำเกินเกณฑ์ จะ cap ค่าคอมฯ ทุกส่วน (NRR + upsell + handover) รวมกัน'],
-      ['เกณฑ์', 'NRR < '+gT1+'% → ×'+gC1+'% · NRR < '+gT2+'% → ×'+gC2+'% · NRR ≥ '+gT1+'% → ×100%'],
-      ['ใครโดน', 'KAM เท่านั้น — TL ไม่มี gate']
-    ]),
-    sec('TL NRR', '#c084fc', [
-      ['วัดอะไร', 'NRR รวมของทุก account ในทีม (aggregate ทุก KAM ในทีม)'],
-      ['tier', '< 98.5% = ฿0 · 98.5–99% = ฿5K · 99–100% = ฿8K · 100–102% = ฿12K · 102–103% = ฿30K · ≥103% = ฿50K'],
-      ['Upsell Mult', 'NRR payout ถูก × ด้วย multiplier จาก upsell performance ของทีม (ดูด้านล่าง)']
-    ]),
-    sec('TL Upsell Multiplier', '#c084fc', [
-      ['สูตร', 'team_upsell_pct = Σ(P1 + P3 incr ทุก KAM) ÷ Σ(baseline GMV ทุก KAM) × 100'],
-      ['Tier', '< 2% = ×1.00 · 2–2.99% = ×1.20 · 3–3.99% = ×1.35 · 4–4.99% = ×1.50 · ≥5% = ×1.80'],
-      ['หมายเหตุ', 'Expansion outlets ไม่นับใน upsell base ของ TL (P1+P3 ที่ existing outlets เท่านั้น)'],
-      ['Final TL', 'TL final = NRR payout × multiplier (ไม่มี gate, ไม่มี expansion commission โดยตรง)']
-    ])
-  ].join('');
+  function getPlanName(myRole, myEmail) {
+    try {
+      var planCode = typeof _commGetAssignmentPlan==='function'
+        ? _commGetAssignmentPlan(period, myRole, myEmail, myRole)
+        : (myRole==='tl'?'TL_NRR_STD':'KAM_NRR_STD');
+      var plans = (_commRuleConfig && _commRuleConfig.plans) || {};
+      return (plans[planCode] && plans[planCode].plan_name) || planCode || '';
+    } catch(e) { return ''; }
+  }
 
-  ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0f1b2f;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9101;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'+
-    '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0f1b2f;z-index:1">'+
-      '<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ ทั้งหมด</div>'+
-      '<div style="display:flex;align-items:center;gap:8px">'+
-        '<div style="font-size:10px;color:rgba(188,215,255,.35);font-family:'+"'IBM Plex Mono',monospace"+'">live config</div>'+
-        '<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.45);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'+
-      '</div>'+
-    '</div>'+
-    '<div style="padding:0 18px 32px">'+html+'</div>'+
-  '</div>';
+  function getTlUpsellTiers() {
+    try {
+      var rules = _commRuleConfig && _commRuleConfig.rules && _commRuleConfig.rules['tl_upsell_mult'];
+      var tiers = (rules && rules[0] && rules[0].tiers) ? rules[0].tiers : [];
+      if (!tiers.length) tiers = [
+        {min_pct:0,max_pct:1.99,multiplier:1.00},{min_pct:2,max_pct:2.99,multiplier:1.20},
+        {min_pct:3,max_pct:3.99,multiplier:1.35},{min_pct:4,max_pct:4.99,multiplier:1.50},
+        {min_pct:5,max_pct:null,multiplier:1.80}
+      ];
+      return tiers;
+    } catch(e) { return []; }
+  }
+
+  // Get current NRR% for "← ตอนนี้" indicator
+  function getMyNrrPct() {
+    try {
+      if (isRep && typeof _commBuildKamPayout==='function') {
+        var r = _commBuildKamPayout(email); return r ? r.nrr_pct : null;
+      }
+      if (isTL && typeof _commBuildTlPayout==='function') {
+        var r = _commBuildTlPayout(email); return r ? r.nrr_pct : null;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  var myNrrPct = getMyNrrPct();
+
+  // Render NRR tier table from live plan
+  function renderNrrTierTable(tiers, currentPct, color) {
+    if (!tiers || !tiers.length) return '<div style="font-size:11px;color:rgba(188,215,255,.40);padding:8px 0">ไม่มีข้อมูล tier</div>';
+    var html = '';
+    tiers.forEach(function(t) {
+      var minV = t.min_value != null ? Number(t.min_value) : null;
+      var maxV = t.max_value != null ? Number(t.max_value) : null;
+      var pay  = Number(t.payout_value || 0);
+      var label = minV != null && maxV != null ? (minV+'%–'+maxV+'%')
+                : minV != null ? ('≥ '+minV+'%')
+                : maxV != null ? ('< '+maxV+'%') : 'ทุกช่วง';
+      var isCurr = currentPct != null
+        && (minV == null || currentPct >= minV)
+        && (maxV == null || currentPct < maxV);
+      var rowBg   = isCurr ? 'background:rgba(255,224,138,.07);' : '';
+      var lblClr  = isCurr ? '#ffe08a' : 'rgba(225,238,255,.70)';
+      var payClr  = pay > 0 ? (isCurr ? '#ffe08a' : color||'rgba(225,238,255,.80)') : 'rgba(225,238,255,.32)';
+      var curr    = isCurr ? ' <span style="font-size:9px;color:rgba(255,224,138,.70);font-family:\'IBM Plex Mono\',monospace"> ← ตอนนี้</span>' : '';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07);'+rowBg+'">'
+        +'<div style="font-size:12px;font-weight:700;color:'+lblClr+'">'+label+curr+'</div>'
+        +'<div style="font-size:13px;font-weight:900;color:'+payClr+';font-family:\'IBM Plex Mono\',monospace">'+(pay?fmtB(pay):'฿0')+'</div>'
+        +'</div>';
+    });
+    return html;
+  }
+
+  function renderTlUpsellTierTable(tiers, currentPct) {
+    if (!tiers || !tiers.length) return '';
+    var html = '';
+    tiers.forEach(function(t) {
+      var minV = t.min_pct != null ? Number(t.min_pct) : null;
+      var maxV = t.max_pct != null ? Number(t.max_pct) : null;
+      var mult = Number(t.multiplier || 1.0);
+      var label = minV != null && maxV != null ? (minV+'%–'+maxV+'%')
+                : minV != null ? ('≥ '+minV+'%') : '< '+maxV+'%';
+      var isCurr = currentPct != null
+        && (minV == null || currentPct >= minV)
+        && (maxV == null || currentPct < maxV);
+      var rowBg  = isCurr ? 'background:rgba(192,132,252,.06);' : '';
+      var lblClr = isCurr ? '#c084fc' : 'rgba(225,238,255,.70)';
+      var mulClr = mult > 1 ? (isCurr ? '#c084fc' : 'rgba(225,238,255,.80)') : 'rgba(225,238,255,.32)';
+      var curr   = isCurr ? ' <span style="font-size:9px;color:rgba(192,132,252,.70);font-family:\'IBM Plex Mono\',monospace"> ← ตอนนี้</span>' : '';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07);'+rowBg+'">'
+        +'<div style="font-size:12px;font-weight:700;color:'+lblClr+'">'+label+curr+'</div>'
+        +'<div style="font-size:13px;font-weight:900;color:'+mulClr+';font-family:\'IBM Plex Mono\',monospace">×'+mult.toFixed(2)+'</div>'
+        +'</div>';
+    });
+    return html;
+  }
+
+  // Section header
+  function secHdr(title, color) {
+    return '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:'+color+';padding:14px 0 6px;font-family:\'IBM Plex Mono\',monospace">'+title+'</div>';
+  }
+  // Detail row (key: value)
+  function detailRow(k, v) {
+    return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(188,215,255,.07)">'
+      +'<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.65);min-width:88px;flex-shrink:0;padding-top:1px">'+k+'</div>'
+      +'<div style="font-size:12px;color:rgba(225,238,255,.88);line-height:1.55">'+v+'</div>'
+      +'</div>';
+  }
+
+  // ── Build HTML sections ───────────────────────────────────────
+  var html = '';
+  var planName = '';
+
+  // KAM or TL: show their own NRR tier first
+  if (isRep) {
+    var tiers = getMyTiers('kam', email);
+    planName  = getPlanName('kam', email);
+    html += secHdr('NRR — รักษาฐานลูกค้า'+( planName ? ' ('+planName+')' : ''), '#4ddc97');
+    html += renderNrrTierTable(tiers, myNrrPct, '#4ddc97');
+    html += '<div style="font-size:10px;color:rgba(188,215,255,.40);padding:6px 0 4px;font-family:\'IBM Plex Mono\',monospace">วัด: daily-rate NRR ของ cohort เดือนนี้ vs เดือนก่อน</div>';
+  }
+  if (isTL) {
+    var tiers = getMyTiers('tl', email);
+    planName  = getPlanName('tl', email);
+    html += secHdr('NRR ทีม'+( planName ? ' — '+planName : ''), '#c084fc');
+    html += renderNrrTierTable(tiers, myNrrPct, '#c084fc');
+    var tlUpsellTiers = getTlUpsellTiers();
+    // get current upsell pct for indicator
+    var tlUpsellPct = null;
+    try { var tu = _commBuildTlPayout(email); if(tu&&tu.upsell_mult) tlUpsellPct=tu.upsell_mult.team_upsell_pct; } catch(e){}
+    html += secHdr('Upsell Multiplier × NRR payout', '#c084fc');
+    html += renderTlUpsellTierTable(tlUpsellTiers, tlUpsellPct ? tlUpsellPct*100 : null);
+    html += detailRow('สูตร', 'Σ(P1+P3 incr ทุก KAM) ÷ Σ(baseline GMV ทุก KAM) × 100');
+    html += detailRow('final', 'NRR payout × multiplier (ไม่มี gate)');
+  }
+  if (!isRep && !isTL) {
+    // Admin: show both KAM std and TL std
+    var kamTiers = getMyTiers('kam','');
+    var tlTiers  = getMyTiers('tl','');
+    html += secHdr('KAM NRR (Standard)', '#4ddc97');
+    html += renderNrrTierTable(kamTiers, null, '#4ddc97');
+    html += secHdr('TL NRR (Standard)', '#c084fc');
+    html += renderNrrTierTable(tlTiers, null, '#c084fc');
+    var tlUpsellTiers = getTlUpsellTiers();
+    html += secHdr('TL Upsell Multiplier', '#c084fc');
+    html += renderTlUpsellTierTable(tlUpsellTiers, null);
+  }
+
+  // Component rates — all roles see this
+  html += secHdr('Upsell', '#ffe08a');
+  html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × group_key · min '+p1MinGmv);
+  html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · โต > '+p3Thresh+'× baseline · min incremental '+p3MinIncr);
+  html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยปรากฏ 6 เดือนย้อนหลัง)');
+
+  html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
+  html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+  html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
+
+  html += secHdr('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.85)');
+  html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');
+  html += detailRow('cap ที่ไหน', 'ทุกส่วน (NRR + upsell + handover) คูณก่อน lock');
+
+  // How to calculate — methodology toggle
+  html += '<div style="margin-top:14px;padding:12px;background:rgba(188,215,255,.05);border-radius:10px;border:1px solid rgba(188,215,255,.10)">';
+  html += '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.55);margin-bottom:6px">วิธีคำนวณ NRR</div>';
+  html += '<div style="font-size:11px;color:rgba(225,238,255,.75);line-height:1.7">';
+  html += 'NRR = (GMV MTD ÷ วันที่ผ่านมา) ÷ (GMV เดือนฐาน ÷ วันในเดือนฐาน)<br>';
+  html += 'cohort = outlet ที่มี GMV ในเดือนฐาน — comeback และ expansion แยกออก ไม่นับใน NRR หลัก<br>';
+  html += 'Transfer In แสดงแยก ไม่นับในยอด commission</div>';
+  html += '</div>';
+
+  ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0d1c34;border-radius:18px 18px 0 0;max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9101;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
+    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0d1c34;z-index:1;border-bottom:1px solid rgba(188,215,255,.08)">'
+      +'<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<div style="font-size:9px;color:rgba(188,215,255,.40);font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">LIVE CONFIG</div>'
+        +'<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.55);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
+      +'</div>'
+    +'</div>'
+    +'<div style="padding:0 18px 32px">'+html+'</div>'
+    +'</div>';
 
   requestAnimationFrame(function(){
-    ov.style.background='rgba(5,14,28,.72)';
+    ov.style.background='rgba(5,14,28,.75)';
     ov.style.pointerEvents='all';
     var sh=ov.querySelector('div');
     if(sh){ sh.style.transform='translateX(-50%) translateY(0)'; }
   });
 }
+
 
 function closeCommissionRulebook() {
   var ov = document.getElementById('comm-rulebook-overlay');
