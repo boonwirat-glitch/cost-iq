@@ -22,31 +22,26 @@ WITH kam_list AS (
     STRUCT('Warissara (Ply) Chanaboon'              AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email)
   ])
 ),
--- v201f: dynamic KAM mapping (replaces hardcoded 623-row list) | 90d churn window
--- v207g: current portfolio owner source-of-truth = user_master.staff_owner_email.
--- Fallback to latest order owner only when the master record has no owner email.
-user_master_current AS (
-  SELECT *
-  FROM `freshket-rn.dim.user_master`
-  WHERE account_guid IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_guid
-    ORDER BY
-      CASE WHEN staff_owner_email IS NOT NULL AND TRIM(staff_owner_email) != '' THEN 0 ELSE 1 END,
-      lasted_order_date DESC NULLS LAST,
-      lead_created_at DESC NULLS LAST
-  ) = 1
-),
-master_kam_accounts AS (
-  SELECT um.account_guid AS account_id, k.kam_name, k.kam_email, k.tl_email, 1 AS _pri
-  FROM user_master_current um
-  JOIN kam_list k ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+-- v4: join via res_id (เหมือน Q8E) รองรับ account rename
+kam_outlets AS (
+  SELECT
+    CAST(um.res_id AS STRING)       AS res_id,
+    CAST(um.account_guid AS STRING) AS account_id,
+    um.account_name,
+    k.kam_name,
+    k.kam_email,
+    k.tl_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   WHERE um.commercial_owner = 'KAM'
     AND um.account_type IN ('SA','MC','Chain','Unknown')
-),
-kam_map AS (
-  SELECT account_id, kam_name, kam_email, tl_email
-  FROM master_kam_accounts
+    AND um.res_id IS NOT NULL
+    AND um.account_guid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 ),
 -- v3: max_date caps current month at latest pipeline data (avoids 1-day lag overcounting)
 params AS (
@@ -58,7 +53,7 @@ params AS (
 )
 
 SELECT
-  o.account_id,
+  ko.account_id,
   CASE EXTRACT(MONTH FROM DATE_TRUNC(o.delivery_date, MONTH))
     WHEN 1  THEN 'ม.ค.'  WHEN 2  THEN 'ก.พ.'  WHEN 3  THEN 'มี.ค.'
     WHEN 4  THEN 'เม.ย.' WHEN 5  THEN 'พ.ค.'  WHEN 6  THEN 'มิ.ย.'
@@ -70,7 +65,7 @@ SELECT
 
 FROM `dwh.order` o, UNNEST(o.item) AS i
 CROSS JOIN params p
-INNER JOIN kam_map km ON o.account_id = km.account_id
+INNER JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
 
 WHERE o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
   AND o.delivery_date <= p.max_date  -- v3: include current month MTD (raw GMV, not run rate)
