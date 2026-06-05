@@ -409,6 +409,16 @@ function _renderComponentRatesEditor() {
       </div>
     </div>
     <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">KAM NRR Tiers</div>
+      <div class="comm-plan-note" style="margin:0 0 10px">แก้ tier โดยตรงใน Rule Library (Step 3 → Edit selected rule) เพื่อ precision สูงสุด · ด้านล่างนี้แสดง tier ของทุก active KAM plan</div>
+      ${_renderKamNrrTierSummary()}
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
+      <div class="comm-component-title">TL NRR Tiers</div>
+      <div class="comm-plan-note" style="margin:0 0 10px">แก้ tier ใน Rule Library (Step 3) · ด้านล่างแสดง tier ของทุก active TL plan</div>
+      ${_renderTlNrrTierSummary()}
+    </div>
+    <div class="comm-component-section" style="margin-top:14px">
       <div class="comm-component-title">TL Upsell Multiplier Tiers</div>
       <div class="comm-tier-helper"><span>Upsell %</span><strong>= Σ(P1+P3 incr) ÷ Team NRR baseline</strong></div>
       <div class="comm-table-lite comm-tier-table" style="margin-top:8px">
@@ -447,6 +457,60 @@ function _renderTlUpsellTierRows() {
     <button class="comm-del" onclick="_commRemoveTlUpsellTier(${i})">×</button>
   </div>`).join('');
 }
+
+function _renderNrrTierReadonlyRows(planCode, role) {
+  const d = _commGetDraftByCode(planCode, role);
+  const tiers = (d && d.tiers) || [];
+  if (!tiers.length) return '<div class="comm-empty" style="padding:8px 0">ไม่มี tier</div>';
+  return tiers.map(t => {
+    const minV = t.min_value != null ? Number(t.min_value) : null;
+    const maxV = t.max_value != null ? Number(t.max_value) : null;
+    const pay  = Number(t.payout_value || 0);
+    const label = minV != null && maxV != null ? (minV+'%–'+maxV+'%')
+                : minV != null ? ('≥ '+minV+'%')
+                : maxV != null ? ('< '+maxV+'%') : 'ทุกช่วง';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:rgba(188,215,255,.04);border:1px solid rgba(188,215,255,.09);margin-bottom:4px">
+      <span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.75)">NRR ${label}</span>
+      <span style="font-size:12px;font-weight:900;color:${pay>0?'#ffe08a':'rgba(225,238,255,.30)'};font-family:'IBM Plex Mono',monospace">${pay?'฿'+pay.toLocaleString('en-US'):'฿0'}</span>
+    </div>`;
+  }).join('');
+}
+function _renderKamNrrTierSummary() {
+  const plans = _commRulesForRole('kam', { activeOnly: true });
+  if (!plans.length) return '<div class="comm-empty">ไม่มี KAM plan — สร้างใน Rule Library</div>';
+  return plans.map(p => {
+    const usedCount = _commRuleUsageCount(p.plan_code);
+    return `<div class="comm-card" style="margin-bottom:10px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:rgba(225,238,255,.88)">${_commEscapeHtml(p.plan_name || p.plan_code)}</div>
+          <div style="font-size:10px;color:rgba(188,215,255,.50);margin-top:1px">${p.plan_code} · ใช้อยู่ ${usedCount} คน</div>
+        </div>
+        <button class="comm-create-rule-btn" style="font-size:10px;padding:4px 8px" onclick="_commSelectedRuleCode='${p.plan_code}';switchCommissionStep('rules')">แก้ไข</button>
+      </div>
+      ${_renderNrrTierReadonlyRows(p.plan_code, 'kam')}
+    </div>`;
+  }).join('');
+}
+function _renderTlNrrTierSummary() {
+  const plans = _commRulesForRole('tl', { activeOnly: true });
+  if (!plans.length) return '<div class="comm-empty">ไม่มี TL plan — สร้างใน Rule Library</div>';
+  return plans.map(p => {
+    const usedCount = _commRuleUsageCount(p.plan_code);
+    return `<div class="comm-card" style="margin-bottom:10px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:rgba(225,238,255,.88)">${_commEscapeHtml(p.plan_name || p.plan_code)}</div>
+          <div style="font-size:10px;color:rgba(188,215,255,.50);margin-top:1px">${p.plan_code} · ใช้อยู่ ${usedCount} คน</div>
+        </div>
+        <button class="comm-create-rule-btn" style="font-size:10px;padding:4px 8px" onclick="_commSelectedRuleCode='${p.plan_code}';switchCommissionStep('rules')">แก้ไข</button>
+      </div>
+      ${_renderNrrTierReadonlyRows(p.plan_code, 'tl')}
+    </div>`;
+  }).join('');
+}
+window._renderKamNrrTierSummary = _renderKamNrrTierSummary;
+window._renderTlNrrTierSummary  = _renderTlNrrTierSummary;
 
 // In-memory staging for component params (flushed on saveCommissionComponentRates)
 let _commComponentPending = {};
