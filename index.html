@@ -1,4 +1,4 @@
-<!-- Freshket Sense 317: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v255: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '317',
+      version: 'v255',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -30276,6 +30276,32 @@ async function saveCommissionComponentRates() {
 }
 window.saveCommissionComponentRates = saveCommissionComponentRates;
 window._commSetComponentParam = _commSetComponentParam;
+
+function _commAddTlUpsellTier() {
+  try {
+    const rules = _commRuleConfig.rules || {};
+    if (!rules.tl_upsell_mult) rules.tl_upsell_mult = [{ tiers:[] }];
+    if (!rules.tl_upsell_mult[0].tiers) rules.tl_upsell_mult[0].tiers = [];
+    rules.tl_upsell_mult[0].tiers.push({min_pct:null,max_pct:null,multiplier:1.0});
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commRemoveTlUpsellTier(idx) {
+  try {
+    _commRuleConfig.rules.tl_upsell_mult[0].tiers.splice(idx, 1);
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commSetTlUpsellTier(idx, field, value) {
+  try {
+    const t = _commRuleConfig.rules.tl_upsell_mult[0].tiers[idx];
+    if (!t) return;
+    t[field] = value === '' ? null : Number(value);
+    _commMarkChanged();
+  } catch(e) {}
+}
 window._commAddTlUpsellTier = _commAddTlUpsellTier;
 window._commRemoveTlUpsellTier = _commRemoveTlUpsellTier;
 window._commSetTlUpsellTier = _commSetTlUpsellTier;
