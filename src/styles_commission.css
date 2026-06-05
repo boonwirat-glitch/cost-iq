@@ -1014,13 +1014,15 @@ flex-wrap:wrap;}
   transition:opacity .18s ease, backdrop-filter .18s ease;
 }
 #commission-cockpit-overlay .comm-sheet{
-  transform:translateY(10px);
-  opacity:.98;
-  animation:commSheetIn .22s cubic-bezier(.2,.9,.25,1) both;
+  transform:translateY(0);
+  transition:transform .35s cubic-bezier(.34,1.1,.64,1);
+}
+#commission-cockpit-overlay.comm-overlay:not(.open) .comm-sheet{
+  transform:translateY(100%);
 }
 @keyframes commSheetIn{
-  from{transform:translateY(28px) scale(.985);opacity:0}
-  to{transform:translateY(0) scale(1);opacity:1}
+  from{transform:translateY(32px);opacity:0}
+  to{transform:translateY(0);opacity:1}
 }
 .comm-body{
   transition:opacity .14s ease, transform .14s ease;
@@ -1422,3 +1424,14 @@ flex-wrap:wrap;}
   font-size:10px;font-weight:700;color:rgba(255,255,255,.4);
   text-transform:uppercase;letter-spacing:.04em;margin-top:12px;
 }
+
+/* v313 contrast lift — all cockpit text up */
+#commission-cockpit-overlay .comm-section-title{color:rgba(225,238,255,.92) !important;font-weight:800 !important}
+#commission-cockpit-overlay .comm-component-title{color:#fff !important;font-size:13px !important;font-weight:900 !important}
+#commission-cockpit-overlay .comm-plan-note{color:rgba(188,215,255,.62) !important}
+#commission-cockpit-overlay .comm-rule-item-name{color:rgba(225,238,255,.92) !important;font-weight:800 !important}
+#commission-cockpit-overlay .comm-rule-item-meta{color:rgba(188,215,255,.55) !important}
+#commission-cockpit-overlay .comm-rule-group-title{color:rgba(225,238,255,.80) !important;font-weight:800 !important}
+#commission-cockpit-overlay label{color:rgba(188,215,255,.82) !important}
+#commission-cockpit-overlay .comm-formula-note{color:rgba(188,215,255,.68) !important}
+#commission-cockpit-overlay .comm-empty{color:rgba(188,215,255,.55) !important}
