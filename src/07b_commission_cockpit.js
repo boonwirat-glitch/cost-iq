@@ -764,7 +764,7 @@ function renderCommLockStep(body) {
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
   const ready = rows.length > 0 && pending === 0;
   if (_commLockSubtab === 'retroactive') {
-    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div>` + _commRenderRetroactiveSection();
+    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div><div class="comm-lock-subtabs"><button class="comm-lock-subtab" onclick="_commLockSubtab='current';renderCommissionCockpit()">เดือนนี้</button><button class="comm-lock-subtab active">Retroactive</button></div></div>` + _commRenderRetroactiveSection();
     return;
   }
   body.innerHTML = `
@@ -1679,8 +1679,7 @@ function _commRenderRetroactiveSection() {
     ? '<div style="margin-top:8px">' + tRows2 + '</div>'
     : '<div class="comm-empty">ยังไม่มี snapshot — กด Compute draft</div>';
 
-  return subtabHtml
-    + '<div class="comm-section-title" style="margin-top:4px"><span>Retroactive Lock</span><em>ล็อคย้อนหลังสำหรับเดือนที่ผ่านไปแล้ว</em></div>'
+  return '<div class="comm-section-title" style="margin-top:4px"><span>Retroactive Lock</span><em>ล็อคย้อนหลังสำหรับเดือนที่ผ่านไปแล้ว</em></div>'
     + '<div class="comm-card" style="padding:14px 16px;margin-bottom:8px">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
     + '<label style="font-size:11px;color:rgba(188,215,255,.75);white-space:nowrap">Period</label>'
