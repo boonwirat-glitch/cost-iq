@@ -572,24 +572,22 @@ const CI = (() => {
   const _INTEL_SYS = `คุณคือ customer intelligence analyst ตอบ JSON เท่านั้น: {"buyer_type":"price|relationship|value|convenience","buyer_icon":"🤝|💰|💎|⚡","buyer_evidence":"...","pain_points":[{"dimension":"Quality|Price|Delivery|Product|Completeness|Expansion|Credit","severity":"high|medium|opportunity","summary":"..."}],"next_actions":[{"action":"...","owner":"KAM|TL","urgency":"3_days|this_week|next_visit"}]}`;
 
   async function _analyzeSkills(text) {
-    const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 2000);
+    const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 4000);
     const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
-    // find last complete JSON object
-    const start = txt.indexOf('{');
-    const end = txt.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('no JSON in response');
-    return JSON.parse(txt.slice(start, end+1));
+    console.log('[CI skills]', txt.substring(0,300));
+    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0,80));
+    return JSON.parse(txt.slice(s, e+1));
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
-    const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 2000);
+    const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 4000);
     const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
-    // find last complete JSON object
-    const start = txt.indexOf('{');
-    const end = txt.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('no JSON in response');
-    return JSON.parse(txt.slice(start, end+1));
+    console.log('[CI intel]', txt.substring(0,300));
+    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0,80));
+    return JSON.parse(txt.slice(s, e+1));
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
