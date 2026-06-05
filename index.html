@@ -1,4 +1,4 @@
-<!-- Freshket Sense 312: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 313: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '312',
+      version: '313',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -26536,21 +26536,33 @@ flex-wrap:wrap;}
 }
 
 
-/* v209f Commission Cockpit shell repair */
+/* v313 Commission Cockpit shell — responsive positioning */
 #commission-cockpit-overlay.comm-overlay{
-  align-items:center !important;
+  align-items:flex-end !important;
   justify-content:center !important;
-  padding:18px 0 !important;
+  padding:0 !important;
   box-sizing:border-box !important;
+}
+@media(min-width:601px){
+  #commission-cockpit-overlay.comm-overlay{
+    align-items:center !important;
+    padding:20px 0 !important;
+  }
 }
 #commission-cockpit-overlay .comm-sheet{
   position:relative !important;
-  width:min(100vw - 24px, 430px) !important;
-  max-width:430px !important;
-  height:min(86vh, 760px) !important;
-  max-height:760px !important;
-  border-radius:22px !important;
+  width:100% !important;
+  max-width:480px !important;
+  height:min(88vh,800px) !important;
+  max-height:800px !important;
+  border-radius:22px 22px 0 0 !important;
   overflow:hidden !important;
+}
+@media(min-width:601px){
+  #commission-cockpit-overlay .comm-sheet{
+    border-radius:22px !important;
+    width:min(calc(100vw - 32px),480px) !important;
+  }
 }
 #commission-cockpit-overlay .comm-head{
   padding:14px 16px 10px !important;
@@ -26583,11 +26595,12 @@ flex-wrap:wrap;}
   right:0 !important;
   bottom:0 !important;
   width:100% !important;
-  padding:10px 12px 12px !important;
+  padding:10px 12px max(12px,env(safe-area-inset-bottom)) !important;
   box-sizing:border-box !important;
   display:grid !important;
-  grid-template-columns:72px 1fr !important;
+  grid-template-columns:auto auto 1fr !important;
   gap:8px !important;
+  background:linear-gradient(180deg,rgba(13,28,52,0),#0d1c34 28%) !important;
 }
 #commission-cockpit-overlay .comm-secondary,
 #commission-cockpit-overlay .comm-save{
@@ -28717,7 +28730,10 @@ function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 }
 function _commPendingCount() {
-  return Object.keys(_commRulePending || {}).length + Object.keys(_commAssignmentPending || {}).length + Object.keys(_nrrGovPending || {}).length;
+  return Object.keys(_commRulePending || {}).length
+       + Object.keys(_commAssignmentPending || {}).length
+       + Object.keys(_nrrGovPending || {}).length
+       + Object.keys((typeof _commComponentPending !== 'undefined' ? _commComponentPending : {})).length;
 }
 function _commHasPendingChanges() {
   return _commPendingCount() > 0;
@@ -30071,107 +30087,79 @@ function renderCommAssignmentStep(body) {
 // Reads/writes to commission_rules params jsonb via _commGetConfig
 // UI uses the same _commRuleConfig cache; on save calls saveCommissionComponentRates()
 function _renderComponentRatesEditor() {
-  const cfg = (k, p, def) => {
-    try {
-      const v = _commGetConfig(k, p, def);
-      return v !== null && v !== undefined ? v : def;
-    } catch(e) { return def; }
-  };
-  // unit types: 'pct-d' = decimal rate (0.03→display 3, save ÷100)
-  //             'pct-i' = integer percent (95→display 95, save as-is)
-  //             'mul'   = multiplier/cap (0.70→display 0.70, save as-is)
-  //             '฿'     = baht amount (2500→display 2500, save as-is)
-  const fld = (label, metricCode, param, defaultVal, step, unit) => {
-    const v = cfg(metricCode, param, defaultVal);
-    const isDecimalPct = unit === 'pct-d';
-    const display = isDecimalPct ? (Math.round(v * 10000) / 100) : v;
-    const unitLabel = isDecimalPct ? '%' : unit === 'pct-i' ? '%' : unit === 'mul' ? '×' : (unit || '฿');
-    const saveExpr = isDecimalPct ? 'this.value/100' : 'Number(this.value)';
-    return `<div class="comm-field">
-      <label>${_commEscapeHtml(label)}</label>
-      <div style="display:flex;align-items:center;gap:6px">
-        <input class="comm-input" style="width:90px" type="number" step="${step||'any'}" value="${display}"
-          oninput="_commSetComponentParam('${metricCode}','${param}',${saveExpr})">
-        <span style="font-size:11px;color:rgba(255,255,255,.5)">${unitLabel}</span>
+  const c = (k,p,d) => { try{ const v=_commGetConfig(k,p,d); return v!=null?v:d; }catch(e){return d;} };
+  const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
+  const fP = n => Math.round(Number(n||0)*100)+'%';
+
+  function rateCard(title, color, fields, note) {
+    const flds = fields.map(([lbl,k,p,def,step,unit]) => {
+      const v = c(k,p,def);
+      const isPctD = unit==='pct-d';
+      const disp = isPctD ? (Math.round(v*10000)/100) : v;
+      const uLbl = isPctD?'%':unit==='pct-i'?'%':unit==='mul'?'×':'฿';
+      const expr = isPctD?'this.value/100':'Number(this.value)';
+      return `<div>
+        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.50);margin-bottom:5px">${lbl}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
+            oninput="_commSetComponentParam('${k}','${p}',${expr});_commMarkChanged()" onfocus="this.style.borderColor='rgba(188,215,255,.35)'" onblur="this.style.borderColor='rgba(188,215,255,.12)'">
+          <span style="font-size:11px;color:rgba(188,215,255,.40);flex-shrink:0">${uLbl}</span>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="border-radius:13px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+        <span style="width:3px;height:16px;border-radius:2px;background:${color};flex-shrink:0"></span>
+        <span style="font-size:12px;font-weight:800;color:rgba(225,238,255,.85)">${title}</span>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${note?'10':'0'}px">${flds}</div>
+      ${note?`<div style="font-size:10px;color:rgba(188,215,255,.42);line-height:1.6;padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px">${note}</div>`:''}
     </div>`;
-  };
-  return `
-    <div class="comm-component-section">
-      <div class="comm-component-title">Upsell SKU</div>
-      <div class="comm-grid2" style="gap:8px">
-        ${fld('P1 rate (item ใหม่ บัญชีนี้)','upsell_sku','p1_rate',0.03,0.005,'pct-d')}
-        ${fld('P3 rate (growth existing item)','upsell_sku','p3_rate',0.03,0.005,'pct-d')}
-        ${fld('P3 growth threshold ×','upsell_sku','p3_threshold_pct',2.00,0.05,'mul')}
-        ${fld('P1 & P3 min GMV (gate)','upsell_sku','p1_min_gmv',5000,100,'฿')}
-        ${fld('P3 min incremental (gate)','upsell_sku','p3_min_incremental',5000,100,'฿')}
-      </div>
-      <div class="comm-formula-note">
-        <b>P1</b>: item ใหม่ที่บัญชีนี้ไม่เคยซื้อ (เดือนก่อน) · GMV ≥ ฿${cfg('upsell_sku','p1_min_gmv',2500).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p1_rate',0.03)*100)}% ทุก outlet<br>
-        <b>P3</b>: item เดิม existing outlet · ยอดปัจจุบัน > baseline × ${cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(2)} AND incremental ≥ ฿${cfg('upsell_sku','p3_min_incremental',5000).toLocaleString('en-US')} · ได้ ${Math.round(cfg('upsell_sku','p3_rate',0.03)*100)}% × incremental
-      </div>
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">Upsell Outlet</div>
-      <div class="comm-grid2" style="gap:8px">
-        ${fld('Rate (outlet ใหม่/comeback)','upsell_outlet','rate',0.015,0.005,'pct-d')}
-      </div>
-      <div class="comm-formula-note">
-        GMV จาก outlet ใหม่/comeback × ${Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10}% · ไม่นับ item ที่ได้ P1 ไปแล้ว
-      </div>
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">Handover Retention</div>
-      <div class="comm-grid2" style="gap:8px">
-        ${fld('Tier 2 retention threshold','handover','tier2_pct',100,5,'pct-i')}
-        ${fld('Tier 3 retention threshold','handover','tier3_pct',120,5,'pct-i')}
-        ${fld('Tier 2 payout','handover','tier2_payout',2500,500,'฿')}
-        ${fld('Tier 3 bonus (เพิ่มเติมจาก T2)','handover','tier3_bonus',2500,500,'฿')}
-      </div>
-      <div class="comm-formula-note">
-        retention = (perf_gmv ÷ days_perf) ÷ (baseline_gmv ÷ days_baseline) × 100 · Sales→KAM เท่านั้น · วัดเดือน M+1 หลังโอน · Tier 1 &lt;${cfg('handover','tier2_pct',100)}% = ฿0 · Tier 2 ≥${cfg('handover','tier2_pct',100)}% = ฿${Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')} · Tier 3 ≥${cfg('handover','tier3_pct',120)}% = ฿${Number(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500)).toLocaleString('en-US')} รวม
-      </div>
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">GMV Gate (KAM only)</div>
-      <div class="comm-grid2" style="gap:8px">
-        ${fld('Threshold 1 — ไม่มี cap เมื่อ ≥ (%)','gmv_gate','threshold_1',95,1,'pct-i')}
-        ${fld('Cap 1 — เมื่อต่ำกว่า T1 (×)','gmv_gate','cap_1',0.70,0.05,'mul')}
-        ${fld('Threshold 2 (%)','gmv_gate','threshold_2',90,1,'pct-i')}
-        ${fld('Cap 2 — เมื่อต่ำกว่า T2 (×)','gmv_gate','cap_2',0.35,0.05,'mul')}
-      </div>
-      <div class="comm-formula-note">
-        ≥${cfg('gmv_gate','threshold_1',95)}% → ×1.0 (ไม่มี cap) · ${cfg('gmv_gate','threshold_2',90)}–${cfg('gmv_gate','threshold_1',95)}% → ×${cfg('gmv_gate','cap_1',0.70)} · &lt;${cfg('gmv_gate','threshold_2',90)}% → ×${cfg('gmv_gate','cap_2',0.35)}<br>
-        ใช้กับ (NRR + Upsell SKU + Upsell Outlet + Handover) รวมก่อน × gate
-      </div>
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">KAM NRR Tiers</div>
-      <div class="comm-plan-note" style="margin:0 0 10px">แก้ tier โดยตรงใน Rule Library (Step 3 → Edit selected rule) เพื่อ precision สูงสุด · ด้านล่างนี้แสดง tier ของทุก active KAM plan</div>
-      ${_renderKamNrrTierSummary()}
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">TL NRR Tiers</div>
-      <div class="comm-plan-note" style="margin:0 0 10px">แก้ tier ใน Rule Library (Step 3) · ด้านล่างแสดง tier ของทุก active TL plan</div>
-      ${_renderTlNrrTierSummary()}
-    </div>
-    <div class="comm-component-section" style="margin-top:14px">
-      <div class="comm-component-title">TL Upsell Multiplier Tiers</div>
-      <div class="comm-tier-helper"><span>Upsell %</span><strong>= Σ(P1+P3 incr) ÷ Team NRR baseline</strong></div>
-      <div class="comm-table-lite comm-tier-table" style="margin-top:8px">
-        <div class="comm-tier-row head"><div>Min upsell %</div><div>Max upsell %</div><div>Multiplier ×</div><div></div></div>
-        ${_renderTlUpsellTierRows()}
-      </div>
-      <button class="comm-add" onclick="_commAddTlUpsellTier()">+ เพิ่ม tier</button>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="comm-save" onclick="saveCommissionComponentRates()">Save rates</button>
-      <div class="comm-plan-note" style="margin:0;align-self:center">ค่าเหล่านี้ใช้ทันทีหลัง save และกระทบ commission ของทุกคน</div>
-    </div>`;
+  }
+
+  const p1r = c('upsell_sku','p1_rate',0.03); const p3r = c('upsell_sku','p3_rate',0.03);
+  const p3t = c('upsell_sku','p3_threshold_pct',2.00); const p1mg = c('upsell_sku','p1_min_gmv',5000);
+  const p3mi = c('upsell_sku','p3_min_incremental',8000);
+  const outr = c('upsell_outlet','rate',0.015);
+  const ht2 = c('handover','tier2_pct',100); const ht3 = c('handover','tier3_pct',120);
+  const ht2p = c('handover','tier2_payout',2500); const ht3b = c('handover','tier3_bonus',2500);
+  const gt1 = c('gmv_gate','threshold_1',95); const gt2 = c('gmv_gate','threshold_2',90);
+  const gc1 = c('gmv_gate','cap_1',0.70); const gc2 = c('gmv_gate','cap_2',0.35);
+
+  return rateCard('สินค้าใหม่ + ยอดเติบโต (P1 / P3)', '#ffe08a', [
+      ['P1 rate — กลุ่มสินค้าใหม่','upsell_sku','p1_rate',0.03,0.005,'pct-d'],
+      ['P1 min GMV ต่อกลุ่มสินค้า','upsell_sku','p1_min_gmv',5000,100,'฿'],
+      ['P3 rate — ยอดเติบโต','upsell_sku','p3_rate',0.03,0.005,'pct-d'],
+      ['P3 threshold (เติบโตกี่เท่า)','upsell_sku','p3_threshold_pct',2.00,0.05,'mul'],
+      ['P3 min incremental','upsell_sku','p3_min_incremental',8000,100,'฿'],
+    ],
+    `P1: กลุ่มสินค้าที่ outlet ไม่เคยซื้อมาก่อน → GMV ≥ ${fB(p1mg)} → ได้ ${fP(p1r)} · P3: กลุ่มที่เคยซื้อแล้ว ยอดโตเกิน ${p3t}× baseline และ incremental ≥ ${fB(p3mi)} → ได้ ${fP(p3r)} × incremental`
+  )
+  + rateCard('Expansion (สาขาใหม่)', '#00c8b0', [
+      ['Expansion rate','upsell_outlet','rate',0.015,0.005,'pct-d'],
+    ],
+    `outlet ที่ไม่เคยซื้อมาก่อนเลย (first purchase date) → GMV ทั้งหมด × ${Math.round(outr*1000)/10}% · ไม่แบ่ง P1/P3`
+  )
+  + rateCard('Handover (Sales → KAM)', '#bcd7ff', [
+      ['Retention เกณฑ์ tier 1 (%)','handover','tier2_pct',100,5,'pct-i'],
+      ['ได้รับ tier 1 (฿)','handover','tier2_payout',2500,500,'฿'],
+      ['Retention เกณฑ์ tier 2 (%)','handover','tier3_pct',120,5,'pct-i'],
+      ['ได้รับ tier 2 รวม (฿)','handover','tier3_bonus',2500,500,'฿'],
+    ],
+    `Retention < ${ht2}% = ฿0 · ≥ ${ht2}% = ${fB(ht2p)} · ≥ ${ht3}% = ${fB(ht2p+ht3b)} รวม`
+  )
+  + rateCard('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.80)', [
+      ['เกณฑ์ผ่าน full (%)','gmv_gate','threshold_1',95,1,'pct-i'],
+      ['Cap เมื่อต่ำกว่าเกณฑ์ผ่าน','gmv_gate','cap_1',0.70,0.05,'mul'],
+      ['เกณฑ์ขั้นต่ำ (%)','gmv_gate','threshold_2',90,1,'pct-i'],
+      ['Cap เมื่อต่ำมาก','gmv_gate','cap_2',0.35,0.05,'mul'],
+    ],
+    `≥ ${gt1}% = ×1.00 · ${gt2}–${gt1}% = ×${gc1} · < ${gt2}% = ×${gc2} · คูณกับยอดรวมทั้งหมดก่อน lock`
+  );
 }
 
+
 function _renderTlUpsellTierRows() {
-  // Read tiers from _commRuleConfig.rules.tl_upsell_mult[0].tiers or use defaults
   let tiers = [];
   try {
     const rules = _commRuleConfig && _commRuleConfig.rules && _commRuleConfig.rules['tl_upsell_mult'];
@@ -30184,103 +30172,47 @@ function _renderTlUpsellTierRows() {
     {min_pct:4,max_pct:4.99,multiplier:1.50},
     {min_pct:5,max_pct:null,multiplier:1.80}
   ];
-  return tiers.map((t,i) => `<div class="comm-tier-row">
-    <input class="comm-input comm-tier-min" value="${t.min_pct ?? ''}" placeholder="-" inputmode="decimal"
-      oninput="_commSetTlUpsellTier(${i},'min_pct',this.value)">
-    <input class="comm-input comm-tier-max" value="${t.max_pct ?? ''}" placeholder="∞" inputmode="decimal"
-      oninput="_commSetTlUpsellTier(${i},'max_pct',this.value)">
-    <input class="comm-input comm-tier-payout" value="${t.multiplier ?? 1.0}" placeholder="1.0" inputmode="decimal"
-      oninput="_commSetTlUpsellTier(${i},'multiplier',this.value)">
-    <button class="comm-del" onclick="_commRemoveTlUpsellTier(${i})">×</button>
-  </div>`).join('');
+  const fmtMult = v => Number(v||1).toFixed(2)+'×';
+  return tiers.map((t,i) => {
+    const minV = t.min_pct != null ? Number(t.min_pct) : null;
+    const maxV = t.max_pct != null ? Number(t.max_pct) : null;
+    const mult = Number(t.multiplier || 1.0);
+    const isBase = mult <= 1.0;
+    const accentColor = isBase ? 'rgba(188,215,255,.30)' : mult >= 1.5 ? '#4ddc97' : '#ffe08a';
+    const prevTxt = minV != null && maxV != null ? `Upsell ${minV}–${maxV}%`
+                  : minV != null ? `Upsell ≥ ${minV}%` : `Upsell < ${maxV}%`;
+    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="width:3px;height:14px;border-radius:2px;background:${accentColor};flex-shrink:0"></span>
+          <span style="font-size:11px;font-weight:800;color:rgba(225,238,255,.75)">${prevTxt} → ${fmtMult(mult)}</span>
+        </div>
+        <button onclick="_commRemoveTlUpsellTier(${i})" style="font-size:14px;color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 5px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+            value="${minV ?? ''}" placeholder="0" inputmode="decimal"
+            oninput="_commSetTlUpsellTier(${i},'min_pct',this.value);_commMarkChanged()">
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+            value="${maxV ?? ''}" placeholder="∞" inputmode="decimal"
+            oninput="_commSetTlUpsellTier(${i},'max_pct',this.value);_commMarkChanged()">
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">Multiplier ×</div>
+          <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:8px;padding:8px 9px;color:#ffe08a;font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+            value="${mult}" placeholder="1.0" inputmode="decimal"
+            oninput="_commSetTlUpsellTier(${i},'multiplier',this.value);_commMarkChanged()">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function _renderNrrTierReadonlyRows(planCode, role) {
-  const d = _commGetDraftByCode(planCode, role);
-  const tiers = (d && d.tiers) || [];
-  if (!tiers.length) return '<div class="comm-empty" style="padding:8px 0">ไม่มี tier</div>';
-  return tiers.map(t => {
-    const minV = t.min_value != null ? Number(t.min_value) : null;
-    const maxV = t.max_value != null ? Number(t.max_value) : null;
-    const pay  = Number(t.payout_value || 0);
-    const label = minV != null && maxV != null ? (minV+'%–'+maxV+'%')
-                : minV != null ? ('≥ '+minV+'%')
-                : maxV != null ? ('< '+maxV+'%') : 'ทุกช่วง';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:rgba(188,215,255,.04);border:1px solid rgba(188,215,255,.09);margin-bottom:4px">
-      <span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.75)">NRR ${label}</span>
-      <span style="font-size:12px;font-weight:900;color:${pay>0?'#ffe08a':'rgba(225,238,255,.30)'};font-family:'IBM Plex Mono',monospace">${pay?'฿'+pay.toLocaleString('en-US'):'฿0'}</span>
-    </div>`;
-  }).join('');
-}
-function _renderKamNrrTierSummary() {
-  const plans = _commRulesForRole('kam', { activeOnly: true });
-  if (!plans.length) return '<div class="comm-empty">ไม่มี KAM plan — สร้างใน Rule Library</div>';
-  return plans.map(p => {
-    const usedCount = _commRuleUsageCount(p.plan_code);
-    return `<div class="comm-card" style="margin-bottom:10px;padding:12px 14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div>
-          <div style="font-size:12px;font-weight:800;color:rgba(225,238,255,.88)">${_commEscapeHtml(p.plan_name || p.plan_code)}</div>
-          <div style="font-size:10px;color:rgba(188,215,255,.50);margin-top:1px">${p.plan_code} · ใช้อยู่ ${usedCount} คน</div>
-        </div>
-        <button class="comm-create-rule-btn" style="font-size:10px;padding:4px 8px" onclick="_commSelectedRuleCode='${p.plan_code}';switchCommissionStep('rules')">แก้ไข</button>
-      </div>
-      ${_renderNrrTierReadonlyRows(p.plan_code, 'kam')}
-    </div>`;
-  }).join('');
-}
-function _renderTlNrrTierSummary() {
-  const plans = _commRulesForRole('tl', { activeOnly: true });
-  if (!plans.length) return '<div class="comm-empty">ไม่มี TL plan — สร้างใน Rule Library</div>';
-  return plans.map(p => {
-    const usedCount = _commRuleUsageCount(p.plan_code);
-    return `<div class="comm-card" style="margin-bottom:10px;padding:12px 14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div>
-          <div style="font-size:12px;font-weight:800;color:rgba(225,238,255,.88)">${_commEscapeHtml(p.plan_name || p.plan_code)}</div>
-          <div style="font-size:10px;color:rgba(188,215,255,.50);margin-top:1px">${p.plan_code} · ใช้อยู่ ${usedCount} คน</div>
-        </div>
-        <button class="comm-create-rule-btn" style="font-size:10px;padding:4px 8px" onclick="_commSelectedRuleCode='${p.plan_code}';switchCommissionStep('rules')">แก้ไข</button>
-      </div>
-      ${_renderNrrTierReadonlyRows(p.plan_code, 'tl')}
-    </div>`;
-  }).join('');
-}
-window._renderKamNrrTierSummary = _renderKamNrrTierSummary;
-window._renderTlNrrTierSummary  = _renderTlNrrTierSummary;
-
-// In-memory staging for component params (flushed on saveCommissionComponentRates)
-let _commComponentPending = {};
-function _commSetComponentParam(metricCode, param, value) {
-  if (!_commComponentPending[metricCode]) _commComponentPending[metricCode] = {};
-  _commComponentPending[metricCode][param] = Number(value);
-  _commMarkChanged();
-}
-function _commAddTlUpsellTier() {
-  try {
-    const rules = _commRuleConfig.rules || {};
-    if (!rules.tl_upsell_mult) rules.tl_upsell_mult = [{ tiers:[] }];
-    if (!rules.tl_upsell_mult[0].tiers) rules.tl_upsell_mult[0].tiers = [];
-    rules.tl_upsell_mult[0].tiers.push({min_pct:null,max_pct:null,multiplier:1.0});
-    _commMarkChanged();
-    renderCommissionCockpit();
-  } catch(e) {}
-}
-function _commRemoveTlUpsellTier(idx) {
-  try {
-    _commRuleConfig.rules.tl_upsell_mult[0].tiers.splice(idx, 1);
-    _commMarkChanged();
-    renderCommissionCockpit();
-  } catch(e) {}
-}
-function _commSetTlUpsellTier(idx, field, value) {
-  try {
-    const t = _commRuleConfig.rules.tl_upsell_mult[0].tiers[idx];
-    if (!t) return;
-    t[field] = value === '' ? null : Number(value);
-    _commMarkChanged();
-  } catch(e) {}
-}
 
 async function saveCommissionComponentRates() {
   if (!Object.keys(_commComponentPending).length) {
@@ -30374,39 +30306,91 @@ function _renderCommRuleEditorByCode(planCode, role) {
   const used = _commRuleUsageCount(planCode);
   const isStandard = planCode === _commPlanCode(role);
   const err = (_commValidationErrors || {})[planCode] || {};
-  const generalErr = err.general ? `<div class="comm-inline-error">${_commEscapeHtml(err.general)}</div>` : '';
-  return `<div class="comm-card comm-rule-editor-card ${Object.keys(err).length?'dirty':''}">
-    <div class="comm-rule-editor-head"><div><div class="comm-name">${_commEscapeHtml(d.plan_name || planCode)}${_commRulePending[planCode]?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">${_commEscapeHtml(d.plan_code)} · ${_commEscapeHtml(d.measurement_scope || 'governed_nrr')} · Used by ${used}</div></div><span class="comm-badge ok">Governed NRR</span></div>
+  const tiers = (d && d.tiers) || [];
+  const isTl = role === 'tl';
+  const accentColor = isTl ? '#c084fc' : '#4ddc97';
+
+  // Try to get current NRR for "ตอนนี้" indicator
+  let currNrr = null;
+  try {
+    if (isTl && typeof _commBuildTlPayout === 'function') {
+      const email = currentUserProfile && currentUserProfile.email;
+      const r = _commBuildTlPayout(email); currNrr = r ? r.nrr_pct : null;
+    }
+  } catch(e) {}
+
+  const tierCards = tiers.map((t,i) => {
+    const minV = t.min_value != null ? Number(t.min_value) : null;
+    const maxV = t.max_value != null ? Number(t.max_value) : null;
+    const pay  = Number(t.payout_value || 0);
+    const te = (err.tiers || {})[i] || {};
+    const isCurr = currNrr != null
+      && (minV == null || currNrr >= minV)
+      && (maxV == null || currNrr < maxV);
+
+    const pillCls = pay === 0 ? `background:rgba(255,107,61,.12);color:rgba(255,107,61,.80);border:1px solid rgba(255,107,61,.22)`
+                  : isCurr    ? `background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)`
+                  : pay >= 30000 ? `background:rgba(77,220,151,.10);color:#4ddc97;border:1px solid rgba(77,220,151,.22)`
+                  : `background:rgba(188,215,255,.08);color:rgba(188,215,255,.60);border:1px solid rgba(188,215,255,.14)`;
+    const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : isCurr ? `Tier ${i+1} — ตอนนี้` : `Tier ${i+1}`;
+
+    const rangeStr = minV != null && maxV != null ? `${minV}–${maxV}%`
+                   : minV != null ? `≥ ${minV}%` : maxV != null ? `< ${maxV}%` : '';
+    const prevLbl = pay ? `฿${Math.round(pay).toLocaleString('en-US')}` : '฿0';
+
+    const borderStyle = isCurr ? 'border:1.5px solid rgba(255,224,138,.28);background:rgba(255,224,138,.04)'
+                      : pay === 0 ? 'border:1px solid rgba(255,107,61,.15);background:rgba(255,80,60,.03)'
+                      : 'border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025)';
+
+    const inputBase = 'width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none';
+    const inputPay  = 'width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.20);border-radius:9px;padding:9px 11px;color:#ffe08a;font-size:13px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none';
+
+    const previewColor = pay === 0 ? 'rgba(255,107,61,.70)' : isCurr ? '#ffe08a' : pay >= 30000 ? '#4ddc97' : 'rgba(225,238,255,.65)';
+    const borderAccent = pay === 0 ? 'rgba(255,107,61,.40)' : isCurr ? 'rgba(255,224,138,.50)' : pay >= 30000 ? 'rgba(77,220,151,.40)' : 'rgba(188,215,255,.20)';
+
+    return `<div style="${borderStyle};border-radius:13px;padding:13px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+        <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;${pillCls}">${_commEscapeHtml(pillLbl)}</span>
+        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:15px;color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 6px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:${pay===0?'1fr 1fr':'1fr 1fr'};gap:8px;margin-bottom:8px">
+        ${minV !== null || pay !== 0 || i > 0 ? `<div><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">NRR ตั้งแต่ (%)</div>
+          <input style="${inputBase}${te.range?';border-color:rgba(255,107,61,.50)':''}" value="${t.min_value ?? ''}" placeholder="—"
+            inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)"></div>` : `<div></div>`}
+        <div><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">${pay===0?'NRR ต่ำกว่า (%)':'ถึง (%) — ว่าง=∞'}</div>
+          <input style="${inputBase}${te.range?';border-color:rgba(255,107,61,.50)':''}" value="${t.max_value ?? ''}" placeholder="∞"
+            inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)"></div>
+      </div>
+      <div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">ได้รับ (฿)</div>
+        <input style="${inputPay}${te.payout?';border-color:rgba(255,107,61,.50)':''}" value="${pay}"
+          inputmode="numeric" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)"></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:rgba(0,0,0,.20);border-left:2px solid ${borderAccent}">
+        <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(188,215,255,.45)">
+          NRR ${rangeStr} → <span style="font-weight:800;color:${previewColor}">${prevLbl}</span>
+        </span>
+      </div>
+      ${te.range||te.payout ? `<div style="font-size:10px;color:rgba(255,107,61,.80);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const generalErr = err.general ? `<div style="font-size:11px;color:rgba(255,107,61,.85);padding:8px 10px;background:rgba(255,80,60,.08);border-radius:8px;margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
+
+  return `<div style="border-radius:14px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.02);padding:14px;margin-bottom:8px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px">
+      <div>
+        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.15);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:220px" value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
+        ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px">Unsaved</span>':''}
+        <div style="font-size:10px;color:rgba(188,215,255,.40);font-family:\'IBM Plex Mono\',monospace;margin-top:4px">${planCode} · ใช้อยู่ ${used} คน</div>
+      </div>
+      <button onclick="archiveCommissionRule('${planCode}')" ${isStandard?'disabled title="Standard rule ลบไม่ได้"':''} style="font-size:10px;color:${isStandard?'rgba(188,215,255,.20)':'rgba(255,107,61,.55)'};background:none;border:1px solid ${isStandard?'rgba(188,215,255,.08)':'rgba(255,107,61,.20)'};border-radius:7px;padding:5px 9px;cursor:${isStandard?'default':'pointer'}">Archive</button>
+    </div>
     ${generalErr}
-    <div class="comm-grid2">
-      <div class="comm-field"><label>Rule name</label><input class="comm-input ${err.name?'invalid':''}" value="${_commEscapeHtml(d.plan_name||'')}" placeholder="เช่น KAM NRR Stretch Q3" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">${err.name?`<div class="comm-inline-error">${_commEscapeHtml(err.name)}</div>`:''}</div>
-      <div class="comm-field"><label>Payout type</label><select class="comm-select" onchange="onRuleHeaderInput('${planCode}','payout_type',this.value)">
-        <option value="flat_amount" ${d.payout_type==='flat_amount'?'selected':''}>Flat amount</option>
-        <option value="bonus_amount" ${d.payout_type==='bonus_amount'?'selected':''}>Bonus amount</option>
-      </select></div>
-    </div>
-    <div class="comm-tier-helper"><span>Rule logic</span><strong>Min ≤ Governed NRR &lt; Max</strong><em>ปล่อย Min/Max ว่างได้สำหรับ open-ended tier</em></div>
-    <div class="comm-table-lite comm-tier-table" style="margin-top:10px">
-      <div class="comm-tier-row head"><div>Min</div><div>Max</div><div>Payout</div><div>Label</div><div></div></div>
-      ${(d.tiers||[]).map((t,i)=>{
-        const te = (err.tiers || {})[i] || {};
-        return `<div class="comm-tier-row ${Object.keys(te).length?'rule-tier-invalid':''}">
-          <input class="comm-input comm-tier-min ${te.range?'invalid':''}" value="${t.min_value ?? ''}" placeholder="-" inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)">
-          <input class="comm-input comm-tier-max ${te.range?'invalid':''}" value="${t.max_value ?? ''}" placeholder="∞" inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">
-          <input class="comm-input comm-tier-payout ${te.payout?'invalid':''}" value="${t.payout_value ?? 0}" placeholder="0" inputmode="numeric" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
-          <input class="comm-input comm-tier-label" value="${_commEscapeHtml(t.payout_label || '')}" placeholder="Label" oninput="onRuleTierInput('${planCode}',${i},'payout_label',this.value)">
-          <button class="comm-del" onclick="removeRuleTier('${planCode}',${i})">×</button>
-          ${(te.range||te.payout)?`<div class="comm-inline-error" style="grid-column:1 / -1">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
-        </div>`;
-      }).join('')}
-    </div>
-    <button class="comm-add" onclick="addRuleTier('${planCode}')">+ เพิ่ม tier</button>
-    <div class="comm-rule-editor-actions">
-      <button class="comm-archive-rule-btn" ${isStandard?'disabled title="Standard rule cannot be archived"':''} onclick="archiveCommissionRule('${planCode}')">Archive rule</button>
-    </div>
-    <div class="comm-plan-note">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ rule นี้ใน Step 2 · Archive จะเปลี่ยน status เป็น inactive ไม่ลบข้อมูลย้อนหลัง</div>
+    ${tierCards}
+    <button class="comm-add" onclick="addRuleTier('${planCode}')" style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.04);border:1px dashed rgba(188,215,255,.16);color:rgba(188,215,255,.50);font-size:11px;font-weight:700;cursor:pointer;margin-top:2px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif">+ เพิ่ม tier</button>
+    <div style="font-size:10px;color:rgba(188,215,255,.30);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer</div>
   </div>`;
 }
+
 function onRuleHeaderInput(planCode, field, value) {
   const d = _commGetDraftByCode(planCode);
   d[field] = value;
