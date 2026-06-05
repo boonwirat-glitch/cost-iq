@@ -272,15 +272,20 @@ const CI = (() => {
 .mb-7{margin-bottom:28px;}
 /* CI sheet overrides — scope inside #ci-fullsheet */
 #ci-fullsheet {
-  position:fixed;inset:0;z-index:9999;
+  position:fixed;
+  top:0;bottom:0;
+  left:50%;
+  width:100%;max-width:430px;
+  transform:translateX(-50%) translateY(100%);
+  z-index:9999;
   background:var(--n-50,#F2F2F7);
   font-family:'DM Sans',-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
-  transform:translateY(100%);
   transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden;
 }
-#ci-fullsheet.ci-open { transform:translateY(0); }
+#ci-fullsheet.ci-open { transform:translateX(-50%) translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
 #ci-fullsheet .scr.on { display:flex; }
 `;
