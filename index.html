@@ -1,4 +1,4 @@
-<!-- Freshket Sense v252: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v253: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v252',
+      version: 'v253',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -36334,13 +36334,19 @@ const CI = (() => {
 
   async function _analyzeSkills(text) {
     const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 2000);
-    return JSON.parse((raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,''));
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
+    // extract first { } or [ ] block in case model adds preamble
+    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
+    return JSON.parse(m ? m[1] : txt);
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
     const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 2000);
-    return JSON.parse((raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,''));
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
+    // extract first { } or [ ] block in case model adds preamble
+    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
+    return JSON.parse(m ? m[1] : txt);
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
