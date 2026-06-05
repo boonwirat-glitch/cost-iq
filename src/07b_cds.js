@@ -2307,26 +2307,28 @@ function openCommissionRulebook() {
   // Render NRR tier table from live plan
   function renderNrrTierTable(tiers, currentPct, color) {
     if (!tiers || !tiers.length) return '<div style="font-size:11px;color:rgba(188,215,255,.40);padding:8px 0">ไม่มีข้อมูล tier</div>';
-    var html = '';
+    var html = '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:4px">';
     tiers.forEach(function(t) {
       var minV = t.min_value != null ? Number(t.min_value) : null;
       var maxV = t.max_value != null ? Number(t.max_value) : null;
       var pay  = Number(t.payout_value || 0);
-      var label = minV != null && maxV != null ? (minV+'%–'+maxV+'%')
-                : minV != null ? ('≥ '+minV+'%')
-                : maxV != null ? ('< '+maxV+'%') : 'ทุกช่วง';
+      var label = minV != null && maxV != null ? ('NRR '+minV+'%–'+maxV+'%')
+                : minV != null ? ('NRR ≥ '+minV+'%')
+                : maxV != null ? ('NRR < '+maxV+'%') : 'ทุกช่วง';
       var isCurr = currentPct != null
         && (minV == null || currentPct >= minV)
         && (maxV == null || currentPct < maxV);
-      var rowBg   = isCurr ? 'background:rgba(255,224,138,.07);' : '';
-      var lblClr  = isCurr ? '#ffe08a' : 'rgba(225,238,255,.70)';
-      var payClr  = pay > 0 ? (isCurr ? '#ffe08a' : color||'rgba(225,238,255,.80)') : 'rgba(225,238,255,.32)';
-      var curr    = isCurr ? ' <span style="font-size:9px;color:rgba(255,224,138,.70);font-family:\'IBM Plex Mono\',monospace"> ← ตอนนี้</span>' : '';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(188,215,255,.07);'+rowBg+'">'
-        +'<div style="font-size:12px;font-weight:700;color:'+lblClr+'">'+label+curr+'</div>'
-        +'<div style="font-size:13px;font-weight:900;color:'+payClr+';font-family:\'IBM Plex Mono\',monospace">'+(pay?fmtB(pay):'฿0')+'</div>'
+      var border = isCurr ? 'border:1.5px solid rgba(255,224,138,.35);' : 'border:1px solid rgba(188,215,255,.10);';
+      var bg     = isCurr ? 'background:rgba(255,224,138,.07);' : 'background:rgba(188,215,255,.03);';
+      var lblClr = isCurr ? '#ffe08a' : 'rgba(225,238,255,.72)';
+      var payClr = pay > 0 ? (isCurr ? '#ffe08a' : (color||'rgba(225,238,255,.80)')) : 'rgba(225,238,255,.28)';
+      var badge  = isCurr ? '<span style="font-size:9px;font-weight:800;color:rgba(255,224,138,.80);background:rgba(255,224,138,.12);border-radius:5px;padding:1px 6px;font-family:\'IBM Plex Mono\',monospace;margin-left:6px">ตอนนี้</span>' : '';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;'+border+bg+'">'
+        +'<div style="font-size:12px;font-weight:700;color:'+lblClr+'">'+label+badge+'</div>'
+        +'<div style="font-size:14px;font-weight:900;color:'+payClr+';font-family:\'IBM Plex Mono\',monospace">'+(pay?fmtB(pay):'฿0')+'</div>'
         +'</div>';
     });
+    html += '</div>';
     return html;
   }
 
@@ -2407,9 +2409,9 @@ function openCommissionRulebook() {
 
   // Component rates — all roles see this
   html += secHdr('Upsell', '#ffe08a');
-  html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × group_key · min '+p1MinGmv);
+  html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × กลุ่มสินค้า · min '+p1MinGmv);
   html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · โต > '+p3Thresh+'× baseline · min incremental '+p3MinIncr);
-  html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยปรากฏ 6 เดือนย้อนหลัง)');
+  html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
   html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
@@ -2419,13 +2421,16 @@ function openCommissionRulebook() {
   html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');
   html += detailRow('cap ที่ไหน', 'ทุกส่วน (NRR + upsell + handover) คูณก่อน lock');
 
-  // How to calculate — methodology toggle
+  // How to calculate — methodology
   html += '<div style="margin-top:14px;padding:12px;background:rgba(188,215,255,.05);border-radius:10px;border:1px solid rgba(188,215,255,.10)">';
-  html += '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.55);margin-bottom:6px">วิธีคำนวณ NRR</div>';
-  html += '<div style="font-size:11px;color:rgba(225,238,255,.75);line-height:1.7">';
+  html += '<div style="font-size:11px;font-weight:700;color:rgba(188,215,255,.55);margin-bottom:8px">วิธีคำนวณ NRR</div>';
+  html += '<div style="font-size:11px;color:rgba(225,238,255,.75);line-height:1.8">';
   html += 'NRR = (GMV MTD ÷ วันที่ผ่านมา) ÷ (GMV เดือนฐาน ÷ วันในเดือนฐาน)<br>';
-  html += 'cohort = outlet ที่มี GMV ในเดือนฐาน — comeback และ expansion แยกออก ไม่นับใน NRR หลัก<br>';
-  html += 'Transfer In แสดงแยก ไม่นับในยอด commission</div>';
+  html += '<br>';
+  html += '<span style="color:rgba(188,215,255,.60)">cohort (core)</span> = outlet ที่มี GMV เดือนก่อน — ไม่รวม comeback, expansion, Transfer In<br>';
+  html += '<span style="color:rgba(188,215,255,.60)">ไม่นับ Handover</span> = outlet ที่รับโอนจาก Sales เดือนที่แล้ว และเดือนนี้ ถูก exclude จาก cohort หลัก (นับแยกเป็น handover commission)<br>';
+  html += '<span style="color:rgba(188,215,255,.60)">Transfer In</span> = โอนมาจาก KAM อื่น — แสดงแยก ไม่นับใน NRR commission<br>';
+  html += '</div>';
   html += '</div>';
 
   ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0d1c34;border-radius:18px 18px 0 0;max-height:84vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9101;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
