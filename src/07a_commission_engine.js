@@ -1601,7 +1601,10 @@ function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 }
 function _commPendingCount() {
-  return Object.keys(_commRulePending || {}).length + Object.keys(_commAssignmentPending || {}).length + Object.keys(_nrrGovPending || {}).length;
+  return Object.keys(_commRulePending || {}).length
+       + Object.keys(_commAssignmentPending || {}).length
+       + Object.keys(_nrrGovPending || {}).length
+       + Object.keys((typeof _commComponentPending !== 'undefined' ? _commComponentPending : {})).length;
 }
 function _commHasPendingChanges() {
   return _commPendingCount() > 0;
