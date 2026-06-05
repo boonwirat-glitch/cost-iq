@@ -1,4 +1,4 @@
-<!-- Freshket Sense 313: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 314: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '313',
+      version: '314',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -26687,13 +26687,15 @@ flex-wrap:wrap;}
   transition:opacity .18s ease, backdrop-filter .18s ease;
 }
 #commission-cockpit-overlay .comm-sheet{
-  transform:translateY(10px);
-  opacity:.98;
-  animation:commSheetIn .22s cubic-bezier(.2,.9,.25,1) both;
+  transform:translateY(0);
+  transition:transform .35s cubic-bezier(.34,1.1,.64,1);
+}
+#commission-cockpit-overlay.comm-overlay:not(.open) .comm-sheet{
+  transform:translateY(100%);
 }
 @keyframes commSheetIn{
-  from{transform:translateY(28px) scale(.985);opacity:0}
-  to{transform:translateY(0) scale(1);opacity:1}
+  from{transform:translateY(32px);opacity:0}
+  to{transform:translateY(0);opacity:1}
 }
 .comm-body{
   transition:opacity .14s ease, transform .14s ease;
@@ -27095,6 +27097,17 @@ flex-wrap:wrap;}
   font-size:10px;font-weight:700;color:rgba(255,255,255,.4);
   text-transform:uppercase;letter-spacing:.04em;margin-top:12px;
 }
+
+/* v313 contrast lift — all cockpit text up */
+#commission-cockpit-overlay .comm-section-title{color:rgba(225,238,255,.92) !important;font-weight:800 !important}
+#commission-cockpit-overlay .comm-component-title{color:#fff !important;font-size:13px !important;font-weight:900 !important}
+#commission-cockpit-overlay .comm-plan-note{color:rgba(188,215,255,.62) !important}
+#commission-cockpit-overlay .comm-rule-item-name{color:rgba(225,238,255,.92) !important;font-weight:800 !important}
+#commission-cockpit-overlay .comm-rule-item-meta{color:rgba(188,215,255,.55) !important}
+#commission-cockpit-overlay .comm-rule-group-title{color:rgba(225,238,255,.80) !important;font-weight:800 !important}
+#commission-cockpit-overlay label{color:rgba(188,215,255,.82) !important}
+#commission-cockpit-overlay .comm-formula-note{color:rgba(188,215,255,.68) !important}
+#commission-cockpit-overlay .comm-empty{color:rgba(188,215,255,.55) !important}
 </style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
@@ -30099,11 +30112,11 @@ function _renderComponentRatesEditor() {
       const uLbl = isPctD?'%':unit==='pct-i'?'%':unit==='mul'?'×':'฿';
       const expr = isPctD?'this.value/100':'Number(this.value)';
       return `<div>
-        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.50);margin-bottom:5px">${lbl}</div>
+        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:5px">${lbl}</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
             oninput="_commSetComponentParam('${k}','${p}',${expr});_commMarkChanged()" onfocus="this.style.borderColor='rgba(188,215,255,.35)'" onblur="this.style.borderColor='rgba(188,215,255,.12)'">
-          <span style="font-size:11px;color:rgba(188,215,255,.40);flex-shrink:0">${uLbl}</span>
+          <span style="font-size:11px;color:rgba(188,215,255,.60);flex-shrink:0">${uLbl}</span>
         </div>
       </div>`;
     }).join('');
@@ -30113,7 +30126,7 @@ function _renderComponentRatesEditor() {
         <span style="font-size:12px;font-weight:800;color:rgba(225,238,255,.85)">${title}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${note?'10':'0'}px">${flds}</div>
-      ${note?`<div style="font-size:10px;color:rgba(188,215,255,.42);line-height:1.6;padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px">${note}</div>`:''}
+      ${note?`<div style="font-size:10px;color:rgba(188,215,255,.65);line-height:1.6;padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px">${note}</div>`:''}
     </div>`;
   }
 
@@ -30191,19 +30204,19 @@ function _renderTlUpsellTierRows() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
           <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
             value="${minV ?? ''}" placeholder="0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'min_pct',this.value);_commMarkChanged()">
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
           <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
             value="${maxV ?? ''}" placeholder="∞" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'max_pct',this.value);_commMarkChanged()">
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:4px">Multiplier ×</div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Multiplier ×</div>
           <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:8px;padding:8px 9px;color:#ffe08a;font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
             value="${mult}" placeholder="1.0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'multiplier',this.value);_commMarkChanged()">
@@ -30307,87 +30320,79 @@ function _renderCommRuleEditorByCode(planCode, role) {
   const isStandard = planCode === _commPlanCode(role);
   const err = (_commValidationErrors || {})[planCode] || {};
   const tiers = (d && d.tiers) || [];
-  const isTl = role === 'tl';
-  const accentColor = isTl ? '#c084fc' : '#4ddc97';
-
-  // Try to get current NRR for "ตอนนี้" indicator
-  let currNrr = null;
-  try {
-    if (isTl && typeof _commBuildTlPayout === 'function') {
-      const email = currentUserProfile && currentUserProfile.email;
-      const r = _commBuildTlPayout(email); currNrr = r ? r.nrr_pct : null;
-    }
-  } catch(e) {}
 
   const tierCards = tiers.map((t,i) => {
     const minV = t.min_value != null ? Number(t.min_value) : null;
     const maxV = t.max_value != null ? Number(t.max_value) : null;
     const pay  = Number(t.payout_value || 0);
     const te = (err.tiers || {})[i] || {};
-    const isCurr = currNrr != null
-      && (minV == null || currNrr >= minV)
-      && (maxV == null || currNrr < maxV);
 
-    const pillCls = pay === 0 ? `background:rgba(255,107,61,.12);color:rgba(255,107,61,.80);border:1px solid rgba(255,107,61,.22)`
-                  : isCurr    ? `background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)`
-                  : pay >= 30000 ? `background:rgba(77,220,151,.10);color:#4ddc97;border:1px solid rgba(77,220,151,.22)`
-                  : `background:rgba(188,215,255,.08);color:rgba(188,215,255,.60);border:1px solid rgba(188,215,255,.14)`;
-    const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : isCurr ? `Tier ${i+1} — ตอนนี้` : `Tier ${i+1}`;
+    // Pill style by pay value
+    const pillStyle = pay === 0
+      ? 'background:rgba(255,100,60,.18);color:rgba(255,120,80,1);border:1px solid rgba(255,100,60,.35)'
+      : pay >= 30000
+      ? 'background:rgba(77,220,151,.18);color:#4ddc97;border:1px solid rgba(77,220,151,.35)'
+      : 'background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)';
+    const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : `Tier ${i+1}`;
 
-    const rangeStr = minV != null && maxV != null ? `${minV}–${maxV}%`
-                   : minV != null ? `≥ ${minV}%` : maxV != null ? `< ${maxV}%` : '';
-    const prevLbl = pay ? `฿${Math.round(pay).toLocaleString('en-US')}` : '฿0';
+    // Range label
+    const rangeLbl = minV != null && maxV != null ? `${minV}–${maxV}%`
+                   : minV != null ? `≥ ${minV}%` : maxV != null ? `< ${maxV}%` : '—';
+    const payLbl = pay ? '฿'+Math.round(pay).toLocaleString('en-US') : '฿0';
+    const previewColor = pay === 0 ? 'rgba(255,120,80,.85)' : pay >= 30000 ? '#4ddc97' : '#ffe08a';
+    const borderLeft = pay === 0 ? 'rgba(255,100,60,.50)' : pay >= 30000 ? 'rgba(77,220,151,.50)' : 'rgba(255,224,138,.40)';
 
-    const borderStyle = isCurr ? 'border:1.5px solid rgba(255,224,138,.28);background:rgba(255,224,138,.04)'
-                      : pay === 0 ? 'border:1px solid rgba(255,107,61,.15);background:rgba(255,80,60,.03)'
-                      : 'border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025)';
+    // Compact: range fields on one row, payout prominent below
+    const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+    const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:9px;padding:10px 12px;color:#ffe08a;font-size:15px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
 
-    const inputBase = 'width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none';
-    const inputPay  = 'width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.20);border-radius:9px;padding:9px 11px;color:#ffe08a;font-size:13px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none';
-
-    const previewColor = pay === 0 ? 'rgba(255,107,61,.70)' : isCurr ? '#ffe08a' : pay >= 30000 ? '#4ddc97' : 'rgba(225,238,255,.65)';
-    const borderAccent = pay === 0 ? 'rgba(255,107,61,.40)' : isCurr ? 'rgba(255,224,138,.50)' : pay >= 30000 ? 'rgba(77,220,151,.40)' : 'rgba(188,215,255,.20)';
-
-    return `<div style="${borderStyle};border-radius:13px;padding:13px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
-        <span style="font-size:9px;font-weight:800;padding:3px 9px;border-radius:99px;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;${pillCls}">${_commEscapeHtml(pillLbl)}</span>
-        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:15px;color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 6px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
+    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.12);background:rgba(255,255,255,.04);padding:12px;margin-bottom:7px${te.range||te.payout?';border-color:rgba(255,100,60,.40)':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;${pillStyle}">${pillLbl}</span>
+        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:16px;color:rgba(255,255,255,.30);background:none;border:none;cursor:pointer;padding:0 4px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.80)'" onmouseout="this.style.color='rgba(255,255,255,.30)'">×</button>
       </div>
-      <div style="display:grid;grid-template-columns:${pay===0?'1fr 1fr':'1fr 1fr'};gap:8px;margin-bottom:8px">
-        ${minV !== null || pay !== 0 || i > 0 ? `<div><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">NRR ตั้งแต่ (%)</div>
-          <input style="${inputBase}${te.range?';border-color:rgba(255,107,61,.50)':''}" value="${t.min_value ?? ''}" placeholder="—"
-            inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'min_value',this.value)"></div>` : `<div></div>`}
-        <div><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">${pay===0?'NRR ต่ำกว่า (%)':'ถึง (%) — ว่าง=∞'}</div>
-          <input style="${inputBase}${te.range?';border-color:rgba(255,107,61,.50)':''}" value="${t.max_value ?? ''}" placeholder="∞"
-            inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">${pay===0?'NRR ต่ำกว่า (%)':'NRR ตั้งแต่ (%)'}</div>
+          <input style="${inpBase}" value="${pay===0?(maxV??''):(minV??'')}" placeholder="—" inputmode="decimal"
+            oninput="onRuleTierInput('${planCode}',${i},'${pay===0?'max_value':'min_value'}',this.value)">
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">${pay===0?'\u00a0':'ถึง (%) — ว่าง=∞'}</div>
+          ${pay===0?'<div style="height:38px"></div>':`<input style="${inpBase}" value="${maxV??''}" placeholder="∞" inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">`}
+        </div>
       </div>
-      <div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.45);margin-bottom:5px">ได้รับ (฿)</div>
-        <input style="${inputPay}${te.payout?';border-color:rgba(255,107,61,.50)':''}" value="${pay}"
-          inputmode="numeric" oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)"></div>
-      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:rgba(0,0,0,.20);border-left:2px solid ${borderAccent}">
-        <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(188,215,255,.45)">
-          NRR ${rangeStr} → <span style="font-weight:800;color:${previewColor}">${prevLbl}</span>
-        </span>
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">ได้รับ (฿)</div>
+        <input style="${inpPay}" value="${pay}" inputmode="numeric"
+          oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
       </div>
-      ${te.range||te.payout ? `<div style="font-size:10px;color:rgba(255,107,61,.80);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;background:rgba(0,0,0,.25);border-left:2px solid ${borderLeft}">
+        <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(188,215,255,.65)">NRR ${rangeLbl} → <span style="font-weight:800;color:${previewColor}">${payLbl}</span></span>
+      </div>
+      ${te.range||te.payout?`<div style="font-size:10px;color:rgba(255,120,80,.90);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
     </div>`;
   }).join('');
 
-  const generalErr = err.general ? `<div style="font-size:11px;color:rgba(255,107,61,.85);padding:8px 10px;background:rgba(255,80,60,.08);border-radius:8px;margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
+  const generalErr = err.general ? `<div style="font-size:11px;color:rgba(255,100,60,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:8px;margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
 
-  return `<div style="border-radius:14px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.02);padding:14px;margin-bottom:8px">
+  return `<div style="border-radius:14px;border:1px solid rgba(188,215,255,.12);background:rgba(255,255,255,.03);padding:14px;margin-bottom:8px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px">
       <div>
-        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.15);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:220px" value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule" oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
-        ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px">Unsaved</span>':''}
-        <div style="font-size:10px;color:rgba(188,215,255,.40);font-family:\'IBM Plex Mono\',monospace;margin-top:4px">${planCode} · ใช้อยู่ ${used} คน</div>
+        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.22);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:210px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif"
+          value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule"
+          oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
+        ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px;vertical-align:middle">Unsaved</span>':''}
+        <div style="font-size:10px;color:rgba(188,215,255,.55);font-family:'IBM Plex Mono',monospace;margin-top:5px">${planCode} · ใช้อยู่ ${used} คน</div>
       </div>
-      <button onclick="archiveCommissionRule('${planCode}')" ${isStandard?'disabled title="Standard rule ลบไม่ได้"':''} style="font-size:10px;color:${isStandard?'rgba(188,215,255,.20)':'rgba(255,107,61,.55)'};background:none;border:1px solid ${isStandard?'rgba(188,215,255,.08)':'rgba(255,107,61,.20)'};border-radius:7px;padding:5px 9px;cursor:${isStandard?'default':'pointer'}">Archive</button>
+      <button onclick="archiveCommissionRule('${planCode}')" ${isStandard?'disabled title="Standard rule ลบไม่ได้"':''}
+        style="font-size:10px;color:${isStandard?'rgba(188,215,255,.25)':'rgba(255,100,60,.70)'};background:none;border:1px solid ${isStandard?'rgba(188,215,255,.10)':'rgba(255,100,60,.28)'};border-radius:7px;padding:5px 10px;cursor:${isStandard?'default':'pointer'};white-space:nowrap">Archive</button>
     </div>
     ${generalErr}
     ${tierCards}
-    <button class="comm-add" onclick="addRuleTier('${planCode}')" style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.04);border:1px dashed rgba(188,215,255,.16);color:rgba(188,215,255,.50);font-size:11px;font-weight:700;cursor:pointer;margin-top:2px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif">+ เพิ่ม tier</button>
-    <div style="font-size:10px;color:rgba(188,215,255,.30);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer</div>
+    <button class="comm-add" onclick="addRuleTier('${planCode}')"
+      style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif">+ เพิ่ม tier</button>
+    <div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer ด้านล่าง</div>
   </div>`;
 }
 
@@ -30681,6 +30686,7 @@ async function saveCommissionCockpit() {
     await saveCommissionPoliciesFromCockpit();
     await saveCommissionRules();
     await saveCommissionAssignments();
+    if (Object.keys(_commComponentPending||{}).length) await saveCommissionComponentRates();
     _commValidationErrors = {};
     if (btn) { btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = 'Saved'; }
     _commSoftenPostSaveUi();
