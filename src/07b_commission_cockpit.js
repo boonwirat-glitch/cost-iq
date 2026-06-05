@@ -461,6 +461,14 @@ function _renderTlUpsellTierRows() {
 }
 
 
+// In-memory staging for component params (flushed on saveCommissionComponentRates)
+let _commComponentPending = {};
+function _commSetComponentParam(metricCode, param, value) {
+  if (!_commComponentPending[metricCode]) _commComponentPending[metricCode] = {};
+  _commComponentPending[metricCode][param] = Number(value);
+  _commMarkChanged();
+}
+
 async function saveCommissionComponentRates() {
   if (!Object.keys(_commComponentPending).length) {
     showToast('ไม่มีการเปลี่ยนแปลง', '!'); return;
@@ -746,6 +754,7 @@ function renderCommLockStep(body) {
       <div class="comm-lock-subtabs"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive</button></div>
     </div>
 `;
+  const _lockHeroHtml = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div>`;
   if (_commLockSubtab === 'retroactive') { body.innerHTML = _lockHeroHtml + _commRenderRetroactiveSection(); return; }
   body.innerHTML = _lockHeroHtml + `
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
