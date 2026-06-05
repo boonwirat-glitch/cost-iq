@@ -510,7 +510,6 @@ async function saveCommissionComponentRates() {
 }
 window.saveCommissionComponentRates = saveCommissionComponentRates;
 window._commSetComponentParam = _commSetComponentParam;
-
 function _commAddTlUpsellTier() {
   try {
     const rules = _commRuleConfig.rules || {};
