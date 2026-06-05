@@ -30589,7 +30589,7 @@ function renderCommLockStep(body) {
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
   const ready = rows.length > 0 && pending === 0;
   if (_commLockSubtab === 'retroactive') {
-    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div><div class="comm-lock-subtabs"><button class="comm-lock-subtab" onclick="_commLockSubtab='current';renderCommissionCockpit()">เดือนนี้</button><button class="comm-lock-subtab active">Retroactive</button></div></div>` + _commRenderRetroactiveSection();
+    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div><div class="comm-lock-subtabs" style="margin:8px 0 4px"><button class="comm-lock-subtab" onclick="_commLockSubtab='current';renderCommissionCockpit()">เดือนนี้</button><button class="comm-lock-subtab active">Retroactive</button></div>` + _commRenderRetroactiveSection();
     return;
   }
   body.innerHTML = `
@@ -30605,8 +30605,8 @@ function renderCommLockStep(body) {
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?`ยังมี exclusion pending ${pending} รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ`:'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
       <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
-      <div class="comm-lock-subtabs"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive</button></div>
     </div>
+    <div class="comm-lock-subtabs" style="margin:8px 0 4px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive</button></div>
     <div id="comm-lock-detail-body">
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
