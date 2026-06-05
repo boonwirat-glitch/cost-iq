@@ -510,6 +510,32 @@ async function saveCommissionComponentRates() {
 }
 window.saveCommissionComponentRates = saveCommissionComponentRates;
 window._commSetComponentParam = _commSetComponentParam;
+
+function _commAddTlUpsellTier() {
+  try {
+    const rules = _commRuleConfig.rules || {};
+    if (!rules.tl_upsell_mult) rules.tl_upsell_mult = [{ tiers:[] }];
+    if (!rules.tl_upsell_mult[0].tiers) rules.tl_upsell_mult[0].tiers = [];
+    rules.tl_upsell_mult[0].tiers.push({min_pct:null,max_pct:null,multiplier:1.0});
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commRemoveTlUpsellTier(idx) {
+  try {
+    _commRuleConfig.rules.tl_upsell_mult[0].tiers.splice(idx, 1);
+    _commMarkChanged();
+    renderCommissionCockpit();
+  } catch(e) {}
+}
+function _commSetTlUpsellTier(idx, field, value) {
+  try {
+    const t = _commRuleConfig.rules.tl_upsell_mult[0].tiers[idx];
+    if (!t) return;
+    t[field] = value === '' ? null : Number(value);
+    _commMarkChanged();
+  } catch(e) {}
+}
 window._commAddTlUpsellTier = _commAddTlUpsellTier;
 window._commRemoveTlUpsellTier = _commRemoveTlUpsellTier;
 window._commSetTlUpsellTier = _commSetTlUpsellTier;
