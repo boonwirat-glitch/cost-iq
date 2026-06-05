@@ -1,4 +1,4 @@
-<!-- Freshket Sense 319: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 320: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '319',
+      version: '320',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -23526,6 +23526,10 @@ function __legacyRenderTeamviewFallback(){
     _tvCommBtn.setAttribute('aria-hidden', _isAdmin ? 'false' : 'true');
     _tvCommBtn.tabIndex = _isAdmin ? 0 : -1;
     _tvCommBtn.style.display = _isAdmin ? 'inline-flex' : 'none';
+  }
+  // v319: also call syncCommissionAdminVisibility if available (07b_cds.js handler)
+  if(typeof window.syncCommissionAdminVisibility === 'function'){
+    requestAnimationFrame(window.syncCommissionAdminVisibility);
   }
   const titleEl=document.getElementById('tv-title');
   const backWrap=document.getElementById('tv-back-wrap');
