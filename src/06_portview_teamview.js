@@ -2015,11 +2015,12 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       ?Object.values(window._tvVisitMap).reduce(function(s,v){return s+Object.keys(v||{}).length;},0):-1;
     var _tvUpsellN=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
     var _tvDaysEl=(typeof portviewBulkData!=='undefined'&&portviewBulkData&&portviewBulkData[0])?portviewBulkData[0].daysElapsed||0:0;
+    var _tvRole=typeof getCurrentRole==='function'?getCurrentRole():'';
     var _tvKey=[
       typeof tvViewMode!=='undefined'?tvViewMode:'full',
       typeof teamviewLevel!=='undefined'?(teamviewLevel||''):'',
       typeof portviewRepEmail!=='undefined'?(portviewRepEmail||''):'',
-      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN,_tvDaysEl
+      _tvPvSnap,_tvHistN,_tvCommN,_tvVisitN,_tvUpsellN,_tvDaysEl,_tvRole
     ].join('|');
     // v307: if last render was no-data state but portview now loaded → force re-render
     var _tvHasDataNow=portviewBulkData&&portviewBulkData.length>0;
