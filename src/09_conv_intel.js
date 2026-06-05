@@ -275,7 +275,7 @@ const CI = (() => {
   position:fixed;
   top:0;bottom:0;
   left:50%;
-  width:100%;max-width:430px;
+  width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:9999;
   background:var(--n-50,#F2F2F7);
@@ -573,19 +573,23 @@ const CI = (() => {
 
   async function _analyzeSkills(text) {
     const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 2000);
-    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
-    // extract first { } or [ ] block in case model adds preamble
-    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
-    return JSON.parse(m ? m[1] : txt);
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
+    // find last complete JSON object
+    const start = txt.indexOf('{');
+    const end = txt.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('no JSON in response');
+    return JSON.parse(txt.slice(start, end+1));
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
     const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 2000);
-    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
-    // extract first { } or [ ] block in case model adds preamble
-    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
-    return JSON.parse(m ? m[1] : txt);
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
+    // find last complete JSON object
+    const start = txt.indexOf('{');
+    const end = txt.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('no JSON in response');
+    return JSON.parse(txt.slice(start, end+1));
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
