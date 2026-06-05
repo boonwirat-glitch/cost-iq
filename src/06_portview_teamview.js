@@ -1716,6 +1716,10 @@ function __legacyRenderTeamviewFallback(){
     _tvCommBtn.tabIndex = _isAdmin ? 0 : -1;
     _tvCommBtn.style.display = _isAdmin ? 'inline-flex' : 'none';
   }
+  // v319: also call syncCommissionAdminVisibility if available (07b_cds.js handler)
+  if(typeof window.syncCommissionAdminVisibility === 'function'){
+    requestAnimationFrame(window.syncCommissionAdminVisibility);
+  }
   const titleEl=document.getElementById('tv-title');
   const backWrap=document.getElementById('tv-back-wrap');
   if(!portviewBulkData||!portviewBulkData.length){
