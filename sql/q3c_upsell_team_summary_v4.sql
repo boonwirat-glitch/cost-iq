@@ -214,7 +214,7 @@ lookback_monthly AS (
     AND i.gmv_ex_vat > 0
   GROUP BY
     ka.kam_email,
-    o.account_id,
+    ka.account_id,
     CAST(o.user_id AS STRING),
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
