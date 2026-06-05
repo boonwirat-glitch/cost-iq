@@ -309,7 +309,7 @@ const CI = (() => {
       requestAnimationFrame(() => { el.classList.add('ci-open'); });
     });
     _initWaveform();
-    _showScreen('s-record');
+    _showScreen('ci-s-record');
   }
 
   function _unmount() {
