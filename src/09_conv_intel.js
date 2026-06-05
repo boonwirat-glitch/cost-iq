@@ -568,13 +568,19 @@ const CI = (() => {
 
   async function _analyzeSkills(text) {
     const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 2000);
-    return JSON.parse((raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,''));
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
+    // extract first { } or [ ] block in case model adds preamble
+    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
+    return JSON.parse(m ? m[1] : txt);
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
     const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 2000);
-    return JSON.parse((raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,''));
+    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
+    // extract first { } or [ ] block in case model adds preamble
+    const m = txt.match(/({[\s\S]*}|\[[\s\S]*\])/);
+    return JSON.parse(m ? m[1] : txt);
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
