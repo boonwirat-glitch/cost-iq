@@ -31,6 +31,7 @@ commission_js = (
     read('src/07b_commission_history.js')
 )
 patches_js    = read('src/08_patches.js')
+conv_intel_js = read('src/09_conv_intel.js')
 styles_main   = read('src/styles_main.css')
 styles_comm   = read('src/styles_commission.css')
 
@@ -47,6 +48,8 @@ out = (shell
              f'<script id="target-module-js">\n{commission_js}</script>\n')
     .replace('<script id="freshket-patches-consolidated">\n<!-- INJECT_PATCHES -->\n</script>\n',
              f'<script id="freshket-patches-consolidated">\n{patches_js}</script>\n')
+    .replace('<script id="freshket-conv-intel">\n<!-- INJECT_CONV_INTEL -->\n</script>\n',
+             f'<script id="freshket-conv-intel">\n{conv_intel_js}</script>\n')
     # ── Build version ──
     .replace("version: 'v212c-diagnostics-counter-fix'",
              f"version: '{VERSION}'")
