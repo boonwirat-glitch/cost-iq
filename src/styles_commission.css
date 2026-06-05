@@ -863,21 +863,33 @@ flex-wrap:wrap;}
 }
 
 
-/* v209f Commission Cockpit shell repair */
+/* v313 Commission Cockpit shell — responsive positioning */
 #commission-cockpit-overlay.comm-overlay{
-  align-items:center !important;
+  align-items:flex-end !important;
   justify-content:center !important;
-  padding:18px 0 !important;
+  padding:0 !important;
   box-sizing:border-box !important;
+}
+@media(min-width:601px){
+  #commission-cockpit-overlay.comm-overlay{
+    align-items:center !important;
+    padding:20px 0 !important;
+  }
 }
 #commission-cockpit-overlay .comm-sheet{
   position:relative !important;
-  width:min(100vw - 24px, 430px) !important;
-  max-width:430px !important;
-  height:min(86vh, 760px) !important;
-  max-height:760px !important;
-  border-radius:22px !important;
+  width:100% !important;
+  max-width:480px !important;
+  height:min(88vh,800px) !important;
+  max-height:800px !important;
+  border-radius:22px 22px 0 0 !important;
   overflow:hidden !important;
+}
+@media(min-width:601px){
+  #commission-cockpit-overlay .comm-sheet{
+    border-radius:22px !important;
+    width:min(calc(100vw - 32px),480px) !important;
+  }
 }
 #commission-cockpit-overlay .comm-head{
   padding:14px 16px 10px !important;
@@ -910,11 +922,12 @@ flex-wrap:wrap;}
   right:0 !important;
   bottom:0 !important;
   width:100% !important;
-  padding:10px 12px 12px !important;
+  padding:10px 12px max(12px,env(safe-area-inset-bottom)) !important;
   box-sizing:border-box !important;
   display:grid !important;
-  grid-template-columns:72px 1fr !important;
+  grid-template-columns:auto auto 1fr !important;
   gap:8px !important;
+  background:linear-gradient(180deg,rgba(13,28,52,0),#0d1c34 28%) !important;
 }
 #commission-cockpit-overlay .comm-secondary,
 #commission-cockpit-overlay .comm-save{
