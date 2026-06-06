@@ -706,3 +706,77 @@
   padding: 4px 14px;
   font-family: 'IBM Plex Mono', monospace;
 }
+
+/* ── W1: Lead type selector (SA / MC / Chain) ── */
+.sv-type-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sv-type-btn {
+  flex: 1;
+  padding: 10px 0;
+  background: #F7F7F7;
+  border: 1.5px solid #EBEBEB;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.sv-type-btn.on {
+  border-color: #FF385C;
+  color: #FF385C;
+  background: rgba(255,56,92,.05);
+}
+.sv-type-btn:active { opacity: .7; }
+.sv-type-tenure {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: inherit;
+  opacity: .7;
+}
+
+/* ── W1: Lead row type pill ── */
+.sv-lead-type-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #FF385C;
+  background: rgba(255,56,92,.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  vertical-align: middle;
+}
+
+/* ── W4: TL view target button ── */
+.sv-tl-target-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  background: rgba(255,56,92,.08);
+  color: #FF385C;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Noto Sans Thai', sans-serif;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 4px;
+  transition: background .12s;
+}
+.sv-tl-target-btn:active { background: rgba(255,56,92,.15); }
+.sv-tl-target-btn svg { width: 13px; height: 13px; }
