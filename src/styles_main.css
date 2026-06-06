@@ -2104,6 +2104,8 @@ body.kam-mode .topbar{background:linear-gradient(135deg,#0d2550,#0a1e42)}
 .pv-chip-dot.unseen{background:rgba(255,255,255,.18)}
 .pv-chip-dot.account{background:rgba(255,255,255,.4)}
 .pv-chip-dot.full{background:var(--g500);box-shadow:0 0 4px rgba(0,208,112,.5)}
+.pv-chip-dot.echo-recent{background:rgba(0,208,112,.95);box-shadow:0 0 5px rgba(0,208,112,.6);width:7px;height:7px;cursor:pointer}
+.pv-chip-dot.echo-old{background:rgba(0,208,112,.38);cursor:pointer}
 .pv-chip-name{flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,.88);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-chip-pace{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;flex-shrink:0;margin-right:4px}
 .pv-chip-pace.great,.pv-chip-pace.safe{color:#4ddc97}
@@ -2368,6 +2370,9 @@ body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
 .pv-dot.unseen{display:none}
 .pv-dot.account{background:rgba(255,255,255,.22);box-shadow:none}
 .pv-dot.full{background:var(--g500);box-shadow:0 0 5px rgba(0,208,112,.4)}
+.pv-dot.echo-recent{background:rgba(0,208,112,.95);box-shadow:0 0 7px rgba(0,208,112,.65),0 0 2px rgba(0,208,112,.9);width:7px;height:7px}
+.pv-dot.echo-old{background:rgba(0,208,112,.38);box-shadow:none}
+.pv-dot.echo-recent,.pv-dot.echo-old{cursor:pointer}
 .portview-acct-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .portview-acct-card:active{transform:scale(0.97);transition-duration:80ms}
 .portview-acct-card.danger:hover{box-shadow:0 6px 24px rgba(229,62,62,.15)}
