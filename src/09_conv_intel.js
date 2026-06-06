@@ -23,7 +23,8 @@ const CI = (() => {
   let _durText     = '0:00';
   let _lastResult  = null;
   let _secs        = 0;
-  let _ownerType   = 'kam'; // 'kam' | 'sales'
+  let _ownerType   = 'kam';
+  let _showPicker  = false; // show account picker section in record screen // 'kam' | 'sales'
   let _floatTimer  = null; // minimize timer ref
   let _sessionId   = null; // ci_sessions UUID after save
 
@@ -404,14 +405,18 @@ const CI = (() => {
       <button class="tab-btn" id="ci-tab-hist" onclick="CI._switchMainTab('history')">ประวัติ</button>
     </div>
   </div>
-  <div style="padding:4px 24px 12px">
+  <!-- Inline picker section — shown when no account selected -->
+  <div id="ci-picker-sec" style="display:${_showPicker?'flex':'none'};flex-direction:column;flex:1;padding:0 24px 24px;gap:12px;overflow-y:auto">
+    ${_ownerType==='sales' ? _buildSalesPickerInline() : _buildKamPickerInline()}
+  </div>
+  <div id="ci-chip-wrap" style="padding:4px 24px 12px;display:${_showPicker?'none':''}">
     <div class="chip">
       <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
       <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
       <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
     </div>
   </div>
-  <div class="rec-center" id="ci-rec-center">
+  <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
     <div class="orb-wrap">
       <div class="orb-ambient"></div>
       <div class="orb-ring orb-ring-1"></div>
@@ -432,8 +437,8 @@ const CI = (() => {
       <div class="timer-hint" id="ci-thint">กดเพื่อเริ่มบันทึก</div>
     </div>
   </div>
-  <div class="waveform" id="ci-wf"></div>
-  <div class="rec-bottom">
+  <div class="waveform" id="ci-wf" style="${_showPicker?'display:none':''}" ></div>
+  <div class="rec-bottom" style="${_showPicker?'display:none':''}">
     <button class="btn-stop" onclick="CI.stopRecording()">หยุด &amp; วิเคราะห์</button>
     <span class="stop-hint">ระบบจะ transcribe และวิเคราะห์ด้วย AI อัตโนมัติ</span>
     </div>
@@ -1792,6 +1797,66 @@ ${text}`;
     }).join('');
   }
 
+  // ── Inline picker builders (Echo design system) ──────────────────────────────
+  function _buildKamPickerInline() {
+    let recentRows = '';
+    try {
+      if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
+        const sorted = portviewBulkData
+          .filter(r => r.res_name)
+          .sort((a,b) => (b.gmv_mtd||0) - (a.gmv_mtd||0))
+          .slice(0, 6);
+        recentRows = sorted.map(r => `
+          <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left"
+            onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
+            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${r.res_name}</span>
+            <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em">${r.account_type||''}</span>
+          </button>`).join('');
+      }
+    } catch(e) {}
+    const emptyMsg = recentRows ? '' : '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลร้านค้า</div>';
+    return `
+      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'DM Mono',monospace;padding:4px 0 8px">กำลังคุยกับร้านไหน?</div>
+      <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
+        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;font-family:'DM Sans',-apple-system,sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        oninput="CI._pickerSearchInline(this.value)" />
+      <div id="ci-pk-list-inline" style="display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto">
+        ${recentRows}${emptyMsg}
+      </div>`;
+  }
+
+  function _buildSalesPickerInline() {
+    return `
+      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'DM Mono',monospace;padding:4px 0 8px">คุณกำลังคุยกับร้านไหน?</div>
+      <input id="ci-sales-name-inline" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
+        style="width:100%;padding:13px 16px;border:1.5px solid #008065;border-radius:12px;font-size:15px;outline:none;font-family:'DM Sans',-apple-system,sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
+      <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name-inline').value)"
+        style="width:100%;padding:14px;border:none;border-radius:14px;background:#008065;color:#fff;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;letter-spacing:-.02em">
+        เริ่มบันทึก
+      </button>
+      <div style="text-align:center;font-size:12px;color:#AEAEB2;padding:4px 0">พิมพ์ชื่อร้าน แล้วกด Enter หรือปุ่มด้านบน</div>`;
+  }
+
+  function _pickerSearchInline(q) {
+    const list = document.getElementById('ci-pk-list-inline');
+    if (!list) return;
+    try {
+      const src = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      const filtered = q
+        ? src.filter(r => r.res_name && r.res_name.toLowerCase().includes(q.toLowerCase())).slice(0,8)
+        : src.filter(r => r.res_name).sort((a,b)=>(b.gmv_mtd||0)-(a.gmv_mtd||0)).slice(0,6);
+      list.innerHTML = filtered.length
+        ? filtered.map(r => `
+          <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left"
+            onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
+            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${r.res_name}</span>
+            <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em">${r.account_type||''}</span>
+          </button>`).join('')
+        : '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">ไม่พบร้านค้า</div>';
+    } catch(e) {}
+  }
+
   // ── Public ─────────────────────────────────────────────────────────────────
   function _topbarLeft() {
     if (_phase === 'recording') { _minimize(); }
@@ -1808,7 +1873,8 @@ ${text}`;
     if (_ownerType === 'sales') {
       // Sales always sees name input first
       _accountGuid = null; _accountName = ''; _accountSeg = '';
-      setTimeout(_mountPicker, 50);
+      _showPicker = true;
+      setTimeout(_mount, 50);
       return;
     }
     // KAM: smart detect
@@ -1822,7 +1888,8 @@ ${text}`;
       setTimeout(_mount, 50);
     } else {
       _accountGuid = null; _accountName = ''; _accountSeg = '';
-      setTimeout(_mountPicker, 50);
+      _showPicker = true;
+      setTimeout(_mount, 50);
     }
   }
 
@@ -1845,26 +1912,46 @@ ${text}`;
   }
 
   function _dismissPicker() {
+    // Legacy — kept for compat
     const el = document.getElementById('ci-picker-sheet');
-    if (!el) return;
-    const sheet = el.querySelector('.ci-picker-inner');
-    if (sheet) {
-      sheet.style.transform = 'translateY(100%)';
-      setTimeout(() => el.remove(), 300);
-    } else { el.remove(); }
+    if (el) el.remove();
+  }
+
+  function _hidePicker() {
+    // Hide inline picker, reveal record UI + update chip
+    const pickerSec = document.getElementById('ci-picker-sec');
+    const recCenter = document.getElementById('ci-rec-center');
+    const wf = document.getElementById('ci-wf');
+    const recBottom = document.querySelector('#ci-s-record .rec-bottom');
+    const chip = document.getElementById('ci-chip-wrap');
+    if (pickerSec) pickerSec.style.display = 'none';
+    if (recCenter) recCenter.style.display = '';
+    if (wf) wf.style.display = '';
+    if (recBottom) recBottom.style.display = '';
+    if (chip) {
+      chip.style.display = '';
+      // Update chip text
+      const ctx = _ctx();
+      const nameEl = chip.querySelector('.chip-txt');
+      const segEl = chip.querySelector('.chip-seg');
+      const dotEl = chip.querySelector('.chip-dot');
+      if (nameEl) nameEl.textContent = ctx.name || _accountName || 'ร้านค้า';
+      if (segEl) { segEl.textContent = _accountSeg === 'LEAD' ? 'LEAD' : ctx.seg; segEl.style.color = _accountSeg === 'LEAD' ? '#FF9500' : ''; }
+      if (dotEl) dotEl.style.background = _accountSeg === 'LEAD' ? '#FF9500' : '';
+    }
   }
 
   function _pickerConfirmKam(guid, name, seg) {
     _accountGuid = guid; _accountName = name; _accountSeg = seg || '';
-    _dismissPicker();
-    setTimeout(_mount, 350);
+    _showPicker = false;
+    _hidePicker();
   }
 
   function _pickerConfirmSales(name) {
     if (!name || !name.trim()) return;
     _accountGuid = null; _accountName = name.trim(); _accountSeg = 'LEAD';
-    _dismissPicker();
-    setTimeout(_mount, 350);
+    _showPicker = false;
+    _hidePicker();
   }
 
   function _buildKamPickerHTML() {
@@ -1921,7 +2008,7 @@ ${text}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize, _switchMainTab, _topbarLeft };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft };
 
 })();
 
