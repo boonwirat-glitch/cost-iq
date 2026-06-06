@@ -1,4 +1,4 @@
-<!-- Freshket Sense v356: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v357: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -514,10 +514,8 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .dp-note{font-size:11px;color:var(--n600);background:var(--n50);border-radius:8px;padding:10px 12px;line-height:1.65}
 
 /* ── KAMBAR ── */
-.kambar{background:linear-gradient(135deg,#1a3a6b,#2660c8);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:54px;z-index:99}
+
 /* #kam-acct-sticky removed in v184 — replaced by #kav-z1 */
-.kambar .kt{color:#fff;font-size:12px;font-weight:500}
-.kambar .kt strong{display:block;font-size:14px}
 
 /* ══ KAM ACCOUNT VIEW — 3-ZONE LAYOUT (v185) ══ */
 
@@ -5166,7 +5164,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v356',
+      version: 'v357',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -7062,11 +7060,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 </div>
 </div>
-<div class="kambar" id="kambar" style="display:none">
-<svg fill="none" height="20" stroke="#fff" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="20"><rect height="16" rx="2" width="20" x="2" y="4"></rect><path d="M8 10h8M8 14h5"></path></svg>
-<div class="kt" style="flex:1"><strong>โหมดเตรียมคุยลูกค้า</strong>วิเคราะห์ข้อมูลพร้อม talking points สำหรับ KAM</div>
-<button id="kam-model-topbar-btn" onclick="cycleKamModel()" style="font-size:10px;font-weight:700;background:rgba(255,255,255,.12);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .2s;flex-shrink:0;white-space:nowrap">Sonnet</button>
-</div>
+<!-- kambar removed v356 -->
 <!-- DATA PANEL -->
 <div class="data-overlay" id="dataOverlay" onclick="closeDataPanel()"></div>
 <div class="data-panel" id="dataPanel">
@@ -9607,10 +9601,6 @@ function renderKamSignalBar(){
   el.innerHTML=signals.map(s=>`<div class="kam-signal-chip ${s.type}"><span class="kam-signal-main">${s.main}</span></div>`).join('');
 }
 
-function cycleKamModel(){
-  kamModel=kamModel==='haiku'?'sonnet':'haiku';
-  setKamModel(kamModel);
-}
 
 // ════════════════════════════════════════
 // UTILS
@@ -19136,7 +19126,7 @@ function __legacyShowScreenFallback(name){
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
-  if(kambar&&isKAM)kambar.style.display=(name==='portview'||name==='teamview'||name==='overview')?'none':'flex';
+
   window.scrollTo({top:0,left:0,behavior:'instant'});
   document.body.scrollTop=0;
   document.documentElement.scrollTop=0;
@@ -19188,7 +19178,6 @@ function setKamModel(model){
     el.querySelector('div').style.color=on?'#fff':'var(--n700)';
   });
   const b1=document.getElementById('kam-model-badge');if(b1)b1.textContent=model==='haiku'?'Haiku':'Sonnet';
-  const tb=document.getElementById('kam-model-topbar-btn');if(tb)tb.textContent=model==='haiku'?'Haiku':'Sonnet';
 }
 
 // SECTION:KAM_ACCOUNT
@@ -20618,7 +20607,7 @@ function __legacySetModeFallback(mode){
   const teamScr=document.getElementById('scr-teamview');
   if(teamScr)teamScr.style.display='none'; // reset on mode change
   document.querySelectorAll('.mbtn').forEach((b,i)=>b.classList.toggle('on',(i===0&&!isKAM)||(i===1&&isKAM)));
-  document.getElementById('kambar').style.display=isKAM?'flex':'none';
+
   document.getElementById('kamsec').style.display='none';
   document.getElementById('hid').style.display=isKAM?'block':'none';
   // Switch between restaurant and KAM overview
