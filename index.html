@@ -1,4 +1,4 @@
-<!-- Freshket Sense v344: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v345: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5103,7 +5103,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v344',
+      version: 'v345',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -37874,33 +37874,96 @@ ${text}`;
       <div style="text-align:center;font-size:12px;color:#AEAEB2;padding:4px 0">พิมพ์ชื่อร้าน แล้วกด Enter หรือปุ่มด้านบน</div>`;
   }
 
+  // ── Build outlet index from bulkOutletsData ─────────────────────────────────
+  // Returns Map<outlet_name_lower → account_id>
+  // Built once per search session — cheap, ~1000 outlets max
+  function _buildOutletIndex() {
+    const idx = new Map();
+    try {
+      const od = window.bulkOutletsData || (typeof bulkOutletsData !== 'undefined' ? bulkOutletsData : null);
+      if (!od) return idx;
+      Object.entries(od).forEach(([accountId, months]) => {
+        // months = { 'พ.ค. 2569': [{outlet_id, outlet_name, ...}] }
+        const seen = new Set();
+        Object.values(months).forEach(outlets => {
+          (outlets||[]).forEach(o => {
+            const n = (o.outlet_name||'').trim();
+            if (n && !seen.has(n)) { seen.add(n); idx.set(n.toLowerCase(), accountId); }
+          });
+        });
+      });
+    } catch(e) { /* non-fatal */ }
+    return idx;
+  }
+
   function _pickerSearchInline(q) {
     const list = document.getElementById('ci-pk-list-inline');
     if (!list) return;
     try {
-      // Use window.portviewBulkData — always fresh at call time
       const src = (window.portviewBulkData && window.portviewBulkData.length)
         ? window.portviewBulkData
         : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
       const qLow = (q||'').toLowerCase().trim();
-      const filtered = qLow
-        ? src.filter(r => (r.res_name||r.name||'').toLowerCase().includes(qLow) ||
-                          (r.account_name||'').toLowerCase().includes(qLow)).slice(0,8)
-        : src.filter(r => r.res_name||r.name).sort((a,b)=>(b.gmv_mtd||b.gmv||0)-(a.gmv_mtd||a.gmv||0)).slice(0,8);
+
+      let filtered;
+      if (!qLow) {
+        // Default: top accounts by GMV
+        filtered = src.slice().sort((a,b) => (b.gmvToDate||b.gmv||0)-(a.gmvToDate||a.gmv||0)).slice(0,8)
+          .map(r => ({ _r: r, _matchLabel: null }));
+      } else {
+        // 1. Match by account_name (r.name)
+        const byAccount = src
+          .filter(r => (r.name||'').toLowerCase().includes(qLow))
+          .map(r => ({ _r: r, _matchLabel: null }));
+
+        // 2. Match by outlet_name via index — map back to account row
+        const outletIdx = _buildOutletIndex();
+        const outletMatches = [];
+        const seenIds = new Set(byAccount.map(x => x._r.id || x._r.account_guid));
+        outletIdx.forEach((accountId, outletNameLow) => {
+          if (!outletNameLow.includes(qLow)) return;
+          if (seenIds.has(accountId)) return; // already in account matches
+          const accountRow = src.find(r => (r.id||r.account_guid) === accountId);
+          if (!accountRow) return;
+          // Find the matching outlet name for display hint
+          const od = window.bulkOutletsData || (typeof bulkOutletsData !== 'undefined' ? bulkOutletsData : null);
+          let outletDisplayName = '';
+          if (od && od[accountId]) {
+            Object.values(od[accountId]).forEach(outlets => {
+              (outlets||[]).forEach(o => {
+                if ((o.outlet_name||'').toLowerCase().includes(qLow)) outletDisplayName = o.outlet_name;
+              });
+            });
+          }
+          seenIds.add(accountId);
+          outletMatches.push({ _r: accountRow, _matchLabel: outletDisplayName });
+        });
+
+        filtered = [...byAccount, ...outletMatches].slice(0, 8);
+      }
+
       if (!filtered.length) {
         list.innerHTML = '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">' +
           (src.length ? 'ไม่พบร้านค้า' : 'กำลังโหลดข้อมูล...') + '</div>';
         return;
       }
-      list.innerHTML = filtered.map(r => {
-        const name = r.res_name || r.name || '-';
-        const guid = r.account_guid || r.id || '';
-        const seg = r.account_type || r.segment || '';
+
+      list.innerHTML = filtered.map(({ _r: r, _matchLabel }) => {
+        const name  = r.name || '-';
+        const guid  = r.id || r.account_guid || '';
+        const seg   = r.accountType || r.account_type || '';
         const safeName = name.replace(/'/g,"\'").replace(/"/g,'&quot;');
+        // Outlet match hint — show outlet name in small text below account name
+        const hint  = _matchLabel
+          ? `<div style="font-size:10px;color:#AEAEB2;margin-top:2px;font-family:'DM Mono',monospace">outlet: ${_matchLabel}</div>`
+          : '';
         return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left;margin-bottom:6px"
           onclick="CI._pickerConfirmKam('${guid}','${safeName}','${seg}')">
-          <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1;text-align:left">${name}</span>
-          <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em">${seg}</span>
+          <div style="flex:1;min-width:0;text-align:left">
+            <div style="font-size:13px;font-weight:500;color:#1C1C1E">${name}</div>
+            ${hint}
+          </div>
+          <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em;flex-shrink:0;margin-left:8px">${seg}</span>
         </button>`;
       }).join('');
     } catch(e) { console.warn('[CI picker search]', e); }
