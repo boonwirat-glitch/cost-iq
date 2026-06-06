@@ -208,52 +208,60 @@ function renderSalesHome(el, outlets, pipeline) {
     </div>`;
   }
 
-  // Projection strip
+  // v6 design: Airbnb/Revolut — big number hero, inline proj, list rows
+  const tbarClass = targetPct >= 100 ? 'ok' : targetPct >= 75 ? 'warn' : 'ac';
   const projHtml = proj.map(p => {
     const gap = p.projected - p.target;
-    const gapLabel = gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`;
-    const gapClass = gap >= 0 ? 'hit' : Math.abs(gap)/p.target < 0.15 ? 'gap' : 'miss';
-    return `<div class="sv-proj-card${p.isCurrent?' current':''}">
-      <div class="sv-proj-month">${p.label}</div>
-      <div class="sv-proj-amount">฿${_sv_fmt(p.projected)}</div>
-      ${p.target > 0 ? `<div class="sv-proj-vs ${gapClass}">${gapLabel} vs target</div>` : ''}
+    const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
+    const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
+    return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
+      <div class="sv-proj-mon">${p.label}</div>
+      <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
+      ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
     </div>`;
   }).join('');
 
   el.innerHTML = `
-    <div class="sv-header">
-      <div>
-        <div class="sv-header-title">Sales Dashboard</div>
-        <div class="sv-header-sub">${period}</div>
+    <div class="sv-page-hd">
+      <div class="sv-page-eye">${period}</div>
+      <div class="sv-page-title">พอร์ตของคุณ</div>
+    </div>
+
+    <div class="sv-hero">
+      <div class="sv-hero-eye">Runrate ในมือ</div>
+      <div><span class="sv-hero-num">฿${_sv_fmt(totalRunrate)}</span></div>
+      <div class="sv-hero-sub">
+        <span>${outlets.length} ร้าน active</span>
+        ${target > 0 ? `<span class="sv-gap-badge${targetPct>=100?' ok':''}">
+          ${targetPct >= 100 ? '+' : '−'}฿${_sv_fmt(Math.abs(totalRunrate-target))} vs target
+        </span>` : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target</span>'}
       </div>
+      ${target > 0 ? `<div class="sv-tbar">
+        <div class="sv-tbar-track"><div class="sv-tbar-fill ${tbarClass}" style="width:${Math.min(100,targetPct)}%"></div></div>
+        <div class="sv-tbar-meta"><span>${targetPct}% of target</span><span>Target ฿${_sv_fmt(target)}</span></div>
+      </div>` : ''}
     </div>
 
-    <div class="sv-card">
-      <div class="sv-card-label">Runrate ในมือ</div>
-      <div class="sv-card-value">฿${_sv_fmt(totalRunrate)}<span class="sv-card-value-unit">/เดือน</span></div>
-      <div class="sv-card-sub">${outlets.length} ร้าน active · Handover ออก ฿${_sv_fmt(handover.m0)} เดือนนี้</div>
-      ${target > 0 ? `
-      <div class="sv-target-bar-wrap">
-        <div class="sv-target-bar-track">
-          <div class="sv-target-bar-fill ${barClass}" style="width:${Math.min(100,targetPct)}%"></div>
-        </div>
-        <div class="sv-target-labels">
-          <span>${targetPct}% of target</span>
-          <span>Target ฿${_sv_fmt(target)}</span>
-        </div>
-      </div>` : '<div class="sv-card-sub" style="margin-top:6px;color:rgba(255,165,0,.6)">ยังไม่มี target — TL ต้องตั้ง</div>'}
+    <div class="sv-proj-row">${projHtml}</div>
+
+    ${urgentHandover.length ? `
+    <div class="sv-sec">
+      <span class="sv-sec-t ac">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        ใกล้ Handover
+      </span>
+      <span class="sv-sec-c">${urgentHandover.length} ร้าน</span>
     </div>
-
-    ${handoverHtml}
-
-    <div style="padding:0 20px 8px;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);font-family:'DM Mono',monospace">Projection 3 เดือน</div>
-    <div class="sv-projection-strip">${projHtml}</div>
-
-    <div class="sv-card" style="cursor:pointer" onclick="if(typeof showScreen==='function')showScreen('sales-pipeline')">
-      <div class="sv-card-label">Pipeline (Manual)</div>
-      <div class="sv-card-value">฿${_sv_fmt(pipeline.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0))}<span class="sv-card-value-unit">/เดือน est.</span></div>
-      <div class="sv-card-sub">${pipeline.length} leads · แตะเพื่อจัดการ →</div>
-    </div>
+    <div class="sv-hov-section">
+      ${urgentHandover.slice(0,5).map(o => {
+        const d = _daysUntilExp(o.newUserExpDate);
+        return `<div class="sv-hov-row">
+          <div class="sv-hov-dot"></div>
+          <span class="sv-hov-name">${o.name||o.id}</span>
+          <span class="sv-hov-days">${d <= 0 ? 'หมดแล้ว' : d+'d'}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
   `;
 }
 
@@ -302,41 +310,44 @@ function _renderSalesOutletList(el, outlets) {
     return da.localeCompare(db);
   });
 
-  const headerHtml = `<div class="sv-portview-header">
-    <div class="sv-portview-title">ร้านทั้งหมด (${outlets.length})</div>
+  // v6: Revolut list rows — colored indicator + name + amount + days bar
+  const headerHtml = `<div class="sv-sec">
+    <span class="sv-sec-t">ร้านทั้งหมด</span>
+    <span class="sv-sec-c">${outlets.length} ร้าน</span>
   </div>`;
 
-  const cardsHtml = sorted.map(o => {
+  const cardsHtml = '<div class="sv-outlet-list">' + sorted.map(o => {
     const daysLeft = _daysUntilExp(o.newUserExpDate);
-    const totalDays = o.daysHeld + (daysLeft !== null ? daysLeft : 0);
-    const pctHeld = totalDays > 0 ? Math.min(100, Math.round(o.daysHeld / totalDays * 100)) : 0;
-    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : '';
-    const cardClass = daysLeft !== null && daysLeft <= 7 ? 'expiring-critical' :
-                      daysLeft !== null && daysLeft <= 14 ? 'expiring-soon' : '';
+    const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+    const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0) / totalDays * 100)) : 0;
+    const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+    const typeCls = pctHeld >= 80 ? '' : pctHeld >= 60 ? 'mid' : 'ok';
     const typeLabel = (o.accountType||'SA').toUpperCase();
     const expLabel = o.newUserExpDate ?
       new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
-    const gmvLabel = `฿${_sv_fmt(o.runrate||o.gmvToDate||0)}/เดือน`;
+    const daysLabel = daysLeft !== null ? (daysLeft <= 0 ? 'หมดแล้ว' : daysLeft+'d') : '—';
+    const gmv = _sv_fmt(o.runrate||o.gmvToDate||0);
+    const safeId = (o.id||'').replace(/'/g,"\'");
+    const safeName = (o.name||'').replace(/'/g,"\'");
 
-    return `<div class="sv-outlet-card ${cardClass}"
-      onclick="window._salesOpenAccount('${(o.id||'').replace(/'/g,"\\'")}','${(o.name||'').replace(/'/g,"\\'")}')"
-    >
-      <div class="sv-outlet-name">
-        <span>${o.name||o.id}</span>
-        <span class="sv-outlet-type">${typeLabel}</span>
+    return `<div class="sv-ol-row" onclick="window._salesOpenAccount('${safeId}','${safeName}')">
+      <div class="sv-ol-top">
+        <div class="sv-ol-ind ${indCls}"></div>
+        <div class="sv-ol-info">
+          <div class="sv-ol-name">${o.name||o.id}</div>
+          <div class="sv-ol-meta">ถือมา ${o.daysHeld||0} วัน</div>
+        </div>
+        <div class="sv-ol-right">
+          <div class="sv-ol-gmv">฿${gmv}</div>
+          <div class="sv-ol-type ${typeCls}">${typeLabel} · ${daysLabel}</div>
+        </div>
       </div>
-      <div class="sv-outlet-gmv">${gmvLabel}</div>
-      <div class="sv-days-bar-wrap">
-        <div class="sv-days-bar-track">
-          <div class="sv-days-bar-fill ${barClass}" style="width:${pctHeld}%"></div>
-        </div>
-        <div class="sv-days-meta">
-          <span>ถือมา ${o.daysHeld||0} วัน</span>
-          <span class="sv-days-deadline">หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
-        </div>
+      <div class="sv-ol-bar-wrap">
+        <div class="sv-days-track"><div class="sv-days-fill ${indCls}" style="width:${pctHeld}%"></div></div>
+        <div class="sv-days-meta"><span></span><span class="sv-days-exp">หมด ${expLabel}</span></div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
 
   el.innerHTML = headerHtml + cardsHtml;
 }
@@ -363,59 +374,99 @@ function renderSalesPipeline() {
   });
 }
 
-function _renderPipelineList(el, leads) {
-  const m0 = _salesMonthOffset(0);
-  const m1 = _salesMonthOffset(1);
-  const m2 = _salesMonthOffset(2);
 
-  // Group by month
+// Helper for gap chart rows (avoids nested template literals)
+function _renderGapRows(gaps) {
+  return gaps.map(function(g) {
+    var col = g.cls==='ok'?'#34C759':g.cls==='warn'?'#FF9500':'#FF385C';
+    var sign = g.val>=0?'+':'−';
+    return '<div class="sv-gap-row">' +
+      '<span class="sv-gap-mon">'+g.mon+'</span>' +
+      '<div class="sv-gap-track"><div class="sv-gap-fill '+g.cls+'" style="width:'+g.fill+'%"></div></div>' +
+      '<span class="sv-gap-val" style="color:'+col+'">'+sign+'฿'+_sv_fmt(Math.abs(g.val))+'</span>' +
+      '</div>';
+  }).join('');
+}
+
+function _renderPipelineList(el, leads) {
+  const m0 = _salesMonthOffset(0), m1 = _salesMonthOffset(1), m2 = _salesMonthOffset(2);
   const groups = {};
   leads.forEach(l => {
     const ym = (l.expected_start_date||'').substring(0,7);
-    const key = ym < m0 ? m0 : ym; // past → bucket into M0
+    const key = ym < m0 ? m0 : ym;
     if (!groups[key]) groups[key] = [];
     groups[key].push(l);
   });
-
   const monthOrder = [m0, m1, m2];
-  // Add any future months beyond M2
   Object.keys(groups).forEach(k => { if (!monthOrder.includes(k)) monthOrder.push(k); });
 
-  let html = `<div class="sv-pipeline-header">
-    <div class="sv-pipeline-title">Pipeline</div>
-  </div>`;
+  const totalPipeline = leads.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0);
+  const tgt = 1600000; // placeholder until target system live
+  const pipM = {}; pipM[m0]=0; pipM[m1]=0; pipM[m2]=0;
+  leads.forEach(l => {
+    const ym = (l.expected_start_date||'').substring(0,7);
+    const k = ym < m0 ? m0 : ym;
+    if(pipM[k]!==undefined) pipM[k] += parseFloat(l.expected_gmv)||0;
+  });
+  const gaps = [m0,m1,m2].map(function(ym) {
+    const v = pipM[ym]||0;
+    return {mon:_salesMonthLabel(ym),fill:Math.min(100,Math.round(v/tgt*100)),val:v-tgt,cls:v>=tgt?'ok':v/tgt>0.8?'warn':'bad'};
+  });
+
+  const gapSign = totalPipeline >= tgt ? '+' : '\u2212';
+  const badCls = totalPipeline < tgt ? ' bad' : '';
+
+  let html = '<div class="sv-page-hd">' +
+    '<div class="sv-page-eye">Manual estimate</div>' +
+    '<div class="sv-page-title">Pipeline</div>' +
+    '</div>';
+
+  html += '<div class="sv-kpi-inline">' +
+    '<div class="sv-ki"><div class="sv-ki-l">Leads</div><div class="sv-ki-v">' + leads.length + '</div></div>' +
+    '<div class="sv-ki"><div class="sv-ki-l">ยอดคาด</div><div class="sv-ki-v">\u0e3f' + _sv_fmt(totalPipeline) + '</div></div>' +
+    '<div class="sv-ki"><div class="sv-ki-l">Gap</div><div class="sv-ki-v' + badCls + '">' + gapSign + '\u0e3f' + _sv_fmt(Math.abs(totalPipeline-tgt)) + '</div></div>' +
+    '</div>';
+
+  html += '<div class="sv-sec"><span class="sv-sec-t">ยอด vs Target</span></div>';
+  html += '<div class="sv-gap-section">' + _renderGapRows(gaps) + '</div>';
 
   if (!leads.length) {
-    html += `<div class="sv-empty">
-      <div class="sv-empty-title">ยังไม่มี leads</div>
-      <div class="sv-empty-sub">กดปุ่ม + เพื่อเพิ่ม lead ที่คุยอยู่</div>
-    </div>`;
+    html += '<div class="sv-empty"><div class="sv-empty-title">ยังไม่มี leads</div><div class="sv-empty-sub">กดปุ่ม + เพื่อเพิ่ม lead ที่คุยอยู่</div></div>';
   } else {
-    monthOrder.forEach(ym => {
+    html += '<div class="sv-lead-list">';
+    monthOrder.forEach(function(ym) {
       const items = groups[ym];
       if (!items || !items.length) return;
       const total = items.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0);
-      html += `<div class="sv-pipeline-month-label">${_salesMonthLabel(ym)}</div>
-        <div class="sv-pipeline-summary">฿${_sv_fmt(total)} รวม · ${items.length} leads</div>`;
-      items.forEach(l => {
+      html += '<div class="sv-lead-month-hd">' +
+        '<span class="sv-lead-month-name">' + _salesMonthLabel(ym) + '</span>' +
+        '<span class="sv-lead-month-total">\u0e3f' + _sv_fmt(total) + ' \u00b7 ' + items.length + ' leads</span>' +
+        '</div>';
+      items.forEach(function(l) {
         const dateLabel = l.expected_start_date ?
-          new Date(l.expected_start_date).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
-        html += `<div class="sv-lead-card">
-          <div class="sv-lead-info">
-            <div class="sv-lead-name">${l.shop_name||'—'}</div>
-            <div class="sv-lead-date">เริ่ม ${dateLabel}</div>
-          </div>
-          <div class="sv-lead-gmv">฿${_sv_fmt(l.expected_gmv)}</div>
-          <div class="sv-lead-actions">
-            <div class="sv-lead-btn" onclick="window._salesEditLead('${l.id}')">✎</div>
-            <div class="sv-lead-btn" onclick="window._salesDeleteLead('${l.id}','${(l.shop_name||'').replace(/'/g,"\\'")}')">✕</div>
-          </div>
-        </div>`;
+          new Date(l.expected_start_date).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '\u2014';
+        const safeId = (l.id||'');
+        const safeName = (l.shop_name||'').replace(/'/g,"\\'");
+        const editBtn = '<button class="sv-lead-btn" onclick="window._salesEditLead(\'' + safeId + '\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+          '</button>';
+        const delBtn = '<button class="sv-lead-btn" onclick="window._salesDeleteLead(\'' + safeId + '\',\'' + safeName + '\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>';
+        html += '<div class="sv-lead-row">' +
+          '<div class="sv-lead-info"><div class="sv-lead-name">' + (l.shop_name||'\u2014') + '</div><div class="sv-lead-date">\u0e40\u0e23\u0e34\u0e48\u0e21 ' + dateLabel + '</div></div>' +
+          '<div class="sv-lead-gmv">\u0e3f' + _sv_fmt(l.expected_gmv) + '</div>' +
+          '<div class="sv-lead-actions">' + editBtn + delBtn + '</div>' +
+          '</div>';
       });
     });
+    html += '</div>';
   }
 
-  html += `<button class="sv-fab" id="sv-fab-add" onclick="window._salesAddLead()">+</button>`;
+  html += '<button class="sv-fab" id="sv-fab-add" onclick="window._salesAddLead()">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+    ' \u0e40\u0e1e\u0e34\u0e48\u0e21 Lead</button>';
+
   el.innerHTML = html;
 }
 
@@ -505,9 +556,10 @@ function renderSalesCommission() {
   const el = document.getElementById('scr-sales-commission');
   if (!el) return;
   el.innerHTML = `<div class="sv-coming-soon">
-    <div class="sv-coming-soon-icon">💰</div>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="1.5" stroke-linecap="round" style="opacity:.4;margin-bottom:16px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
     <div class="sv-coming-soon-title">Commission</div>
-    <div class="sv-coming-soon-sub">ระบบ commission สำหรับ Sales<br>อยู่ระหว่างออกแบบ<br><br>Coming soon</div>
+    <div class="sv-coming-soon-sub">ระบบ commission สำหรับ Sales<br>อยู่ระหว่างออกแบบร่วมกับทีม</div>
+    <div class="sv-coming-badge">Coming Soon</div>
   </div>`;
 }
 
@@ -555,7 +607,7 @@ function renderSalesTeamview() {
     const daysLeft = _daysUntilExp(acct.newUserExpDate);
     const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
     const pctHeld = totalDays > 0 ? Math.min(100, Math.round((acct.daysHeld||0)/totalDays*100)) : 0;
-    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : '';
+    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
     const expLabel = acct.newUserExpDate ?
       new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
 
@@ -564,16 +616,20 @@ function renderSalesTeamview() {
     // Inject Sales-specific block; hide KAM elements via CSS class
     const salesBlock = document.createElement('div');
     salesBlock.className = 'sales-content-only';
-    salesBlock.innerHTML = `<div style="padding:12px 16px;background:rgba(255,255,255,.05);border-radius:14px;margin:8px 0">
-      <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);font-family:'DM Mono',monospace;margin-bottom:8px">ระยะเวลาในมือ</div>
-      <div class="sv-days-bar-track" style="margin-bottom:6px">
-        <div class="sv-days-bar-fill ${barClass}" style="width:${pctHeld}%"></div>
+    // v6: Revolut style tenure section — no card, just rows
+    salesBlock.innerHTML = `<div class="sv-band"></div>
+      <div class="sv-tenure-section">
+        <div class="sv-tenure-eye">ระยะเวลาในมือ</div>
+        <div class="sv-tenure-bar-row">
+          <div class="sv-tenure-track"><div class="sv-tenure-fill${barClass==='late'?' late':''}" style="width:${pctHeld}%"></div></div>
+          <span class="sv-tenure-pct${barClass==='late'?' late':''}">${pctHeld}%</span>
+        </div>
+        <div class="sv-tenure-dl">
+          <span class="sv-tenure-held">ถือมา ${acct.daysHeld||0} วัน</span>
+          <span class="sv-tenure-exp">หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.5)">
-        <span>ถือมา ${acct.daysHeld||0} วัน</span>
-        <span>หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
-      </div>
-    </div>`;
+      <div class="sv-band"></div>`;
     target.prepend(salesBlock);
   }
 })();
@@ -622,3 +678,4 @@ function renderSalesTeamview() {
 })();
 
 console.log('%c[Sense] Sales module loaded','color:#4ddc97');
+
