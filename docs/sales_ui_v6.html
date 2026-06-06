@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Freshket Sense — Sales v6</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --canvas:   #FFFFFF;
+  --surface:  #F7F7F7;
+  --ink:      #222222;
+  --body:     #3F3F3F;
+  --muted:    #6A6A6A;
+  --hairline: #EBEBEB;
+  --ac:       #FF385C;
+  --ac-dim:   rgba(255,56,92,.08);
+  --ok:       #34C759;
+  --warn:     #FF9500;
+  --sp: cubic-bezier(0.16,1,0.3,1);
+  --bo: cubic-bezier(0.34,1.56,0.64,1);
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+
+body {
+  font-family: 'Noto Sans Thai', -apple-system, sans-serif;
+  background: #E2E2E2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px 80px;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.pw { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.pl { font-size:10px; font-family:'IBM Plex Mono',monospace; letter-spacing:.14em; text-transform:uppercase; color:#999; }
+
+.phone {
+  width:375px; height:820px;
+  background:var(--canvas);
+  border-radius:52px; overflow:hidden;
+  position:relative; display:flex; flex-direction:column;
+  box-shadow: 0 0 0 10px #1A1A1A, 0 0 0 11.5px rgba(255,255,255,.1), 0 40px 100px rgba(0,0,0,.4);
+}
+.island { position:absolute; top:12px; left:50%; transform:translateX(-50%); width:120px; height:36px; background:#000; border-radius:999px; z-index:200; }
+
+.sbar { height:54px; padding:16px 24px 0; display:flex; justify-content:space-between; align-items:center; font-size:15px; font-weight:600; color:var(--ink); flex-shrink:0; }
+
+/* Topbar — no border, clean */
+.topbar {
+  padding:8px 20px 10px;
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--canvas);
+  border-bottom:1px solid var(--hairline);
+  flex-shrink:0; z-index:20;
+}
+.tb-l { display:flex; align-items:center; gap:8px; }
+.tb-mark { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:-.02em; }
+.sense-chip { font-size:10px; font-weight:600; color:var(--ac); background:var(--ac-dim); border-radius:999px; padding:2px 9px; }
+.role-chip { font-size:11px; font-weight:700; color:var(--ac); background:var(--ac-dim); border-radius:999px; padding:4px 12px; }
+
+.screen { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; padding-bottom:96px; }
+.screen::-webkit-scrollbar { display:none; }
+
+/* ── PILL NAV — white, strong shadow ── */
+.bnav {
+  position:absolute;
+  bottom:calc(6px + env(safe-area-inset-bottom,0px));
+  left:16px; right:16px; max-width:408px; margin:0 auto;
+  background:#fff;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,.06);
+  padding:10px 12px; gap:0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.13), 0 20px 48px rgba(0,0,0,.09);
+  display:flex; align-items:center; z-index:100;
+}
+.ni { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; padding:4px 0; cursor:pointer; background:none; border:none; outline:none; border-radius:999px; transition:transform .3s var(--bo); justify-content:center; }
+.nwrap { position:relative; }
+.ni svg { width:24px; height:24px; opacity:.32; color:var(--ink); transition:opacity .18s,filter .18s,color .18s; }
+.ni .lb { font-size:10px; font-weight:600; color:var(--muted); letter-spacing:.2px; transition:color .18s; white-space:nowrap; font-family:'Noto Sans Thai',sans-serif; }
+.ni.on svg { opacity:1; color:var(--ac); filter:drop-shadow(0 0 5px rgba(255,56,92,.35)); }
+.ni.on .lb { color:var(--ac); font-weight:700; }
+.ni:active { transform:scale(1.1); transition:transform .07s ease !important; }
+
+/* ════════════════════════════════════════
+   PAGE HEADER
+════════════════════════════════════════ */
+.phd { padding:22px 20px 6px; }
+.peye { font-size:10px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:4px; }
+.ptitle { font-size:28px; font-weight:700; color:var(--ink); letter-spacing:-.02em; line-height:1.15; }
+
+/* ════════════════════════════════════════
+   HERO — single card, the only box on page
+   Revolut style: big number anchors,
+   label tiny above, progress below
+════════════════════════════════════════ */
+.hero {
+  margin:16px 20px 0;
+  background:var(--surface);
+  border-radius:16px;
+  padding:20px 20px 18px;
+  position:relative; overflow:hidden;
+}
+/* Rausch top stroke */
+.hero::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--ac); border-radius:16px 16px 0 0; }
+
+.hero-eye { font-size:10px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--ac); font-family:'IBM Plex Mono',monospace; margin-bottom:6px; }
+.hero-num { font-size:48px; font-weight:700; color:var(--ink); letter-spacing:-.03em; line-height:1; }
+.hero-unit { font-size:22px; font-weight:600; color:var(--body); }
+.hero-sub { margin-top:6px; display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); }
+.gbadge { font-size:12px; font-weight:700; color:var(--ac); background:var(--ac-dim); border-radius:999px; padding:2px 10px; }
+.gbadge.ok { color:var(--ok); background:rgba(52,199,89,.09); }
+
+.tbar { margin-top:14px; }
+.tbar-t { height:4px; background:var(--hairline); border-radius:2px; overflow:hidden; }
+.tbar-f { height:100%; border-radius:2px; transition:width .9s var(--sp); }
+.tbar-f.ac  { background:var(--ac); }
+.tbar-f.ok  { background:var(--ok); }
+.tbar-f.w   { background:var(--warn); }
+.tbar-meta { display:flex; justify-content:space-between; margin-top:5px; font-size:11px; font-weight:600; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+
+/* ════════════════════════════════════════
+   PROJ STRIP — Apple Music style
+   No boxes. 3 stat columns separated by
+   thin vertical hairlines, sitting on bg
+════════════════════════════════════════ */
+.proj-row {
+  display:flex;
+  margin:16px 20px 0;
+  background:var(--surface);
+  border-radius:12px;
+  overflow:hidden;
+}
+.proj-cell {
+  flex:1;
+  padding:12px 0 12px 14px;
+  position:relative;
+}
+.proj-cell + .proj-cell::before {
+  content:'';
+  position:absolute; left:0; top:10px; bottom:10px;
+  width:1px; background:var(--hairline);
+}
+.proj-cell.now { background:rgba(255,56,92,.04); }
+.pc-m { font-size:9px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:5px; }
+.proj-cell.now .pc-m { color:var(--ac); }
+.pc-a { font-size:17px; font-weight:700; color:var(--ink); letter-spacing:-.02em; line-height:1.1; }
+.pc-g { font-size:11px; font-weight:700; margin-top:3px; font-family:'IBM Plex Mono',monospace; }
+.pc-g.ok   { color:var(--ok); }
+.pc-g.warn { color:var(--warn); }
+.pc-g.bad  { color:var(--ac); }
+
+/* ════════════════════════════════════════
+   SECTION LABEL — Revolut style
+   No border, no box. Just label floating.
+════════════════════════════════════════ */
+.sec { padding:20px 20px 10px; display:flex; justify-content:space-between; align-items:center; }
+.sec-t { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+.sec-c { font-size:11px; font-weight:600; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+
+/* ════════════════════════════════════════
+   HANDOVER — Revolut list style
+   No card box. Red dot per row.
+   Hairline dividers between rows.
+════════════════════════════════════════ */
+.hov-section { padding:0 20px; }
+.hov-title-row {
+  display:flex; align-items:center; gap:7px;
+  padding-bottom:10px;
+}
+.hov-ico { width:15px; height:15px; color:var(--ac); flex-shrink:0; }
+.hov-title-text { font-size:13px; font-weight:700; color:var(--ac); }
+
+.hov-row {
+  display:flex; align-items:center;
+  padding:11px 0;
+  border-top:1px solid var(--hairline);
+}
+.hov-dot { width:7px; height:7px; border-radius:50%; background:var(--ac); flex-shrink:0; margin-right:10px; }
+.hov-name { font-size:14px; font-weight:500; color:var(--ink); flex:1; }
+.hov-days { font-size:12px; font-weight:700; color:var(--ac); font-family:'IBM Plex Mono',monospace; }
+
+/* ════════════════════════════════════════
+   OUTLET LIST — Revolut transaction style
+   No card per row. List with hairline divider.
+   Left: colored urgency bar (2px) + name
+   Right: GMV amount
+   Below: days bar full width
+════════════════════════════════════════ */
+.outlet-list { padding:0 20px; }
+
+.ol-row {
+  padding:13px 0;
+  border-top:1px solid var(--hairline);
+  cursor:pointer;
+  transition:opacity .12s;
+}
+.ol-row:active { opacity:.7; }
+
+.ol-top { display:flex; align-items:center; gap:0; margin-bottom:6px; }
+
+/* Urgency indicator — tiny colored pill left of name */
+.ol-ind {
+  width:3px; height:32px;
+  border-radius:2px;
+  background:var(--hairline);
+  flex-shrink:0; margin-right:10px;
+  align-self:center;
+}
+.ol-ind.ok   { background:var(--ok); }
+.ol-ind.mid  { background:var(--warn); }
+.ol-ind.late { background:var(--ac); }
+
+.ol-info { flex:1; min-width:0; }
+.ol-name { font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; }
+.ol-meta { font-size:12px; font-weight:400; color:var(--muted); margin-top:1px; }
+
+.ol-right { text-align:right; flex-shrink:0; margin-left:10px; }
+.ol-gmv { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:-.01em; }
+.ol-type { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ac); font-family:'IBM Plex Mono',monospace; margin-top:2px; }
+.ol-type.ok   { color:var(--ok); }
+.ol-type.mid  { color:var(--warn); }
+
+/* Days bar — full width under name+amount */
+.ol-bar-wrap { padding-left:13px; }
+.db-t { height:3px; background:var(--hairline); border-radius:2px; overflow:hidden; margin-bottom:4px; }
+.db-f { height:100%; border-radius:2px; transition:width .5s var(--sp); }
+.db-f.ok   { background:var(--ok); }
+.db-f.mid  { background:var(--warn); }
+.db-f.late { background:var(--ac); }
+.db-m { display:flex; justify-content:space-between; font-size:10px; font-weight:600; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+.db-exp { color:var(--body); }
+
+/* ════════════════════════════════════════
+   PIPELINE SCREEN
+════════════════════════════════════════ */
+
+/* KPI — inline stats, no boxes
+   Revolut: big number, small label above */
+.kpi-inline {
+  display:flex; gap:0;
+  padding:0 20px 0;
+}
+.ki {
+  flex:1; padding:16px 0 12px 0;
+  position:relative;
+}
+.ki + .ki { padding-left:20px; }
+.ki + .ki::before { content:''; position:absolute; left:0; top:14px; bottom:10px; width:1px; background:var(--hairline); }
+.ki-l { font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:4px; }
+.ki-v { font-size:22px; font-weight:700; color:var(--ink); letter-spacing:-.02em; line-height:1; }
+.ki-v.bad { color:var(--ac); }
+
+/* Gap chart — no card, just section */
+.gap-section { padding:4px 20px 0; }
+.gap-title { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:14px; }
+.gr { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.gr:last-child { margin-bottom:0; }
+.gr-m { font-size:11px; font-weight:600; color:var(--muted); font-family:'IBM Plex Mono',monospace; width:32px; flex-shrink:0; }
+.gr-t { flex:1; height:4px; background:var(--hairline); border-radius:2px; overflow:hidden; }
+.gr-f { height:100%; border-radius:2px; transition:width .7s var(--sp); }
+.gr-f.ok   { background:var(--ok); }
+.gr-f.warn { background:var(--warn); }
+.gr-f.bad  { background:var(--ac); }
+.gr-v { font-size:11px; font-weight:700; font-family:'IBM Plex Mono',monospace; width:44px; text-align:right; flex-shrink:0; }
+
+/* Lead list — same Revolut list style */
+.lead-list { padding:0 20px; }
+.lead-month-header {
+  padding:16px 0 8px;
+  display:flex; justify-content:space-between; align-items:baseline;
+  border-top:1px solid var(--hairline);
+}
+.lm-name { font-size:15px; font-weight:700; color:var(--ink); }
+.lm-total { font-size:12px; font-weight:600; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+
+.lead-row {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 0;
+  border-top:1px solid var(--hairline);
+  cursor:pointer;
+}
+.lr-info { flex:1; min-width:0; }
+.lr-name { font-size:14px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lr-date { font-size:12px; font-weight:400; color:var(--muted); margin-top:1px; font-family:'IBM Plex Mono',monospace; }
+.lr-gmv { font-size:15px; font-weight:700; color:var(--ink); white-space:nowrap; flex-shrink:0; }
+.lr-actions { display:flex; gap:5px; flex-shrink:0; }
+.la { width:28px; height:28px; border-radius:999px; background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); border:none; }
+.la svg { width:13px; height:13px; }
+.la:active { background:var(--hairline); }
+
+/* FAB — rausch pill */
+.fab {
+  position:absolute; bottom:88px; right:20px;
+  height:44px; padding:0 20px;
+  background:var(--ac); color:#fff; border:none; border-radius:999px;
+  font-size:14px; font-weight:700; font-family:'Noto Sans Thai',sans-serif;
+  display:flex; align-items:center; gap:7px;
+  box-shadow:0 4px 16px rgba(255,56,92,.32);
+  z-index:50; cursor:pointer; transition:transform .2s var(--sp);
+}
+.fab:active { transform:scale(.95); }
+
+/* ════════════════════════════════════════
+   ACCOUNT VIEW
+════════════════════════════════════════ */
+.back-r { display:flex; align-items:center; gap:4px; padding:14px 20px 8px; cursor:pointer; }
+.back-r svg { color:var(--ac); }
+.back-l { font-size:14px; font-weight:600; color:var(--ac); }
+
+.acct-hd { padding:4px 20px 16px; }
+.acct-nm { font-size:26px; font-weight:700; color:var(--ink); letter-spacing:-.025em; line-height:1.15; margin-bottom:6px; }
+.acct-row { display:flex; align-items:center; gap:8px; }
+.acct-pill { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ac); background:var(--ac-dim); border-radius:999px; padding:3px 10px; }
+.acct-gmv { font-size:14px; font-weight:400; color:var(--muted); }
+
+/* Full-bleed divider — Revolut section separator */
+.band { height:8px; background:var(--surface); }
+
+/* Tenure — no card, just content in section */
+.tenure-section { padding:16px 20px; }
+.tenure-eye { font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:12px; }
+.tenure-bar-row { display:flex; align-items:center; gap:12px; margin-bottom:7px; }
+.tenure-track { flex:1; height:6px; background:var(--hairline); border-radius:3px; overflow:hidden; }
+.tenure-fill { height:100%; border-radius:3px; background:var(--warn); transition:width .6s var(--sp); }
+.tenure-pct { font-size:14px; font-weight:700; color:var(--warn); font-family:'IBM Plex Mono',monospace; width:36px; text-align:right; }
+.tenure-dl { display:flex; justify-content:space-between; font-size:12px; font-weight:500; }
+.tenure-held { color:var(--muted); }
+.tenure-exp { font-weight:700; color:var(--ac); }
+
+/* Stats — Revolut list rows, no grid boxes */
+.stat-list { padding:0 20px; }
+.stat-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 0;
+  border-top:1px solid var(--hairline);
+}
+.stat-row:last-child { border-bottom:1px solid var(--hairline); }
+.stat-key { font-size:14px; font-weight:400; color:var(--muted); }
+.stat-val { font-size:14px; font-weight:700; color:var(--ink); }
+
+/* Tabs — Apple Music category style */
+.itabs {
+  display:flex; gap:0; padding:12px 20px 0;
+  border-bottom:1px solid var(--hairline);
+}
+.itab {
+  padding:8px 12px; font-size:13px; font-weight:600;
+  color:var(--muted); background:none; border:none;
+  border-bottom:2px solid transparent;
+  cursor:pointer; transition:color .15s, border-color .15s;
+  margin-bottom:-1px; font-family:'Noto Sans Thai',sans-serif;
+}
+.itab.on { color:var(--ink); border-bottom-color:var(--ac); }
+
+/* Profile rows */
+.pf-list { padding:0 20px; }
+.pf-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 0; border-bottom:1px solid var(--hairline);
+}
+.pf-row:last-child { border:none; }
+.pf-k { font-size:14px; font-weight:400; color:var(--muted); }
+.pf-v { font-size:14px; font-weight:600; color:var(--ink); }
+.pf-v.ac { color:var(--ac); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SCREEN 1: พอร์ต ═══════════ -->
+<div class="pw">
+<div class="pl">Screen 1 — พอร์ต</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar">
+    <span>9:41</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="#222"><rect x="0" y="3.5" width="3" height="7.5" rx="1"/><rect x="4.7" y="2" width="3" height="9" rx="1"/><rect x="9.4" y="0" width="3" height="11" rx="1"/><rect x="14.1" y="0" width="2.9" height="11" rx="1" opacity=".3"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none" stroke="#222" stroke-width="1.2"><rect x=".6" y=".6" width="21.8" height="10.8" rx="3.4"/><path d="M23 4.5v3a1.5 1.5 0 000-3z" fill="#222" stroke="none"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#222" stroke="none"/></svg>
+    </div>
+  </div>
+  <div class="topbar">
+    <div class="tb-l">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="tb-mark">freshket</span>
+      <span class="sense-chip">Sense</span>
+    </div>
+    <div class="role-chip">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="phd">
+      <div class="peye">มิถุนายน 2569</div>
+      <div class="ptitle">พอร์ตของคุณ</div>
+    </div>
+
+    <!-- Hero — the only box -->
+    <div class="hero">
+      <div class="hero-eye">Runrate ในมือ</div>
+      <div><span class="hero-num">฿1.24</span><span class="hero-unit">M</span></div>
+      <div class="hero-sub">
+        <span>24 ร้าน active</span>
+        <span class="gbadge">−฿360K vs target</span>
+      </div>
+      <div class="tbar">
+        <div class="tbar-t"><div class="tbar-f w" style="width:78%"></div></div>
+        <div class="tbar-meta"><span>78% of target</span><span>Target ฿1.6M</span></div>
+      </div>
+    </div>
+
+    <!-- 3-month — no boxes, inline columns -->
+    <div class="proj-row">
+      <div class="proj-cell now">
+        <div class="pc-m">มิ.ย.</div>
+        <div class="pc-a">฿1.24M</div>
+        <div class="pc-g warn">−฿360K</div>
+      </div>
+      <div class="proj-cell">
+        <div class="pc-m">ก.ค.</div>
+        <div class="pc-a">฿1.09M</div>
+        <div class="pc-g bad">−฿510K</div>
+      </div>
+      <div class="proj-cell">
+        <div class="pc-m">ส.ค.</div>
+        <div class="pc-a">฿820K</div>
+        <div class="pc-g bad">−฿780K</div>
+      </div>
+    </div>
+
+    <!-- Handover — no box, list rows with dots -->
+    <div class="sec" style="padding-bottom:4px">
+      <div class="sec-t" style="color:var(--ac);display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        ใกล้ Handover
+      </div>
+      <span class="sec-c">3 ร้าน</span>
+    </div>
+    <div class="hov-section">
+      <div class="hov-row"><div class="hov-dot"></div><span class="hov-name">ร้านซีฟู้ดบ้านเรา</span><span class="hov-days">5d</span></div>
+      <div class="hov-row"><div class="hov-dot"></div><span class="hov-name">The Corner Bistro</span><span class="hov-days">11d</span></div>
+      <div class="hov-row"><div class="hov-dot"></div><span class="hov-name">ครัวคุณแม่</span><span class="hov-days">14d</span></div>
+    </div>
+
+    <!-- Outlet list — Revolut transaction rows -->
+    <div class="sec">
+      <span class="sec-t">ร้านทั้งหมด</span>
+      <span class="sec-c">24 ร้าน</span>
+    </div>
+    <div class="outlet-list">
+
+      <div class="ol-row">
+        <div class="ol-ind late"></div>
+        <div class="ol-info">
+          <div class="ol-name">ร้านซีฟู้ดบ้านเรา</div>
+          <div class="ol-meta">ถือมา 40 วัน</div>
+        </div>
+        <div class="ol-right">
+          <div class="ol-gmv">฿48K</div>
+          <div class="ol-type">SA · 5d</div>
+        </div>
+      </div>
+      <div class="ol-bar-wrap">
+        <div class="db-t"><div class="db-f late" style="width:89%"></div></div>
+        <div class="db-m"><span></span><span class="db-exp">หมด 11 มิ.ย.</span></div>
+      </div>
+
+      <div class="ol-row">
+        <div class="ol-ind mid"></div>
+        <div class="ol-info">
+          <div class="ol-name">The Corner Bistro</div>
+          <div class="ol-meta">ถือมา 63 วัน</div>
+        </div>
+        <div class="ol-right">
+          <div class="ol-gmv">฿92K</div>
+          <div class="ol-type mid">MC · 11d</div>
+        </div>
+      </div>
+      <div class="ol-bar-wrap">
+        <div class="db-t"><div class="db-f mid" style="width:70%"></div></div>
+        <div class="db-m"><span></span><span class="db-exp">หมด 17 มิ.ย.</span></div>
+      </div>
+
+      <div class="ol-row">
+        <div class="ol-ind ok"></div>
+        <div class="ol-info">
+          <div class="ol-name">Bloom Cafe &amp; Bistro</div>
+          <div class="ol-meta">ถือมา 17 วัน</div>
+        </div>
+        <div class="ol-right">
+          <div class="ol-gmv">฿65K</div>
+          <div class="ol-type ok">SA · 29d</div>
+        </div>
+      </div>
+      <div class="ol-bar-wrap">
+        <div class="db-t"><div class="db-f ok" style="width:38%"></div></div>
+        <div class="db-m"><span></span><span class="db-exp">หมด 5 ก.ค.</span></div>
+      </div>
+
+      <div class="ol-row">
+        <div class="ol-ind ok"></div>
+        <div class="ol-info">
+          <div class="ol-name">Central Kitchen Co.</div>
+          <div class="ol-meta">ถือมา 20 วัน</div>
+        </div>
+        <div class="ol-right">
+          <div class="ol-gmv">฿210K</div>
+          <div class="ol-type ok">Chain · 70d</div>
+        </div>
+      </div>
+      <div class="ol-bar-wrap">
+        <div class="db-t"><div class="db-f ok" style="width:22%"></div></div>
+        <div class="db-m"><span></span><span class="db-exp">หมด 4 ก.ย.</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <nav class="bnav">
+    <button class="ni on"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg></div><span class="lb">พอร์ต</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></div><span class="lb">Save</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span class="lb">Pipeline</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><span class="lb">Commission</span></button>
+  </nav>
+</div>
+</div>
+
+<!-- ═══════════ SCREEN 2: PIPELINE ═══════════ -->
+<div class="pw">
+<div class="pl">Screen 2 — Pipeline</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="17" height="11" viewBox="0 0 17 11" fill="#222"><rect x="0" y="3.5" width="3" height="7.5" rx="1"/><rect x="4.7" y="2" width="3" height="9" rx="1"/><rect x="9.4" y="0" width="3" height="11" rx="1"/></svg><svg width="25" height="12" viewBox="0 0 25 12" fill="none" stroke="#222" stroke-width="1.2"><rect x=".6" y=".6" width="21.8" height="10.8" rx="3.4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#222" stroke="none"/></svg></div></div>
+  <div class="topbar">
+    <div class="tb-l">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="tb-mark">freshket</span><span class="sense-chip">Sense</span>
+    </div>
+    <div class="role-chip">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="phd">
+      <div class="peye">Manual estimate</div>
+      <div class="ptitle">Pipeline</div>
+    </div>
+
+    <!-- KPI inline — no boxes -->
+    <div class="kpi-inline">
+      <div class="ki"><div class="ki-l">Leads</div><div class="ki-v">8</div></div>
+      <div class="ki"><div class="ki-l">ยอดคาด</div><div class="ki-v">฿380K</div></div>
+      <div class="ki"><div class="ki-l">Gap</div><div class="ki-v bad">−฿120K</div></div>
+    </div>
+
+    <!-- Gap chart — no card -->
+    <div class="sec" style="padding-bottom:4px"><span class="sec-t">ยอด vs Target</span></div>
+    <div class="gap-section">
+      <div class="gr"><span class="gr-m">มิ.ย.</span><div class="gr-t"><div class="gr-f warn" style="width:62%"></div></div><span class="gr-v" style="color:var(--warn)">−120K</span></div>
+      <div class="gr"><span class="gr-m">ก.ค.</span><div class="gr-t"><div class="gr-f ok" style="width:100%"></div></div><span class="gr-v" style="color:var(--ok)">+50K</span></div>
+      <div class="gr"><span class="gr-m">ส.ค.</span><div class="gr-t"><div class="gr-f bad" style="width:35%"></div></div><span class="gr-v" style="color:var(--ac)">−290K</span></div>
+    </div>
+
+    <!-- Lead list -->
+    <div class="lead-list">
+      <div class="lead-month-header">
+        <span class="lm-name">มิถุนายน 2569</span>
+        <span class="lm-total">฿180K · 3 leads</span>
+      </div>
+      <div class="lead-row">
+        <div class="lr-info"><div class="lr-name">ร้านอาหารยายเพิ่ม</div><div class="lr-date">เริ่ม 10 มิ.ย.</div></div>
+        <div class="lr-gmv">฿80K</div>
+        <div class="lr-actions">
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="lead-row">
+        <div class="lr-info"><div class="lr-name">Bloom Cafe &amp; Bistro</div><div class="lr-date">เริ่ม 15 มิ.ย.</div></div>
+        <div class="lr-gmv">฿60K</div>
+        <div class="lr-actions">
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="lead-row">
+        <div class="lr-info"><div class="lr-name">The Workshop Kitchen</div><div class="lr-date">เริ่ม 20 มิ.ย.</div></div>
+        <div class="lr-gmv">฿40K</div>
+        <div class="lr-actions">
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+
+      <div class="lead-month-header">
+        <span class="lm-name">กรกฎาคม 2569</span>
+        <span class="lm-total">฿200K · 5 leads</span>
+      </div>
+      <div class="lead-row">
+        <div class="lr-info"><div class="lr-name">Central Kitchen Co.</div><div class="lr-date">เริ่ม 1 ก.ค.</div></div>
+        <div class="lr-gmv">฿120K</div>
+        <div class="lr-actions">
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="la"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="lead-row" style="opacity:.55">
+        <div class="lr-info"><div class="lr-name">+4 leads อื่นๆ</div><div class="lr-date">ก.ค. · รวม ฿80K</div></div>
+        <div class="lr-gmv" style="color:var(--muted)">฿80K</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    เพิ่ม Lead
+  </button>
+
+  <nav class="bnav">
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg></div><span class="lb">พอร์ต</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></div><span class="lb">Save</span></button>
+    <button class="ni on"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span class="lb">Pipeline</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><span class="lb">Commission</span></button>
+  </nav>
+</div>
+</div>
+
+<!-- ═══════════ SCREEN 3: ACCOUNT ═══════════ -->
+<div class="pw">
+<div class="pl">Screen 3 — Account View</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><div style="display:flex;gap:6px;align-items:center"><svg width="17" height="11" viewBox="0 0 17 11" fill="#222"><rect x="0" y="3.5" width="3" height="7.5" rx="1"/><rect x="4.7" y="2" width="3" height="9" rx="1"/><rect x="9.4" y="0" width="3" height="11" rx="1"/></svg><svg width="25" height="12" viewBox="0 0 25 12" fill="none" stroke="#222" stroke-width="1.2"><rect x=".6" y=".6" width="21.8" height="10.8" rx="3.4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#222" stroke="none"/></svg></div></div>
+  <div class="topbar">
+    <div class="tb-l">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span class="tb-mark">freshket</span><span class="sense-chip">Sense</span>
+    </div>
+    <div class="role-chip">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="back-r">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 1L1 7l6 6"/></svg>
+      <span class="back-l">พอร์ต</span>
+    </div>
+
+    <div class="acct-hd">
+      <div class="acct-nm">The Corner Bistro</div>
+      <div class="acct-row">
+        <span class="acct-pill">MC</span>
+        <span class="acct-gmv">฿92,000 / เดือน</span>
+      </div>
+    </div>
+
+    <div class="band"></div>
+
+    <!-- Tenure — no card -->
+    <div class="tenure-section">
+      <div class="tenure-eye">ระยะเวลาในมือ</div>
+      <div class="tenure-bar-row">
+        <div class="tenure-track"><div class="tenure-fill" style="width:70%"></div></div>
+        <span class="tenure-pct">70%</span>
+      </div>
+      <div class="tenure-dl">
+        <span class="tenure-held">ถือมา 63 วัน</span>
+        <span class="tenure-exp">หมด 17 มิ.ย. (11d)</span>
+      </div>
+    </div>
+
+    <div class="band"></div>
+
+    <!-- Stats — list rows -->
+    <div class="stat-list" style="padding-top:4px">
+      <div class="stat-row"><span class="stat-key">GMV เดือนนี้</span><span class="stat-val">฿92,000</span></div>
+      <div class="stat-row"><span class="stat-key">First Order</span><span class="stat-val">6 เม.ย. 2569</span></div>
+      <div class="stat-row"><span class="stat-key">ออเดอร์</span><span class="stat-val">14 ครั้ง</span></div>
+      <div class="stat-row"><span class="stat-key">AOV</span><span class="stat-val">฿6,571</span></div>
+    </div>
+
+    <div class="band"></div>
+
+    <!-- Tabs -->
+    <div class="itabs">
+      <button class="itab on">Profile</button>
+      <button class="itab">SKU</button>
+      <button class="itab">Echo</button>
+      <button class="itab">Save</button>
+    </div>
+
+    <!-- Profile rows -->
+    <div class="pf-list" style="padding-top:4px">
+      <div class="pf-row"><span class="pf-k">ประเภท</span><span class="pf-v">Mid-sized Customer</span></div>
+      <div class="pf-row"><span class="pf-k">Class</span><span class="pf-v">Normal</span></div>
+      <div class="pf-row"><span class="pf-k">เขต</span><span class="pf-v">สาทร</span></div>
+      <div class="pf-row"><span class="pf-k">Sales owner</span><span class="pf-v ac">Guitar (คุณ)</span></div>
+      <div class="pf-row"><span class="pf-k">ทีม</span><span class="pf-v">Team A — Tao TL</span></div>
+    </div>
+  </div>
+
+  <nav class="bnav">
+    <button class="ni on"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg></div><span class="lb">พอร์ต</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></div><span class="lb">Save</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span class="lb">Pipeline</span></button>
+    <button class="ni"><div class="nwrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><span class="lb">Commission</span></button>
+  </nav>
+</div>
+</div>
+
+</body>
+</html>
