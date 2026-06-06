@@ -1,4 +1,4 @@
-<!-- Freshket Sense v359: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v360: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5170,7 +5170,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v359',
+      version: 'v360',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -28225,6 +28225,80 @@ flex-wrap:wrap;}
   padding: 4px 14px;
   font-family: 'IBM Plex Mono', monospace;
 }
+
+/* ── W1: Lead type selector (SA / MC / Chain) ── */
+.sv-type-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sv-type-btn {
+  flex: 1;
+  padding: 10px 0;
+  background: #F7F7F7;
+  border: 1.5px solid #EBEBEB;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.sv-type-btn.on {
+  border-color: #FF385C;
+  color: #FF385C;
+  background: rgba(255,56,92,.05);
+}
+.sv-type-btn:active { opacity: .7; }
+.sv-type-tenure {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: inherit;
+  opacity: .7;
+}
+
+/* ── W1: Lead row type pill ── */
+.sv-lead-type-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #FF385C;
+  background: rgba(255,56,92,.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  vertical-align: middle;
+}
+
+/* ── W4: TL view target button ── */
+.sv-tl-target-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  background: rgba(255,56,92,.08);
+  color: #FF385C;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Noto Sans Thai', sans-serif;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 4px;
+  transition: background .12s;
+}
+.sv-tl-target-btn:active { background: rgba(255,56,92,.15); }
+.sv-tl-target-btn svg { width: 13px; height: 13px; }
 </style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
@@ -39287,8 +39361,11 @@ function renderSalesHome(el, outlets, pipeline) {
   const target = getSalesTarget(period, email);
   const handover = getSalesHandoverOut(outlets);
   const proj = getSalesProjection(outlets, pipeline, target);
+  // W2: runrate = outlets still held PAST this month (exclude expiring M0)
+  // totalRunrate is used for outlet count only; heroRunrate drives target comparison
   const totalRunrate = outlets.reduce((s,o) => s+(o.runrate||0), 0);
-  const targetPct = target > 0 ? Math.min(200, Math.round(totalRunrate/target*100)) : 0;
+  const heroRunrate = getSalesRunrate(outlets);
+  const targetPct = target > 0 ? Math.min(200, Math.round(heroRunrate/target*100)) : 0;
   const barClass = targetPct >= 100 ? 'great' : targetPct >= 80 ? '' : targetPct >= 60 ? 'warn' : 'danger';
 
   // Handover warning: outlets expiring ≤14 days
@@ -39333,12 +39410,12 @@ function renderSalesHome(el, outlets, pipeline) {
 
     <div class="sv-hero">
       <div class="sv-hero-eye">Runrate ในมือ</div>
-      <div><span class="sv-hero-num">฿${_sv_fmt(totalRunrate)}</span></div>
+      <div><span class="sv-hero-num">฿${_sv_fmt(heroRunrate)}</span></div>
       <div class="sv-hero-sub">
         <span>${outlets.length} ร้าน active</span>
         ${target > 0 ? `<span class="sv-gap-badge${targetPct>=100?' ok':''}">
-          ${targetPct >= 100 ? '+' : '−'}฿${_sv_fmt(Math.abs(totalRunrate-target))} vs target
-        </span>` : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target</span>'}
+          ${targetPct >= 100 ? '+' : '−'}฿${_sv_fmt(Math.abs(heroRunrate-target))} vs target
+        </span>` : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>'}
       </div>
       ${target > 0 ? `<div class="sv-tbar">
         <div class="sv-tbar-track"><div class="sv-tbar-fill ${tbarClass}" style="width:${Math.min(100,targetPct)}%"></div></div>
@@ -39505,7 +39582,10 @@ function _renderPipelineList(el, leads) {
   Object.keys(groups).forEach(k => { if (!monthOrder.includes(k)) monthOrder.push(k); });
 
   const totalPipeline = leads.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0);
-  const tgt = 1600000; // placeholder until target system live
+  // W2: connect to real target via _tgtGet (same Supabase targets table as KAM)
+  const _email = (currentUserProfile && currentUserProfile.email) || '';
+  const _period = _salesCurrentPeriod();
+  const tgt = getSalesTarget(_period, _email) || 1600000;
   const pipM = {}; pipM[m0]=0; pipM[m1]=0; pipM[m2]=0;
   leads.forEach(l => {
     const ym = (l.expected_start_date||'').substring(0,7);
@@ -39557,8 +39637,11 @@ function _renderPipelineList(el, leads) {
         const delBtn = '<button class="sv-lead-btn" onclick="window._salesDeleteLead(\'' + safeId + '\',\'' + safeName + '\')">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
           '</button>';
+        var lType = (l.account_type||'SA').toUpperCase();
+        var tenureDays = lType==='SA' ? 45 : 90;
+        var typePill = '<span class="sv-lead-type-pill">' + lType + ' · ' + tenureDays + 'd</span>';
         html += '<div class="sv-lead-row">' +
-          '<div class="sv-lead-info"><div class="sv-lead-name">' + (l.shop_name||'\u2014') + '</div><div class="sv-lead-date">\u0e40\u0e23\u0e34\u0e48\u0e21 ' + dateLabel + '</div></div>' +
+          '<div class="sv-lead-info"><div class="sv-lead-name">' + (l.shop_name||'\u2014') + typePill + '</div><div class="sv-lead-date">\u0e40\u0e23\u0e34\u0e48\u0e21 ' + dateLabel + '</div></div>' +
           '<div class="sv-lead-gmv">\u0e3f' + _sv_fmt(l.expected_gmv) + '</div>' +
           '<div class="sv-lead-actions">' + editBtn + delBtn + '</div>' +
           '</div>';
@@ -39580,10 +39663,18 @@ window._salesAddLead = function(existing) {
   overlay.className = 'sv-sheet-overlay';
   overlay.id = 'sv-lead-overlay';
   const isEdit = !!(existing && existing.id);
+  const _acctType = isEdit ? (existing.account_type||'SA') : 'SA';
   overlay.innerHTML = `<div class="sv-sheet" id="sv-lead-sheet">
     <div class="sv-sheet-title">${isEdit ? 'แก้ไข Lead' : 'เพิ่ม Lead'}</div>
     <div class="sv-field-label">ชื่อร้าน</div>
     <input class="sv-field-input" id="sv-lead-name" type="text" placeholder="ร้านอาหาร..." value="${isEdit?existing.shop_name:''}" />
+    <div class="sv-field-label">ประเภทร้าน</div>
+    <div class="sv-type-row">
+      <button class="sv-type-btn${_acctType==='SA'?' on':''}" data-type="SA" onclick="window._salesSelectType(this,'SA')">SA <span class="sv-type-tenure">45d</span></button>
+      <button class="sv-type-btn${_acctType==='MC'?' on':''}" data-type="MC" onclick="window._salesSelectType(this,'MC')">MC <span class="sv-type-tenure">90d</span></button>
+      <button class="sv-type-btn${_acctType==='Chain'?' on':''}" data-type="Chain" onclick="window._salesSelectType(this,'Chain')">Chain <span class="sv-type-tenure">90d</span></button>
+    </div>
+    <input type="hidden" id="sv-lead-type" value="${_acctType}" />
     <div class="sv-field-label">ยอดคาด / เดือน (บาท)</div>
     <input class="sv-field-input" id="sv-lead-gmv" type="number" inputmode="numeric" placeholder="50000" value="${isEdit?existing.expected_gmv:''}" />
     <div class="sv-field-label">วันที่ยอดน่าจะเริ่มเข้า</div>
@@ -39598,6 +39689,13 @@ window._salesAddLead = function(existing) {
     const s = document.getElementById('sv-lead-sheet');
     if (s) s.classList.add('open');
   });
+};
+
+window._salesSelectType = function(btn, type) {
+  document.querySelectorAll('.sv-type-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const inp = document.getElementById('sv-lead-type');
+  if (inp) inp.value = type;
 };
 
 window._salesEditLead = function(id) {
@@ -39617,6 +39715,7 @@ window._salesSaveLead = async function(existingId) {
   const name = (document.getElementById('sv-lead-name')?.value||'').trim();
   const gmv  = parseFloat(document.getElementById('sv-lead-gmv')?.value||0);
   const date = document.getElementById('sv-lead-date')?.value||'';
+  const acctType = document.getElementById('sv-lead-type')?.value || 'SA';
   if (!name || !gmv || !date) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
   const email = (currentUserProfile && currentUserProfile.email) || '';
   const btn = document.querySelector('.sv-btn-save');
@@ -39625,12 +39724,12 @@ window._salesSaveLead = async function(existingId) {
     if (existingId) {
       await supa.from('sales_pipeline').update({
         shop_name: name, expected_gmv: gmv, expected_start_date: date,
-        updated_at: new Date().toISOString()
+        account_type: acctType, updated_at: new Date().toISOString()
       }).eq('id', existingId);
     } else {
       await supa.from('sales_pipeline').insert({
         sales_email: email, shop_name: name,
-        expected_gmv: gmv, expected_start_date: date
+        expected_gmv: gmv, expected_start_date: date, account_type: acctType
       });
     }
     _salesPipelineCache = null; // invalidate cache
@@ -39674,17 +39773,113 @@ function renderSalesCommission() {
 function renderSalesTeamview() {
   const el = document.getElementById('scr-sales-teamview');
   if (!el) return;
-  // Delegate to KAM teamview render — portviewBulkData already filtered to Sales team
-  // TL filters by salesTeamName matching their own team
-  if (typeof renderTeamview === 'function') {
-    try { renderTeamview(); } catch(e) { console.warn('[Sales TL] renderTeamview failed:', e); }
+  const role = getCurrentRole();
+  if (role !== 'sales_tl' && role !== 'admin') {
+    el.innerHTML = '';
     return;
   }
-  el.innerHTML = `<div class="sv-empty">
-    <div class="sv-empty-title">Team View</div>
-    <div class="sv-empty-sub">ยังไม่มีข้อมูลทีม</div>
-  </div>`;
+  const email = (currentUserProfile && currentUserProfile.email) || '';
+  const period = _salesCurrentPeriod();
+  // Filter portviewBulkData to this TL's Sales team
+  const allData = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+  const teamData = allData.filter(r => {
+    // Sales TL sees their team; admin sees all
+    if (role === 'admin') return true;
+    return (r.tlEmail || '').toLowerCase() === email.toLowerCase();
+  });
+  // Group by rep email
+  const repMap = {};
+  teamData.forEach(r => {
+    const re = (r.kamEmail || '').toLowerCase();
+    if (!re) return;
+    if (!repMap[re]) repMap[re] = { email: re, name: r.kamName || re, outlets: [], runrate: 0 };
+    repMap[re].outlets.push(r);
+    repMap[re].runrate += (r.runrate || 0);
+  });
+  const reps = Object.values(repMap).sort((a,b) => b.runrate - a.runrate);
+  const teamRunrate = reps.reduce((s,r) => s + r.runrate, 0);
+  // Team target: _tgtGet for team level
+  const teamTarget = (typeof _tgtGet === 'function')
+    ? (_tgtGet(period, 'sales_team', email) || 0)
+    : 0;
+  const teamPct = teamTarget > 0 ? Math.min(200, Math.round(teamRunrate / teamTarget * 100)) : 0;
+  const tbarCls = teamPct >= 100 ? 'ok' : teamPct >= 75 ? 'warn' : 'ac';
+
+  // Target button: show for sales_tl and admin
+  const canSetTarget = (role === 'sales_tl' || role === 'admin');
+  const targetBtnHtml = canSetTarget
+    ? '<button class="sv-tl-target-btn" onclick="window._salesOpenTargetSetup()">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>' +
+        ' ตั้ง Target</button>'
+    : '';
+
+  let html = '<div class="sv-page-hd" style="display:flex;align-items:flex-start;justify-content:space-between;">' +
+    '<div><div class="sv-page-eye">Sales Team</div><div class="sv-page-title">ภาพรวมทีม</div></div>' +
+    targetBtnHtml + '</div>';
+
+  // Team hero
+  html += '<div class="sv-hero">' +
+    '<div class="sv-hero-eye">Runrate ทีม</div>' +
+    '<div><span class="sv-hero-num">฿' + _sv_fmt(teamRunrate) + '</span></div>' +
+    '<div class="sv-hero-sub">' +
+      '<span>' + reps.length + ' reps · ' + teamData.length + ' ร้าน</span>' +
+      (teamTarget > 0
+        ? '<span class="sv-gap-badge' + (teamPct >= 100 ? ' ok' : '') + '">' +
+            (teamPct >= 100 ? '+' : '−') + '฿' + _sv_fmt(Math.abs(teamRunrate - teamTarget)) + ' vs target</span>'
+        : '<span style="font-size:12px;color:#FF9500">ยังไม่มี team target</span>') +
+    '</div>' +
+    (teamTarget > 0
+      ? '<div class="sv-tbar"><div class="sv-tbar-track"><div class="sv-tbar-fill ' + tbarCls + '" style="width:' + Math.min(100,teamPct) + '%"></div></div>' +
+        '<div class="sv-tbar-meta"><span>' + teamPct + '% of target</span><span>Target ฿' + _sv_fmt(teamTarget) + '</span></div></div>'
+      : '') +
+    '</div>';
+
+  // Rep list
+  html += '<div class="sv-sec"><span class="sv-sec-t">แต่ละ Rep</span><span class="sv-sec-c">' + reps.length + ' คน</span></div>';
+  if (!reps.length) {
+    html += '<div class="sv-empty"><div class="sv-empty-title">ไม่มีข้อมูล Rep</div><div class="sv-empty-sub">ตรวจสอบว่า Sales portview CSV upload แล้ว</div></div>';
+  } else {
+    html += '<div class="sv-outlet-list">';
+    reps.forEach(function(rep) {
+      const repTarget = (typeof _tgtGet === 'function') ? (_tgtGet(period, 'sales', rep.email) || 0) : 0;
+      const repPct = repTarget > 0 ? Math.min(200, Math.round(rep.runrate / repTarget * 100)) : 0;
+      const indCls = repPct >= 100 ? 'ok' : repPct >= 75 ? 'mid' : 'late';
+      const repName = rep.name.split('@')[0]; // short name fallback
+      html += '<div class="sv-ol-row" onclick="window._salesTLDrillRep("' + rep.email + '"' + ')">' +
+        '<div class="sv-ol-top">' +
+          '<div class="sv-ol-ind ' + indCls + '"></div>' +
+          '<div class="sv-ol-info">' +
+            '<div class="sv-ol-name">' + repName + '</div>' +
+            '<div class="sv-ol-meta">' + rep.outlets.length + ' ร้าน' + (repTarget > 0 ? ' · target ฿' + _sv_fmt(repTarget) : '') + '</div>' +
+          '</div>' +
+          '<div class="sv-ol-right">' +
+            '<div class="sv-ol-gmv">฿' + _sv_fmt(rep.runrate) + '</div>' +
+            (repTarget > 0
+              ? '<div class="sv-ol-type ' + (repPct >= 100 ? 'ok' : repPct >= 75 ? 'mid' : '') + '">' + repPct + '% target</div>'
+              : '<div class="sv-ol-type" style="color:#FF9500">ยังไม่มี target</div>') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
 }
+
+// W4: TL target setup trigger
+window._salesOpenTargetSetup = function() {
+  const role = getCurrentRole();
+  if (typeof openTargetSetup === 'function') {
+    try { openTargetSetup(role === 'admin' ? 'admin' : 'tl'); } catch(e) {}
+  }
+};
+
+// W4: TL drill into individual rep (show their portview)
+window._salesTLDrillRep = function(repEmail) {
+  // Future: filter portview to single rep and navigate
+  // For now: no-op placeholder
+};
 
 // ══════════════════════════════════════════
 // SECTION:SALES_ACCOUNT_VIEW_PATCH
