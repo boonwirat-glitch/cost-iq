@@ -4832,6 +4832,29 @@ body.sales-mode .kam-content-only  { display: none !important; }
 .sales-content-only                { display: none !important; }
 body.sales-mode .sales-content-only { display: block !important; }
 
+/* ── Sales v6: hide KAM screens + override kam-mode nav ── */
+body.sales-mode #scr-portview,
+body.sales-mode #scr-teamview,
+body.sales-mode #scr-opportunities { display: none !important; }
+
+/* Sales user gets both .sales-mode AND .kam-mode
+   Need higher specificity to override dark glass pill */
+body.sales-mode.kam-mode .bnav {
+  background: #FFFFFF !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(0,0,0,.06) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.13), 0 20px 48px rgba(0,0,0,.09) !important;
+  border-top: none !important;
+  border-radius: 999px !important;
+}
+
+/* Nav icons: inactive = dark muted, active = rausch */
+body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
+body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
+body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
+body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
+
 /* Sales portview screen — same layout as KAM portview */
 #scr-sales-portview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
 #scr-sales-pipeline { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
