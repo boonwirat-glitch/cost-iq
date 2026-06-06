@@ -67,7 +67,7 @@ const CI = (() => {
   const _CSS = `
 /* ── SPEC TOKENS ── */
 :root{
-  --n-0:#FFFFFF;--n-50:#F2F2F7;--n-100:#E5E5EA;--n-200:#AEAEB2;--n-400:#636366;--n-900:#1C1C1E;
+  --n-0:#FFFFFF;--n-50:#F2F2F7;--n-100:#E5E5EA;--n-200:#6C6C70;--n-400:#636366;--n-900:#1C1C1E;
   --teal:#008065;--teal-h:#00a882;
   --teal-5:rgba(0,128,101,.05);--teal-8:rgba(0,128,101,.08);--teal-12:rgba(0,128,101,.12);--teal-20:rgba(0,128,101,.20);
   --danger:#FF3B30;--danger-bg:rgba(255,59,48,.08);
@@ -323,20 +323,20 @@ const CI = (() => {
 .sk-badge{font-size:10px;letter-spacing:.08em}
 .buyer-type{font-size:20px;font-weight:300;letter-spacing:-.03em;color:#1C1C1E}
 .buyer-ev{font-size:12px;color:#636366;line-height:1.5}
-.buyer-lbl{font-size:9px;letter-spacing:.14em;color:#AEAEB2;margin-bottom:4px}
+.buyer-lbl{font-size:9px;letter-spacing:.14em;color:#6C6C70;margin-bottom:4px}
 .pain-txt{font-size:12px;color:#636366;line-height:1.55}
-.pain-dim{font-size:10px;color:#AEAEB2;letter-spacing:.13em}
+.pain-dim{font-size:10px;color:#6C6C70;letter-spacing:.13em}
 .action-txt{font-size:13px;color:#1C1C1E;line-height:1.5}
-.action-who{font-size:11px;color:#AEAEB2}
-.action-n{font-size:10px;color:#AEAEB2;letter-spacing:.08em}
-.eyebrow{font-size:10px;color:#AEAEB2;letter-spacing:.16em}
-.tab-btn{font-size:13px;font-weight:400;color:#AEAEB2}
+.action-who{font-size:11px;color:#6C6C70}
+.action-n{font-size:10px;color:#6C6C70;letter-spacing:.08em}
+.eyebrow{font-size:10px;color:#6C6C70;letter-spacing:.16em}
+.tab-btn{font-size:13px;font-weight:400;color:#6C6C70}
 .tab-btn.on{color:#1C1C1E;font-weight:500}
 .proc-step{font-size:15px;color:#1C1C1E}
-.proc-sub{font-size:11px;color:#AEAEB2}
+.proc-sub{font-size:11px;color:#6C6C70}
 .timer-val{color:#1C1C1E}
-.timer-hint{font-size:11px;color:#AEAEB2}
-.stop-hint{font-size:11px;color:#AEAEB2}
+.timer-hint{font-size:11px;color:#6C6C70}
+.stop-hint{font-size:11px;color:#6C6C70}
 .btn-stop{font-size:15px;color:#1C1C1E;background:rgba(0,0,0,.055)}
 .chip-txt{font-size:13px;color:#636366}
 .chip-seg{font-size:10px;color:#008065}
@@ -2069,7 +2069,7 @@ ${text}`;
         const safeName = name.replace(/'/g,"\'").replace(/"/g,'&quot;');
         // Outlet match hint — show outlet name in small text below account name
         const hint  = _matchLabel
-          ? `<div style="font-size:10px;color:#AEAEB2;margin-top:2px;font-family:'DM Mono',monospace">outlet: ${_matchLabel}</div>`
+          ? `<div style="font-size:11px;color:#6C6C70;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">outlet: ${_matchLabel}</div>`
           : '';
         return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left;margin-bottom:6px"
           onclick="CI._pickerConfirmKam('${guid}','${safeName}','${seg}')">
