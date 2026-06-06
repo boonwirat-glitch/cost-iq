@@ -1,4 +1,4 @@
-<!-- Freshket Sense v335: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v336: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5094,7 +5094,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v335',
+      version: 'v336',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -7409,11 +7409,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span id="kam-insight-btn-label">Account Insight</span>
 </button>
 
-<!-- CI button — บันทึกการสนทนา -->
-<button class="kam-insight-btn kav-brief-btn" id="ci-open-btn" onclick="ciOpen(currentAccountId)" style="margin-top:8px;background:rgba(0,128,101,0.08);border-color:rgba(0,128,101,0.25)">
-<span style="font-size:14px">🎙</span>
-<span id="ci-open-btn-label">บันทึกการสนทนา</span>
-</button>
 <!-- Signal bar — rule-based, renders immediately -->
 <div class="kam-signal-bar" id="kam-signal-bar"></div>
 <!-- AI Loading -->
@@ -36147,6 +36142,11 @@ const CI = (() => {
 #ci-fullsheet.ci-open { transform:translateX(-50%) translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
 #ci-fullsheet .scr.on { display:flex; }
+/* ── Picker sheet items ── */
+.ci-pk-item{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:10px;border:none;background:rgba(0,0,0,.03);cursor:pointer;width:100%;text-align:left;transition:background .15s;margin-bottom:2px;}
+.ci-pk-item:active{background:rgba(0,128,101,.08);}
+.ci-pk-name{font-size:13px;color:#1C1C1E;font-weight:500;flex:1;text-align:left;}
+.ci-pk-seg{font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em;margin-left:8px;}
 `;
 
   // ── Mount / unmount sheet ──────────────────────────────────────────────────
@@ -36192,6 +36192,11 @@ const CI = (() => {
     const pill = document.getElementById('echo-float-pill');
     if (pill) { pill.classList.add('visible'); _startFloatTimer(); }
     document.body.classList.add('echo-active');
+    // Update topbar: left button becomes minimize when recording
+    const _tbLeft = document.getElementById('ci-topbar-left-label');
+    const _tbIcon = document.getElementById('ci-topbar-left-icon');
+    if (_tbLeft) _tbLeft.textContent = 'ย่อ';
+    if (_tbIcon) _tbIcon.textContent = '↓';
   }
 
   function _startFloatTimer() {
@@ -36208,15 +36213,18 @@ const CI = (() => {
     return `
 <div id="ci-s-record" class="scr on">
   <div class="topbar">
-    <span class="tb-act" onclick="CI.cancel()">ยกเลิก</span>
-    <span class="tb-lbl">Conversation Intel</span>
-    <span class="tb-rec"><span class="rec-dot" id="ci-rdot"></span><span id="ci-rlbl">Full Record</span></span>
+    <span class="tb-act" id="ci-topbar-left" onclick="(_phase==='recording')?CI._minimize():CI.cancel()" style="display:flex;align-items:center;gap:4px;">
+      <span id="ci-topbar-left-icon" style="font-size:16px;line-height:1">←</span>
+      <span id="ci-topbar-left-label">ยกเลิก</span>
+    </span>
+    <span class="tb-lbl">Echo</span>
+    <span class="tb-rec"><span class="rec-dot" id="ci-rdot"></span><span id="ci-rlbl">พร้อมบันทึก</span></span>
   </div>
   <div style="padding:0 24px 16px">
     <div class="chip">
-      <div class="chip-dot"></div>
-      <span class="chip-txt">${ctx.name}</span>
-      <span class="chip-seg">${ctx.seg}</span>
+      <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
+      <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
+      <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
     </div>
   </div>
   <div class="rec-center" id="ci-rec-center">
@@ -36395,6 +36403,9 @@ const CI = (() => {
     document.body.classList.remove('echo-active');
     const pill = document.getElementById('echo-float-pill');
     if (pill) pill.classList.remove('visible');
+    // Reset CI fullsheet display if minimized
+    const sheet = document.getElementById('ci-fullsheet');
+    if (sheet) sheet.style.display = '';
     clearInterval(_timerRef);
     if (_recorder && _phase === 'recording') {
       _recorder.stop();
