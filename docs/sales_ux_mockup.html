@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Freshket Sense — Sales UX Mockup</title>
+<style>
+:root {
+  --bg: #0a1628;
+  --bg2: #0f1f3d;
+  --surface: rgba(255,255,255,.07);
+  --surface2: rgba(255,255,255,.11);
+  --border: rgba(255,255,255,.1);
+  --border2: rgba(255,255,255,.18);
+  --tx: rgba(255,255,255,.95);
+  --tx2: rgba(255,255,255,.55);
+  --tx3: rgba(255,255,255,.3);
+  --ac: #00c896;
+  --ac2: rgba(0,200,150,.15);
+  --warn: #ffaa00;
+  --warn2: rgba(255,170,0,.12);
+  --danger: #ff4d4d;
+  --danger2: rgba(255,77,77,.1);
+  --hit: #34C759;
+  --mono: 'DM Mono', 'Courier New', monospace;
+  --r: 18px;
+  --r2: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: #1a1a2e;
+  font-family: 'IBM Plex Sans Thai', 'Helvetica Neue', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 24px 16px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* ── Phone shell ── */
+.phone {
+  width: 375px;
+  background: var(--bg);
+  border-radius: 44px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255,255,255,.12);
+  box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.phone-label {
+  text-align: center;
+  color: rgba(255,255,255,.4);
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* Status bar */
+.statusbar {
+  height: 44px;
+  padding: 14px 28px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx);
+}
+
+/* Topbar */
+.topbar {
+  padding: 8px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0.5px solid var(--border);
+}
+.topbar-logo { font-size: 16px; font-weight: 700; color: var(--tx); display: flex; align-items: center; gap: 6px; }
+.sense-badge { background: rgba(0,200,150,.15); border: 1px solid rgba(0,200,150,.3); border-radius: 20px; padding: 2px 8px; font-size: 10px; color: var(--ac); font-weight: 600; }
+.topbar-role { background: rgba(255,170,0,.12); border: 1px solid rgba(255,170,0,.25); border-radius: 8px; padding: 3px 10px; font-size: 10px; color: var(--warn); font-weight: 700; letter-spacing: .05em; }
+
+/* Screen content */
+.screen { height: 680px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+
+/* ── SCREEN 1: Sales Home / พอร์ต ── */
+
+.s1-header {
+  padding: 16px 20px 8px;
+}
+.s1-title { font-size: 22px; font-weight: 300; color: var(--tx); letter-spacing: -.03em; }
+.s1-sub { font-size: 11px; color: var(--tx3); font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+
+/* Hero projection card */
+.hero-card {
+  margin: 8px 16px 12px;
+  background: linear-gradient(135deg, rgba(0,200,150,.12), rgba(0,120,100,.08));
+  border: 0.5px solid rgba(0,200,150,.25);
+  border-radius: var(--r);
+  padding: 18px 18px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px;
+  background: radial-gradient(circle, rgba(0,200,150,.12), transparent 70%);
+  pointer-events: none;
+}
+.hero-label { font-size: 9px; font-family: var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ac); opacity: .7; margin-bottom: 4px; }
+.hero-amount { font-size: 38px; font-weight: 200; color: var(--tx); letter-spacing: -.04em; line-height: 1; }
+.hero-unit { font-size: 14px; color: var(--tx2); font-weight: 400; }
+.hero-vs { font-size: 12px; color: var(--tx2); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.hero-vs-target { color: var(--tx3); }
+.hero-vs-gap { color: var(--warn); font-weight: 600; }
+.hero-vs-gap.hit { color: var(--hit); }
+
+/* Target bar */
+.target-bar { margin-top: 12px; }
+.target-bar-track { height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.target-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--ac), #00e5b0); transition: width .8s cubic-bezier(.16,1,.3,1); }
+.target-bar-labels { display: flex; justify-content: space-between; margin-top: 5px; font-size: 9px; color: var(--tx3); font-family: var(--mono); }
+
+/* 3-month strip */
+.proj-strip {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.proj-strip::-webkit-scrollbar { display: none; }
+.proj-card {
+  flex: 0 0 108px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r2);
+  padding: 12px 12px 10px;
+}
+.proj-card.active { background: rgba(0,200,150,.1); border-color: rgba(0,200,150,.3); }
+.proj-month { font-size: 9px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); margin-bottom: 5px; }
+.proj-amount { font-size: 20px; font-weight: 200; color: var(--tx); letter-spacing: -.03em; }
+.proj-gap { font-size: 10px; margin-top: 3px; font-weight: 500; }
+.proj-gap.hit { color: var(--hit); }
+.proj-gap.miss { color: var(--danger); }
+.proj-gap.gap { color: var(--warn); }
+
+/* Handover warning */
+.handover-card {
+  margin: 0 16px 12px;
+  background: var(--danger2);
+  border: 0.5px solid rgba(255,77,77,.25);
+  border-radius: var(--r2);
+  padding: 12px 14px;
+}
+.handover-title { font-size: 11px; font-weight: 600; color: var(--danger); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.handover-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 0.5px solid rgba(255,77,77,.1); font-size: 12px; color: var(--tx); }
+.handover-row:last-child { border: none; padding-bottom: 0; }
+.handover-days { font-size: 10px; font-family: var(--mono); color: var(--danger); font-weight: 600; }
+
+/* Section header */
+.sec-header { padding: 4px 20px 8px; font-size: 9px; font-family: var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--tx3); display: flex; justify-content: space-between; align-items: center; }
+.sec-count { color: var(--tx2); }
+
+/* Outlet cards */
+.outlet-card {
+  margin: 0 16px 8px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r2);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background .15s;
+  position: relative;
+}
+.outlet-card.expiring { border-color: rgba(255,170,0,.35); background: var(--warn2); }
+.outlet-card.critical { border-color: rgba(255,77,77,.35); background: var(--danger2); }
+
+.outlet-top { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.outlet-name { font-size: 13px; font-weight: 500; color: var(--tx); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outlet-type { font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,200,150,.12); color: var(--ac); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+.outlet-gmv { font-size: 12px; color: var(--tx2); margin-bottom: 8px; }
+
+/* Days bar */
+.days-track { height: 3px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+.days-fill { height: 100%; border-radius: 2px; background: var(--ac); }
+.days-fill.mid { background: var(--warn); }
+.days-fill.late { background: var(--danger); }
+.days-meta { display: flex; justify-content: space-between; font-size: 9px; font-family: var(--mono); color: var(--tx3); }
+.days-deadline { color: var(--tx2); }
+
+/* ── SCREEN 2: Pipeline ── */
+.pip-header { padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; background: var(--bg); backdrop-filter: blur(20px); }
+.pip-title { font-size: 20px; font-weight: 300; color: var(--tx); letter-spacing: -.03em; }
+.pip-total { font-size: 11px; color: var(--ac); font-family: var(--mono); font-weight: 600; }
+
+.pip-summary-card {
+  margin: 0 16px 16px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  padding: 16px;
+  display: flex;
+  gap: 0;
+}
+.pip-kpi { flex: 1; text-align: center; border-right: 0.5px solid var(--border); }
+.pip-kpi:last-child { border: none; }
+.pip-kpi-val { font-size: 22px; font-weight: 200; color: var(--tx); letter-spacing: -.03em; }
+.pip-kpi-lbl { font-size: 9px; color: var(--tx3); font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-top: 3px; }
+
+.pip-month-lbl { padding: 4px 20px 6px; font-size: 9px; font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tx3); display: flex; justify-content: space-between; }
+.pip-month-total { color: var(--ac); font-weight: 600; }
+
+.lead-card {
+  margin: 0 16px 8px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r2);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lead-info { flex: 1; min-width: 0; }
+.lead-name { font-size: 13px; font-weight: 500; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-date { font-size: 10px; color: var(--tx3); font-family: var(--mono); margin-top: 2px; }
+.lead-gmv { font-size: 15px; font-weight: 400; color: var(--ac); flex-shrink: 0; white-space: nowrap; }
+.lead-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.lead-btn { width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.06); border: 0.5px solid var(--border); color: var(--tx2); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
+
+.pip-progress-card {
+  margin: 8px 16px 12px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r2);
+  padding: 14px;
+}
+.pip-progress-label { font-size: 10px; color: var(--tx3); font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 10px; }
+.pip-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pip-bar-name { font-size: 11px; color: var(--tx2); width: 28px; flex-shrink: 0; font-family: var(--mono); }
+.pip-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,.07); border-radius: 3px; overflow: hidden; }
+.pip-bar-fill { height: 100%; border-radius: 3px; }
+.pip-bar-val { font-size: 10px; color: var(--tx2); font-family: var(--mono); width: 36px; text-align: right; flex-shrink: 0; }
+
+/* FAB */
+.fab { position: sticky; bottom: 80px; float: right; margin-right: 20px; width: 48px; height: 48px; background: var(--ac); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; box-shadow: 0 4px 16px rgba(0,200,150,.35); cursor: pointer; }
+
+/* ── SCREEN 3: Commission ── */
+.cs-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center; }
+.cs-icon { font-size: 52px; opacity: .35; margin-bottom: 20px; }
+.cs-title { font-size: 24px; font-weight: 200; color: rgba(255,255,255,.5); letter-spacing: -.03em; margin-bottom: 10px; }
+.cs-sub { font-size: 13px; color: rgba(255,255,255,.25); line-height: 1.7; }
+.cs-badge { display: inline-block; margin-top: 20px; background: rgba(255,255,255,.06); border: 0.5px solid var(--border); border-radius: 20px; padding: 6px 16px; font-size: 10px; color: var(--tx3); font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+/* ── Bottom Nav ── */
+.bnav {
+  position: sticky;
+  bottom: 0;
+  background: rgba(10,22,40,.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  gap: 0;
+}
+.ni { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; cursor: pointer; transition: all .15s; }
+.ni.on { background: rgba(0,200,150,.12); }
+.ni-icon { font-size: 20px; opacity: .4; transition: opacity .15s; }
+.ni.on .ni-icon { opacity: 1; }
+.ni-label { font-size: 9px; font-weight: 500; color: var(--tx2); letter-spacing: .05em; transition: color .15s; }
+.ni.on .ni-label { color: var(--ac); font-weight: 700; }
+
+/* Add lead sheet */
+.sheet-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.6); z-index: 100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.sheet-overlay.open { opacity: 1; pointer-events: all; }
+.sheet { background: #0f1f3d; border-radius: 24px 24px 0 0; padding: 20px 20px 32px; width: 100%; transform: translateY(100%); transition: transform .32s cubic-bezier(.16,1,.3,1); }
+.sheet-overlay.open .sheet { transform: translateY(0); }
+.sheet-title { font-size: 15px; font-weight: 600; color: var(--tx); margin-bottom: 16px; }
+.field-label { font-size: 9px; font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tx3); margin-bottom: 5px; }
+.field-input { width: 100%; background: rgba(255,255,255,.07); border: 0.5px solid var(--border2); border-radius: 10px; padding: 11px 13px; font-size: 14px; color: var(--tx); font-family: inherit; margin-bottom: 12px; outline: none; }
+.field-input:focus { border-color: rgba(0,200,150,.5); background: rgba(0,200,150,.05); }
+.sheet-actions { display: flex; gap: 8px; margin-top: 4px; }
+.btn-save { flex: 1; padding: 13px; background: var(--ac); color: #000; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.btn-cancel { padding: 13px 18px; background: rgba(255,255,255,.07); color: var(--tx2); border: 0.5px solid var(--border); border-radius: 12px; font-size: 13px; font-family: inherit; cursor: pointer; }
+
+/* Legend */
+.legend { background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px; width: 100%; max-width: 375px; flex-shrink: 0; }
+.legend-title { font-size: 11px; font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 12px; }
+.legend-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.legend-text h4 { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.7); margin-bottom: 2px; }
+.legend-text p { font-size: 11px; color: rgba(255,255,255,.35); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- ══ SCREEN 1: พอร์ต (Sales Home) ══ -->
+<div>
+<div class="phone-label">Screen 1 — พอร์ต (Home)</div>
+<div class="phone">
+  <div class="statusbar">
+    <span>16:53</span>
+    <span>●●●</span>
+  </div>
+  <div class="topbar">
+    <div class="topbar-logo">
+      <span>🥬</span> freshket <span class="sense-badge">✦ Sense</span>
+    </div>
+    <div class="topbar-role">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="s1-header">
+      <div class="s1-title">พอร์ตของฉัน</div>
+      <div class="s1-sub">มิ.ย. 2569 · ✦ Guitar</div>
+    </div>
+
+    <!-- Hero: Runrate vs Target -->
+    <div class="hero-card">
+      <div class="hero-label">Runrate ในมือ</div>
+      <div class="hero-amount">฿1.2<span class="hero-unit">M/เดือน</span></div>
+      <div class="hero-vs">
+        <span class="hero-vs-gap gap">−฿0.3M vs target</span>
+        <span class="hero-vs-target">target ฿1.5M</span>
+      </div>
+      <div class="target-bar">
+        <div class="target-bar-track">
+          <div class="target-bar-fill" style="width:80%"></div>
+        </div>
+        <div class="target-bar-labels">
+          <span>80% of target</span>
+          <span>58 ร้าน active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-month projection -->
+    <div class="sec-header" style="padding-bottom:6px">Projection 3 เดือน <span style="color:rgba(255,255,255,.2);font-size:9px">รวม pipeline</span></div>
+    <div class="proj-strip">
+      <div class="proj-card active">
+        <div class="proj-month">มิ.ย. (นี้)</div>
+        <div class="proj-amount">฿1.38M</div>
+        <div class="proj-gap gap">−฿120K</div>
+      </div>
+      <div class="proj-card">
+        <div class="proj-month">ก.ค.</div>
+        <div class="proj-amount">฿1.55M</div>
+        <div class="proj-gap hit">+฿50K</div>
+      </div>
+      <div class="proj-card">
+        <div class="proj-month">ส.ค.</div>
+        <div class="proj-amount">฿1.21M</div>
+        <div class="proj-gap miss">−฿290K</div>
+      </div>
+    </div>
+
+    <!-- Handover warning -->
+    <div class="handover-card">
+      <div class="handover-title">⚠ Handover ออกเดือนนี้ — 4 ร้าน (−฿180K)</div>
+      <div class="handover-row">
+        <span>ร้านบ้านโกนมสด</span>
+        <span class="handover-days">5d</span>
+      </div>
+      <div class="handover-row">
+        <span>เต็ง1 ข้าวมันไก่</span>
+        <span class="handover-days">8d</span>
+      </div>
+      <div class="handover-row">
+        <span>สายแคมป์ Roofbar</span>
+        <span class="handover-days">12d</span>
+      </div>
+    </div>
+
+    <!-- Outlet list -->
+    <div class="sec-header">ร้านในมือ <span class="sec-count">58 ร้าน</span></div>
+
+    <div class="outlet-card critical">
+      <div class="outlet-top">
+        <span class="outlet-name">ร้านบ้านโกนมสด</span>
+        <span class="outlet-type">MC</span>
+      </div>
+      <div class="outlet-gmv">฿13.6K/เดือน · ถือ 93 วัน</div>
+      <div class="days-track"><div class="days-fill late" style="width:93%"></div></div>
+      <div class="days-meta"><span>93/100 วัน</span><span class="days-deadline">หมด 15 มิ.ย. (5d)</span></div>
+    </div>
+
+    <div class="outlet-card expiring">
+      <div class="outlet-top">
+        <span class="outlet-name">Catrika Mexican Latin Grill Bar</span>
+        <span class="outlet-type">MC</span>
+      </div>
+      <div class="outlet-gmv">฿110K/เดือน · ถือ 62 วัน</div>
+      <div class="days-track"><div class="days-fill mid" style="width:69%"></div></div>
+      <div class="days-meta"><span>62/90 วัน</span><span class="days-deadline">หมด 15 มิ.ย. (8d)</span></div>
+    </div>
+
+    <div class="outlet-card">
+      <div class="outlet-top">
+        <span class="outlet-name">Starlux สาขา Central ดุสิต</span>
+        <span class="outlet-type">MC</span>
+      </div>
+      <div class="outlet-gmv">฿31K/เดือน · ถือ 13 วัน</div>
+      <div class="days-track"><div class="days-fill" style="width:14%"></div></div>
+      <div class="days-meta"><span>13/90 วัน</span><span class="days-deadline">หมด 15 ก.ย.</span></div>
+    </div>
+
+    <div class="outlet-card">
+      <div class="outlet-top">
+        <span class="outlet-name">In the battle</span>
+        <span class="outlet-type">MC</span>
+      </div>
+      <div class="outlet-gmv">฿15K/เดือน · ถือ 20 วัน</div>
+      <div class="days-track"><div class="days-fill" style="width:22%"></div></div>
+      <div class="days-meta"><span>20/90 วัน</span><span class="days-deadline">หมด 15 ก.ย.</span></div>
+    </div>
+
+    <div style="height:80px"></div>
+  </div>
+
+  <div class="bnav">
+    <div class="ni on" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">🔖</div>
+      <div class="ni-label">Save</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni" onclick="switchScreen(1)">
+      <div class="ni-icon">↗</div>
+      <div class="ni-label">Pipeline</div>
+    </div>
+    <div class="ni" onclick="switchScreen(2)">
+      <div class="ni-icon">$</div>
+      <div class="ni-label">Commission</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 2: Pipeline ══ -->
+<div>
+<div class="phone-label">Screen 2 — Pipeline</div>
+<div class="phone">
+  <div class="statusbar">
+    <span>16:53</span>
+    <span>●●●</span>
+  </div>
+  <div class="topbar">
+    <div class="topbar-logo">
+      <span>🥬</span> freshket <span class="sense-badge">✦ Sense</span>
+    </div>
+    <div class="topbar-role">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="pip-header">
+      <div>
+        <div class="pip-title">Pipeline</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:2px;font-family:var(--mono)">manual estimate</div>
+      </div>
+      <div class="pip-total">฿380K est.</div>
+    </div>
+
+    <!-- Summary KPIs -->
+    <div class="pip-summary-card">
+      <div class="pip-kpi">
+        <div class="pip-kpi-val">8</div>
+        <div class="pip-kpi-lbl">Leads</div>
+      </div>
+      <div class="pip-kpi">
+        <div class="pip-kpi-val">฿380K</div>
+        <div class="pip-kpi-lbl">ยอดคาด</div>
+      </div>
+      <div class="pip-kpi">
+        <div class="pip-kpi-val" style="color:var(--warn)">−฿120K</div>
+        <div class="pip-kpi-lbl">gap to target</div>
+      </div>
+    </div>
+
+    <!-- Month breakdown bar -->
+    <div class="pip-progress-card">
+      <div class="pip-progress-label">ยอด pipeline vs target gap รายเดือน</div>
+      <div class="pip-bar-row">
+        <div class="pip-bar-name">มิ.ย.</div>
+        <div class="pip-bar-track"><div class="pip-bar-fill" style="width:62%;background:var(--warn)"></div></div>
+        <div class="pip-bar-val" style="color:var(--warn)">−120K</div>
+      </div>
+      <div class="pip-bar-row">
+        <div class="pip-bar-name">ก.ค.</div>
+        <div class="pip-bar-track"><div class="pip-bar-fill" style="width:100%;background:var(--ac)"></div></div>
+        <div class="pip-bar-val" style="color:var(--ac)">+50K</div>
+      </div>
+      <div class="pip-bar-row">
+        <div class="pip-bar-name">ส.ค.</div>
+        <div class="pip-bar-track"><div class="pip-bar-fill" style="width:40%;background:var(--danger)"></div></div>
+        <div class="pip-bar-val" style="color:var(--danger)">−290K</div>
+      </div>
+    </div>
+
+    <!-- Leads by month -->
+    <div class="pip-month-lbl">
+      <span>มิถุนายน 2569</span>
+      <span class="pip-month-total">฿180K · 3 leads</span>
+    </div>
+
+    <div class="lead-card">
+      <div class="lead-info">
+        <div class="lead-name">ร้านอาหารยายเพิ่ม</div>
+        <div class="lead-date">เริ่ม 10 มิ.ย.</div>
+      </div>
+      <div class="lead-gmv">฿80K</div>
+      <div class="lead-actions">
+        <div class="lead-btn">✎</div>
+        <div class="lead-btn">✕</div>
+      </div>
+    </div>
+
+    <div class="lead-card">
+      <div class="lead-info">
+        <div class="lead-name">Bloom Cafe & Bistro</div>
+        <div class="lead-date">เริ่ม 15 มิ.ย.</div>
+      </div>
+      <div class="lead-gmv">฿60K</div>
+      <div class="lead-actions">
+        <div class="lead-btn">✎</div>
+        <div class="lead-btn">✕</div>
+      </div>
+    </div>
+
+    <div class="lead-card">
+      <div class="lead-info">
+        <div class="lead-name">The Workshop Kitchen</div>
+        <div class="lead-date">เริ่ม 20 มิ.ย.</div>
+      </div>
+      <div class="lead-gmv">฿40K</div>
+      <div class="lead-actions">
+        <div class="lead-btn">✎</div>
+        <div class="lead-btn">✕</div>
+      </div>
+    </div>
+
+    <div class="pip-month-lbl" style="margin-top:8px">
+      <span>กรกฎาคม 2569</span>
+      <span class="pip-month-total">฿200K · 5 leads</span>
+    </div>
+
+    <div class="lead-card">
+      <div class="lead-info">
+        <div class="lead-name">Central Kitchen Co.</div>
+        <div class="lead-date">เริ่ม 1 ก.ค.</div>
+      </div>
+      <div class="lead-gmv">฿120K</div>
+      <div class="lead-actions">
+        <div class="lead-btn">✎</div>
+        <div class="lead-btn">✕</div>
+      </div>
+    </div>
+
+    <div class="lead-card" style="opacity:.7">
+      <div class="lead-info">
+        <div class="lead-name">+4 leads อื่นๆ</div>
+        <div class="lead-date">ก.ค. · รวม ฿80K</div>
+      </div>
+      <div class="lead-gmv" style="color:var(--tx2)">฿80K</div>
+    </div>
+
+    <div style="height:100px"></div>
+  </div>
+
+  <!-- FAB -->
+  <div style="position:relative">
+    <div class="fab" style="position:absolute;bottom:70px;right:20px;z-index:50" onclick="openSheet()">+</div>
+  </div>
+
+  <div class="bnav">
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">🔖</div>
+      <div class="ni-label">Save</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni on">
+      <div class="ni-icon">↗</div>
+      <div class="ni-label">Pipeline</div>
+    </div>
+    <div class="ni" onclick="switchScreen(2)">
+      <div class="ni-icon">$</div>
+      <div class="ni-label">Commission</div>
+    </div>
+  </div>
+
+  <!-- Add Lead Sheet -->
+  <div class="sheet-overlay" id="sheet2">
+    <div class="sheet">
+      <div class="sheet-title">เพิ่ม Lead</div>
+      <div class="field-label">ชื่อร้าน</div>
+      <input class="field-input" placeholder="ร้านอาหาร...">
+      <div class="field-label">ยอดคาด / เดือน (บาท)</div>
+      <input class="field-input" type="number" placeholder="50000">
+      <div class="field-label">วันที่ยอดน่าจะเริ่มเข้า</div>
+      <input class="field-input" type="date">
+      <div class="sheet-actions">
+        <button class="btn-save">บันทึก</button>
+        <button class="btn-cancel" onclick="closeSheet()">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 3: Commission Coming Soon ══ -->
+<div>
+<div class="phone-label">Screen 3 — Commission</div>
+<div class="phone">
+  <div class="statusbar">
+    <span>16:53</span>
+    <span>●●●</span>
+  </div>
+  <div class="topbar">
+    <div class="topbar-logo">
+      <span>🥬</span> freshket <span class="sense-badge">✦ Sense</span>
+    </div>
+    <div class="topbar-role">Sales</div>
+  </div>
+
+  <div class="screen">
+    <div class="cs-wrap">
+      <div class="cs-icon">💰</div>
+      <div class="cs-title">Commission</div>
+      <div class="cs-sub">
+        ระบบ commission สำหรับ Sales<br>
+        อยู่ระหว่างออกแบบร่วมกับทีม<br><br>
+        เร็วๆ นี้จะเห็น:<br>
+        ยอดที่ได้จากร้านที่ handover ออก<br>
+        + bonus จากการปิดร้านใหม่
+      </div>
+      <div class="cs-badge">Coming Soon</div>
+    </div>
+  </div>
+
+  <div class="bnav">
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">🔖</div>
+      <div class="ni-label">Save</div>
+    </div>
+    <div class="ni" onclick="switchTab(this,0)">
+      <div class="ni-icon">⊞</div>
+      <div class="ni-label">พอร์ต</div>
+    </div>
+    <div class="ni" onclick="switchScreen(1)">
+      <div class="ni-icon">↗</div>
+      <div class="ni-label">Pipeline</div>
+    </div>
+    <div class="ni on">
+      <div class="ni-icon">$</div>
+      <div class="ni-label">Commission</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ Legend ══ -->
+<div class="legend">
+  <div class="legend-title">Design Decisions</div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--ac)"></div>
+    <div class="legend-text">
+      <h4>Hero Card — Runrate vs Target</h4>
+      <p>ตัวเลขใหญ่ที่สุดคือ runrate ในมือจริง ไม่ใช่ยอดเดือนที่แล้ว Sales ต้องรู้ทันทีว่าตัวเองอยู่ที่ไหน</p>
+    </div>
+  </div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#6b8cff"></div>
+    <div class="legend-text">
+      <h4>3-Month Projection Strip</h4>
+      <p>แสดง M+0/M+1/M+2 พร้อม gap ให้ Sales รู้ล่วงหน้าว่าเดือนไหนจะขาด → ต้องปิดร้านเพิ่มตอนนี้</p>
+    </div>
+  </div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--danger)"></div>
+    <div class="legend-text">
+      <h4>Handover Warning Card</h4>
+      <p>แสดงเฉพาะร้านที่จะออกเดือนนี้ พร้อมบอก GMV ที่จะหาย ให้ Sales รู้ว่าต้องปิดใหม่เพิ่มเท่าไร</p>
+    </div>
+  </div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--warn)"></div>
+    <div class="legend-text">
+      <h4>Days Held Progress Bar</h4>
+      <p>แทน pace % ของ KAM ด้วย tenure bar — สีเขียว→เหลือง→แดง ตาม % ของวันที่ผ่านไป ไม่มี baseline concept</p>
+    </div>
+  </div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:rgba(255,255,255,.3)"></div>
+    <div class="legend-text">
+      <h4>Pipeline — Manual Estimate</h4>
+      <p>3 fields เท่านั้น: ชื่อร้าน + ยอดคาด + วันเริ่ม grouped by month พร้อม gap bar แสดง shortfall</p>
+    </div>
+  </div>
+
+  <div class="legend-item">
+    <div class="legend-dot" style="background:rgba(0,200,150,.4)"></div>
+    <div class="legend-text">
+      <h4>Account View — เหมือน KAM</h4>
+      <p>กดร้านแล้วเข้าได้ครบ: profile, SKU, Echo, Save เหมือน KAM แต่ซ่อน NRR bar / upsell / pace signal แสดง days_held + deadline แทน</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function openSheet() {
+  document.getElementById('sheet2').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('sheet2').classList.remove('open');
+}
+</script>
+</body>
+</html>
