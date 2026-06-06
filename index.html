@@ -1,4 +1,4 @@
-<!-- Freshket Sense v353: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v354: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5114,6 +5114,29 @@ body.sales-mode .kam-content-only  { display: none !important; }
 .sales-content-only                { display: none !important; }
 body.sales-mode .sales-content-only { display: block !important; }
 
+/* ── Sales v6: hide KAM screens + override kam-mode nav ── */
+body.sales-mode #scr-portview,
+body.sales-mode #scr-teamview,
+body.sales-mode #scr-opportunities { display: none !important; }
+
+/* Sales user gets both .sales-mode AND .kam-mode
+   Need higher specificity to override dark glass pill */
+body.sales-mode.kam-mode .bnav {
+  background: #FFFFFF !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(0,0,0,.06) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.13), 0 20px 48px rgba(0,0,0,.09) !important;
+  border-top: none !important;
+  border-radius: 999px !important;
+}
+
+/* Nav icons: inactive = dark muted, active = rausch */
+body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
+body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
+body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
+body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
+
 /* Sales portview screen — same layout as KAM portview */
 #scr-sales-portview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
 #scr-sales-pipeline { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
@@ -5143,7 +5166,7 @@ body.sales-mode .sales-content-only { display: block !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v353',
+      version: 'v354',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -11098,6 +11121,20 @@ function _patchR2FilesForSales(){
       R2_FILES['portview']='sales_portview_'+safeKey+'.csv';
       R2_FILES['handover']='sales_handover_'+safeKey+'.csv';
       console.log('%c[Sense] R2 routed for Sales','color:#4ddc97',{portview:R2_FILES['portview']});
+      // Fix B: clear IDB 'portview' cache so Sales user never loads KAM portview data
+      // IDB key 'portview' holds KAM data (640 accounts) — must be evicted before fetch
+      try{
+        const _db_req=indexedDB.open('ciq-csv-v1',1);
+        _db_req.onsuccess=function(e){
+          const _db=e.target.result;
+          try{
+            const _tx=_db.transaction('csv','readwrite');
+            _tx.objectStore('csv').delete('portview');
+            _tx.objectStore('csv').delete('handover');
+            console.log('%c[Sense] IDB portview/handover cleared for Sales','color:#4ddc97');
+          }catch(ex){}
+        };
+      }catch(ex){}
     }
   }catch(e){ console.warn('[_patchR2FilesForSales]',e); }
 }
