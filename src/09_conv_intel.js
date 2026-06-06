@@ -142,7 +142,7 @@ const CI = (() => {
 /* ── TIMER ── */
 .timer-block{text-align:center;}
 .timer-val{font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums;}
-.timer-hint{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-top:5px;font-family:var(--mono);transition:color 220ms;}
+.timer-hint{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:var(--mono);transition:color 220ms;}
 .is-rec .timer-hint{color:var(--ac);}
 
 /* ── WAVEFORM ── */
@@ -160,7 +160,7 @@ const CI = (() => {
 }
 .btn-stop:hover{background:rgba(0,0,0,.08);color:var(--tx);}
 .btn-stop:active{transform:scale(.98);}
-.stop-hint{text-align:center;font-size:11px;color:var(--tx3);font-family:var(--mono);letter-spacing:.04em;}
+.stop-hint{text-align:center;font-size:11px;color:#8e8e93;font-family:var(--mono);letter-spacing:.04em;}
 
 /* ── PROCESSING SCREEN ── */
 .proc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 24px;}
@@ -1811,8 +1811,10 @@ ${text}`;
       setTimeout(_mountPicker, 50);
       return;
     }
-    // KAM: smart detect — use provided guid, then currentAccountId
-    const resolved = accountGuid || (typeof currentAccountId !== 'undefined' ? currentAccountId : null);
+    // KAM: smart detect
+    // Only skip picker if BOTH: has accountGuid/currentAccountId AND user is actively in account view
+    const _inAccountView = document.body.classList.contains('restaurant-sheet');
+    const resolved = accountGuid || (_inAccountView && typeof currentAccountId !== 'undefined' ? currentAccountId : null);
     if (resolved) {
       _accountGuid = resolved;
       const ctx = _ctx();
