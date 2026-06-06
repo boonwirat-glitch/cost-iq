@@ -447,11 +447,12 @@ async function doLogin() {
     // (which fires async from signInWithPassword) knows doLogin already handles UI.
     window._doLoginHandled = true;
     currentUser = data.user;
-    // v195 Step 1: start R2 fetch immediately — runs in parallel with loadUserProfile
-    // so cache-warm data is already ingested by the time splash shows.
-    // sheetsLoadStarted guard prevents double-call if _autoRouteAfterLogin also fires.
-    if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
+    // Load profile first so role is known before R2 fetch starts
     await loadUserProfile();
+    // v348: patch R2 filenames for Sales BEFORE starting fetch
+    try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+    // v195 Step 1: start R2 fetch after profile + patch ready
+    if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
     hideLoginOverlay();
   } catch(e) {
     window._doLoginHandled = false;
@@ -1004,18 +1005,22 @@ async function checkSession() {
     if (session && !currentUser) {
       window._sessionCheckHandling = true;
       currentUser = session.user;
-      // v195 Step 1: start R2 fetch in parallel with loadUserProfile (same guard applies)
-      if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
       // v220 PROFILE CACHE: same cache-first pattern as onAuthStateChange path.
       var _cpcs=_profileCacheGet(session.user.id);
       if(_cpcs){
         currentUserProfile=_cpcs; normalizeCurrentUserProfileRole();
         _senseDataLog('PROFILE','⚡ cache hit (checkSession) → hideLoginOverlay immediately');
+        // v348: patch R2 for Sales before fetch
+        try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+        if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
         window._sessionCheckHandling=false;
         hideLoginOverlay();
         loadUserProfile(); // background revalidate
       }else{
         await loadUserProfile();
+        // v348: patch R2 for Sales before fetch
+        try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+        if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
         window._sessionCheckHandling = false;
         hideLoginOverlay();
       }
