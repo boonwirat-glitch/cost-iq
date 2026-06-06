@@ -17,12 +17,13 @@ let currentUser = null;
 let currentUserProfile = null;
 
 // v210i: Canonical auth-role normalization.
-// DB source of truth uses: admin / tl / rep. UI may still label rep as KAM.
+// DB source of truth uses: admin / tl / rep / sales. UI may still label rep as KAM.
 // SECTION:AUTH
 function normalizeRole(role){
   const r = String(role || '').trim().toLowerCase();
   if(r === 'kam' || r === 'ka' || r === 'key_account' || r === 'key account') return 'rep';
   if(r === 'team_lead' || r === 'team lead') return 'tl';
+  if(r === 'sales' || r === 'sale' || r === 'sales_rep') return 'sales';
   return r || 'rep';
 }
 function getCurrentRole(){
@@ -31,11 +32,14 @@ function getCurrentRole(){
 function isAdminRole(role){ return normalizeRole(role) === 'admin'; }
 function isTLRole(role){ return normalizeRole(role) === 'tl'; }
 function isRepRole(role){ return normalizeRole(role) === 'rep'; }
+function isSalesRole(role){ return normalizeRole(role) === 'sales'; }
+function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'; }
 function roleLabel(role){
   const r = normalizeRole(role);
   if(r === 'rep') return 'KAM';
   if(r === 'tl') return 'TL';
   if(r === 'admin') return 'Admin';
+  if(r === 'sales') return 'Sales';
   return role || '';
 }
 function normalizeCurrentUserProfileRole(){
@@ -54,6 +58,8 @@ try{
   window.isAdminRole = isAdminRole;
   window.isTLRole = isTLRole;
   window.isRepRole = isRepRole;
+  window.isSalesRole = isSalesRole;
+  window.isEchoUser = isEchoUser;
   window.roleLabel = roleLabel;
 }catch(e){}
 
