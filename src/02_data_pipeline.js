@@ -1956,6 +1956,12 @@ async function _preloadFromIndexedDB(){
 // SECTION:REFRESH_GATE
 function allCriticalReady(){
   try{
+    // v355: Sales users: handover CSV doesn't exist yet (404) — gate on portview+history only
+    var _salesMode=typeof getCurrentRole==='function'&&
+      (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+    if(_salesMode){
+      return _cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history');
+    }
     return _cloudLoadedTabs.has('portview') &&
            _cloudLoadedTabs.has('history') &&
            _cloudLoadedTabs.has('handover');
@@ -2030,6 +2036,15 @@ window.RenderBus = (function(){
     try{
       if(document.getElementById('scr-teamview')?.classList.contains('on') &&
          typeof renderTeamview === 'function') renderTeamview();
+    }catch(e){}
+    // Sales screens — render when sales-mode active
+    try{
+      if(document.body.classList.contains('sales-mode')){
+        var _salesScr=document.getElementById('scr-sales-portview');
+        if(_salesScr&&_salesScr.classList.contains('on')&&typeof renderSalesPortview==='function'){
+          renderSalesPortview();
+        }
+      }
     }catch(e){}
   }
 
