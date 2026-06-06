@@ -1,4 +1,4 @@
-<!-- Freshket Sense v352: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v353: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5098,15 +5098,16 @@ body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
 body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
 
 /* Sales nav grid: 3 cols (portview + pipeline + commission) */
-body.sales-mode .bnav { grid-template-columns: repeat(3,1fr); }
+body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
 
 /* Sales uses same dark theme as KAM */
-body.sales-mode { background: #0d1f3c; }
+/* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
+body.sales-mode { background: #FFFFFF; }
 body.sales-mode #scr-sales-portview,
 body.sales-mode #scr-sales-pipeline,
 body.sales-mode #scr-sales-commission,
-body.sales-mode #scr-sales-teamview { background: #0d1f3c; }
+body.sales-mode #scr-sales-teamview { background: #FFFFFF; }
 
 /* Sales-mode: hide KAM-specific content, show Sales-specific content */
 body.sales-mode .kam-content-only  { display: none !important; }
@@ -5142,7 +5143,7 @@ body.sales-mode .sales-content-only { display: block !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v352',
+      version: 'v353',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
