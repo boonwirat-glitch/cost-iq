@@ -838,7 +838,10 @@ async function openTargetSetup(mode) {
   const overlay = document.getElementById('target-setup-overlay');
   if (overlay) overlay.classList.add('open');
   const title = document.getElementById('tgt-sheet-title');
-  if (title) title.textContent = mode === 'admin' ? 'ตั้ง Target ทีม' : 'ตั้ง Target KAM';
+  const _isSalesTL = typeof isSalesTLRole === 'function' && isSalesTLRole(
+    currentUserProfile && currentUserProfile.role
+  );
+  if (title) title.textContent = mode === 'admin' ? 'ตั้ง Target ทีม' : (_isSalesTL ? 'ตั้ง Target Sales' : 'ตั้ง Target KAM');
   const tabRow = document.getElementById('tgt-tab-row');
   if (tabRow) tabRow.style.display = mode === 'admin' ? 'flex' : 'none';
   // v209: Target sheet is for target/settings only. Commission governance moved to Commission Cockpit.
@@ -957,8 +960,13 @@ function renderTargetSheetBody() {
     <button onclick="tgtNavQuarter(1)">›</button>
   </div>`;
 
+  const _isSalesTLMode = typeof isSalesTLRole === 'function' && isSalesTLRole(
+    currentUserProfile && currentUserProfile.role
+  );
   if (_tgtMode === 'admin') {
     html += _renderAdminTLBlocks(months, moLabels);
+  } else if (_isSalesTLMode) {
+    html += _renderTLSalesBlocks(months, moLabels);
   } else {
     html += _renderTLKamBlocks(months, moLabels);
   }
@@ -1086,6 +1094,90 @@ function _renderTLKamBlocks(months, moLabels) {
 
   if (!kams.length) {
     html += `<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:13px">ไม่พบ KAM ในทีม<br><span style="font-size:11px">อัปโหลด portview.csv ก่อน</span></div>`;
+  }
+  return html;
+}
+
+// W3: Sales TL — assign target per Sales rep (uses portviewBulkData filtered by salesTeamName)
+function _renderTLSalesBlocks(months, moLabels) {
+  const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
+  const teamTargets = months.map(m => _tgtGet(m, 'sales_team', tlEmail));
+  // Get Sales reps from portviewBulkData (Sales portview CSV has kamEmail=rep email, tlEmail=TL email)
+  const repMap = {};
+  if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
+    portviewBulkData.filter(r => !tlEmail || (r.tlEmail || '').toLowerCase() === tlEmail.toLowerCase()).forEach(r => {
+      const email = (r.kamEmail || '').toLowerCase();
+      const name = r.kamName || email || 'ไม่ระบุ';
+      if (email && !repMap[email]) repMap[email] = { email, name };
+    });
+  }
+  const reps = Object.values(repMap);
+  let html = '';
+
+  // Alloc bar — team target vs sum of rep targets
+  if (teamTargets.some(v => v > 0)) {
+    const allocByMonth = months.map(m => {
+      let sum = 0;
+      reps.forEach(r => {
+        const key = m + '|sales|' + r.email;
+        const pending = _tgtPendingEdits[key];
+        sum += pending !== undefined ? pending : _tgtGet(m, 'sales', r.email);
+      });
+      return sum;
+    });
+    html += '<div class="tgt-alloc-bar" id="tgt-alloc-bar"><div class="tgt-alloc-mo-grid">' +
+      months.map(function(m, i) {
+        const vp = teamTargets[i];
+        const alloc = allocByMonth[i];
+        const diff = alloc - vp;
+        const pct = vp > 0 ? Math.min(110, Math.round(alloc / vp * 100)) : 0;
+        const barPct = Math.min(100, pct);
+        const barCls = pct >= 100 ? 'great' : 'warn';
+        let diffText = '', diffCls = '';
+        if (vp <= 0)          { diffText = 'ยังไม่มี team target'; diffCls = 'none'; }
+        else if (alloc === 0) { diffText = 'ยังไม่แบ่ง';           diffCls = 'warn'; }
+        else if (diff < 0)    { diffText = 'ขาด ' + _tgtFmtM(-diff); diffCls = 'warn'; }
+        else if (diff === 0)  { diffText = 'ครบแล้ว';               diffCls = 'ok'; }
+        else                  { diffText = '+' + _tgtFmtM(diff);    diffCls = 'over'; }
+        return '<div class="tgt-alloc-mo-col" id="tgt-alloc-mo-' + m + '">'
+          + '<div class="tgt-alloc-mo-label">' + moLabels[i] + '</div>'
+          + (vp > 0 ? '<div class="tgt-alloc-mo-vp">' + _tgtFmtM(vp) + '</div>'
+                    : '<div class="tgt-alloc-mo-vp dim">–</div>')
+          + '<div class="tgt-alloc-track" style="margin:4px 0 2px">'
+          +   '<div class="tgt-alloc-fill kav-ss-bar-fill ' + barCls + '" style="width:' + barPct + '%"></div>'
+          + '</div>'
+          + '<div class="tgt-alloc-mo-alloc">' + (vp > 0 && alloc > 0 ? _tgtFmtM(alloc) : '') + '</div>'
+          + '<div class="tgt-alloc-mo-diff ' + diffCls + '">' + diffText + '</div>'
+          + '</div>';
+      }).join('') + '</div></div>';
+  }
+
+  // Rep blocks
+  reps.forEach(function(rep) {
+    const vals = months.map(m => _tgtGet(m, 'sales', rep.email));
+    html += '<div class="tgt-person-block">'
+      + '<div class="tgt-person-name">'
+      +   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,56,92,.7)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> '
+      +   rep.name
+      + '</div>'
+      + '<div class="tgt-person-meta">' + rep.email + '</div>'
+      + '<div class="tgt-month-grid">'
+      + months.map(function(m, i) {
+          return '<div class="tgt-month-col">'
+            + '<label>' + moLabels[i] + '</label>'
+            + '<input class="tgt-month-input" id="tgt-inp-sales-' + _tgtSafeId(rep.email) + '-' + m + '"'
+            +   ' value="' + (vals[i] ? _tgtFmtInput(vals[i]) : '') + '"'
+            +   ' placeholder="฿"'
+            +   ' oninput="onTgtInput(\"sales\",\"' + rep.email + '\",\"' + m + '\",this.value)">'
+            + '</div>';
+        }).join('')
+      + '</div>'
+      + '</div>';
+  });
+
+  if (!reps.length) {
+    html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:13px">'
+      + 'ไม่พบ Sales rep ในทีม<br><span style="font-size:11px">ตรวจสอบว่า portview CSV upload แล้ว</span></div>';
   }
   return html;
 }
