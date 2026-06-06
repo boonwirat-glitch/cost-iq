@@ -2915,14 +2915,32 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span class="lb">พอร์ต</span>
 </button>
 <!-- Restaurant-only tabs -->
+<!-- Echo — AI conversation assistant (KAM + Sales, all modes) -->
+<button class="ni rest-only echo-nav-btn" id="nav-echo" onclick="echoOpen()" aria-label="Echo">
+<div class="nwrap">
+<div class="echo-pill" id="echo-nav-pill">
+<span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span>
+</div>
+</div>
+<span class="lb">Echo</span>
+</button>
 <!-- Sense — restaurant mode + KAM overlay mode (v183) -->
 <button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="(isKAM&amp;&amp;document.body.classList.contains('restaurant-sheet'))?_overlayNav('opportunities'):showScreen('opportunities')">
 <div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-sense"></use></svg><span class="nbadge" id="opp-nav-badge" style="display:none">0</span></div>
-<span class="lb">Sense</span>
+<span class="lb">Save</span>
 </button>
 <button class="ni rest-only" id="nav-report" onclick="showScreen('report')">
 <div class="nwrap"><svg height="22" width="22"><use href="#ico-doc"></use></svg></div>
 <span class="lb">รายงาน</span>
+</button>
+<!-- Echo — KAM mode (visible for all roles that can use Echo) -->
+<button class="ni kam-only echo-nav-btn" id="nav-echo-kam" onclick="echoOpen()" aria-label="Echo">
+<div class="nwrap">
+<div class="echo-pill" id="echo-nav-pill-kam">
+<span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span><span class="echo-bar"></span>
+</div>
+</div>
+<span class="lb">Echo</span>
 </button>
 <!-- KAM-only: Portview (home button) -->
 <button class="ni kam-only nav-home" id="nav-portview" onclick="showScreen('portview')">
@@ -3373,5 +3391,15 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <script id="freshket-conv-intel">
 <!-- INJECT_CONV_INTEL -->
 </script>
+<!-- Echo floating pill — shown when recording + minimized -->
+<div id="echo-float-pill" onclick="echoExpand()" role="button" aria-label="กลับไปที่ Echo">
+  <div class="fp-bars">
+    <span class="fp-bar"></span><span class="fp-bar"></span><span class="fp-bar"></span>
+    <span class="fp-bar"></span><span class="fp-bar"></span>
+  </div>
+  <span class="fp-label">Echo</span>
+  <span class="fp-time" id="echo-float-time">0:00</span>
+</div>
 </body>
 </html>
+
