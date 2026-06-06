@@ -1514,10 +1514,6 @@ function renderKamSignalBar(){
   el.innerHTML=signals.map(s=>`<div class="kam-signal-chip ${s.type}"><span class="kam-signal-main">${s.main}</span></div>`).join('');
 }
 
-function cycleKamModel(){
-  kamModel=kamModel==='haiku'?'sonnet':'haiku';
-  setKamModel(kamModel);
-}
 
 // ════════════════════════════════════════
 // UTILS
