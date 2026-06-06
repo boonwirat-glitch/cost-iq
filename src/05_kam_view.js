@@ -115,7 +115,7 @@ function __legacyShowScreenFallback(name){
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
-  if(kambar&&isKAM)kambar.style.display=(name==='portview'||name==='teamview'||name==='overview')?'none':'flex';
+
   window.scrollTo({top:0,left:0,behavior:'instant'});
   document.body.scrollTop=0;
   document.documentElement.scrollTop=0;
@@ -167,7 +167,6 @@ function setKamModel(model){
     el.querySelector('div').style.color=on?'#fff':'var(--n700)';
   });
   const b1=document.getElementById('kam-model-badge');if(b1)b1.textContent=model==='haiku'?'Haiku':'Sonnet';
-  const tb=document.getElementById('kam-model-topbar-btn');if(tb)tb.textContent=model==='haiku'?'Haiku':'Sonnet';
 }
 
 // SECTION:KAM_ACCOUNT
@@ -1597,7 +1596,7 @@ function __legacySetModeFallback(mode){
   const teamScr=document.getElementById('scr-teamview');
   if(teamScr)teamScr.style.display='none'; // reset on mode change
   document.querySelectorAll('.mbtn').forEach((b,i)=>b.classList.toggle('on',(i===0&&!isKAM)||(i===1&&isKAM)));
-  document.getElementById('kambar').style.display=isKAM?'flex':'none';
+
   document.getElementById('kamsec').style.display='none';
   document.getElementById('hid').style.display=isKAM?'block':'none';
   // Switch between restaurant and KAM overview
