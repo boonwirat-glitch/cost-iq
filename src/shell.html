@@ -2952,7 +2952,41 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <span class="lb">Team</span>
 </button>
+<!-- Sales: Portfolio (พอร์ต) — sales-only -->
+<button class="ni sales-only nav-home" id="nav-sales-portview" onclick="showScreen('sales-portview')">
+<div class="nwrap" style="position:relative">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><rect height="7" width="7" x="3" y="3"></rect><rect height="7" width="7" x="14" y="3"></rect><rect height="7" width="7" x="3" y="14"></rect><path d="M14 17h7M17 14v7"></path></svg>
+<span class="nbadge" id="sales-port-badge" style="display:none">0</span>
+</div>
+<span class="lb">พอร์ต</span>
+</button>
+<!-- Sales: Pipeline — sales-only -->
+<button class="ni sales-only" id="nav-sales-pipeline" onclick="showScreen('sales-pipeline')">
+<div class="nwrap">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+</div>
+<span class="lb">Pipeline</span>
+</button>
+<!-- Sales: Commission (Coming Soon) — sales-only -->
+<button class="ni sales-only" id="nav-sales-commission" onclick="showScreen('sales-commission')">
+<div class="nwrap">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><line x1="12" x2="12" y1="1" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+</div>
+<span class="lb">Commission</span>
+</button>
+<!-- Sales TL: Team — sales-tl-only -->
+<button class="ni sales-tl-only" id="nav-sales-teamview" onclick="showScreen('sales-teamview')">
+<div class="nwrap">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+</div>
+<span class="lb">Team</span>
+</button>
 </nav>
+<!-- ══ SALES SCREENS ══ -->
+<div class="scr" id="scr-sales-portview" style="background:#0d1f3c"></div>
+<div class="scr" id="scr-sales-pipeline" style="background:#0d1f3c"></div>
+<div class="scr" id="scr-sales-commission" style="background:#0d1f3c"></div>
+<div class="scr" id="scr-sales-teamview" style="background:#0d1f3c"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:#0d1f3c">
 <div class="portview-header">
@@ -3327,6 +3361,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <style id="target-module-css">
 <!-- INJECT_STYLES_COMMISSION -->
 </style>
+<style id="sales-module-css">
+<!-- INJECT_STYLES_SALES -->
+</style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
 <div id="target-setup-sheet">
@@ -3385,6 +3422,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </script>
 <script id="freshket-conv-intel">
 <!-- INJECT_CONV_INTEL -->
+</script>
+<script id="freshket-sales">
+<!-- INJECT_SALES -->
 </script>
 <!-- Echo floating pill — shown when recording + minimized -->
 <div id="echo-float-pill" onclick="echoExpand()" role="button" aria-label="กลับไปที่ Echo">
