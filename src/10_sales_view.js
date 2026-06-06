@@ -734,7 +734,9 @@ window._salesTLDrillRep = function(repEmail) {
 
     const target = document.getElementById('portview-summary');
     if (!target) return;
-    // Inject Sales-specific block; hide KAM elements via CSS class
+    // Clear any previous Sales block to avoid duplicate on re-render
+    const existing = target.querySelector('.sales-content-only');
+    if (existing) existing.remove();
     const salesBlock = document.createElement('div');
     salesBlock.className = 'sales-content-only';
     // v6: Revolut style tenure section — no card, just rows
@@ -742,7 +744,7 @@ window._salesTLDrillRep = function(repEmail) {
       <div class="sv-tenure-section">
         <div class="sv-tenure-eye">ระยะเวลาในมือ</div>
         <div class="sv-tenure-bar-row">
-          <div class="sv-tenure-track"><div class="sv-tenure-fill${barClass==='late'?' late':''}" style="width:${pctHeld}%"></div></div>
+          <div class="sv-tenure-track"><div class="sv-tenure-fill${barClass==='late'?' late':barClass==='mid'?' mid':''}" style="width:${pctHeld}%"></div></div>
           <span class="sv-tenure-pct${barClass==='late'?' late':''}">${pctHeld}%</span>
         </div>
         <div class="sv-tenure-dl">
