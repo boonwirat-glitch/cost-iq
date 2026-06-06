@@ -1,4 +1,4 @@
-<!-- Freshket Sense v357: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v358: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5095,6 +5095,12 @@ body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
 /* Sales TL mode: show Team tab in addition */
 body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
 
+/* Sales v6: hide non-Sales nav buttons including nav-overview */
+body.sales-mode .bnav #nav-overview     { display: none !important; }
+body.sales-mode .bnav #nav-restaurant   { display: none !important; }
+body.sales-mode .bnav #nav-portview     { display: none !important; }
+body.sales-mode .bnav #nav-teamview     { display: none !important; }
+
 /* Sales nav grid: 3 cols (portview + pipeline + commission) */
 body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
@@ -5164,7 +5170,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v357',
+      version: 'v358',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -7838,10 +7844,10 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </button>
 </nav>
 <!-- ══ SALES SCREENS ══ -->
-<div class="scr" id="scr-sales-portview" style="background:#0d1f3c"></div>
-<div class="scr" id="scr-sales-pipeline" style="background:#0d1f3c"></div>
-<div class="scr" id="scr-sales-commission" style="background:#0d1f3c"></div>
-<div class="scr" id="scr-sales-teamview" style="background:#0d1f3c"></div>
+<div class="scr" id="scr-sales-portview"></div>
+<div class="scr" id="scr-sales-pipeline"></div>
+<div class="scr" id="scr-sales-commission"></div>
+<div class="scr" id="scr-sales-teamview"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:#0d1f3c">
 <div class="portview-header">
