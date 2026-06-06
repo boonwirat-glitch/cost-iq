@@ -1200,6 +1200,20 @@ function _patchR2FilesForSales(){
       R2_FILES['portview']='sales_portview_'+safeKey+'.csv';
       R2_FILES['handover']='sales_handover_'+safeKey+'.csv';
       console.log('%c[Sense] R2 routed for Sales','color:#4ddc97',{portview:R2_FILES['portview']});
+      // Fix B: clear IDB 'portview' cache so Sales user never loads KAM portview data
+      // IDB key 'portview' holds KAM data (640 accounts) — must be evicted before fetch
+      try{
+        const _db_req=indexedDB.open('ciq-csv-v1',1);
+        _db_req.onsuccess=function(e){
+          const _db=e.target.result;
+          try{
+            const _tx=_db.transaction('csv','readwrite');
+            _tx.objectStore('csv').delete('portview');
+            _tx.objectStore('csv').delete('handover');
+            console.log('%c[Sense] IDB portview/handover cleared for Sales','color:#4ddc97');
+          }catch(ex){}
+        };
+      }catch(ex){}
     }
   }catch(e){ console.warn('[_patchR2FilesForSales]',e); }
 }
