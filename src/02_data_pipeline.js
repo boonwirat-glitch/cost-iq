@@ -1629,7 +1629,9 @@ async function loadFromCloudflareR2(){
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'];
+  // v359: Sales users skip handover fetch (no sales_handover_{key}.csv exists — not needed for render)
+  const _isSalesMode=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
