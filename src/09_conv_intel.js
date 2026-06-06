@@ -368,6 +368,7 @@ const CI = (() => {
   <div class="rec-bottom">
     <button class="btn-stop" onclick="CI.stopRecording()">หยุด &amp; วิเคราะห์</button>
     <span class="stop-hint">ระบบจะ transcribe และวิเคราะห์ด้วย AI อัตโนมัติ</span>
+    <button onclick="CI._openHistory()" style="background:none;border:none;font-size:11px;color:var(--tx3,#AEAEB2);cursor:pointer;font-family:'DM Mono','IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:4px 0">ดูประวัติ</button>
   </div>
 </div>
 
@@ -403,6 +404,10 @@ const CI = (() => {
   <div class="result-cta">
     <button class="btn btn-ghost" onclick="CI.cancel()">ทิ้ง</button>
     <button class="btn btn-primary" onclick="CI._save()">บันทึก</button>
+  </div>
+  <div id="ci-tl-actions" style="display:none;padding:0 24px 12px;gap:8px;flex-shrink:0">
+    <button onclick="CI._openDebrief()" style="flex:1;padding:10px;border-radius:12px;border:0.5px solid rgba(83,74,183,.3);background:rgba(83,74,183,.07);color:#534AB7;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif">Debrief</button>
+    <button onclick="CI._openHistory()" style="flex:1;padding:10px;border-radius:12px;border:0.5px solid rgba(0,0,0,.12);background:rgba(0,0,0,.04);color:var(--tx2,#636366);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif">ประวัติ</button>
   </div>
 </div>`;
   }
@@ -879,6 +884,8 @@ Buyer type (BANK framework):
     document.getElementById('ci-p0').innerHTML = _skillsPanel(skillData);
     document.getElementById('ci-p1').innerHTML = _customerPanel(intelData);
     document.getElementById('ci-p2').innerHTML = _actionsPanel(intelData);
+    const tlDiv = document.getElementById('ci-tl-actions');
+    if (tlDiv) tlDiv.style.display = _canDebrief() ? 'flex' : 'none';
   }
 
   function _skillsPanel(d) {
@@ -987,6 +994,554 @@ Buyer type (BANK framework):
     }).join('');
   }
 
+
+  // ── CI_TL_DEBRIEF ───────────────────────────────────────────────────────────
+  // TL/Admin เท่านั้น — override AI score per skill + เพิ่ม coaching note
+  // เปิดจาก "Debrief" button ใน result screen
+  // Save ลง kam_skill_log.tl_override + tl_note
+
+  let _debriefOverrides = {}; // { skillCode: { score, note } }
+
+  function _canDebrief() {
+    return isTLRole(getCurrentRole()) || isAdminRole(getCurrentRole());
+  }
+
+  function _buildDebriefCSS() {
+    return `
+#ci-debrief-sheet {
+  position:fixed;top:0;bottom:0;left:50%;
+  width:100%;max-width:440px;
+  transform:translateX(-50%) translateY(100%);
+  z-index:10000;
+  background:var(--n-50,#F2F2F7);
+  font-family:'DM Sans',-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden;
+}
+#ci-debrief-sheet.open { transform:translateX(-50%) translateY(0); }
+.db-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);
+  flex-shrink:0;
+}
+.db-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.db-role-chip {
+  font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  font-family:'DM Mono','IBM Plex Mono',monospace;
+  padding:3px 8px;border-radius:100px;
+  background:rgba(83,74,183,.1);color:#534AB7;
+}
+.db-body { flex:1;overflow-y:auto;padding:16px 24px;-webkit-overflow-scrolling:touch; }
+.db-body::-webkit-scrollbar { display:none; }
+.db-skill-row {
+  padding:14px 0;border-bottom:0.5px solid var(--n-100,#E5E5EA);
+}
+.db-skill-row:last-child { border-bottom:none; }
+.db-skill-head {
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px;gap:10px;
+}
+.db-skill-name { font-size:13px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em;flex:1; }
+.db-ai-badge {
+  font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  font-family:'DM Mono','IBM Plex Mono',monospace;
+  padding:2px 7px;border-radius:100px;flex-shrink:0;
+}
+.db-ai-badge.pass { background:rgba(52,199,89,.12);color:#1a7a38; }
+.db-ai-badge.dev  { background:rgba(255,149,0,.12);color:#a05800; }
+.db-ai-badge.no   { background:rgba(0,0,0,.06);color:#888; }
+.db-evidence { font-size:11px;color:var(--n-400,#636366);line-height:1.5;margin-bottom:8px; }
+.db-override-row { display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap; }
+.db-pill {
+  padding:5px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.12);
+  font-size:11px;font-weight:500;font-family:'DM Mono','IBM Plex Mono',monospace;
+  letter-spacing:.04em;cursor:pointer;background:rgba(0,0,0,.03);
+  color:var(--n-400,#636366);transition:background 100ms,color 100ms,border-color 100ms;
+}
+.db-pill.sel-pass   { background:rgba(52,199,89,.12);color:#1a7a38;border-color:rgba(52,199,89,.3); }
+.db-pill.sel-dev    { background:rgba(255,149,0,.12);color:#a05800;border-color:rgba(255,149,0,.3); }
+.db-pill.sel-no     { background:rgba(0,0,0,.07);color:#555;border-color:rgba(0,0,0,.18); }
+.db-pill.sel-na     { background:rgba(0,0,0,.04);color:#aaa;border-color:rgba(0,0,0,.1); }
+.db-note {
+  width:100%;box-sizing:border-box;
+  border:0.5px solid rgba(0,0,0,.14);border-radius:10px;
+  padding:9px 12px;font-size:12px;font-family:'DM Sans',-apple-system,sans-serif;
+  color:var(--n-900,#1C1C1E);background:rgba(255,255,255,.7);
+  resize:none;min-height:52px;outline:none;line-height:1.5;
+  transition:border-color 150ms;
+}
+.db-note:focus { border-color:rgba(0,128,101,.35); }
+.db-note::placeholder { color:var(--n-200,#AEAEB2); }
+.db-footer {
+  padding:12px 24px 36px;display:flex;gap:8px;flex-shrink:0;
+  border-top:0.5px solid var(--n-100,#E5E5EA);
+}
+.db-btn {
+  flex:1;padding:13px;border-radius:14px;border:none;
+  font-family:'DM Sans',-apple-system,sans-serif;font-size:15px;
+  font-weight:500;letter-spacing:-.02em;cursor:pointer;
+  transition:opacity 60ms,transform 60ms;
+}
+.db-btn:active { transform:scale(.97);opacity:.85; }
+.db-btn-primary { background:#008065;color:#fff; }
+.db-btn-primary:hover { background:#00a882; }
+.db-btn-ghost { background:rgba(0,0,0,.045);color:var(--n-400,#636366); }
+.db-saving { text-align:center;font-size:12px;color:var(--n-200,#AEAEB2);padding:4px 0; }
+`;
+  }
+
+  function _openDebrief() {
+    if (!_canDebrief() || !_lastResult?.skillData) return;
+    _debriefOverrides = {};
+
+    // Inject CSS once
+    if (!document.getElementById('ci-debrief-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-debrief-style';
+      s.textContent = _buildDebriefCSS();
+      document.head.appendChild(s);
+    }
+
+    // Remove old sheet if exists
+    document.getElementById('ci-debrief-sheet')?.remove();
+
+    const skills = _lastResult.skillData.skills || [];
+    const rows = skills.map(s => {
+      const dc = s.score==='pass'?'pass':s.score==='developing'?'dev':'no';
+      const bl = s.score==='pass'?'Pass':s.score==='developing'?'Developing':s.score==='not_applicable'?'N/A':'Not observed';
+      const ev = s.evidence || s.evidence_summary || '-';
+      return `<div class="db-skill-row" data-code="${s.code}">
+        <div class="db-skill-head">
+          <span class="db-skill-name">${s.code} · ${s.name||s.code}</span>
+          <span class="db-ai-badge ${dc}">AI: ${bl}</span>
+        </div>
+        <div class="db-evidence">${ev}</div>
+        <div class="db-override-row">
+          <button class="db-pill" data-code="${s.code}" data-val="pass" onclick="CI._debriefPick(this)">Pass</button>
+          <button class="db-pill" data-code="${s.code}" data-val="developing" onclick="CI._debriefPick(this)">Developing</button>
+          <button class="db-pill" data-code="${s.code}" data-val="not_observed" onclick="CI._debriefPick(this)">Not observed</button>
+          <button class="db-pill" data-code="${s.code}" data-val="not_applicable" onclick="CI._debriefPick(this)">N/A</button>
+        </div>
+        <textarea class="db-note" placeholder="Coaching note สำหรับ rep (optional)" rows="2"
+          oninput="CI._debriefNote('${s.code}', this.value)"></textarea>
+      </div>`;
+    }).join('');
+
+    const sheet = document.createElement('div');
+    sheet.id = 'ci-debrief-sheet';
+    sheet.innerHTML = `
+      <div class="db-header">
+        <span class="db-title">TL Debrief</span>
+        <span class="db-role-chip">${roleLabel(getCurrentRole())}</span>
+      </div>
+      <div class="db-body">${rows}</div>
+      <div class="db-footer">
+        <button class="db-btn db-btn-ghost" onclick="CI._closeDebrief()">ยกเลิก</button>
+        <button class="db-btn db-btn-primary" id="db-save-btn" onclick="CI._saveDebrief()">บันทึก Debrief</button>
+      </div>`;
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+  }
+
+  function _debriefPick(btn) {
+    const code = btn.dataset.code;
+    const val  = btn.dataset.val;
+    // Deselect siblings
+    btn.closest('.db-override-row').querySelectorAll('.db-pill').forEach(b => {
+      b.className = 'db-pill';
+    });
+    // Select this
+    const cls = {pass:'sel-pass',developing:'sel-dev',not_observed:'sel-no',not_applicable:'sel-na'}[val]||'sel-no';
+    btn.classList.add(cls);
+    if (!_debriefOverrides[code]) _debriefOverrides[code] = {};
+    _debriefOverrides[code].score = val;
+  }
+
+  function _debriefNote(code, val) {
+    if (!_debriefOverrides[code]) _debriefOverrides[code] = {};
+    _debriefOverrides[code].note = val;
+  }
+
+  function _closeDebrief() {
+    const sheet = document.getElementById('ci-debrief-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    setTimeout(() => sheet.remove(), 400);
+  }
+
+  async function _saveDebrief() {
+    if (!_lastResult?.skillData) return;
+    const btn = document.getElementById('db-save-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
+
+    const tlEmail = currentUserProfile?.email;
+    const today   = new Date().toISOString().split('T')[0];
+    const rows = [];
+
+    (_lastResult.skillData.skills || []).forEach(s => {
+      const override = _debriefOverrides[s.code];
+      if (!override?.score && !override?.note) return; // ไม่มีการเปลี่ยนแปลง
+      rows.push({
+        kam_email:        _lastResult.repEmail || tlEmail,
+        account_id:       _accountGuid,
+        session_date:     today,
+        skill_code:       s.code,
+        score:            s.score,          // AI score เดิม
+        evidence_summary: s.evidence || s.evidence_summary || '',
+        tl_override:      override.score || null,
+        tl_note:          override.note  || null,
+      });
+    });
+
+    if (rows.length === 0) { _closeDebrief(); return; }
+
+    try {
+      const { error } = await supa.from('kam_skill_log').insert(rows);
+      if (error) throw error;
+      _closeDebrief();
+      _toast('บันทึก Debrief แล้ว');
+    } catch(e) {
+      console.warn('[CI debrief save]', e.message);
+      if (btn) { btn.disabled = false; btn.textContent = 'บันทึก Debrief'; }
+      _toast('บันทึกไม่สำเร็จ: ' + e.message);
+    }
+  }
+
+
+  // ── CI_HISTORY ──────────────────────────────────────────────────────────────
+  // ดูประวัติ CI sessions ย้อนหลัง per account
+  // KAM เห็นของตัวเอง, TL/admin เห็นทุก rep ใน account นั้น
+
+  async function _loadHistory() {
+    const email = currentUserProfile?.email;
+    if (!_accountGuid || !email) return [];
+    try {
+      let query = supa
+        .from('kam_skill_log')
+        .select('*')
+        .eq('account_id', _accountGuid)
+        .order('session_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      // KAM เห็นเฉพาะของตัวเอง
+      if (!_canDebrief()) query = query.eq('kam_email', email);
+
+      const { data, error } = await query.limit(200);
+      if (error) throw error;
+      return data || [];
+    } catch(e) {
+      console.warn('[CI history]', e.message);
+      return [];
+    }
+  }
+
+  function _groupHistoryBySessions(rows) {
+    // Group by (kam_email, session_date) — แต่ละ session = 1 วัน + 1 rep
+    const map = {};
+    rows.forEach(r => {
+      const key = `${r.kam_email}__${r.session_date}`;
+      if (!map[key]) map[key] = { kam_email: r.kam_email, session_date: r.session_date, skills: [] };
+      map[key].skills.push(r);
+    });
+    return Object.values(map).sort((a,b) => b.session_date.localeCompare(a.session_date));
+  }
+
+  function _buildHistoryCSS() {
+    return `
+#ci-history-sheet {
+  position:fixed;top:0;bottom:0;left:50%;
+  width:100%;max-width:440px;
+  transform:translateX(-50%) translateY(100%);
+  z-index:10000;
+  background:var(--n-50,#F2F2F7);
+  font-family:'DM Sans',-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden;
+}
+#ci-history-sheet.open { transform:translateX(-50%) translateY(0); }
+.hist-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);flex-shrink:0;
+}
+.hist-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.hist-close { font-size:15px;color:var(--n-400,#636366);cursor:pointer;padding:4px; }
+.hist-body { flex:1;overflow-y:auto;padding:12px 24px 24px;-webkit-overflow-scrolling:touch; }
+.hist-body::-webkit-scrollbar { display:none; }
+.hist-empty { text-align:center;padding:48px 0;font-size:13px;color:var(--n-200,#AEAEB2); }
+.hist-session {
+  background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-radius:14px;border:0.5px solid rgba(255,255,255,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);
+  padding:14px 16px;margin-bottom:10px;
+}
+.hist-session-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
+.hist-date { font-size:12px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.01em; }
+.hist-rep  { font-size:10px;color:var(--n-400,#636366);font-family:'DM Mono','IBM Plex Mono',monospace;letter-spacing:.03em; }
+.hist-skills { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px; }
+.hist-skill-dot {
+  display:flex;align-items:center;gap:4px;
+  font-size:10px;font-family:'DM Mono','IBM Plex Mono',monospace;
+  color:var(--n-400,#636366);letter-spacing:.03em;
+}
+.hsd { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
+.hsd.pass { background:#34C759; }
+.hsd.dev  { background:#FF9500; }
+.hsd.no   { background:#AEAEB2; }
+.hist-coaching {
+  font-size:11px;color:var(--teal,#008065);font-style:italic;line-height:1.5;
+  border-top:0.5px solid rgba(0,128,101,.12);padding-top:6px;margin-top:6px;
+}
+.hist-tl-note {
+  font-size:11px;color:#534AB7;font-style:italic;line-height:1.5;
+  border-top:0.5px solid rgba(83,74,183,.12);padding-top:6px;margin-top:4px;
+}
+`;
+  }
+
+  async function _openHistory() {
+    // Inject CSS once
+    if (!document.getElementById('ci-history-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-history-style';
+      s.textContent = _buildHistoryCSS();
+      document.head.appendChild(s);
+    }
+    document.getElementById('ci-history-sheet')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'ci-history-sheet';
+    sheet.innerHTML = `
+      <div class="hist-header">
+        <span class="hist-title">ประวัติการสนทนา</span>
+        <span class="hist-close" onclick="CI._closeHistory()">ปิด</span>
+      </div>
+      <div class="hist-body" id="ci-hist-body">
+        <div class="hist-empty">กำลังโหลด...</div>
+      </div>`;
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+
+    // Load async
+    const rows = await _loadHistory();
+    const sessions = _groupHistoryBySessions(rows);
+    const body = document.getElementById('ci-hist-body');
+    if (!body) return;
+
+    if (sessions.length === 0) {
+      body.innerHTML = '<div class="hist-empty">ยังไม่มีประวัติ</div>';
+      return;
+    }
+
+    body.innerHTML = sessions.map(sess => {
+      const isTL = _canDebrief();
+      const repLabel = isTL ? `<span class="hist-rep">${sess.kam_email.split('@')[0]}</span>` : '';
+      const dateLabel = new Date(sess.session_date).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+
+      // Skill dots — prefer tl_override if exists
+      const skillDots = sess.skills.map(sk => {
+        const finalScore = sk.tl_override || sk.score;
+        const dc = finalScore==='pass'?'pass':finalScore==='developing'?'dev':'no';
+        return `<span class="hist-skill-dot"><span class="hsd ${dc}"></span>${sk.skill_code}</span>`;
+      }).join('');
+
+      // Coaching notes from AI
+      const notes = sess.skills
+        .filter(sk => sk.score && sk.score !== 'pass' && sk.evidence_summary)
+        .slice(0, 2)
+        .map(sk => `${sk.skill_code}: ${sk.evidence_summary}`)
+        .join(' · ');
+      const coachingHtml = notes
+        ? `<div class="hist-coaching">${notes}</div>` : '';
+
+      // TL notes
+      const tlNotes = sess.skills
+        .filter(sk => sk.tl_note)
+        .map(sk => `${sk.skill_code}: ${sk.tl_note}`)
+        .join(' · ');
+      const tlHtml = tlNotes
+        ? `<div class="hist-tl-note">TL: ${tlNotes}</div>` : '';
+
+      return `<div class="hist-session">
+        <div class="hist-session-head">
+          <span class="hist-date">${dateLabel}</span>
+          ${repLabel}
+        </div>
+        <div class="hist-skills">${skillDots}</div>
+        ${coachingHtml}${tlHtml}
+      </div>`;
+    }).join('');
+  }
+
+  function _closeHistory() {
+    const sheet = document.getElementById('ci-history-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    setTimeout(() => sheet.remove(), 400);
+  }
+
+
+  // ── CI_SKILL_TREND (TL view) ─────────────────────────────────────────────────
+  // TL/admin เท่านั้น — heatmap skill score ต่อ rep ใน squad
+
+  async function _loadSkillTrend(repEmails) {
+    try {
+      const { data, error } = await supa
+        .from('kam_skill_log')
+        .select('kam_email, skill_code, score, tl_override, session_date')
+        .in('kam_email', repEmails)
+        .order('session_date', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    } catch(e) {
+      console.warn('[CI trend]', e.message);
+      return [];
+    }
+  }
+
+  function _buildTrendCSS() {
+    return `
+#ci-trend-sheet {
+  position:fixed;top:0;bottom:0;left:50%;
+  width:100%;max-width:440px;
+  transform:translateX(-50%) translateY(100%);
+  z-index:10000;
+  background:var(--n-50,#F2F2F7);
+  font-family:'DM Sans',-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden;
+}
+#ci-trend-sheet.open { transform:translateX(-50%) translateY(0); }
+.trend-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);flex-shrink:0;
+}
+.trend-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.trend-close { font-size:15px;color:var(--n-400,#636366);cursor:pointer;padding:4px; }
+.trend-body { flex:1;overflow-y:auto;overflow-x:auto;padding:16px 24px 24px;-webkit-overflow-scrolling:touch; }
+.trend-body::-webkit-scrollbar { display:none; }
+.trend-rep-row { margin-bottom:20px; }
+.trend-rep-name { font-size:12px;font-weight:500;color:var(--n-900,#1C1C1E);margin-bottom:8px;letter-spacing:-.01em; }
+.trend-grid { display:flex;flex-wrap:wrap;gap:5px; }
+.trend-cell {
+  width:44px;padding:5px 4px;border-radius:7px;text-align:center;
+  font-size:9px;font-family:'DM Mono','IBM Plex Mono',monospace;letter-spacing:.04em;
+}
+.trend-cell-code { font-weight:500;margin-bottom:2px;line-height:1.2; }
+.trend-cell-score { font-size:8px;opacity:.75; }
+.trend-cell.pass { background:rgba(52,199,89,.14);color:#1a7a38; }
+.trend-cell.dev  { background:rgba(255,149,0,.14);color:#a05800; }
+.trend-cell.no   { background:rgba(0,0,0,.05);color:#888; }
+.trend-cell.none { background:rgba(0,0,0,.03);color:#ccc; }
+.trend-legend { display:flex;gap:14px;margin-bottom:16px; }
+.tl-dot { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px; }
+.tl-legend-item { display:flex;align-items:center;font-size:10px;color:var(--n-400,#636366); }
+`;
+  }
+
+  async function _openSkillTrend() {
+    if (!_canDebrief()) return;
+
+    if (!document.getElementById('ci-trend-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-trend-style';
+      s.textContent = _buildTrendCSS();
+      document.head.appendChild(s);
+    }
+    document.getElementById('ci-trend-sheet')?.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'ci-trend-sheet';
+    sheet.innerHTML = `
+      <div class="trend-header">
+        <span class="trend-title">Skill Overview — Team</span>
+        <span class="trend-close" onclick="CI._closeTrend()">ปิด</span>
+      </div>
+      <div class="trend-body" id="ci-trend-body">
+        <div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+      </div>`;
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+
+    // Get rep emails from squad (use portviewBulkData if available)
+    let repEmails = [];
+    if (typeof portviewBulkData !== 'undefined' && portviewBulkData) {
+      const seen = new Set();
+      portviewBulkData.forEach(r => {
+        if (r.owner_email && !seen.has(r.owner_email)) {
+          seen.add(r.owner_email);
+          repEmails.push(r.owner_email);
+        }
+      });
+    }
+    if (repEmails.length === 0) {
+      repEmails = [currentUserProfile?.email].filter(Boolean);
+    }
+
+    const rows = await _loadSkillTrend(repEmails);
+    const body = document.getElementById('ci-trend-body');
+    if (!body) return;
+
+    if (rows.length === 0) {
+      body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูล</div>';
+      return;
+    }
+
+    // Aggregate: per rep, per skill → latest score
+    const repMap = {}; // repEmail → { skillCode → { score, sessions } }
+    rows.forEach(r => {
+      if (!repMap[r.kam_email]) repMap[r.kam_email] = {};
+      const code = r.skill_code;
+      if (!repMap[r.kam_email][code]) repMap[r.kam_email][code] = { latest: null, pass: 0, dev: 0, no: 0, total: 0 };
+      const bucket = repMap[r.kam_email][code];
+      const finalScore = r.tl_override || r.score;
+      if (!bucket.latest) bucket.latest = finalScore;
+      if (finalScore === 'pass') bucket.pass++;
+      else if (finalScore === 'developing') bucket.dev++;
+      else bucket.no++;
+      bucket.total++;
+    });
+
+    const skillCodes = _SKILL_RUBRIC.filter(s => s.ci_scope !== 'none').map(s => s.code);
+
+    const legend = `<div class="trend-legend">
+      <div class="tl-legend-item"><span class="tl-dot" style="background:#34C759"></span>Pass</div>
+      <div class="tl-legend-item"><span class="tl-dot" style="background:#FF9500"></span>Developing</div>
+      <div class="tl-legend-item"><span class="tl-dot" style="background:#AEAEB2"></span>Not observed</div>
+    </div>`;
+
+    const repRows = Object.entries(repMap).map(([email, skills]) => {
+      const name = email.split('@')[0];
+      const cells = skillCodes.map(code => {
+        const sk = skills[code];
+        if (!sk) return `<div class="trend-cell none"><div class="trend-cell-code">${code}</div><div class="trend-cell-score">—</div></div>`;
+        const cls = sk.latest==='pass'?'pass':sk.latest==='developing'?'dev':'no';
+        const pct = sk.total > 0 ? Math.round(sk.pass/sk.total*100) : 0;
+        return `<div class="trend-cell ${cls}"><div class="trend-cell-code">${code}</div><div class="trend-cell-score">${pct}%</div></div>`;
+      }).join('');
+      return `<div class="trend-rep-row">
+        <div class="trend-rep-name">${name}</div>
+        <div class="trend-grid">${cells}</div>
+      </div>`;
+    }).join('');
+
+    body.innerHTML = legend + repRows;
+  }
+
+  function _closeTrend() {
+    const sheet = document.getElementById('ci-trend-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    setTimeout(() => sheet.remove(), 400);
+  }
+
+
   // ── Public ─────────────────────────────────────────────────────────────────
   function open(accountGuid) {
     _accountGuid = accountGuid || (typeof currentAccountId !== 'undefined' ? currentAccountId : null);
@@ -995,7 +1550,7 @@ Buyer type (BANK framework):
     setTimeout(_mount, 50);
   }
 
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); } };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend };
 
 })();
 
