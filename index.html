@@ -1,4 +1,4 @@
-<!-- Freshket Sense v351: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v352: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -278,7 +278,7 @@
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>Freshket Sense</title>
 <!-- Phase 2 safe modular baseline: security + extracted module references. Deployable output remains monolith-compatible. -->
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <style>
 /* ============================================================
    FRESHKET SENSE — MAIN STYLES
@@ -5142,7 +5142,7 @@ body.sales-mode .sales-content-only { display: block !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v351',
+      version: 'v352',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -27460,486 +27460,582 @@ flex-wrap:wrap;}
 </style>
 <style id="sales-module-css">
 /* ══════════════════════════════════════════════════════
-   SALES MODULE STYLES — styles_sales.css
-   Design system: same tokens as styles_main.css
-   --bg:#F2F2F7  --surface:rgba(255,255,255,.72)+blur
-   --ac:#008065  --tx:#1C1C1E  --tx2:#636366  --tx3:#6C6C70
+   SALES MODULE STYLES — styles_sales.css  v6
+   Design: Airbnb DLS × Revolut list pattern
+   Font:   Noto Sans Thai (loaded in shell.html)
+   Accent: Rausch #FF385C — no green
    ══════════════════════════════════════════════════════ */
 
-/* ── Sales Home ── */
-.sv-header {
-  padding: 20px 20px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.sv-header-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: rgba(255,255,255,.9);
-  letter-spacing: -0.02em;
-}
-.sv-header-sub {
+/* ── Token system ── */
+/* --canvas   #FFFFFF   pure white bg         */
+/* --surface  #F7F7F7   band / subtle bg      */
+/* --ink      #222222   primary text          */
+/* --body     #3F3F3F   secondary text        */
+/* --muted    #6A6A6A   tertiary / labels     */
+/* --hairline #EBEBEB   dividers              */
+/* --ac       #FF385C   rausch accent         */
+/* --ac-dim   rgba(255,56,92,.08)             */
+/* --ok       #34C759   positive only         */
+/* --warn     #FF9500   caution               */
+
+/* ── Page header ── */
+.sv-page-hd { padding: 22px 20px 6px; }
+.sv-page-eye {
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: .14em;
+  font-weight: 600;
+  letter-spacing: .20em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 4px;
+}
+.sv-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.02em;
+  line-height: 1.15;
 }
 
-/* ── Metric card ── */
-.sv-card {
-  background: rgba(255,255,255,.08);
-  border: 0.5px solid rgba(255,255,255,.14);
-  border-radius: 20px;
-  padding: 18px 18px 16px;
-  margin: 0 16px 12px;
-}
-.sv-card-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,.45);
-  font-family: 'DM Mono', monospace;
-  margin-bottom: 6px;
-}
-.sv-card-value {
-  font-size: 32px;
-  font-weight: 200;
-  color: #fff;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-.sv-card-value-unit {
-  font-size: 14px;
-  font-weight: 400;
-  color: rgba(255,255,255,.6);
-  margin-left: 2px;
-}
-.sv-card-sub {
-  font-size: 12px;
-  color: rgba(255,255,255,.5);
-  margin-top: 4px;
-}
-
-/* ── Target progress bar ── */
-.sv-target-bar-wrap {
-  margin-top: 12px;
-}
-.sv-target-bar-track {
-  background: rgba(255,255,255,.1);
-  border-radius: 4px;
-  height: 5px;
+/* ── Hero card — the single box on portview ── */
+.sv-hero {
+  margin: 16px 20px 0;
+  background: #F7F7F7;
+  border-radius: 16px;
+  padding: 20px 20px 18px;
+  position: relative;
   overflow: hidden;
 }
-.sv-target-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: #008065;
-  transition: width .6s cubic-bezier(.16,1,.3,1);
+.sv-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #FF385C;
+  border-radius: 16px 16px 0 0;
 }
-.sv-target-bar-fill.warn  { background: #FF9500; }
-.sv-target-bar-fill.danger { background: #FF3B30; }
-.sv-target-bar-fill.great { background: #34C759; }
-.sv-target-labels {
+.sv-hero-eye {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #FF385C;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 6px;
+}
+.sv-hero-num {
+  font-size: 48px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.sv-hero-unit {
+  font-size: 22px;
+  font-weight: 600;
+  color: #3F3F3F;
+}
+.sv-hero-sub {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #6A6A6A;
+}
+.sv-gap-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF385C;
+  background: rgba(255,56,92,.08);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.sv-gap-badge.ok {
+  color: #34C759;
+  background: rgba(52,199,89,.09);
+}
+
+/* Target bar */
+.sv-tbar { margin-top: 14px; }
+.sv-tbar-track {
+  height: 4px;
+  background: #EBEBEB;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sv-tbar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .9s cubic-bezier(.16,1,.3,1);
+}
+.sv-tbar-fill.ac   { background: #FF385C; }
+.sv-tbar-fill.ok   { background: #34C759; }
+.sv-tbar-fill.warn { background: #FF9500; }
+.sv-tbar-meta {
   display: flex;
   justify-content: space-between;
   margin-top: 5px;
-  font-size: 10px;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
-/* ── 3-month projection strip ── */
-.sv-projection-strip {
+/* ── 3-month projection strip — inline columns, no boxes ── */
+.sv-proj-row {
   display: flex;
-  gap: 8px;
-  padding: 0 16px 12px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  margin: 14px 20px 0;
+  background: #F7F7F7;
+  border-radius: 12px;
+  overflow: hidden;
 }
-.sv-projection-strip::-webkit-scrollbar { display: none; }
-.sv-proj-card {
-  flex: 0 0 calc(33vw - 16px);
-  min-width: 96px;
-  background: rgba(255,255,255,.06);
-  border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 14px;
-  padding: 12px 12px 10px;
+.sv-proj-cell {
+  flex: 1;
+  padding: 12px 0 12px 14px;
+  position: relative;
 }
-.sv-proj-card.current {
-  background: rgba(0,128,101,.15);
-  border-color: rgba(0,128,101,.35);
+.sv-proj-cell + .sv-proj-cell::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 1px;
+  background: #EBEBEB;
 }
-.sv-proj-month {
+.sv-proj-cell.now { background: rgba(255,56,92,.04); }
+.sv-proj-mon {
   font-size: 9px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 5px;
+}
+.sv-proj-cell.now .sv-proj-mon { color: #FF385C; }
+.sv-proj-amt {
+  font-size: 17px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+.sv-proj-gap {
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sv-proj-gap.ok   { color: #34C759; }
+.sv-proj-gap.warn { color: #FF9500; }
+.sv-proj-gap.bad  { color: #FF385C; }
+
+/* ── Section label ── */
+.sv-sec {
+  padding: 20px 20px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sv-sec-t {
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
-  margin-bottom: 6px;
-}
-.sv-proj-amount {
-  font-size: 18px;
-  font-weight: 200;
-  color: #fff;
-  letter-spacing: -0.03em;
-}
-.sv-proj-vs {
-  font-size: 10px;
-  margin-top: 4px;
-}
-.sv-proj-vs.hit  { color: #34C759; }
-.sv-proj-vs.miss { color: #FF3B30; }
-.sv-proj-vs.gap  { color: #FF9500; }
-
-/* ── Handover warning card ── */
-.sv-handover-card {
-  background: rgba(255,59,48,.08);
-  border: 0.5px solid rgba(255,59,48,.25);
-  border-radius: 20px;
-  padding: 14px 18px;
-  margin: 0 16px 12px;
-}
-.sv-handover-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: #FF3B30;
-  margin-bottom: 6px;
-}
-.sv-handover-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 0.5px solid rgba(255,59,48,.12);
-  font-size: 12px;
-  color: rgba(255,255,255,.8);
-}
-.sv-handover-row:last-child { border-bottom: none; }
-.sv-handover-days {
-  font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  color: #FF3B30;
-  font-weight: 500;
-}
-
-/* ── Sales Portview outlet list ── */
-.sv-portview-header {
-  padding: 16px 20px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: rgba(13,31,60,.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.sv-portview-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
-}
-.sv-sort-btn {
-  font-size: 11px;
-  color: rgba(255,255,255,.5);
-  background: rgba(255,255,255,.07);
-  border: 0.5px solid rgba(255,255,255,.12);
-  border-radius: 8px;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-/* Outlet card */
-.sv-outlet-card {
-  background: rgba(255,255,255,.06);
-  border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin: 0 16px 10px;
-  cursor: pointer;
-  transition: background .15s;
-}
-.sv-outlet-card:active { background: rgba(255,255,255,.1); }
-.sv-outlet-card.expiring-soon {
-  border-color: rgba(255,149,0,.35);
-  background: rgba(255,149,0,.05);
-}
-.sv-outlet-card.expiring-critical {
-  border-color: rgba(255,59,48,.35);
-  background: rgba(255,59,48,.06);
-}
-.sv-outlet-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255,255,255,.9);
-  margin-bottom: 4px;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.sv-outlet-type {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: rgba(0,128,101,.9);
-  background: rgba(0,128,101,.12);
-  border-radius: 4px;
-  padding: 2px 6px;
-}
-.sv-outlet-gmv {
-  font-size: 13px;
-  color: rgba(255,255,255,.7);
-  margin-bottom: 8px;
+.sv-sec-t.ac { color: #FF385C; }
+.sv-sec-c {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
-/* Days held progress bar */
-.sv-days-bar-wrap { margin-bottom: 6px; }
-.sv-days-bar-track {
-  background: rgba(255,255,255,.08);
-  border-radius: 3px;
-  height: 4px;
+/* ── Handover rows — dot + name + days, no card ── */
+.sv-hov-section { padding: 0 20px; }
+.sv-hov-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid #EBEBEB;
+}
+.sv-hov-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #FF385C;
+  flex-shrink: 0;
+  margin-right: 10px;
+}
+.sv-hov-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #222222;
+  flex: 1;
+}
+.sv-hov-days {
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF385C;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Outlet list — Revolut transaction row style ── */
+.sv-outlet-list { padding: 0 20px; }
+
+.sv-ol-row {
+  padding: 13px 0;
+  border-top: 1px solid #EBEBEB;
+  cursor: pointer;
+  transition: opacity .12s;
+}
+.sv-ol-row:active { opacity: .7; }
+
+.sv-ol-top {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.sv-ol-ind {
+  width: 3px; height: 32px;
+  border-radius: 2px;
+  background: #EBEBEB;
+  flex-shrink: 0;
+  margin-right: 10px;
+  align-self: center;
+}
+.sv-ol-ind.ok   { background: #34C759; }
+.sv-ol-ind.mid  { background: #FF9500; }
+.sv-ol-ind.late { background: #FF385C; }
+
+.sv-ol-info { flex: 1; min-width: 0; }
+.sv-ol-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #222222;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
-.sv-days-bar-fill {
+.sv-ol-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: #6A6A6A;
+  margin-top: 1px;
+}
+.sv-ol-right {
+  text-align: right;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+.sv-ol-gmv {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.01em;
+}
+.sv-ol-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #FF385C;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 2px;
+}
+.sv-ol-type.ok  { color: #34C759; }
+.sv-ol-type.mid { color: #FF9500; }
+
+/* Days bar under each outlet row */
+.sv-ol-bar-wrap { padding-left: 13px; }
+.sv-days-track {
+  height: 3px;
+  background: #EBEBEB;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.sv-days-fill {
   height: 100%;
-  border-radius: 3px;
-  background: #34C759;
-  transition: width .4s;
+  border-radius: 2px;
+  transition: width .5s cubic-bezier(.16,1,.3,1);
 }
-.sv-days-bar-fill.mid  { background: #FF9500; }
-.sv-days-bar-fill.late { background: #FF3B30; }
+.sv-days-fill.ok   { background: #34C759; }
+.sv-days-fill.mid  { background: #FF9500; }
+.sv-days-fill.late { background: #FF385C; }
 .sv-days-meta {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  color: rgba(255,255,255,.35);
-  margin-top: 3px;
+  font-weight: 600;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
 }
-.sv-days-deadline { color: rgba(255,255,255,.5); }
+.sv-days-exp { color: #3F3F3F; }
 
 /* ── Pipeline screen ── */
-.sv-pipeline-header {
-  padding: 16px 20px 12px;
+
+/* KPI inline — no boxes */
+.sv-kpi-inline {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: rgba(13,31,60,.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  gap: 0;
+  padding: 0 20px;
 }
-.sv-pipeline-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
+.sv-ki {
+  flex: 1;
+  padding: 16px 0 12px;
+  position: relative;
 }
-.sv-pipeline-month-label {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: .12em;
+.sv-ki + .sv-ki { padding-left: 20px; }
+.sv-ki + .sv-ki::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 14px; bottom: 10px;
+  width: 1px;
+  background: #EBEBEB;
+}
+.sv-ki-l {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
-  padding: 4px 20px 8px;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 4px;
 }
-.sv-pipeline-summary {
-  font-size: 11px;
-  color: rgba(255,255,255,.4);
-  padding: 0 20px 10px;
+.sv-ki-v {
+  font-size: 22px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.02em;
+  line-height: 1;
 }
-.sv-lead-card {
-  background: rgba(255,255,255,.06);
-  border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin: 0 16px 8px;
+.sv-ki-v.bad { color: #FF385C; }
+
+/* Gap chart — no card */
+.sv-gap-section { padding: 4px 20px 0; }
+.sv-gap-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  margin-bottom: 12px;
+}
+.sv-gap-row:last-child { margin-bottom: 0; }
+.sv-gap-mon {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  width: 32px;
+  flex-shrink: 0;
+}
+.sv-gap-track {
+  flex: 1;
+  height: 4px;
+  background: #EBEBEB;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sv-gap-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .7s cubic-bezier(.16,1,.3,1);
+}
+.sv-gap-fill.ok   { background: #34C759; }
+.sv-gap-fill.warn { background: #FF9500; }
+.sv-gap-fill.bad  { background: #FF385C; }
+.sv-gap-val {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Lead list */
+.sv-lead-list { padding: 0 20px; }
+.sv-lead-month-hd {
+  padding: 16px 0 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1px solid #EBEBEB;
+}
+.sv-lead-month-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222222;
+}
+.sv-lead-month-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sv-lead-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid #EBEBEB;
+  cursor: pointer;
 }
 .sv-lead-info { flex: 1; min-width: 0; }
 .sv-lead-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255,255,255,.9);
+  font-size: 14px;
+  font-weight: 600;
+  color: #222222;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .sv-lead-date {
-  font-size: 10px;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
-  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #6A6A6A;
+  margin-top: 1px;
+  font-family: 'IBM Plex Mono', monospace;
 }
 .sv-lead-gmv {
-  font-size: 14px;
-  font-weight: 400;
-  color: rgba(0,200,120,.9);
+  font-size: 15px;
+  font-weight: 700;
+  color: #222222;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.sv-lead-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
+.sv-lead-actions { display: flex; gap: 5px; flex-shrink: 0; }
 .sv-lead-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 0.5px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.5);
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  background: #F7F7F7;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 12px;
+  color: #6A6A6A;
+  transition: background .12s;
 }
-.sv-lead-btn:active { background: rgba(255,255,255,.12); }
+.sv-lead-btn:active { background: #EBEBEB; }
+.sv-lead-btn svg { width: 13px; height: 13px; }
 
-/* FAB — add lead */
+/* FAB */
 .sv-fab {
   position: fixed;
-  bottom: calc(90px + env(safe-area-inset-bottom,0px));
+  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   right: 20px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: #008065;
+  height: 44px;
+  padding: 0 20px;
+  background: #FF385C;
   color: #fff;
   border: none;
-  font-size: 24px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Noto Sans Thai', sans-serif;
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,128,101,.4);
+  gap: 7px;
+  box-shadow: 0 4px 16px rgba(255,56,92,.32);
   z-index: 50;
-  transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+  cursor: pointer;
+  transition: transform .2s cubic-bezier(.16,1,.3,1);
 }
-.sv-fab:active { transform: scale(.92); }
+.sv-fab:active { transform: scale(.95); }
 
-/* Add/Edit lead sheet */
-.sv-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.5);
-  z-index: 200;
+/* ── Account view patches ── */
+.sv-back-row {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 20px 8px;
+  cursor: pointer;
 }
-.sv-sheet {
-  background: #1a2d50;
-  border-radius: 28px 28px 0 0;
-  padding: 24px 24px 32px;
-  width: 100%;
-  max-width: 440px;
-  transform: translateY(100%);
-  transition: transform .32s cubic-bezier(.16,1,.3,1);
-}
-.sv-sheet.open { transform: translateY(0); }
-.sv-sheet-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
-  margin-bottom: 20px;
-}
-.sv-field-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,.4);
-  font-family: 'DM Mono', monospace;
+.sv-back-row svg { color: #FF385C; }
+.sv-back-label { font-size: 14px; font-weight: 600; color: #FF385C; }
+
+.sv-acct-hd { padding: 4px 20px 16px; }
+.sv-acct-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.025em;
+  line-height: 1.15;
   margin-bottom: 6px;
 }
-.sv-field-input {
-  width: 100%;
-  background: rgba(255,255,255,.07);
-  border: 0.5px solid rgba(255,255,255,.15);
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 14px;
-  color: #fff;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  margin-bottom: 14px;
-  box-sizing: border-box;
+.sv-acct-row { display: flex; align-items: center; gap: 8px; }
+.sv-acct-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #FF385C;
+  background: rgba(255,56,92,.08);
+  border-radius: 999px;
+  padding: 3px 10px;
 }
-.sv-field-input:focus {
-  outline: none;
-  border-color: rgba(0,128,101,.6);
-  background: rgba(0,128,101,.06);
-}
-.sv-sheet-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-.sv-btn-save {
-  flex: 1;
-  padding: 14px;
-  background: #008065;
-  color: #fff;
-  border: none;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  cursor: pointer;
-}
-.sv-btn-cancel {
-  padding: 14px 20px;
-  background: rgba(255,255,255,.07);
-  color: rgba(255,255,255,.7);
-  border: 0.5px solid rgba(255,255,255,.12);
-  border-radius: 14px;
-  font-size: 14px;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  cursor: pointer;
-}
+.sv-acct-gmv { font-size: 14px; font-weight: 400; color: #6A6A6A; }
 
-/* ── Commission Coming Soon ── */
-.sv-coming-soon {
+/* Full-bleed band separator */
+.sv-band { height: 8px; background: #F7F7F7; }
+
+/* Tenure section — no card */
+.sv-tenure-section { padding: 16px 20px; }
+.sv-tenure-eye {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 12px;
+}
+.sv-tenure-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 7px; }
+.sv-tenure-track {
+  flex: 1;
+  height: 6px;
+  background: #EBEBEB;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sv-tenure-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #FF9500;
+  transition: width .6s cubic-bezier(.16,1,.3,1);
+}
+.sv-tenure-fill.late { background: #FF385C; }
+.sv-tenure-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FF9500;
+  font-family: 'IBM Plex Mono', monospace;
+  width: 36px;
+  text-align: right;
+}
+.sv-tenure-pct.late { color: #FF385C; }
+.sv-tenure-dl { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; }
+.sv-tenure-held { color: #6A6A6A; }
+.sv-tenure-exp { font-weight: 700; color: #FF385C; }
+
+/* Stat list rows */
+.sv-stat-list { padding: 0 20px; }
+.sv-stat-row {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  padding: 40px 32px;
-  text-align: center;
+  padding: 12px 0;
+  border-top: 1px solid #EBEBEB;
 }
-.sv-coming-soon-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: .5;
-}
-.sv-coming-soon-title {
-  font-size: 20px;
-  font-weight: 200;
-  color: rgba(255,255,255,.7);
-  letter-spacing: -0.03em;
-  margin-bottom: 8px;
-}
-.sv-coming-soon-sub {
-  font-size: 13px;
-  color: rgba(255,255,255,.35);
-  line-height: 1.5;
-}
+.sv-stat-row:last-child { border-bottom: 1px solid #EBEBEB; }
+.sv-stat-key { font-size: 14px; font-weight: 400; color: #6A6A6A; }
+.sv-stat-val { font-size: 14px; font-weight: 700; color: #222222; }
 
 /* ── Empty state ── */
 .sv-empty {
@@ -27951,14 +28047,125 @@ flex-wrap:wrap;}
   text-align: center;
 }
 .sv-empty-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255,255,255,.4);
+  font-size: 15px;
+  font-weight: 600;
+  color: #6A6A6A;
   margin-bottom: 6px;
 }
-.sv-empty-sub {
-  font-size: 12px;
-  color: rgba(255,255,255,.25);
+.sv-empty-sub { font-size: 13px; font-weight: 400; color: #AEAEB2; }
+
+/* ── Add/Edit lead sheet ── */
+.sv-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sv-sheet {
+  background: #FFFFFF;
+  border-radius: 24px 24px 0 0;
+  padding: 24px 24px 32px;
+  width: 100%;
+  max-width: 440px;
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.16,1,.3,1);
+}
+.sv-sheet.open { transform: translateY(0); }
+.sv-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #222222;
+  margin-bottom: 20px;
+}
+.sv-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 6px;
+}
+.sv-field-input {
+  width: 100%;
+  background: #F7F7F7;
+  border: 1px solid #EBEBEB;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #222222;
+  font-family: 'Noto Sans Thai', sans-serif;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+.sv-field-input:focus {
+  outline: none;
+  border-color: #FF385C;
+  background: rgba(255,56,92,.03);
+}
+.sv-sheet-actions { display: flex; gap: 10px; margin-top: 8px; }
+.sv-btn-save {
+  flex: 1;
+  padding: 14px;
+  background: #FF385C;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Noto Sans Thai', sans-serif;
+  cursor: pointer;
+}
+.sv-btn-cancel {
+  padding: 14px 20px;
+  background: #F7F7F7;
+  color: #6A6A6A;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'Noto Sans Thai', sans-serif;
+  cursor: pointer;
+}
+
+/* ── Coming soon (commission) ── */
+.sv-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 32px;
+  text-align: center;
+}
+.sv-coming-soon-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #222222;
+  letter-spacing: -.02em;
+  margin-bottom: 8px;
+}
+.sv-coming-soon-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: #6A6A6A;
+  line-height: 1.6;
+}
+.sv-coming-badge {
+  margin-top: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #FF385C;
+  background: rgba(255,56,92,.08);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-family: 'IBM Plex Mono', monospace;
 }
 </style>
 <!-- Target Setup Overlay HTML -->
@@ -39047,52 +39254,60 @@ function renderSalesHome(el, outlets, pipeline) {
     </div>`;
   }
 
-  // Projection strip
+  // v6 design: Airbnb/Revolut — big number hero, inline proj, list rows
+  const tbarClass = targetPct >= 100 ? 'ok' : targetPct >= 75 ? 'warn' : 'ac';
   const projHtml = proj.map(p => {
     const gap = p.projected - p.target;
-    const gapLabel = gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`;
-    const gapClass = gap >= 0 ? 'hit' : Math.abs(gap)/p.target < 0.15 ? 'gap' : 'miss';
-    return `<div class="sv-proj-card${p.isCurrent?' current':''}">
-      <div class="sv-proj-month">${p.label}</div>
-      <div class="sv-proj-amount">฿${_sv_fmt(p.projected)}</div>
-      ${p.target > 0 ? `<div class="sv-proj-vs ${gapClass}">${gapLabel} vs target</div>` : ''}
+    const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
+    const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
+    return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
+      <div class="sv-proj-mon">${p.label}</div>
+      <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
+      ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
     </div>`;
   }).join('');
 
   el.innerHTML = `
-    <div class="sv-header">
-      <div>
-        <div class="sv-header-title">Sales Dashboard</div>
-        <div class="sv-header-sub">${period}</div>
+    <div class="sv-page-hd">
+      <div class="sv-page-eye">${period}</div>
+      <div class="sv-page-title">พอร์ตของคุณ</div>
+    </div>
+
+    <div class="sv-hero">
+      <div class="sv-hero-eye">Runrate ในมือ</div>
+      <div><span class="sv-hero-num">฿${_sv_fmt(totalRunrate)}</span></div>
+      <div class="sv-hero-sub">
+        <span>${outlets.length} ร้าน active</span>
+        ${target > 0 ? `<span class="sv-gap-badge${targetPct>=100?' ok':''}">
+          ${targetPct >= 100 ? '+' : '−'}฿${_sv_fmt(Math.abs(totalRunrate-target))} vs target
+        </span>` : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target</span>'}
       </div>
+      ${target > 0 ? `<div class="sv-tbar">
+        <div class="sv-tbar-track"><div class="sv-tbar-fill ${tbarClass}" style="width:${Math.min(100,targetPct)}%"></div></div>
+        <div class="sv-tbar-meta"><span>${targetPct}% of target</span><span>Target ฿${_sv_fmt(target)}</span></div>
+      </div>` : ''}
     </div>
 
-    <div class="sv-card">
-      <div class="sv-card-label">Runrate ในมือ</div>
-      <div class="sv-card-value">฿${_sv_fmt(totalRunrate)}<span class="sv-card-value-unit">/เดือน</span></div>
-      <div class="sv-card-sub">${outlets.length} ร้าน active · Handover ออก ฿${_sv_fmt(handover.m0)} เดือนนี้</div>
-      ${target > 0 ? `
-      <div class="sv-target-bar-wrap">
-        <div class="sv-target-bar-track">
-          <div class="sv-target-bar-fill ${barClass}" style="width:${Math.min(100,targetPct)}%"></div>
-        </div>
-        <div class="sv-target-labels">
-          <span>${targetPct}% of target</span>
-          <span>Target ฿${_sv_fmt(target)}</span>
-        </div>
-      </div>` : '<div class="sv-card-sub" style="margin-top:6px;color:rgba(255,165,0,.6)">ยังไม่มี target — TL ต้องตั้ง</div>'}
+    <div class="sv-proj-row">${projHtml}</div>
+
+    ${urgentHandover.length ? `
+    <div class="sv-sec">
+      <span class="sv-sec-t ac">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        ใกล้ Handover
+      </span>
+      <span class="sv-sec-c">${urgentHandover.length} ร้าน</span>
     </div>
-
-    ${handoverHtml}
-
-    <div style="padding:0 20px 8px;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);font-family:'DM Mono',monospace">Projection 3 เดือน</div>
-    <div class="sv-projection-strip">${projHtml}</div>
-
-    <div class="sv-card" style="cursor:pointer" onclick="if(typeof showScreen==='function')showScreen('sales-pipeline')">
-      <div class="sv-card-label">Pipeline (Manual)</div>
-      <div class="sv-card-value">฿${_sv_fmt(pipeline.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0))}<span class="sv-card-value-unit">/เดือน est.</span></div>
-      <div class="sv-card-sub">${pipeline.length} leads · แตะเพื่อจัดการ →</div>
-    </div>
+    <div class="sv-hov-section">
+      ${urgentHandover.slice(0,5).map(o => {
+        const d = _daysUntilExp(o.newUserExpDate);
+        return `<div class="sv-hov-row">
+          <div class="sv-hov-dot"></div>
+          <span class="sv-hov-name">${o.name||o.id}</span>
+          <span class="sv-hov-days">${d <= 0 ? 'หมดแล้ว' : d+'d'}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
   `;
 }
 
@@ -39141,41 +39356,44 @@ function _renderSalesOutletList(el, outlets) {
     return da.localeCompare(db);
   });
 
-  const headerHtml = `<div class="sv-portview-header">
-    <div class="sv-portview-title">ร้านทั้งหมด (${outlets.length})</div>
+  // v6: Revolut list rows — colored indicator + name + amount + days bar
+  const headerHtml = `<div class="sv-sec">
+    <span class="sv-sec-t">ร้านทั้งหมด</span>
+    <span class="sv-sec-c">${outlets.length} ร้าน</span>
   </div>`;
 
-  const cardsHtml = sorted.map(o => {
+  const cardsHtml = '<div class="sv-outlet-list">' + sorted.map(o => {
     const daysLeft = _daysUntilExp(o.newUserExpDate);
-    const totalDays = o.daysHeld + (daysLeft !== null ? daysLeft : 0);
-    const pctHeld = totalDays > 0 ? Math.min(100, Math.round(o.daysHeld / totalDays * 100)) : 0;
-    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : '';
-    const cardClass = daysLeft !== null && daysLeft <= 7 ? 'expiring-critical' :
-                      daysLeft !== null && daysLeft <= 14 ? 'expiring-soon' : '';
+    const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+    const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0) / totalDays * 100)) : 0;
+    const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+    const typeCls = pctHeld >= 80 ? '' : pctHeld >= 60 ? 'mid' : 'ok';
     const typeLabel = (o.accountType||'SA').toUpperCase();
     const expLabel = o.newUserExpDate ?
       new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
-    const gmvLabel = `฿${_sv_fmt(o.runrate||o.gmvToDate||0)}/เดือน`;
+    const daysLabel = daysLeft !== null ? (daysLeft <= 0 ? 'หมดแล้ว' : daysLeft+'d') : '—';
+    const gmv = _sv_fmt(o.runrate||o.gmvToDate||0);
+    const safeId = (o.id||'').replace(/'/g,"\'");
+    const safeName = (o.name||'').replace(/'/g,"\'");
 
-    return `<div class="sv-outlet-card ${cardClass}"
-      onclick="window._salesOpenAccount('${(o.id||'').replace(/'/g,"\\'")}','${(o.name||'').replace(/'/g,"\\'")}')"
-    >
-      <div class="sv-outlet-name">
-        <span>${o.name||o.id}</span>
-        <span class="sv-outlet-type">${typeLabel}</span>
+    return `<div class="sv-ol-row" onclick="window._salesOpenAccount('${safeId}','${safeName}')">
+      <div class="sv-ol-top">
+        <div class="sv-ol-ind ${indCls}"></div>
+        <div class="sv-ol-info">
+          <div class="sv-ol-name">${o.name||o.id}</div>
+          <div class="sv-ol-meta">ถือมา ${o.daysHeld||0} วัน</div>
+        </div>
+        <div class="sv-ol-right">
+          <div class="sv-ol-gmv">฿${gmv}</div>
+          <div class="sv-ol-type ${typeCls}">${typeLabel} · ${daysLabel}</div>
+        </div>
       </div>
-      <div class="sv-outlet-gmv">${gmvLabel}</div>
-      <div class="sv-days-bar-wrap">
-        <div class="sv-days-bar-track">
-          <div class="sv-days-bar-fill ${barClass}" style="width:${pctHeld}%"></div>
-        </div>
-        <div class="sv-days-meta">
-          <span>ถือมา ${o.daysHeld||0} วัน</span>
-          <span class="sv-days-deadline">หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
-        </div>
+      <div class="sv-ol-bar-wrap">
+        <div class="sv-days-track"><div class="sv-days-fill ${indCls}" style="width:${pctHeld}%"></div></div>
+        <div class="sv-days-meta"><span></span><span class="sv-days-exp">หมด ${expLabel}</span></div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
 
   el.innerHTML = headerHtml + cardsHtml;
 }
@@ -39202,59 +39420,99 @@ function renderSalesPipeline() {
   });
 }
 
-function _renderPipelineList(el, leads) {
-  const m0 = _salesMonthOffset(0);
-  const m1 = _salesMonthOffset(1);
-  const m2 = _salesMonthOffset(2);
 
-  // Group by month
+// Helper for gap chart rows (avoids nested template literals)
+function _renderGapRows(gaps) {
+  return gaps.map(function(g) {
+    var col = g.cls==='ok'?'#34C759':g.cls==='warn'?'#FF9500':'#FF385C';
+    var sign = g.val>=0?'+':'−';
+    return '<div class="sv-gap-row">' +
+      '<span class="sv-gap-mon">'+g.mon+'</span>' +
+      '<div class="sv-gap-track"><div class="sv-gap-fill '+g.cls+'" style="width:'+g.fill+'%"></div></div>' +
+      '<span class="sv-gap-val" style="color:'+col+'">'+sign+'฿'+_sv_fmt(Math.abs(g.val))+'</span>' +
+      '</div>';
+  }).join('');
+}
+
+function _renderPipelineList(el, leads) {
+  const m0 = _salesMonthOffset(0), m1 = _salesMonthOffset(1), m2 = _salesMonthOffset(2);
   const groups = {};
   leads.forEach(l => {
     const ym = (l.expected_start_date||'').substring(0,7);
-    const key = ym < m0 ? m0 : ym; // past → bucket into M0
+    const key = ym < m0 ? m0 : ym;
     if (!groups[key]) groups[key] = [];
     groups[key].push(l);
   });
-
   const monthOrder = [m0, m1, m2];
-  // Add any future months beyond M2
   Object.keys(groups).forEach(k => { if (!monthOrder.includes(k)) monthOrder.push(k); });
 
-  let html = `<div class="sv-pipeline-header">
-    <div class="sv-pipeline-title">Pipeline</div>
-  </div>`;
+  const totalPipeline = leads.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0);
+  const tgt = 1600000; // placeholder until target system live
+  const pipM = {}; pipM[m0]=0; pipM[m1]=0; pipM[m2]=0;
+  leads.forEach(l => {
+    const ym = (l.expected_start_date||'').substring(0,7);
+    const k = ym < m0 ? m0 : ym;
+    if(pipM[k]!==undefined) pipM[k] += parseFloat(l.expected_gmv)||0;
+  });
+  const gaps = [m0,m1,m2].map(function(ym) {
+    const v = pipM[ym]||0;
+    return {mon:_salesMonthLabel(ym),fill:Math.min(100,Math.round(v/tgt*100)),val:v-tgt,cls:v>=tgt?'ok':v/tgt>0.8?'warn':'bad'};
+  });
+
+  const gapSign = totalPipeline >= tgt ? '+' : '\u2212';
+  const badCls = totalPipeline < tgt ? ' bad' : '';
+
+  let html = '<div class="sv-page-hd">' +
+    '<div class="sv-page-eye">Manual estimate</div>' +
+    '<div class="sv-page-title">Pipeline</div>' +
+    '</div>';
+
+  html += '<div class="sv-kpi-inline">' +
+    '<div class="sv-ki"><div class="sv-ki-l">Leads</div><div class="sv-ki-v">' + leads.length + '</div></div>' +
+    '<div class="sv-ki"><div class="sv-ki-l">ยอดคาด</div><div class="sv-ki-v">\u0e3f' + _sv_fmt(totalPipeline) + '</div></div>' +
+    '<div class="sv-ki"><div class="sv-ki-l">Gap</div><div class="sv-ki-v' + badCls + '">' + gapSign + '\u0e3f' + _sv_fmt(Math.abs(totalPipeline-tgt)) + '</div></div>' +
+    '</div>';
+
+  html += '<div class="sv-sec"><span class="sv-sec-t">ยอด vs Target</span></div>';
+  html += '<div class="sv-gap-section">' + _renderGapRows(gaps) + '</div>';
 
   if (!leads.length) {
-    html += `<div class="sv-empty">
-      <div class="sv-empty-title">ยังไม่มี leads</div>
-      <div class="sv-empty-sub">กดปุ่ม + เพื่อเพิ่ม lead ที่คุยอยู่</div>
-    </div>`;
+    html += '<div class="sv-empty"><div class="sv-empty-title">ยังไม่มี leads</div><div class="sv-empty-sub">กดปุ่ม + เพื่อเพิ่ม lead ที่คุยอยู่</div></div>';
   } else {
-    monthOrder.forEach(ym => {
+    html += '<div class="sv-lead-list">';
+    monthOrder.forEach(function(ym) {
       const items = groups[ym];
       if (!items || !items.length) return;
       const total = items.reduce((s,l)=>s+(parseFloat(l.expected_gmv)||0),0);
-      html += `<div class="sv-pipeline-month-label">${_salesMonthLabel(ym)}</div>
-        <div class="sv-pipeline-summary">฿${_sv_fmt(total)} รวม · ${items.length} leads</div>`;
-      items.forEach(l => {
+      html += '<div class="sv-lead-month-hd">' +
+        '<span class="sv-lead-month-name">' + _salesMonthLabel(ym) + '</span>' +
+        '<span class="sv-lead-month-total">\u0e3f' + _sv_fmt(total) + ' \u00b7 ' + items.length + ' leads</span>' +
+        '</div>';
+      items.forEach(function(l) {
         const dateLabel = l.expected_start_date ?
-          new Date(l.expected_start_date).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
-        html += `<div class="sv-lead-card">
-          <div class="sv-lead-info">
-            <div class="sv-lead-name">${l.shop_name||'—'}</div>
-            <div class="sv-lead-date">เริ่ม ${dateLabel}</div>
-          </div>
-          <div class="sv-lead-gmv">฿${_sv_fmt(l.expected_gmv)}</div>
-          <div class="sv-lead-actions">
-            <div class="sv-lead-btn" onclick="window._salesEditLead('${l.id}')">✎</div>
-            <div class="sv-lead-btn" onclick="window._salesDeleteLead('${l.id}','${(l.shop_name||'').replace(/'/g,"\\'")}')">✕</div>
-          </div>
-        </div>`;
+          new Date(l.expected_start_date).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '\u2014';
+        const safeId = (l.id||'');
+        const safeName = (l.shop_name||'').replace(/'/g,"\\'");
+        const editBtn = '<button class="sv-lead-btn" onclick="window._salesEditLead(\'' + safeId + '\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+          '</button>';
+        const delBtn = '<button class="sv-lead-btn" onclick="window._salesDeleteLead(\'' + safeId + '\',\'' + safeName + '\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>';
+        html += '<div class="sv-lead-row">' +
+          '<div class="sv-lead-info"><div class="sv-lead-name">' + (l.shop_name||'\u2014') + '</div><div class="sv-lead-date">\u0e40\u0e23\u0e34\u0e48\u0e21 ' + dateLabel + '</div></div>' +
+          '<div class="sv-lead-gmv">\u0e3f' + _sv_fmt(l.expected_gmv) + '</div>' +
+          '<div class="sv-lead-actions">' + editBtn + delBtn + '</div>' +
+          '</div>';
       });
     });
+    html += '</div>';
   }
 
-  html += `<button class="sv-fab" id="sv-fab-add" onclick="window._salesAddLead()">+</button>`;
+  html += '<button class="sv-fab" id="sv-fab-add" onclick="window._salesAddLead()">' +
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+    ' \u0e40\u0e1e\u0e34\u0e48\u0e21 Lead</button>';
+
   el.innerHTML = html;
 }
 
@@ -39344,9 +39602,10 @@ function renderSalesCommission() {
   const el = document.getElementById('scr-sales-commission');
   if (!el) return;
   el.innerHTML = `<div class="sv-coming-soon">
-    <div class="sv-coming-soon-icon">💰</div>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="1.5" stroke-linecap="round" style="opacity:.4;margin-bottom:16px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
     <div class="sv-coming-soon-title">Commission</div>
-    <div class="sv-coming-soon-sub">ระบบ commission สำหรับ Sales<br>อยู่ระหว่างออกแบบ<br><br>Coming soon</div>
+    <div class="sv-coming-soon-sub">ระบบ commission สำหรับ Sales<br>อยู่ระหว่างออกแบบร่วมกับทีม</div>
+    <div class="sv-coming-badge">Coming Soon</div>
   </div>`;
 }
 
@@ -39394,7 +39653,7 @@ function renderSalesTeamview() {
     const daysLeft = _daysUntilExp(acct.newUserExpDate);
     const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
     const pctHeld = totalDays > 0 ? Math.min(100, Math.round((acct.daysHeld||0)/totalDays*100)) : 0;
-    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : '';
+    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
     const expLabel = acct.newUserExpDate ?
       new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
 
@@ -39403,16 +39662,20 @@ function renderSalesTeamview() {
     // Inject Sales-specific block; hide KAM elements via CSS class
     const salesBlock = document.createElement('div');
     salesBlock.className = 'sales-content-only';
-    salesBlock.innerHTML = `<div style="padding:12px 16px;background:rgba(255,255,255,.05);border-radius:14px;margin:8px 0">
-      <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);font-family:'DM Mono',monospace;margin-bottom:8px">ระยะเวลาในมือ</div>
-      <div class="sv-days-bar-track" style="margin-bottom:6px">
-        <div class="sv-days-bar-fill ${barClass}" style="width:${pctHeld}%"></div>
+    // v6: Revolut style tenure section — no card, just rows
+    salesBlock.innerHTML = `<div class="sv-band"></div>
+      <div class="sv-tenure-section">
+        <div class="sv-tenure-eye">ระยะเวลาในมือ</div>
+        <div class="sv-tenure-bar-row">
+          <div class="sv-tenure-track"><div class="sv-tenure-fill${barClass==='late'?' late':''}" style="width:${pctHeld}%"></div></div>
+          <span class="sv-tenure-pct${barClass==='late'?' late':''}">${pctHeld}%</span>
+        </div>
+        <div class="sv-tenure-dl">
+          <span class="sv-tenure-held">ถือมา ${acct.daysHeld||0} วัน</span>
+          <span class="sv-tenure-exp">หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.5)">
-        <span>ถือมา ${acct.daysHeld||0} วัน</span>
-        <span>หมด ${expLabel}${daysLeft!==null?' ('+daysLeft+'d)':''}</span>
-      </div>
-    </div>`;
+      <div class="sv-band"></div>`;
     target.prepend(salesBlock);
   }
 })();
@@ -39461,6 +39724,7 @@ function renderSalesTeamview() {
 })();
 
 console.log('%c[Sense] Sales module loaded','color:#4ddc97');
+
 </script>
 <!-- Echo floating pill — shown when recording + minimized -->
 <div id="echo-float-pill" onclick="echoExpand()" role="button" aria-label="กลับไปที่ Echo">
