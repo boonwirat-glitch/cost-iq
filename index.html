@@ -1,4 +1,4 @@
-<!-- Freshket Sense v328: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v329: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v328',
+      version: 'v329',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -36333,14 +36333,265 @@ const CI = (() => {
   }
 
   // ── AI Analysis ────────────────────────────────────────────────────────────
-  const _SKILL_SYS = `คุณคือ AI coach สำหรับ Freshket sales team วิเคราะห์ transcript การสนทนาระหว่าง KAM กับลูกค้าร้านอาหาร match กับ 14 skill cards: APIPC(PIPC Framework) A5(Freshket Value) A9(Planning) A10(Pipeline) B2(Decision Maker) B3(Appointment) B4(Pre-Visit Prep) C0(Rapport) C1(Discovery 7 dimensions) C3(Connect Pain) C4(Objection) C5(Close) D1(Wallet Size) D2(Follow-Up). ตอบ JSON เท่านั้น: {"skills":[{"code":"C0","score":"pass|developing|not_observed","evidence_summary":"..."}],"pipc_stage":"P1|I|P2|C","overall":"strong|developing|needs_work"}`;
+  //
+  // SKILL RUBRIC — source of truth จาก Modules Sales Lead (Feb 2026)
+  // แต่ละ skill มี: principle (ทำไม), pass_criteria (ผ่านต้องทำอะไรได้),
+  //                 observable (สัญญาณที่ฟังออกได้จาก transcript)
+  // B1 ตัดออก — เป็น pre-visit activity ไม่มีใน conversation
+  //
+  const _SKILL_RUBRIC = [
+    {
+      code: 'APIPC',
+      name: 'PIPC Framework',
+      principle: 'ทุกการสนทนาต้องเป็นไปตามลำดับ Prepare→Identify→Probe→Close — ไม่ใช่ script แต่เป็นเครื่องมือวินิจฉัย',
+      pass_criteria: [
+        'สามารถระบุได้ว่า benchmark กับใคร และนำ value ไปตอบโจทย์ได้เหมาะสม',
+        'ถ้า conversation เริ่มจาก price → สามารถ redirect กลับมาที่ value ได้',
+        'ครบ 4 ขั้นตอน: แนะนำตัว/FKT → ถามหา need/pain → เชื่อม solution → มี next step'
+      ],
+      observable: 'ลำดับการพูด — มีการ introduce ก่อน probe ก่อน pitch, ไม่ขาย product ก่อนถาม pain',
+      ci_scope: 'full'
+    },
+    {
+      code: 'A5',
+      name: 'Freshket Value & USP',
+      principle: 'เปลี่ยนมุมมองลูกค้าจาก "ซัพฯ อีกเจ้า" → "พันธมิตรที่ขจัดความเสี่ยงประจำวัน"',
+      pass_criteria: [
+        'อธิบาย 3-tier logic ได้: สิ่งที่ซัพฯ ทุกเจ้ามี / สิ่งที่ FKT ทำได้ดีกว่า / สิ่งที่ FKT เท่านั้นมี',
+        'เชื่อม value เข้ากับบริบทของร้านนั้นๆ ไม่ใช่แค่ list feature'
+      ],
+      observable: 'rep พูดถึง quality/delivery/completeness/OMS ในบริบทของปัญหาร้านนั้น ไม่ใช่ท่อง spec',
+      ci_scope: 'full'
+    },
+    {
+      code: 'A9',
+      name: 'Planning & Target Tracking',
+      principle: 'การวางแผนคือเครื่องมือคิด ไม่ใช่แบบฟอร์ม',
+      pass_criteria: [
+        'กล่าวถึง target/plan/priority ในการสนทนา — มีตรรกะรองรับตัวเลข ไม่ใช่แค่บอกว่าจะทำมากขึ้น'
+      ],
+      observable: 'rep mention เป้า/แผน/ลำดับความสำคัญระหว่างคุย — แต่ behavior จริงอยู่นอก conversation',
+      ci_scope: 'partial'
+    },
+    {
+      code: 'A10',
+      name: 'Pipeline Management',
+      principle: 'Lead ดีมีชัยไปกว่าครึ่ง',
+      pass_criteria: [
+        'กล่าวถึง stage ของลูกค้า + next activity ที่จะทำได้ชัดเจน',
+        'วิเคราะห์แยก Hot/Warm/Cold ได้พร้อม logic'
+      ],
+      observable: 'rep mention next step/stage/timeline ที่ชัดเจน — quality ของ pipeline จริงอยู่นอก conversation',
+      ci_scope: 'partial'
+    },
+    {
+      code: 'B2',
+      name: 'Finding the Decision Maker',
+      principle: 'เจอคนตัดสินใจ → ปิดขายเร็วขึ้น',
+      pass_criteria: [
+        'ระบุ stakeholder ที่คุยอยู่ได้: Gatekeeper / Decision Maker / User',
+        'มีวิธีคุยที่ต่างกันในแต่ละ role (owner / chef / จัดซื้อ / บัญชี / ผจก.ร้าน)',
+        'confirm authority ก่อน pitch จริงจัง'
+      ],
+      observable: 'rep ถามหรือ confirm role ของคนที่คุยด้วย ก่อนเริ่ม pitch ลึก',
+      ci_scope: 'full'
+    },
+    {
+      code: 'B3',
+      name: 'Making an Appointment',
+      principle: 'เป้าหมายการโทรไม่ใช่ขาย FKT แต่คือขาย "เวลา 20 นาที" ของเจ้าของร้าน',
+      pass_criteria: [
+        'พูดด้วยความมั่นใจ อธิบาย FKT ได้กระชับ',
+        'handle objection ได้อย่างน้อย 3 สถานการณ์',
+        'จบด้วยการนัด + ระบุ role ของลูกค้า + timeline ชัดเจน'
+      ],
+      observable: 'มีการนัดเวลาที่เฉพาะเจาะจง หรือ commit next meeting ในการสนทนา',
+      ci_scope: 'full'
+    },
+    {
+      code: 'B4',
+      name: 'Pre-Visit Preparation',
+      principle: 'rep ที่เตรียมดีจะถามคำถามได้ดีกว่า เพราะรู้แล้วว่าคำถามไหนสำคัญ',
+      pass_criteria: [
+        'ระบุ DM ที่น่าจะเป็นได้พร้อมเหตุผล',
+        'วิเคราะห์เมนูเพื่อหา SKU ที่เหมาะได้',
+        'มีสินค้า 3 รายการที่จะเสนอพร้อม logic'
+      ],
+      observable: 'อนุมานจากคุณภาพคำถาม — rep ที่เตรียมดีจะถามเจาะจง ไม่ถาม generic',
+      ci_scope: 'partial'
+    },
+    {
+      code: 'C0',
+      name: 'Rapport & Reading the Room',
+      principle: 'ขายของกับคนที่ยังไม่เชื่อใจไม่ได้ — ต้องอ่านทัศนคติลูกค้าก่อนแล้วปรับตัว',
+      pass_criteria: [
+        'วิเคราะห์ personality type ของลูกค้าได้ (BANK: Blueprint/Action/Nurturing/Knowledge)',
+        'เปิดใจลูกค้าได้ตาม type',
+        'รับมือ first impression เชิงลบได้ (ไม่เคยได้ยิน FKT / เคยมีประสบการณ์แย่ / ไม่มีอำนาจตัดสินใจ)'
+      ],
+      observable: 'ลูกค้า self-disclose pain/context เอง โดย rep ไม่ interrupt — มี small talk ก่อน pitch',
+      ci_scope: 'full'
+    },
+    {
+      code: 'C1',
+      name: 'Discovery — OCPB Framework',
+      principle: 'การตั้งคำถามเพื่อเข้าใจให้ถึงจุดที่ปิดการขายได้',
+      pass_criteria: [
+        'cover ครบ OCPB: Operation / Competitor+service+price / Payment+Billing / Business Plan',
+        'สรุปข้อมูลได้ลึก และระบุช่องโหว่ข้อมูลของตัวเองได้'
+      ],
+      observable: 'นับ dimensions ที่ rep ถามครอบคลุม: O=ถามเรื่อง ops ร้าน, C=ถามเรื่องซัพเดิม/ราคา, P=ถาม billing/credit, B=ถาม plan ร้าน',
+      ci_scope: 'full'
+    },
+    {
+      code: 'C3',
+      name: 'Analyze & Connect Pain to Solution',
+      principle: 'ปิดช่องว่างระหว่างสิ่งที่ได้ยิน กับสิ่งที่ FKT แก้ได้ — โดยใช้คำพูดของลูกค้าเอง',
+      pass_criteria: [
+        'ระบุ pain point จากข้อมูลที่ถามมาได้ชัดเจน',
+        'เชื่อม pain → FKT value ได้ถูกต้อง ไม่แค่ list feature',
+        'ใช้คำหรือ context ที่ลูกค้าพูดมาก่อนในการ pitch'
+      ],
+      observable: 'rep echo คำพูดลูกค้า + ลิ้งหา solution — ไม่ pitch แบบ generic ที่ไม่ relate กับร้านนั้น',
+      ci_scope: 'full'
+    },
+    {
+      code: 'C4',
+      name: 'Objection Handling',
+      principle: 'คำคัดค้านไม่ใช่การปฏิเสธ — เป็นสัญญาณว่าลูกค้ายังประเมินอยู่',
+      pass_criteria: [
+        'ใช้ sequence: Acknowledge → Clarify → Reframe → Confirm',
+        'ไม่ defend ทันที — รับทราบก่อน เข้าใจก่อน',
+        'handle ได้ใน 4 หัวข้อหลัก: Quality / Price / Completeness / Logistics'
+      ],
+      observable: 'เมื่อลูกค้า object: rep ไม่รีบโต้ตอบ มีการ acknowledge + ถามเพิ่ม ก่อน reframe',
+      ci_scope: 'full'
+    },
+    {
+      code: 'C5',
+      name: 'Close & Next Step',
+      principle: 'การปิดขายต้องมี next step ชัดว่า action อะไรที่จะทำให้เกิดการสั่งซื้อ',
+      pass_criteria: [
+        'ทวน pain ของลูกค้าก่อนปิด',
+        'ยืนยันวันที่ที่แน่นอน',
+        'มีอย่างน้อย 1 อย่างที่ลูกค้า commit จะทำ (customer action item)'
+      ],
+      observable: 'ending ของ conversation — มี pain recap + specific date + customer commitment',
+      ci_scope: 'full'
+    },
+    {
+      code: 'D1',
+      name: 'Estimating Wallet Size',
+      principle: 'จัดลำดับว่าควรลงทุนเวลากับลูกค้าคนนี้แค่ไหน',
+      pass_criteria: [
+        'ประเมิน Wallet Size และ Wallet Share ได้พร้อม logic',
+        'จัด Hot/Warm/Cold พร้อมหลักฐานที่เฉพาะเจาะจง'
+      ],
+      observable: 'อนุมานจากคำพูด — rep mention category mix / competitor share / potential order size',
+      ci_scope: 'partial'
+    },
+    {
+      code: 'D2',
+      name: 'Follow-Up with Purpose',
+      principle: 'ติดตามต้องมีวัตถุประสงค์ชัด + หา option/solution ใหม่',
+      pass_criteria: [
+        'มีกลยุทธ์ต่างกันชัดเจนใน 3 กลุ่ม: ยังไม่สั่ง / สั่งแล้วหาย / สั่งน้อยลง-เพิ่มขึ้น',
+        'ระบุ actions + timeline ที่เฉพาะเจาะจง'
+      ],
+      observable: 'next steps ที่ rep commit ใน conversation — มีความชัดเจนในแต่ละ scenario',
+      ci_scope: 'full'
+    }
+  ];
 
-  const _INTEL_SYS = `คุณคือ customer intelligence analyst ตอบ JSON เท่านั้น: {"buyer_type":"price|relationship|value|convenience","buyer_icon":"🤝|💰|💎|⚡","buyer_evidence":"...","pain_points":[{"dimension":"Quality|Price|Delivery|Product|Completeness|Expansion|Credit","severity":"high|medium|opportunity","summary":"..."}],"next_actions":[{"action":"...","owner":"KAM|TL","urgency":"3_days|this_week|next_visit"}]}`;
+  const _SKILL_SYS = (() => {
+    const rubricText = _SKILL_RUBRIC.map(s =>
+      `[${s.code}] ${s.name} (${s.ci_scope === 'partial' ? 'partial — อนุมานจากบางส่วน' : 'ประเมินจาก conversation ได้'})
+Principle: ${s.principle}
+Pass criteria: ${s.pass_criteria.join(' | ')}
+สัญญาณที่ฟังได้: ${s.observable}`
+    ).join('\n\n');
+
+    return `คุณคือ AI coach สำหรับ Freshket sales team
+วิเคราะห์ transcript การสนทนาระหว่าง Sales/KAM กับลูกค้าร้านอาหาร
+ประเมินตาม skill rubric ด้านล่าง — ใช้ pass_criteria เป็นเกณฑ์ตัดสิน ไม่ใช่แค่ความรู้สึก
+
+${rubricText}
+
+scoring:
+- pass = เห็นหลักฐานชัดว่าทำตาม pass_criteria ได้ครบ
+- developing = เริ่มทำแต่ยังไม่ครบ หรือทำได้บางส่วน
+- not_observed = ไม่มีส่วนนี้ใน conversation เลย
+- not_applicable = skill นี้ไม่ใช้ใน context นี้ (เช่น B3 สำหรับ visit ที่ไม่มีการนัด)
+
+ตอบ JSON เท่านั้น ไม่มี markdown ไม่มี preamble:
+{
+  "skills": [
+    {
+      "code": "C0",
+      "name": "Rapport & Reading the Room",
+      "score": "pass|developing|not_observed|not_applicable",
+      "evidence": "คำพูดหรือพฤติกรรมจริงที่เห็นใน transcript (ถ้าไม่มีให้ใส่ '-')",
+      "gap": "สิ่งที่ขาดไปจาก pass_criteria (ถ้าผ่านแล้วใส่ '-')",
+      "coaching_note": "คำแนะนำสำหรับ TL ใช้ debrief กับ rep (1-2 ประโยค)"
+    }
+  ],
+  "pipc_stage": "Prepare|Identify|Probe|Close",
+  "pipc_reached": "ขั้นตอนสูงสุดที่ rep ทำถึงใน conversation นี้",
+  "overall": "strong|developing|needs_work",
+  "session_summary": "สรุปภาพรวม 2-3 ประโยค — จุดเด่น จุดที่ต้องพัฒนา"
+}`;
+  })();
+
+  const _INTEL_SYS = `คุณคือ customer intelligence analyst สำหรับ Freshket
+วิเคราะห์ insight จากการสนทนากับลูกค้าร้านอาหาร
+ใช้ข้อมูลร้านที่ให้มาประกอบการวิเคราะห์
+
+OCPB framework (ตาม C1 Discovery):
+- O: Operation — วิธีทำงาน ปัญหา ops ประจำวัน
+- C: Competitor/Service/Price — ซัพเดิมคือใคร ปัญหาอะไร เปรียบเทียบราคา
+- P: Payment/Billing — credit term, billing cycle, วิธีจ่ายเงิน
+- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
+
+Buyer type (BANK framework):
+- Blueprint (B): ต้องการข้อมูลครบ process ชัด ตัดสินใจช้าแต่ละเอียด
+- Action (A): ต้องการผลลัพธ์เร็ว direct to the point ไม่ชอบ process ยาว
+- Nurturing (N): ให้ความสำคัญกับความสัมพันธ์ trust ก่อน deal
+- Knowledge (K): ต้องการ expertise และ data รองรับทุกอย่าง
+
+ตอบ JSON เท่านั้น ไม่มี markdown:
+{
+  "buyer_type": "Blueprint|Action|Nurturing|Knowledge",
+  "buyer_type_th": "ชื่อภาษาไทย",
+  "buyer_icon": "📋|⚡|🤝|🔍",
+  "buyer_evidence": "หลักฐานจากการสนทนาว่าทำไมถึง type นี้",
+  "ocpb_covered": ["O","C","P","B"],
+  "ocpb_missing": ["dimension ที่ยังไม่ถาม"],
+  "pain_points": [
+    {
+      "dimension": "Quality|Price|Delivery|Completeness|Service|Credit",
+      "severity": "high|medium|opportunity",
+      "summary": "สรุป pain ที่ลูกค้าพูด — ใช้ภาษาใกล้เคียงกับที่ลูกค้าพูด"
+    }
+  ],
+  "upsell_signals": [
+    {"category": "หมวดสินค้า", "evidence": "หลักฐานที่บ่งชี้ถึงความต้องการ"}
+  ],
+  "wallet_estimate": "hot|warm|cold",
+  "wallet_logic": "เหตุผลที่ประเมิน hot/warm/cold",
+  "next_actions": [
+    {
+      "action": "สิ่งที่ต้องทำ",
+      "owner": "KAM|TL",
+      "urgency": "3_days|this_week|next_visit",
+      "reason": "ทำไมถึง urgent ระดับนี้"
+    }
+  ]
+}`;
 
   async function _analyzeSkills(text) {
-    const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 4000);
+    const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 6000);
     const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
-    console.log('[CI skills]', txt.substring(0,300));
+    console.log('[CI skills raw]', txt.substring(0,400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0,80));
     return JSON.parse(txt.slice(s, e+1));
@@ -36348,35 +36599,44 @@ const CI = (() => {
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
-    const raw = await callAI('sonnet', _INTEL_SYS, [{ role: 'user', content: `ร้าน: ${ctx.name} (${ctx.seg})\nTranscript:\n${text}` }], 4000);
+    const accountCtx = `ข้อมูลร้าน:
+- ชื่อ: ${ctx.name}
+- Segment: ${ctx.seg}
+- อยู่กับ rep มา: ${ctx.days} วัน`;
+    const raw = await callAI('sonnet', _INTEL_SYS, [{
+      role: 'user',
+      content: `${accountCtx}\n\nTranscript:\n${text}`
+    }], 6000);
     const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
-    console.log('[CI intel]', txt.substring(0,300));
+    console.log('[CI intel raw]', txt.substring(0,400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0,80));
     return JSON.parse(txt.slice(s, e+1));
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
-  async function _save(skillData, intelData) {
+  async function _saveToSupabase(skillData, intelData) {
     if (!skillData && !intelData) return;
     const email = currentUserProfile?.email;
     if (!email) return;
     const today = new Date().toISOString().split('T')[0];
-    // save to kam_skill_log
     if (skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
         kam_email: email, account_id: _accountGuid,
         session_date: today, skill_code: s.code,
-        score: s.score, evidence_summary: s.evidence_summary || ''
+        score: s.score,
+        evidence_summary: s.evidence || s.evidence_summary || ''
       }));
-      await supa.from('kam_skill_log').insert(rows);
+      const { error } = await supa.from('kam_skill_log').insert(rows);
+      if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
-    // upsert ci columns to kam_visits
-    await supa.from('kam_visits').upsert({
+    const { error: visitError } = await supa.from('kam_visits').upsert({
       kam_email: email, account_id: _accountGuid, visit_date: today,
       ci_skill_scores: skillData, ci_customer_signals: intelData,
-      ci_next_actions: intelData?.next_actions || [], ci_mode: 'voice'
+      ci_next_actions: intelData?.next_actions || [], ci_mode: 'voice',
+      ci_created_at: new Date().toISOString()
     }, { onConflict: 'kam_email,account_id,visit_date' });
+    if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
   }
 
   // ── Render result panels ───────────────────────────────────────────────────
@@ -36388,29 +36648,55 @@ const CI = (() => {
   }
 
   function _skillsPanel(d) {
-    const stages = ['P · Rapport','I · Discovery','P · Pitch','C · Close'];
-    const stageIdx = {P1:0,I:1,P2:2,C:3}[d?.pipc_stage] ?? 0;
-    const segs = stages.map((l,i) =>
-      `<div class="pipc-seg${i<=stageIdx?' done':''}"></div>`).join('');
-    const lbls = stages.map((l,i) =>
-      `<span class="pipc-lbl${i<=stageIdx?' done':''}">${l}</span>`).join('');
+    const PIPC_STAGES = ['Prepare','Identify','Probe','Close'];
+    const stageIdx = PIPC_STAGES.indexOf(d?.pipc_stage);
+    const reached = stageIdx >= 0 ? stageIdx : 0;
+    const segs = PIPC_STAGES.map((l,i) =>
+      `<div class="pipc-seg${i<=reached?' done':''}"></div>`).join('');
+    const lbls = PIPC_STAGES.map((l,i) =>
+      `<span class="pipc-lbl${i<=reached?' done':''}">${l}</span>`).join('');
+
+    const summary = d?.session_summary
+      ? `<div style="margin-bottom:20px;padding:12px 14px;background:rgba(0,128,101,.06);border-radius:10px;border:0.5px solid rgba(0,128,101,.15)"><p style="font-size:12px;color:var(--tx2,#636366);line-height:1.6;margin:0">${d.session_summary}</p></div>`
+      : '';
+
     const rows = (d?.skills||[]).map(s => {
       const dc = s.score==='pass'?'pass':s.score==='developing'?'dev':'no';
-      const bl = s.score==='pass'?'Pass':s.score==='developing'?'Developing':'Not observed';
+      const bl = s.score==='pass'?'Pass':s.score==='developing'?'Developing':s.score==='not_applicable'?'N/A':'Not observed';
+      const coaching = s.coaching_note && s.coaching_note !== '-'
+        ? `<p style="font-size:11px;color:var(--ac,#008065);margin:4px 0 0;font-style:italic;line-height:1.5">💬 ${s.coaching_note}</p>`
+        : '';
+      const gap = s.gap && s.gap !== '-'
+        ? `<p style="font-size:11px;color:var(--tx3,#AEAEB2);margin:3px 0 0;line-height:1.4">▸ ขาด: ${s.gap}</p>`
+        : '';
       return `<div class="skill-row">
         <div class="sk-dot ${dc}"></div>
         <div class="sk-body">
-          <div class="sk-head"><span class="sk-name">${s.code}</span><span class="sk-badge ${dc}">${bl}</span></div>
-          <p class="sk-note">${s.evidence_summary||'-'}</p>
+          <div class="sk-head"><span class="sk-name">${s.code} · ${s.name||''}</span><span class="sk-badge ${dc}">${bl}</span></div>
+          <p class="sk-note">${s.evidence||s.evidence_summary||'-'}</p>
+          ${gap}${coaching}
         </div>
       </div>`;
     }).join('');
+
     return `<div class="eyebrow">PIPC Progress</div>
       <div class="pipc-track">${segs}</div>
-      <div class="pipc-labels">${lbls}</div>${rows}`;
+      <div class="pipc-labels">${lbls}</div>
+      ${summary}${rows}`;
   }
 
   function _customerPanel(d) {
+    const ocpbAll = ['O','C','P','B'];
+    const covered = d?.ocpb_covered || [];
+    const ocpbBar = ocpbAll.map(dim => {
+      const done = covered.includes(dim);
+      const label = {O:'Operation',C:'Competitor',P:'Payment',B:'Business'}[dim];
+      return `<div style="flex:1;text-align:center">
+        <div style="width:32px;height:32px;border-radius:8px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;background:${done?'rgba(0,128,101,.12)':'rgba(0,0,0,.04)'};color:${done?'var(--ac,#008065)':'var(--tx3,#AEAEB2)'}">${dim}</div>
+        <div style="font-size:9px;color:${done?'var(--ac,#008065)':'var(--tx3,#AEAEB2)'};font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase">${label}</div>
+      </div>`;
+    }).join('');
+
     const painRows = (d?.pain_points||[]).map(p => {
       const dc = p.severity==='high'?'hi':p.severity==='medium'?'md':'op';
       return `<div class="pain-row">
@@ -36421,25 +36707,48 @@ const CI = (() => {
         </div>
       </div>`;
     }).join('');
+
+    const upsells = (d?.upsell_signals||[]).length
+      ? `<div class="eyebrow" style="margin-top:20px">Upsell Signals</div>` +
+        (d.upsell_signals||[]).map(u =>
+          `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--br,#E5E5EA)">
+            <div style="font-size:12px;font-weight:500;color:var(--ac,#008065);min-width:80px">${u.category}</div>
+            <div style="font-size:12px;color:var(--tx2,#636366);flex:1">${u.evidence}</div>
+          </div>`).join('')
+      : '';
+
+    const walletColor = d?.wallet_estimate==='hot'?'var(--danger,#FF3B30)':d?.wallet_estimate==='warm'?'var(--warning,#FF9500)':'var(--tx3,#AEAEB2)';
+
     return `<div class="buyer-card">
         <div class="buyer-icon-wrap">${d?.buyer_icon||'🤝'}</div>
-        <div>
-          <div class="buyer-lbl">Buyer Type</div>
-          <div class="buyer-type">${d?.buyer_type||'-'}</div>
+        <div style="flex:1">
+          <div class="buyer-lbl">Buyer Type (BANK)</div>
+          <div class="buyer-type">${d?.buyer_type_th||d?.buyer_type||'-'}</div>
           <div class="buyer-ev">${d?.buyer_evidence||''}</div>
         </div>
+        <div style="text-align:center;min-width:48px">
+          <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono);margin-bottom:3px">Wallet</div>
+          <div style="font-size:16px;font-weight:500;color:${walletColor}">${(d?.wallet_estimate||'-').toUpperCase()}</div>
+          <div style="font-size:9px;color:var(--tx3,#AEAEB2);font-family:var(--mono)">${d?.wallet_logic||''}</div>
+        </div>
       </div>
-      <div class="eyebrow">Pain Points</div>${painRows}`;
+      <div class="eyebrow" style="margin-bottom:10px">Discovery Coverage (OCPB)</div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">${ocpbBar}</div>
+      <div class="eyebrow">Pain Points</div>${painRows}${upsells}`;
   }
 
   function _actionsPanel(d) {
     return (d?.next_actions||[]).map((a,i) => {
       const uc = a.urgency==='3_days'?'hi':'md';
       const ul = a.urgency==='3_days'?'ภายใน 3 วัน':a.urgency==='this_week'?'สัปดาห์นี้':'visit ถัดไป';
+      const reason = a.reason
+        ? `<div style="font-size:10px;color:var(--tx3,#AEAEB2);margin-top:3px;font-family:var(--mono);letter-spacing:.03em">${a.reason}</div>`
+        : '';
       return `<div class="action-card">
         <div class="action-top"><span class="action-n">${String(i+1).padStart(2,'0')}</span><span class="urg ${uc}">${ul}</span></div>
         <p class="action-txt">${a.action}</p>
         <span class="action-who">${a.owner}</span>
+        ${reason}
       </div>`;
     }).join('');
   }
@@ -36452,7 +36761,8 @@ const CI = (() => {
     setTimeout(_mount, 50);
   }
 
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { cancel(); } };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); } };
+
 })();
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
