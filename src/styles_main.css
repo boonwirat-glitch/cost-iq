@@ -242,19 +242,11 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* Zone 1: sticky dark header */
 #kav-z1{
   position:sticky;top:54px;z-index:98;
-  background:linear-gradient(180deg,#0c1a36 0%,#091526 75%,rgba(9,21,38,0) 100%);
-  padding:10px 16px 20px;
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-}
-/* prevent content bleeding through sticky header gradient */
-#kav-z1::after{
-  content:'';
-  position:absolute;
-  inset:0;
-  background:inherit;
-  z-index:-1;
-  pointer-events:none;
+  background:#091526;
+  padding:10px 16px 6px;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(255,255,255,.06);
 }
 /* top row: back | dept·KAM chip | spacer | micro-toggle */
 .kav-z1-toprow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
@@ -2211,22 +2203,24 @@ body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ea
 .echo-pill{
   display:flex;align-items:flex-end;justify-content:center;gap:2.5px;
   width:28px;height:22px;
-  padding:0 0 1px;
+  padding:0 0 0;
   flex-shrink:0;
-  /* no border/bg in idle — just bars, same as SVG icon of other tabs */
 }
-body.kam-mode .echo-pill{ /* same */ }
+body.kam-mode .echo-pill{
+  /* inherit */
+}
 .echo-nav-btn .nwrap{
   padding:3px 7px!important;
-  display:flex;align-items:center;justify-content:center;
+  display:flex;align-items:flex-end;justify-content:center;
   min-height:28px;
+  height:28px;
 }
 /* bars: Pattern B — 5·11·6·14·17 zigzag ascending, 4px wide */
 .echo-bar{
   display:inline-block;
   width:4px;
   border-radius:2px 2px 1px 1px;
-  background:rgba(255,255,255,.5);  /* idle = same tint as other nav icons */
+  background:rgba(0,208,112,.7);  /* idle = green always */
   flex-shrink:0;
 }
 .echo-bar:nth-child(1){height:5px}
@@ -2248,8 +2242,8 @@ body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infi
 body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
 body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
 /* label — same color/weight as other tabs, green only when active */
-.echo-nav-btn .lb{color:rgba(255,255,255,.45)!important;font-weight:500!important}
-body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.9)!important;font-weight:600!important}
+.echo-nav-btn .lb{color:rgba(0,208,112,.7)!important;font-weight:600!important}
+body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.95)!important;font-weight:600!important}
 /* Floating recording pill (minimize state) */
 #echo-float-pill{
   position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
