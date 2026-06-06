@@ -369,7 +369,14 @@ const CI = (() => {
     <span class="tb-lbl">Echo</span>
     <span class="tb-rec"><span class="rec-dot" id="ci-rdot"></span><span id="ci-rlbl">พร้อมบันทึก</span></span>
   </div>
-  <div style="padding:0 24px 16px">
+  <div style="padding:8px 24px 0">
+    <div class="tab-bar" id="ci-main-tabs">
+      <div class="tab-pill" id="ci-tab-pill" style="left:3px;width:calc(50% - 3px)"></div>
+      <button class="tab-btn on" id="ci-tab-rec" onclick="CI._switchMainTab('record')">บันทึก</button>
+      <button class="tab-btn" id="ci-tab-hist" onclick="CI._switchMainTab('history')">ประวัติ</button>
+    </div>
+  </div>
+  <div style="padding:4px 24px 12px">
     <div class="chip">
       <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
       <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
@@ -401,7 +408,12 @@ const CI = (() => {
   <div class="rec-bottom">
     <button class="btn-stop" onclick="CI.stopRecording()">หยุด &amp; วิเคราะห์</button>
     <span class="stop-hint">ระบบจะ transcribe และวิเคราะห์ด้วย AI อัตโนมัติ</span>
-    <button onclick="CI._openHistory()" style="background:none;border:none;font-size:11px;color:var(--tx3,#AEAEB2);cursor:pointer;font-family:'DM Mono','IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:4px 0">ดูประวัติ</button>
+    </div>
+  <!-- inline history panel — shown when tab=history -->
+  <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px 32px;-webkit-overflow-scrolling:touch">
+    <div id="ci-inline-hist-body" style="padding-top:8px">
+      <div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>
+    </div>
   </div>
 </div>
 
@@ -952,6 +964,20 @@ ${text}`;
         ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
       }, { onConflict: 'kam_email,account_id' });
       if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
+    }
+
+    // 4. Write echo visit to localStorage (fast, for portview dot)
+    if (_accountGuid) {
+      try {
+        const _echoKey = 'ciq_echo_visits';
+        const _store = JSON.parse(localStorage.getItem(_echoKey) || '{}');
+        const _eKey = email + '::' + _accountGuid;
+        _store[_eKey] = { ts: Date.now(), count: (_store[_eKey]?.count || 0) + 1 };
+        // Prune entries older than 30 days
+        const _cutoff = Date.now() - 30*24*60*60*1000;
+        Object.keys(_store).forEach(k => { if (_store[k].ts < _cutoff) delete _store[k]; });
+        localStorage.setItem(_echoKey, JSON.stringify(_store));
+      } catch(e) { /* non-fatal */ }
     }
   }
 
@@ -1621,6 +1647,123 @@ ${text}`;
   }
 
 
+  // ── Main tab switch (บันทึก / ประวัติ) ────────────────────────────────────────
+  function _switchMainTab(tab) {
+    const pill = document.getElementById('ci-tab-pill');
+    const recBtn = document.getElementById('ci-tab-rec');
+    const histBtn = document.getElementById('ci-tab-hist');
+    const recArea = document.getElementById('ci-rec-center');
+    const wf = document.getElementById('ci-wf');
+    const recBottom = document.querySelector('#ci-s-record .rec-bottom');
+    const histPanel = document.getElementById('ci-inline-hist');
+    const chip = document.querySelector('#ci-s-record .chip')?.parentElement;
+
+    if (tab === 'history') {
+      if (pill) { pill.style.left = 'calc(50%)'; pill.style.width = 'calc(50% - 3px)'; }
+      if (recBtn) recBtn.classList.remove('on');
+      if (histBtn) histBtn.classList.add('on');
+      if (recArea) recArea.style.display = 'none';
+      if (wf) wf.style.display = 'none';
+      if (recBottom) recBottom.style.display = 'none';
+      if (chip) chip.style.display = 'none';
+      if (histPanel) { histPanel.style.display = 'block'; _loadInlineHistory(); }
+    } else {
+      if (pill) { pill.style.left = '3px'; pill.style.width = 'calc(50% - 3px)'; }
+      if (recBtn) recBtn.classList.add('on');
+      if (histBtn) histBtn.classList.remove('on');
+      if (recArea) recArea.style.display = '';
+      if (wf) wf.style.display = '';
+      if (recBottom) recBottom.style.display = '';
+      if (chip) chip.style.display = '';
+      if (histPanel) histPanel.style.display = 'none';
+    }
+  }
+
+  async function _loadInlineHistory() {
+    const body = document.getElementById('ci-inline-hist-body');
+    if (!body) return;
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>';
+    const email = currentUserProfile?.email;
+    if (!email) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ไม่พบผู้ใช้งาน</div>'; return; }
+    try {
+      // Query ci_sessions — all user sessions, newest first
+      let q = supa.from('ci_sessions')
+        .select('id,account_id,account_name,visited_at,duration_secs,skill_scores,next_actions,status')
+        .eq('owner_email', email)
+        .order('visited_at', { ascending: false })
+        .limit(50);
+      if (_accountGuid) q = q.eq('account_id', _accountGuid);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (!data || !data.length) {
+        body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ Echo</div>';
+        return;
+      }
+      body.innerHTML = _renderInlineHistory(data);
+    } catch(e) {
+      console.warn('[CI inline history]', e.message);
+      // Fallback to kam_skill_log if ci_sessions not ready
+      const rows = await _loadHistory();
+      const sessions = _groupHistoryBySessions(rows);
+      if (!sessions.length) {
+        body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ</div>';
+        return;
+      }
+      body.innerHTML = _renderLegacyHistory(sessions);
+    }
+  }
+
+  function _renderInlineHistory(sessions) {
+    // Group by month
+    const byMonth = {};
+    sessions.forEach(s => {
+      const d = new Date(s.visited_at);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = { label: d.toLocaleDateString('th-TH',{month:'long',year:'2-digit'}), items: [] };
+      byMonth[key].items.push(s);
+    });
+    return Object.entries(byMonth).map(([,grp]) => {
+      const items = grp.items.map(s => {
+        const date = new Date(s.visited_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+        const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
+        const acctLabel = s.account_name || (portviewBulkData?.find(r=>r.account_guid===s.account_id)?.res_name) || s.account_id || '—';
+        const skills = s.skill_scores?.skills || [];
+        const skillDots = skills.slice(0,6).map(sk => {
+          const sc = sk.tl_override || sk.score;
+          const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
+          return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:var(--mono,'DM Mono',monospace)"><span style="width:5px;height:5px;border-radius:50%;background:${col};flex-shrink:0"></span>${sk.code||sk.skill_code||''}</span>`;
+        }).join('');
+        const actions = (s.next_actions||[]).slice(0,2).map(a=>
+          `<span style="font-size:10px;color:var(--ac,#008065);background:rgba(0,128,101,.07);padding:3px 8px;border-radius:6px;font-weight:500">${a.action||a}</span>`
+        ).join('');
+        return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${_accountGuid ? date : acctLabel}</span>
+            <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:var(--mono)">${_accountGuid ? dur : date + (dur?' · '+dur:'')}</span>
+          </div>
+          ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${actions?'8px':'0'}">${skillDots}</div>` : ''}
+          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div>` : ''}
+        </div>`;
+      }).join('');
+      return `<div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'DM Mono',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
+    }).join('');
+  }
+
+  function _renderLegacyHistory(sessions) {
+    return sessions.map(sess => {
+      const dateLabel = new Date(sess.session_date).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
+      const skillDots = sess.skills.map(sk => {
+        const sc = sk.tl_override||sk.score;
+        const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
+        return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:var(--mono)"><span style="width:5px;height:5px;border-radius:50%;background:${col}"></span>${sk.skill_code}</span>`;
+      }).join('');
+      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E);margin-bottom:8px">${dateLabel}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${skillDots}</div>
+      </div>`;
+    }).join('');
+  }
+
   // ── Public ─────────────────────────────────────────────────────────────────
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
@@ -1743,12 +1886,18 @@ ${text}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize, _switchMainTab };
 
 })();
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
 function echoOpen() { CI.open(null); }
+function echoHistory(accountId) {
+  // Open Echo sheet on history tab for specific account
+  CI.open(accountId || null);
+  // Switch to history tab after mount
+  setTimeout(() => CI._switchMainTab('history'), 100);
+}
 function echoExpand() {
   const pill = document.getElementById('echo-float-pill');
   if (pill) pill.classList.remove('visible');
