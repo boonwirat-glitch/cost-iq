@@ -879,11 +879,11 @@ ${text}`;
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
     const { error: visitError } = await supa.from('kam_visits').upsert({
-      kam_email: email, account_id: _accountGuid, visit_date: today,
+      kam_email: email, account_id: _accountGuid,
       ci_skill_scores: skillData, ci_customer_signals: intelData,
       ci_next_actions: intelData?.next_actions || [], ci_mode: 'voice',
       ci_created_at: new Date().toISOString()
-    }, { onConflict: 'kam_email,account_id,visit_date' });
+    }, { onConflict: 'kam_email,account_id' });
     if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
   }
 
