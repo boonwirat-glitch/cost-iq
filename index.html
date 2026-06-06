@@ -1,4 +1,4 @@
-<!-- Freshket Sense v348: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v349: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5142,7 +5142,7 @@ body.sales-mode .sales-content-only { display: block !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v348',
+      version: 'v349',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -8516,11 +8516,12 @@ async function doLogin() {
     // (which fires async from signInWithPassword) knows doLogin already handles UI.
     window._doLoginHandled = true;
     currentUser = data.user;
-    // v195 Step 1: start R2 fetch immediately — runs in parallel with loadUserProfile
-    // so cache-warm data is already ingested by the time splash shows.
-    // sheetsLoadStarted guard prevents double-call if _autoRouteAfterLogin also fires.
-    if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
+    // Load profile first so role is known before R2 fetch starts
     await loadUserProfile();
+    // v348: patch R2 filenames for Sales BEFORE starting fetch
+    try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+    // v195 Step 1: start R2 fetch after profile + patch ready
+    if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
     hideLoginOverlay();
   } catch(e) {
     window._doLoginHandled = false;
@@ -9073,18 +9074,22 @@ async function checkSession() {
     if (session && !currentUser) {
       window._sessionCheckHandling = true;
       currentUser = session.user;
-      // v195 Step 1: start R2 fetch in parallel with loadUserProfile (same guard applies)
-      if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
       // v220 PROFILE CACHE: same cache-first pattern as onAuthStateChange path.
       var _cpcs=_profileCacheGet(session.user.id);
       if(_cpcs){
         currentUserProfile=_cpcs; normalizeCurrentUserProfileRole();
         _senseDataLog('PROFILE','⚡ cache hit (checkSession) → hideLoginOverlay immediately');
+        // v348: patch R2 for Sales before fetch
+        try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+        if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
         window._sessionCheckHandling=false;
         hideLoginOverlay();
         loadUserProfile(); // background revalidate
       }else{
         await loadUserProfile();
+        // v348: patch R2 for Sales before fetch
+        try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+        if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
         window._sessionCheckHandling = false;
         hideLoginOverlay();
       }
