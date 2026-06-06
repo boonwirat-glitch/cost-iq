@@ -24,6 +24,7 @@ function normalizeRole(role){
   if(r === 'kam' || r === 'ka' || r === 'key_account' || r === 'key account') return 'rep';
   if(r === 'team_lead' || r === 'team lead') return 'tl';
   if(r === 'sales' || r === 'sale' || r === 'sales_rep') return 'sales';
+  if(r === 'sales_tl' || r === 'sales_lead' || r === 'sales_team_lead') return 'sales_tl';
   return r || 'rep';
 }
 function getCurrentRole(){
@@ -33,13 +34,16 @@ function isAdminRole(role){ return normalizeRole(role) === 'admin'; }
 function isTLRole(role){ return normalizeRole(role) === 'tl'; }
 function isRepRole(role){ return normalizeRole(role) === 'rep'; }
 function isSalesRole(role){ return normalizeRole(role) === 'sales'; }
-function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'; }
+function isSalesTLRole(role){ return normalizeRole(role) === 'sales_tl'; }
+function isSalesAny(role){ const r=normalizeRole(role); return r==='sales'||r==='sales_tl'; }
+function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'; }
 function roleLabel(role){
   const r = normalizeRole(role);
   if(r === 'rep') return 'KAM';
   if(r === 'tl') return 'TL';
   if(r === 'admin') return 'Admin';
   if(r === 'sales') return 'Sales';
+  if(r === 'sales_tl') return 'Sales TL';
   return role || '';
 }
 function normalizeCurrentUserProfileRole(){
@@ -59,6 +63,8 @@ try{
   window.isTLRole = isTLRole;
   window.isRepRole = isRepRole;
   window.isSalesRole = isSalesRole;
+  window.isSalesTLRole = isSalesTLRole;
+  window.isSalesAny = isSalesAny;
   window.isEchoUser = isEchoUser;
   window.roleLabel = roleLabel;
 }catch(e){}
@@ -652,6 +658,10 @@ function hideLoginOverlay() {
       const _pf_role = getCurrentRole();
       _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
       if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
+      else if(_pf_role==='sales'||_pf_role==='sales_tl'){
+        if(typeof setMode==='function') setMode('kam');
+        if(typeof showScreen==='function') showScreen('sales-portview');
+      }
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
