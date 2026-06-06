@@ -1,4 +1,4 @@
-<!-- Freshket Sense v350: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v351: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5142,7 +5142,7 @@ body.sales-mode .sales-content-only { display: block !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v350',
+      version: 'v351',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -8729,6 +8729,9 @@ function hideLoginOverlay() {
       _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
       if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
       else if(_pf_role==='sales'||_pf_role==='sales_tl'){
+        // Set sales-mode body class FIRST so CSS gates work before render
+        document.body.classList.add('sales-mode');
+        if(_pf_role==='sales_tl') document.body.classList.add('sales-tl-mode');
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
@@ -23581,7 +23584,7 @@ function __legacyRenderPortviewFallback(){
     if(_bl)_bl.textContent='ภาพรวมทีม';
   } else {
     if(heading)heading.textContent='พอร์ตของฉัน';
-    if(levelBadge)levelBadge.textContent=role==='tl'||role==='admin'?'TL':'KAM';
+    if(levelBadge)levelBadge.textContent=role==='tl'||role==='admin'?'TL':role==='sales'||role==='sales_tl'?'Sales':'KAM';
     if(backWrap)backWrap.style.display='none';
   }
   renderPortviewSummary();
