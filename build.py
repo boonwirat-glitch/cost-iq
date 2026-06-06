@@ -32,6 +32,8 @@ commission_js = (
 )
 patches_js    = read('src/08_patches.js')
 conv_intel_js = read('src/09_conv_intel.js')
+sales_js     = read('src/10_sales_view.js')
+styles_sales = read('src/styles_sales.css')
 styles_main   = read('src/styles_main.css')
 styles_comm   = read('src/styles_commission.css')
 
@@ -50,6 +52,10 @@ out = (shell
              f'<script id="freshket-patches-consolidated">\n{patches_js}</script>\n')
     .replace('<script id="freshket-conv-intel">\n<!-- INJECT_CONV_INTEL -->\n</script>\n',
              f'<script id="freshket-conv-intel">\n{conv_intel_js}</script>\n')
+    .replace('<script id="freshket-sales">\n<!-- INJECT_SALES -->\n</script>\n',
+             f'<script id="freshket-sales">\n{sales_js}</script>\n')
+    .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
+             f'<style id="sales-module-css">\n{styles_sales}</style>')
     # ── Build version ──
     .replace("version: 'v212c-diagnostics-counter-fix'",
              f"version: '{VERSION}'")
@@ -59,7 +65,7 @@ out = (shell
 
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION',
-          'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES']:
+          'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
