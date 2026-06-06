@@ -547,8 +547,8 @@ const CI = (() => {
       _setStep('Reading customer signals...', 'Claude Sonnet · restaurant context', 74);
       const intelData = await _analyzeIntel(text);
 
-      _setStep('Building next actions...', 'Claude Sonnet', 96);
-      await _save(skillData, intelData);
+      _setStep('Saving...', '', 96);
+      await _saveToSupabase(skillData, intelData);
 
       _setStep('Done', '', 100);
       setTimeout(() => {
