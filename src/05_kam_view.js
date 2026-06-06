@@ -1574,16 +1574,22 @@ function __legacySetModeFallback(mode){
   if(icoKam)icoKam.style.display=isKAM?'':'none';
   // Show Team tab for TL/admin only
   const isTL=currentUserProfile&&(currentUserProfile.role==='tl'||currentUserProfile.role==='admin');
+  const _isSales=typeof isSalesAny==='function'&&isSalesAny(currentUserProfile&&currentUserProfile.role);
+  const _isSalesTL=typeof isSalesTLRole==='function'&&isSalesTLRole(currentUserProfile&&currentUserProfile.role);
   // Add tl-mode class for 3-col grid + Team tab visibility (CSS .tl-only handles display)
   document.body.classList.toggle('tl-mode',isKAM&&isTL);
+  // Sales body classes — controls Sales-specific nav/content visibility
+  document.body.classList.toggle('sales-mode',_isSales);
+  document.body.classList.toggle('sales-tl-mode',isKAM&&_isSalesTL);
   // v183: Show Team button in portview header for TL/Admin only
   const _portviewTeamBtn = document.getElementById('portview-team-btn');
-  if (_portviewTeamBtn) _portviewTeamBtn.style.display = isTL ? 'flex' : 'none';
+  if (_portviewTeamBtn) _portviewTeamBtn.style.display = (isTL||_isSalesTL) ? 'flex' : 'none';
   const _portviewTgtBtn = document.getElementById('portview-target-btn');
   if (_portviewTgtBtn) {
-    _portviewTgtBtn.style.display = isTL ? 'flex' : 'none';
+    _portviewTgtBtn.style.display = (isTL||_isSalesTL) ? 'flex' : 'none';
     // Store mode so button knows admin vs tl
-    window._tgtAdminMode = (currentUserProfile && currentUserProfile.role === 'admin') ? 'admin' : 'tl';
+    window._tgtAdminMode = (currentUserProfile && currentUserProfile.role === 'admin') ? 'admin' :
+                           (_isSalesTL ? 'sales_tl' : 'tl');
   }
   // v183: Sync bnav disabled state
   if (typeof _updateKamNavDisabled === 'function') _updateKamNavDisabled();
