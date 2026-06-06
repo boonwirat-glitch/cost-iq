@@ -827,32 +827,41 @@ Buyer type (BANK framework):
   ]
 }`;
 
+  async function _ciCallAI(modelKey, system, userContent, maxTokens) {
+    // CI calls worker directly — bypasses callAI wrapper which returns empty string
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'claude', modelKey, system, messages: [{ role: 'user', content: userContent }], maxTokens })
+    });
+    if (!res.ok) throw new Error('worker ' + res.status);
+    const data = await res.json();
+    const txt = data?.content?.[0]?.text || data?.text || '';
+    return txt.trim().replace(/```json\n?|```/g, '').trim();
+  }
+
   async function _analyzeSkills(text) {
-    const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 6000);
-    // callAI returns plain text string (not Anthropic object)
-    const txt = (typeof raw === 'string' ? raw : raw?.content?.[0]?.text || '').trim().replace(/```json\n?|```/g,'').trim();
-    console.log('[CI skills raw]', txt.substring(0,400));
+    const txt = await _ciCallAI('haiku', _SKILL_SYS, `Transcript:\n${text}`, 6000);
+    console.log('[CI skills raw]', txt.substring(0, 400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0,80));
-    return JSON.parse(txt.slice(s, e+1));
+    if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0, 80));
+    return JSON.parse(txt.slice(s, e + 1));
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
-    const accountCtx = `ข้อมูลร้าน:
+    const userContent = `ข้อมูลร้าน:
 - ชื่อ: ${ctx.name}
 - Segment: ${ctx.seg}
-- อยู่กับ rep มา: ${ctx.days} วัน`;
-    const raw = await callAI('sonnet', _INTEL_SYS, [{
-      role: 'user',
-      content: `${accountCtx}\n\nTranscript:\n${text}`
-    }], 6000);
-    // callAI returns plain text string (not Anthropic object)
-    const txt = (typeof raw === 'string' ? raw : raw?.content?.[0]?.text || '').trim().replace(/```json\n?|```/g,'').trim();
-    console.log('[CI intel raw]', txt.substring(0,400));
+- อยู่กับ rep มา: ${ctx.days} วัน
+
+Transcript:
+${text}`;
+    const txt = await _ciCallAI('sonnet', _INTEL_SYS, userContent, 6000);
+    console.log('[CI intel raw]', txt.substring(0, 400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0,80));
-    return JSON.parse(txt.slice(s, e+1));
+    if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0, 80));
+    return JSON.parse(txt.slice(s, e + 1));
   }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
