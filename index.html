@@ -1,4 +1,4 @@
-<!-- Freshket Sense v338: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v339: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2480,13 +2480,14 @@ body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transit
 body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.9)) drop-shadow(0 0 18px rgba(255,255,255,.3));}
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
 /* ── Echo nav pill — idle + active states ── */
+/* ── Echo nav pill — Deezer-style equalizer ── */
 .echo-pill{
-  display:flex;align-items:center;justify-content:center;gap:2px;
+  display:flex;align-items:flex-end;justify-content:center;gap:2px;
   width:36px;height:20px;
   border-radius:999px;
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
-  padding:0 6px;
+  padding:0 6px 3px;
   flex-shrink:0;
   transition:background .2s,border-color .2s,box-shadow .2s;
 }
@@ -2494,7 +2495,6 @@ body.kam-mode .echo-pill{
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
 }
-/* Force echo-nav-btn nwrap same height as other tabs */
 .echo-nav-btn .nwrap{
   padding:3px 7px!important;
   display:flex;align-items:center;justify-content:center;
@@ -2502,35 +2502,44 @@ body.kam-mode .echo-pill{
 }
 .echo-bar{
   display:inline-block;
-  width:2.5px;
-  border-radius:2px;
-  background:rgba(0,208,112,.7);
-  transition:height .15s ease;
+  width:3px;
+  border-radius:2px 2px 1px 1px;
+  background:rgba(0,208,112,.72);
+  flex-shrink:0;
 }
-/* Idle: organic waveform heights — NOT uniform */
-.echo-bar:nth-child(1){height:5px}
-.echo-bar:nth-child(2){height:10px}
+/* Idle: Deezer-style static equalizer — asymmetric, bottom-aligned */
+.echo-bar:nth-child(1){height:4px}
+.echo-bar:nth-child(2){height:11px}
 .echo-bar:nth-child(3){height:14px}
-.echo-bar:nth-child(4){height:8px}
-.echo-bar:nth-child(5){height:4px}
-/* idle: bars all same height, no animation */
-/* active: bars animate (class body.echo-active added by JS) */
-@keyframes echo-wa{0%,100%{height:4px;opacity:.55}50%{height:14px;opacity:1}}
-@keyframes echo-wb{0%,100%{height:8px;opacity:.8}50%{height:5px;opacity:.55}}
-@keyframes echo-wc{0%,100%{height:13px;opacity:1}50%{height:3px;opacity:.4}}
-@keyframes echo-wd{0%,100%{height:6px;opacity:.7}50%{height:12px;opacity:.9}}
-@keyframes echo-we{0%,100%{height:3px;opacity:.4}50%{height:9px;opacity:.75}}
+.echo-bar:nth-child(4){height:7px}
+.echo-bar:nth-child(5){height:3px}
+/* Active: each bar bounces independently — snappy multi-step like real equalizer */
+@keyframes echo-wa{
+  0%{height:4px}15%{height:12px}30%{height:5px}50%{height:14px}70%{height:3px}85%{height:10px}100%{height:4px}
+}
+@keyframes echo-wb{
+  0%{height:11px}20%{height:4px}40%{height:14px}55%{height:7px}75%{height:13px}90%{height:5px}100%{height:11px}
+}
+@keyframes echo-wc{
+  0%{height:14px}10%{height:6px}25%{height:14px}45%{height:9px}60%{height:14px}80%{height:4px}100%{height:14px}
+}
+@keyframes echo-wd{
+  0%{height:7px}20%{height:13px}35%{height:3px}55%{height:11px}70%{height:5px}90%{height:12px}100%{height:7px}
+}
+@keyframes echo-we{
+  0%{height:3px}25%{height:10px}45%{height:4px}65%{height:13px}80%{height:3px}100%{height:3px}
+}
 body.echo-active .echo-pill{
-  background:rgba(0,208,112,.22);
-  border-color:rgba(0,208,112,.6);
-  box-shadow:0 0 10px rgba(0,208,112,.25);
+  background:rgba(0,208,112,.2);
+  border-color:rgba(0,208,112,.55);
+  box-shadow:0 0 8px rgba(0,208,112,.2);
 }
 body.echo-active .echo-bar{background:rgba(0,208,112,.92);}
-body.echo-active .echo-bar:nth-child(1){animation:echo-wa 1.2s ease-in-out infinite}
-body.echo-active .echo-bar:nth-child(2){animation:echo-wb 1.0s ease-in-out infinite .1s}
-body.echo-active .echo-bar:nth-child(3){animation:echo-wc 1.4s ease-in-out infinite .2s}
-body.echo-active .echo-bar:nth-child(4){animation:echo-wd 1.1s ease-in-out infinite .05s}
-body.echo-active .echo-bar:nth-child(5){animation:echo-we 1.3s ease-in-out infinite .15s}
+body.echo-active .echo-bar:nth-child(1){animation:echo-wa .9s steps(4,end) infinite}
+body.echo-active .echo-bar:nth-child(2){animation:echo-wb .7s steps(4,end) infinite .08s}
+body.echo-active .echo-bar:nth-child(3){animation:echo-wc .8s steps(4,end) infinite .15s}
+body.echo-active .echo-bar:nth-child(4){animation:echo-wd .75s steps(4,end) infinite .05s}
+body.echo-active .echo-bar:nth-child(5){animation:echo-we .85s steps(4,end) infinite .12s}
 /* label under pill */
 .echo-nav-btn .lb{color:rgba(0,208,112,.65)!important;font-weight:600!important}
 body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.95)!important}
@@ -2549,13 +2558,13 @@ body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.95)!important}
 }
 @keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 #echo-float-pill.visible{display:flex}
-#echo-float-pill .fp-bars{display:flex;align-items:center;gap:2px}
-#echo-float-pill .fp-bar{width:2px;border-radius:2px;background:rgba(0,208,112,.9)}
-#echo-float-pill .fp-bar:nth-child(1){animation:echo-wa 1.2s ease-in-out infinite}
-#echo-float-pill .fp-bar:nth-child(2){animation:echo-wb 1.0s ease-in-out infinite .1s}
-#echo-float-pill .fp-bar:nth-child(3){animation:echo-wc 1.4s ease-in-out infinite .2s}
-#echo-float-pill .fp-bar:nth-child(4){animation:echo-wd 1.1s ease-in-out infinite .05s}
-#echo-float-pill .fp-bar:nth-child(5){animation:echo-we 1.3s ease-in-out infinite .15s}
+#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+#echo-float-pill .fp-bar{width:3px;border-radius:2px 2px 1px 1px;background:rgba(0,208,112,.9)}
+#echo-float-pill .fp-bar:nth-child(1){animation:echo-wa .9s steps(4,end) infinite}
+#echo-float-pill .fp-bar:nth-child(2){animation:echo-wb .7s steps(4,end) infinite .08s}
+#echo-float-pill .fp-bar:nth-child(3){animation:echo-wc .8s steps(4,end) infinite .15s}
+#echo-float-pill .fp-bar:nth-child(4){animation:echo-wd .75s steps(4,end) infinite .05s}
+#echo-float-pill .fp-bar:nth-child(5){animation:echo-we .85s steps(4,end) infinite .12s}
 #echo-float-pill .fp-label{font-size:11px;font-weight:600;color:rgba(0,208,112,.9);letter-spacing:.04em}
 #echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
 body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
@@ -5112,7 +5121,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v338',
+      version: 'v339',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -36037,7 +36046,7 @@ const CI = (() => {
 /* ── TIMER ── */
 .timer-block{text-align:center;}
 .timer-val{font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums;}
-.timer-hint{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);margin-top:5px;font-family:var(--mono);transition:color 220ms;}
+.timer-hint{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:var(--mono);transition:color 220ms;}
 .is-rec .timer-hint{color:var(--ac);}
 
 /* ── WAVEFORM ── */
@@ -36055,7 +36064,7 @@ const CI = (() => {
 }
 .btn-stop:hover{background:rgba(0,0,0,.08);color:var(--tx);}
 .btn-stop:active{transform:scale(.98);}
-.stop-hint{text-align:center;font-size:11px;color:var(--tx3);font-family:var(--mono);letter-spacing:.04em;}
+.stop-hint{text-align:center;font-size:11px;color:#8e8e93;font-family:var(--mono);letter-spacing:.04em;}
 
 /* ── PROCESSING SCREEN ── */
 .proc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 24px;}
@@ -37706,8 +37715,10 @@ ${text}`;
       setTimeout(_mountPicker, 50);
       return;
     }
-    // KAM: smart detect — use provided guid, then currentAccountId
-    const resolved = accountGuid || (typeof currentAccountId !== 'undefined' ? currentAccountId : null);
+    // KAM: smart detect
+    // Only skip picker if BOTH: has accountGuid/currentAccountId AND user is actively in account view
+    const _inAccountView = document.body.classList.contains('restaurant-sheet');
+    const resolved = accountGuid || (_inAccountView && typeof currentAccountId !== 'undefined' ? currentAccountId : null);
     if (resolved) {
       _accountGuid = resolved;
       const ctx = _ctx();
