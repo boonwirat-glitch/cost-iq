@@ -1,0 +1,501 @@
+/* ══════════════════════════════════════════════════════
+   SALES MODULE STYLES — styles_sales.css
+   Design system: same tokens as styles_main.css
+   --bg:#F2F2F7  --surface:rgba(255,255,255,.72)+blur
+   --ac:#008065  --tx:#1C1C1E  --tx2:#636366  --tx3:#6C6C70
+   ══════════════════════════════════════════════════════ */
+
+/* ── Sales Home ── */
+.sv-header {
+  padding: 20px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sv-header-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255,255,255,.9);
+  letter-spacing: -0.02em;
+}
+.sv-header-sub {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Metric card ── */
+.sv-card {
+  background: rgba(255,255,255,.08);
+  border: 0.5px solid rgba(255,255,255,.14);
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+  margin: 0 16px 12px;
+}
+.sv-card-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 6px;
+}
+.sv-card-value {
+  font-size: 32px;
+  font-weight: 200;
+  color: #fff;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+.sv-card-value-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255,255,255,.6);
+  margin-left: 2px;
+}
+.sv-card-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,.5);
+  margin-top: 4px;
+}
+
+/* ── Target progress bar ── */
+.sv-target-bar-wrap {
+  margin-top: 12px;
+}
+.sv-target-bar-track {
+  background: rgba(255,255,255,.1);
+  border-radius: 4px;
+  height: 5px;
+  overflow: hidden;
+}
+.sv-target-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #008065;
+  transition: width .6s cubic-bezier(.16,1,.3,1);
+}
+.sv-target-bar-fill.warn  { background: #FF9500; }
+.sv-target-bar-fill.danger { background: #FF3B30; }
+.sv-target-bar-fill.great { background: #34C759; }
+.sv-target-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 10px;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── 3-month projection strip ── */
+.sv-projection-strip {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.sv-projection-strip::-webkit-scrollbar { display: none; }
+.sv-proj-card {
+  flex: 0 0 calc(33vw - 16px);
+  min-width: 96px;
+  background: rgba(255,255,255,.06);
+  border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 12px 12px 10px;
+}
+.sv-proj-card.current {
+  background: rgba(0,128,101,.15);
+  border-color: rgba(0,128,101,.35);
+}
+.sv-proj-month {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 6px;
+}
+.sv-proj-amount {
+  font-size: 18px;
+  font-weight: 200;
+  color: #fff;
+  letter-spacing: -0.03em;
+}
+.sv-proj-vs {
+  font-size: 10px;
+  margin-top: 4px;
+}
+.sv-proj-vs.hit  { color: #34C759; }
+.sv-proj-vs.miss { color: #FF3B30; }
+.sv-proj-vs.gap  { color: #FF9500; }
+
+/* ── Handover warning card ── */
+.sv-handover-card {
+  background: rgba(255,59,48,.08);
+  border: 0.5px solid rgba(255,59,48,.25);
+  border-radius: 20px;
+  padding: 14px 18px;
+  margin: 0 16px 12px;
+}
+.sv-handover-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #FF3B30;
+  margin-bottom: 6px;
+}
+.sv-handover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 0.5px solid rgba(255,59,48,.12);
+  font-size: 12px;
+  color: rgba(255,255,255,.8);
+}
+.sv-handover-row:last-child { border-bottom: none; }
+.sv-handover-days {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: #FF3B30;
+  font-weight: 500;
+}
+
+/* ── Sales Portview outlet list ── */
+.sv-portview-header {
+  padding: 16px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(13,31,60,.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.sv-portview-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+}
+.sv-sort-btn {
+  font-size: 11px;
+  color: rgba(255,255,255,.5);
+  background: rgba(255,255,255,.07);
+  border: 0.5px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+/* Outlet card */
+.sv-outlet-card {
+  background: rgba(255,255,255,.06);
+  border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 0 16px 10px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.sv-outlet-card:active { background: rgba(255,255,255,.1); }
+.sv-outlet-card.expiring-soon {
+  border-color: rgba(255,149,0,.35);
+  background: rgba(255,149,0,.05);
+}
+.sv-outlet-card.expiring-critical {
+  border-color: rgba(255,59,48,.35);
+  background: rgba(255,59,48,.06);
+}
+.sv-outlet-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,.9);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sv-outlet-type {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(0,128,101,.9);
+  background: rgba(0,128,101,.12);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.sv-outlet-gmv {
+  font-size: 13px;
+  color: rgba(255,255,255,.7);
+  margin-bottom: 8px;
+}
+
+/* Days held progress bar */
+.sv-days-bar-wrap { margin-bottom: 6px; }
+.sv-days-bar-track {
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  height: 4px;
+  overflow: hidden;
+}
+.sv-days-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #34C759;
+  transition: width .4s;
+}
+.sv-days-bar-fill.mid  { background: #FF9500; }
+.sv-days-bar-fill.late { background: #FF3B30; }
+.sv-days-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(255,255,255,.35);
+  margin-top: 3px;
+}
+.sv-days-deadline { color: rgba(255,255,255,.5); }
+
+/* ── Pipeline screen ── */
+.sv-pipeline-header {
+  padding: 16px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(13,31,60,.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.sv-pipeline-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+}
+.sv-pipeline-month-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+  padding: 4px 20px 8px;
+}
+.sv-pipeline-summary {
+  font-size: 11px;
+  color: rgba(255,255,255,.4);
+  padding: 0 20px 10px;
+}
+.sv-lead-card {
+  background: rgba(255,255,255,.06);
+  border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 0 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sv-lead-info { flex: 1; min-width: 0; }
+.sv-lead-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-lead-date {
+  font-size: 10px;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+  margin-top: 2px;
+}
+.sv-lead-gmv {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(0,200,120,.9);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sv-lead-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sv-lead-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0.5px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+.sv-lead-btn:active { background: rgba(255,255,255,.12); }
+
+/* FAB — add lead */
+.sv-fab {
+  position: fixed;
+  bottom: calc(90px + env(safe-area-inset-bottom,0px));
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #008065;
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,128,101,.4);
+  z-index: 50;
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.sv-fab:active { transform: scale(.92); }
+
+/* Add/Edit lead sheet */
+.sv-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sv-sheet {
+  background: #1a2d50;
+  border-radius: 28px 28px 0 0;
+  padding: 24px 24px 32px;
+  width: 100%;
+  max-width: 440px;
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.16,1,.3,1);
+}
+.sv-sheet.open { transform: translateY(0); }
+.sv-sheet-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 20px;
+}
+.sv-field-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 6px;
+}
+.sv-field-input {
+  width: 100%;
+  background: rgba(255,255,255,.07);
+  border: 0.5px solid rgba(255,255,255,.15);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #fff;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+.sv-field-input:focus {
+  outline: none;
+  border-color: rgba(0,128,101,.6);
+  background: rgba(0,128,101,.06);
+}
+.sv-sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.sv-btn-save {
+  flex: 1;
+  padding: 14px;
+  background: #008065;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  cursor: pointer;
+}
+.sv-btn-cancel {
+  padding: 14px 20px;
+  background: rgba(255,255,255,.07);
+  color: rgba(255,255,255,.7);
+  border: 0.5px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  font-size: 14px;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  cursor: pointer;
+}
+
+/* ── Commission Coming Soon ── */
+.sv-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 32px;
+  text-align: center;
+}
+.sv-coming-soon-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: .5;
+}
+.sv-coming-soon-title {
+  font-size: 20px;
+  font-weight: 200;
+  color: rgba(255,255,255,.7);
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+.sv-coming-soon-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,.35);
+  line-height: 1.5;
+}
+
+/* ── Empty state ── */
+.sv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 32px;
+  text-align: center;
+}
+.sv-empty-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,.4);
+  margin-bottom: 6px;
+}
+.sv-empty-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,.25);
+}
