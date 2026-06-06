@@ -1115,10 +1115,12 @@ ${text}`;
       else if (sessionRow) _sessionId = sessionRow.id;
     } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
 
-    // 2. Save skill log rows (KAM only — needs account_id for TL debrief)
-    if (_accountGuid && skillData?.skills?.length) {
+    // 2. Save skill log rows (all roles — Sales uses account_name fallback when no guid)
+    if (skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
-        kam_email: email, account_id: _accountGuid,
+        kam_email: email,
+        account_id: _accountGuid || null,
+        account_name: _accountName || null,
         session_date: today, skill_code: s.code,
         score: s.score,
         evidence_summary: s.evidence || s.evidence_summary || '',
@@ -1874,7 +1876,12 @@ ${text}`;
         .eq('owner_email', email)
         .order('visited_at', { ascending: false })
         .limit(50);
-      if (_accountGuid) q = q.eq('account_id', _accountGuid);
+      if (_accountGuid) {
+        q = q.eq('account_id', _accountGuid);
+      } else if (typeof isSalesRole === 'function' && isSalesRole(typeof getCurrentRole === 'function' ? getCurrentRole() : '')) {
+        // Sales mode: no account_id filter — show all own sessions, group by account_name
+        // (query already filtered by owner_email above)
+      }
       const { data, error } = await q;
       if (error) throw error;
       if (!data || !data.length) {
@@ -1896,7 +1903,50 @@ ${text}`;
   }
 
   function _renderInlineHistory(sessions) {
-    // Group by month
+    const _salesMode = typeof isSalesRole === 'function' &&
+      isSalesRole(typeof getCurrentRole === 'function' ? getCurrentRole() : '');
+    const _groupBySales = _salesMode && !_accountGuid;
+
+    function _renderSessionCard(s, opts) {
+      const date = new Date(s.visited_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+      const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
+      const acctLabel = s.account_name || (portviewBulkData?.find(r=>r.account_guid===s.account_id)?.res_name) || s.account_id || '—';
+      const skills = s.skill_scores?.skills || [];
+      const skillDots = skills.slice(0,6).map(sk => {
+        const sc = sk.tl_override || sk.score;
+        const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
+        return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:var(--mono,'DM Mono',monospace)"><span style="width:5px;height:5px;border-radius:50%;background:${col};flex-shrink:0"></span>${sk.code||sk.skill_code||''}</span>`;
+      }).join('');
+      const actions = (s.next_actions||[]).slice(0,2).map(a=>
+        `<span style="font-size:10px;color:var(--ac,#008065);background:rgba(0,128,101,.07);padding:3px 8px;border-radius:6px;font-weight:500">${a.action||a}</span>`
+      ).join('');
+      const titleLeft = opts?.showAccount ? acctLabel : ((_accountGuid || _groupBySales) ? date : acctLabel);
+      const titleRight = opts?.showAccount ? date + (dur?' · '+dur:'') : ((_accountGuid || _groupBySales) ? dur : date + (dur?' · '+dur:''));
+      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${titleLeft}</span>
+          <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:var(--mono)">${titleRight}</span>
+        </div>
+        ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${actions?'8px':'0'}">${skillDots}</div>` : ''}
+        ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div>` : ''}
+      </div>`;
+    }
+
+    if (_groupBySales) {
+      // Sales mode without specific account: group by account_name
+      const byAccount = {};
+      sessions.forEach(s => {
+        const key = s.account_name || s.account_id || '—';
+        if (!byAccount[key]) byAccount[key] = { label: key, items: [] };
+        byAccount[key].items.push(s);
+      });
+      return Object.entries(byAccount).map(([,grp]) => {
+        const items = grp.items.map(s => _renderSessionCard(s, { showAccount: false })).join('');
+        return `<div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'DM Mono',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
+      }).join('');
+    }
+
+    // Default (KAM): group by month
     const byMonth = {};
     sessions.forEach(s => {
       const d = new Date(s.visited_at);
@@ -1905,28 +1955,7 @@ ${text}`;
       byMonth[key].items.push(s);
     });
     return Object.entries(byMonth).map(([,grp]) => {
-      const items = grp.items.map(s => {
-        const date = new Date(s.visited_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
-        const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
-        const acctLabel = s.account_name || (portviewBulkData?.find(r=>r.account_guid===s.account_id)?.res_name) || s.account_id || '—';
-        const skills = s.skill_scores?.skills || [];
-        const skillDots = skills.slice(0,6).map(sk => {
-          const sc = sk.tl_override || sk.score;
-          const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
-          return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:var(--mono,'DM Mono',monospace)"><span style="width:5px;height:5px;border-radius:50%;background:${col};flex-shrink:0"></span>${sk.code||sk.skill_code||''}</span>`;
-        }).join('');
-        const actions = (s.next_actions||[]).slice(0,2).map(a=>
-          `<span style="font-size:10px;color:var(--ac,#008065);background:rgba(0,128,101,.07);padding:3px 8px;border-radius:6px;font-weight:500">${a.action||a}</span>`
-        ).join('');
-        return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${_accountGuid ? date : acctLabel}</span>
-            <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:var(--mono)">${_accountGuid ? dur : date + (dur?' · '+dur:'')}</span>
-          </div>
-          ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${actions?'8px':'0'}">${skillDots}</div>` : ''}
-          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div>` : ''}
-        </div>`;
-      }).join('');
+      const items = grp.items.map(s => _renderSessionCard(s)).join('');
       return `<div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'DM Mono',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
     }).join('');
   }
