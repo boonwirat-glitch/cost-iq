@@ -1,4 +1,4 @@
-<!-- Freshket Sense v355: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v356: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5166,7 +5166,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v355',
+      version: 'v356',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -11877,6 +11877,12 @@ async function _preloadFromIndexedDB(){
 // SECTION:REFRESH_GATE
 function allCriticalReady(){
   try{
+    // v355: Sales users: handover CSV doesn't exist yet (404) — gate on portview+history only
+    var _salesMode=typeof getCurrentRole==='function'&&
+      (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+    if(_salesMode){
+      return _cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history');
+    }
     return _cloudLoadedTabs.has('portview') &&
            _cloudLoadedTabs.has('history') &&
            _cloudLoadedTabs.has('handover');
@@ -11951,6 +11957,15 @@ window.RenderBus = (function(){
     try{
       if(document.getElementById('scr-teamview')?.classList.contains('on') &&
          typeof renderTeamview === 'function') renderTeamview();
+    }catch(e){}
+    // Sales screens — render when sales-mode active
+    try{
+      if(document.body.classList.contains('sales-mode')){
+        var _salesScr=document.getElementById('scr-sales-portview');
+        if(_salesScr&&_salesScr.classList.contains('on')&&typeof renderSalesPortview==='function'){
+          renderSalesPortview();
+        }
+      }
     }catch(e){}
   }
 
@@ -19117,7 +19132,7 @@ function __legacyShowScreenFallback(name){
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
-  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview')?'none':'';
+  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview')?'none':'';
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
