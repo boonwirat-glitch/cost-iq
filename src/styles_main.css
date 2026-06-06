@@ -4816,15 +4816,16 @@ body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
 body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
 
 /* Sales nav grid: 3 cols (portview + pipeline + commission) */
-body.sales-mode .bnav { grid-template-columns: repeat(3,1fr); }
+body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
 
 /* Sales uses same dark theme as KAM */
-body.sales-mode { background: #0d1f3c; }
+/* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
+body.sales-mode { background: #FFFFFF; }
 body.sales-mode #scr-sales-portview,
 body.sales-mode #scr-sales-pipeline,
 body.sales-mode #scr-sales-commission,
-body.sales-mode #scr-sales-teamview { background: #0d1f3c; }
+body.sales-mode #scr-sales-teamview { background: #FFFFFF; }
 
 /* Sales-mode: hide KAM-specific content, show Sales-specific content */
 body.sales-mode .kam-content-only  { display: none !important; }
