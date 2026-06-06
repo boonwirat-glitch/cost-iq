@@ -660,6 +660,9 @@ function hideLoginOverlay() {
       _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
       if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
       else if(_pf_role==='sales'||_pf_role==='sales_tl'){
+        // Set sales-mode body class FIRST so CSS gates work before render
+        document.body.classList.add('sales-mode');
+        if(_pf_role==='sales_tl') document.body.classList.add('sales-tl-mode');
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
