@@ -57,9 +57,15 @@ function parsePortviewBulk(csv){
       const kamEmail=(p[17]||'').trim();    // Q8E v2: kam_email
       const tlEmail=(p[18]||'').trim();     // Q8E v2: tl_email
       const daysWithCurrentKam=p[19]!==undefined&&p[19].trim()!==''?parseInt(p[19])||null:null; // Q8E v3: days since handoff (null = ≥12mo)
+      // Sales columns (optional — only in sales_portview_{key}.csv)
+      const firstDollarDate=(p[20]||'').trim().replace(/^"|"$/g,'')||null;
+      const newUserExpDate=(p[21]||'').trim().replace(/^"|"$/g,'')||null;
+      const daysHeld=p[22]!==undefined&&p[22].trim()!==''?parseInt(p[22])||0:0;
+      const salesTeamName=(p[23]||'').trim().replace(/^"|"$/g,'')||'';
       return{id:accountId,name:accountName,lastGmv,gmvToDate,daysElapsed,daysInMonth,runrate,accountType,
         churnedSkuCount,churnedGmv,topChurnedNames,missingCatCount,missingCats,
         lastMonthSkuCount,curSkuCount,ordersToDate,kamName,kamEmail,tlEmail,daysWithCurrentKam,
+        firstDollarDate,newUserExpDate,daysHeld,salesTeamName,
         paceSignal:{cls,pct,label,expected,lastGmv,gmvToDate,runrate,
           histMonths:1,confidence:'low',isNew:lastGmv===0,
           baselineDaily:Math.round(dailyRate),baselineGmv:Math.round(dailyRate*daysInMonth)},churnCount:0};
@@ -1182,6 +1188,22 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
 const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',current_movements:'portview_current_movements.csv'};
+// Sales CSV routing — called after loadUserProfile() resolves
+// Patches R2_FILES keys so Sales users load their own portview CSV
+function _patchR2FilesForSales(){
+  try{
+    const role=typeof getCurrentRole==='function'?getCurrentRole():'';
+    if(role==='sales'||role==='sales_tl'){
+      const email=(typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email)||'';
+      if(!email) return;
+      const safeKey=email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+      R2_FILES['portview']='sales_portview_'+safeKey+'.csv';
+      R2_FILES['handover']='sales_handover_'+safeKey+'.csv';
+      console.log('%c[Sense] R2 routed for Sales','color:#4ddc97',{portview:R2_FILES['portview']});
+    }
+  }catch(e){ console.warn('[_patchR2FilesForSales]',e); }
+}
+window._patchR2FilesForSales=_patchR2FilesForSales;
 const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) || {
   // Foreground 5 files are intentionally cached: small enough and needed at app start.
   portview:{type:'portview-bulk',tab:'portview',cache:false}, // Level 3: always fetch — changes daily
