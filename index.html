@@ -1,4 +1,4 @@
-<!-- Freshket Sense v337: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v338: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2481,25 +2481,38 @@ body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
 /* ── Echo nav pill — idle + active states ── */
 .echo-pill{
-  display:flex;align-items:center;justify-content:center;gap:2.5px;
-  width:44px;height:22px;
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  width:36px;height:20px;
   border-radius:999px;
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
-  padding:0 8px;
+  padding:0 6px;
+  flex-shrink:0;
   transition:background .2s,border-color .2s,box-shadow .2s;
 }
 body.kam-mode .echo-pill{
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
 }
+/* Force echo-nav-btn nwrap same height as other tabs */
+.echo-nav-btn .nwrap{
+  padding:3px 7px!important;
+  display:flex;align-items:center;justify-content:center;
+  min-height:28px;
+}
 .echo-bar{
   display:inline-block;
-  width:2.5px;height:8px;
+  width:2.5px;
   border-radius:2px;
   background:rgba(0,208,112,.7);
-  transition:height .1s ease;
+  transition:height .15s ease;
 }
+/* Idle: organic waveform heights — NOT uniform */
+.echo-bar:nth-child(1){height:5px}
+.echo-bar:nth-child(2){height:10px}
+.echo-bar:nth-child(3){height:14px}
+.echo-bar:nth-child(4){height:8px}
+.echo-bar:nth-child(5){height:4px}
 /* idle: bars all same height, no animation */
 /* active: bars animate (class body.echo-active added by JS) */
 @keyframes echo-wa{0%,100%{height:4px;opacity:.55}50%{height:14px;opacity:1}}
@@ -5099,7 +5112,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v337',
+      version: 'v338',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -36163,12 +36176,17 @@ const CI = (() => {
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:9999;
-  background:var(--n-50,#F2F2F7);
+  background:#F2F2F7!important;
   font-family:'DM Sans',-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
   transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
   overflow:hidden;
+  color:#1C1C1E!important;
+}
+#ci-fullsheet .topbar{
+  background:#fff!important;
+  border-bottom:0.5px solid rgba(0,0,0,.07);
 }
 #ci-fullsheet.ci-open { transform:translateX(-50%) translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
@@ -36178,6 +36196,29 @@ const CI = (() => {
 .ci-pk-item:active{background:rgba(0,128,101,.08);}
 .ci-pk-name{font-size:13px;color:#1C1C1E;font-weight:500;flex:1;text-align:left;}
 .ci-pk-seg{font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em;margin-left:8px;}
+/* ── Readability overrides ── */
+.sk-name{font-size:13px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em}
+.sk-note{font-size:12px;color:#636366;line-height:1.55;letter-spacing:-.005em}
+.sk-badge{font-size:10px;letter-spacing:.08em}
+.buyer-type{font-size:20px;font-weight:300;letter-spacing:-.03em;color:#1C1C1E}
+.buyer-ev{font-size:12px;color:#636366;line-height:1.5}
+.buyer-lbl{font-size:9px;letter-spacing:.14em;color:#AEAEB2;margin-bottom:4px}
+.pain-txt{font-size:12px;color:#636366;line-height:1.55}
+.pain-dim{font-size:10px;color:#AEAEB2;letter-spacing:.13em}
+.action-txt{font-size:13px;color:#1C1C1E;line-height:1.5}
+.action-who{font-size:11px;color:#AEAEB2}
+.action-n{font-size:10px;color:#AEAEB2;letter-spacing:.08em}
+.eyebrow{font-size:10px;color:#AEAEB2;letter-spacing:.16em}
+.tab-btn{font-size:13px;font-weight:400;color:#AEAEB2}
+.tab-btn.on{color:#1C1C1E;font-weight:500}
+.proc-step{font-size:15px;color:#1C1C1E}
+.proc-sub{font-size:11px;color:#AEAEB2}
+.timer-val{color:#1C1C1E}
+.timer-hint{font-size:11px;color:#AEAEB2}
+.stop-hint{font-size:11px;color:#AEAEB2}
+.btn-stop{font-size:15px;color:#1C1C1E;background:rgba(0,0,0,.055)}
+.chip-txt{font-size:13px;color:#636366}
+.chip-seg{font-size:10px;color:#008065}
 `;
 
   // ── Mount / unmount sheet ──────────────────────────────────────────────────
@@ -36223,11 +36264,11 @@ const CI = (() => {
     const pill = document.getElementById('echo-float-pill');
     if (pill) { pill.classList.add('visible'); _startFloatTimer(); }
     document.body.classList.add('echo-active');
-    // Update topbar: left button becomes minimize when recording
+    // Update topbar: left button shows minimize hint
     const _tbLeft = document.getElementById('ci-topbar-left-label');
     const _tbIcon = document.getElementById('ci-topbar-left-icon');
     if (_tbLeft) _tbLeft.textContent = 'ย่อ';
-    if (_tbIcon) _tbIcon.textContent = '↓';
+    if (_tbIcon) _tbIcon.style.display = 'none';
   }
 
   function _startFloatTimer() {
@@ -36244,7 +36285,7 @@ const CI = (() => {
     return `
 <div id="ci-s-record" class="scr on">
   <div class="topbar">
-    <span class="tb-act" id="ci-topbar-left" onclick="(_phase==='recording')?CI._minimize():CI.cancel()" style="display:flex;align-items:center;gap:4px;">
+    <span class="tb-act" id="ci-topbar-left" onclick="CI._topbarLeft()" style="display:flex;align-items:center;gap:4px;">
       <span id="ci-topbar-left-icon" style="font-size:16px;line-height:1">←</span>
       <span id="ci-topbar-left-label">ยกเลิก</span>
     </span>
@@ -36954,10 +36995,10 @@ ${text}`;
           <div class="buyer-type">${({'Blueprint':'Blueprint','Action':'Action','Nurturing':'Nurturing','Knowledge':'Knowledge'})[d?.buyer_type]||d?.buyer_type||'-'}</div>
           <div class="buyer-ev">${d?.buyer_evidence||''}</div>
         </div>
-        <div style="text-align:center;min-width:48px">
+        <div style="text-align:right;min-width:44px;max-width:60px;flex-shrink:0">
           <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono);margin-bottom:3px">Wallet</div>
           <div style="font-size:16px;font-weight:500;color:${walletColor}">${(d?.wallet_estimate||'-').toUpperCase()}</div>
-          <div style="font-size:9px;color:var(--tx3,#AEAEB2);font-family:var(--mono)">${d?.wallet_logic||''}</div>
+          <div style="font-size:9px;color:var(--tx3,#AEAEB2);font-family:var(--mono);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d?.wallet_logic||''}">${(d?.wallet_logic||'').slice(0,18)}</div>
         </div>
       </div>
       <div class="eyebrow" style="margin-bottom:10px">Discovery Coverage (OCPB)</div>
@@ -37647,6 +37688,11 @@ ${text}`;
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
+  function _topbarLeft() {
+    if (_phase === 'recording') { _minimize(); }
+    else { cancel(); }
+  }
+
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
     _unmount();
@@ -37768,7 +37814,7 @@ ${text}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize, _switchMainTab };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize, _switchMainTab, _topbarLeft };
 
 })();
 
