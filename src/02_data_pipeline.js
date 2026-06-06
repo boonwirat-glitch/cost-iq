@@ -1905,9 +1905,16 @@ function _senseDataLog(){
 // _idbPreloaded=true fires when critical 3 ready (portview+history+handover).
 // Extra 3 are a bonus — eliminate the post-splash debounced batch render on warm boot.
 async function _preloadFromIndexedDB(){
+  // v354: Sales users must skip portview+handover IDB preload
+  // IDB has KAM portview (640 accounts) — wrong data for Sales
+  // IDB clear in _patchR2FilesForSales() handles eviction, but race condition
+  // on warm boot means IDB may still be populated. Skip here to be safe.
+  var _isSalesPreload=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
   var CRITICAL=['portview','history','handover'];
   var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
-  var TABS=[...CRITICAL,...EXTRA];
+  var TABS=_isSalesPreload
+    ? [...CRITICAL,...EXTRA].filter(function(t){return t!=='portview'&&t!=='handover';})
+    : [...CRITICAL,...EXTRA];
   var loaded=0; var criticalLoaded=0;
   try{
     var tasks=TABS.map(async function(tab){
@@ -1931,7 +1938,8 @@ async function _preloadFromIndexedDB(){
       }catch(e){}
     });
     await Promise.all(tasks);
-    if(criticalLoaded===3){
+    var _criticalGate=_isSalesPreload?1:3;
+    if(criticalLoaded>=_criticalGate){
       window._idbPreloaded=true;
       _senseDataLog('⚡ IDB-PRELOAD','critical 3 ready ('+loaded+'/'+TABS.length+' total) — splash fast path, R2 skipped');
       if(allCriticalReady()){
