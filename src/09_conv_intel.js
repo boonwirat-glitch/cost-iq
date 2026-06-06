@@ -23,6 +23,9 @@ const CI = (() => {
   let _durText     = '0:00';
   let _lastResult  = null;
   let _secs        = 0;
+  let _ownerType   = 'kam'; // 'kam' | 'sales'
+  let _floatTimer  = null; // minimize timer ref
+  let _sessionId   = null; // ci_sessions UUID after save
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function _fmt(s) {
@@ -326,6 +329,23 @@ const CI = (() => {
     clearInterval(_waveRef);
   }
 
+  function _minimize() {
+    if (_phase !== 'recording') return;
+    const sheet = document.getElementById('ci-fullsheet');
+    if (sheet) sheet.style.display = 'none';
+    const pill = document.getElementById('echo-float-pill');
+    if (pill) { pill.classList.add('visible'); _startFloatTimer(); }
+    document.body.classList.add('echo-active');
+  }
+
+  function _startFloatTimer() {
+    clearInterval(_floatTimer);
+    _floatTimer = setInterval(() => {
+      const el = document.getElementById('echo-float-time');
+      if (el) el.textContent = _fmt(_secs);
+    }, 1000);
+  }
+
   // ── HTML (structure from mockup) ───────────────────────────────────────────
   function _buildHTML() {
     const ctx = _ctx();
@@ -468,6 +488,7 @@ const CI = (() => {
 
   // ── Recording ─────────────────────────────────────────────────────────────
   async function startRecording() {
+    document.body.classList.add('echo-active');
     if (_phase !== 'idle') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -514,6 +535,10 @@ const CI = (() => {
   }
 
   function cancel() {
+    clearInterval(_floatTimer);
+    document.body.classList.remove('echo-active');
+    const pill = document.getElementById('echo-float-pill');
+    if (pill) pill.classList.remove('visible');
     clearInterval(_timerRef);
     if (_recorder && _phase === 'recording') {
       _recorder.stop();
@@ -868,23 +893,50 @@ ${text}`;
     const email = currentUserProfile?.email;
     if (!email) return;
     const today = new Date().toISOString().split('T')[0];
-    if (skillData?.skills?.length) {
+    const nowIso = new Date().toISOString();
+
+    // 1. Save ci_sessions row (append — every Echo session = 1 row)
+    //    Graceful fail if table doesn't exist yet
+    try {
+      const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
+        owner_email: email,
+        owner_type: _ownerType,
+        account_id: _accountGuid || null,
+        account_name: _accountName || null,
+        visited_at: nowIso,
+        duration_secs: _secs,
+        skill_scores: skillData || null,
+        customer_intel: intelData || null,
+        next_actions: intelData?.next_actions || [],
+        status: 'saved'
+      }).select('id').single();
+      if (sessionErr) console.warn('[CI] ci_sessions insert (table may not exist yet):', sessionErr.message);
+      else if (sessionRow) _sessionId = sessionRow.id;
+    } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
+
+    // 2. Save skill log rows (KAM only — needs account_id for TL debrief)
+    if (_accountGuid && skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
         kam_email: email, account_id: _accountGuid,
         session_date: today, skill_code: s.code,
         score: s.score,
-        evidence_summary: s.evidence || s.evidence_summary || ''
+        evidence_summary: s.evidence || s.evidence_summary || '',
+        ci_session_id: _sessionId || null
       }));
       const { error } = await supa.from('kam_skill_log').insert(rows);
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
-    const { error: visitError } = await supa.from('kam_visits').upsert({
-      kam_email: email, account_id: _accountGuid,
-      ci_skill_scores: skillData, ci_customer_signals: intelData,
-      ci_next_actions: intelData?.next_actions || [], ci_mode: 'voice',
-      ci_created_at: new Date().toISOString()
-    }, { onConflict: 'kam_email,account_id' });
-    if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
+
+    // 3. Update kam_visits latest snapshot (KAM only)
+    if (_accountGuid) {
+      const { error: visitError } = await supa.from('kam_visits').upsert({
+        kam_email: email, account_id: _accountGuid,
+        ci_skill_scores: skillData, ci_customer_signals: intelData,
+        ci_next_actions: intelData?.next_actions || [], ci_mode: 'echo',
+        ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
+      }, { onConflict: 'kam_email,account_id' });
+      if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
+    }
   }
 
   // ── Render result panels ───────────────────────────────────────────────────
@@ -1555,14 +1607,136 @@ ${text}`;
 
   // ── Public ─────────────────────────────────────────────────────────────────
   function open(accountGuid) {
-    _accountGuid = accountGuid || (typeof currentAccountId !== 'undefined' ? currentAccountId : null);
-    _phase = 'idle'; _lastResult = null; _secs = 0;
+    _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
     _unmount();
-    setTimeout(_mount, 50);
+    // Detect owner type from profile
+    const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
+    _ownerType = (role === 'sales') ? 'sales' : 'kam';
+
+    if (_ownerType === 'sales') {
+      // Sales always sees name input first
+      _accountGuid = null; _accountName = ''; _accountSeg = '';
+      setTimeout(_mountPicker, 50);
+      return;
+    }
+    // KAM: smart detect — use provided guid, then currentAccountId
+    const resolved = accountGuid || (typeof currentAccountId !== 'undefined' ? currentAccountId : null);
+    if (resolved) {
+      _accountGuid = resolved;
+      const ctx = _ctx();
+      _accountName = ctx.name; _accountSeg = ctx.seg;
+      setTimeout(_mount, 50);
+    } else {
+      _accountGuid = null; _accountName = ''; _accountSeg = '';
+      setTimeout(_mountPicker, 50);
+    }
   }
 
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend };
+  function _mountPicker() {
+    if (document.getElementById('ci-picker-sheet')) return;
+    if (!document.getElementById('ci-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-style'; s.textContent = _CSS;
+      document.head.appendChild(s);
+    }
+    const el = document.createElement('div');
+    el.id = 'ci-picker-sheet';
+    el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(10,16,30,.72);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
+    el.innerHTML = _ownerType === 'sales' ? _buildSalesPickerHTML() : _buildKamPickerHTML();
+    document.body.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const sheet = el.querySelector('.ci-picker-inner');
+      if (sheet) sheet.style.transform = 'translateY(0)';
+    }));
+  }
+
+  function _dismissPicker() {
+    const el = document.getElementById('ci-picker-sheet');
+    if (!el) return;
+    const sheet = el.querySelector('.ci-picker-inner');
+    if (sheet) {
+      sheet.style.transform = 'translateY(100%)';
+      setTimeout(() => el.remove(), 300);
+    } else { el.remove(); }
+  }
+
+  function _pickerConfirmKam(guid, name, seg) {
+    _accountGuid = guid; _accountName = name; _accountSeg = seg || '';
+    _dismissPicker();
+    setTimeout(_mount, 350);
+  }
+
+  function _pickerConfirmSales(name) {
+    if (!name || !name.trim()) return;
+    _accountGuid = null; _accountName = name.trim(); _accountSeg = 'LEAD';
+    _dismissPicker();
+    setTimeout(_mount, 350);
+  }
+
+  function _buildKamPickerHTML() {
+    let recents = '';
+    try {
+      if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
+        recents = portviewBulkData
+          .filter(r => r.res_name)
+          .sort((a,b) => (b.gmv_mtd||0) - (a.gmv_mtd||0))
+          .slice(0, 5)
+          .map(r => `<button class="ci-pk-item" onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
+            <span class="ci-pk-name">${r.res_name||'-'}</span>
+            <span class="ci-pk-seg">${r.account_type||'-'}</span>
+          </button>`).join('');
+      }
+    } catch(e) {}
+    return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
+      <div style="width:36px;height:4px;border-radius:2px;background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
+      <div style="font-size:13px;font-weight:600;color:#1C1C1E;margin-bottom:4px;">เลือกร้านค้า</div>
+      <div style="font-size:12px;color:#636366;margin-bottom:16px;">หรือค้นหาด้านล่าง</div>
+      <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
+        style="width:100%;padding:11px 14px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;"
+        oninput="CI._pickerSearch(this.value)" />
+      <div id="ci-pk-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">${recents}</div>
+      <button onclick="CI._dismissPicker()" style="margin-top:16px;width:100%;padding:12px;border:none;border-radius:12px;background:rgba(0,0,0,.06);font-size:14px;color:#636366;cursor:pointer;">ยกเลิก</button>
+    </div>`;
+  }
+
+  function _buildSalesPickerHTML() {
+    return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
+      <div style="width:36px;height:4px;border-radius:2px;background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
+      <div style="font-size:13px;font-weight:600;color:#1C1C1E;margin-bottom:4px;">คุณกำลังคุยกับร้านไหน?</div>
+      <div style="font-size:12px;color:#636366;margin-bottom:16px;">พิมพ์ชื่อร้าน ใช้สำหรับเก็บประวัติการสนทนา</div>
+      <input id="ci-sales-name" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
+        style="width:100%;padding:13px 14px;border:1.5px solid #008065;border-radius:12px;font-size:15px;outline:none;margin-bottom:12px;box-sizing:border-box;"
+        onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
+      <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name').value)"
+        style="width:100%;padding:13px;border:none;border-radius:12px;background:#008065;color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">เริ่มบันทึก</button>
+      <button onclick="CI._dismissPicker()" style="width:100%;padding:12px;border:none;border-radius:12px;background:rgba(0,0,0,.06);font-size:14px;color:#636366;cursor:pointer;">ยกเลิก</button>
+    </div>`;
+  }
+
+  function _pickerSearch(q) {
+    const list = document.getElementById('ci-pk-list');
+    if (!list) return;
+    try {
+      const filtered = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
+        .filter(r => r.res_name && r.res_name.toLowerCase().includes(q.toLowerCase()))
+        .slice(0, 8);
+      list.innerHTML = filtered.map(r =>
+        `<button class="ci-pk-item" onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
+          <span class="ci-pk-name">${r.res_name||'-'}</span>
+          <span class="ci-pk-seg">${r.account_type||'-'}</span>
+        </button>`).join('');
+    } catch(e) {}
+  }
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _minimize };
 
 })();
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
+function echoOpen() { CI.open(null); }
+function echoExpand() {
+  const pill = document.getElementById('echo-float-pill');
+  if (pill) pill.classList.remove('visible');
+  const sheet = document.getElementById('ci-fullsheet');
+  if (sheet) { sheet.style.display = ''; sheet.classList.add('ci-open'); }
+  else { CI.open(null); }
+}
