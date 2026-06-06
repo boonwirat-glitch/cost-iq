@@ -837,8 +837,34 @@ function __legacyRenderPortviewListFallback(){
   if(!listEl)return;
   const accounts=getPortviewAccounts();
   const searchQ=(document.getElementById('portview-search')?.value||'').toLowerCase();
+
+  // Build outlet index for search — map outlet_name_lower → account_id
+  // bulkOutletsData: { account_id → { month → [{outlet_id, outlet_name, ...}] } }
+  let _outletMatchIds = null; // Set of account ids that match via outlet name
+  if(searchQ){
+    try{
+      const od = window.bulkOutletsData || (typeof bulkOutletsData!=='undefined' ? bulkOutletsData : null);
+      if(od){
+        _outletMatchIds = new Set();
+        Object.entries(od).forEach(([accountId, months])=>{
+          Object.values(months).forEach(outlets=>{
+            (outlets||[]).forEach(o=>{
+              if((o.outlet_name||'').toLowerCase().includes(searchQ))
+                _outletMatchIds.add(accountId);
+            });
+          });
+        });
+      }
+    }catch(e){ /* non-fatal */ }
+  }
+
   const filtered=accounts.filter(a=>{
-    if(searchQ&&!a.name.toLowerCase().includes(searchQ))return false;
+    if(searchQ){
+      const aid = a.id || a.account_guid || '';
+      const matchAccount = (a.name||'').toLowerCase().includes(searchQ);
+      const matchOutlet  = _outletMatchIds && _outletMatchIds.has(aid);
+      if(!matchAccount && !matchOutlet) return false;
+    }
     if(portviewFilter==='all')return true;
     const cls=a.paceSignal?a.paceSignal.cls:'';
     if(portviewFilter==='danger')return cls==='danger';
