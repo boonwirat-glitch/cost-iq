@@ -1,4 +1,4 @@
-<!-- Freshket Sense v343: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v344: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5103,7 +5103,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v343',
+      version: 'v344',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -35909,6 +35909,7 @@ const CI = (() => {
   let _durText     = '0:00';
   let _lastResult  = null;
   let _secs        = 0;
+  let _lastTranscriptWordCount = 0;
   let _ownerType   = 'kam';
   let _showPicker  = false; // show account picker section in record screen // 'kam' | 'sales'
   let _floatTimer  = null; // minimize timer ref
@@ -35929,9 +35930,23 @@ const CI = (() => {
   function _ctx() {
     if (typeof portviewBulkData !== 'undefined' && _accountGuid) {
       const row = portviewBulkData.find(r => r.account_guid === _accountGuid);
-      if (row) return { name: row.res_name||'-', seg: row.account_type||'-', days: row.days_with_current_kam||0 };
+      if (row) return {
+        name: row.res_name||'-',
+        seg: row.account_type||'-',
+        days: row.days_with_current_kam||0,
+        // enriched fields for AI context
+        gmv_mtd: row.gmv_to_date||0,
+        gmv_baseline: row.baseline_gmv||row.gmv_last_month||0,
+        pace_pct: row.pace_pct||null,
+        churn_count: row.churned_sku_count||0,
+        missing_cats: row.missing_cat_count||0,
+        account_class: row.account_class||'-',
+        is_new: (row.days_with_current_kam||0) <= 30
+      };
     }
-    return { name: _accountName||'-', seg: _accountSeg||'-', days: 0 };
+    return { name: _accountName||'-', seg: _accountSeg||'-', days: 0,
+             gmv_mtd:0, gmv_baseline:0, pace_pct:null, churn_count:0,
+             missing_cats:0, account_class:'-', is_new:false };
   }
 
   // ── CSS from mockup (verbatim) ─────────────────────────────────────────────
@@ -36518,10 +36533,22 @@ const CI = (() => {
       const { text } = await res.json();
       if (!text || text.trim().length < 5) throw new Error('transcript ว่างเปล่า');
 
-      _setStep('Analyzing skills...', 'Claude Haiku · 14 skills', 44);
+      // Minimum quality gate — skill scoring needs enough conversation
+      const _wordCount = text.trim().split(/\s+/).length;
+      const _SHORT_THRESHOLD = 80; // words
+      const _isShortTranscript = _wordCount < _SHORT_THRESHOLD;
+      // Pass flag to analyze functions — short transcript skips skill split
+      _lastTranscriptWordCount = _wordCount;
+
+      const isShortTranscript = _lastTranscriptWordCount < 80;
+      if (isShortTranscript) {
+        _setStep('Analyzing skills...', `Claude Haiku · ${_lastTranscriptWordCount} คำ (short mode)`, 44);
+      } else {
+        _setStep('Analyzing skills...', 'Claude Haiku · 2 passes parallel', 44);
+      }
       const skillData = await _analyzeSkills(text);
 
-      _setStep('Reading customer signals...', 'Claude Sonnet · restaurant context', 74);
+      _setStep('Reading customer signals...', 'Claude Sonnet · full account context', 74);
       const intelData = await _analyzeIntel(text);
 
       _setStep('Saving...', '', 96);
@@ -36810,23 +36837,136 @@ Buyer type (BANK framework) — ใช้ชื่อภาษาอังกฤ
     return txt.trim().replace(/```json\n?|```/g, '').trim();
   }
 
+  // ── Skill analysis — 2-pass split ────────────────────────────────────────
+  // Pass 1: Observable skills (can be directly heard in transcript)
+  // Pass 2: Inference skills (partial — require reading between lines)
+  // Short transcripts (<80w): single pass, mark inference skills as not_applicable
+
+  const _OBSERVABLE_CODES = ['APIPC','A5','B2','B3','C0','C1','C3','C4','C5','D2'];
+  const _INFERENCE_CODES  = ['A9','A10','B4','D1'];
+
+  function _buildAccountContext() {
+    const ctx = _ctx();
+    if (!_accountGuid && !_accountName) return '';
+    const gmvK = ctx.gmv_mtd ? Math.round(ctx.gmv_mtd/1000) + 'K' : '-';
+    const baseK = ctx.gmv_baseline ? Math.round(ctx.gmv_baseline/1000) + 'K' : '-';
+    const pace = ctx.pace_pct ? ctx.pace_pct + '%' : '-';
+    return `\n\nAccount context (ใช้ประกอบการประเมิน D1/D2):
+- ชื่อ: ${ctx.name} | Segment: ${ctx.seg} | Class: ${ctx.account_class}
+- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่ — ยังไม่มี baseline)' : ''}
+- GMV เดือนนี้: ${gmvK} / baseline: ${baseK} | Pace: ${pace}
+- SKU หาย: ${ctx.churn_count} | Category ที่ยังไม่สั่ง: ${ctx.missing_cats}`;
+  }
+
+  function _buildSkillPromptPass1() {
+    const pass1Skills = _SKILL_RUBRIC.filter(s => _OBSERVABLE_CODES.includes(s.code));
+    const rubricText = pass1Skills.map(s =>
+      `[${s.code}] ${s.name}\nPrinciple: ${s.principle}\nPass criteria: ${s.pass_criteria.join(' | ')}\nสัญญาณที่ฟัง: ${s.observable}`
+    ).join('\n\n');
+    return `คุณคือ AI coach สำหรับ Freshket sales team
+วิเคราะห์ transcript ต่อไปนี้ ประเมินเฉพาะ ${pass1Skills.length} skills ที่สังเกตได้โดยตรงจากการสนทนา
+
+${rubricText}
+
+scoring: pass=เห็นหลักฐานชัด | developing=เริ่มทำแต่ยังไม่ครบ | not_observed=ไม่มีใน conversation | not_applicable=skill นี้ไม่เกี่ยวกับ context นี้
+
+ตอบ JSON เท่านั้น:
+{"skills":[{"code":"C0","name":"Rapport & Reading the Room","score":"pass|developing|not_observed|not_applicable","evidence":"คำพูดจริงหรือ '-'","gap":"สิ่งที่ขาดหรือ '-'","coaching_note":"คำแนะนำ TL 1-2 ประโยค"}],"pipc_stage":"Prepare|Identify|Probe|Close","pipc_reached":"ขั้นสูงสุด","overall":"strong|developing|needs_work","session_summary":"สรุป 2-3 ประโยค"}`;
+  }
+
+  function _buildSkillPromptPass2() {
+    const pass2Skills = _SKILL_RUBRIC.filter(s => _INFERENCE_CODES.includes(s.code));
+    const rubricText = pass2Skills.map(s =>
+      `[${s.code}] ${s.name}\nPrinciple: ${s.principle}\nPass criteria: ${s.pass_criteria.join(' | ')}\nวิธีอนุมาน: ${s.observable}`
+    ).join('\n\n');
+    return `คุณคือ AI coach สำหรับ Freshket sales team
+ประเมิน 4 skills ที่ต้องอนุมานจากสัญญาณอ้อมๆ ใน transcript — ไม่ได้สังเกตได้โดยตรง
+
+${rubricText}
+
+หมายเหตุ: skills เหล่านี้ประเมินจากคุณภาพของคำพูด ไม่ใช่พฤติกรรมนอก conversation
+scoring: pass|developing|not_observed|not_applicable
+
+ตอบ JSON เท่านั้น:
+{"skills":[{"code":"A9","name":"Planning & Target Tracking","score":"pass|developing|not_observed|not_applicable","evidence":"สัญญาณที่เห็นหรือ '-'","gap":"สิ่งที่ขาดหรือ '-'","coaching_note":"คำแนะนำ 1-2 ประโยค"}]}`;
+  }
+
   async function _analyzeSkills(text) {
-    const txt = await _ciCallAI('haiku', _SKILL_SYS, `Transcript:\n${text}`, 6000);
-    console.log('[CI skills raw]', txt.substring(0, 400));
-    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0, 80));
-    return JSON.parse(txt.slice(s, e + 1));
+    const acctCtx = _buildAccountContext();
+    const isShort = _lastTranscriptWordCount < 80;
+
+    if (isShort) {
+      // Short transcript: single pass, observable only, mark inference as not_applicable
+      const sys1 = _buildSkillPromptPass1();
+      const txt = await _ciCallAI('haiku', sys1, `Transcript:\n${text}${acctCtx}`, 5000);
+      console.log('[CI skills pass1 (short)]', txt.substring(0, 300));
+      const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+      if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0, 80));
+      const result = JSON.parse(txt.slice(s, e + 1));
+      // Add inference skills as not_applicable
+      const inferenceNA = _INFERENCE_CODES.map(code => {
+        const rubric = _SKILL_RUBRIC.find(r => r.code === code);
+        return { code, name: rubric?.name||code, score:'not_applicable',
+                 evidence:'-', gap:'-', coaching_note:'Transcript สั้นเกินไปสำหรับ skill นี้' };
+      });
+      result.skills = [...(result.skills||[]), ...inferenceNA];
+      result._short_transcript = true;
+      result._word_count = _lastTranscriptWordCount;
+      return result;
+    }
+
+    // Full transcript: 2 passes in parallel
+    const [txt1, txt2] = await Promise.all([
+      _ciCallAI('haiku', _buildSkillPromptPass1(), `Transcript:\n${text}${acctCtx}`, 5000),
+      _ciCallAI('haiku', _buildSkillPromptPass2(), `Transcript:\n${text}${acctCtx}`, 3000)
+    ]);
+    console.log('[CI skills pass1]', txt1.substring(0, 200));
+    console.log('[CI skills pass2]', txt2.substring(0, 200));
+
+    // Parse pass 1
+    const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+    if (s1 === -1 || e1 === -1) throw new Error('skills pass1 no JSON');
+    const result1 = JSON.parse(txt1.slice(s1, e1 + 1));
+
+    // Parse pass 2 — merge skills only
+    let inferenceSkills = [];
+    try {
+      const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
+      if (s2 !== -1 && e2 !== -1) {
+        const result2 = JSON.parse(txt2.slice(s2, e2 + 1));
+        inferenceSkills = result2.skills || [];
+      }
+    } catch(e) { console.warn('[CI pass2 parse fail]', e.message); }
+
+    // Merge: result1 is authoritative for pipc/overall/summary
+    result1.skills = [...(result1.skills||[]), ...inferenceSkills];
+    result1._word_count = _lastTranscriptWordCount;
+    return result1;
   }
 
   async function _analyzeIntel(text) {
     const ctx = _ctx();
-    const userContent = `ข้อมูลร้าน:
+    const fmtK = n => n >= 1000000 ? (n/1000000).toFixed(1)+'M' : n >= 1000 ? Math.round(n/1000)+'K' : n.toString();
+
+    // Build rich account context for Sonnet
+    let acctSection = `ข้อมูลร้าน:
 - ชื่อ: ${ctx.name}
-- Segment: ${ctx.seg}
-- อยู่กับ rep มา: ${ctx.days} วัน
+- Segment: ${ctx.seg} | Class: ${ctx.account_class}
+- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่)' : ''}`;
+
+    if (ctx.gmv_mtd > 0) {
+      acctSection += `\n- GMV เดือนนี้: ${fmtK(ctx.gmv_mtd)} / baseline: ${fmtK(ctx.gmv_baseline)}`;
+      if (ctx.pace_pct) acctSection += ` | Pace: ${ctx.pace_pct}%`;
+    }
+    if (ctx.churn_count > 0)   acctSection += `\n- SKU ที่หยุดสั่ง: ${ctx.churn_count} รายการ (โอกาส win-back)`;
+    if (ctx.missing_cats > 0)  acctSection += `\n- Category ที่ยังไม่เคยสั่ง: ${ctx.missing_cats} หมวด (โอกาส upsell)`;
+    if (_ownerType === 'sales') acctSection += `\n- ประเภท: Sales lead (ยังไม่เป็นลูกค้า Freshket)`;
+
+    const userContent = `${acctSection}
 
 Transcript:
 ${text}`;
+
     const txt = await _ciCallAI('sonnet', _INTEL_SYS, userContent, 6000);
     console.log('[CI intel raw]', txt.substring(0, 400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
@@ -36911,6 +37051,15 @@ ${text}`;
   }
 
   function _skillsPanel(d) {
+    const shortBanner = (d?._short_transcript)
+      ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:12px;margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
+          <div style="font-size:18px;flex-shrink:0">⚡</div>
+          <div>
+            <div style="font-size:12px;font-weight:500;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
+            <div style="font-size:11px;color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
+          </div>
+        </div>`
+      : '';
     const PIPC_STAGES = ['Prepare','Identify','Probe','Close'];
     const stageIdx = PIPC_STAGES.indexOf(d?.pipc_stage);
     const reached = stageIdx >= 0 ? stageIdx : 0;
@@ -36942,7 +37091,7 @@ ${text}`;
       </div>`;
     }).join('');
 
-    return `<div class="eyebrow">PIPC Progress</div>
+    return shortBanner + `<div class="eyebrow">PIPC Progress</div>
       <div class="pipc-track">${segs}</div>
       <div class="pipc-labels">${lbls}</div>
       ${summary}${rows}`;
