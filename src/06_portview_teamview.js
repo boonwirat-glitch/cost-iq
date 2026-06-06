@@ -853,6 +853,7 @@ function __legacyRenderPortviewListFallback(){
     return;
   }
   const _pvVisitMap=getVisitMap((currentUserProfile&&currentUserProfile.email)||'local');
+  const _pvEchoMap=getEchoMap((currentUserProfile&&currentUserProfile.email)||'local');
 
   // Value guard: skip full list rebuild if data + context unchanged
   const _pvSnap=portviewBulkData.length>0
@@ -950,8 +951,9 @@ function __legacyRenderPortviewListFallback(){
 
   function fullCard(a,idx=0){
     const _delay=`animation-delay:${Math.min(idx*35,280)}ms`;
-    const _vDot=getVisitDot(_pvVisitMap,a.id);
-    const _dotHtml=_vDot!=='unseen'?`<span class="pv-dot ${_vDot}"></span>`:'<span class="pv-dot unseen"></span>';
+    const _vDot=getVisitDot(_pvVisitMap,a.id,_pvEchoMap);
+    const _isEchoDot=_vDot==='echo-recent'||_vDot==='echo-old';
+    const _dotHtml=_vDot!=='unseen'?`<span class="pv-dot ${_vDot}"${_isEchoDot?' onclick="echoHistory(\'' + a.id + '\');event.stopPropagation()"':''}></span>`:'<span class="pv-dot unseen"></span>';
     const sig=a.paceSignal;
     const isNew=sig&&sig.isNew;
     const cls=sig?sig.cls:'';
@@ -1000,7 +1002,8 @@ function __legacyRenderPortviewListFallback(){
   }
 
   function compactCard(a,idx=0){
-    const _vDot=getVisitDot(_pvVisitMap,a.id);
+    const _vDot=getVisitDot(_pvVisitMap,a.id,_pvEchoMap);
+    const _isEchoDot=_vDot==='echo-recent'||_vDot==='echo-old';
     const sig=a.paceSignal;
     const isNew=sig&&sig.isNew;
     const cls=isNew?'new':(sig?sig.cls:'');
@@ -1017,7 +1020,7 @@ function __legacyRenderPortviewListFallback(){
       // churnMini=`<span class="pv-chip-churn">${a.churnedSkuCount||a.churnCount}↓</span>`;
     }
     return`<div class="pv-chip ${cls}" style="${_delay}" onclick="portviewSelectAccount('${a.id}')">
-      <span class="pv-chip-dot ${_vDot}"></span>
+      <span class="pv-chip-dot ${_vDot}"${_isEchoDot?' onclick="echoHistory(\''+ a.id +'\');event.stopPropagation()"':''} ></span>
       <span class="pv-chip-name">${a.name}</span>
       ${churnMini}
       <span class="pv-chip-pace ${cls}">${pctStr}</span>
@@ -2343,11 +2346,34 @@ async function getTeamVisitMapFromSupabase(kamEmails){
   }catch(e){return{};}
 }
 
-function getVisitDot(visitMap,accountId){
-  // Returns 'full'|'account'|'unseen'
+function getEchoMap(kamEmail){
+  const KEY='ciq_echo_visits';
+  try{
+    const store=JSON.parse(localStorage.getItem(KEY)||'{}');
+    const prefix=(kamEmail||'local')+'::';
+    const now=Date.now();
+    const cutoff=30*24*60*60*1000;
+    const result={};
+    Object.entries(store).forEach(([k,v])=>{
+      if(k.startsWith(prefix)&&(now-v.ts)<=cutoff){
+        result[k.slice(prefix.length)]=v;
+      }
+    });
+    return result;
+  }catch(e){return{};}
+}
+
+function getVisitDot(visitMap,accountId,echoMap){
+  // Priority: echo-recent > echo-old > full > account > unseen
+  const echo=echoMap&&echoMap[accountId];
+  if(echo){
+    const age=Date.now()-echo.ts;
+    if(age<=7*24*60*60*1000)return'echo-recent';
+    return'echo-old';
+  }
   const v=visitMap[accountId];
   if(!v)return'unseen';
-  if(v.modes.includes('restaurant'))return'full';
+  if(v.modes&&v.modes.includes('restaurant'))return'full';
   return'account';
 }
 
