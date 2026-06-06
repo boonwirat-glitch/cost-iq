@@ -1819,7 +1819,8 @@ ${text}`;
       <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'DM Mono',monospace;padding:4px 0 8px">กำลังคุยกับร้านไหน?</div>
       <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
         style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;font-family:'DM Sans',-apple-system,sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
-        oninput="CI._pickerSearchInline(this.value)" />
+        oninput="CI._pickerSearchInline(this.value)"
+        onfocus="CI._pickerSearchInline(this.value)" />
       <div id="ci-pk-list-inline" style="display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto">
         ${recentRows}${emptyMsg}
       </div>`;
@@ -1842,19 +1843,32 @@ ${text}`;
     const list = document.getElementById('ci-pk-list-inline');
     if (!list) return;
     try {
-      const src = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
-      const filtered = q
-        ? src.filter(r => r.res_name && r.res_name.toLowerCase().includes(q.toLowerCase())).slice(0,8)
-        : src.filter(r => r.res_name).sort((a,b)=>(b.gmv_mtd||0)-(a.gmv_mtd||0)).slice(0,6);
-      list.innerHTML = filtered.length
-        ? filtered.map(r => `
-          <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left"
-            onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
-            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${r.res_name}</span>
-            <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em">${r.account_type||''}</span>
-          </button>`).join('')
-        : '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">ไม่พบร้านค้า</div>';
-    } catch(e) {}
+      // Use window.portviewBulkData — always fresh at call time
+      const src = (window.portviewBulkData && window.portviewBulkData.length)
+        ? window.portviewBulkData
+        : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      const qLow = (q||'').toLowerCase().trim();
+      const filtered = qLow
+        ? src.filter(r => (r.res_name||r.name||'').toLowerCase().includes(qLow) ||
+                          (r.account_name||'').toLowerCase().includes(qLow)).slice(0,8)
+        : src.filter(r => r.res_name||r.name).sort((a,b)=>(b.gmv_mtd||b.gmv||0)-(a.gmv_mtd||a.gmv||0)).slice(0,8);
+      if (!filtered.length) {
+        list.innerHTML = '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">' +
+          (src.length ? 'ไม่พบร้านค้า' : 'กำลังโหลดข้อมูล...') + '</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(r => {
+        const name = r.res_name || r.name || '-';
+        const guid = r.account_guid || r.id || '';
+        const seg = r.account_type || r.segment || '';
+        const safeName = name.replace(/'/g,"\'").replace(/"/g,'&quot;');
+        return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'DM Sans',-apple-system,sans-serif;text-align:left;margin-bottom:6px"
+          onclick="CI._pickerConfirmKam('${guid}','${safeName}','${seg}')">
+          <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1;text-align:left">${name}</span>
+          <span style="font-size:10px;font-weight:600;color:#008065;font-family:'DM Mono',monospace;letter-spacing:.06em">${seg}</span>
+        </button>`;
+      }).join('');
+    } catch(e) { console.warn('[CI picker search]', e); }
   }
 
   // ── Public ─────────────────────────────────────────────────────────────────
