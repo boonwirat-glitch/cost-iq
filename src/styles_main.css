@@ -232,10 +232,8 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .dp-note{font-size:11px;color:var(--n600);background:var(--n50);border-radius:8px;padding:10px 12px;line-height:1.65}
 
 /* ── KAMBAR ── */
-.kambar{background:linear-gradient(135deg,#1a3a6b,#2660c8);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:54px;z-index:99}
+
 /* #kam-acct-sticky removed in v184 — replaced by #kav-z1 */
-.kambar .kt{color:#fff;font-size:12px;font-weight:500}
-.kambar .kt strong{display:block;font-size:14px}
 
 /* ══ KAM ACCOUNT VIEW — 3-ZONE LAYOUT (v185) ══ */
 
