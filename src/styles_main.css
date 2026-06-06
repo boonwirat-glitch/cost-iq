@@ -2199,25 +2199,38 @@ body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
 /* ── Echo nav pill — idle + active states ── */
 .echo-pill{
-  display:flex;align-items:center;justify-content:center;gap:2.5px;
-  width:44px;height:22px;
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  width:36px;height:20px;
   border-radius:999px;
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
-  padding:0 8px;
+  padding:0 6px;
+  flex-shrink:0;
   transition:background .2s,border-color .2s,box-shadow .2s;
 }
 body.kam-mode .echo-pill{
   background:rgba(0,208,112,.12);
   border:1px solid rgba(0,208,112,.28);
 }
+/* Force echo-nav-btn nwrap same height as other tabs */
+.echo-nav-btn .nwrap{
+  padding:3px 7px!important;
+  display:flex;align-items:center;justify-content:center;
+  min-height:28px;
+}
 .echo-bar{
   display:inline-block;
-  width:2.5px;height:8px;
+  width:2.5px;
   border-radius:2px;
   background:rgba(0,208,112,.7);
-  transition:height .1s ease;
+  transition:height .15s ease;
 }
+/* Idle: organic waveform heights — NOT uniform */
+.echo-bar:nth-child(1){height:5px}
+.echo-bar:nth-child(2){height:10px}
+.echo-bar:nth-child(3){height:14px}
+.echo-bar:nth-child(4){height:8px}
+.echo-bar:nth-child(5){height:4px}
 /* idle: bars all same height, no animation */
 /* active: bars animate (class body.echo-active added by JS) */
 @keyframes echo-wa{0%,100%{height:4px;opacity:.55}50%{height:14px;opacity:1}}
