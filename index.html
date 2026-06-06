@@ -1,4 +1,4 @@
-<!-- Freshket Sense v333: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v334: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5028,7 +5028,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v333',
+      version: 'v334',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -36645,11 +36645,11 @@ ${text}`;
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
     const { error: visitError } = await supa.from('kam_visits').upsert({
-      kam_email: email, account_id: _accountGuid, visit_date: today,
+      kam_email: email, account_id: _accountGuid,
       ci_skill_scores: skillData, ci_customer_signals: intelData,
       ci_next_actions: intelData?.next_actions || [], ci_mode: 'voice',
       ci_created_at: new Date().toISOString()
-    }, { onConflict: 'kam_email,account_id,visit_date' });
+    }, { onConflict: 'kam_email,account_id' });
     if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
   }
 
