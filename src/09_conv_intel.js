@@ -791,17 +791,15 @@ OCPB framework (ตาม C1 Discovery):
 - P: Payment/Billing — credit term, billing cycle, วิธีจ่ายเงิน
 - B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
 
-Buyer type (BANK framework):
-- Blueprint (B): ต้องการข้อมูลครบ process ชัด ตัดสินใจช้าแต่ละเอียด
-- Action (A): ต้องการผลลัพธ์เร็ว direct to the point ไม่ชอบ process ยาว
-- Nurturing (N): ให้ความสำคัญกับความสัมพันธ์ trust ก่อน deal
-- Knowledge (K): ต้องการ expertise และ data รองรับทุกอย่าง
+Buyer type (BANK framework) — ใช้ชื่อภาษาอังกฤษเท่านั้น:
+- Blueprint: ต้องการข้อมูลครบ process ชัด ตัดสินใจช้าแต่ละเอียด
+- Action: ต้องการผลลัพธ์เร็ว direct ไม่ชอบ process ยาว
+- Nurturing: ให้ความสำคัญกับความสัมพันธ์ trust ก่อน deal
+- Knowledge: ต้องการ expertise และ data รองรับทุกอย่าง
 
 ตอบ JSON เท่านั้น ไม่มี markdown:
 {
   "buyer_type": "Blueprint|Action|Nurturing|Knowledge",
-  "buyer_type_th": "ชื่อภาษาไทย",
-  "buyer_icon": "📋|⚡|🤝|🔍",
   "buyer_evidence": "หลักฐานจากการสนทนาว่าทำไมถึง type นี้",
   "ocpb_covered": ["O","C","P","B"],
   "ocpb_missing": ["dimension ที่ยังไม่ถาม"],
@@ -972,10 +970,12 @@ ${text}`;
     const walletColor = d?.wallet_estimate==='hot'?'var(--danger,#FF3B30)':d?.wallet_estimate==='warm'?'var(--warning,#FF9500)':'var(--tx3,#AEAEB2)';
 
     return `<div class="buyer-card">
-        <div class="buyer-icon-wrap">${d?.buyer_icon||'🤝'}</div>
+        <div class="buyer-icon-wrap" style="background:rgba(0,128,101,.08);border-radius:12px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <div style="font-size:11px;font-weight:500;color:var(--ac,#008065);font-family:'DM Mono','IBM Plex Mono',monospace;letter-spacing:.06em">${({'Blueprint':'BPRT','Action':'ACT','Nurturing':'NUR','Knowledge':'KNOW'})[d?.buyer_type]||'--'}</div>
+        </div>
         <div style="flex:1">
           <div class="buyer-lbl">Buyer Type (BANK)</div>
-          <div class="buyer-type">${d?.buyer_type_th||d?.buyer_type||'-'}</div>
+          <div class="buyer-type">${({'Blueprint':'Blueprint','Action':'Action','Nurturing':'Nurturing','Knowledge':'Knowledge'})[d?.buyer_type]||d?.buyer_type||'-'}</div>
           <div class="buyer-ev">${d?.buyer_evidence||''}</div>
         </div>
         <div style="text-align:center;min-width:48px">
