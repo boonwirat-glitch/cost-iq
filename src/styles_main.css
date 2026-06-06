@@ -4797,3 +4797,42 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 #spl-bar{height:100%;background:linear-gradient(90deg,rgba(0,208,112,.4),var(--g500));width:0;border-radius:1px;}
 /* shared */
 @keyframes spl-fadein{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:translateY(0);}}
+
+/* ══════════════════════════════════════════════════════
+   SALES MODE — CSS gating (added Phase 3 Sales build)
+   ══════════════════════════════════════════════════════ */
+
+/* Default: Sales-only nav hidden */
+.bnav .ni.sales-only     { display: none !important; }
+.bnav .ni.sales-tl-only  { display: none !important; }
+
+/* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
+body.sales-mode .bnav .ni.sales-only     { display: flex !important; }
+body.sales-mode .bnav .ni.kam-only       { display: none !important; }
+body.sales-mode .bnav .ni.tl-only        { display: none !important; }
+body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
+
+/* Sales TL mode: show Team tab in addition */
+body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
+
+/* Sales nav grid: 3 cols (portview + pipeline + commission) */
+body.sales-mode .bnav { grid-template-columns: repeat(3,1fr); }
+body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
+
+/* Sales uses same dark theme as KAM */
+body.sales-mode { background: #0d1f3c; }
+body.sales-mode #scr-sales-portview,
+body.sales-mode #scr-sales-pipeline,
+body.sales-mode #scr-sales-commission,
+body.sales-mode #scr-sales-teamview { background: #0d1f3c; }
+
+/* Sales-mode: hide KAM-specific content, show Sales-specific content */
+body.sales-mode .kam-content-only  { display: none !important; }
+.sales-content-only                { display: none !important; }
+body.sales-mode .sales-content-only { display: block !important; }
+
+/* Sales portview screen — same layout as KAM portview */
+#scr-sales-portview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
+#scr-sales-pipeline { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
+#scr-sales-commission { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
+#scr-sales-teamview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
