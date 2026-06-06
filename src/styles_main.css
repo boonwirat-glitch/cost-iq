@@ -242,10 +242,19 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* Zone 1: sticky dark header */
 #kav-z1{
   position:sticky;top:54px;z-index:98;
-  background:linear-gradient(180deg,#0c1a36 0%,#091526 68%,rgba(9,21,38,0) 100%);
+  background:linear-gradient(180deg,#0c1a36 0%,#091526 75%,rgba(9,21,38,0) 100%);
   padding:10px 16px 20px;
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+/* prevent content bleeding through sticky header gradient */
+#kav-z1::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:inherit;
+  z-index:-1;
+  pointer-events:none;
 }
 /* top row: back | dept·KAM chip | spacer | micro-toggle */
 .kav-z1-toprow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
@@ -475,7 +484,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:100;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:'IBM Plex Sans Thai',sans-serif;transition:all .2s}
 .ni svg{width:22px;height:22px;color:var(--n400);transition:color .2s}
-.ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s}
+.ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s;white-space:nowrap}
 .ni.on svg,.ni.on .lb{color:var(--g700)}
 .ni.on .lb{font-weight:700}
 .nwrap{position:relative}
@@ -2192,75 +2201,55 @@ body.kam-mode .bnav #nav-opportunities{display:flex!important;}
 body.kam-mode #nav-portview{display:none!important;}
 body.kam-mode .bnav{background:rgba(14,24,45,.52);border:1px solid rgba(255,255,255,.18);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.35);}
 body.kam-mode .bnav .ni{flex:1;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;}
-body.kam-mode .bnav .ni .lb{display:block!important;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.2px;transition:color .18s,font-weight .18s;}
+body.kam-mode .bnav .ni .lb{display:block!important;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.2px;transition:color .18s,font-weight .18s;white-space:nowrap;}
 body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
 body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transition:opacity .18s,filter .18s;}
 body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.9)) drop-shadow(0 0 18px rgba(255,255,255,.3));}
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
 /* ── Echo nav pill — idle + active states ── */
-/* ── Echo nav pill — Deezer-style equalizer ── */
+/* ── Echo nav — Pattern B wave · 4px bars · uniform with other tabs ── */
 .echo-pill{
-  display:flex;align-items:flex-end;justify-content:center;gap:2px;
-  width:36px;height:20px;
-  border-radius:999px;
-  background:rgba(0,208,112,.12);
-  border:1px solid rgba(0,208,112,.28);
-  padding:0 6px 3px;
+  display:flex;align-items:flex-end;justify-content:center;gap:2.5px;
+  width:28px;height:22px;
+  padding:0 0 1px;
   flex-shrink:0;
-  transition:background .2s,border-color .2s,box-shadow .2s;
+  /* no border/bg in idle — just bars, same as SVG icon of other tabs */
 }
-body.kam-mode .echo-pill{
-  background:rgba(0,208,112,.12);
-  border:1px solid rgba(0,208,112,.28);
-}
+body.kam-mode .echo-pill{ /* same */ }
 .echo-nav-btn .nwrap{
   padding:3px 7px!important;
   display:flex;align-items:center;justify-content:center;
   min-height:28px;
 }
+/* bars: Pattern B — 5·11·6·14·17 zigzag ascending, 4px wide */
 .echo-bar{
   display:inline-block;
-  width:3px;
+  width:4px;
   border-radius:2px 2px 1px 1px;
-  background:rgba(0,208,112,.72);
+  background:rgba(255,255,255,.5);  /* idle = same tint as other nav icons */
   flex-shrink:0;
 }
-/* Idle: Deezer-style static equalizer — asymmetric, bottom-aligned */
-.echo-bar:nth-child(1){height:4px}
+.echo-bar:nth-child(1){height:5px}
 .echo-bar:nth-child(2){height:11px}
-.echo-bar:nth-child(3){height:14px}
-.echo-bar:nth-child(4){height:7px}
-.echo-bar:nth-child(5){height:3px}
-/* Active: each bar bounces independently — snappy multi-step like real equalizer */
-@keyframes echo-wa{
-  0%{height:4px}15%{height:12px}30%{height:5px}50%{height:14px}70%{height:3px}85%{height:10px}100%{height:4px}
-}
-@keyframes echo-wb{
-  0%{height:11px}20%{height:4px}40%{height:14px}55%{height:7px}75%{height:13px}90%{height:5px}100%{height:11px}
-}
-@keyframes echo-wc{
-  0%{height:14px}10%{height:6px}25%{height:14px}45%{height:9px}60%{height:14px}80%{height:4px}100%{height:14px}
-}
-@keyframes echo-wd{
-  0%{height:7px}20%{height:13px}35%{height:3px}55%{height:11px}70%{height:5px}90%{height:12px}100%{height:7px}
-}
-@keyframes echo-we{
-  0%{height:3px}25%{height:10px}45%{height:4px}65%{height:13px}80%{height:3px}100%{height:3px}
-}
-body.echo-active .echo-pill{
-  background:rgba(0,208,112,.2);
-  border-color:rgba(0,208,112,.55);
-  box-shadow:0 0 8px rgba(0,208,112,.2);
-}
+.echo-bar:nth-child(3){height:6px}
+.echo-bar:nth-child(4){height:14px}
+.echo-bar:nth-child(5){height:17px}
+/* Active keyframes — snappy steps like real EQ */
+@keyframes echo-wa{0%{height:5px}33%{height:15px}66%{height:3px}100%{height:5px}}
+@keyframes echo-wb{0%{height:11px}33%{height:4px}66%{height:17px}100%{height:11px}}
+@keyframes echo-wc{0%{height:6px}33%{height:17px}66%{height:5px}100%{height:6px}}
+@keyframes echo-wd{0%{height:14px}33%{height:5px}66%{height:17px}100%{height:14px}}
+@keyframes echo-we{0%{height:17px}33%{height:7px}66%{height:14px}100%{height:17px}}
+body.echo-active .echo-pill{ /* no pill bg — just glowing bars */ }
 body.echo-active .echo-bar{background:rgba(0,208,112,.92);}
-body.echo-active .echo-bar:nth-child(1){animation:echo-wa .9s steps(4,end) infinite}
-body.echo-active .echo-bar:nth-child(2){animation:echo-wb .7s steps(4,end) infinite .08s}
-body.echo-active .echo-bar:nth-child(3){animation:echo-wc .8s steps(4,end) infinite .15s}
-body.echo-active .echo-bar:nth-child(4){animation:echo-wd .75s steps(4,end) infinite .05s}
-body.echo-active .echo-bar:nth-child(5){animation:echo-we .85s steps(4,end) infinite .12s}
-/* label under pill */
-.echo-nav-btn .lb{color:rgba(0,208,112,.65)!important;font-weight:600!important}
-body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.95)!important}
+body.echo-active .echo-bar:nth-child(1){animation:echo-wa .6s steps(2,end) infinite}
+body.echo-active .echo-bar:nth-child(2){animation:echo-wb .75s steps(2,end) infinite .08s}
+body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infinite .15s}
+body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
+body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
+/* label — same color/weight as other tabs, green only when active */
+.echo-nav-btn .lb{color:rgba(255,255,255,.45)!important;font-weight:500!important}
+body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.9)!important;font-weight:600!important}
 /* Floating recording pill (minimize state) */
 #echo-float-pill{
   position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
@@ -2276,13 +2265,13 @@ body.echo-active .echo-nav-btn .lb{color:rgba(0,208,112,.95)!important}
 }
 @keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 #echo-float-pill.visible{display:flex}
-#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2px;height:14px}
-#echo-float-pill .fp-bar{width:3px;border-radius:2px 2px 1px 1px;background:rgba(0,208,112,.9)}
-#echo-float-pill .fp-bar:nth-child(1){animation:echo-wa .9s steps(4,end) infinite}
-#echo-float-pill .fp-bar:nth-child(2){animation:echo-wb .7s steps(4,end) infinite .08s}
-#echo-float-pill .fp-bar:nth-child(3){animation:echo-wc .8s steps(4,end) infinite .15s}
-#echo-float-pill .fp-bar:nth-child(4){animation:echo-wd .75s steps(4,end) infinite .05s}
-#echo-float-pill .fp-bar:nth-child(5){animation:echo-we .85s steps(4,end) infinite .12s}
+#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2.5px;height:14px}
+#echo-float-pill .fp-bar{width:4px;border-radius:2px 2px 1px 1px;background:rgba(0,208,112,.9)}
+#echo-float-pill .fp-bar:nth-child(1){height:5px;animation:echo-wa .6s steps(2,end) infinite}
+#echo-float-pill .fp-bar:nth-child(2){height:9px;animation:echo-wb .75s steps(2,end) infinite .08s}
+#echo-float-pill .fp-bar:nth-child(3){height:5px;animation:echo-wc .65s steps(2,end) infinite .15s}
+#echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
+#echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
 #echo-float-pill .fp-label{font-size:11px;font-weight:600;color:rgba(0,208,112,.9);letter-spacing:.04em}
 #echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
 body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
