@@ -1,4 +1,4 @@
-<!-- Freshket Sense v342: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v343: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -524,11 +524,10 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* Zone 1: sticky dark header */
 #kav-z1{
   position:sticky;top:54px;z-index:98;
-  background:#091526;
-  padding:10px 16px 6px;
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(255,255,255,.06);
+  background:linear-gradient(180deg,#0c1a36 0%,#091526 68%,rgba(9,21,38,0) 100%);
+  padding:10px 16px 20px;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 /* top row: back | dept·KAM chip | spacer | micro-toggle */
 .kav-z1-toprow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
@@ -5104,7 +5103,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v342',
+      version: 'v343',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
