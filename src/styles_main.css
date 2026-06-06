@@ -242,11 +242,10 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 /* Zone 1: sticky dark header */
 #kav-z1{
   position:sticky;top:54px;z-index:98;
-  background:#091526;
-  padding:10px 16px 6px;
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(255,255,255,.06);
+  background:linear-gradient(180deg,#0c1a36 0%,#091526 68%,rgba(9,21,38,0) 100%);
+  padding:10px 16px 20px;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 /* top row: back | dept·KAM chip | spacer | micro-toggle */
 .kav-z1-toprow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
