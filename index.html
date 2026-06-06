@@ -1,4 +1,4 @@
-<!-- Freshket Sense v358: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v359: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5170,7 +5170,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v358',
+      version: 'v359',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -11546,7 +11546,9 @@ async function loadFromCloudflareR2(){
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'];
+  // v359: Sales users skip handover fetch (no sales_handover_{key}.csv exists — not needed for render)
+  const _isSalesMode=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
