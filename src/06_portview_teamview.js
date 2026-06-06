@@ -427,7 +427,7 @@ function closeRestaurantSheet() {
   document.body.classList.add('rest-closing');
 
   const lbl = document.getElementById('nav-restaurant-label');
-  if (lbl) lbl.textContent = 'ร้าน';
+  if (lbl) lbl.textContent = 'Profile';
 
   setTimeout(() => {
     document.body.classList.remove('restaurant-sheet');
@@ -2923,8 +2923,8 @@ function _updateRestSwipe(grp,idx,opts){
       }, 850);
     }
     function relabel(){
-      var lab=$('nav-restaurant-label'); if(lab) lab.textContent='รายร้าน';
-      var nav=$('nav-restaurant'); if(nav){ nav.setAttribute('aria-label','เปิดมุมมองรายร้าน'); nav.title='เปิดมุมมองรายร้านใน account นี้'; }
+      var lab=$('nav-restaurant-label'); if(lab) lab.textContent='Profile';
+      var nav=$('nav-restaurant'); if(nav){ nav.setAttribute('aria-label','เปิด Profile'); nav.title='Profile'; }
     }
     relabel(); showCoachSoon();
     try{
