@@ -829,7 +829,8 @@ Buyer type (BANK framework):
 
   async function _analyzeSkills(text) {
     const raw = await callAI('haiku', _SKILL_SYS, [{ role: 'user', content: `Transcript:\n${text}` }], 6000);
-    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
+    // callAI returns plain text string (not Anthropic object)
+    const txt = (typeof raw === 'string' ? raw : raw?.content?.[0]?.text || '').trim().replace(/```json\n?|```/g,'').trim();
     console.log('[CI skills raw]', txt.substring(0,400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0,80));
@@ -846,7 +847,8 @@ Buyer type (BANK framework):
       role: 'user',
       content: `${accountCtx}\n\nTranscript:\n${text}`
     }], 6000);
-    const txt = (raw?.content?.[0]?.text||'').trim().replace(/```json\n?|```/g,'').trim();
+    // callAI returns plain text string (not Anthropic object)
+    const txt = (typeof raw === 'string' ? raw : raw?.content?.[0]?.text || '').trim().replace(/```json\n?|```/g,'').trim();
     console.log('[CI intel raw]', txt.substring(0,400));
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
     if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0,80));
