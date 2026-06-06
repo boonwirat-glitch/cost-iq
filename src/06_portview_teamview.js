@@ -1535,7 +1535,7 @@ function __legacyRenderPortviewFallback(){
     if(_bl)_bl.textContent='ภาพรวมทีม';
   } else {
     if(heading)heading.textContent='พอร์ตของฉัน';
-    if(levelBadge)levelBadge.textContent=role==='tl'||role==='admin'?'TL':'KAM';
+    if(levelBadge)levelBadge.textContent=role==='tl'||role==='admin'?'TL':role==='sales'||role==='sales_tl'?'Sales':'KAM';
     if(backWrap)backWrap.style.display='none';
   }
   renderPortviewSummary();
