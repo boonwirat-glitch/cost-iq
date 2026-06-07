@@ -1,0 +1,99 @@
+/* ============================================================
+   FRESHKET SENSE — DESIGN TOKENS
+   src/styles_tokens.css · v1.0
+
+   Single source of truth for all design values.
+   Migrate: hardcode → var(--token)  [visual unchanged]
+   Retheme: change values here only  [all components update]
+
+   CURRENT: Dark navy + Green (KAM original)
+   TARGET:  Light white + Red (post-retheme)
+   ============================================================ */
+
+:root {
+
+  /* ── BACKGROUND ─────────────────────────────────────────── */
+  --tk-bg-base:         #0d1f3c;   /* main screen bg         → #FFFFFF */
+  --tk-bg-nav:          #0d2550;   /* bottom nav bg          → #FFFFFF */
+  --tk-bg-topbar:       #006050;   /* topbar bg              → #FFFFFF */
+  --tk-bg-topbar-2:     #0a1e42;   /* topbar gradient end    → #FFFFFF */
+  --tk-bg-surface:      rgba(255,255,255,.05); /* card surface  → #F7F7F7 */
+  --tk-bg-surface-2:    rgba(255,255,255,.07); /* subtab bg     → #F0F0F0 */
+  --tk-bg-panel:        #0d1f3c;   /* data panel bg          → #FFFFFF */
+
+  /* ── ACCENT (brand interactive) ─────────────────────────── */
+  --tk-accent:          #2660c8;            /* nav active, CTA       → #FF385C */
+  --tk-accent-dark:     #1a3a6b;            /* accent pressed/bg     → rgba(255,56,92,.12) */
+  --tk-accent-dim:      rgba(38,96,200,.15); /* accent tint bg       → rgba(255,56,92,.08) */
+  --tk-accent-dim-2:    rgba(38,96,200,.22); /* accent border        → rgba(255,56,92,.20) */
+  --tk-accent-dim-3:    rgba(38,96,200,.35); /* nav pill active bg   → rgba(255,56,92,.15) */
+
+  /* ── OK / POSITIVE SIGNAL (ไม่เปลี่ยน — semantic green) ── */
+  --tk-ok:              #34C759;            /* positive result        KEEP */
+  --tk-ok-bright:       #4ddc97;            /* bright green on dark   KEEP */
+  --tk-ok-500:          #00d070;            /* green-500 brand        KEEP */
+  --tk-ok-dim:          rgba(0,208,112,.10); /* ok tint bg            KEEP */
+  --tk-ok-dim-2:        rgba(0,208,112,.18); /* ok surface            KEEP */
+  --tk-ok-border:       rgba(0,208,112,.22); /* ok border             KEEP */
+  --tk-ok-glow:         rgba(77,220,151,.12); /* ok glow              KEEP */
+
+  /* ── WARNING / AMBER ─────────────────────────────────────── */
+  --tk-warn:            #FF9500;
+  --tk-warn-dim:        rgba(240,165,0,.10);
+
+  /* ── DANGER / RED ────────────────────────────────────────── */
+  --tk-danger:          #e53e3e;
+  --tk-danger-dim:      rgba(229,62,62,.10);
+
+  /* ── TEXT ────────────────────────────────────────────────── */
+  --tk-text-primary:    #FFFFFF;            /* heading, numbers      → #222222 */
+  --tk-text-secondary:  rgba(255,255,255,.70); /* body text          → #3F3F3F */
+  --tk-text-muted:      rgba(255,255,255,.45); /* labels, meta       → #6A6A6A */
+  --tk-text-faint:      rgba(255,255,255,.25); /* placeholder        → #BDBDBD */
+
+  /* ── BORDER ──────────────────────────────────────────────── */
+  --tk-border:          rgba(255,255,255,.10); /* card border        → #EBEBEB */
+  --tk-border-strong:   rgba(255,255,255,.18); /* elevated border    → #D0D0D0 */
+  --tk-hairline:        rgba(255,255,255,.06); /* subtle divider     → #F0F0F0 */
+
+  /* ── TOPBAR GRADIENT ─────────────────────────────────────── */
+  --tk-topbar-gradient: linear-gradient(135deg, #0d2550, #0a1e42);
+                                            /*                       → none (flat white) */
+
+  /* ── FONT ────────────────────────────────────────────────── */
+  --tk-font-body:       'IBM Plex Sans Thai', sans-serif; /* → 'Noto Sans Thai', sans-serif */
+  --tk-font-mono:       'IBM Plex Mono', monospace;       /* unchanged */
+
+  /* ── IQ BADGE (topbar AI indicator) ─────────────────────── */
+  --tk-iq-bg:           linear-gradient(135deg,rgba(0,208,112,.18),rgba(0,208,112,.08));
+  --tk-iq-border:       rgba(0,208,112,.55);
+  --tk-iq-color:        #4ddc97;            /*                       → #FF385C or neutral */
+  --tk-iq-glow-lo:      rgba(0,208,112,.20);
+  --tk-iq-glow-hi:      rgba(0,208,112,.40);
+
+  /* ── NAV ─────────────────────────────────────────────────── */
+  --tk-nav-bg:          #0d2550;            /* bnav background       → #FFFFFF */
+  --tk-nav-border:      rgba(255,255,255,.10); /* bnav top border    → #EBEBEB */
+  --tk-nav-icon:        rgba(255,255,255,.55); /* idle icon/label    → #6A6A6A */
+  --tk-nav-active-icon: #FFFFFF;            /* active icon/label     → #FF385C */
+  --tk-nav-active-pill: rgba(38,96,200,.35); /* active pill bg      → rgba(255,56,92,.08) */
+
+  /* ── SUBTAB ──────────────────────────────────────────────── */
+  --tk-subtab-bg:       rgba(255,255,255,.07);
+  --tk-subtab-active:   rgba(38,96,200,.50); /*                      → rgba(255,56,92,.12) */
+  --tk-subtab-text:     rgba(255,255,255,.45);
+  --tk-subtab-active-text: #FFFFFF;         /*                       → #FF385C */
+
+  /* ── PORTVIEW HEADER ─────────────────────────────────────── */
+  --tk-pv-header-bg:    linear-gradient(180deg, #0d2550 0%, #0d2550 60%, transparent 100%);
+                                            /*                       → #FFFFFF */
+
+  /* ── DATA PANEL ──────────────────────────────────────────── */
+  --tk-dp-accent:       #2660c8;            /* panel headers/btns    → #FF385C */
+  --tk-dp-accent-dim:   rgba(38,96,200,.12); /* panel tint           → rgba(255,56,92,.06) */
+  --tk-dp-upload-border: rgba(0,208,112,.30); /* upload slot border  KEEP (functional) */
+
+  /* ── TEAMVIEW SCREEN ─────────────────────────────────────── */
+  --tk-teamview-bg:     #0d1f3c;            /* scr-teamview bg       → #FFFFFF */
+
+}
