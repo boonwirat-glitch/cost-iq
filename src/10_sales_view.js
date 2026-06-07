@@ -286,6 +286,9 @@ function renderSalesPortview() {
   const outlets = getSalesPortviewData();
   const email = (currentUserProfile && currentUserProfile.email) || '';
 
+  // Reset account-view guard so RenderBus can render portview normally again
+  window._salesInAccountView = false;
+
   // Load pipeline async then render home summary + outlet list
   _loadSalesPipeline().then(pipeline => {
     el.innerHTML = '';
@@ -566,6 +569,9 @@ window._salesOpenAccount = function(accountId, accountName) {
     if (!acct) { console.warn('[Sales] account not found:', accountId); return; }
     const el = document.getElementById('scr-sales-portview');
     if (!el) return;
+
+    // Guard: tell RenderBus not to overwrite account view with portview list
+    window._salesInAccountView = true;
 
     const daysLeft = _daysUntilExp(acct.newUserExpDate);
     const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
