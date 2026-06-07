@@ -1151,23 +1151,16 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-ol-row { cursor: pointer; }
 
 /* Proj note label */
-.sv-proj-note {
-  font-size: 7.5px;
-  color: #6A6A6A;
-  font-family: 'IBM Plex Mono', monospace;
-  margin-bottom: 2px;
-  letter-spacing: .03em;
-}
-.sv-proj-cell.now .sv-proj-note { color: rgba(255,56,92,.55); }
+.sv-proj-note { display: none; } /* removed per UX feedback */
+.sv-proj-cell.now .sv-proj-note { display: none; }
 
 /* Projection breakdown line */
 .sv-proj-breakdown {
-  font-size: 8px;
+  font-size: 10px;
   color: #6A6A6A;
-  font-family: 'IBM Plex Mono', monospace;
-  margin-top: 3px;
-  letter-spacing: .02em;
-  line-height: 1.4;
+  font-family: 'Noto Sans Thai', sans-serif;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 
 /* Category — empty/not-purchased */
