@@ -102,6 +102,8 @@
 
   /* ── SPACING SCALE (4px base grid) ──────────────────────── */
   --sp-1:   4px;
+  --sp-1h:  6px;    /* 1.5 step */
+  --sp-2h:  10px;   /* 2.5 step */
   --sp-2:   8px;
   --sp-3:   12px;
   --sp-4:   16px;
@@ -141,6 +143,7 @@
 
   /* ── BORDER RADIUS ───────────────────────────────────────── */
   --r-xs:   4px;
+  --r-xxs:  2px;
   --r-sm:   6px;
   --r-md:   10px;
   --r-lg:   14px;
