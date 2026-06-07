@@ -240,7 +240,7 @@ function _injectSenseThemePicker(){
           <div style="width:100%;height:16px;border-radius:5px;background:${t.card};margin-bottom:4px;border:1px solid rgba(0,0,0,.15)"></div>
           <div style="width:100%;height:4px;border-radius:2px;background:${t.page};border:1px solid rgba(0,0,0,.1);margin-bottom:6px"></div>
           <div style="font-size:10px;font-weight:700;color:var(--n700)">${t.name}</div>
-          ${k==='light'?'<div style="font-size:8px;color:var(--g700);margin-top:2px">default</div>':''}
+          ${k==='light'?'<div style="font-size:8px;color:var(--tk-ok-text);margin-top:2px">default</div>':''}
         </div>
       `).join('')}
     </div>`;
