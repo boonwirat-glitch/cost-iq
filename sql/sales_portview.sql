@@ -115,7 +115,7 @@ ytd_active_outlet AS (
     AND o.delivery_date <= p.max_date
 )
 
--- FINAL: 24 columns ตรง parsePortviewBulk col 0-23
+-- FINAL: 25 columns ตรง parsePortviewBulk col 0-24
 SELECT
   so.account_id,                                                              -- [0]
   so.res_name,                                                                -- [1]
@@ -142,7 +142,8 @@ SELECT
   so.first_dollar_date,                                                       -- [20]
   so.new_user_exp_date,                                                       -- [21]
   so.days_held,                                                               -- [22]
-  so.sales_team_name                                    AS sales_team_name    -- [23]
+  so.sales_team_name                                    AS sales_team_name,   -- [23]
+  so.account_name                                                              -- [24]
 
 FROM sale_outlets so
 JOIN ytd_active_outlet ya  ON ya.res_id = so.res_id
