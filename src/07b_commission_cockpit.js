@@ -646,7 +646,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
   return `<div style="border-radius:14px;border:1px solid rgba(188,215,255,.12);background:rgba(255,255,255,.03);padding:14px;margin-bottom:8px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px">
       <div>
-        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.22);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:210px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif"
+        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.22);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:210px;font-family:var(--tk-font-body),system-ui,sans-serif"
           value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule"
           oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
         ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px;vertical-align:middle">Unsaved</span>':''}
@@ -658,7 +658,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     ${generalErr}
     ${tierCards}
     <button class="comm-add" onclick="addRuleTier('${planCode}')"
-      style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px;font-family:'IBM Plex Sans Thai',system-ui,sans-serif">+ เพิ่ม tier</button>
+      style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px;font-family:var(--tk-font-body),system-ui,sans-serif">+ เพิ่ม tier</button>
     <div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer ด้านล่าง</div>
   </div>`;
 }
