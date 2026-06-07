@@ -1220,7 +1220,7 @@ ${text}`;
   function _skillsPanel(d) {
     const shortBanner = (d?._short_transcript)
       ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:12px;margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
-          <div style="font-size:18px;flex-shrink:0">⚡</div>
+          <div style="flex-shrink:0;display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning,#FF9500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
           <div>
             <div style="font-size:12px;font-weight:500;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
             <div style="font-size:11px;color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
@@ -1243,7 +1243,7 @@ ${text}`;
       const dc = s.score==='pass'?'pass':s.score==='developing'?'dev':'no';
       const bl = s.score==='pass'?'Pass':s.score==='developing'?'Developing':s.score==='not_applicable'?'N/A':'Not observed';
       const coaching = s.coaching_note && s.coaching_note !== '-'
-        ? `<p style="font-size:11px;color:var(--ac,#FF385C);margin:4px 0 0;font-style:italic;line-height:1.5">💬 ${s.coaching_note}</p>`
+        ? `<p style="font-size:11px;color:var(--ac,#FF385C);margin:4px 0 0;font-style:italic;line-height:1.5"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px;vertical-align:-1px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> ${s.coaching_note}</p>`
         : '';
       const gap = s.gap && s.gap !== '-'
         ? `<p style="font-size:11px;color:var(--tx3,#AEAEB2);margin:3px 0 0;line-height:1.4">▸ ขาด: ${s.gap}</p>`
