@@ -203,15 +203,14 @@ async function _loadSkillUsers() {
 
 function _skUserName(userId) {
   if (!userId) return '?';
-  // lookup by UUID ก่อน (Supabase strategy)
-  let u = _skillUsers[userId];
-  // ถ้าไม่เจอ — ลองหา profile ที่ match user_id จาก bulk data
-  if (!u && typeof portviewBulkData !== 'undefined') {
-    const match = portviewBulkData.find(r => r.kamEmail && r.kamEmail.toLowerCase() === userId.toLowerCase());
-    if (match) u = { kam_name: match.kamName, full_name: match.kamName, email: match.kamEmail };
-  }
-  if (!u) return userId.slice(0,8);
-  return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
+  // 1. หาจาก _skillProg — user_name ที่บันทึกไว้ตอน training (ไม่ต้องผ่าน RLS)
+  const progWithName = Object.values(_skillProg).find(p => p.user_id === userId && p.user_name);
+  if (progWithName && progWithName.user_name) return progWithName.user_name;
+  // 2. fallback: _skillUsers (ถ้า profiles query สำเร็จ)
+  const u = _skillUsers[userId];
+  if (u) return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
+  // 3. last resort: UUID 8 chars
+  return userId.slice(0,8);
 }
 
 function _skUserInitials(userId) {
@@ -488,6 +487,9 @@ async function skillsStartTraining(skillId) {
         user_id:    _skillsUserId,
         skill_id:   skillId,
         state:      'training',
+        user_name:  (typeof currentUserProfile !== 'undefined' && currentUserProfile)
+                      ? (currentUserProfile.kam_name || currentUserProfile.full_name || currentUserProfile.email || '')
+                      : '',
         updated_at: new Date().toISOString(),
       }
     });
@@ -806,6 +808,9 @@ async function skillsTLSave(userId, skillId) {
 
   try {
     // Update progress
+    // ดึง user_name จาก cache ถ้ายังไม่มี
+    const _tlProgKey = `${userId}:${skillId}`;
+    const _existingName = _skillProg[_tlProgKey] ? _skillProg[_tlProgKey].user_name : null;
     await _skFetch(`${SKILLS_TABLE_PROG}?user_id=eq.${userId}&skill_id=eq.${skillId}`, {
       method: 'PATCH',
       prefer: 'return=minimal',
@@ -814,6 +819,7 @@ async function skillsTLSave(userId, skillId) {
         evaluated_by: _skillsUserId,
         evaluated_at: new Date().toISOString(),
         notes:        note || null,
+        user_name:    _existingName || _skUserName(userId) || null,
       }
     });
 
