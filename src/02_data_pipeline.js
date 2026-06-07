@@ -1196,10 +1196,13 @@ function _patchR2FilesForSales(){
     if(role==='sales'||role==='sales_tl'){
       const email=(typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email)||'';
       if(!email) return;
-      // Bulk routing: single shared CSV for all Sales reps (filter by kamEmail in client)
-      R2_FILES['portview']='sales_portview.csv';
-      // handover not needed for Sales — newUserExpDate in portview handles it
-      R2_FILES['handover']='';
+      // Bulk routing: shared Sales CSVs (filter by kamEmail in client for portview)
+      R2_FILES['portview']   = 'sales_portview.csv';
+      R2_FILES['history']    = 'sales_history.csv';
+      R2_FILES['categories'] = 'sales_categories.csv';
+      R2_FILES['sku_current']= 'sales_sku_current.csv';
+      R2_FILES['outlets']    = 'sales_outlets.csv';
+      R2_FILES['handover']   = ''; // not needed — newUserExpDate in portview covers it
       console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:R2_FILES['portview']});
       // Fix B: clear IDB 'portview' cache so Sales user never loads KAM portview data
       // IDB key 'portview' holds KAM data (640 accounts) — must be evicted before fetch
