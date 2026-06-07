@@ -1157,12 +1157,42 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* Projection breakdown line */
 .sv-proj-breakdown {
-  font-size: 10px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  padding-top: 5px;
+}
+.sv-pb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2.5px 0;
+  border-top: 1px solid #F4F4F4;
+}
+.sv-pb-row:first-child { border-top: none; }
+.sv-pb-lbl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
   color: #6A6A6A;
   font-family: 'Noto Sans Thai', sans-serif;
-  margin-top: 4px;
-  line-height: 1.5;
 }
+.sv-pb-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sv-pb-dot.run  { background: #AEAEB2; }
+.sv-pb-dot.pipe { background: #34C759; }
+.sv-pb-dot.hov  { background: #FF385C; }
+.sv-pb-val {
+  font-size: 9px;
+  font-weight: 700;
+  color: #3F3F3F;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sv-pb-val.pipe { color: #34C759; }
+.sv-pb-val.hov  { color: #FF385C; }
 
 /* Category — empty/not-purchased */
 .sv-cat-empty {
