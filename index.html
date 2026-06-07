@@ -1,4 +1,4 @@
-<!-- Freshket Sense v404: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v405: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v404',
+      version: 'v405',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -41213,7 +41213,7 @@ function _skImgTag(def, opts = {}) {
   const bg = MODULE_BG[def ? def.module : 'A'];
   const code = def ? def.skill_code.split('_')[0] : '';
   return `<div class="${cls}" style="width:${w};height:${h};background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-    <span style="font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;opacity:.3;">${code}</span>
+    <span style="font-size:10px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;opacity:.3;">${code}</span>
   </div>`;
 }
 
@@ -41785,7 +41785,7 @@ function _renderTLOverview() {
 <div class="sk-rep-row" onclick="skillsTLOpenRepDetail('${uid}')">
   <div class="sk-rep-avatar">${initials}</div>
   <div class="sk-rep-info">
-    <div class="sk-rep-name">${pendDot}${uid}</div>
+    <div class="sk-rep-name">${pendDot}${_skUserName(uid)}</div>
     <div class="sk-rep-prog-row">
       <div class="sk-rep-track"><div class="sk-rep-fill ${fillCls}" style="width:${pct2}%;"></div></div>
       <span class="sk-rep-count">${uCount}/${uTotal}</span>
@@ -41888,11 +41888,21 @@ async function skillsTLOpenEval(userId, skillId) {
 </div>`).join('');
 
   const modCode = def.skill_code.split('_')[0];
-  const stateButtons = ['locked','training','unlocked','mastered'].map(s => `
-<button class="sk-tl-btn${s===state?' sk-tl-btn-sel-'+s:''}" onclick="_skTLSelectState('${s}')">
-  <div class="sk-tl-btn-dot" style="background:var(--sk-state-${s});"></div>
+  const SK_BTN_ICONS = {
+    locked:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="currentColor" d="M12 2c0 0-4 4-4 9a4 4 0 008 0c0-5-4-9-4-9z"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/><polyline points="9 12 11 14 15 10"/></svg>',
+    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>',
+  };
+  const stateButtons = ['locked','training','unlocked','mastered'].map(s => {
+    const isSelected = s === state;
+    const dimCls = !isSelected ? ' sk-tl-btn-dim' : '';
+    const selCls = isSelected ? ` sk-tl-btn-sel-${s}` : '';
+    return `<button class="sk-tl-btn${selCls}${dimCls}" onclick="_skTLSelectState('${s}')" style="color:var(--sk-state-${s});">
+  <div class="sk-tl-btn-icon">${SK_BTN_ICONS[s]}</div>
   <span class="sk-tl-btn-label">${SKILL_STATE_LABEL_TH[s]}</span>
-</button>`).join('');
+</button>`;
+  }).join('');
 
   scr.innerHTML = `
 <div class="sk-cg-topbar">
@@ -41941,17 +41951,22 @@ function _skTLSelectState(newState) {
   const row = document.getElementById('tl-state-row');
   if (!row) return;
   row.dataset.selected = newState;
-  row.querySelectorAll('.sk-tl-btn').forEach(btn => {
-    const s = btn.querySelector('.sk-tl-btn-dot').style.background; // not ideal
-    btn.className = 'sk-tl-btn';
-  });
   // Re-render buttons with new selected
-  const cur = SKILL_STATES;
-  row.innerHTML = cur.map(s => `
-<button class="sk-tl-btn${s===newState?' sk-tl-btn-sel-'+s:''}" onclick="_skTLSelectState('${s}')">
-  <div class="sk-tl-btn-dot" style="background:var(--sk-state-${s});"></div>
+  const _btnIcons = {
+    locked:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="currentColor" d="M12 2c0 0-4 4-4 9a4 4 0 008 0c0-5-4-9-4-9z"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/><polyline points="9 12 11 14 15 10"/></svg>',
+    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>',
+  };
+  row.innerHTML = SKILL_STATES.map(s => {
+    const isSelected = s === newState;
+    const dimCls = !isSelected ? ' sk-tl-btn-dim' : '';
+    const selCls = isSelected ? ` sk-tl-btn-sel-${s}` : '';
+    return `<button class="sk-tl-btn${selCls}${dimCls}" onclick="_skTLSelectState('${s}')" style="color:var(--sk-state-${s});">
+  <div class="sk-tl-btn-icon">${_btnIcons[s]}</div>
   <span class="sk-tl-btn-label">${SKILL_STATE_LABEL_TH[s]}</span>
-</button>`).join('');
+</button>`;
+  }).join('');
 }
 
 async function skillsTLSave(userId, skillId) {
@@ -42062,7 +42077,7 @@ function skillsTLOpenRepDetail(userId) {
   <div class="sk-rep-det-hd">
     <div class="sk-rep-det-avatar">${_skUserInitials(userId)}</div>
     <div>
-      <div class="sk-rep-det-name">${userId}</div>
+      <div class="sk-rep-det-name">${_skUserName(userId)}</div>
       <div class="sk-rep-det-meta">Sales · ${uCount}/${uTotal} unlocked</div>
     </div>
     <div style="position:relative;width:36px;height:36px;margin-left:auto;">
@@ -42071,7 +42086,7 @@ function skillsTLOpenRepDetail(userId) {
         ${ringPct>0?`<circle cx="18" cy="18" r="15" fill="none" stroke="var(--sk-ac)" stroke-width="2.5"
           stroke-dasharray="94.25" stroke-dashoffset="${ringOff.toFixed(2)}" stroke-linecap="round"/>`:''}
       </svg>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);font-family:'IBM Plex Mono',monospace;">${uCount}/${uTotal}</div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
     </div>
   </div>
   <div class="sk-filter-row">
@@ -42141,12 +42156,13 @@ window._skSetOvToggle          = _skSetOvToggle;
 window._skTLSelectState        = _skTLSelectState;
 window._skRepFilter            = _skRepFilter;
 window._renderSkillsScreen     = _renderSkillsScreen;
+
 </script>
 <style id="skills-module-css">
 /* ══════════════════════════════════════════════════════
    styles_skills.css — Skills Feature
    Design tokens: Airbnb DLS × Revolut
-   Font: Noto Sans Thai + IBM Plex Mono
+   Font: Noto Sans Thai only
    Accent: #FF385C (ac) only — NO green in Sales theme
    ══════════════════════════════════════════════════════ */
 
@@ -42184,14 +42200,14 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 }
 #scr-skills::-webkit-scrollbar { display: none; }
 
-/* ── Eyebrow (IBM Plex Mono label) ── */
+/* ── Eyebrow label (Noto Sans Thai) ── */
 .sk-eyebrow {
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: .15em;
   text-transform: uppercase;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-eyebrow-ac { color: var(--sk-ac); }
 
@@ -42246,7 +42262,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 2px;
 }
 .sk-next-name {
@@ -42259,7 +42275,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 9px;
   font-weight: 600;
   color: var(--sk-info);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
 }
 .sk-track {
@@ -42280,7 +42296,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   margin-top: 3px;
   font-size: 8.5px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 
 /* ══ MODULE LIST ════════════════════════════════════════ */
@@ -42315,7 +42331,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-mod-sil {
   font-size: 11px;
   font-weight: 600;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   opacity: .3;
 }
 .sk-mod-info { flex: 1; min-width: 0; }
@@ -42353,7 +42369,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 9px;
   font-weight: 700;
   color: var(--sk-ink);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-chev {
   width: 14px;
@@ -42449,7 +42465,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-card-sil {
   font-size: 11px;
   font-weight: 600;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   opacity: .3;
 }
 
@@ -42487,7 +42503,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .state-locked   .sk-state-label { color: var(--sk-locked); }
 .state-training .sk-state-label { color: var(--sk-info); }
@@ -42504,7 +42520,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-card-code {
   font-size: 8.5px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
 }
 .sk-lock-ico {
@@ -42563,7 +42579,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 9px;
   font-weight: 600;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-state-pill-row {
   display: flex;
@@ -42581,7 +42597,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .pill-locked   { background: rgba(0,0,0,.06);            color: var(--sk-muted); }
 .pill-training { background: rgba(33,150,243,.09);       color: var(--sk-info); }
@@ -42610,7 +42626,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 6px;
 }
 .sk-rubric-text {
@@ -42628,7 +42644,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 10px;
   color: var(--sk-muted);
   text-align: center;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 8px;
 }
 .sk-cta-btn {
@@ -42655,7 +42671,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin: 14px 0 6px;
 }
 .sk-log-row {
@@ -42684,7 +42700,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-log-meta {
   font-size: 9px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
 }
 
@@ -42724,7 +42740,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 24px;
   font-weight: 700;
   color: var(--sk-ac);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   line-height: 1;
   text-align: right;
 }
@@ -42735,7 +42751,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   background: rgba(124,58,237,.09);
   border-radius: 999px;
   padding: 3px 9px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 
 /* Tab bar */
@@ -42773,7 +42789,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   color: #fff;
   font-size: 8px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-left: 4px;
   vertical-align: middle;
 }
@@ -42800,7 +42816,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-pend-name {
@@ -42818,7 +42834,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-pend-date {
   font-size: 9px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
 }
 .sk-pend-right {
@@ -42838,7 +42854,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   background: rgba(33,150,243,.09);
   color: var(--sk-info);
 }
@@ -42889,7 +42905,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   cursor: pointer;
   font-size: 10px;
   font-weight: 600;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -42929,14 +42945,14 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   color: var(--sk-ink);
   letter-spacing: -.03em;
   line-height: 1;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-denom {
   font-size: 13px;
   font-weight: 500;
   color: var(--sk-muted);
   margin-bottom: 3px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-label {
   font-size: 10px;
@@ -42948,7 +42964,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 22px;
   font-weight: 700;
   color: var(--sk-ac);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-track {
   height: 3px;
@@ -42967,7 +42983,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   margin-top: 3px;
   font-size: 8.5px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 
 /* By Rep rows */
@@ -42991,7 +43007,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-rep-name {
@@ -43031,7 +43047,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-rep-count {
   font-size: 9px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   flex-shrink: 0;
 }
@@ -43045,7 +43061,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   letter-spacing: .15em;
   text-transform: uppercase;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-skill-row {
   display: flex;
@@ -43067,7 +43083,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 9px;
   font-weight: 700;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-skill-name {
@@ -43096,7 +43112,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-skill-count {
   font-size: 9px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   flex-shrink: 0;
   min-width: 24px;
@@ -43116,7 +43132,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--sk-ac);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 10px;
 }
 .sk-tl-rep-row {
@@ -43137,7 +43153,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   justify-content: center;
   font-size: 10px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-tl-rep-name {
@@ -43149,12 +43165,12 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-tl-rep-meta {
   font-size: 9px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-tl-state-label {
   font-size: 8.5px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 6px;
   font-weight: 600;
   letter-spacing: .1em;
@@ -43169,30 +43185,47 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   flex: 1;
   border: 1.5px solid var(--sk-hairline);
   border-radius: 8px;
-  padding: 8px 2px;
+  padding: 9px 2px 8px;
   background: #fff;
   cursor: pointer;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: opacity .15s, border-color .15s, background .15s;
 }
-.sk-tl-btn-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  margin: 0 auto 4px;
-  background: var(--sk-hairline);
+.sk-tl-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  flex-shrink: 0;
+}
+.sk-tl-btn-icon svg {
+  display: block;
+  width: 16px; height: 16px;
 }
 .sk-tl-btn-label {
   font-size: 8px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
-  letter-spacing: .04em;
+  letter-spacing: .02em;
   text-transform: uppercase;
   display: block;
 }
-.sk-tl-btn-sel-training { border-color: var(--sk-info);    background: rgba(33,150,243,.07); }
-.sk-tl-btn-sel-unlocked { border-color: var(--sk-ok);      background: rgba(52,199,89,.07); }
-.sk-tl-btn-sel-mastered { border-color: var(--sk-warn);    background: rgba(255,149,0,.07); }
-.sk-tl-btn-sel-locked   { border-color: var(--sk-locked);  background: rgba(189,189,189,.07); }
+/* unselected dim */
+.sk-tl-btn-dim { opacity: .4; }
+/* selected states */
+.sk-tl-btn-sel-locked   { border-color: var(--sk-locked); background: rgba(189,189,189,.07); }
+.sk-tl-btn-sel-locked   .sk-tl-btn-label { color: var(--sk-locked); }
+.sk-tl-btn-sel-training { border-color: var(--sk-info);   background: rgba(33,150,243,.07); }
+.sk-tl-btn-sel-training .sk-tl-btn-label { color: var(--sk-info); }
+.sk-tl-btn-sel-unlocked { border-color: var(--sk-ok);     background: rgba(52,199,89,.07); }
+.sk-tl-btn-sel-unlocked .sk-tl-btn-label { color: var(--sk-ok); }
+.sk-tl-btn-sel-mastered { border-color: var(--sk-warn);   background: rgba(255,149,0,.07); }
+.sk-tl-btn-sel-mastered .sk-tl-btn-label { color: var(--sk-warn); }
 .sk-tl-note {
   width: 100%;
   border: 1px solid var(--sk-hairline);
@@ -43239,7 +43272,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-rep-det-name {
@@ -43251,7 +43284,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-rep-det-meta {
   font-size: 10px;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
 }
 .sk-filter-row {
@@ -43270,7 +43303,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   border-radius: 999px;
   padding: 3px 10px;
   cursor: pointer;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-fpill-on {
   color: var(--sk-ac);
@@ -43290,7 +43323,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-size: 8px;
   font-weight: 700;
   color: var(--sk-muted);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
   width: 28px;
 }
@@ -43306,7 +43339,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -43352,6 +43385,7 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
 </style>
 <!-- Echo floating pill — shown when recording + minimized -->
 <div id="echo-float-pill" onclick="echoExpand()" role="button" aria-label="กลับไปที่ Echo">
