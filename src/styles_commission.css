@@ -76,7 +76,7 @@
 .ncs-header{padding:0 16px 12px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
 .ncs-title{font-size:14px;font-weight:700;color:rgba(255,255,255,.95);margin-bottom:12px}
 .ncs-tabs{display:flex;gap:3px;background:rgba(0,0,0,.35);border-radius:10px;padding:3px}
-.ncs-tab{flex:1;font-size:10px;font-weight:700;padding:7px 4px;border-radius:8px;text-align:center;cursor:pointer;color:rgba(255,255,255,.35);line-height:1.3;transition:all .18s;border:none;background:none;font-family:'IBM Plex Sans Thai',sans-serif}
+.ncs-tab{flex:1;font-size:10px;font-weight:700;padding:7px 4px;border-radius:8px;text-align:center;cursor:pointer;color:rgba(255,255,255,.35);line-height:1.3;transition:all .18s;border:none;background:none;font-family:var(--tk-font-body)}
 .ncs-tab.on{background:rgba(255,255,255,.1);color:rgba(255,255,255,.9)}
 .ncs-tab.on.t-nrr{color:#1AE87B}
 .ncs-tab.on.t-cb{color:#64a0ff}
@@ -84,7 +84,7 @@
 .ncs-meta{display:flex;align-items:center;gap:8px;padding:7px 16px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
 .ncs-meta{display:flex;align-items:center;gap:8px;padding:7px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
 .ncs-meta-text{font-size:12px;color:rgba(255,255,255,.75);flex:1;line-height:1.4}
-.ncs-sort-btn{font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap}
+.ncs-sort-btn{font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:3px 9px;cursor:pointer;font-family:var(--tk-font-body);white-space:nowrap}
 .cds-toggle-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:rgba(255,255,255,.06);border-radius:7px;cursor:pointer;color:rgba(255,255,255,.55);flex-shrink:0;transition:background .15s}
 .cds-toggle-btn:hover{background:rgba(255,255,255,.11);color:rgba(255,255,255,.85)}
 .ncs-tbl-head{display:grid;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0}
@@ -116,7 +116,7 @@
 .ncs-total-val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700}
 .ncs-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
 .ncs-footer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.22);flex-shrink:0;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
-.ncs-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;font-family:'IBM Plex Sans Thai',sans-serif;transition:opacity .15s;white-space:nowrap}
+.ncs-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;font-family:var(--tk-font-body);transition:opacity .15s;white-space:nowrap}
 .ncs-btn:active{opacity:.7}
 .ncs-btn.primary{flex:1;background:rgba(0,204,106,.1);border-color:rgba(0,204,106,.3);color:#00CC6A}
 .ncs-btn.secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.55)}
@@ -125,7 +125,7 @@
 .tgt-det-row.tappable:last-child{margin-bottom:-3px}
 .tgt-det-row.tappable:active{background:rgba(255,255,255,.07)}
 .ncs-chevron-hint{font-size:10px;color:rgba(255,255,255,.18);margin-left:4px}
-.ncs-row-btn{font-size:10px;font-weight:700;color:#00CC6A;border:1px solid rgba(0,204,106,.3);border-radius:5px;padding:2px 8px;margin-left:auto;flex-shrink:0;background:rgba(0,204,106,.08);font-family:'IBM Plex Sans Thai',sans-serif;white-space:nowrap}
+.ncs-row-btn{font-size:10px;font-weight:700;color:#00CC6A;border:1px solid rgba(0,204,106,.3);border-radius:5px;padding:2px 8px;margin-left:auto;flex-shrink:0;background:rgba(0,204,106,.08);font-family:var(--tk-font-body);white-space:nowrap}
 .ncs-empty{text-align:center;padding:32px 16px;font-size:12px;color:rgba(255,255,255,.3)}
 .tgt-color-key{display:flex;gap:12px;flex-wrap:wrap;padding:5px 0 2px;}
 .tgt-ck-item{display:inline-flex;align-items:center;gap:4px;font-size:10px;}
@@ -192,7 +192,7 @@
   flex-shrink:0;
 }
 .tgt-sheet-title {
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
   font-size:16px;font-weight:700;color:#fff;
 }
 .tgt-sheet-close {
@@ -306,7 +306,7 @@
 .tgt-save-btn {
   width:100%;padding:14px;border-radius:12px;border:none;
   background:linear-gradient(135deg,rgba(0,208,112,.9),rgba(0,180,90,.85));
-  color:#0d1117;font-family:'IBM Plex Sans Thai',sans-serif;font-size:14px;font-weight:700;
+  color:#0d1117;font-family:var(--tk-font-body);font-size:14px;font-weight:700;
   cursor:pointer;margin-top:4px;transition:opacity .15s;
   display:flex;align-items:center;justify-content:center;gap:8px;
 }
@@ -317,7 +317,7 @@
 }
 .tgt-tab-btn {
   padding:8px 14px;border:none;background:transparent;
-  font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px;font-weight:600;
+  font-family:var(--tk-font-body);font-size:12px;font-weight:600;
   color:rgba(255,255,255,.6);cursor:pointer;border-bottom:2px solid transparent;
   transition:color .15s,border-color .15s;margin-bottom:-1px;
 }
@@ -333,7 +333,7 @@
 .tv-set-target-btn {
   border:none;background:rgba(0,208,112,.12);border:1px solid rgba(0,208,112,.2);
   border-radius:6px;padding:4px 10px;
-  font-family:'IBM Plex Sans Thai',sans-serif;font-size:10px;font-weight:700;
+  font-family:var(--tk-font-body);font-size:10px;font-weight:700;
   color:rgba(0,208,112,.85);cursor:pointer;transition:background .15s;
 }
 .tv-set-target-btn:hover { background:rgba(0,208,112,.2); }
@@ -341,7 +341,7 @@
 .tgt-admin-btn {
   border:none;background:rgba(0,208,112,.1);border:1px solid rgba(0,208,112,.18);
   border-radius:8px;padding:6px 12px;
-  font-family:'IBM Plex Sans Thai',sans-serif;font-size:11px;font-weight:700;
+  font-family:var(--tk-font-body);font-size:11px;font-weight:700;
   color:rgba(0,208,112,.8);cursor:pointer;display:flex;align-items:center;gap:5px;
   transition:background .15s;margin-bottom:10px;
 }
@@ -418,7 +418,7 @@
   display:none;align-items:center;gap:5px;background:rgba(188,215,255,.12);
   border:1px solid rgba(188,215,255,.24);border-radius:8px;padding:5px 10px;
   font-size:11px;font-weight:800;color:#bcd7ff;cursor:pointer;white-space:nowrap;flex-shrink:0;
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
 }
 .comm-overlay{
   position:fixed;inset:0;background:rgba(3,8,18,.72);z-index:10040;
@@ -438,7 +438,7 @@
 .comm-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
 .comm-step{
   border:none;background:transparent;color:rgba(255,255,255,.48);font-size:10px;font-weight:800;
-  font-family:'IBM Plex Sans Thai',sans-serif;padding:10px 4px 9px;cursor:pointer;position:relative;line-height:1.25
+  font-family:var(--tk-font-body);padding:10px 4px 9px;cursor:pointer;position:relative;line-height:1.25
 }
 .comm-step.active{color:#4ddc97}
 .comm-step.active:after{content:'';position:absolute;left:14px;right:14px;bottom:0;height:2px;border-radius:2px;background:#4ddc97}
@@ -450,11 +450,11 @@
 }
 .comm-save{
   flex:1;border:none;border-radius:13px;padding:13px 14px;background:linear-gradient(135deg,rgba(0,208,112,.96),rgba(0,180,90,.88));
-  color:#07111d;font-weight:900;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+  color:#07111d;font-weight:900;font-family:var(--tk-font-body);cursor:pointer
 }
 .comm-secondary{
   border:1px solid rgba(255,255,255,.10);border-radius:13px;padding:13px 14px;background:rgba(255,255,255,.06);
-  color:rgba(255,255,255,.74);font-weight:800;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer
+  color:rgba(255,255,255,.74);font-weight:800;font-family:var(--tk-font-body);cursor:pointer
 }
 .comm-hero{
   background:linear-gradient(135deg,rgba(23,53,101,.96),rgba(10,24,50,.95));
@@ -486,7 +486,7 @@
 .comm-select,.comm-input{
   width:100%;padding:10px 11px;border-radius:11px;background:rgba(255,255,255,.07);
   border:1px solid rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;outline:none;
-  font-family:'IBM Plex Sans Thai',sans-serif
+  font-family:var(--tk-font-body)
 }
 .comm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
 .comm-field label{font-size:10px;font-weight:850;color:rgba(255,255,255,.5);display:block;margin-bottom:5px}
@@ -504,7 +504,7 @@
 .comm-tier-row{display:grid;grid-template-columns:.8fr .8fr 1fr 1fr 28px;gap:6px;align-items:center}
 .comm-tier-row.head{font-size:9px;text-transform:uppercase;color:rgba(255,255,255,.38);font-weight:850}
 .comm-del{width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);cursor:pointer}
-.comm-add{width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px dashed rgba(0,208,112,.35);background:rgba(0,208,112,.08);color:#4ddc97;font-weight:850;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer}
+.comm-add{width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px dashed rgba(0,208,112,.35);background:rgba(0,208,112,.08);color:#4ddc97;font-weight:850;font-family:var(--tk-font-body);cursor:pointer}
 .comm-empty{padding:24px 14px;text-align:center;color:rgba(255,255,255,.42);font-size:12px;background:rgba(255,255,255,.035);border-radius:14px;border:1px solid rgba(255,255,255,.06)}
 .comm-lock-list{display:flex;flex-direction:column;gap:8px}
 .comm-lock-row{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:10px}
@@ -627,7 +627,7 @@ flex-wrap:wrap;}
   padding:6px 9px;
   font-size:10px;
   font-weight:850;
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
   cursor:pointer;
 }
 
@@ -986,7 +986,7 @@ flex-wrap:wrap;}
   padding:8px 10px;
   font-size:10px;
   font-weight:850;
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
   cursor:pointer;
 }
 .comm-plan-note{
@@ -1101,7 +1101,7 @@ flex-wrap:wrap;}
   padding:7px 9px;
   font-size:10px;
   font-weight:900;
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
   cursor:pointer;
 }
 .comm-archive-rule-btn:disabled{
@@ -1141,7 +1141,7 @@ flex-wrap:wrap;}
   padding:10px 9px;
   font-size:11px;
   font-weight:900;
-  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-family:var(--tk-font-body);
   cursor:pointer;
 }
 .comm-rule-editor-head{
@@ -1440,13 +1440,13 @@ flex-wrap:wrap;}
 
 /* Subtab switcher */
 .comm-lock-subtabs{display:flex;gap:4px;margin-top:10px;padding:3px;background:rgba(0,0,0,.25);border-radius:11px}
-.comm-lock-subtab{flex:1;padding:7px 10px;border-radius:8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;border:none;background:transparent;color:rgba(225,238,255,.45);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;transition:background .15s,color .15s}
+.comm-lock-subtab{flex:1;padding:7px 10px;border-radius:8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;border:none;background:transparent;color:rgba(225,238,255,.45);font-family:var(--tk-font-body);transition:background .15s,color .15s}
 .comm-lock-subtab.active{background:rgba(255,255,255,.09);color:#fff}
 .comm-lock-subtab:hover:not(.active){color:rgba(225,238,255,.70)}
 
 /* Action buttons row */
 .tgt-lock-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
-.tgt-lock-btn{flex:1;min-width:90px;padding:11px 10px;border-radius:12px;font-size:12px;font-weight:800;cursor:pointer;text-align:center;font-family:'IBM Plex Sans Thai',system-ui,sans-serif;border:none;transition:filter .15s,transform .10s}
+.tgt-lock-btn{flex:1;min-width:90px;padding:11px 10px;border-radius:12px;font-size:12px;font-weight:800;cursor:pointer;text-align:center;font-family:var(--tk-font-body);border:none;transition:filter .15s,transform .10s}
 .tgt-lock-btn:active{transform:scale(.97)}
 .tgt-lock-btn.secondary{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(225,238,255,.80)}
 .tgt-lock-btn.outline{background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.20);color:#bcd7ff}
