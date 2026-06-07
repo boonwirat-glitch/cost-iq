@@ -1,4 +1,4 @@
-<!-- Freshket Sense v398: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v399: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v398',
+      version: 'v399',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -40828,17 +40828,29 @@ function renderSalesTeamview() {
     if (role === 'admin') return true;
     return (r.tlEmail || '').toLowerCase() === email.toLowerCase();
   });
-  // Group by rep email
+  // Group by rep email — คำนวณ net runrate ผ่าน getSalesRunrate (เหมือน portview)
   const repMap = {};
   teamData.forEach(r => {
     const re = (r.kamEmail || '').toLowerCase();
     if (!re) return;
-    if (!repMap[re]) repMap[re] = { email: re, name: r.kamName || re, outlets: [], runrate: 0 };
+    if (!repMap[re]) repMap[re] = { email: re, name: r.kamName || re, outlets: [] };
     repMap[re].outlets.push(r);
-    repMap[re].runrate += (r.runrate || 0);
   });
-  const reps = Object.values(repMap).sort((a,b) => b.runrate - a.runrate);
-  const teamRunrate = reps.reduce((s,r) => s + r.runrate, 0);
+
+  // คำนวณ net + handover ต่อ rep
+  Object.values(repMap).forEach(rep => {
+    const { active, expiringM0, expiringM1, expiringM2 } = _salesPartitionOutlets(rep.outlets);
+    rep.netRunrate  = [...active, ...expiringM1, ...expiringM2].reduce((s,o) => s+(o.runrate||0), 0);
+    rep.handoverOut = expiringM0.reduce((s,o) => s+(o.runrate||0), 0);  // กำลัง handover เดือนนี้
+    rep.handoverCount = expiringM0.length;
+    rep.runrate = rep.netRunrate; // ใช้ net สำหรับ sort/display
+  });
+
+  const reps = Object.values(repMap).sort((a,b) => b.netRunrate - a.netRunrate);
+  const teamRunrate    = reps.reduce((s,r) => s + r.netRunrate,  0);   // สุทธิ
+  const teamHandover   = reps.reduce((s,r) => s + r.handoverOut, 0);   // handover ออกเดือนนี้
+  const teamHandoverCt = reps.reduce((s,r) => s + r.handoverCount, 0);
+
   // Team target: _tgtGet for team level
   const teamTarget = (typeof _tgtGet === 'function')
     ? (_tgtGet(period, 'sales_team', email) || 0)
@@ -40858,9 +40870,9 @@ function renderSalesTeamview() {
     '<div><div class="sv-page-eye">Sales Team</div><div class="sv-page-title">ภาพรวมทีม</div></div>' +
     targetBtnHtml + '</div>';
 
-  // Team hero
+  // Team hero — แสดง net runrate + handover breakdown strip
   html += '<div class="sv-hero">' +
-    '<div class="sv-hero-eye">Runrate ทีม</div>' +
+    '<div class="sv-hero-eye">Runrate ทีม (สุทธิ)</div>' +
     '<div><span class="sv-hero-num">฿' + _sv_fmt(teamRunrate) + '</span></div>' +
     '<div class="sv-hero-sub">' +
       '<span>' + reps.length + ' reps · ' + teamData.length + ' ร้าน</span>' +
@@ -40873,6 +40885,15 @@ function renderSalesTeamview() {
       ? '<div class="sv-tbar"><div class="sv-tbar-track"><div class="sv-tbar-fill ' + tbarCls + '" style="width:' + Math.min(100,teamPct) + '%"></div></div>' +
         '<div class="sv-tbar-meta"><span>' + teamPct + '% of target</span><span>Target ฿' + _sv_fmt(teamTarget) + '</span></div></div>'
       : '') +
+    (teamHandover > 0
+      ? '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,56,92,.06);border-radius:8px;border-left:2.5px solid #FF385C;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div>' +
+            '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#FF385C;font-family:IBM Plex Mono,monospace;">Handover ออกเดือนนี้</div>' +
+            '<div style="font-size:11px;color:#6A6A6A;margin-top:1px;">' + teamHandoverCt + ' ร้าน กำลัง handover ให้ KAM</div>' +
+          '</div>' +
+          '<div style="font-size:15px;font-weight:700;color:#FF385C;font-family:IBM Plex Mono,monospace;">−฿' + _sv_fmt(teamHandover) + '</div>' +
+        '</div>'
+      : '') +
     '</div>';
 
   // Rep list
@@ -40883,18 +40904,22 @@ function renderSalesTeamview() {
     html += '<div class="sv-outlet-list">';
     reps.forEach(function(rep) {
       const repTarget = (typeof _tgtGet === 'function') ? (_tgtGet(period, 'sales', rep.email) || 0) : 0;
-      const repPct = repTarget > 0 ? Math.min(200, Math.round(rep.runrate / repTarget * 100)) : 0;
+      const repPct = repTarget > 0 ? Math.min(200, Math.round(rep.netRunrate / repTarget * 100)) : 0;
       const indCls = repPct >= 100 ? 'ok' : repPct >= 75 ? 'mid' : 'late';
-      const repName = rep.name.split('@')[0]; // short name fallback
-      html += '<div class="sv-ol-row" onclick="window._salesTLDrillRep("' + rep.email + '"' + ')">' +
+      const repName = rep.name.split('@')[0];
+      // handover badge ต่อ rep
+      const hovBadge = rep.handoverOut > 0
+        ? '<span style="font-size:8.5px;font-weight:700;color:#FF385C;font-family:IBM Plex Mono,monospace;background:rgba(255,56,92,.08);border-radius:999px;padding:1px 6px;">−฿' + _sv_fmt(rep.handoverOut) + ' HO</span>'
+        : '';
+      html += '<div class="sv-ol-row" onclick="window._salesTLDrillRep(\'' + rep.email + '\')">' +
         '<div class="sv-ol-top">' +
           '<div class="sv-ol-ind ' + indCls + '"></div>' +
           '<div class="sv-ol-info">' +
-            '<div class="sv-ol-name">' + repName + '</div>' +
+            '<div class="sv-ol-name" style="display:flex;align-items:center;gap:6px;">' + repName + hovBadge + '</div>' +
             '<div class="sv-ol-meta">' + rep.outlets.length + ' ร้าน' + (repTarget > 0 ? ' · target ฿' + _sv_fmt(repTarget) : '') + '</div>' +
           '</div>' +
           '<div class="sv-ol-right">' +
-            '<div class="sv-ol-gmv">฿' + _sv_fmt(rep.runrate) + '</div>' +
+            '<div class="sv-ol-gmv">฿' + _sv_fmt(rep.netRunrate) + '</div>' +
             (repTarget > 0
               ? '<div class="sv-ol-type ' + (repPct >= 100 ? 'ok' : repPct >= 75 ? 'mid' : '') + '">' + repPct + '% target</div>'
               : '<div class="sv-ol-type" style="color:#FF9500">ยังไม่มี target</div>') +
