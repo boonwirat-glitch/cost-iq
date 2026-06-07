@@ -641,7 +641,7 @@ When mentioning a SKU, use ฿ — not %.`;
     const _pvStrip=document.getElementById('pv-compact-strip');
     if(_pvColl){_pvColl.className='pv-collapsible collapsed';window._pvLastCollapseMs=Date.now();}
     if(_pvStrip)_pvStrip.className='pv-compact-strip visible';
-    if(lbl)lbl.innerHTML='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="vertical-align:-.5px"><path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="#4ddc97" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Portfolio Insight';
+    if(lbl)lbl.innerHTML='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="vertical-align:-.5px"><path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="var(--tk-ok-bright)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Portfolio Insight';
     btn.classList.remove('loading');
     btn.classList.add('done');
     btn.classList.add('done-bounce');
@@ -937,7 +937,7 @@ function __legacyRenderPortviewListFallback(){
     const bars=lastBar?[...histVals,lastBar]:histVals;
     if(!bars.length)return'';
     const max=Math.max(...bars.map(b=>b.v),1);
-    const c={great:'#4ddc97',safe:'#4ddc97',warn:'#f0b000',danger:'#ff8888',new:'rgba(100,160,255,.7)'};
+    const c={great:'var(--tk-ok-bright)',safe:'var(--tk-ok-bright)',warn:'#f0b000',danger:'#ff8888',new:'rgba(100,160,255,.7)'};
     const hi=c[cls]||'rgba(255,255,255,.3)';
     return bars.map((b,i)=>{
       const isLast=i===bars.length-1;
@@ -1143,7 +1143,7 @@ function _pvBuildCompactStrip(){
         :Math.round(acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0)/Math.max(1,acctWithPace.reduce((s,a)=>s+a.paceSignal.expected,0))*100))
       :0;
   const ppCls=portfolioPace>=100?'great':portfolioPace>=95?'safe':portfolioPace>=85?'warn':'danger';
-  const paceColor=ppCls==='great'||ppCls==='safe'?'#4ddc97':ppCls==='warn'?'var(--amb)':'#ff8888';
+  const paceColor=ppCls==='great'||ppCls==='safe'?'var(--tk-ok-bright)':ppCls==='warn'?'var(--amb)':'#ff8888';
   const okA=accounts.filter(a=>!a.paceSignal||(a.paceSignal.cls==='great'||a.paceSignal.cls==='safe'));
   const warnA=accounts.filter(a=>a.paceSignal&&a.paceSignal.cls==='warn');
   const dangerA=accounts.filter(a=>a.paceSignal&&a.paceSignal.cls==='danger');
@@ -1798,7 +1798,7 @@ function _tvBuildCompactStrip(){
   const pace=_tgtTeamPct !== null ? _tgtTeamPct
     : (totalBaseline>0?Math.round(totalGmv/totalBaseline*100):0);
   const cls=pace>=100?'great':pace>=95?'safe':pace>=85?'warn':'danger';
-  const color=cls==='great'||cls==='safe'?'#4ddc97':cls==='warn'?'var(--amb)':'#ff8888';
+  const color=cls==='great'||cls==='safe'?'var(--tk-ok-bright)':cls==='warn'?'var(--amb)':'#ff8888';
   const danger=groups.filter(g=>g.cls==='danger');const warn=groups.filter(g=>g.cls==='warn');const ok=groups.filter(g=>g.cls==='safe'||g.cls==='great'||!g.cls);
   const searchIconSvg=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg>`;
   const chips=[
@@ -2077,7 +2077,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
-    const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
+    const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
@@ -2109,7 +2109,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const surplus=g.pace-100;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
-    const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
+    const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
@@ -2143,7 +2143,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const vm=getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
-    const chips=dot('#4ddc97',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
+    const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
@@ -2242,7 +2242,7 @@ When mentioning a SKU, use ฿ — not %.`;
     const _tvStrip=document.getElementById('tv-compact-strip');
     if(_tvColl){_tvColl.className='pv-collapsible expanded';}
     if(_tvStrip){_tvStrip.className='pv-compact-strip hidden';_tvStrip.innerHTML='';}
-    if(lbl)lbl.innerHTML='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="vertical-align:-.5px"><path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="#4ddc97" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Team Insight';
+    if(lbl)lbl.innerHTML='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="vertical-align:-.5px"><path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="var(--tk-ok-bright)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Team Insight';
     btn.classList.add('done');
     btn.classList.add('done-bounce');
     btn.addEventListener('animationend',e=>{if(e.animationName==='doneBounce')btn.classList.remove('done-bounce');},{once:true});
