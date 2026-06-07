@@ -1,4 +1,4 @@
-<!-- Freshket Sense v400: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v401: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v400',
+      version: 'v401',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -41316,14 +41316,25 @@ async function _loadSkillProgress() {
   if (!_skillsUserId) return;
   try {
     const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+    // TL: join profiles เพื่อดึง email+name พร้อมกับ progress
+    // Supabase REST join: select=*,profiles(id,email,full_name,kam_name)
     const query = isTL
-      ? `${SKILLS_TABLE_PROG}?select=*`                              // TL sees all (RLS handles team filter)
+      ? `${SKILLS_TABLE_PROG}?select=*,profiles(id,email,full_name,kam_name)`
       : `${SKILLS_TABLE_PROG}?select=*&user_id=eq.${_skillsUserId}`;
     const rows = await _skFetch(query);
     _skillProg = {};
+    _skillUsers = {};  // build _skillUsers จาก join result ทันที
     (rows || []).forEach(r => {
       const key = isTL ? `${r.user_id}:${r.skill_id}` : String(r.skill_id);
       _skillProg[key] = r;
+      // เก็บ profile info index by UUID (สำหรับ _skUserName lookup)
+      if (isTL && r.profiles && !_skillUsers[r.user_id]) {
+        _skillUsers[r.user_id] = {
+          full_name: r.profiles.kam_name || r.profiles.full_name || r.profiles.email || '',
+          kam_name:  r.profiles.kam_name || r.profiles.full_name || '',
+          email:     r.profiles.email || '',
+        };
+      }
     });
   } catch(e) {
     console.error('[Skills] loadProgress:', e);
@@ -41335,17 +41346,23 @@ async function _loadSkillUsers() {
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   if (!isTL) return;
   try {
-    // Strategy 1: ดึงจาก portviewBulkData (มี kamEmail+kamName อยู่แล้ว ไม่ต้องผ่าน RLS)
+    // Strategy 0: ถ้า _loadSkillProgress join สำเร็จ _skillUsers มีข้อมูลแล้ว — เสริมด้วย portviewBulkData
+    // Strategy 1: เสริมจาก portviewBulkData (kamName ดีกว่า full_name ในหลายกรณี)
     const bulk = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
     if (bulk.length > 0) {
-      _skillUsers = {};
+      // merge — ไม่ overwrite UUID key ที่มีอยู่แล้ว แต่เพิ่ม email key
       bulk.forEach(r => {
         const email = (r.kamEmail || '').toLowerCase();
-        if (email && !_skillUsers[email]) {
+        if (!email) return;
+        const existing = Object.values(_skillUsers).find(u => u.email && u.email.toLowerCase() === email);
+        if (existing) {
+          // อัพเดท kamName จาก bulk (มักดีกว่า)
+          if (r.kamName) existing.kam_name = r.kamName;
+        } else {
+          // เพิ่ม entry ใหม่ index by email (fallback)
           _skillUsers[email] = { full_name: r.kamName || email, kam_name: r.kamName || email, email };
         }
       });
-      // _skillProg.user_id อาจเป็น UUID หรือ email — build index ทั้งคู่
       return;
     }
     // Strategy 2: fallback query Supabase profiles (ถ้าไม่มี portviewBulkData)
