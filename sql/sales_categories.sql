@@ -26,7 +26,7 @@ params AS (
 )
 
 SELECT
-  o.account_id,
+  CAST(um.account_guid AS STRING)  AS account_id,
   CASE EXTRACT(MONTH FROM DATE_TRUNC(o.delivery_date, MONTH))
     WHEN 1  THEN 'ม.ค.'  WHEN 2  THEN 'ก.พ.'  WHEN 3  THEN 'มี.ค.'
     WHEN 4  THEN 'เม.ย.' WHEN 5  THEN 'พ.ค.'  WHEN 6  THEN 'มิ.ย.'
