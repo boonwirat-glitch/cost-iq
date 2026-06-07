@@ -1157,3 +1157,19 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   letter-spacing: .03em;
 }
 .sv-proj-cell.now .sv-proj-note { color: rgba(255,56,92,.55); }
+
+/* Projection breakdown line */
+.sv-proj-breakdown {
+  font-size: 8px;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 3px;
+  letter-spacing: .02em;
+  line-height: 1.4;
+}
+
+/* Category — empty/not-purchased */
+.sv-cat-empty {
+  color: #C0C0C0 !important;
+  font-style: italic;
+}
