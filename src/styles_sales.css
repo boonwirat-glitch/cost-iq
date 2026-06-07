@@ -18,10 +18,17 @@
 /* --warn     #FF9500   caution               */
 
 /* ── Global font: Noto Sans Thai for all Sales UI ── */
-[class*="sv-"], .scr-sales-portview, #scr-sales-portview,
-#scr-sales-pipeline, #scr-sales-commission, #scr-sales-teamview,
-.sv-sheet, .sv-sheet-overlay {
-  font-family: 'Noto Sans Thai', sans-serif;
+/* Override body IBM Plex Sans Thai — high specificity on screen containers */
+body.sales-mode .scr,
+body.sales-mode #scr-sales-portview,
+body.sales-mode #scr-sales-pipeline,
+body.sales-mode #scr-sales-commission,
+body.sales-mode #scr-sales-teamview,
+body.sales-mode .sv-sheet,
+body.sales-mode .sv-sheet-overlay,
+body.sales-mode [class*="sv-"],
+body.sales-mode [class*="sv-"] * {
+  font-family: 'Noto Sans Thai', sans-serif !important;
 }
 
 
