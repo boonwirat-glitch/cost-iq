@@ -918,39 +918,41 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* Account group header */
 /* Account group header — prominent, clearly a parent */
-.sv-ol-acct-hd {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 6px 0 0;
-  padding: 10px 12px;
+/* 8px surface band — visual break before/after group (Airbnb pattern) */
+.sv-ol-band {
+  height: 8px;
   background: #F7F7F7;
-  border-radius: 8px;
+}
+/* Group header — typography hierarchy, no card/border */
+.sv-ol-grp-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 20px 4px;
   cursor: pointer;
-  border-left: 3px solid #222222;
 }
-.sv-ol-acct-left { flex: 1; min-width: 0; }
-.sv-ol-acct-name {
-  font-size: 13px;
+.sv-ol-grp-name {
+  font-size: 11px;
   font-weight: 700;
-  color: #222222;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #3F3F3F;
+  font-family: 'IBM Plex Mono', monospace;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
-.sv-ol-acct-meta {
+.sv-ol-grp-arrow {
+  font-size: 10px;
+  color: #B0B0B0;
+  font-weight: 400;
+}
+.sv-ol-grp-meta {
   font-size: 10px;
   color: #6A6A6A;
   font-family: 'IBM Plex Mono', monospace;
-  margin-top: 1px;
 }
-.sv-ol-acct-right { flex-shrink: 0; margin-left: 10px; }
-.sv-ol-acct-toggle {
-  font-size: 11px;
-  color: #6A6A6A;
-  font-weight: 700;
-}
-/* Branch rows indent under account header */
+/* Branch rows — indented under group header */
 .sv-ol-branch {
   padding: 8px 0 8px 12px;
   border-top: 1px solid #EBEBEB;
