@@ -62,6 +62,7 @@ function parsePortviewBulk(csv){
       const newUserExpDate=(p[21]||'').trim().replace(/^"|"$/g,'')||null;
       const daysHeld=p[22]!==undefined&&p[22].trim()!==''?parseInt(p[22])||0:0;
       const salesTeamName=(p[23]||'').trim().replace(/^"|"$/g,'')||'';
+      const accountGroupName=(p[24]||'').trim().replace(/^"|"$/g,'')||'';
       return{id:accountId,name:accountName,lastGmv,gmvToDate,daysElapsed,daysInMonth,runrate,accountType,
         churnedSkuCount,churnedGmv,topChurnedNames,missingCatCount,missingCats,
         lastMonthSkuCount,curSkuCount,ordersToDate,kamName,kamEmail,tlEmail,daysWithCurrentKam,
