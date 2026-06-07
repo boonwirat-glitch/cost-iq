@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Skills Mockup v3 — TL Screens</title>
+<style>
+:root{
+  --canvas:#FFF;--surface:#F7F7F7;--ink:#222;--body:#3F3F3F;--muted:#6A6A6A;
+  --hairline:#EBEBEB;--ac:#FF385C;--ac-dim:rgba(255,56,92,.08);
+  --ok:#34C759;--warn:#FF9500;--info:#2196F3;--locked:#BDBDBD;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Noto Sans Thai',sans-serif;
+  background:#C8C8C8;
+  display:flex;align-items:flex-start;justify-content:center;
+  min-height:100vh;padding:32px 20px 64px;gap:24px;flex-wrap:wrap;
+}
+.pw{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.pl{font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#555;text-align:center;max-width:360px;}
+.phone{
+  width:360px;background:var(--canvas);border-radius:40px;overflow:hidden;
+  position:relative;display:flex;flex-direction:column;
+  box-shadow:0 0 0 7px #1A1A1A,0 0 0 8px rgba(255,255,255,.08),0 32px 80px rgba(0,0,0,.5);
+  min-height:700px;
+}
+.island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:90px;height:26px;background:#000;border-radius:999px;z-index:200;}
+.sbar{height:42px;padding:12px 22px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--ink);flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+.topbar{padding:6px 14px 7px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--hairline);flex-shrink:0;}
+.tb-mark{font-size:13px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.chip{font-size:9px;font-weight:600;color:var(--ac);background:var(--ac-dim);border-radius:999px;padding:2px 8px;margin-left:5px;font-family:'IBM Plex Mono',monospace;}
+.tl-role-chip{font-size:10px;font-weight:700;color:#7C3AED;background:rgba(124,58,237,.09);border-radius:999px;padding:3px 9px;font-family:'IBM Plex Mono',monospace;}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:84px;}
+.screen::-webkit-scrollbar{display:none;}
+
+/* NAV */
+.bnav{
+  position:absolute;bottom:7px;left:11px;right:11px;
+  background:#fff;border-radius:999px;border:1px solid rgba(0,0,0,.07);
+  padding:7px 9px;display:flex;align-items:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.07),0 8px 28px rgba(0,0,0,.14);
+}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:3px 0;cursor:pointer;position:relative;}
+.ni svg{width:20px;height:20px;opacity:.28;color:var(--ink);stroke-width:1.8;fill:none;stroke:currentColor;}
+.ni .lb{font-size:9px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.ni.on svg{opacity:1;color:var(--ac);}
+.ni.on .lb{color:var(--ac);font-weight:700;}
+/* dot badge */
+.ni-badge{
+  position:absolute;top:1px;right:calc(50% - 16px);
+  width:6px;height:6px;border-radius:50%;
+  background:var(--ac);border:1.5px solid #fff;
+}
+
+/* EYEBROW */
+.eyebrow{font-size:8.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.eyebrow.ac{color:var(--ac);}
+
+/* HERO STRIP (TL — compact) */
+.tl-hero{
+  margin:10px 14px 0;background:var(--surface);border-radius:12px;
+  padding:13px 14px;position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.tl-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--ac);border-radius:12px 12px 0 0;}
+.tl-hero-left{}
+.tl-hero-eye{font-size:8px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--ac);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;}
+.tl-hero-squad{font-size:13px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.tl-hero-sub{font-size:10px;color:var(--muted);font-family:'Noto Sans Thai',sans-serif;margin-top:1px;}
+.tl-hero-right{text-align:right;}
+.tl-hero-count{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;}
+.tl-hero-pending{font-size:22px;font-weight:700;color:var(--ac);font-family:'IBM Plex Mono',monospace;line-height:1;}
+.tl-hero-pendlbl{font-size:9px;color:var(--ac);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+
+/* TAB BAR */
+.tab-bar{
+  display:flex;margin:10px 14px 0;
+  background:var(--surface);border-radius:9px;padding:3px;gap:3px;
+}
+.tab{
+  flex:1;text-align:center;padding:7px 0;
+  border-radius:7px;cursor:pointer;
+  font-size:11px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;
+  color:var(--muted);
+}
+.tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1);}
+.tab-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--ac);color:#fff;
+  font-size:8px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+  margin-left:4px;vertical-align:middle;
+}
+
+/* PENDING LIST */
+.sec{padding:12px 14px 5px;display:flex;justify-content:space-between;align-items:center;}
+.sec-t{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.sec-meta{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+
+.pend-list{padding:0 14px;}
+.pend-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-top:1px solid var(--hairline);cursor:pointer;
+}
+.pend-row:active{background:var(--surface);}
+.pend-avatar{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+}
+.av-m{background:rgba(255,56,92,.1);color:var(--ac);}
+.av-t{background:rgba(33,150,243,.1);color:var(--info);}
+.av-p{background:rgba(52,199,89,.1);color:var(--ok);}
+.pend-info{flex:1;min-width:0;}
+.pend-name{font-size:13px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.pend-skill{font-size:11px;color:var(--body);font-family:'Noto Sans Thai',sans-serif;margin-top:1px;}
+.pend-date{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.pend-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+.state-pill-sm{
+  display:flex;align-items:center;gap:4px;
+  border-radius:999px;padding:3px 9px;
+  font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  font-family:'IBM Plex Mono',monospace;
+  background:rgba(33,150,243,.09);color:var(--info);
+}
+.pill-dot-sm{width:4px;height:4px;border-radius:50%;background:var(--info);}
+.chev{width:14px;height:14px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;}
+
+/* EMPTY STATE */
+.empty{padding:40px 14px;text-align:center;}
+.empty-icon{width:40px;height:40px;margin:0 auto 12px;color:var(--hairline);fill:none;stroke:currentColor;stroke-width:1.5;}
+.empty-title{font-size:14px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px;}
+.empty-sub{font-size:11px;color:var(--muted);font-family:'Noto Sans Thai',sans-serif;line-height:1.5;}
+
+/* TEAM OVERVIEW — hero */
+.ov-hero{margin:10px 14px 0;background:var(--surface);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+.ov-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--ac);border-radius:12px 12px 0 0;}
+.ov-hero-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px;}
+.ov-big{font-size:32px;font-weight:700;color:var(--ink);letter-spacing:-.03em;line-height:1;font-family:'IBM Plex Mono',monospace;}
+.ov-denom{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:3px;font-family:'IBM Plex Mono',monospace;}
+.ov-label{font-size:10px;color:var(--muted);font-family:'Noto Sans Thai',sans-serif;margin-top:2px;}
+.ov-pct{font-size:22px;font-weight:700;color:var(--ac);font-family:'IBM Plex Mono',monospace;}
+.ov-track{height:3px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.ov-fill{height:100%;border-radius:2px;background:var(--ac);}
+.ov-meta{display:flex;justify-content:space-between;margin-top:3px;font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+
+/* VIEW TOGGLE */
+.view-toggle{
+  display:flex;margin:10px 14px 0;
+  background:var(--surface);border-radius:8px;padding:3px;gap:3px;
+}
+.vt{
+  flex:1;text-align:center;padding:6px 0;border-radius:6px;cursor:pointer;
+  font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;
+  color:var(--muted);letter-spacing:.04em;text-transform:uppercase;
+}
+.vt.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.09);}
+
+/* VIEW A — by rep */
+.rep-list{padding:0 14px;}
+.rep-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-top:1px solid var(--hairline);cursor:pointer;
+}
+.rep-avatar{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+}
+.rep-info{flex:1;min-width:0;}
+.rep-name{font-size:13px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.rep-prog-row{display:flex;align-items:center;gap:7px;margin-top:5px;}
+.rep-track{flex:1;height:3px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.rep-fill{height:100%;border-radius:2px;}
+.rep-fill.ok{background:var(--ok);}
+.rep-fill.mid{background:var(--warn);}
+.rep-fill.low{background:var(--ac);}
+.rep-count{font-size:9px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--muted);flex-shrink:0;}
+.rep-pending-dot{width:6px;height:6px;border-radius:50%;background:var(--ac);flex-shrink:0;}
+
+/* VIEW B — by skill */
+.skill-list{padding:0 14px;}
+.mod-group-hd{
+  padding:12px 0 4px;
+  font-size:8px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--muted);font-family:'IBM Plex Mono',monospace;
+}
+.skill-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-top:1px solid var(--hairline);
+}
+.skill-info{flex:1;min-width:0;}
+.skill-name-row{display:flex;align-items:center;gap:6px;}
+.skill-code{font-size:9px;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;}
+.skill-name{font-size:12px;font-weight:600;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.skill-bar-row{display:flex;align-items:center;gap:7px;margin-top:4px;}
+.skill-track{flex:1;height:3px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.skill-fill{height:100%;border-radius:2px;background:var(--ok);}
+.skill-fill.mid{background:var(--warn);}
+.skill-fill.low{background:var(--ac);}
+.skill-fill.zero{background:var(--hairline);}
+.skill-count{font-size:9px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--muted);flex-shrink:0;min-width:24px;text-align:right;}
+/* status dot */
+.sk-warn-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.sk-warn-dot.warn{background:var(--warn);}
+.sk-warn-dot.ac{background:var(--ac);}
+.sk-warn-dot.ok{background:var(--ok);}
+.sk-warn-dot.none{background:transparent;}
+
+/* REP DETAIL — skill list (from View A tap) */
+.rep-det-hd{
+  padding:10px 14px 12px;border-bottom:1px solid var(--hairline);
+  display:flex;align-items:center;gap:10px;
+}
+.rep-det-avatar{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+}
+.rep-det-name{font-size:16px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.rep-det-meta{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+.filter-row{
+  padding:8px 14px;display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid var(--hairline);
+}
+.fpill{
+  font-size:9px;font-weight:700;color:var(--muted);
+  background:var(--surface);border:1px solid var(--hairline);
+  border-radius:999px;padding:3px 10px;cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;
+}
+.fpill.on{color:var(--ac);background:var(--ac-dim);border-color:rgba(255,56,92,.25);}
+
+.det-skill-list{padding:0 14px;}
+.det-skill-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 0;border-top:1px solid var(--hairline);cursor:pointer;
+}
+.det-skill-mod{font-size:8px;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;width:28px;}
+.det-skill-name{flex:1;font-size:12px;font-weight:600;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.det-state-badge{
+  font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  font-family:'IBM Plex Mono',monospace;flex-shrink:0;
+  display:flex;align-items:center;gap:4px;
+}
+.det-dot{width:5px;height:5px;border-radius:50%;}
+</style>
+</head>
+<body>
+
+<!-- ══ 4a · TL Skills Home — Pending tab ══ -->
+<div class="pw">
+<div class="pl">4a · TL View — รอประเมิน tab · 3 pending</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="tl-role-chip">Sales TL</span>
+  </div>
+  <div class="screen">
+
+    <!-- TL hero strip -->
+    <div class="tl-hero">
+      <div class="tl-hero-left">
+        <div class="tl-hero-eye">SKILLS</div>
+        <div class="tl-hero-squad">Squad A</div>
+        <div class="tl-hero-sub">5 sales reps</div>
+      </div>
+      <div class="tl-hero-right">
+        <div class="tl-hero-count">รอประเมิน</div>
+        <div class="tl-hero-pending">3</div>
+        <div class="tl-hero-pendlbl">PENDING</div>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab on">
+        รอประเมิน
+        <span class="tab-badge">3</span>
+      </div>
+      <div class="tab">ภาพรวมทีม</div>
+    </div>
+
+    <!-- Pending list -->
+    <div class="sec">
+      <span class="sec-t">เรียงตาม · รอนานสุด</span>
+    </div>
+    <div class="pend-list">
+
+      <!-- Row 1 — 3 days ago -->
+      <div class="pend-row">
+        <div class="pend-avatar av-m">M</div>
+        <div class="pend-info">
+          <div class="pend-name">Mint Siriprapa</div>
+          <div class="pend-skill">C00 · Rapport &amp; Reading the Room</div>
+          <div class="pend-date">self-marked 3 days ago</div>
+        </div>
+        <div class="pend-right">
+          <div class="state-pill-sm"><div class="pill-dot-sm"></div>Training</div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- Row 2 — 1 day ago -->
+      <div class="pend-row">
+        <div class="pend-avatar av-t">T</div>
+        <div class="pend-info">
+          <div class="pend-name">Toon Chaklid</div>
+          <div class="pend-skill">A09 · Planning &amp; Target Tracking</div>
+          <div class="pend-date">self-marked 1 day ago</div>
+        </div>
+        <div class="pend-right">
+          <div class="state-pill-sm"><div class="pill-dot-sm"></div>Training</div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- Row 3 — today -->
+      <div class="pend-row" style="border-bottom:1px solid var(--hairline);">
+        <div class="pend-avatar av-p">P</div>
+        <div class="pend-info">
+          <div class="pend-name">Pop Siriprapa</div>
+          <div class="pend-skill">B01 · Lead Finding</div>
+          <div class="pend-date">self-marked today</div>
+        </div>
+        <div class="pend-right">
+          <div class="state-pill-sm"><div class="pill-dot-sm"></div>Training</div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Nav — dot badge on ทักษะ -->
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on">
+      <div class="ni-badge"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <span class="lb">ทักษะ</span>
+    </div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 4b · TL — Empty pending state ══ -->
+<div class="pw">
+<div class="pl">4b · TL View — รอประเมิน · 0 pending (empty)</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="tl-role-chip">Sales TL</span>
+  </div>
+  <div class="screen">
+    <div class="tl-hero">
+      <div class="tl-hero-left">
+        <div class="tl-hero-eye">SKILLS</div>
+        <div class="tl-hero-squad">Squad A</div>
+        <div class="tl-hero-sub">5 sales reps</div>
+      </div>
+      <div class="tl-hero-right">
+        <div class="tl-hero-count">รอประเมิน</div>
+        <div class="tl-hero-pending" style="color:var(--ok);">0</div>
+        <div class="tl-hero-pendlbl" style="color:var(--ok);">ALL CLEAR</div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab on">รอประเมิน</div>
+      <div class="tab">ภาพรวมทีม</div>
+    </div>
+    <div class="empty">
+      <svg class="empty-icon" viewBox="0 0 24 24">
+        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <div class="empty-title">ทีมทุกคนเป็นปัจจุบัน</div>
+      <div class="empty-sub">ไม่มีทักษะที่รอการประเมิน<br>ดูภาพรวมทีมได้ที่ tab ถัดไป</div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <span class="lb">ทักษะ</span>
+    </div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 5a · Team Overview — View A (by rep) ══ -->
+<div class="pw">
+<div class="pl">5a · ภาพรวมทีม — View A · by rep</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="tl-role-chip">Sales TL</span>
+  </div>
+  <div class="screen">
+
+    <!-- Team hero -->
+    <div class="ov-hero">
+      <div class="eyebrow ac" style="margin-bottom:6px;">TEAM SKILLS · Squad A</div>
+      <div class="ov-hero-row">
+        <div>
+          <div style="display:flex;align-items:flex-end;gap:3px;">
+            <span class="ov-big">28</span>
+            <span class="ov-denom">/75</span>
+          </div>
+          <div class="ov-label">ทีม unlock แล้ว (5 reps × 15 skills)</div>
+        </div>
+        <div class="ov-pct">37%</div>
+      </div>
+      <div class="ov-track"><div class="ov-fill" style="width:37%;"></div></div>
+      <div class="ov-meta"><span>28 UNLOCKED</span><span>47 REMAINING</span></div>
+    </div>
+
+    <!-- View toggle -->
+    <div class="view-toggle">
+      <div class="vt on">By Rep</div>
+      <div class="vt">By Skill</div>
+    </div>
+
+    <!-- Rep rows -->
+    <div class="sec">
+      <span class="sec-t">รายคน</span>
+      <span class="sec-meta">เรียงตาม progress</span>
+    </div>
+    <div class="rep-list">
+
+      <!-- Toon — 8/15 best -->
+      <div class="rep-row">
+        <div class="rep-avatar av-t">T</div>
+        <div class="rep-info">
+          <div class="rep-name">Toon Chaklid</div>
+          <div class="rep-prog-row">
+            <div class="rep-track"><div class="rep-fill ok" style="width:53%;"></div></div>
+            <span class="rep-count" style="color:var(--ok);">8/15</span>
+          </div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <!-- Pop — 5/15 -->
+      <div class="rep-row">
+        <div class="rep-avatar av-p">P</div>
+        <div class="rep-info">
+          <div class="rep-name">Pop Siriprapa</div>
+          <div class="rep-prog-row">
+            <div class="rep-track"><div class="rep-fill ok" style="width:33%;"></div></div>
+            <span class="rep-count" style="color:var(--ok);">5/15</span>
+          </div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <!-- Mint — 2/15 + pending -->
+      <div class="rep-row">
+        <div class="rep-avatar av-m">M</div>
+        <div class="rep-info">
+          <div class="rep-name" style="display:flex;align-items:center;gap:6px;">
+            Mint Siriprapa
+            <div class="rep-pending-dot"></div>
+          </div>
+          <div class="rep-prog-row">
+            <div class="rep-track"><div class="rep-fill mid" style="width:13%;"></div></div>
+            <span class="rep-count" style="color:var(--warn);">2/15</span>
+          </div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <!-- Nong — 8/15 -->
+      <div class="rep-row">
+        <div class="rep-avatar" style="background:rgba(255,149,0,.1);color:var(--warn);">N</div>
+        <div class="rep-info">
+          <div class="rep-name">Nong Rinlaphat</div>
+          <div class="rep-prog-row">
+            <div class="rep-track"><div class="rep-fill mid" style="width:27%;"></div></div>
+            <span class="rep-count" style="color:var(--muted);">4/15</span>
+          </div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <!-- Krit — 1/15 low -->
+      <div class="rep-row" style="border-bottom:1px solid var(--hairline);">
+        <div class="rep-avatar" style="background:rgba(255,56,92,.08);color:var(--ac);">K</div>
+        <div class="rep-info">
+          <div class="rep-name" style="display:flex;align-items:center;gap:6px;">
+            Krit Napat
+            <div class="rep-pending-dot"></div>
+          </div>
+          <div class="rep-prog-row">
+            <div class="rep-track"><div class="rep-fill low" style="width:6%;"></div></div>
+            <span class="rep-count" style="color:var(--ac);">1/15</span>
+          </div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+    </div>
+    <div style="padding:12px 14px;"><span class="eyebrow">dot แดง = มี skill รอประเมิน</span></div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on">
+      <div class="ni-badge"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <span class="lb">ทักษะ</span>
+    </div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 5b · Team Overview — View B (by skill) ══ -->
+<div class="pw">
+<div class="pl">5b · ภาพรวมทีม — View B · by skill (A→D fixed)</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="tl-role-chip">Sales TL</span>
+  </div>
+  <div class="screen">
+    <div class="ov-hero">
+      <div class="eyebrow ac" style="margin-bottom:6px;">TEAM SKILLS · Squad A</div>
+      <div class="ov-hero-row">
+        <div>
+          <div style="display:flex;align-items:flex-end;gap:3px;">
+            <span class="ov-big">28</span><span class="ov-denom">/75</span>
+          </div>
+          <div class="ov-label">ทีม unlock แล้ว</div>
+        </div>
+        <div class="ov-pct">37%</div>
+      </div>
+      <div class="ov-track"><div class="ov-fill" style="width:37%;"></div></div>
+      <div class="ov-meta"><span>28 UNLOCKED</span><span>47 REMAINING</span></div>
+    </div>
+
+    <div class="view-toggle">
+      <div class="vt">By Rep</div>
+      <div class="vt on">By Skill</div>
+    </div>
+
+    <div class="skill-list">
+
+      <!-- Module A -->
+      <div class="mod-group-hd">Module A — Foundation & Way of Work</div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot ok"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">A01</span>
+            <span class="skill-name">PIPC</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill" style="width:80%;"></div></div>
+            <span class="skill-count" style="color:var(--ok);">4/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot ok"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">A05</span>
+            <span class="skill-name">Value & USP</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill" style="width:60%;"></div></div>
+            <span class="skill-count" style="color:var(--ok);">3/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot warn"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">A09</span>
+            <span class="skill-name">Planning & Target</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill mid" style="width:20%;"></div></div>
+            <span class="skill-count" style="color:var(--warn);">1/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot ac"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">A10</span>
+            <span class="skill-name">Pipeline Management</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill zero" style="width:0%;"></div></div>
+            <span class="skill-count" style="color:var(--ac);">0/5</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module B -->
+      <div class="mod-group-hd" style="margin-top:4px;">Module B — Preparation</div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot ok"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">B01</span>
+            <span class="skill-name">Lead Finding</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill" style="width:80%;"></div></div>
+            <span class="skill-count" style="color:var(--ok);">4/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot warn"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">B02</span>
+            <span class="skill-name">Decision Maker</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill mid" style="width:40%;"></div></div>
+            <span class="skill-count" style="color:var(--warn);">2/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot warn"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">B03</span>
+            <span class="skill-name">Making Appointment</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill mid" style="width:40%;"></div></div>
+            <span class="skill-count" style="color:var(--warn);">2/5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="skill-row">
+        <div class="sk-warn-dot ac"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">B04</span>
+            <span class="skill-name">Pre-Visit Preparation</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill zero" style="width:0%;"></div></div>
+            <span class="skill-count" style="color:var(--ac);">0/5</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module C header only — scrolls off -->
+      <div class="mod-group-hd" style="margin-top:4px;">Module C — Pitch</div>
+      <div class="skill-row">
+        <div class="sk-warn-dot warn"></div>
+        <div class="skill-info">
+          <div class="skill-name-row">
+            <span class="skill-code">C00</span>
+            <span class="skill-name">Rapport &amp; Reading</span>
+          </div>
+          <div class="skill-bar-row">
+            <div class="skill-track"><div class="skill-fill mid" style="width:20%;"></div></div>
+            <span class="skill-count" style="color:var(--warn);">1/5</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- legend -->
+    <div style="padding:12px 14px 4px;display:flex;gap:14px;">
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div class="sk-warn-dot ac"></div>
+        <span class="eyebrow">0 passed · ยังไม่เริ่ม</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div class="sk-warn-dot warn"></div>
+        <span class="eyebrow">&lt;40% · อ่อน</span>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on">
+      <div class="ni-badge"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <span class="lb">ทักษะ</span>
+    </div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 5c · Rep Detail — from View A tap ══ -->
+<div class="pw">
+<div class="pl">5c · Rep Detail — Mint · default filter "ยังไม่ผ่าน"</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar" style="padding:8px 14px;">
+    <button style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:0;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+      <span style="font-size:12px;font-weight:600;color:var(--ac);font-family:'Noto Sans Thai',sans-serif;">ภาพรวมทีม</span>
+    </button>
+    <span class="tl-role-chip">TL View</span>
+  </div>
+  <div class="screen">
+
+    <!-- Rep header -->
+    <div class="rep-det-hd">
+      <div class="rep-det-avatar av-m">M</div>
+      <div>
+        <div class="rep-det-name">Mint Siriprapa</div>
+        <div class="rep-det-meta">Sales · Squad A · 2/15 unlocked</div>
+      </div>
+      <!-- mini ring -->
+      <div style="position:relative;width:36px;height:36px;margin-left:auto;">
+        <svg viewBox="0 0 36 36" style="width:36px;height:36px;transform:rotate(-90deg);">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+          <circle cx="18" cy="18" r="15" fill="none" stroke="var(--warn)" stroke-width="2.5"
+            stroke-dasharray="94.25" stroke-dashoffset="81.6" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--warn);font-family:'IBM Plex Mono',monospace;">2/15</div>
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-row">
+      <span class="fpill on">ยังไม่ผ่าน</span>
+      <span class="fpill">ดูทั้งหมด</span>
+    </div>
+
+    <!-- Skill list — filtered: locked + training only -->
+    <div class="det-skill-list">
+
+      <!-- Training -->
+      <div class="det-skill-row">
+        <span class="det-skill-mod">C00</span>
+        <span class="det-skill-name">Rapport &amp; Reading the Room</span>
+        <div class="det-state-badge" style="color:var(--info);">
+          <div class="det-dot" style="background:var(--info);"></div>Training
+        </div>
+        <svg style="width:12px;height:12px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;flex-shrink:0;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <!-- Locked ones -->
+      <div class="det-skill-row">
+        <span class="det-skill-mod">A09</span>
+        <span class="det-skill-name">Planning &amp; Target Tracking</span>
+        <div class="det-state-badge" style="color:var(--locked);">
+          <div class="det-dot" style="background:var(--locked);"></div>Locked
+        </div>
+        <svg style="width:12px;height:12px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;flex-shrink:0;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="det-skill-row">
+        <span class="det-skill-mod">A10</span>
+        <span class="det-skill-name">Pipeline Management</span>
+        <div class="det-state-badge" style="color:var(--locked);">
+          <div class="det-dot" style="background:var(--locked);"></div>Locked
+        </div>
+        <svg style="width:12px;height:12px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;flex-shrink:0;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="det-skill-row">
+        <span class="det-skill-mod">B02</span>
+        <span class="det-skill-name">Finding Decision Maker</span>
+        <div class="det-state-badge" style="color:var(--locked);">
+          <div class="det-dot" style="background:var(--locked);"></div>Locked
+        </div>
+        <svg style="width:12px;height:12px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;flex-shrink:0;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="det-skill-row">
+        <span class="det-skill-mod">B03</span>
+        <span class="det-skill-name">Making Appointment</span>
+        <div class="det-state-badge" style="color:var(--locked);">
+          <div class="det-dot" style="background:var(--locked);"></div>Locked
+        </div>
+        <svg style="width:12px;height:12px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;flex-shrink:0;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="det-skill-row" style="opacity:.5;">
+        <span class="det-skill-mod" style="color:var(--muted);">+8</span>
+        <span class="det-skill-name" style="color:var(--muted);">อีก 8 skills ล็อคอยู่</span>
+        <span style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">→ ดูทั้งหมด</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on">
+      <div class="ni-badge"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <span class="lb">ทักษะ</span>
+    </div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>

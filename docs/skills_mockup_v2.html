@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Skills Mockup v2 — Freshket Sense</title>
+<style>
+:root{
+  --canvas:#FFF;--surface:#F7F7F7;--ink:#222;--body:#3F3F3F;--muted:#6A6A6A;
+  --hairline:#EBEBEB;--ac:#FF385C;--ac-dim:rgba(255,56,92,.08);
+  --ok:#34C759;--warn:#FF9500;--info:#2196F3;--locked:#BDBDBD;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Noto Sans Thai',sans-serif;
+  background:#C8C8C8;
+  display:flex;align-items:flex-start;justify-content:center;
+  min-height:100vh;padding:32px 20px 64px;gap:24px;flex-wrap:wrap;
+}
+/* phone frame */
+.pw{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.pl{font-size:8px;font-family:'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#666;text-align:center;max-width:360px;}
+.phone{
+  width:360px;background:var(--canvas);border-radius:40px;overflow:hidden;
+  position:relative;display:flex;flex-direction:column;
+  box-shadow:0 0 0 7px #1A1A1A,0 0 0 8px rgba(255,255,255,.08),0 32px 80px rgba(0,0,0,.5);
+  min-height:700px;
+}
+.island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:90px;height:26px;background:#000;border-radius:999px;z-index:200;}
+.sbar{height:42px;padding:12px 22px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--ink);flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+.topbar{padding:6px 14px 7px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--hairline);flex-shrink:0;}
+.tb-mark{font-size:13px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.chip{font-size:9px;font-weight:600;color:var(--ac);background:var(--ac-dim);border-radius:999px;padding:2px 8px;margin-left:5px;font-family:'IBM Plex Mono',monospace;}
+.role-chip{font-size:10px;font-weight:700;color:var(--ac);background:var(--ac-dim);border-radius:999px;padding:3px 9px;font-family:'IBM Plex Mono',monospace;}
+.tl-role-chip{font-size:10px;font-weight:700;color:#7C3AED;background:rgba(124,58,237,.09);border-radius:999px;padding:3px 9px;font-family:'IBM Plex Mono',monospace;}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:84px;}
+.screen::-webkit-scrollbar{display:none;}
+
+/* character image placeholders */
+.char-img{display:flex;align-items:flex-end;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;}
+.char-img-nav{background:linear-gradient(160deg,#FFD6E0 0%,#FFECD2 100%);}
+.char-img-scout{background:linear-gradient(160deg,#D4EDDA 0%,#F0F7DA 100%);}
+.char-img-consult{background:linear-gradient(160deg,#E8D5F5 0%,#D6E4F5 100%);}
+.char-img-growth{background:linear-gradient(160deg,#FFE8CC 0%,#FFF3CC 100%);}
+/* silhouette placeholder text */
+.char-sil{font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;opacity:.35;text-align:center;padding-bottom:8px;}
+.char-sil-nav{color:#C0436A;}
+.char-sil-scout{color:#2E7D4F;}
+.char-sil-consult{color:#6B21A8;}
+.char-sil-growth{color:#C2620A;}
+
+/* card image placeholder (2-col grid cards) */
+.card-img{width:100%;display:flex;align-items:center;justify-content:center;position:relative;}
+.card-img-consult{background:linear-gradient(160deg,#E8D5F5 0%,#D6E4F5 100%);}
+.card-lbl{font-size:9px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:#6B21A8;opacity:.4;}
+
+/* NAV */
+.bnav{
+  position:absolute;bottom:7px;left:11px;right:11px;
+  background:#fff;border-radius:999px;border:1px solid rgba(0,0,0,.07);
+  padding:7px 9px;display:flex;align-items:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.07),0 8px 28px rgba(0,0,0,.14);
+}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:3px 0;cursor:pointer;}
+.ni svg{width:20px;height:20px;opacity:.28;color:var(--ink);stroke-width:1.8;fill:none;stroke:currentColor;}
+.ni .lb{font-size:9px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.ni.on svg{opacity:1;color:var(--ac);}
+.ni.on .lb{color:var(--ac);font-weight:700;}
+
+/* EYEBROW */
+.eyebrow{font-size:8.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.eyebrow.ac{color:var(--ac);}
+
+/* SKILLS HERO */
+.sk-hero{margin:10px 14px 0;background:var(--surface);border-radius:14px;padding:16px;position:relative;overflow:hidden;}
+.sk-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac);border-radius:14px 14px 0 0;}
+.sk-hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.sk-big{font-size:40px;font-weight:700;color:var(--ink);letter-spacing:-.04em;line-height:1;font-family:'Noto Sans Thai',sans-serif;}
+.sk-denom{font-size:14px;font-weight:500;color:var(--muted);margin-bottom:5px;font-family:'Noto Sans Thai',sans-serif;}
+.sk-label{font-size:10px;color:var(--muted);margin-top:3px;font-family:'Noto Sans Thai',sans-serif;}
+.sk-next-block{text-align:right;}
+.sk-next-eye{font-size:7.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;}
+.sk-next-name{font-size:11px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.sk-next-state{font-size:9px;font-weight:600;color:var(--info);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+.sk-track{height:3px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.sk-fill{height:100%;border-radius:2px;background:var(--ac);}
+.sk-meta{display:flex;justify-content:space-between;margin-top:3px;font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+
+/* MODULE LIST */
+.sec{padding:13px 14px 5px;}
+.mod-list{padding:0 14px;}
+.mod-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--hairline);cursor:pointer;}
+.mod-thumb{width:50px;height:50px;border-radius:12px;overflow:hidden;flex-shrink:0;}
+.mod-thumb.dim{opacity:.38;filter:grayscale(1);}
+.mod-code{font-size:8px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;}
+.mod-name{font-size:14px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.mod-sub{font-size:10px;color:var(--muted);margin-top:1px;font-family:'Noto Sans Thai',sans-serif;}
+.mod-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.ring{position:relative;width:36px;height:36px;}
+.ring svg{width:36px;height:36px;transform:rotate(-90deg);}
+.ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--ink);font-family:'IBM Plex Mono',monospace;}
+.chev{width:14px;height:14px;color:var(--muted);opacity:.5;fill:none;stroke:currentColor;stroke-width:2;}
+
+/* CARD GRID */
+.cg-topbar{padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hairline);flex-shrink:0;background:#fff;}
+.back-btn{display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:0;}
+.back-btn svg{width:16px;height:16px;color:var(--ac);stroke-width:2.2;fill:none;stroke:currentColor;}
+.back-btn span{font-size:12px;font-weight:600;color:var(--ac);font-family:'Noto Sans Thai',sans-serif;}
+.cg-mod-code{font-size:8px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.cg-mod-name{font-size:15px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+
+/* char banner */
+.char-banner{margin:10px 14px 12px;background:var(--surface);border-radius:14px;display:flex;align-items:stretch;overflow:hidden;height:116px;position:relative;}
+.char-banner-content{flex:1;padding:13px 13px 13px 11px;display:flex;flex-direction:column;justify-content:space-between;}
+.char-banner-name{font-size:15px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.trait-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.trait-pill{font-size:8px;font-weight:600;border-radius:999px;padding:2px 8px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
+.trait-ac{background:var(--ac-dim);color:var(--ac);}
+.trait-pu{background:rgba(124,58,237,.09);color:#7C3AED;}
+.char-quote{font-size:10px;color:var(--muted);line-height:1.45;font-family:'Noto Sans Thai',sans-serif;}
+
+/* skill cards */
+.sk-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 14px 16px;}
+.sk-card{border-radius:12px;overflow:hidden;cursor:pointer;background:var(--surface);position:relative;border-bottom:2.5px solid transparent;}
+.sk-card-body{padding:8px 10px 10px;}
+.sk-state-row{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
+.sk-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.state-locked .sk-dot{background:var(--locked);}
+.state-training .sk-dot{background:var(--info);}
+.state-unlocked .sk-dot{background:var(--ok);}
+.state-mastered .sk-dot{background:var(--warn);}
+.sk-state-label{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
+.state-locked .sk-state-label{color:var(--locked);}
+.state-training .sk-state-label{color:var(--info);}
+.state-unlocked .sk-state-label{color:var(--ok);}
+.state-mastered .sk-state-label{color:var(--warn);}
+.state-training{border-bottom-color:var(--info);}
+.state-unlocked{border-bottom-color:var(--ok);}
+.state-mastered{border-bottom-color:var(--warn);}
+.sk-card-name{font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;font-family:'Noto Sans Thai',sans-serif;}
+.sk-card-code{font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.state-locked .card-img{opacity:.38;filter:grayscale(1);}
+.state-training .card-img{opacity:.65;filter:saturate(.3);}
+.lock-ico{position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.38);display:flex;align-items:center;justify-content:center;}
+.lock-ico svg{width:10px;height:10px;color:#fff;stroke-width:2.2;fill:none;stroke:currentColor;}
+/* mastered wide */
+.sk-card-wide{grid-column:1/-1;display:flex;align-items:center;border-radius:12px;overflow:hidden;cursor:pointer;background:var(--surface);border-bottom:2.5px solid var(--warn);position:relative;}
+.sk-card-wide .sk-card-body{flex:1;}
+.master-star{position:absolute;top:8px;right:10px;width:16px;height:16px;color:var(--warn);fill:currentColor;}
+
+/* DETAIL SHEET */
+.detail-phone{min-height:740px;}
+.detail-topbar{padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hairline);flex-shrink:0;background:#fff;}
+.detail-code{font-size:9px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.img-zone{overflow:hidden;position:relative;flex-shrink:0;}
+.img-fade{position:absolute;bottom:0;left:0;right:0;height:70px;background:linear-gradient(to top,#fff 10%,transparent 100%);}
+.detail-body{flex:1;overflow-y:auto;padding:0 16px 24px;}
+.detail-body::-webkit-scrollbar{display:none;}
+.state-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;}
+.state-pill{display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 13px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
+.pill-training{background:rgba(33,150,243,.09);color:var(--info);}
+.pill-dot{width:5px;height:5px;border-radius:50%;}
+.pill-training .pill-dot{background:var(--info);}
+.skill-name{font-size:21px;font-weight:700;color:var(--ink);margin-bottom:14px;line-height:1.2;font-family:'Noto Sans Thai',sans-serif;}
+.rubric-block{margin-bottom:12px;}
+.rubric-eye{font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;}
+.rubric-text{font-size:12px;color:var(--body);line-height:1.65;font-family:'Noto Sans Thai',sans-serif;}
+.divider{height:1px;background:var(--hairline);margin:12px 0;}
+.rep-hint{font-size:10px;color:var(--muted);text-align:center;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;}
+.cta-btn{width:100%;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;}
+.cta-outline{background:#fff;color:var(--ac);border:1.5px solid var(--ac);}
+.log-eye{font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin:14px 0 6px;}
+.log-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid var(--hairline);}
+.log-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.log-dot.training{background:var(--info);}
+.log-state{font-size:10.5px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.log-meta{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+/* TL zone */
+.tl-zone{background:var(--surface);border-radius:12px;padding:13px;margin:8px 0;}
+.tl-eye{font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ac);font-family:'IBM Plex Mono',monospace;margin-bottom:10px;}
+.tl-rep-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--hairline);}
+.tl-avatar{width:28px;height:28px;border-radius:50%;background:var(--ac-dim);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--ac);flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+.tl-rep-name{font-size:12px;font-weight:700;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;}
+.tl-rep-meta{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.tl-state-label{font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:6px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;}
+.tl-state-row{display:flex;gap:5px;margin-bottom:10px;}
+.tl-btn{flex:1;border:1.5px solid var(--hairline);border-radius:8px;padding:8px 2px;background:#fff;cursor:pointer;text-align:center;}
+.tl-btn-dot{width:5px;height:5px;border-radius:50%;margin:0 auto 4px;}
+.tl-btn-label{font-size:8.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;display:block;}
+.tl-btn.sel-training{border-color:var(--info);background:rgba(33,150,243,.07);}
+.tl-btn.sel-training .tl-btn-dot{background:var(--info);}
+.tl-btn.sel-training .tl-btn-label{color:var(--info);}
+.tl-note{width:100%;border:1px solid var(--hairline);border-radius:8px;padding:9px 10px;font-size:11px;color:var(--ink);font-family:'Noto Sans Thai',sans-serif;resize:none;background:#fff;outline:none;}
+.tl-note::placeholder{color:var(--muted);}
+.tl-note:focus{border-color:rgba(255,56,92,.35);}
+.tl-save{width:100%;margin-top:8px;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;}
+</style>
+</head>
+<body>
+
+<!-- ══ 1 · Skills Home ══ -->
+<div class="pw">
+<div class="pl">1 · Skills Home — Sales Rep · 2/15 unlocked</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="role-chip">Sales</span>
+  </div>
+  <div class="screen">
+    <div class="sk-hero">
+      <div class="eyebrow ac" style="margin-bottom:5px;">SKILLS MASTERY</div>
+      <div class="sk-hero-top">
+        <div>
+          <div style="display:flex;align-items:flex-end;gap:3px;">
+            <span class="sk-big">2</span><span class="sk-denom">/15</span>
+          </div>
+          <div class="sk-label">ทักษะที่ปลดล็อคแล้ว</div>
+        </div>
+        <div class="sk-next-block">
+          <div class="sk-next-eye">NEXT UP</div>
+          <div class="sk-next-name">C00 · Rapport</div>
+          <div class="sk-next-state">TRAINING</div>
+        </div>
+      </div>
+      <div class="sk-track"><div class="sk-fill" style="width:13.3%;"></div></div>
+      <div class="sk-meta"><span>2 UNLOCKED</span><span>13 REMAINING</span></div>
+    </div>
+
+    <div class="sec"><span class="eyebrow">Modules</span></div>
+    <div class="mod-list">
+
+      <!-- A Navigator — 2/4 -->
+      <div class="mod-row">
+        <div class="mod-thumb char-img char-img-nav" style="display:flex;align-items:flex-end;justify-content:center;">
+          <span class="char-sil char-sil-nav">NAV</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="mod-code">Module A</div>
+          <div class="mod-name">The Navigator</div>
+          <div class="mod-sub">Foundation & Way of Work · 4 skills</div>
+        </div>
+        <div class="mod-right">
+          <div class="ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--ok)" stroke-width="2.5"
+                stroke-dasharray="94.25" stroke-dashoffset="47.12" stroke-linecap="round"/>
+            </svg>
+            <div class="ring-label">2/4</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- B Scout — 0/4 -->
+      <div class="mod-row">
+        <div class="mod-thumb dim char-img char-img-scout" style="display:flex;align-items:flex-end;justify-content:center;">
+          <span class="char-sil char-sil-scout">SCT</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="mod-code">Module B</div>
+          <div class="mod-name">The Scout</div>
+          <div class="mod-sub">Preparation · 4 skills</div>
+        </div>
+        <div class="mod-right">
+          <div class="ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+            </svg>
+            <div class="ring-label" style="color:var(--muted);">0/4</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- C Consultant — 1 training -->
+      <div class="mod-row">
+        <div class="mod-thumb dim char-img char-img-consult" style="display:flex;align-items:flex-end;justify-content:center;">
+          <span class="char-sil char-sil-consult">CST</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="mod-code">Module C</div>
+          <div class="mod-name">The Consultant</div>
+          <div class="mod-sub">Pitch · 5 skills</div>
+        </div>
+        <div class="mod-right">
+          <div class="ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--info)" stroke-width="2.5"
+                stroke-dasharray="4 3" stroke-dashoffset="75.4" stroke-linecap="round"/>
+            </svg>
+            <div class="ring-label" style="color:var(--info);">1✦</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <!-- D Growth — 0/2 -->
+      <div class="mod-row" style="border-bottom:1px solid var(--hairline);">
+        <div class="mod-thumb dim char-img char-img-growth" style="display:flex;align-items:flex-end;justify-content:center;">
+          <span class="char-sil char-sil-growth">GRW</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="mod-code">Module D</div>
+          <div class="mod-name">The Growth Partner</div>
+          <div class="mod-sub">Account Development · 2 skills</div>
+        </div>
+        <div class="mod-right">
+          <div class="ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+            </svg>
+            <div class="ring-label" style="color:var(--muted);">0/2</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>
+    </div>
+    <div style="padding:16px 14px;text-align:center;"><span class="eyebrow">TL ประเมินและ unlock ทักษะให้คุณ</span></div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M3 3h18v4H3zM3 10h12v4H3zM3 17h8v4H3z"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg><span class="lb">ทักษะ</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 2 · Module C Card Grid ══ -->
+<div class="pw">
+<div class="pl">2 · Module C — Card Grid · The Consultant</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="cg-topbar">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+      <span>ทักษะ</span>
+    </button>
+    <div style="text-align:right;">
+      <div class="cg-mod-code">Module C</div>
+      <div class="cg-mod-name">The Consultant</div>
+    </div>
+  </div>
+  <div class="screen">
+    <!-- Character banner -->
+    <div class="char-banner">
+      <div class="char-img char-img-consult" style="width:90px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;">
+        <span style="font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:#6B21A8;opacity:.4;">CST</span>
+      </div>
+      <div class="char-banner-content">
+        <div>
+          <div class="char-banner-name">The Consultant</div>
+          <div class="trait-row">
+            <span class="trait-pill trait-ac">Empathetic</span>
+            <span class="trait-pill trait-pu">Intelligent</span>
+            <span class="trait-pill trait-pu">Persuasive</span>
+          </div>
+        </div>
+        <div class="char-quote">"Understand the real need,<br>then connect the right solution."</div>
+      </div>
+    </div>
+
+    <div class="sk-grid">
+      <!-- C00 Training -->
+      <div class="sk-card state-training">
+        <div class="card-img char-img-consult" style="height:106px;"><span class="card-lbl">C00</span></div>
+        <div class="sk-card-body">
+          <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">Training</span></div>
+          <div class="sk-card-name">Rapport & Reading</div>
+          <div class="sk-card-code">C00</div>
+        </div>
+      </div>
+      <!-- C01 Locked -->
+      <div class="sk-card state-locked">
+        <div class="card-img char-img-consult" style="height:106px;"><span class="card-lbl">C01</span></div>
+        <div class="lock-ico"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+        <div class="sk-card-body">
+          <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">Locked</span></div>
+          <div class="sk-card-name">Discovery</div>
+          <div class="sk-card-code">C01</div>
+        </div>
+      </div>
+      <!-- C03 Locked -->
+      <div class="sk-card state-locked">
+        <div class="card-img char-img-consult" style="height:106px;"><span class="card-lbl">C03</span></div>
+        <div class="lock-ico"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+        <div class="sk-card-body">
+          <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">Locked</span></div>
+          <div class="sk-card-name">Analyze & Connect Pain</div>
+          <div class="sk-card-code">C03</div>
+        </div>
+      </div>
+      <!-- C04 Unlocked -->
+      <div class="sk-card state-unlocked">
+        <div class="card-img char-img-consult" style="height:106px;"><span class="card-lbl">C04</span></div>
+        <div class="sk-card-body">
+          <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">Unlocked</span></div>
+          <div class="sk-card-name">Objection Handling</div>
+          <div class="sk-card-code">C04</div>
+        </div>
+      </div>
+      <!-- C05 Mastered — wide -->
+      <div class="sk-card-wide">
+        <div class="card-img char-img-consult" style="width:90px;height:90px;flex-shrink:0;"><span class="card-lbl">C05</span></div>
+        <svg class="master-star" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+        <div class="sk-card-body">
+          <div class="sk-state-row"><div class="sk-dot" style="background:var(--warn);"></div><span class="sk-state-label" style="color:var(--warn);">Mastered</span></div>
+          <div class="sk-card-name">Close & Next Step</div>
+          <div class="sk-card-code">C05 · สูงสุด</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M3 3h18v4H3zM3 10h12v4H3zM3 17h8v4H3z"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg><span class="lb">ทักษะ</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 3a · Skill Detail — Rep ══ -->
+<div class="pw">
+<div class="pl">3a · Skill Detail — Rep view · C00 · Training</div>
+<div class="phone detail-phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="detail-topbar">
+    <button class="back-btn"><svg viewBox="0 0 24 24"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg><span>Module C</span></button>
+    <span class="detail-code">C00</span>
+  </div>
+  <div class="img-zone char-img-consult" style="height:190px;">
+    <div class="img-fade"></div>
+  </div>
+  <div class="detail-body">
+    <div class="state-row">
+      <div class="state-pill pill-training"><div class="pill-dot"></div>Training</div>
+      <span class="detail-code">The Consultant · C00</span>
+    </div>
+    <div class="skill-name">Rapport & Reading the Room</div>
+    <div class="rubric-block">
+      <div class="rubric-eye">Principle</div>
+      <div class="rubric-text">คุณไม่สามารถขายของให้กับคนที่ยังไม่เชื่อใจคุณได้ ก่อนจะเริ่มนำเสนอ หน้าที่ของ Sales คือต้องอ่านให้ออกว่าลูกค้าเริ่มต้นด้วยทัศนคติอย่างไร และปรับตัวตามนั้น</div>
+    </div>
+    <div class="divider"></div>
+    <div class="rubric-block">
+      <div class="rubric-eye">Practice</div>
+      <div class="rubric-text">Framework B.A.N.K — ระบุบุคลิกลูกค้า<br>วิธี Break the Ice ในแต่ละแบบ<br>Role play 3 สถานการณ์ร่วมกับ TL</div>
+    </div>
+    <div class="divider"></div>
+    <div class="rubric-block">
+      <div class="rubric-eye">Pass Test</div>
+      <div class="rubric-text">วิเคราะห์ได้ว่า user ที่คุยเป็นบุคลิกแบบไหน — วิธีเปิดใจลูกค้าในกลุ่มต่างๆ — รับมือกับ Perception ของลูกค้าในครั้งแรกได้</div>
+    </div>
+    <div class="divider"></div>
+    <div class="rep-hint">รอ TL ประเมินเพื่อ unlock ทักษะนี้</div>
+    <button class="cta-btn cta-outline">แจ้ง TL ขอรับการประเมิน</button>
+    <div class="log-eye">History</div>
+    <div class="log-row">
+      <div class="log-dot training"></div>
+      <div>
+        <div class="log-state">เริ่มฝึก · Training</div>
+        <div class="log-meta">self · 2026-06-07 09:14</div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M3 3h18v4H3zM3 10h12v4H3zM3 17h8v4H3z"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg><span class="lb">ทักษะ</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 3b · Skill Detail — TL ══ -->
+<div class="pw">
+<div class="pl">3b · Skill Detail — TL view · ประเมิน C00 · Mint</div>
+<div class="phone detail-phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="detail-topbar">
+    <button class="back-btn"><svg viewBox="0 0 24 24"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg><span>ทีม</span></button>
+    <span class="tl-role-chip">TL View</span>
+  </div>
+  <div class="img-zone char-img-consult" style="height:150px;">
+    <div class="img-fade"></div>
+  </div>
+  <div class="detail-body">
+    <div class="state-row">
+      <div class="state-pill pill-training"><div class="pill-dot"></div>Training</div>
+      <span class="detail-code">C00</span>
+    </div>
+    <div class="skill-name">Rapport & Reading the Room</div>
+    <div class="rubric-block">
+      <div class="rubric-eye">Pass Test</div>
+      <div class="rubric-text">1. วิเคราะห์ได้ว่า user ที่คุยเป็นบุคลิกแบบไหน (B.A.N.K)<br>2. วิธีเปิดใจลูกค้าในแต่ละกลุ่มทำอย่างไร<br>3. รับมือกับ Perception ครั้งแรกได้</div>
+    </div>
+    <div class="divider"></div>
+    <div class="tl-zone">
+      <div class="tl-eye">TL · Evaluation</div>
+      <div class="tl-rep-row">
+        <div class="tl-avatar">M</div>
+        <div>
+          <div class="tl-rep-name">Mint Siriprapa</div>
+          <div class="tl-rep-meta">Sales · Squad A · self-marked 2026-06-07</div>
+        </div>
+      </div>
+      <div class="tl-state-label">Mark as</div>
+      <div class="tl-state-row">
+        <button class="tl-btn">
+          <div class="tl-btn-dot" style="background:var(--locked);"></div>
+          <span class="tl-btn-label">Locked</span>
+        </button>
+        <button class="tl-btn sel-training">
+          <div class="tl-btn-dot"></div>
+          <span class="tl-btn-label">Training</span>
+        </button>
+        <button class="tl-btn">
+          <div class="tl-btn-dot" style="background:var(--ok);"></div>
+          <span class="tl-btn-label">Unlock</span>
+        </button>
+        <button class="tl-btn">
+          <div class="tl-btn-dot" style="background:var(--warn);"></div>
+          <span class="tl-btn-label">Master</span>
+        </button>
+      </div>
+      <textarea class="tl-note" rows="2" placeholder="Note — เช่น ยังต้องฝึก B.A.N.K เพิ่ม..."></textarea>
+      <button class="tl-save">บันทึกการประเมิน</button>
+    </div>
+    <div class="log-eye">History</div>
+    <div class="log-row">
+      <div class="log-dot training"></div>
+      <div>
+        <div class="log-state">เริ่มฝึก · Training</div>
+        <div class="log-meta">Mint · self · 2026-06-07 09:14</div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span class="lb">ทีม</span></div>
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg><span class="lb">ทักษะ</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>
