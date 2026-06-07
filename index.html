@@ -10069,7 +10069,7 @@ function parsePortviewBulk(csv){
       return{id:accountId,name:accountName,lastGmv,gmvToDate,daysElapsed,daysInMonth,runrate,accountType,
         churnedSkuCount,churnedGmv,topChurnedNames,missingCatCount,missingCats,
         lastMonthSkuCount,curSkuCount,ordersToDate,kamName,kamEmail,tlEmail,daysWithCurrentKam,
-        firstDollarDate,newUserExpDate,daysHeld,salesTeamName,
+        firstDollarDate,newUserExpDate,daysHeld,salesTeamName,accountGroupName,
         paceSignal:{cls,pct,label,expected,lastGmv,gmvToDate,runrate,
           histMonths:1,confidence:'low',isNew:lastGmv===0,
           baselineDaily:Math.round(dailyRate),baselineGmv:Math.round(dailyRate*daysInMonth)},churnCount:0};
@@ -28769,6 +28769,22 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   letter-spacing: .03em;
 }
 .sv-proj-cell.now .sv-proj-note { color: rgba(255,56,92,.55); }
+
+/* Projection breakdown line */
+.sv-proj-breakdown {
+  font-size: 8px;
+  color: #6A6A6A;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 3px;
+  letter-spacing: .02em;
+  line-height: 1.4;
+}
+
+/* Category — empty/not-purchased */
+.sv-cat-empty {
+  color: #C0C0C0 !important;
+  font-style: italic;
+}
 </style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
@@ -39910,10 +39926,14 @@ function getSalesProjection(outlets, pipeline, target) {
   const runrate_m2_base = [...active,...expiringM2].reduce((s,o)=>s+(o.runrate||0),0);
   const proj_m2 = runrate_m2_base - (expiringM2.reduce((s,o)=>s+(o.runrate||0),0)) + (pipeByMonth[m2Period]||0);
 
+  const handoverOut = getSalesHandoverOut(outlets);
   return [
-    { period: m0Period, label: _salesMonthLabel(m0Period), projected: Math.max(0,proj_m0), target, isCurrent: true },
-    { period: m1Period, label: _salesMonthLabel(m1Period), projected: Math.max(0,proj_m1), target },
-    { period: m2Period, label: _salesMonthLabel(m2Period), projected: Math.max(0,proj_m2), target },
+    { period: m0Period, label: _salesMonthLabel(m0Period), projected: Math.max(0,proj_m0), target, isCurrent: true,
+      runratePart: totalRunrate, pipelinePart: pipeByMonth[m0Period]||0, handoverPart: handoverOut.m0 },
+    { period: m1Period, label: _salesMonthLabel(m1Period), projected: Math.max(0,proj_m1), target,
+      runratePart: runrate_m1_base, pipelinePart: pipeByMonth[m1Period]||0, handoverPart: handoverOut.m1 },
+    { period: m2Period, label: _salesMonthLabel(m2Period), projected: Math.max(0,proj_m2), target,
+      runratePart: runrate_m2_base, pipelinePart: pipeByMonth[m2Period]||0, handoverPart: handoverOut.m2 },
   ];
 }
 
@@ -39969,9 +39989,16 @@ function renderSalesHome(el, outlets, pipeline) {
     const gap = p.projected - p.target;
     const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
     const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
+    // Build breakdown string: runrate · pipeline · -handover
+    const bParts = [];
+    if (p.runratePart > 0) bParts.push('฿'+_sv_fmt(p.runratePart)+' runrate');
+    if (p.pipelinePart > 0) bParts.push('+฿'+_sv_fmt(p.pipelinePart)+' pipeline');
+    if (p.handoverPart > 0) bParts.push('−฿'+_sv_fmt(p.handoverPart)+' handover');
+    p.breakdown = bParts.join(' · ');
     return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
       <div class="sv-proj-mon">${p.label}</div>
       <div class="sv-proj-note">${p.isCurrent ? 'runrate+pipeline' : 'projected'}</div>
+      ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
       <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
       ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
     </div>`;
@@ -39987,10 +40014,10 @@ function renderSalesHome(el, outlets, pipeline) {
       <div class="sv-hero-eye">Runrate ในมือ</div>
       <div><span class="sv-hero-num">฿${_sv_fmt(heroRunrate)}</span></div>
       <div class="sv-hero-sub">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
+        <span style="color:#EBEBEB">·</span>
         <span>${outlets.length} ร้าน active</span>
-        ${target > 0 ? `<span class="sv-gap-badge${targetPct>=100?' ok':''}">
-          ${targetPct >= 100 ? '+' : '−'}฿${_sv_fmt(Math.abs(heroRunrate-target))} vs target
-        </span>` : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>'}
+        ${target === 0 ? '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>' : ''}
       </div>
       ${target > 0 ? `<div class="sv-tbar">
         <div class="sv-tbar-track"><div class="sv-tbar-fill ${tbarClass}" style="width:${Math.min(100,targetPct)}%"></div></div>
@@ -40003,7 +40030,7 @@ function renderSalesHome(el, outlets, pipeline) {
     ${urgentHandover.length ? `
     <div class="sv-sec">
       <span class="sv-sec-t ac">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Handover
       </span>
     </div>
@@ -40088,15 +40115,13 @@ function _olSortOutlets(outlets) {
 }
 
 function _olGroupByAccount(outlets) {
-  // Group by account_id (parent). res_id = outlet-level.
-  // portviewBulkData: o.id = account_guid (outlet), o.account_group = parent account_id if available
-  // Simple grouping: outlets with same name prefix or same account_id field
-  const groups = {}; // accountId → {name, outlets[]}
+  // Group by account_id (same UUID for all branches of one account)
+  // Use accountGroupName (col[24]) as group display name — falls back to res_name
+  const groups = {}; // account_id → {name, outlets[]}
   outlets.forEach(o => {
-    // Use id as group key — if multiple outlets share same account_id they group together
-    // account_guid is outlet-level; we group by the first part before branch name
-    const gKey = o.accountId || o.id;
-    if (!groups[gKey]) groups[gKey] = { name: o.name||o.id, outlets: [] };
+    const gKey = o.id; // account_id = same for all branches
+    const groupName = o.accountGroupName || o.name || o.id;
+    if (!groups[gKey]) groups[gKey] = { name: groupName, outlets: [] };
     groups[gKey].outlets.push(o);
   });
   return Object.values(groups).sort((a,b) => {
@@ -40189,7 +40214,7 @@ function _renderSalesOutletList(el, outlets) {
 
   const sortHtml = '<button class="sv-sort-btn" onclick="window._olCycleSort()">' +
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>' +
-    '<span>' + (_olSort==='expiry'?'Expiry':_olSort==='mtd'?'MTD':'GMV') + '</span>' +
+    '<span>' + (_olSort==='expiry'?'Expiry':'MTD') + '</span>' +
   '</button>';
 
   const viewHtml = ''; // view toggle removed
@@ -40254,7 +40279,7 @@ function _olSetView(v) { window._olSetView(v); }
 function _olCycleSort() { window._olCycleSort(); }
 window._olSetFilter = function(f) { _olFilter=f; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
 window._olSetView = function(v) { _olView=v; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
-window._olCycleSort = function() { const s=['gmv','expiry','mtd']; _olSort=s[(s.indexOf(_olSort)+1)%s.length]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
+window._olCycleSort = function() { const s=['mtd','expiry']; _olSort=s[(s.indexOf(_olSort)+1)%s.length]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
 window._olToggleGroup = function(id) { _olCollapsed[id]=!_olCollapsed[id]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
 // ── Handover bottom sheet ──────────────────────────────
 window._salesOpenHandoverSheet = function() {
@@ -40375,7 +40400,7 @@ window._salesOpenAccount = function(accountId, accountName) {
         '</div>';
       })() : '') +
       '</div>' +
-      '<div class="sv-chart-note">ghost bar = runrate ฿' + _sv_fmt(acct.runrate||0) + '/เดือน</div>' +
+      // runrate shown as label on ghost bar, no separate note line +
       '</div>'
     ) : '';
 
@@ -40399,21 +40424,30 @@ window._salesOpenAccount = function(accountId, accountName) {
       '</div></div>'
     ) : '';
 
-    // Category breakdown from bulkCatsData
+    // Category breakdown — show ฿ amounts + categories not yet purchased
+    const _CAT_MASTER = ['Beverage Alcohol','Beverage Non-alcohol','DG Food','DG Non-food','Egg','Fish & Seafood','Fruit','Meat','Processed Food','Vegetable'];
     const cats = _findObjData(_catData);
     const catKeys = Object.keys(cats).sort((a,b) => moSort(b)-moSort(a));
-    const latestCats = catKeys.length ? (cats[catKeys[0]]||[]).slice(0,4) : [];
-    const catHtml = latestCats.length ? (
+    const purchasedCats = catKeys.length ? (cats[catKeys[0]]||[]) : [];
+    const purchasedNames = new Set(purchasedCats.map(c => c.n));
+    const totalCatGmv = purchasedCats.reduce((s,c) => s+(c.s||0), 0);
+    // Merge: purchased (sorted by ฿) + not-yet-purchased
+    const notPurchased = _CAT_MASTER.filter(n => !purchasedNames.has(n)).map(n => ({n, s:0, p:0, c:'#EBEBEB', empty:true}));
+    const allCats = [...purchasedCats.slice().sort((a,b) => (b.s||0)-(a.s||0)), ...notPurchased];
+    const catHtml = allCats.length ? (
       '<div class="sv-cat-sec">' +
-      '<div class="sv-sec"><span class="sv-sec-t">Category</span></div>' +
+      '<div class="sv-sec"><span class="sv-sec-t">Category</span><span class="sv-sec-c">' + purchasedCats.length + '/' + _CAT_MASTER.length + ' หมวด</span></div>' +
       '<div class="sv-cat-list">' +
-      latestCats.map(c => (
-        '<div class="sv-cat-row">' +
-        '<span class="sv-cat-name">' + (c.n||'—') + '</span>' +
-        '<div class="sv-cat-bar-wrap"><div class="sv-cat-fill" style="width:' + (c.p||0) + '%;background:' + (c.c||'var(--sv-ac)') + '"></div></div>' +
-        '<span class="sv-cat-pct">' + (c.p||0) + '%</span>' +
-        '</div>'
-      )).join('') +
+      allCats.map(c => {
+        const barW = totalCatGmv > 0 ? Math.round((c.s||0)/totalCatGmv*100) : 0;
+        const gmvLabel = c.empty ? '<span style="font-size:11px;color:#EBEBEB;font-family:\'IBM Plex Mono\',monospace">—</span>' :
+          '<span style="font-size:12px;font-weight:700;color:#222222;font-family:\'IBM Plex Mono\',monospace">฿' + _sv_fmt(c.s||0) + '</span>';
+        return '<div class="sv-cat-row">' +
+          '<span class="sv-cat-name' + (c.empty?' sv-cat-empty':'') + '">' + (c.n||'—') + '</span>' +
+          '<div class="sv-cat-bar-wrap"><div class="sv-cat-fill" style="width:' + barW + '%;background:' + (c.c||'#EBEBEB') + ';opacity:' + (c.empty?'0.3':'0.65') + '"></div></div>' +
+          gmvLabel +
+        '</div>';
+      }).join('') +
       '</div></div>'
     ) : '';
 
