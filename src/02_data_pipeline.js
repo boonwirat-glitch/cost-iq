@@ -65,7 +65,7 @@ function parsePortviewBulk(csv){
       return{id:accountId,name:accountName,lastGmv,gmvToDate,daysElapsed,daysInMonth,runrate,accountType,
         churnedSkuCount,churnedGmv,topChurnedNames,missingCatCount,missingCats,
         lastMonthSkuCount,curSkuCount,ordersToDate,kamName,kamEmail,tlEmail,daysWithCurrentKam,
-        firstDollarDate,newUserExpDate,daysHeld,salesTeamName,
+        firstDollarDate,newUserExpDate,daysHeld,salesTeamName,accountGroupName,
         paceSignal:{cls,pct,label,expected,lastGmv,gmvToDate,runrate,
           histMonths:1,confidence:'low',isNew:lastGmv===0,
           baselineDaily:Math.round(dailyRate),baselineGmv:Math.round(dailyRate*daysInMonth)},churnCount:0};
