@@ -1851,7 +1851,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
-body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px));margin-top:-40px} /* v200: was 148px — caused visible empty space at scroll-end */
+body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px));padding-top:var(--sense-topbar-h)} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
