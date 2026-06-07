@@ -50,7 +50,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     return null;
   }
   const _nrrGatePass = moSort(currentMonthLabel) > moSort(prevMonth);
-  console.log('%c[Sense NRR] gate','color:'+(_nrrGatePass?'#4ddc97':'#ff6b6b')+';font-weight:bold',
+  console.log('%c[Sense NRR] gate','color:'+(_nrrGatePass?'var(--tk-ok-bright)':'#ff6b6b')+';font-weight:bold',
     {scope:kamEmail||('TL:'+tlEmail), currentMonth:currentMonthLabel, prevMonth,
      gate:_nrrGatePass?'✓ PASS':'✗ FAIL — NRR=null', daysElapsed, accounts:allAccounts.length});
   if (!_nrrGatePass) return null;
@@ -354,7 +354,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   const core = coreResult || {};
   const _nrrFinalPct = core.nrr!==null&&core.nrr!==undefined ? Math.round(core.nrr*100) : null;
   console.log(
-    '%c[Sense NRR] ✓ result', 'color:'+(_nrrFinalPct===null?'#f08000':_nrrFinalPct>=95?'#4ddc97':'#ffb347')+';font-weight:bold',
+    '%c[Sense NRR] ✓ result', 'color:'+(_nrrFinalPct===null?'#f08000':_nrrFinalPct>=95?'var(--tk-ok-bright)':'#ffb347')+';font-weight:bold',
     { scope: kamEmail||('TL:'+tlEmail),
       nrr: _nrrFinalPct!==null ? _nrrFinalPct+'%' : 'null',
       cohort_gmv:    Math.round(core.cohortGmv||0),
@@ -668,7 +668,7 @@ async function renderPortviewTargetBar() {
   if (!_tgtLoaded) {
     const _calcEl=document.getElementById('tgt-nrr-bar');
     if(_calcEl&&!_calcEl.innerHTML.trim()){
-      _calcEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:rgba(255,255,255,.35);font-size:11px"><span class="spl-dot-pulse" style="display:inline-flex;gap:3px">'+'<span style="width:4px;height:4px;border-radius:50%;background:rgba(0,208,112,.4);animation:_dotBlink .9s ease-in-out infinite"></span>'.repeat(3)+'</span>กำลังคำนวณ NRR...</div>';
+      _calcEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:rgba(255,255,255,.35);font-size:11px"><span class="spl-dot-pulse" style="display:inline-flex;gap:3px">'+'<span style="width:4px;height:4px;border-radius:50%;background:var(--tk-ok-border);animation:_dotBlink .9s ease-in-out infinite"></span>'.repeat(3)+'</span>กำลังคำนวณ NRR...</div>';
     }
     await loadTargets(_tgtCurrentQuarter());
     if(_calcEl)_calcEl.innerHTML=''; // clear placeholder before real render
@@ -902,7 +902,7 @@ async function renderPortviewTargetBar() {
 
   // ── Movement rows (v198) ─────────────────────────────────────
   const fmtK = v => v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+Math.round(v);
-  const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'#4ddc97':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
+  const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'var(--tk-ok-bright)':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
   const nrrPctStr = n => n===null?'—':Math.round(n*100)+'%';
   const mvRows = [];
   if (nrrResult && nrrResult.transferIn && nrrResult.transferIn.count > 0) {
