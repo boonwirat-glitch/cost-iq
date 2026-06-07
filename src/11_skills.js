@@ -479,6 +479,9 @@ async function skillsStartTraining(skillId) {
   if (!_skillsUserId) return;
   const def = _skillDefs.find(d => d.id === skillId);
   if (!def) return;
+  // guard: ถ้า state ไม่ใช่ locked แล้ว ไม่ต้อง write ซ้ำ
+  const existing = _skillProg[String(skillId)];
+  if (existing && existing.state !== 'locked') return;
 
   try {
     // Upsert progress row — on_conflict ใน URL สำหรับ Supabase REST
@@ -801,7 +804,9 @@ async function skillsTLSave(userId, skillId) {
   // ดึง oldState จาก local cache (source of truth) ไม่ใช่จาก HTML parameter
   const key      = `${userId}:${skillId}`;
   const oldState = _skillProg[key] ? _skillProg[key].state : 'locked';
-  if (!newState || newState === oldState) return;
+  if (!newState) return;
+  // guard: ถ้า state เหมือนเดิม และไม่มี note ก็ไม่ต้อง write
+  if (newState === oldState && !note.trim()) return;
 
   try {
     // Update progress
