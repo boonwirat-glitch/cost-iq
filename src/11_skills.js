@@ -137,6 +137,7 @@ async function skillsInit() {
   await Promise.all([
     _loadSkillDefs(),
     _loadSkillProgress(),
+    _loadEchoObs(),
   ]);
   await _loadSkillUsers();   // โหลดชื่อ rep หลังรู้ว่ามี user_id อะไรบ้าง
 
@@ -158,7 +159,7 @@ async function _loadSkillProgress() {
   try {
     const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
     const query = isTL
-      ? `${SKILLS_TABLE_PROG}?select=*`                              // TL sees all (RLS handles team filter)
+      ? `${SKILLS_TABLE_PROG}?select=*`
       : `${SKILLS_TABLE_PROG}?select=*&user_id=eq.${_skillsUserId}`;
     const rows = await _skFetch(query);
     _skillProg = {};
@@ -169,6 +170,46 @@ async function _loadSkillProgress() {
   } catch(e) {
     console.error('[Skills] loadProgress:', e);
   }
+}
+
+// ── Load Echo observations (rep view only) ──────────
+let _echoObs = {}; // { 'B04_PREVISIT': [{ai_score, evidence, coaching_note, observed_at},...] }
+
+async function _loadEchoObs() {
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  if (isTL || !_skillsUserId) return;
+  _echoObs = {};
+  try {
+    const rows = await _skFetch(
+      `echo_skill_observations?user_id=eq.${_skillsUserId}&order=observed_at.desc&limit=100`
+    );
+    (rows || []).forEach(r => {
+      if (!_echoObs[r.skill_code]) _echoObs[r.skill_code] = [];
+      _echoObs[r.skill_code].push(r);
+    });
+  } catch(e) {
+    // graceful — table may not exist yet
+    console.warn('[Skills] echo_skill_observations not available yet');
+  }
+}
+
+function _echoScoreLabel(score) {
+  return score === 'pass' ? 'ผ่าน' : score === 'developing' ? 'กำลังพัฒนา' : score === 'not_observed' ? 'ไม่เห็นใน session' : '—';
+}
+function _echoScoreColor(score) {
+  return score === 'pass' ? 'var(--sk-ok)' : score === 'developing' ? 'var(--sk-warn)' : 'var(--sk-muted)';
+}
+function _echoLatestStrip(skillCode) {
+  const obs = (_echoObs[skillCode] || []).slice(0, 1)[0];
+  if (!obs) return '';
+  const date = obs.observed_at ? new Date(obs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+  const col   = _echoScoreColor(obs.ai_score);
+  const label = _echoScoreLabel(obs.ai_score);
+  return '<div class="sk-echo-strip">'
+    + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg>'
+    + '<span class="sk-echo-date">' + date + '</span>'
+    + '<span class="sk-echo-score" style="color:' + col + '">' + label + '</span>'
+    + '</div>';
 }
 
 // ── Load user profiles for TL (name display) ─────────
@@ -277,6 +318,7 @@ function _renderRepHome() {
     <div class="sk-eyebrow">Module ${m}</div>
     <div class="sk-mod-name">${meta.name}</div>
     <div class="sk-mod-sub">${meta.sub} · ${defs.length} skills</div>
+    ${(()=>{ const obs=defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0]; if(!obs) return ''; const col=_echoScoreColor(obs.ai_score); const lbl=_echoScoreLabel(obs.ai_score); const dt=new Date(obs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">🎙 '+lbl+'</span></div>'; })()}
   </div>
   <div class="sk-mod-right">
     <div class="sk-ring">
@@ -419,6 +461,36 @@ async function skillsOpenDetail(skillId) {
   </div>
 </div>`).join('');
 
+  // Echo history for this skill (rep view)
+  const _echoHistory = (_echoObs[def.skill_code] || []).slice(0, 3);
+  const echoRows = _echoHistory.map(o => {
+    const col  = _echoScoreColor(o.ai_score);
+    const lbl  = _echoScoreLabel(o.ai_score);
+    const dt   = o.observed_at ? new Date(o.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '';
+    const ev   = o.evidence   || '';
+    const note = o.coaching_note || '';
+    return `<div class="sk-echo-row">
+  <div class="sk-echo-row-top">
+    <div style="display:flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg>
+      <span class="sk-echo-row-date">${dt}</span>
+    </div>
+    <span class="sk-echo-row-score" style="color:${col};">${lbl}</span>
+  </div>
+  ${ev ? `<div class="sk-echo-row-ev">${ev}</div>` : ''}
+  ${note ? `<div class="sk-echo-row-note">💬 ${note}</div>` : ''}
+</div>`;
+  }).join('');
+  const echoSection = _echoHistory.length > 0 ? `
+<div class="sk-divider"></div>
+<div class="sk-rubric-block">
+  <div class="sk-rubric-eye" style="display:flex;align-items:center;gap:5px;">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg>
+    Echo Sessions
+  </div>
+  <div class="sk-echo-list">${echoRows}</div>
+</div>` : '';
+
   // CTA based on state
   let cta = '';
   if (state === 'locked') {
@@ -470,6 +542,8 @@ async function skillsOpenDetail(skillId) {
     <div class="sk-rubric-text">${def.pass_test_th.split('/').map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
+
+  ${echoSection}
 
   ${cta}
 
