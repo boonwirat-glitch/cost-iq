@@ -598,7 +598,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     const pillStyle = pay === 0
       ? 'background:rgba(255,100,60,.18);color:rgba(255,120,80,1);border:1px solid rgba(255,100,60,.35)'
       : pay >= 30000
-      ? 'background:rgba(77,220,151,.18);color:var(--tk-ok-bright);border:1px solid var(--tk-ok-border)'
+      ? 'background:var(--tk-ok-dim-2);color:var(--tk-ok-bright);border:1px solid var(--tk-ok-border)'
       : 'background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)';
     const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : `Tier ${i+1}`;
 
@@ -607,7 +607,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
                    : minV != null ? `≥ ${minV}%` : maxV != null ? `< ${maxV}%` : '—';
     const payLbl = pay ? '฿'+Math.round(pay).toLocaleString('en-US') : '฿0';
     const previewColor = pay === 0 ? 'rgba(255,120,80,.85)' : pay >= 30000 ? 'var(--tk-ok-bright)' : '#ffe08a';
-    const borderLeft = pay === 0 ? 'rgba(255,100,60,.50)' : pay >= 30000 ? 'rgba(77,220,151,.50)' : 'rgba(255,224,138,.40)';
+    const borderLeft = pay === 0 ? 'rgba(255,100,60,.50)' : pay >= 30000 ? 'var(--tk-ok-border)' : 'rgba(255,224,138,.40)';
 
     // Compact: range fields on one row, payout prominent below
     const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
@@ -1330,7 +1330,7 @@ function _renderPayoutRuleBlock(role) {
     <div class="tgt-rule-head">
       <div>
         <div class="tgt-rule-title">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(0,208,112,.75)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tk-ok-bright)" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
           ${title}
         </div>
         <div class="tgt-rule-sub">${sub}</div>
