@@ -1204,17 +1204,18 @@ function _patchR2FilesForSales(){
       R2_FILES['outlets']    = 'sales_outlets.csv';
       R2_FILES['handover']   = ''; // not needed — newUserExpDate in portview covers it
       console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:R2_FILES['portview']});
-      // Fix B: clear IDB 'portview' cache so Sales user never loads KAM portview data
-      // IDB key 'portview' holds KAM data (640 accounts) — must be evicted before fetch
+      // Fix B: clear ALL Sales-relevant IDB keys so KAM cached data never serves Sales
+      // history/sku_current/categories/outlets are cached per-tab — must evict before Sales fetch
       try{
-        // Bulk portview shared → clear IDB so KAM data doesn't serve Sales
+        const _SALES_IDB_KEYS=['portview','history','sku_current','categories','outlets'];
         const _db_req=indexedDB.open('ciq-csv-v1',1);
         _db_req.onsuccess=function(e){
           const _db=e.target.result;
           try{
             const _tx=_db.transaction('csv','readwrite');
-            _tx.objectStore('csv').delete('portview');
-            console.log('%c[Sense] IDB portview cleared for Sales bulk','color:#4ddc97');
+            const _store=_tx.objectStore('csv');
+            _SALES_IDB_KEYS.forEach(function(k){ _store.delete(k); });
+            console.log('%c[Sense] IDB cleared for Sales bulk (5 tabs)','color:#4ddc97');
           }catch(ex){}
         };
       }catch(ex){}
