@@ -598,7 +598,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     const pillStyle = pay === 0
       ? 'background:rgba(255,100,60,.18);color:rgba(255,120,80,1);border:1px solid rgba(255,100,60,.35)'
       : pay >= 30000
-      ? 'background:rgba(77,220,151,.18);color:#4ddc97;border:1px solid rgba(77,220,151,.35)'
+      ? 'background:rgba(77,220,151,.18);color:var(--tk-ok-bright);border:1px solid rgba(77,220,151,.35)'
       : 'background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)';
     const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : `Tier ${i+1}`;
 
