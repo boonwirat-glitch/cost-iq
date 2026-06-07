@@ -425,7 +425,7 @@ function _renderTlUpsellTierRows() {
     const maxV = t.max_pct != null ? Number(t.max_pct) : null;
     const mult = Number(t.multiplier || 1.0);
     const isBase = mult <= 1.0;
-    const accentColor = isBase ? 'rgba(188,215,255,.30)' : mult >= 1.5 ? '#4ddc97' : '#ffe08a';
+    const accentColor = isBase ? 'rgba(188,215,255,.30)' : mult >= 1.5 ? 'var(--tk-ok-bright)' : '#ffe08a';
     const prevTxt = minV != null && maxV != null ? `Upsell ${minV}–${maxV}%`
                   : minV != null ? `Upsell ≥ ${minV}%` : `Upsell < ${maxV}%`;
     return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:12px;margin-bottom:8px">
@@ -598,7 +598,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     const pillStyle = pay === 0
       ? 'background:rgba(255,100,60,.18);color:rgba(255,120,80,1);border:1px solid rgba(255,100,60,.35)'
       : pay >= 30000
-      ? 'background:rgba(77,220,151,.18);color:var(--tk-ok-bright);border:1px solid rgba(77,220,151,.35)'
+      ? 'background:rgba(77,220,151,.18);color:var(--tk-ok-bright);border:1px solid var(--tk-ok-border)'
       : 'background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.30)';
     const pillLbl = pay === 0 ? 'ไม่ถึงเกณฑ์' : `Tier ${i+1}`;
 
@@ -606,7 +606,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     const rangeLbl = minV != null && maxV != null ? `${minV}–${maxV}%`
                    : minV != null ? `≥ ${minV}%` : maxV != null ? `< ${maxV}%` : '—';
     const payLbl = pay ? '฿'+Math.round(pay).toLocaleString('en-US') : '฿0';
-    const previewColor = pay === 0 ? 'rgba(255,120,80,.85)' : pay >= 30000 ? '#4ddc97' : '#ffe08a';
+    const previewColor = pay === 0 ? 'rgba(255,120,80,.85)' : pay >= 30000 ? 'var(--tk-ok-bright)' : '#ffe08a';
     const borderLeft = pay === 0 ? 'rgba(255,100,60,.50)' : pay >= 30000 ? 'rgba(77,220,151,.50)' : 'rgba(255,224,138,.40)';
 
     // Compact: range fields on one row, payout prominent below
