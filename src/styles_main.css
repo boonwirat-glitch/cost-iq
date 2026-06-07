@@ -4936,3 +4936,11 @@ body.sales-mode .bnav {
   border-top: none !important;
   box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
 }
+
+/* ── DEBUG GAP HUNT ── */
+.portview-header { background: red !important; }
+.scr-teamview, #scr-teamview { background: blue !important; }
+#scr-portview { background: green !important; }
+body.kam-mode { background: yellow !important; }
+/* ── END DEBUG ── */
+
