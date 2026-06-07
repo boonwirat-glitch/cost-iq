@@ -1041,7 +1041,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 /* Sense Verify Button — dark scan card (Option B) */
 .sense-verify-btn{width:100%;display:flex;align-items:center;gap:12px;background:#0a1f14;border:1px solid var(--tk-ok-border);border-radius:var(--r);padding:12px 14px;cursor:pointer;margin-bottom:12px;position:relative;overflow:hidden;text-align:left;font-family:var(--tk-font-body);transition:border-color .2s;animation:svb-border-pulse 3s ease-in-out infinite;}
 @keyframes svb-border-pulse{0%,100%{box-shadow:0 0 0 0 transparent;}55%{box-shadow:0 0 0 2px var(--tk-ok-dim-2),0 0 12px var(--tk-ok-dim);}}
-.sense-verify-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(0,208,112,.14) 50%,transparent 100%);transform:translateX(-100%);animation:svb-scan-line 2.8s ease-in-out infinite;}
+.sense-verify-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,var(--tk-ok-dim) 50%,transparent 100%);transform:translateX(-100%);animation:svb-scan-line 2.8s ease-in-out infinite;}
 @keyframes svb-scan-line{0%{transform:translateX(-100%);}65%,100%{transform:translateX(270%);}}
 .sense-verify-btn:hover{border-color:var(--tk-ok-border);}
 .sense-verify-btn:active{opacity:.82;}
@@ -1143,7 +1143,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .plan-card.unselected .plan-card-btn{display:none}
 /* ── Plan verify card (right slot, pre-verify) ── */
 .plan-verify-card{flex:1;border-radius:10px;padding:10px 12px;cursor:pointer;background:#0a1f14;border:1px solid var(--tk-ok-border);position:relative;overflow:hidden;animation:pvc-border-glow 3.2s ease-in-out infinite;transition:border-color .2s;}
-@keyframes pvc-border-glow{0%,100%{box-shadow:none;}55%{box-shadow:0 0 0 2px rgba(0,208,112,.14),0 0 10px var(--tk-ok-dim);}}
+@keyframes pvc-border-glow{0%,100%{box-shadow:none;}55%{box-shadow:0 0 0 2px var(--tk-ok-dim),0 0 10px var(--tk-ok-dim);}}
 .plan-verify-card::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--tk-ok-dim),transparent);transform:translateX(-100%);animation:pvs-scan 3s ease-in-out infinite;pointer-events:none;}
 @keyframes pvs-scan{0%{transform:translateX(-100%);}65%,100%{transform:translateX(250%);}}
 .plan-verify-card:hover{border-color:var(--tk-ok-border);}
@@ -1510,7 +1510,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 }
 @keyframes fab-sense-pulse{
   0%,100%{box-shadow:0 6px 24px rgba(0,60,45,.55),0 0 0 0 var(--tk-ok-border);}
-  55%{box-shadow:0 6px 28px rgba(0,60,45,.55),0 0 0 9px rgba(0,208,112,.0);}
+  55%{box-shadow:0 6px 28px rgba(0,60,45,.55),0 0 0 9px transparent;}
 }
 @keyframes fab-star-idle{
   0%,100%{transform:rotate(0deg) scale(1);opacity:.95}
@@ -1807,7 +1807,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .pb-conf-badge.high{color:var(--g700);text-shadow:0 0 8px var(--tk-ok-border)}
 
 /* จุด 6: AI FAB outer glow pulse */
-@keyframes fab-pulse{0%,100%{box-shadow:0 4px 18px rgba(0,96,80,.35),0 0 0 0 var(--tk-ok-border)}60%{box-shadow:0 4px 18px rgba(0,96,80,.35),0 0 0 8px rgba(0,208,112,.0)}}
+@keyframes fab-pulse{0%,100%{box-shadow:0 4px 18px rgba(0,96,80,.35),0 0 0 0 var(--tk-ok-border)}60%{box-shadow:0 4px 18px rgba(0,96,80,.35),0 0 0 8px transparent}}
 /* Progress panel */
 .gen-progress-wrap{margin-top:12px;display:none;background:var(--n0);border:1px solid var(--n100);border-radius:10px;padding:12px 14px}
 .gen-prog-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -2008,7 +2008,7 @@ body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 .pv-sparkline{display:flex;align-items:flex-end;gap:2px;height:14px;margin-top:3px}
 .pv-sp-bar{border-radius:2px 2px 0 0;flex-shrink:0}
 .pv-sku-seg{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;border:1px solid}
-.pv-sku-ok{background:var(--tk-ok-dim);color:rgba(77,220,151,.9);border-color:var(--tk-ok-border)}
+.pv-sku-ok{background:var(--tk-ok-dim);color:var(--tk-ok-bright);border-color:var(--tk-ok-border)}
 .pv-sku-gone{background:rgba(240,80,0,.12);color:#ff9060;border-color:rgba(240,80,0,.28)}
 .pv-sku-watch{background:rgba(240,176,0,.12);color:#f0c040;border-color:rgba(240,176,0,.26)}
 .pv-sku-total{background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.1)}
@@ -3056,7 +3056,7 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
 .comm-preview-tl-money strong{display:block;font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:950;color:#ffe08a;line-height:1.1;margin:3px 0;text-shadow:0 0 16px rgba(255,224,138,.18);}
 .comm-kam-subhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px 4px;}
 .comm-kam-subhead span{font-size:9px;font-weight:950;letter-spacing:.04em;text-transform:uppercase;color:rgba(225,238,255,.42);}
-.comm-kam-subhead em{font-style:normal;font-size:9px;font-weight:850;color:rgba(77,220,151,.68);}
+.comm-kam-subhead em{font-style:normal;font-size:9px;font-weight:850;color:var(--tk-ok-border);}
 .comm-kam-payout-row{margin:0 14px;padding:10px 0 !important;grid-template-columns:minmax(0,1fr) auto !important;}
 .comm-kam-payout-row.hit .comm-person-name{color:#fff;}
 .comm-kam-payout-row.hit .comm-person-payout{color:#ffe08a !important;}
@@ -3303,7 +3303,7 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 .pv-commission-strip-slot{display:block;width:100%;margin:0 0 10px 0;}
 .pv-commission-strip-slot:empty{display:none;}
 .pv-comm-strip{width:100%;border-radius:14px;padding:11px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:linear-gradient(135deg,rgba(35,73,126,.58),rgba(15,42,76,.46));border:1px solid rgba(188,215,255,.20);box-shadow:inset 0 1px 0 rgba(255,255,255,.045);}
-.pv-comm-strip.hit{background:linear-gradient(135deg,var(--tk-ok-dim),rgba(35,73,126,.48));border-color:rgba(77,220,151,.36);}
+.pv-comm-strip.hit{background:linear-gradient(135deg,var(--tk-ok-dim),rgba(35,73,126,.48));border-color:var(--tk-ok-border);}
 .pv-comm-strip.bonus{background:linear-gradient(135deg,rgba(255,224,138,.15),rgba(35,73,126,.48));border-color:rgba(255,224,138,.40);}
 .pv-comm-strip.miss{background:linear-gradient(135deg,rgba(35,73,126,.56),rgba(15,42,76,.48));border-color:rgba(188,215,255,.20);}
 .pv-comm-left{min-width:0;}
@@ -3657,7 +3657,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 #ncs-sheet .ncs-total-val{font-size:17px!important;}
 #ncs-sheet .ncs-footer{padding:12px 18px!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important;background:rgba(0,0,0,.14)!important;border-top:1px solid rgba(255,255,255,.08)!important;}
 #ncs-sheet .ncs-btn{border-radius:12px!important;padding:12px 14px!important;}
-#ncs-sheet .ncs-btn.primary{background:var(--tk-ok-dim)!important;border-color:rgba(77,220,151,.32)!important;color:var(--tk-ok-bright)!important;}
+#ncs-sheet .ncs-btn.primary{background:var(--tk-ok-dim)!important;border-color:var(--tk-ok-dim-2)!important;color:var(--tk-ok-bright)!important;}
 #ncs-sheet .ncs-btn.secondary{background:rgba(255,255,255,.06)!important;border-color:rgba(255,255,255,.12)!important;color:rgba(225,238,255,.70)!important;}
 #ncs-sheet .ncs-empty{color:rgba(198,216,245,.50)!important;}
 #ncs-sheet .ncs-mv-cols{grid-template-columns:minmax(0,1fr) 74px 70px!important;}
