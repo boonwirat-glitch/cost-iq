@@ -2931,7 +2931,7 @@ function _sgRevealScore(){
   }
   // Score in ring — SENSE SCORE label underneath
   if(scoreNum){scoreNum.style.color='#ffffff';scoreNum.textContent='0';}
-  if(scoreUnit){scoreUnit.textContent='SENSE SCORE';scoreUnit.style.cssText='font-size:8px;color:rgba(160,255,200,.6);font-family:\'IBM Plex Sans Thai\',sans-serif;margin-top:5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;';}
+  if(scoreUnit){scoreUnit.textContent='SENSE SCORE';scoreUnit.style.cssText='font-size:8px;color:rgba(160,255,200,.6);font-family:\'Noto Sans Thai\',sans-serif;margin-top:5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;';}
   requestAnimationFrame(()=>{
     if(scoreWrap)scoreWrap.classList.add('visible');
     if(scoreNum){
@@ -2952,7 +2952,7 @@ function _sgRevealScore(){
   setTimeout(()=>{
     if(doneLabel){
       doneLabel.textContent='มี '+OPPS.length+' รายการที่ราคาคุ้มกว่า';
-      doneLabel.style.cssText='font-size:15px;font-weight:700;color:#fff;text-align:center;font-family:\'IBM Plex Sans Thai\',sans-serif;margin-bottom:4px;';
+      doneLabel.style.cssText='font-size:15px;font-weight:700;color:#fff;text-align:center;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:4px;';
     }
     if(doneDesc){
       doneDesc.textContent='ประหยัดได้ '+(savYr>0?fmt(savYr):'—')+' / ปี';
