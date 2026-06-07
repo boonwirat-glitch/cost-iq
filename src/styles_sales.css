@@ -17,6 +17,15 @@
 /* --ok       #34C759   positive only         */
 /* --warn     #FF9500   caution               */
 
+/* ── Global font: Noto Sans Thai for all Sales UI ── */
+[class*="sv-"], .scr-sales-portview, #scr-sales-portview,
+#scr-sales-pipeline, #scr-sales-commission, #scr-sales-teamview,
+.sv-sheet, .sv-sheet-overlay {
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+
+
+
 /* ── Page header ── */
 .sv-page-hd { padding: 22px 20px 6px; }
 .sv-page-eye {
