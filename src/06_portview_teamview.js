@@ -221,7 +221,7 @@ function setSenseDarkTheme(t){
   document.querySelectorAll('.sdt-opt').forEach(el=>{
     const on=el.dataset.theme===t;
     el.style.borderColor=on?'var(--g500)':'var(--n200)';
-    el.style.boxShadow=on?'inset 0 0 0 1px rgba(0,208,112,.3)':'';
+    el.style.boxShadow=on?'inset 0 0 0 1px var(--tk-ok-border)':'';
   });
 }
 function _injectSenseThemePicker(){
@@ -236,7 +236,7 @@ function _injectSenseThemePicker(){
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--n500);margin-bottom:10px">✦ Sense Dark Theme</div>
     <div style="display:flex;gap:7px">
       ${Object.entries(_SDT_THEMES).map(([k,t])=>`
-        <div class="sdt-opt" data-theme="${k}" onclick="setSenseDarkTheme('${k}')" style="flex:1;border-radius:10px;border:1.5px solid ${k===cur?'var(--g500)':'var(--n200)'};${k===cur?'box-shadow:inset 0 0 0 1px rgba(0,208,112,.3);':''}padding:9px 7px;cursor:pointer;background:var(--n50);text-align:center;transition:all .2s">
+        <div class="sdt-opt" data-theme="${k}" onclick="setSenseDarkTheme('${k}')" style="flex:1;border-radius:10px;border:1.5px solid ${k===cur?'var(--g500)':'var(--n200)'};${k===cur?'box-shadow:inset 0 0 0 1px var(--tk-ok-border);':''}padding:9px 7px;cursor:pointer;background:var(--n50);text-align:center;transition:all .2s">
           <div style="width:100%;height:16px;border-radius:5px;background:${t.card};margin-bottom:4px;border:1px solid rgba(0,0,0,.15)"></div>
           <div style="width:100%;height:4px;border-radius:2px;background:${t.page};border:1px solid rgba(0,0,0,.1);margin-bottom:6px"></div>
           <div style="font-size:10px;font-weight:700;color:var(--n700)">${t.name}</div>
@@ -904,7 +904,7 @@ function __legacyRenderPortviewListFallback(){
     const _cc=a._churnCounts;
     let churnBadge='';
     if(_cc&&_cc.total>0){
-      const orderedPart=_cc.ordered>0?`<span style="color:rgba(0,208,112,.7)">${_cc.ordered} สั่งแล้ว</span>`:'';
+      const orderedPart=_cc.ordered>0?`<span style="color:var(--tk-ok-bright)">${_cc.ordered} สั่งแล้ว</span>`:'';
       const gonePart=_cc.gone>0?`<span style="color:var(--org)">${orderedPart?' · ':''}${_cc.gone} หาย</span>`:'';
       const nearPart=_cc.near>0?`<span style="color:var(--amb)">${(orderedPart||gonePart)?' · ':''}${_cc.near} เฝ้าดู</span>`:'';
       const totalPart=`<span style="color:rgba(255,255,255,.35)"> / ${_cc.total} SKU</span>`;
@@ -957,7 +957,7 @@ function __legacyRenderPortviewListFallback(){
     const _cc=a._churnCounts;
     const catCount=a.missingCatCount||0;
     const parts=[];
-    if(_cc&&_cc.ordered>0)parts.push(`<span style="color:rgba(77,220,151,.8);font-weight:600">สั่ง ${_cc.ordered}</span>`);
+    if(_cc&&_cc.ordered>0)parts.push(`<span style="color:var(--tk-ok-bright);font-weight:600">สั่ง ${_cc.ordered}</span>`);
     if(_cc&&_cc.gone>0)parts.push(`<span style="color:#ff9060;font-weight:600">หาย ${_cc.gone}</span>`);
     if(_cc&&_cc.near>0)parts.push(`<span style="color:#f0c040;font-weight:600">เฝ้าดู ${_cc.near}</span>`);
     if(_cc&&_cc.total>0)parts.push(`<span style="color:rgba(255,255,255,.6)">/ ${_cc.total} SKU</span>`);
@@ -1008,7 +1008,7 @@ function __legacyRenderPortviewListFallback(){
     const _earlyMonth=sig&&(sig.daysElapsed||0)<5;
     const pctStr=sig?sig.pct+'%':'—';
     const rrHtml=sig?(sig.runrate
-      ?`<span style="color:rgba(77,220,151,.72)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
+      ?`<span style="color:var(--tk-ok-bright)">${fmtK(sig.runrate)}</span> / ${fmtK(sig.baselineGmv||0)}`
       :`${fmtK(sig.gmvToDate)} / ${fmtK(sig.baselineGmv||0)}`)
       :'ไม่มีข้อมูล pace';
     return`<div class="portview-acct-card ${cls}" style="${_delay}" onclick="portviewSelectAccount('${a.id}')">
@@ -1438,7 +1438,7 @@ function __legacyRenderPortviewSummaryFallback(){
           <div style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${ok} ร้าน</div>
         </div>
         <div class="portview-tier-val">${fmtGMV(okRunRate)}</div>
-        <div style="border-top:1px solid rgba(77,220,151,.18);margin-top:8px;padding-top:7px;display:flex;align-items:baseline;gap:5px">
+        <div style="border-top:1px solid var(--tk-ok-dim-2);margin-top:8px;padding-top:7px;display:flex;align-items:baseline;gap:5px">
           <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-bright)">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</span>
           <span style="font-size:10px;color:rgba(255,255,255,.55)">เหนือ baseline</span>
         </div>
