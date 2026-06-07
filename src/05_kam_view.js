@@ -162,8 +162,8 @@ function setKamModel(model){
   ['km-haiku','km-sonnet'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const on=id==='km-'+model;
-    el.style.borderColor=on?'#2660c8':'var(--n200)';
-    el.style.background=on?'#1a3a6b':'var(--n50)';
+    el.style.borderColor=on?'var(--tk-accent)':'var(--n200)';
+    el.style.background=on?'var(--tk-accent-dark)':'var(--n50)';
     el.querySelector('div').style.color=on?'#fff':'var(--n700)';
   });
   const b1=document.getElementById('kam-model-badge');if(b1)b1.textContent=model==='haiku'?'Haiku':'Sonnet';
@@ -305,7 +305,7 @@ function renderSkuMovementHtml(sm){
             <div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:4px">→ ${sub.substituteName}</div>
             <div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>
           </div>
-          <span style="font-size:10px;font-weight:700;background:rgba(38,96,200,.35);color:rgba(180,210,255,.95);border:1px solid rgba(38,96,200,.5);border-radius:10px;padding:2px 8px;flex-shrink:0">สลับ</span>
+          <span style="font-size:10px;font-weight:700;background:var(--tk-accent-dim-3);color:rgba(180,210,255,.95);border:1px solid var(--tk-subtab-active);border-radius:10px;padding:2px 8px;flex-shrink:0">สลับ</span>
         </div>`;
       }
       return row('−','neg',s.name,s.gmv,'');
@@ -411,7 +411,7 @@ function _renderKamZone1Status(){
   // RUN RATE / BASELINE pair — color runrate by vs baseline
   if(fcstEl){
     fcstEl.textContent=sig.runrate?_fK(sig.runrate):'—';
-    fcstEl.style.color=sig.runrate&&sig.baselineGmv?(sig.runrate>=sig.baselineGmv?'#4ddc97':'#ff8888'):'rgba(255,255,255,.88)';
+    fcstEl.style.color=sig.runrate&&sig.baselineGmv?(sig.runrate>=sig.baselineGmv?'var(--tk-ok-bright)':'#ff8888'):'rgba(255,255,255,.88)';
   }
   if(baseEl)baseEl.textContent=sig.baselineGmv?_fK(sig.baselineGmv):'—';
 
@@ -652,7 +652,7 @@ function __legacyRenderKamThisMonthFallback(){
       const nameOp=dimmed?'opacity:.4':'';
       const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
-      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:rgba(38,96,200,.3);border:1px solid rgba(38,96,200,.45);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
+      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:rgba(38,96,200,.3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
@@ -669,7 +669,7 @@ function __legacyRenderKamThisMonthFallback(){
     if(notYetSigs.length){
       const showNotYet=churnExpanded?notYetSigs:notYetSigs.slice(0,0);
       if(showNotYet.length)html+=showNotYet.map(s=>renderSkuRow(s,true)).join('');
-      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:11px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+notYetSigs.length+' รายการ — กดดู'}</button>`;
+      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:11px;font-weight:600;font-family:var(--tk-font-body);cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+notYetSigs.length+' รายการ — กดดู'}</button>`;
     }
     html+=`</div></div>`;
   } else if(D.sku_current&&D.sku_current.length&&!signals.length){
@@ -778,7 +778,7 @@ function __legacyRenderKamLastMonthFallback(){
       </div>
       <div class="kam-dc-insight" id="dc-insight-cost" style="display:none"></div>
       <div style="padding:0 14px 12px">
-        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:11px;font-weight:700;color:rgba(180,210,255,.85);background:rgba(38,96,200,.15);border:1px solid rgba(38,96,200,.35);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;display:inline-flex;align-items:center;gap:5px">
+        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:11px;font-weight:700;color:rgba(180,210,255,.85);background:rgba(38,96,200,.15);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--tk-font-body);display:inline-flex;align-items:center;gap:5px">
           ดูทั้ง <span id="kam-opp-count-cta">—</span> รายการ →
         </button>
       </div>
@@ -2532,7 +2532,7 @@ function renderSkuDetailContent(sku,priceData){
   return`<div style="padding:12px 16px 0">
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:'IBM Plex Sans Thai',sans-serif">/${sku.display_unit||'กก.'}</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/${sku.display_unit||'กก.'}</span></div>
         ${sku.pack_size?`<div style="font-size:10px;color:var(--n400);margin-top:2px">${sku.pack_size}</div>`:''}</div>
       <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${first.mo} – ${last.mo}</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
