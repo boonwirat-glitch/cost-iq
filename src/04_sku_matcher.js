@@ -539,20 +539,9 @@ function setAiProvider(p){
   function getFiles(){
     try{
       // Base files from global R2_FILES (02_data_pipeline) or frozen default
+      // Sales routing handled by _patchR2FilesForSales() → shared sales_*.csv (all reps, client-side filter)
+      // Per-rep CSV approach removed — requires N files generated daily, doesn't scale
       const base = (typeof R2_FILES !== 'undefined') ? R2_FILES : (baseData.r2Files || {});
-      // Sales override: inject correct portview filename at fetch time (not at module init)
-      // KAM/TL/Admin: role !== sales/sales_tl → no override → base returned as-is
-      const role = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
-      if(role === 'sales' || role === 'sales_tl'){
-        const email = (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.email) || '';
-        if(email){
-          const safeKey = email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
-          return Object.assign({}, base, {
-            portview: 'sales_portview_' + safeKey + '.csv',
-            handover: 'sales_handover_' + safeKey + '.csv'
-          });
-        }
-      }
       return base;
     }catch(e){ return baseData.r2Files || {}; }
   }
