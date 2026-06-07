@@ -227,16 +227,16 @@ function renderSalesHome(el, outlets, pipeline) {
     const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
     const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
     // Build breakdown string: runrate · pipeline · -handover
-    const bLines = [];
-    if (p.runratePart > 0) bLines.push('฿'+_sv_fmt(p.runratePart)+' runrate');
-    if (p.pipelinePart > 0) bLines.push('+฿'+_sv_fmt(p.pipelinePart)+' pipeline');
-    if (p.handoverPart > 0) bLines.push('−฿'+_sv_fmt(p.handoverPart)+' handover');
-    p.breakdown = bLines.join('<br>');
+    // Revolut-style breakdown rows: dot + label left, value right
+    const bRows = [];
+    if (p.runratePart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot run"></span>runrate</span><span class="sv-pb-val">฿'+_sv_fmt(p.runratePart)+'</span></div>');
+    if (p.pipelinePart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot pipe"></span>pipeline</span><span class="sv-pb-val pipe">+฿'+_sv_fmt(p.pipelinePart)+'</span></div>');
+    if (p.handoverPart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot hov"></span>handover</span><span class="sv-pb-val hov">−฿'+_sv_fmt(p.handoverPart)+'</span></div>');
+    p.breakdown = bRows.join('');
     return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
       <div class="sv-proj-mon">${p.label}</div>
-      ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
       <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
-      ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
+      ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
     </div>`;
   }).join('');
 
