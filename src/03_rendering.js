@@ -207,7 +207,7 @@ function selectMonth(idx,init){
 
 // ── Overview KPI stats — 4 cards synced to selected bar month ──
 // ── Category color palette (tonal green family — overrides data colors) ──
-const CAT_PALETTE=['#00cc6a','#00888a','#2d6a4f','#52b788','#74c69d','#1e6091','#2660c8','#909090'];
+const CAT_PALETTE=['#00cc6a','#00888a','#2d6a4f','#52b788','#74c69d','#1e6091','var(--tk-accent)','#909090'];
 function catColor(i){return CAT_PALETTE[Math.min(i,CAT_PALETTE.length-1)];}
 
 // ── Interpretation Strip ──────────────────────────────────────────────────
@@ -785,7 +785,7 @@ function renderPlanBuilder(opps){
     <button class="pill ${_f==='custom'?'on':''}" onclick="setOppFilter('custom',this)">กำหนดเอง</button>
   </div>
   <div id="opp-custom-row" style="display:${_f==='custom'?'block':'none'};margin:4px 0 8px">
-    <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:'IBM Plex Sans Thai',sans-serif;outline:none" oninput="renderOpps()">
+    <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:var(--tk-font-body);outline:none" oninput="renderOpps()">
   </div>
   <div id="opp-filter-info" class="opp-filter-info">${opps.length} รายการ · ยอดซื้อปัจจุบัน ${fmt(opps.reduce((s,o)=>s+o.monthlyGmv,0))}/เดือน</div>`;
 
@@ -982,7 +982,7 @@ function sheetTogglePlan(id){
   if(btn){
     const now=sel.has(id);
     btn.textContent=now?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน';
-    btn.style.borderColor=now?'var(--g500)':'var(--n200)';
+    btn.style.borderColor=now?'var(--tk-ok-500)':'var(--n200)';
     btn.style.background=now?'var(--g50)':'var(--n0)';
     btn.style.color=now?'var(--g700)':'var(--n700)';
   }
@@ -1033,7 +1033,7 @@ function renderSingleCard(o){
   </div>
   ${chosen.caveat?`<div class="onote" style="color:var(--amb);border-top:1px solid var(--n100);padding-top:8px">▲ ${chosen.caveat}</div>`:''}
   <div style="padding:12px 13px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--g50)':'var(--n0)'};color:${ck?'var(--g700)':'var(--n700)'};font-size:13px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
+    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--g50)':'var(--n0)'};color:${ck?'var(--g700)':'var(--n700)'};font-size:13px;font-weight:700;font-family:var(--tk-font-body);cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
   </div>`;
 }
 
@@ -2560,7 +2560,7 @@ function renderOutletCard(){
     return`<div style="padding:9px 0;border-bottom:1px solid var(--n100)">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">
         <div style="font-size:12px;font-weight:600;color:var(--n900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${o.outlet_name}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--n900);flex-shrink:0">${fmt(o.gmv)}<span style="font-size:9px;font-weight:400;color:var(--n400);font-family:'IBM Plex Sans Thai',sans-serif">/เดือน</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--n900);flex-shrink:0">${fmt(o.gmv)}<span style="font-size:9px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/เดือน</span></div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;font-size:10px">
         <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${tier.color};flex-shrink:0;box-shadow:0 0 0 2px ${tier.color}22"></span>
