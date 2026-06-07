@@ -4909,7 +4909,8 @@ body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
 body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
 body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
 
-/* Save tab: hide in sales-mode (not yet enabled for Sales) */
+/* Save tab + rest-only: hide all in sales-mode */
+body.sales-mode .bnav .ni.rest-only { display: none !important; }
 body.sales-mode .bnav .ni[onclick*="Save"],
 body.sales-mode .bnav .ni[onclick*="save"],
 body.sales-mode .bnav #nav-save-btn { display: none !important; }
