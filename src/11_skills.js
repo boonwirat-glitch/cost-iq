@@ -48,7 +48,7 @@ function _skImgTag(def, opts = {}) {
   const cls = opts.cls || 'sk-card-img';
   const url = def && def.card_image_url;
   if (url) {
-    return `<img src="${url}" class="${cls}" style="width:${w};height:${h};object-fit:cover;object-position:top center;display:block;" alt="${def.skill_name_en || ''}">`;
+    return `<img src="${url}" class="${cls}" style="width:${w};height:${h};object-fit:cover;object-position:center 25%;display:block;" alt="${def.skill_name_en || ''}">`;
   }
   // fallback: gradient placeholder
   const bg = MODULE_BG[def ? def.module : 'A'];
@@ -114,7 +114,12 @@ async function _skFetch(path, opts = {}) {
     const txt = await res.text();
     throw new Error(`Skills API ${res.status}: ${txt}`);
   }
-  if (res.status === 204) return null;
+  // handle 204 No Content และ 201 with empty body
+  if (res.status === 204 || res.status === 201) {
+    const txt = await res.text();
+    if (!txt || txt.trim() === '') return null;
+    try { return JSON.parse(txt); } catch(_) { return null; }
+  }
   return res.json();
 }
 
@@ -425,22 +430,22 @@ async function skillsOpenDetail(skillId) {
 
   ${def.principle_th ? `
   <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Principle</div>
+    <div class="sk-rubric-eye">Principle — ทำไมสกิลนี้สำคัญ</div>
     <div class="sk-rubric-text">${def.principle_th}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
   ${def.practice_th ? `
   <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Practice</div>
-    <div class="sk-rubric-text">${def.practice_th.replace(/\|/g,'<br>')}</div>
+    <div class="sk-rubric-eye">Practice — ต้องทำอะไร</div>
+    <div class="sk-rubric-text">${def.practice_th.split('|').map(t => t.trim()).filter(Boolean).map(t => '• ' + t).join('<br>')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
   ${def.pass_test_th ? `
   <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Pass Test</div>
-    <div class="sk-rubric-text">${def.pass_test_th.replace(/\//g,'<br>')}</div>
+    <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
+    <div class="sk-rubric-text">${def.pass_test_th.split('/').map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
@@ -457,10 +462,10 @@ async function skillsStartTraining(skillId) {
   if (!def) return;
 
   try {
-    // Upsert progress row
-    await _skFetch(SKILLS_TABLE_PROG, {
+    // Upsert progress row — on_conflict ใน URL สำหรับ Supabase REST
+    await _skFetch(`${SKILLS_TABLE_PROG}?on_conflict=user_id,skill_id`, {
       method:  'POST',
-      prefer:  'resolution=merge-duplicates,return=representation',
+      prefer:  'resolution=merge-duplicates,return=minimal',
       body: {
         user_id:    _skillsUserId,
         skill_id:   skillId,
@@ -728,7 +733,7 @@ async function skillsTLOpenEval(userId, skillId) {
   </div>
   <div class="sk-skill-title">${def.skill_name_en}</div>
   <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Pass Test</div>
+    <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
     <div class="sk-rubric-text">${(def.pass_test_th||'').replace(/\//g,'<br>')}</div>
   </div>
   <div class="sk-divider"></div>
