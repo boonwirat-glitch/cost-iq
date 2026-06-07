@@ -352,7 +352,26 @@ supa.auth.onAuthStateChange((event, session) => {
       _idbPreloadProm.then(function(count){
         if(count<3){
           // Partial or no IndexedDB hit — kick off normal R2 load with ETag
-          try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
+          // v379: must patch R2 filenames for Sales BEFORE fetch starts.
+          // Profile may already be set (cache hit path above), or may still be loading.
+          // We wait up to 2s for profile, then patch and fetch regardless.
+          var _doR2Fetch = function(){
+            try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+            try{ if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2(); }catch(e){}
+          };
+          if(currentUserProfile && currentUserProfile.email){
+            _doR2Fetch();
+          } else {
+            // Profile not ready yet — wait for loadUserProfile() which is running in background
+            var _profileWait = 0;
+            var _profilePoll = setInterval(function(){
+              _profileWait += 50;
+              if((currentUserProfile && currentUserProfile.email) || _profileWait >= 2000){
+                clearInterval(_profilePoll);
+                _doR2Fetch();
+              }
+            }, 50);
+          }
         }
         // v224d: ETag check fires immediately after IDB render (was 3000ms).
         // Minimises stale-data window: 304 = silent no-op, 200 = re-render within ~500ms.
