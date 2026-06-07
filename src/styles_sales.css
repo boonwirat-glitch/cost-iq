@@ -901,34 +901,43 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-days-fill.late ~ .sv-days-meta .sv-days-exp { color: var(--sv-ac); }
 
 /* Account group header */
+/* Account group header — prominent, clearly a parent */
 .sv-ol-acct-hd {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 9px 0 5px;
+  justify-content: space-between;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--sv-surface);
+  border-radius: 8px;
   cursor: pointer;
+  border-left: 3px solid var(--sv-ink);
 }
-.sv-ol-acct-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--sv-muted);
-  flex-shrink: 0;
-}
+.sv-ol-acct-left { flex: 1; min-width: 0; }
 .sv-ol-acct-name {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--sv-body);
+  color: var(--sv-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sv-ol-acct-meta {
-  font-size: 9.5px;
+  font-size: 10px;
   color: var(--sv-muted);
   font-family: 'IBM Plex Mono', monospace;
+  margin-top: 1px;
 }
-.sv-ol-acct-arrow {
-  font-size: 9px;
+.sv-ol-acct-right { flex-shrink: 0; margin-left: 10px; }
+.sv-ol-acct-toggle {
+  font-size: 11px;
   color: var(--sv-muted);
-  margin-left: auto;
+  font-weight: 700;
+}
+/* Branch rows indent under account header */
+.sv-ol-branch {
+  padding: 8px 0 8px 12px;
+  border-top: 1px solid var(--sv-hairline);
 }
 
 /* Compact grid */
