@@ -272,7 +272,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     };
   }
 
-  console.log('%c[Sense NRR] cohort split','color:#4ddc97',
+  console.log('%c[Sense NRR] cohort split','color:var(--tk-ok-bright)',
     {scope:kamEmail||('TL:'+tlEmail), core:coreAccounts.length,
      transfer_in:transferInAccounts.length, new_sales:newFromSalesAccounts.length,
      prevMonth, currentMonth:currentMonthLabel, daysElapsed});
@@ -858,7 +858,7 @@ async function renderPortviewTargetBar() {
     <div class="tgt-det-section">
       <div class="tgt-det-stitle">GMV รายประเภท</div>
       <div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('nrr')">
-        <div class="tgt-det-dot" style="background:#4ddc97"></div><span class="tgt-det-lbl">NRR</span><span class="tgt-det-val" style="color:#4ddc97">${_tgtFmtM(cohortGmv)}</span><span class="tgt-det-count">${cohortCount} outlets</span><span class="ncs-row-btn">ดู ›</span></div>
+        <div class="tgt-det-dot" style="background:var(--tk-ok-bright)"></div><span class="tgt-det-lbl">NRR</span><span class="tgt-det-val" style="color:var(--tk-ok-bright)">${_tgtFmtM(cohortGmv)}</span><span class="tgt-det-count">${cohortCount} outlets</span><span class="ncs-row-btn">ดู ›</span></div>
       ${cbGmv>0?`<div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('cb')"><div class="tgt-det-dot" style="background:#64a0ff"></div><span class="tgt-det-lbl">Comeback</span><span class="tgt-det-val" style="color:#64a0ff">+${_tgtFmtM(cbGmv)}</span><span class="tgt-det-count">${cbCount} outlets</span><span class="ncs-row-btn" style="color:#64a0ff;border-color:rgba(100,160,255,.3)">ดู ›</span></div>`:''}
       ${exGmv>0?`<div class="tgt-det-row tappable" onclick="_tgtShowCohortSheet('ex')"><div class="tgt-det-dot" style="background:#00c8b0"></div><span class="tgt-det-lbl">Expansion</span><span class="tgt-det-val" style="color:#00c8b0">+${_tgtFmtM(exGmv)}</span><span class="tgt-det-count">${exCount} outlets</span><span class="ncs-row-btn" style="color:#00c8b0;border-color:rgba(0,200,176,.3)">ดู ›</span></div>`:''}
     </div>` : '';
@@ -935,10 +935,10 @@ async function renderPortviewTargetBar() {
     const mvDefSection = hasMv ? `<div class="tgt-det-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="tgt-det-stitle" style="margin-bottom:0">นิยาม Portfolio Movement</div>
-        <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:9px;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;padding:0;font-family:'IBM Plex Sans Thai',sans-serif">▾ ดูนิยาม</button>
+        <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:9px;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;padding:0;font-family:var(--tk-font-body)">▾ ดูนิยาม</button>
       </div>
       <div style="display:none">
-        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:#4ddc97">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนเดือนนี้ และไม่อยู่ใน transfer_in/handover list — วัด retention จริง</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:var(--tk-ok-bright)">Core NRR</span><span class="tgt-fml-eq" style="font-size:10px">account ที่อยู่กับ KAM นี้ก่อนเดือนนี้ และไม่อยู่ใน transfer_in/handover list — วัด retention จริง</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(140,180,255,.9)">Transfer in</span><span class="tgt-fml-eq" style="font-size:10px">account ที่โอนมาจาก KAM อื่นในเดือนนี้ — วัด NRR ต่อเนื่องหลังรับโอน</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(0,200,176,.9)">New (Sales)</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ Sales ปิดดีล แล้วโอนมา KAM เดือนนี้ — วัด onboarding success</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(255,140,100,.8)">Transfer out</span><span class="tgt-fml-eq" style="font-size:10px">account ที่ออกจากพอร์ตนี้ไปเดือนนี้ — GMV เดือนก่อนของ account เหล่านั้น</span></div>
@@ -987,7 +987,7 @@ async function renderPortviewTargetBar() {
   const colorKeySection = `<div class="tgt-det-section">
     <div class="tgt-det-stitle">สีของตัวเลข เป้าหมาย</div>
     <div class="tgt-color-key">
-      <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:#4ddc97"></div><span class="tgt-ck-lbl">สีเขียว = Target จริงที่ TL ตั้ง</span></div>
+      <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:var(--tk-ok-bright)"></div><span class="tgt-ck-lbl">สีเขียว = Target จริงที่ TL ตั้ง</span></div>
       <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:var(--amb,#f0b000)"></div><span class="tgt-ck-lbl">อำพัน = ประมาณการจากโควต้าทีม</span></div>
       <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.2)"></div><span class="tgt-ck-lbl">ขาวหมอง = baseline avg 3 เดือน (ยังไม่มี Target)</span></div>
     </div>
