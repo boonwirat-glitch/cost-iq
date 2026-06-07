@@ -573,7 +573,16 @@ window._salesOpenAccount = function(accountId, accountName) {
     const typeLabel = (acct.accountType||'SA').toUpperCase();
 
     // GMV history from bulkHistoryData
-    const hist = (typeof bulkHistoryData !== 'undefined' && bulkHistoryData[accountId]) || [];
+    // sales_history.csv keyed by o.account_id (from dwh.order) which may differ from account_guid
+    // Try multiple keys: accountId (account_guid), then numeric res_id variants
+    const _bhData = typeof bulkHistoryData !== 'undefined' ? bulkHistoryData : {};
+    const _skuData = typeof bulkSkuCurrentData !== 'undefined' ? bulkSkuCurrentData : {};
+    const _catData = typeof bulkCatsData !== 'undefined' ? bulkCatsData : {};
+    // Build candidate keys from acct object
+    const _keys = [accountId, acct.id, acct.res_id, acct.user_id, String(acct.res_id||''), String(acct.user_id||'')].filter(Boolean);
+    const _findData = (store) => { for (const k of _keys) { if (store[k] && store[k].length) return store[k]; } return []; };
+    const _findObjData = (store) => { for (const k of _keys) { if (store[k] && Object.keys(store[k]).length) return store[k]; } return {}; };
+    const hist = _findData(_bhData);
     const moSort = m => { const p=(m||'').split(' '); const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return (parseInt(p[1]||0)*12)+mo.indexOf(p[0]); };
     const sorted3 = hist.slice().sort((a,b) => moSort(a.m)-moSort(b.m)).slice(-3);
 
@@ -597,12 +606,12 @@ window._salesOpenAccount = function(accountId, accountName) {
         const ghostHt = Math.round((acct.runrate||0)/maxGmv*56);
         const mtdHt = Math.round((acct.gmvToDate||0)/maxGmv*56);
         return '<div class="sv-bw now">' +
-          '<div class="sv-bv" style="color:var(--sv-ac)">฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bv" style="color:#FF385C">฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
           '<div class="sv-b-ghost-wrap" style="height:' + Math.max(2,ghostHt) + 'px">' +
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:var(--sv-ac)">MTD</div>' +
+          '<div class="sv-bl" style="color:#FF385C">MTD</div>' +
         '</div>';
       })() : '') +
       '</div>' +
@@ -611,7 +620,7 @@ window._salesOpenAccount = function(accountId, accountName) {
     ) : '';
 
     // SKU current
-    const skus = (typeof bulkSkuCurrentData !== 'undefined' && bulkSkuCurrentData[accountId]) || [];
+    const skus = _findData(_skuData);
     const prevHist = sorted3.length >= 2 ? (hist.filter(h => moSort(h.m) < moSort(sorted3[sorted3.length-1].m))) : [];
     const prevMonthLabel = prevHist.length ? prevHist[prevHist.length-1].m : null;
     const skusSorted = skus.slice().sort((a,b) => (b.gmv_to_date||0)-(a.gmv_to_date||0)).slice(0,6);
@@ -631,7 +640,7 @@ window._salesOpenAccount = function(accountId, accountName) {
     ) : '';
 
     // Category breakdown from bulkCatsData
-    const cats = (typeof bulkCatsData !== 'undefined' && bulkCatsData[accountId]) || {};
+    const cats = _findObjData(_catData);
     const catKeys = Object.keys(cats).sort((a,b) => moSort(b)-moSort(a));
     const latestCats = catKeys.length ? (cats[catKeys[0]]||[]).slice(0,4) : [];
     const catHtml = latestCats.length ? (
@@ -651,8 +660,8 @@ window._salesOpenAccount = function(accountId, accountName) {
     el.innerHTML =
       '<div class="sv-page-hd" style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;">' +
         '<button onclick="renderSalesPortview()" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sv-ac)" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
-          '<span style="font-size:12px;font-weight:600;color:var(--sv-ac)">พอร์ต</span>' +
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+          '<span style="font-size:14px;font-weight:600;color:#FF385C;font-family:Noto Sans Thai,sans-serif">พอร์ต</span>' +
         '</button>' +
       '</div>' +
       '<div style="padding:0 16px 12px;">' +
