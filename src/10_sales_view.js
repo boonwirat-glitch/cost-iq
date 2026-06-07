@@ -474,21 +474,22 @@ function _renderSalesOutletList(el, outlets) {
   html += '<div class="sv-outlet-list">';
   groups.forEach(function(g) {
     if (g.outlets.length > 1) {
-      // Account group header — prominent, full-width
+      // 8px surface band before group — visual break (Airbnb pattern)
+      html += '<div class="sv-ol-band"></div>';
       const gGmv = g.outlets.reduce(function(s,o){ return s+(o.runrate||0); }, 0);
       const gId = g.outlets[0].id;
       const collapsed = !!_olCollapsed[gId];
-      html += '<div class="sv-ol-acct-hd" data-gid="' + gId + '">' +
-        '<div class="sv-ol-acct-left">' +
-          '<div class="sv-ol-acct-name">' + g.name + '</div>' +
-          '<div class="sv-ol-acct-meta">' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '/เดือน</div>' +
+      // Group header: uppercase muted label (typography hierarchy, no card/border)
+      html += '<div class="sv-ol-grp-hd" data-gid="' + gId + '">' +
+        '<div class="sv-ol-grp-name">' + g.name +
+          '<span class="sv-ol-grp-arrow">' + (collapsed?'▸':'▾') + '</span>' +
         '</div>' +
-        '<div class="sv-ol-acct-right">' +
-          '<div class="sv-ol-acct-toggle">' + (collapsed?'▸':'▾') + '</div>' +
-        '</div>' +
+        '<span class="sv-ol-grp-meta">' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '</span>' +
       '</div>';
       if (!collapsed) {
         g.outlets.forEach(function(o) { html += _olRenderOutletRow(o, true); });
+        // 8px band after group closes
+        html += '<div class="sv-ol-band"></div>';
       }
     } else {
       html += _olRenderOutletRow(g.outlets[0], false);
