@@ -124,12 +124,23 @@ async function _loadSalesPipeline() {
 
 // Pipeline GMV per month
 function _pipelineByMonth(leads) {
+  // Spread GMV across tenure months based on account_type
+  // SA=45d (~1-2mo), MC/Chain=90d (~3mo) — spread monthly GMV across holding period
   const byMonth = {};
   leads.forEach(l => {
-    const ym = (l.expected_start_date || '').substring(0,7);
-    if (!ym) return;
-    if (!byMonth[ym]) byMonth[ym] = 0;
-    byMonth[ym] += parseFloat(l.expected_gmv) || 0;
+    const startYM = (l.expected_start_date || '').substring(0,7);
+    if (!startYM) return;
+    const gmv = parseFloat(l.expected_gmv) || 0;
+    const type = (l.account_type || 'SA').toUpperCase();
+    // months to spread: SA→1, MC/Chain→3
+    const spreadMonths = (type === 'MC' || type === 'CHAIN') ? 3 : 1;
+    const [y, m] = startYM.split('-').map(Number);
+    for (let i = 0; i < spreadMonths; i++) {
+      const d = new Date(y, m - 1 + i, 1);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = 0;
+      byMonth[key] += gmv;
+    }
   });
   return byMonth;
 }
@@ -364,9 +375,46 @@ function _renderSalesOutletList(el, outlets) {
 
 window._salesOpenAccount = function(accountId, accountName) {
   try {
-    if (typeof portviewSelectAccount === 'function') {
-      portviewSelectAccount(accountId, accountName);
-    }
+    // For Sales: show account detail inline in sales-portview screen
+    const data = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+    const acct = data.find(r => r.id === accountId || r.account_guid === accountId);
+    if (!acct) { console.warn('[Sales] account not found:', accountId); return; }
+    const el = document.getElementById('scr-sales-portview');
+    if (!el) return;
+    const daysLeft = _daysUntilExp(acct.newUserExpDate);
+    const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+    const pctHeld = totalDays > 0 ? Math.min(100, Math.round((acct.daysHeld||0)/totalDays*100)) : 0;
+    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+    const expLabel = acct.newUserExpDate
+      ? new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
+    const typeLabel = (acct.accountType||'SA').toUpperCase();
+    el.innerHTML =
+      '<div class="sv-page-hd" style="display:flex;align-items:center;gap:10px;">' +
+        '<button onclick="renderSalesPortview()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+          '<span class="sv-back-label">พอร์ต</span>' +
+        '</button>' +
+        '<div><div class="sv-page-eye">' + typeLabel + '</div><div class="sv-page-title">' + (acct.name||acct.id) + '</div></div>' +
+      '</div>' +
+      '<div class="sv-band"></div>' +
+      '<div class="sv-tenure-section">' +
+        '<div class="sv-tenure-eye">ระยะเวลาในมือ</div>' +
+        '<div class="sv-tenure-bar-row">' +
+          '<div class="sv-tenure-track"><div class="sv-tenure-fill' + (barClass==='late'?' late':barClass==='mid'?' mid':'') + '" style="width:' + pctHeld + '%"></div></div>' +
+          '<span class="sv-tenure-pct' + (barClass==='late'?' late':'') + '">' + pctHeld + '%</span>' +
+        '</div>' +
+        '<div class="sv-tenure-dl">' +
+          '<span class="sv-tenure-held">ถือมา ' + (acct.daysHeld||0) + ' วัน</span>' +
+          '<span class="sv-tenure-exp">หมด ' + expLabel + (daysLeft!==null?' ('+daysLeft+'d)':'') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sv-band"></div>' +
+      '<div class="sv-stat-list">' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Runrate</span><span class="sv-stat-val">฿' + _sv_fmt(acct.runrate||0) + '</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">GMV เดือนที่แล้ว</span><span class="sv-stat-val">฿' + _sv_fmt(acct.lastMonthGmv||0) + '</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Orders เดือนนี้</span><span class="sv-stat-val">' + (acct.ordersToDate||0) + ' ออเดอร์</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Account type</span><span class="sv-stat-val">' + typeLabel + '</span></div>' +
+      '</div>';
   } catch(e) { console.warn('[Sales] open account failed:', e); }
 };
 
@@ -505,7 +553,7 @@ window._salesAddLead = function(existing) {
     </div>
     <input type="hidden" id="sv-lead-type" value="${_acctType}" />
     <div class="sv-field-label">ยอดคาด / เดือน (บาท)</div>
-    <input class="sv-field-input" id="sv-lead-gmv" type="number" inputmode="numeric" placeholder="50000" value="${isEdit?existing.expected_gmv:''}" />
+    <input class="sv-field-input" id="sv-lead-gmv" type="text" inputmode="numeric" pattern="[0-9,]*" placeholder="50,000" value="${isEdit?(existing.expected_gmv?Number(existing.expected_gmv).toLocaleString():'')+'':''}" oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',')" />
     <div class="sv-field-label">วันที่ยอดน่าจะเริ่มเข้า</div>
     <input class="sv-field-input" id="sv-lead-date" type="date" value="${isEdit?existing.expected_start_date:''}" />
     <div class="sv-sheet-actions">
@@ -542,7 +590,7 @@ window._salesCloseSheet = function() {
 
 window._salesSaveLead = async function(existingId) {
   const name = (document.getElementById('sv-lead-name')?.value||'').trim();
-  const gmv  = parseFloat(document.getElementById('sv-lead-gmv')?.value||0);
+  const gmv  = parseFloat((document.getElementById('sv-lead-gmv')?.value||'0').replace(/,/g,''));
   const date = document.getElementById('sv-lead-date')?.value||'';
   const acctType = document.getElementById('sv-lead-type')?.value || 'SA';
   if (!name || !gmv || !date) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
