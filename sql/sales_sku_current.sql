@@ -1,8 +1,7 @@
 -- ════════════════════════════════════════════════════════════
--- SALES_SKU_CURRENT v1
--- Output: ส่วน Sales ของ bulk_sku_current.csv
--- Window: current month MTD (day-1 lag)
--- Logic: dwh.order stamp commercial_owner + staff_owner ต่อ order
+-- SALES_SKU_CURRENT v2
+-- Output: Sales SKU MTD keyed by account_guid
+-- Fix v2: JOIN dim.user_master เพื่อได้ account_guid
 -- ════════════════════════════════════════════════════════════
 
 WITH sales_names AS (
@@ -17,31 +16,31 @@ WITH sales_names AS (
       'sasaluk.t@freshket.co','supanida.r@freshket.co','thida.p@freshket.co'
     )
 ),
-mtd_items AS (
+params AS (
   SELECT
-    CAST(um.account_guid AS STRING)  AS account_id,
-    o.order_id,
-    o.delivery_date,
-    i.item_id,
-    i.item_name_th,
-    i.gmv_ex_vat
-  FROM `freshket-rn.dwh.order` o
-  CROSS JOIN UNNEST(o.item) AS i
-  JOIN sales_names sl ON LOWER(TRIM(o.staff_owner)) = LOWER(TRIM(sl.staff_owner))
-  WHERE o.commercial_owner = 'SALE'
-    AND o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH)
-    AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)
-    AND i.gmv_ex_vat > 0
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH) AS cur_month_start,
+    DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)                    AS max_date
 )
 
 SELECT
-  account_id,
-  CAST(item_id AS STRING)           AS item_id,
-  ANY_VALUE(item_name_th)           AS item_name_th,
-  COUNT(DISTINCT order_id)          AS order_count_mtd,
-  ROUND(SUM(gmv_ex_vat), 2)        AS gmv_mtd,
-  MAX(delivery_date)                AS last_order_date
-FROM mtd_items
-WHERE item_id IS NOT NULL
-GROUP BY account_id, item_id
-ORDER BY account_id, gmv_mtd DESC;
+  CAST(um.account_guid AS STRING)               AS account_id,
+  CAST(i.item_id AS STRING)                     AS item_id,
+  MAX(i.item_name_th)                           AS item_name_th,
+  COUNT(DISTINCT o.order_id)                    AS orders_this_month,
+  ROUND(SUM(i.gmv_ex_vat), 0)                  AS gmv_to_date,
+  MAX(o.delivery_date)                          AS last_order_date
+
+FROM `freshket-rn.dwh.order` o, UNNEST(o.item) AS i
+CROSS JOIN params p
+JOIN sales_names sl ON LOWER(TRIM(o.staff_owner)) = LOWER(TRIM(sl.staff_owner))
+JOIN `freshket-rn.dim.user_master` um
+  ON CAST(o.user_id AS STRING) = CAST(um.res_id AS STRING)
+
+WHERE o.commercial_owner = 'SALE'
+  AND o.delivery_date >= p.cur_month_start
+  AND o.delivery_date <= p.max_date
+  AND i.gmv_ex_vat > 0
+  AND um.account_guid IS NOT NULL
+
+GROUP BY 1, 2
+ORDER BY 1, gmv_to_date DESC;
