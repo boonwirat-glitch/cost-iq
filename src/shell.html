@@ -308,8 +308,8 @@
       shortName: 'Freshket',
       version: 'v212c-diagnostics-counter-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
-      themeColor: '#006050',
-      backgroundColor: '#006050',
+      themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
+      backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
       serviceWorkerUrl: '/sw.js',
       manifestStartUrl: '/',
       manifestDisplay: 'standalone'
@@ -1386,9 +1386,9 @@
         // v205c: run rate ON TOP outside (.tba), actual value INSIDE solid bar
         var _actInner = _actH >= 16 ? '<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">'+fmtK(currentMonth.gmv_to_date)+'</span>' : '';
         currentBar = '<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()">'
-          + '<span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">'+fmtK(_rr)+'</span>'
+          + '<span class="tba" style="color:var(--tk-ok-bright);font-size:10px;font-weight:700;font-family:monospace">'+fmtK(_rr)+'</span>'
           + '<div style="position:relative;height:'+_rrH+'px;width:100%;flex-shrink:0">'
-          + '<div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div>'
+          + '<div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div>'
           + '<div style="position:absolute;bottom:0;left:0;right:0;height:'+_actH+'px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">'+_actInner+'</div>'
           + '</div>'
           + '<span class="tbl" style="color:var(--g700);font-weight:700">'+_lbl+'</span></div>';
@@ -1995,7 +1995,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#00d070" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
 </svg>
 <span id="dlp-text">กำลังโหลด</span>
-<span id="dlp-count" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.8)">0/5</span>
+<span id="dlp-count" style="font-family:var(--tk-font-mono);font-size:11px;color:var(--tk-ok-dim-2)">0/5</span>
 </div>
 <div class="lgi-checking" id="login-overlay">
 <div class="lgi-box">
@@ -2006,7 +2006,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <div class="lgi-wordmark">
         freshket<span class="lgi-badge">
-<svg fill="#4ddc97" viewbox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+<svg fill="var(--tk-ok-bright)" viewbox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
 <path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path>
 </svg>Sense
         </span>
@@ -2057,7 +2057,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <button id="local-dev-btn" onclick="activateLocalMode()" onmouseout="this.style.color='rgba(255,255,255,.2)'" onmouseover="this.style.color='rgba(255,255,255,.5)'" style="
       display:block;margin:16px auto 0;
       background:transparent;border:none;
-      font-size:10px;font-family:'IBM Plex Mono',monospace;
+      font-size:10px;font-family:var(--tk-font-mono);
       color:rgba(255,255,255,.2);cursor:pointer;
       letter-spacing:.5px;padding:4px 8px;border-radius:4px;
       transition:all .3s;
@@ -2072,12 +2072,12 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div id="sense-splash">
 <div class="spl-orb">
 <div class="spl-glow"></div>
-<svg fill="#4ddc97" height="72" id="spl-star" viewbox="0 0 10 10" width="72">
+<svg fill="var(--tk-ok-bright)" height="72" id="spl-star" viewbox="0 0 10 10" width="72">
 <path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path>
 </svg>
 </div>
 <div class="spl-brand">
-<div class="spl-wordmark">freshket<span class="lgi-badge" style="margin-left:7px"><svg fill="#4ddc97" height="8" viewbox="0 0 10 10" width="8"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span></div>
+<div class="spl-wordmark">freshket<span class="lgi-badge" style="margin-left:7px"><svg fill="var(--tk-ok-bright)" height="8" viewbox="0 0 10 10" width="8"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span></div>
 <div class="spl-sub">Restaurant Intelligence Platform</div>
 </div>
 <div class="spl-ticker-wrap"><span id="spl-ticker"></span></div>
@@ -2111,13 +2111,13 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </script>
 <div id="local-persona-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;padding:20px">
 <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:100%;max-width:400px;max-height:80vh;overflow-y:auto">
-<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,208,112,.6);letter-spacing:.8px;margin-bottom:4px">LOCAL DEV MODE</div>
+<div style="font-family:var(--tk-font-mono);font-size:11px;color:var(--tk-ok-dim-2);letter-spacing:.8px;margin-bottom:4px">LOCAL DEV MODE</div>
 <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:4px">เลือก Persona</div>
 <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:20px">เสมือนจริง — ไม่ต้อง login Supabase</div>
 <!-- Admin persona -->
 <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">Admin</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-<button onclick="_setLocalPersona('admin','boonwirat.t@freshket.co','Bucci (VP Revenue)')" style="background:rgba(240,80,0,.15);border:1px solid rgba(240,80,0,.4);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif">
+<button onclick="_setLocalPersona('admin','boonwirat.t@freshket.co','Bucci (VP Revenue)')" style="background:rgba(240,80,0,.15);border:1px solid rgba(240,80,0,.4);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif">
 <div style="font-size:13px;font-weight:700">Bucci (VP Revenue)</div>
 <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">boonwirat.t@freshket.co · ตั้ง target ทุกทีมได้</div>
 </button>
@@ -2125,11 +2125,11 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- TL personas -->
 <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">Team Lead</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-<button onclick="_setLocalPersona('tl','nitipat.s@freshket.co','Nitipat (Squad A)')" style="background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.4);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif">
+<button onclick="_setLocalPersona('tl','nitipat.s@freshket.co','Nitipat (Squad A)')" style="background:var(--tk-accent-dim-2);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif">
 <div style="font-size:13px;font-weight:700">Nitipat (Squad A)</div>
 <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">nitipat.s@freshket.co · 7 KAMs</div>
 </button>
-<button onclick="_setLocalPersona('tl','pavarisa.mu@freshket.co','Pavarisa (Squad B)')" style="background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.4);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif">
+<button onclick="_setLocalPersona('tl','pavarisa.mu@freshket.co','Pavarisa (Squad B)')" style="background:var(--tk-accent-dim-2);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif">
 <div style="font-size:13px;font-weight:700">Pavarisa (Squad B)</div>
 <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">pavarisa.mu@freshket.co · 8 KAMs</div>
 </button>
@@ -2137,20 +2137,20 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- KAM personas -->
 <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">KAM</div>
 <div style="display:flex;flex-direction:column;gap:6px">
-<button onclick="_setLocalPersona('rep','anusorn.k@freshket.co','Anusorn (Bookbig)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Anusorn (Bookbig) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','chaklid.n@freshket.co','Chaklid (Dent)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Chaklid (Dent) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','duangruedee.bu@freshket.co','Duangruedee (Ning)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Duangruedee (Ning) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','guntinun.t@freshket.co','Guntinun (Monet)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Guntinun (Monet) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','intuon.y@freshket.co','Intuon (Jane)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Intuon (Jane) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','napat.k@freshket.co','Napat (To)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Napat (To) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','natchita.b@freshket.co','Natchita (Foam)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Natchita (Foam) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','niracha.s@freshket.co','Niracha (Cream)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Niracha (Cream) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','nuttawan.ma@freshket.co','Nuttawan (Kwang)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Nuttawan (Kwang) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','ploynitcha.r@freshket.co','Ploynitcha (Nitcha)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Ploynitcha (Nitcha) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','puttipong.w@freshket.co','Puttipong (Tape)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Puttipong (Tape) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','rinlaphat.s@freshket.co','Rinlaphat (Mild)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Rinlaphat (Mild) · nitipat.s</button>
-<button onclick="_setLocalPersona('rep','siriprapa.p@freshket.co','Siriprapa (Pop)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Siriprapa (Pop) · pavarisa.mu</button>
-<button onclick="_setLocalPersona('rep','warissara.c@freshket.co','Warissara (Ply)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px">Warissara (Ply) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','anusorn.k@freshket.co','Anusorn (Bookbig)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Anusorn (Bookbig) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','chaklid.n@freshket.co','Chaklid (Dent)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Chaklid (Dent) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','duangruedee.bu@freshket.co','Duangruedee (Ning)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Duangruedee (Ning) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','guntinun.t@freshket.co','Guntinun (Monet)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Guntinun (Monet) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','intuon.y@freshket.co','Intuon (Jane)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Intuon (Jane) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','napat.k@freshket.co','Napat (To)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Napat (To) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','natchita.b@freshket.co','Natchita (Foam)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Natchita (Foam) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','niracha.s@freshket.co','Niracha (Cream)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Niracha (Cream) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','nuttawan.ma@freshket.co','Nuttawan (Kwang)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Nuttawan (Kwang) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','ploynitcha.r@freshket.co','Ploynitcha (Nitcha)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Ploynitcha (Nitcha) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','puttipong.w@freshket.co','Puttipong (Tape)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Puttipong (Tape) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','rinlaphat.s@freshket.co','Rinlaphat (Mild)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Rinlaphat (Mild) · nitipat.s</button>
+<button onclick="_setLocalPersona('rep','siriprapa.p@freshket.co','Siriprapa (Pop)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Siriprapa (Pop) · pavarisa.mu</button>
+<button onclick="_setLocalPersona('rep','warissara.c@freshket.co','Warissara (Ply)')" style="background:rgba(0,208,112,.08);border:1px solid rgba(0,208,112,.2);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;color:#fff;font-family:var(--tk-font-body),sans-serif;font-size:12px">Warissara (Ply) · pavarisa.mu</button>
 </div>
 </div>
 </div>
@@ -2183,7 +2183,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="logo-box">
 <img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/>
 </div>
-    freshket <span class="iq-badge"><svg class="iq-icon" fill="#4ddc97" viewbox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span>
+    freshket <span class="iq-badge"><svg class="iq-icon" fill="var(--tk-ok-bright)" viewbox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span>
 </div>
 <div class="topbar-right">
 <span id="aip-badge" onclick="openDataPanel()" style="display:none;font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:20px;border:1px solid rgba(0,204,106,.25);background:rgba(0,204,106,.12);color:var(--g700);cursor:pointer;flex-shrink:0;transition:all .2s" title="AI Provider">Claude</span>
@@ -2242,7 +2242,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div id="aip-claude-section" style="transition:opacity .2s">
 <div class="dp-matcher-section" id="dp-quick-matcher">
 <div class="dp-matcher-title" style="display:flex;align-items:center;gap:6px;color:var(--g700);letter-spacing:.5px">
-<svg fill="var(--g500)" height="11" style="flex-shrink:0;filter:drop-shadow(0 0 3px rgba(0,208,112,.5))" viewbox="0 0 10 10" width="11"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
+<svg fill="var(--g500)" height="11" style="flex-shrink:0;filter:drop-shadow(0 0 3px var(--tk-ok-dim))" viewbox="0 0 10 10" width="11"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
           Freshket Sense — เทียบสเปค
         </div>
 <!-- Mode (Fast = Haiku + fast schema, Detail = Sonnet + detail schema with note_th) -->
@@ -2267,7 +2267,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <button class="ms-opt" id="ms-custom" onclick="setMatcherScope('custom',this)">กำหนดเอง</button>
 </div>
 <div id="ms-custom-row" style="display:none;margin-bottom:8px">
-<input id="ms-custom-n" max="9999" min="1" oninput="this.style.borderColor=this.value&gt;0?'var(--g500)':'var(--n200)';updateMatcherPreStatus()" placeholder="จำนวน SKU" style="width:100%;padding:6px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s" type="number"/>
+<input id="ms-custom-n" max="9999" min="1" oninput="this.style.borderColor=this.value&gt;0?'var(--g500)':'var(--n200)';updateMatcherPreStatus()" placeholder="จำนวน SKU" style="width:100%;padding:6px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:var(--tk-font-mono);outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s" type="number"/>
 </div>
 <div class="gen-pre-status" id="gen-pre-status">upload bulk_alternatives.csv หรือ matcher_input.csv ก่อน</div>
 <button class="gen-btn" id="gen-btn" onclick="runMatcherInApp()">
@@ -2275,7 +2275,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
           Generate โอกาสประหยัด
         </button>
 <div id="gen-reverify-link" style="display:none;text-align:center;margin-top:6px">
-<button onclick="reVerifyAll()" style="background:none;border:none;color:var(--n400);font-size:11px;text-decoration:underline;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">↻ Re-verify ทั้งหมด</button>
+<button onclick="reVerifyAll()" style="background:none;border:none;color:var(--n400);font-size:11px;text-decoration:underline;cursor:pointer;font-family:var(--tk-font-body),sans-serif">↻ Re-verify ทั้งหมด</button>
 </div>
 <div class="gen-progress-wrap" id="gen-progress-wrap">
 <div class="gen-prog-header">
@@ -2292,14 +2292,14 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 </div>
 <!-- KAM AI Model -->
-<div style="margin-top:12px;padding:12px 14px;background:rgba(26,58,107,.06);border:1px solid rgba(38,96,200,.15);border-radius:10px">
-<div style="font-size:10px;font-weight:700;color:#2660c8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">KAM Briefing Model</div>
+<div style="margin-top:12px;padding:12px 14px;background:rgba(26,58,107,.06);border:1px solid var(--tk-accent-dim);border-radius:10px">
+<div style="font-size:10px;font-weight:700;color:var(--tk-accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">KAM Briefing Model</div>
 <div style="display:flex;gap:6px">
 <div id="km-haiku" onclick="setKamModel('haiku')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--n200);background:var(--n50);cursor:pointer;transition:all .15s">
 <div style="font-size:12px;font-weight:700;color:var(--n700)">Haiku</div>
 <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:2px">เร็ว · แนะนำ</div>
 </div>
-<div id="km-sonnet" onclick="setKamModel('sonnet')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid #2660c8;background:#1a3a6b;cursor:pointer;transition:all .15s">
+<div id="km-sonnet" onclick="setKamModel('sonnet')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--tk-accent);background:var(--tk-accent-dark);cursor:pointer;transition:all .15s">
 <div style="font-size:12px;font-weight:700;color:#fff">Sonnet</div>
 <div style="font-size:10px;color:var(--n400);margin-top:2px">ละเอียดกว่า</div>
 </div>
@@ -2312,15 +2312,15 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     ══════════════════════════════ -->
 <div id="dp-bulk" style="display:none">
 <!-- ── GOOGLE SHEETS LOADER (Ops only) ── -->
-<div style="margin-bottom:16px;padding:12px 14px;background:rgba(38,96,200,.06);border:1.5px solid rgba(38,96,200,.22);border-radius:12px">
+<div style="margin-bottom:16px;padding:12px 14px;background:var(--tk-accent-dim);border:1.5px solid var(--tk-accent-dim-2);border-radius:12px">
 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
 <div>
-<div style="font-size:12px;font-weight:700;color:rgba(38,96,200,.9)">Cloudflare Data</div>
-<div style="font-size:10px;color:rgba(38,96,200,.55);margin-top:2px">โหลดอัตโนมัติตอน login · กดเพื่อ refresh</div>
+<div style="font-size:12px;font-weight:700;color:var(--tk-accent-solid)">Cloudflare Data</div>
+<div style="font-size:10px;color:var(--tk-accent-solid);margin-top:2px">โหลดอัตโนมัติตอน login · กดเพื่อ refresh</div>
 </div>
 <div style="display:flex;align-items:center;gap:6px">
-<span id="sheets-loaded-count" style="display:none;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(38,96,200,.15);color:rgba(38,96,200,.85)">0/7</span>
-<button id="sheets-load-btn" onclick="reloadFromGoogleSheets()" style="flex-shrink:0;padding:7px 14px;border-radius:8px;border:none;background:#2660c8;color:#fff;font-size:12px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer">
+<span id="sheets-loaded-count" style="display:none;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--tk-accent-dim);color:var(--tk-accent-solid)">0/7</span>
+<button id="sheets-load-btn" onclick="reloadFromGoogleSheets()" style="flex-shrink:0;padding:7px 14px;border-radius:8px;border:none;background:var(--tk-accent);color:#fff;font-size:12px;font-weight:700;font-family:var(--tk-font-body),sans-serif;cursor:pointer">
               โหลดซ้ำ
             </button>
 </div>
@@ -2329,7 +2329,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <!-- ── FOLDER SHORTCUT (local dev only) ── -->
 <div id="dp-folder-wrap" style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
-<button id="dp-folder-btn" onclick="pickFolder()" style="flex:1;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1.5px dashed var(--g500);background:rgba(0,208,112,.06);cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px;font-weight:700;color:var(--g700);transition:all .2s;text-align:left">
+<button id="dp-folder-btn" onclick="pickFolder()" style="flex:1;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1.5px dashed var(--g500);background:rgba(0,208,112,.06);cursor:pointer;font-family:var(--tk-font-body),sans-serif;font-size:12px;font-weight:700;color:var(--g700);transition:all .2s;text-align:left">
 <svg fill="none" height="16" stroke="var(--g500)" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
 <span id="dp-folder-label">เลือก folder CSV</span>
 </button>
@@ -2338,7 +2338,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- DAILY -->
 <div style="margin-bottom:16px">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-<span style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;background:rgba(0,208,112,.15);color:var(--g700);border-radius:6px;padding:2px 8px">ทุกวัน</span>
+<span style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;background:var(--tk-ok-dim);color:var(--g700);border-radius:6px;padding:2px 8px">ทุกวัน</span>
 <span style="font-size:11px;font-weight:700;color:var(--n700)">Portview + Pace + Churn</span>
 </div>
 <div class="dp-upload-slot" id="slot-portview-bulk" onclick="document.getElementById('fi-portview-bulk').click()" style="border-color:rgba(0,208,112,.3);margin-bottom:6px">
@@ -2380,7 +2380,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- WEEKLY -->
 <div>
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-<span style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;background:rgba(38,96,200,.12);color:#2660c8;border-radius:6px;padding:2px 8px">ทุกจันทร์</span>
+<span style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;background:var(--tk-accent-dim);color:var(--tk-accent);border-radius:6px;padding:2px 8px">ทุกจันทร์</span>
 <span style="font-size:11px;font-weight:700;color:var(--n700)">Bulk Data</span>
 </div>
 <div style="font-size:10px;color:var(--n400);background:var(--n50);border-radius:8px;padding:6px 10px;margin-bottom:8px;line-height:1.6">
@@ -2538,7 +2538,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <div class="sense-preview" id="rest-ai-preview" style="display:none"><div class="sense-preview-eyebrow"><span class="rap-star">✦</span> Sense เช็คให้แล้ว</div><div class="rap-opps" id="rap-opps">—</div><div class="rap-savings-note" id="rap-sub">—</div><button class="rap-cta" onclick="showScreen('opportunities')">ดูวัตถุดิบที่เจอ →</button></div>
 </div>
-<div id="kamsec" style="display:none"><div class="card" style="border-left:3px solid #2660c8"><div class="ch"><span class="ct" style="color:#2660c8">Talking Points — KAM</span></div><div id="tpts"></div></div></div>
+<div id="kamsec" style="display:none"><div class="card" style="border-left:3px solid var(--tk-accent)"><div class="ch"><span class="ct" style="color:var(--tk-accent)">Talking Points — KAM</span></div><div id="tpts"></div></div></div>
 <div style="height:8px"></div>
 </div><!-- /rest-overview -->
 <!-- ══ KAM OVERVIEW — 3-Zone Layout (v184) ══ -->
@@ -2639,7 +2639,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="kam-dc-head"><span class="kam-dc-head-label">ชวนลูกค้าคุยเรื่องอะไรดี</span></div>
 <div class="kam-dc-body" id="kam-talkline-body"></div>
 </div>
-<div id="kam-tl-loading" style="display:none;padding:14px 16px;background:rgba(38,96,200,.07);border:1px solid rgba(38,96,200,.15);border-radius:10px;margin-bottom:10px">
+<div id="kam-tl-loading" style="display:none;padding:14px 16px;background:var(--tk-accent-dim);border:1px solid var(--tk-accent-dim);border-radius:10px;margin-bottom:10px">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
 <div style="width:12px;height:12px;border-radius:50%;border:2px solid rgba(100,160,255,.6);border-top-color:transparent;animation:spin .7s linear infinite;flex-shrink:0"></div>
 <span style="font-size:11px;font-weight:600;color:rgba(180,210,255,.7)">กำลังสร้าง Talk Line...</span>
@@ -2657,7 +2657,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div id="kam-empty-state" style="display:none;text-align:center;padding:32px 16px">
 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:6px">ยังไม่มีข้อมูลร้าน</div>
 <div style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.6;margin-bottom:14px">อัปโหลดข้อมูลก่อนเริ่มวิเคราะห์</div>
-<button onclick="openDataPanel()" style="font-size:12px;font-weight:700;color:rgba(180,210,255,.9);background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.4);border-radius:20px;padding:7px 18px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">อัปโหลดข้อมูล</button>
+<button onclick="openDataPanel()" style="font-size:12px;font-weight:700;color:rgba(180,210,255,.9);background:var(--tk-accent-dim-2);border:1px solid var(--tk-accent-dim-3);border-radius:20px;padding:7px 18px;cursor:pointer;font-family:var(--tk-font-body),sans-serif">อัปโหลดข้อมูล</button>
 </div>
 <!-- No-account state -->
 <div id="kam-no-acct-state" style="display:none;text-align:center;padding:40px 24px 60px">
@@ -2666,7 +2666,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;line-height:1.4">เลือกร้านก่อน Sense ถึงจะวิเคราะห์ได้</div>
 <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.7;margin-bottom:22px">Insight แสดงผลรายร้าน — พอเลือกร้านจากพอร์ตแล้ว<br/>Sense จะคุยสถานการณ์ของร้านนั้นให้ฟัง</div>
-<button onclick="showScreen('portview')" style="font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,rgba(38,96,200,.5),rgba(60,130,240,.4));border:1px solid rgba(140,200,255,.6);border-radius:22px;padding:11px 28px;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif;box-shadow:0 4px 14px rgba(38,96,200,.3),inset 0 1px 0 rgba(255,255,255,.15);transition:all .15s">ไปที่พอร์ต →</button>
+<button onclick="showScreen('portview')" style="font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--tk-subtab-active),rgba(60,130,240,.4));border:1px solid rgba(140,200,255,.6);border-radius:22px;padding:11px 28px;cursor:pointer;font-family:var(--tk-font-body),sans-serif;box-shadow:0 4px 14px var(--tk-accent-dim-3),inset 0 1px 0 rgba(255,255,255,.15);transition:all .15s">ไปที่พอร์ต →</button>
 <div id="kna-recent-wrap" style="display:none;margin-top:36px">
 <div style="font-size:10px;font-weight:700;color:rgba(180,210,255,.45);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">ร้านที่เพิ่งดู</div>
 <div id="kna-recent-list" style="display:flex;flex-direction:column;gap:6px;text-align:left"></div>
@@ -2688,7 +2688,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div id="port-top">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
 <div class="stit" style="margin-bottom:0">สินค้า</div>
-<span id="port-month-label" style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--n400)"></span>
+<span id="port-month-label" style="font-size:11px;font-family:var(--tk-font-mono);color:var(--n400)"></span>
 </div>
 <div class="port-month-bar" id="port-month-bar"></div>
 <div class="port-mom-insight" id="port-mom-insight" style="display:none"></div>
@@ -2711,7 +2711,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div style="font-size:13px;font-weight:700;color:var(--n700);margin-bottom:4px">กราฟราคาคืออะไร?</div>
 <div style="font-size:12px;color:var(--n600);line-height:1.65">แสดงราคาซื้อจริง (฿/kg) ของแต่ละ SKU ย้อนหลังสูงสุด 6 เดือน</div>
 <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--n200)">
-<div style="font-size:11px;color:var(--n400);line-height:1.6"><span style="font-weight:600;color:var(--n600)">SKU ที่ไม่มีกราฟ</span> = ยอดซื้อต่ำกว่า <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--n600)">฿100/เดือน</span> หรือยังไม่มีข้อมูลย้อนหลัง</div>
+<div style="font-size:11px;color:var(--n400);line-height:1.6"><span style="font-weight:600;color:var(--n600)">SKU ที่ไม่มีกราฟ</span> = ยอดซื้อต่ำกว่า <span style="font-family:var(--tk-font-mono);font-weight:700;color:var(--n600)">฿100/เดือน</span> หรือยังไม่มีข้อมูลย้อนหลัง</div>
 </div>
 </div>
 <div class="sku-search-row">
@@ -2807,7 +2807,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="rpt2-brand">
 <div class="rpt2-logo-box"><img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/></div>
 <div>
-<div class="rpt2-wordmark">freshket<span class="lgi-badge" style="margin-left:6px;font-size:9px;padding:1px 5px;animation:none"><svg fill="#4ddc97" height="7" viewbox="0 0 10 10" width="7"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span></div>
+<div class="rpt2-wordmark">freshket<span class="lgi-badge" style="margin-left:6px;font-size:9px;padding:1px 5px;animation:none"><svg fill="var(--tk-ok-bright)" height="7" viewbox="0 0 10 10" width="7"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span></div>
 <div class="rpt2-sub">Cost Reduction Report</div>
 </div>
 </div>
@@ -2995,7 +2995,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- ══ SKILLS SCREEN ══ -->
 <div class="scr" id="scr-skills"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
-<div class="scr" id="scr-teamview" style="background:#0d1f3c">
+<div class="scr" id="scr-teamview" style="background:var(--tk-bg-base)">
 <div class="portview-header">
 <div id="tv-back-wrap" style="display:none">
 <button class="portview-back-btn" onclick="teamviewGoBack()">
@@ -3018,7 +3018,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" viewbox="0 0 24 24" width="12"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             Commission
           </button>
-<button id="tv-portfolio-btn" onclick="showScreen('portview')" style="display:none;align-items:center;gap:5px;background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.45);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
+<button id="tv-portfolio-btn" onclick="showScreen('portview')" style="display:none;align-items:center;gap:5px;background:var(--tk-accent-dim-2);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
 <svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" viewbox="0 0 24 24" width="12"><rect height="7" rx="1" width="7" x="3" y="3"></rect><rect height="7" rx="1" width="7" x="14" y="3"></rect><rect height="7" rx="1" width="7" x="3" y="14"></rect><rect height="7" rx="1" width="7" x="14" y="14"></rect></svg>
             พอร์ต
           </button>
@@ -3071,7 +3071,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <svg fill="none" height="11" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" viewbox="0 0 24 24" width="11"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><line x1="12" x2="12" y1="2" y2="4"></line></svg>
             Target
           </button>
-<button id="portview-team-btn" onclick="showScreen('teamview')" style="display:none;align-items:center;gap:5px;background:rgba(38,96,200,.2);border:1px solid rgba(38,96,200,.45);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
+<button id="portview-team-btn" onclick="showScreen('teamview')" style="display:none;align-items:center;gap:5px;background:var(--tk-accent-dim-2);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0">
 <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             ทีม
           </button>
@@ -3134,7 +3134,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="pf-vintage" id="pf-vintage">จากยอดซื้อ —</div>
 </div>
 <div class="pb-footer-right" style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
-<button class="pb-footer-cta" onclick="showScreen('report')" style="background:rgba(0,208,112,.15);border-color:rgba(0,208,112,.4);color:rgba(200,255,230,.9)">สร้างรายงาน →</button>
+<button class="pb-footer-cta" onclick="showScreen('report')" style="background:var(--tk-ok-dim);border-color:rgba(0,208,112,.4);color:rgba(200,255,230,.9)">สร้างรายงาน →</button>
 </div>
 </div>
 <!-- ── DETAIL SHEET ── -->
@@ -3155,7 +3155,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <img alt="Olive" class="fab-avatar" id="fab-avatar-img"/>
 <svg fill="none" height="26" id="fab-avatar-svg" viewbox="0 0 26 26" width="26" xmlns="http://www.w3.org/2000/svg">
 <!-- Central 4-point sparkle star -->
-<path class="fab-star-main" d="M13 3.5L14.52 9.48L20.5 11L14.52 12.52L13 18.5L11.48 12.52L5.5 11L11.48 9.48Z" fill="#4ddc97"></path>
+<path class="fab-star-main" d="M13 3.5L14.52 9.48L20.5 11L14.52 12.52L13 18.5L11.48 12.52L5.5 11L11.48 9.48Z" fill="var(--tk-ok-bright)"></path>
 <!-- Small top-right accent star -->
 <path class="fab-star-sm1" d="M19.5 5.5L20.18 7.82L22.5 8.5L20.18 9.18L19.5 11.5L18.82 9.18L16.5 8.5L18.82 7.82Z" fill="rgba(77,220,151,.8)"></path>
 <!-- Tiny bottom-left star -->
@@ -3167,7 +3167,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="aiav">
 <img alt="Olive" class="aiav-img" id="aiav-img"/>
 <svg fill="none" height="18" id="aiav-svg" viewbox="0 0 26 26" width="18" xmlns="http://www.w3.org/2000/svg">
-<path d="M13 3.5L14.52 9.48L20.5 11L14.52 12.52L13 18.5L11.48 12.52L5.5 11L11.48 9.48Z" fill="#4ddc97"></path>
+<path d="M13 3.5L14.52 9.48L20.5 11L14.52 12.52L13 18.5L11.48 12.52L5.5 11L11.48 9.48Z" fill="var(--tk-ok-bright)"></path>
 <path d="M19.5 5.5L20.18 7.82L22.5 8.5L20.18 9.18L19.5 11.5L18.82 9.18L16.5 8.5L18.82 7.82Z" fill="rgba(77,220,151,.75)"></path>
 </svg>
 </div>
@@ -3277,7 +3277,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <button class="ms-opt" onclick="setMatcherScope('custom',this);updateMatcherPreStatus();syncVsStatus()">กำหนดเอง</button>
 </div>
 <div id="vs-custom-row" style="display:none;margin-bottom:8px">
-<input id="vs-custom-n" max="9999" min="1" oninput="this.style.borderColor=this.value&gt;0?'var(--g500)':'var(--n200)';updateMatcherPreStatus()" placeholder="จำนวน SKU" style="width:100%;padding:6px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s" type="number"/>
+<input id="vs-custom-n" max="9999" min="1" oninput="this.style.borderColor=this.value&gt;0?'var(--g500)':'var(--n200)';updateMatcherPreStatus()" placeholder="จำนวน SKU" style="width:100%;padding:6px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:12px;font-family:var(--tk-font-mono);outline:none;background:var(--n50);color:var(--n900);transition:border-color .2s" type="number"/>
 </div>
 <div class="gen-pre-status" id="vs-pre-status" style="margin-bottom:12px"></div>
 <button class="gen-btn" id="vs-run-btn" onclick="runMatcherFromSheet()" style="width:100%">
@@ -3285,7 +3285,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span id="vs-run-label">ให้ Sense เทียบสเปค</span>
 </button>
 <div id="vs-reverify-link" style="display:none;text-align:center;margin-top:6px">
-<button onclick="reVerifyAllFromSheet()" style="background:none;border:none;color:var(--n400);font-size:11px;text-decoration:underline;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">↻ Re-verify ทั้งหมด</button>
+<button onclick="reVerifyAllFromSheet()" style="background:none;border:none;color:var(--n400);font-size:11px;text-decoration:underline;cursor:pointer;font-family:var(--tk-font-body),sans-serif">↻ Re-verify ทั้งหมด</button>
 </div>
 </div>
 <!-- ── PROGRESS SECTION (shown during run) ── -->
@@ -3302,11 +3302,11 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div id="vs-result" style="display:none;margin-top:10px">
 <div class="gen-result-summary" id="vs-result-summary"></div>
 <div class="gen-result-table" id="vs-result-table"></div>
-<button id="vs-nav-opps-btn" onclick="goToSenseOpportunitiesAfterVerify()" style="width:100%;margin-top:12px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:14px;font-weight:700;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s">
+<button id="vs-nav-opps-btn" onclick="goToSenseOpportunitiesAfterVerify()" style="width:100%;margin-top:12px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:14px;font-weight:700;font-family:var(--tk-font-body),sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s">
 <svg fill="currentColor" height="12" stroke="none" viewbox="0 0 10 10" width="12"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
 <span id="vs-nav-opps-label">ดูวัตถุดิบที่เจอ →</span>
 </button>
-<button onclick="vsResetToConfig()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1.5px solid var(--n200);background:transparent;color:var(--n600);font-size:12px;font-weight:600;font-family:'IBM Plex Sans Thai',sans-serif;cursor:pointer">← กลับตั้งค่า</button>
+<button onclick="vsResetToConfig()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1.5px solid var(--n200);background:transparent;color:var(--n600);font-size:12px;font-weight:600;font-family:var(--tk-font-body),sans-serif;cursor:pointer">← กลับตั้งค่า</button>
 </div>
 </div>
 </div>
