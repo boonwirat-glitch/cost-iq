@@ -1,4 +1,4 @@
-<!-- Freshket Sense v365: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v366: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5179,6 +5179,32 @@ body.sales-mode .cds-sheet { display: none !important; }
 
 /* pb-footer: plan builder footer — KAM only */
 body.sales-mode .pb-footer { display: none !important; }
+
+/* Topbar: white background in sales-mode */
+body.sales-mode .topbar {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #EBEBEB !important;
+}
+body.sales-mode .topbar .logo { color: #222222 !important; }
+body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; }
+body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
+body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
+body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
+
+/* Save tab: hide in sales-mode (not yet enabled for Sales) */
+body.sales-mode .bnav .ni[onclick*="Save"],
+body.sales-mode .bnav .ni[onclick*="save"],
+body.sales-mode .bnav #nav-save-btn { display: none !important; }
+
+/* Nav pill glass effect in sales-mode (frosted white) */
+body.sales-mode .bnav {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0,0,0,.07) !important;
+  border-top: none !important;
+  box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
+}
 </style>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
@@ -5203,7 +5229,7 @@ body.sales-mode .pb-footer { display: none !important; }
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v365',
+      version: 'v366',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -28336,6 +28362,18 @@ flex-wrap:wrap;}
 }
 .sv-tl-target-btn:active { background: rgba(255,56,92,.15); }
 .sv-tl-target-btn svg { width: 13px; height: 13px; }
+
+/* ── Input: remove browser :invalid red border ── */
+.sv-field-input:invalid,
+.sv-field-input[type="text"]:placeholder-shown { box-shadow: none; }
+input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; }
+
+/* ── Nav: 3-column grid for Sales rep (no Save, no Team tab) ── */
+body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(3,1fr) !important; }
+
+/* ── Login transition: white bg from start, no flash ── */
+body.sales-mode { background: #FFFFFF !important; }
+body.sales-mode .scr { background: #FFFFFF !important; }
 </style>
 <!-- Target Setup Overlay HTML -->
 <div id="target-setup-overlay" onclick="if(event.target===this)closeTargetSetup()">
@@ -39439,12 +39477,23 @@ async function _loadSalesPipeline() {
 
 // Pipeline GMV per month
 function _pipelineByMonth(leads) {
+  // Spread GMV across tenure months based on account_type
+  // SA=45d (~1-2mo), MC/Chain=90d (~3mo) — spread monthly GMV across holding period
   const byMonth = {};
   leads.forEach(l => {
-    const ym = (l.expected_start_date || '').substring(0,7);
-    if (!ym) return;
-    if (!byMonth[ym]) byMonth[ym] = 0;
-    byMonth[ym] += parseFloat(l.expected_gmv) || 0;
+    const startYM = (l.expected_start_date || '').substring(0,7);
+    if (!startYM) return;
+    const gmv = parseFloat(l.expected_gmv) || 0;
+    const type = (l.account_type || 'SA').toUpperCase();
+    // months to spread: SA→1, MC/Chain→3
+    const spreadMonths = (type === 'MC' || type === 'CHAIN') ? 3 : 1;
+    const [y, m] = startYM.split('-').map(Number);
+    for (let i = 0; i < spreadMonths; i++) {
+      const d = new Date(y, m - 1 + i, 1);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = 0;
+      byMonth[key] += gmv;
+    }
   });
   return byMonth;
 }
@@ -39679,9 +39728,46 @@ function _renderSalesOutletList(el, outlets) {
 
 window._salesOpenAccount = function(accountId, accountName) {
   try {
-    if (typeof portviewSelectAccount === 'function') {
-      portviewSelectAccount(accountId, accountName);
-    }
+    // For Sales: show account detail inline in sales-portview screen
+    const data = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+    const acct = data.find(r => r.id === accountId || r.account_guid === accountId);
+    if (!acct) { console.warn('[Sales] account not found:', accountId); return; }
+    const el = document.getElementById('scr-sales-portview');
+    if (!el) return;
+    const daysLeft = _daysUntilExp(acct.newUserExpDate);
+    const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+    const pctHeld = totalDays > 0 ? Math.min(100, Math.round((acct.daysHeld||0)/totalDays*100)) : 0;
+    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+    const expLabel = acct.newUserExpDate
+      ? new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
+    const typeLabel = (acct.accountType||'SA').toUpperCase();
+    el.innerHTML =
+      '<div class="sv-page-hd" style="display:flex;align-items:center;gap:10px;">' +
+        '<button onclick="renderSalesPortview()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+          '<span class="sv-back-label">พอร์ต</span>' +
+        '</button>' +
+        '<div><div class="sv-page-eye">' + typeLabel + '</div><div class="sv-page-title">' + (acct.name||acct.id) + '</div></div>' +
+      '</div>' +
+      '<div class="sv-band"></div>' +
+      '<div class="sv-tenure-section">' +
+        '<div class="sv-tenure-eye">ระยะเวลาในมือ</div>' +
+        '<div class="sv-tenure-bar-row">' +
+          '<div class="sv-tenure-track"><div class="sv-tenure-fill' + (barClass==='late'?' late':barClass==='mid'?' mid':'') + '" style="width:' + pctHeld + '%"></div></div>' +
+          '<span class="sv-tenure-pct' + (barClass==='late'?' late':'') + '">' + pctHeld + '%</span>' +
+        '</div>' +
+        '<div class="sv-tenure-dl">' +
+          '<span class="sv-tenure-held">ถือมา ' + (acct.daysHeld||0) + ' วัน</span>' +
+          '<span class="sv-tenure-exp">หมด ' + expLabel + (daysLeft!==null?' ('+daysLeft+'d)':'') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sv-band"></div>' +
+      '<div class="sv-stat-list">' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Runrate</span><span class="sv-stat-val">฿' + _sv_fmt(acct.runrate||0) + '</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">GMV เดือนที่แล้ว</span><span class="sv-stat-val">฿' + _sv_fmt(acct.lastMonthGmv||0) + '</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Orders เดือนนี้</span><span class="sv-stat-val">' + (acct.ordersToDate||0) + ' ออเดอร์</span></div>' +
+        '<div class="sv-stat-row"><span class="sv-stat-key">Account type</span><span class="sv-stat-val">' + typeLabel + '</span></div>' +
+      '</div>';
   } catch(e) { console.warn('[Sales] open account failed:', e); }
 };
 
@@ -39820,7 +39906,7 @@ window._salesAddLead = function(existing) {
     </div>
     <input type="hidden" id="sv-lead-type" value="${_acctType}" />
     <div class="sv-field-label">ยอดคาด / เดือน (บาท)</div>
-    <input class="sv-field-input" id="sv-lead-gmv" type="number" inputmode="numeric" placeholder="50000" value="${isEdit?existing.expected_gmv:''}" />
+    <input class="sv-field-input" id="sv-lead-gmv" type="text" inputmode="numeric" pattern="[0-9,]*" placeholder="50,000" value="${isEdit?(existing.expected_gmv?Number(existing.expected_gmv).toLocaleString():'')+'':''}" oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',')" />
     <div class="sv-field-label">วันที่ยอดน่าจะเริ่มเข้า</div>
     <input class="sv-field-input" id="sv-lead-date" type="date" value="${isEdit?existing.expected_start_date:''}" />
     <div class="sv-sheet-actions">
@@ -39857,7 +39943,7 @@ window._salesCloseSheet = function() {
 
 window._salesSaveLead = async function(existingId) {
   const name = (document.getElementById('sv-lead-name')?.value||'').trim();
-  const gmv  = parseFloat(document.getElementById('sv-lead-gmv')?.value||0);
+  const gmv  = parseFloat((document.getElementById('sv-lead-gmv')?.value||'0').replace(/,/g,''));
   const date = document.getElementById('sv-lead-date')?.value||'';
   const acctType = document.getElementById('sv-lead-type')?.value || 'SA';
   if (!name || !gmv || !date) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
