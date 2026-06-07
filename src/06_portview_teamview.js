@@ -987,7 +987,7 @@ function __legacyRenderPortviewListFallback(){
     const churnSegs=_buildChurnBadge(a);
     const spark=_buildSparkline(a,isNew?'new':cls);
     const handoffBadge=(a.daysWithCurrentKam!==null&&a.daysWithCurrentKam<=30)
-      ?`<span style="font-size:8px;font-weight:700;font-family:'IBM Plex Mono',monospace;background:rgba(38,96,200,.18);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:4px;padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
+      ?`<span style="font-size:8px;font-weight:700;font-family:'IBM Plex Mono',monospace;background:var(--tk-accent-dim-2);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:4px;padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
       :'';
     if(isNew){
       return`<div class="portview-acct-card new" style="${_delay}" onclick="portviewSelectAccount('${a.id}')">
@@ -3170,7 +3170,7 @@ function _updateRestSwipe(grp,idx,opts){
     const icon = isFail ? '⚠' : '⟳';
     const color = isFail ? 'rgba(240,176,0,.9)' : 'rgba(120,180,255,.95)';
     const border = isFail ? 'rgba(240,176,0,.28)' : 'rgba(100,170,255,.24)';
-    const bg = isFail ? 'rgba(240,176,0,.07)' : 'rgba(38,96,200,.10)';
+    const bg = isFail ? 'rgba(240,176,0,.07)' : 'var(--tk-accent-dim)';
     const retry = isFail || isPending ? `<button type="button" onclick="window._v206eRetryCurrentBundle && window._v206eRetryCurrentBundle()" style="margin-top:9px;padding:7px 12px;border-radius:9px;border:1px solid ${border};background:rgba(255,255,255,.06);color:${color};font-family:var(--tk-font-body);font-size:11px;font-weight:700;cursor:pointer">${isFail?'Retry SKU intelligence':'โหลดตอนนี้'}</button>` : '';
     return `<div id="kam-bundle-state-card" class="kam-dc" style="margin-bottom:12px;border-color:${border};background:${bg}">
       <div class="kam-dc-head" style="border-bottom-color:rgba(255,255,255,.06)"><span class="kam-dc-head-label" style="color:${color}">${icon} ${title}</span></div>
