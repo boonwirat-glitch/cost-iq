@@ -412,7 +412,7 @@
 
     var subtotalAmt=(src.nrr||0)+(src.upsell_sku||0)+(src.upsell_outlet||0)+(src.handover||0);
     var gateOk2=!src.gate_active;
-    var gateCardHtml='<div style="margin:0 18px 12px;background:'+(gateOk2?'rgba(77,220,151,.08)':'rgba(240,80,0,.08)')+';border:1px solid '+(gateOk2?'rgba(77,220,151,.2)':'rgba(240,80,0,.2)')+';border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">'
+    var gateCardHtml='<div style="margin:0 18px 12px;background:'+(gateOk2?'var(--tk-ok-dim)':'rgba(240,80,0,.08)')+';border:1px solid '+(gateOk2?'var(--tk-ok-dim-2)':'rgba(240,80,0,.2)')+';border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">'
       +'<div><div style="font-size:12px;color:rgba(225,238,255,.78)">NRR Gate</div>'
       +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct||'—')+'% '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
       +'<span style="font-size:13px;font-weight:900;color:'+(gateOk2?'var(--tk-ok-bright)':'#ff6b3d')+';font-family:\'IBM Plex Mono\',monospace">× '+gCapPct+'% '+(gateOk2?'✓':'⚠')+'</span></div>';
@@ -420,11 +420,11 @@
     var heroHtml='<div style="padding:18px;text-align:center">'
       +'<div style="font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.12em;color:rgba(188,215,255,.55);font-family:\'IBM Plex Mono\',monospace;margin-bottom:5px">Final Payout</div>'
       +'<div style="font-size:36px;font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.025em;text-shadow:0 0 24px rgba(255,224,138,.15);line-height:1.1">'+money(finalAmt)+'</div>'
-      +(!src.loading?'<div style="font-size:11px;color:#4ddc97;margin-top:5px;font-weight:700">ตรงกับ commission panel ✓</div>':'')
+      +(!src.loading?'<div style="font-size:11px;color:var(--tk-ok-bright);margin-top:5px;font-weight:700">ตรงกับ commission panel ✓</div>':'')
       +'</div>';
 
     var exportBtnHtml=(src.upsell_sku>0||src.upsell_outlet>0)
-      ?'<button onclick="_commExportAuditCSV()" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:12px;border-radius:10px;background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.78);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">↓ Export audit CSV</button>'
+      ?'<button onclick="_commExportAuditCSV()" style="display:block;width:calc(100% - 36px);margin:0 18px 8px;padding:12px;border-radius:10px;background:rgba(188,215,255,.07);border:1px solid rgba(188,215,255,.18);color:rgba(225,238,255,.78);font-size:13px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">↓ Export audit CSV</button>'
       :'';
 
     var html=[
@@ -453,8 +453,8 @@
       heroHtml,
       '<div style="font-size:10px;color:rgba(225,238,255,.22);text-align:center;padding:0 18px 12px;font-family:\'IBM Plex Mono\',monospace">คำนวณจาก CSV ที่โหลดอยู่ · v235 · '+nowStr+'</div>',
       exportBtnHtml,
-      '<div style="padding:0 18px 4px;display:flex;gap:6px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionHistory,80)" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid rgba(77,220,151,.25);color:#4ddc97;font-size:12px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">History</button><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">Rules</button></div>',
-      '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">ปิด</button></div>',
+      '<div style="padding:0 18px 4px;display:flex;gap:6px"><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionHistory,80)" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid rgba(77,220,151,.25);color:var(--tk-ok-bright);font-size:12px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">History</button><button onclick="_commCloseKamSelfSheet();setTimeout(openCommissionRulebook,80)" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Rules</button></div>',
+      '<div style="padding:0 18px 20px"><button onclick="_commCloseKamSelfSheet()" style="width:100%;padding:11px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.12);color:rgba(225,238,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">ปิด</button></div>',
       '</div>',
       '</div></div>',
     ].join('');
@@ -490,7 +490,7 @@
 
     var groups=type==='p1'?(window._pvCommP1Groups||[]):(window._pvCommP3Groups||[]);
     var titleLabel=type==='p1'?'กลุ่มสินค้าใหม่':'ยอดเติบโต';
-    var badgeColor=type==='p1'?'rgba(77,220,151,.15)':'rgba(255,224,138,.15)';
+    var badgeColor=type==='p1'?'var(--tk-ok-dim)':'rgba(255,224,138,.15)';
     var badgeText=type==='p1'?'var(--tk-ok-bright)':'#ffe08a';
 
     function mon(n){n=Number(n||0);if(!n)return'฿0';if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'฿'+(n/1000).toFixed(0)+'K';return'฿'+Math.round(n).toLocaleString('en-US');}
@@ -523,7 +523,7 @@
           if(type==='p1'){
             return '<div style="display:grid;grid-template-columns:1fr 64px 56px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(188,215,255,.08);align-items:center">'
               +'<span style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</span>'
-              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.total_gmv)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:var(--tk-ok-bright)">'+mon(g.total_gmv)+'</span>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
               +'</div>';
           } else {
@@ -531,17 +531,17 @@
               +'<div><div style="font-size:11px;font-weight:700;color:rgba(225,238,255,.65)">'+es(g.groupKey||g.group_key)+'</div>'
               +(g.max_baseline_month?'<div style="font-size:9px;color:rgba(225,238,255,.28);margin-top:1px">Base: '+es(g.max_baseline_month)+'</div>':'')+'</div>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:rgba(188,215,255,.50)">'+mon(g.max_baseline||0)+'</span>'
-              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#4ddc97">'+mon(g.incremental)+'</span>'
+              +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:var(--tk-ok-bright)">'+mon(g.incremental)+'</span>'
               +'<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:700;color:#ffe08a">'+mon(g.commission)+'</span>'
               +'</div>';
           }
         }).join('');
         var colsHd=type==='p1'?'grid-template-columns:1fr 64px 56px':'grid-template-columns:1fr 52px 56px 52px';
         var amtCols=type==='p1'
-          ?('<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+          ?('<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:var(--tk-ok-bright)">'+mon(o.totalPrimary)+'</span>'
             +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>')
           :('<span style="font-size:11px;font-family:\'IBM Plex Mono\',monospace;text-align:right;color:rgba(188,215,255,.35)">—</span>'
-            +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#4ddc97">'+mon(o.totalPrimary)+'</span>'
+            +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:var(--tk-ok-bright)">'+mon(o.totalPrimary)+'</span>'
             +'<span style="font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:900;color:#ffe08a">'+mon(o.totalComm)+'</span>');
         return '<div>'
           +'<div style="display:grid;'+colsHd+' 20px;padding:10px 16px;border-bottom:1px solid rgba(188,215,255,.09);align-items:center;cursor:pointer;background:rgba(188,215,255,.05)" '
@@ -744,12 +744,12 @@
       +_pvDrillHeader('NRR Commission','','','')
       +'<div style="overflow-y:auto;flex:1">'
       +'<div style="padding:14px 18px 10px">'+(cfg.tierRows||'')+'</div>'
-      +'<div style="padding:10px 18px;background:rgba(77,220,151,.06);border-top:1px solid var(--tk-ok-dim)">'
+      +'<div style="padding:10px 18px;background:var(--tk-ok-dim);border-top:1px solid var(--tk-ok-dim)">'
       +'<div style="font-size:12px;color:rgba(225,238,255,.75);line-height:1.6">'+(cfg.action||'')+'</div>'
       +'</div>'
       +(src.nrr>0?'<div style="padding:14px 18px"><div style="display:flex;justify-content:space-between">'
         +'<span style="font-size:13px;color:rgba(225,238,255,.75)">NRR Payout</span>'
-        +'<span style="font-size:18px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(src.nrr)+'</span>'
+        +'<span style="font-size:18px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+mon(src.nrr)+'</span>'
         +'</div></div>':'')
       +'</div></div>';
     _pvPushDrill(html);
@@ -768,10 +768,10 @@
       +window._pvDrillHeader('กลุ่มสินค้าใหม่ + ยอดเติบโต','','','')
       +'<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:16px 18px;display:flex;flex-direction:column;gap:10px">'
       +(p1g.length
-        ?'<div id="pvChooseP1" style="padding:16px;border-radius:12px;background:rgba(77,220,151,.08);border:1px solid rgba(77,220,151,.2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+        ?'<div id="pvChooseP1" style="padding:16px;border-radius:12px;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
           +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
           +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
-          +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#4ddc97;font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
+          +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
           +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
           +'</div>'
         :'')
@@ -1797,10 +1797,10 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   if (meta) {
     var tierHtml =
       '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
-      + (hit2 ? 'background:var(--tk-ok-dim);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + (hit2 ? 'background:var(--tk-ok-dim);color:var(--tk-ok-bright);' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
       + '">≥' + t2Pct + '% ฿' + fmt(t2Pay) + '</span> '
       + '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
-      + (hit3 ? 'background:var(--tk-ok-dim);color:#4ddc97;' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+      + (hit3 ? 'background:var(--tk-ok-dim);color:var(--tk-ok-bright);' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
       + '">≥' + t3Pct + '% +฿' + fmt(t3Bon) + '</span>';
 
     meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
