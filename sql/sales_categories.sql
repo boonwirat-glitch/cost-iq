@@ -1,8 +1,7 @@
 -- ════════════════════════════════════════════════════════════
--- SALES_CATEGORIES v1
--- Output: ส่วน Sales ของ bulk_categories.csv
--- Logic: dwh.order stamp commercial_owner + staff_owner ต่อ order
---   → category GMV เฉพาะช่วงที่ Sales rep เป็น owner จริงๆ
+-- SALES_CATEGORIES v2
+-- Output: Sales category GMV keyed by account_guid
+-- Fix v2: JOIN dim.user_master เพื่อได้ account_guid แทน o.account_id
 -- ════════════════════════════════════════════════════════════
 
 WITH sales_names AS (
@@ -26,7 +25,7 @@ params AS (
 )
 
 SELECT
-  CAST(um.account_guid AS STRING)  AS account_id,
+  CAST(um.account_guid AS STRING)               AS account_id,
   CASE EXTRACT(MONTH FROM DATE_TRUNC(o.delivery_date, MONTH))
     WHEN 1  THEN 'ม.ค.'  WHEN 2  THEN 'ก.พ.'  WHEN 3  THEN 'มี.ค.'
     WHEN 4  THEN 'เม.ย.' WHEN 5  THEN 'พ.ค.'  WHEN 6  THEN 'มิ.ย.'
@@ -40,11 +39,14 @@ SELECT
 FROM `freshket-rn.dwh.order` o, UNNEST(o.item) AS i
 CROSS JOIN params p
 JOIN sales_names sl ON LOWER(TRIM(o.staff_owner)) = LOWER(TRIM(sl.staff_owner))
+JOIN `freshket-rn.dim.user_master` um
+  ON CAST(o.user_id AS STRING) = CAST(um.res_id AS STRING)
 
 WHERE o.commercial_owner = 'SALE'
   AND o.delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
   AND o.delivery_date <= p.max_date
   AND i.gmv_ex_vat > 0
+  AND um.account_guid IS NOT NULL
 
 GROUP BY 1, 2, 3
 ORDER BY 1, 2, gmv DESC;
