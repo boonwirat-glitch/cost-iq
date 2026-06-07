@@ -208,26 +208,12 @@ function renderSalesHome(el, outlets, pipeline) {
   const targetPct = target > 0 ? Math.min(200, Math.round(heroRunrate/target*100)) : 0;
   const barClass = targetPct >= 100 ? 'great' : targetPct >= 80 ? '' : targetPct >= 60 ? 'warn' : 'danger';
 
-  // Handover warning: outlets expiring ≤14 days
-  const urgentHandover = handover.outlets_m0.filter(o => {
+  // Handover warning: outlets expiring ≤15 days
+  const urgentHandover = outlets.filter(o => {
     const d = _daysUntilExp(o.newUserExpDate);
-    return d !== null && d <= 14;
+    return d !== null && d <= 15;
   }).sort((a,b) => (a.newUserExpDate||'').localeCompare(b.newUserExpDate||''));
-
-  let handoverHtml = '';
-  if (urgentHandover.length) {
-    const rows = urgentHandover.slice(0,5).map(o => {
-      const d = _daysUntilExp(o.newUserExpDate);
-      return `<div class="sv-handover-row">
-        <span>${o.name||o.id}</span>
-        <span class="sv-handover-days">${d <= 0 ? 'หมดแล้ว' : d + 'd'}</span>
-      </div>`;
-    }).join('');
-    handoverHtml = `<div class="sv-handover-card">
-      <div class="sv-handover-title">⚠️ ใกล้ Handover — ${urgentHandover.length} ร้าน</div>
-      ${rows}
-    </div>`;
-  }
+  const handoverGmv = urgentHandover.reduce((s,o) => s+(o.runrate||0), 0);
 
   // v6 design: Airbnb/Revolut — big number hero, inline proj, list rows
   const tbarClass = targetPct >= 100 ? 'ok' : targetPct >= 75 ? 'warn' : 'ac';
@@ -268,20 +254,22 @@ function renderSalesHome(el, outlets, pipeline) {
     ${urgentHandover.length ? `
     <div class="sv-sec">
       <span class="sv-sec-t ac">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        ใกล้ Handover
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        Handover
       </span>
-      <span class="sv-sec-c">${urgentHandover.length} ร้าน</span>
     </div>
-    <div class="sv-hov-section">
-      ${urgentHandover.slice(0,5).map(o => {
-        const d = _daysUntilExp(o.newUserExpDate);
-        return `<div class="sv-hov-row">
-          <div class="sv-hov-dot"></div>
-          <span class="sv-hov-name">${o.name||o.id}</span>
-          <span class="sv-hov-days">${d <= 0 ? 'หมดแล้ว' : d+'d'}</span>
-        </div>`;
-      }).join('')}
+    <div class="sv-hov-summary" onclick="window._salesOpenHandoverSheet()">
+      <div class="sv-hov-sum-l">
+        <div class="sv-hov-sum-dot"></div>
+        <div>
+          <div class="sv-hov-sum-label">${urgentHandover.length} ร้าน</div>
+          <div class="sv-hov-sum-meta">ภายใน 15 วัน</div>
+        </div>
+      </div>
+      <div class="sv-hov-sum-r">
+        <div class="sv-hov-sum-gmv">฿${_sv_fmt(handoverGmv)}</div>
+        <div class="sv-hov-sum-arrow">กดดูรายการ ›</div>
+      </div>
     </div>` : ''}
   `;
 }
@@ -315,108 +303,396 @@ function renderSalesPortview() {
   });
 }
 
+// ── Outlet list state ──────────────────────────────
+let _olSort = 'gmv';     // 'gmv' | 'expiry' | 'mtd'
+let _olFilter = 'all';   // 'all' | 'ordered' | 'not-ordered' | 'stopped'
+let _olView = 'list';    // 'list' | 'grid'
+let _olCollapsed = {};   // accountId → boolean
+
+function _olFilterOutlets(outlets) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  return outlets.filter(o => {
+    const gmvMtd = o.gmvToDate || 0;
+    const lastOrder = o.lastOrderDate ? new Date(o.lastOrderDate) : null;
+    const daysSinceLast = lastOrder ? Math.floor((today - lastOrder) / 86400000) : 999;
+    if (_olFilter === 'ordered') return gmvMtd > 0;
+    if (_olFilter === 'not-ordered') return gmvMtd === 0 && daysSinceLast <= 7;
+    if (_olFilter === 'stopped') return gmvMtd === 0 && daysSinceLast > 7;
+    return true;
+  });
+}
+
+function _olSortOutlets(outlets) {
+  return [...outlets].sort((a,b) => {
+    if (_olSort === 'expiry') {
+      return (a.newUserExpDate||'9999-12-31').localeCompare(b.newUserExpDate||'9999-12-31');
+    }
+    if (_olSort === 'mtd') return (b.gmvToDate||0) - (a.gmvToDate||0);
+    return (b.runrate||0) - (a.runrate||0); // gmv default
+  });
+}
+
+function _olGroupByAccount(outlets) {
+  // Group by account_id (parent). res_id = outlet-level.
+  // portviewBulkData: o.id = account_guid (outlet), o.account_group = parent account_id if available
+  // Simple grouping: outlets with same name prefix or same account_id field
+  const groups = {}; // accountId → {name, outlets[]}
+  outlets.forEach(o => {
+    // Use id as group key — if multiple outlets share same account_id they group together
+    // account_guid is outlet-level; we group by the first part before branch name
+    const gKey = o.accountId || o.id;
+    if (!groups[gKey]) groups[gKey] = { name: o.name||o.id, outlets: [] };
+    groups[gKey].outlets.push(o);
+  });
+  return Object.values(groups).sort((a,b) => {
+    // Sort groups by top outlet in each group
+    const aTop = a.outlets.reduce((mx,o) => Math.max(mx, o.runrate||0), 0);
+    const bTop = b.outlets.reduce((mx,o) => Math.max(mx, o.runrate||0), 0);
+    return bTop - aTop;
+  });
+}
+
+function _olRenderOutletRow(o, isChild) {
+  const daysLeft = _daysUntilExp(o.newUserExpDate);
+  const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+  const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0)/totalDays*100)) : 0;
+  const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+  const typeLabel = (o.accountType||'SA').toUpperCase();
+  const expLabel = o.newUserExpDate ?
+    new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
+  const daysLeftLabel = daysLeft !== null ? (daysLeft <= 0 ? 'หมดแล้ว' : daysLeft+'d') : '—';
+  const gmv = _sv_fmt(o.runrate||0);
+  const mtd = _sv_fmt(o.gmvToDate||0);
+  const safeId = (o.id||'').replace(/"/g,'');
+  const indent = isChild ? ' sv-ol-branch' : '';
+  return '<div class="sv-ol-row' + indent + '" onclick="window._salesOpenAccount(\"' + safeId + '\")">' +
+    '<div class="sv-ol-top">' +
+      '<div class="sv-ol-ind ' + indCls + '"></div>' +
+      '<div class="sv-ol-info">' +
+        '<div class="sv-ol-name">' + (o.name||o.id) + '</div>' +
+        '<div class="sv-ol-meta">' + typeLabel + ' · ถือมา ' + (o.daysHeld||0) + ' วัน</div>' +
+      '</div>' +
+      '<div class="sv-ol-right">' +
+        '<div class="sv-ol-gmv">฿' + gmv + '</div>' +
+        '<div class="sv-ol-mtd">MTD ฿' + mtd + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="sv-ol-bar-wrap">' +
+      '<div class="sv-days-track"><div class="sv-days-fill ' + indCls + '" style="width:' + pctHeld + '%"></div></div>' +
+      '<div class="sv-days-meta">' +
+        '<span class="sv-tenure-held-sm">ถือมา ' + (o.daysHeld||0) + ' วัน</span>' +
+        '<span class="sv-days-exp">handover ' + expLabel + (daysLeft!==null?' ('+daysLeftLabel+')':'') + '</span>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _olRenderCardRow(o) {
+  const daysLeft = _daysUntilExp(o.newUserExpDate);
+  const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+  const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0)/totalDays*100)) : 0;
+  const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+  const typeLabel = (o.accountType||'SA').toUpperCase();
+  const expLabel = o.newUserExpDate ?
+    new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
+  const daysLeftLabel = daysLeft !== null ? (daysLeft <= 0 ? 'หมดแล้ว' : daysLeft+'d') : '';
+  const safeId = (o.id||'').replace(/"/g,'');
+  return '<div class="sv-ol-card ' + indCls + '" onclick="window._salesOpenAccount(\"' + safeId + '\")">' +
+    '<div class="sv-oc-badge">' + typeLabel + '</div>' +
+    '<div class="sv-oc-name">' + (o.name||o.id) + '</div>' +
+    '<div class="sv-oc-gmv">฿' + _sv_fmt(o.runrate||0) + '</div>' +
+    '<div class="sv-oc-sub">handover ' + expLabel + (daysLeftLabel?' · '+daysLeftLabel:'') + '</div>' +
+  '</div>';
+}
+
 function _renderSalesOutletList(el, outlets) {
   if (!outlets.length) {
-    el.innerHTML = `<div class="sv-empty">
-      <div class="sv-empty-title">ยังไม่มีร้านในพอร์ต</div>
-      <div class="sv-empty-sub">ร้านที่สั่งครั้งแรกจาก Sales จะแสดงที่นี่</div>
-    </div>`;
+    el.innerHTML = '<div class="sv-empty"><div class="sv-empty-title">ยังไม่มีร้านในพอร์ต</div><div class="sv-empty-sub">ร้านที่สั่งครั้งแรกจาก Sales จะแสดงที่นี่</div></div>';
     return;
   }
 
-  // Sort: expiring soonest first
-  const sorted = [...outlets].sort((a,b) => {
-    const da = a.newUserExpDate || '9999-12-31';
-    const db = b.newUserExpDate || '9999-12-31';
-    return da.localeCompare(db);
-  });
+  const filtered = _olFilterOutlets(outlets);
+  const sorted = _olSortOutlets(filtered);
+  const groups = _olGroupByAccount(sorted);
 
-  // v6: Revolut list rows — colored indicator + name + amount + days bar
-  const headerHtml = `<div class="sv-sec">
-    <span class="sv-sec-t">ร้านทั้งหมด</span>
-    <span class="sv-sec-c">${outlets.length} ร้าน</span>
-  </div>`;
+  // ── Action bar ──
+  const fPills = [
+    {key:'all', label:'ทั้งหมด'},
+    {key:'ordered', label:'สั่งแล้ว'},
+    {key:'not-ordered', label:'ยังไม่สั่ง'},
+    {key:'stopped', label:'หยุดสั่ง'},
+  ];
+  const sPills = [
+    {key:'gmv', label:'GMV'},
+    {key:'expiry', label:'Expiry'},
+    {key:'mtd', label:'MTD'},
+  ];
 
-  const cardsHtml = '<div class="sv-outlet-list">' + sorted.map(o => {
-    const daysLeft = _daysUntilExp(o.newUserExpDate);
-    const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
-    const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0) / totalDays * 100)) : 0;
-    const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
-    const typeCls = pctHeld >= 80 ? '' : pctHeld >= 60 ? 'mid' : 'ok';
-    const typeLabel = (o.accountType||'SA').toUpperCase();
+  const filterHtml = fPills.map(function(p) {
+    return '<button class="sv-fpill' + (_olFilter===p.key?' on':'') + '" onclick="_olSetFilter(\'' + p.key + '\')">' + p.label + '</button>';
+  }).join('');
+
+  const sortHtml = '<button class="sv-sort-btn" onclick="window._olCycleSort()">' +
+    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>' +
+    '<span>' + (_olSort==='expiry'?'Expiry':_olSort==='mtd'?'MTD':'GMV') + '</span>' +
+  '</button>';
+
+  const viewHtml =
+    '<button class="sv-vt-btn' + (_olView==='list'?' on':'') + '" onclick="_olSetView(\'list\')" aria-label="list">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>' +
+    '</button>' +
+    '<button class="sv-vt-btn' + (_olView==='grid'?' on':'') + '" onclick="_olSetView(\'grid\')" aria-label="grid">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>' +
+    '</button>';
+
+  let html = '<div class="sv-sec">' +
+    '<span class="sv-sec-t">ร้านทั้งหมด</span>' +
+    '<span class="sv-sec-c">' + outlets.length + ' ร้าน</span>' +
+  '</div>' +
+  '<div class="sv-action-bar">' +
+    '<div class="sv-filter-pills">' + filterHtml + '</div>' +
+    '<div class="sv-icon-bar">' + sortHtml + viewHtml + '</div>' +
+  '</div>';
+
+  if (!filtered.length) {
+    html += '<div class="sv-empty" style="padding:32px 20px"><div class="sv-empty-title">ไม่มีร้านในกลุ่มนี้</div></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // ── Render groups ──
+  if (_olView === 'grid') {
+    html += '<div class="sv-ol-grid">';
+    groups.forEach(function(g) {
+      if (g.outlets.length > 1) {
+        const gGmv = g.outlets.reduce((s,o) => s+(o.runrate||0), 0);
+        const collapsed = !!_olCollapsed[g.outlets[0].id];
+        html += '<div class="sv-ol-acct-hd" onclick="window._olToggleGroup(\'" + g.outlets[0].id + "\')">' +
+          '<span class="sv-ol-acct-dot"></span>' +
+          '<span class="sv-ol-acct-name">' + g.name + '</span>' +
+          '<span class="sv-ol-acct-meta">· ' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '</span>' +
+          '<span class="sv-ol-acct-arrow">' + (collapsed?'▸':'▾') + '</span>' +
+        '</div>';
+        if (!collapsed) {
+          g.outlets.forEach(o => { html += _olRenderCardRow(o); });
+        }
+      } else {
+        html += _olRenderCardRow(g.outlets[0]);
+      }
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="sv-outlet-list">';
+    groups.forEach(function(g) {
+      if (g.outlets.length > 1) {
+        const gGmv = g.outlets.reduce((s,o) => s+(o.runrate||0), 0);
+        const collapsed = !!_olCollapsed[g.outlets[0].id];
+        html += '<div class="sv-ol-acct-hd" onclick="window._olToggleGroup(\'" + g.outlets[0].id + "\')">' +
+          '<span class="sv-ol-acct-dot"></span>' +
+          '<span class="sv-ol-acct-name">' + g.name + '</span>' +
+          '<span class="sv-ol-acct-meta">· ' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '</span>' +
+          '<span class="sv-ol-acct-arrow">' + (collapsed?'▸':'▾') + '</span>' +
+        '</div>';
+        if (!collapsed) {
+          g.outlets.forEach(o => { html += _olRenderOutletRow(o, true); });
+        }
+      } else {
+        html += _olRenderOutletRow(g.outlets[0], false);
+      }
+    });
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// State setters — re-render outlet list only
+function _olSetFilter(f) { window._olSetFilter(f); }
+function _olSetView(v) { window._olSetView(v); }
+function _olCycleSort() { window._olCycleSort(); }
+window._olSetFilter = function(f) { _olFilter=f; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
+window._olSetView = function(v) { _olView=v; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
+window._olCycleSort = function() { const s=['gmv','expiry','mtd']; _olSort=s[(s.indexOf(_olSort)+1)%s.length]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
+window._olToggleGroup = function(id) { _olCollapsed[id]=!_olCollapsed[id]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
+// ── Handover bottom sheet ──────────────────────────────
+window._salesOpenHandoverSheet = function() {
+  const outlets = getSalesPortviewData();
+  const urgent = outlets.filter(o => {
+    const d = _daysUntilExp(o.newUserExpDate);
+    return d !== null && d <= 15;
+  }).sort((a,b) => (a.newUserExpDate||'').localeCompare(b.newUserExpDate||''));
+
+  const rows = urgent.map(o => {
+    const d = _daysUntilExp(o.newUserExpDate);
     const expLabel = o.newUserExpDate ?
       new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
-    const daysLabel = daysLeft !== null ? (daysLeft <= 0 ? 'หมดแล้ว' : daysLeft+'d') : '—';
-    const gmv = _sv_fmt(o.runrate||o.gmvToDate||0);
-    const safeId = (o.id||'').replace(/'/g,"\'");
-    const safeName = (o.name||'').replace(/'/g,"\'");
+    return '<div class="sv-sheet-row">' +
+      '<div class="sv-sheet-dot"></div>' +
+      '<span class="sv-sheet-name">' + (o.name||o.id) + '</span>' +
+      '<span class="sv-sheet-days">' + (d<=0?'หมดแล้ว':d+'d') + '</span>' +
+      '<span class="sv-sheet-gmv">฿' + _sv_fmt(o.runrate||0) + '</span>' +
+    '</div>';
+  }).join('');
 
-    return `<div class="sv-ol-row" onclick="window._salesOpenAccount('${safeId}','${safeName}')">
-      <div class="sv-ol-top">
-        <div class="sv-ol-ind ${indCls}"></div>
-        <div class="sv-ol-info">
-          <div class="sv-ol-name">${o.name||o.id}</div>
-          <div class="sv-ol-meta">ถือมา ${o.daysHeld||0} วัน</div>
-        </div>
-        <div class="sv-ol-right">
-          <div class="sv-ol-gmv">฿${gmv}</div>
-          <div class="sv-ol-type ${typeCls}">${typeLabel} · ${daysLabel}</div>
-        </div>
-      </div>
-      <div class="sv-ol-bar-wrap">
-        <div class="sv-days-track"><div class="sv-days-fill ${indCls}" style="width:${pctHeld}%"></div></div>
-        <div class="sv-days-meta"><span></span><span class="sv-days-exp">หมด ${expLabel}</span></div>
-      </div>
-    </div>`;
-  }).join('') + '</div>';
+  const totalGmv = urgent.reduce((s,o) => s+(o.runrate||0), 0);
 
-  el.innerHTML = headerHtml + cardsHtml;
-}
+  const overlay = document.createElement('div');
+  overlay.className = 'sv-sheet-overlay';
+  overlay.id = 'sv-handover-overlay';
+  overlay.innerHTML =
+    '<div class="sv-sheet" id="sv-handover-sheet">' +
+      '<div class="sv-sheet-handle"></div>' +
+      '<div class="sv-sheet-title">Handover ภายใน 15 วัน</div>' +
+      '<div class="sv-sheet-sub">' + urgent.length + ' ร้าน · ฿' + _sv_fmt(totalGmv) + '/เดือน</div>' +
+      '<div class="sv-sheet-scroll">' + rows + '</div>' +
+    '</div>';
+
+  // Close on backdrop tap
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) window._salesCloseHandoverSheet();
+  });
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => {
+    const s = document.getElementById('sv-handover-sheet');
+    if (s) s.classList.add('open');
+  });
+};
+
+window._salesCloseHandoverSheet = function() {
+  const ov = document.getElementById('sv-handover-overlay');
+  if (!ov) return;
+  const s = document.getElementById('sv-handover-sheet');
+  if (s) s.classList.remove('open');
+  setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+};
+
+
 
 window._salesOpenAccount = function(accountId, accountName) {
   try {
-    // For Sales: show account detail inline in sales-portview screen
     const data = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
-    const acct = data.find(r => r.id === accountId || r.account_guid === accountId);
+    const acct = data.find(r => (r.id||'') === accountId || (r.account_guid||'') === accountId);
     if (!acct) { console.warn('[Sales] account not found:', accountId); return; }
     const el = document.getElementById('scr-sales-portview');
     if (!el) return;
+
     const daysLeft = _daysUntilExp(acct.newUserExpDate);
     const totalDays = (acct.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
     const pctHeld = totalDays > 0 ? Math.min(100, Math.round((acct.daysHeld||0)/totalDays*100)) : 0;
-    const barClass = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
-    const expLabel = acct.newUserExpDate
-      ? new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
+    const barCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : '';
+    const expLabel = acct.newUserExpDate ?
+      new Date(acct.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}) : '—';
     const typeLabel = (acct.accountType||'SA').toUpperCase();
+
+    // GMV history from bulkHistoryData
+    const hist = (typeof bulkHistoryData !== 'undefined' && bulkHistoryData[accountId]) || [];
+    const moSort = m => { const p=(m||'').split(' '); const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return (parseInt(p[1]||0)*12)+mo.indexOf(p[0]); };
+    const sorted3 = hist.slice().sort((a,b) => moSort(a.m)-moSort(b.m)).slice(-3);
+
+    // Chart bars — max for scaling
+    const maxGmv = Math.max(...sorted3.map(h=>h.s||0), acct.runrate||0, 1);
+    const chartHtml = sorted3.length ? (
+      '<div class="sv-chart-sec">' +
+      '<div class="sv-c-eye">GMV ย้อนหลัง</div>' +
+      '<div class="sv-bars">' +
+      sorted3.map((h,i) => {
+        const ht = Math.round((h.s||0)/maxGmv*56);
+        const isCurrent = i === sorted3.length-1;
+        return '<div class="sv-bw' + (isCurrent?' now':'') + '">' +
+          '<div class="sv-bv">฿' + _sv_fmt(h.s||0) + '</div>' +
+          '<div class="sv-b solid" style="height:' + Math.max(2,ht) + 'px"></div>' +
+          '<div class="sv-bl">' + (h.m||'') + '</div>' +
+        '</div>';
+      }).join('') +
+      // Ghost bar for MTD
+      (acct.gmvToDate !== undefined ? (function() {
+        const ghostHt = Math.round((acct.runrate||0)/maxGmv*56);
+        const mtdHt = Math.round((acct.gmvToDate||0)/maxGmv*56);
+        return '<div class="sv-bw now">' +
+          '<div class="sv-bv" style="color:var(--sv-ac)">฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-b-ghost-wrap" style="height:' + Math.max(2,ghostHt) + 'px">' +
+            '<div class="sv-b ghost"></div>' +
+            '<div class="sv-b-mtd-fill" style="height:' + Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100) + '%"></div>' +
+          '</div>' +
+          '<div class="sv-bl" style="color:var(--sv-ac)">MTD</div>' +
+        '</div>';
+      })() : '') +
+      '</div>' +
+      '<div class="sv-chart-note">ghost bar = runrate ฿' + _sv_fmt(acct.runrate||0) + '/เดือน</div>' +
+      '</div>'
+    ) : '';
+
+    // SKU current
+    const skus = (typeof bulkSkuCurrentData !== 'undefined' && bulkSkuCurrentData[accountId]) || [];
+    const prevHist = sorted3.length >= 2 ? (hist.filter(h => moSort(h.m) < moSort(sorted3[sorted3.length-1].m))) : [];
+    const prevMonthLabel = prevHist.length ? prevHist[prevHist.length-1].m : null;
+    const skusSorted = skus.slice().sort((a,b) => (b.gmv_to_date||0)-(a.gmv_to_date||0)).slice(0,6);
+    const skuHtml = skusSorted.length ? (
+      '<div class="sv-sku-sec">' +
+      '<div class="sv-sec"><span class="sv-sec-t">SKU เดือนนี้</span><span class="sv-sec-c">' + skusSorted.length + ' รายการ</span></div>' +
+      '<div class="sv-sku-list">' +
+      skusSorted.map(s => {
+        const isNew = !!s.is_new || false;
+        return '<div class="sv-sku-row">' +
+          '<span class="sv-sku-name">' + (s.item_name_th||'—') + '</span>' +
+          '<span class="sv-sku-gmv">฿' + _sv_fmt(s.gmv_to_date||0) + '</span>' +
+          (isNew ? '<span class="sv-sku-badge-new">ใหม่</span>' : '') +
+        '</div>';
+      }).join('') +
+      '</div></div>'
+    ) : '';
+
+    // Category breakdown from bulkCatsData
+    const cats = (typeof bulkCatsData !== 'undefined' && bulkCatsData[accountId]) || {};
+    const catKeys = Object.keys(cats).sort((a,b) => moSort(b)-moSort(a));
+    const latestCats = catKeys.length ? (cats[catKeys[0]]||[]).slice(0,4) : [];
+    const catHtml = latestCats.length ? (
+      '<div class="sv-cat-sec">' +
+      '<div class="sv-sec"><span class="sv-sec-t">Category</span></div>' +
+      '<div class="sv-cat-list">' +
+      latestCats.map(c => (
+        '<div class="sv-cat-row">' +
+        '<span class="sv-cat-name">' + (c.n||'—') + '</span>' +
+        '<div class="sv-cat-bar-wrap"><div class="sv-cat-fill" style="width:' + (c.p||0) + '%;background:' + (c.c||'var(--sv-ac)') + '"></div></div>' +
+        '<span class="sv-cat-pct">' + (c.p||0) + '%</span>' +
+        '</div>'
+      )).join('') +
+      '</div></div>'
+    ) : '';
+
     el.innerHTML =
-      '<div class="sv-page-hd" style="display:flex;align-items:center;gap:10px;">' +
-        '<button onclick="renderSalesPortview()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">' +
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
-          '<span class="sv-back-label">พอร์ต</span>' +
+      '<div class="sv-page-hd" style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;">' +
+        '<button onclick="renderSalesPortview()" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;">' +
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sv-ac)" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+          '<span style="font-size:12px;font-weight:600;color:var(--sv-ac)">พอร์ต</span>' +
         '</button>' +
-        '<div><div class="sv-page-eye">' + typeLabel + '</div><div class="sv-page-title">' + (acct.name||acct.id) + '</div></div>' +
+      '</div>' +
+      '<div style="padding:0 16px 12px;">' +
+        '<div class="sv-page-eye">' + typeLabel + '</div>' +
+        '<div class="sv-page-title">' + (acct.name||acct.id) + '</div>' +
       '</div>' +
       '<div class="sv-band"></div>' +
       '<div class="sv-tenure-section">' +
         '<div class="sv-tenure-eye">ระยะเวลาในมือ</div>' +
         '<div class="sv-tenure-bar-row">' +
-          '<div class="sv-tenure-track"><div class="sv-tenure-fill' + (barClass==='late'?' late':barClass==='mid'?' mid':'') + '" style="width:' + pctHeld + '%"></div></div>' +
-          '<span class="sv-tenure-pct' + (barClass==='late'?' late':'') + '">' + pctHeld + '%</span>' +
+          '<div class="sv-tenure-track"><div class="sv-tenure-fill ' + barCls + '" style="width:' + pctHeld + '%"></div></div>' +
+          '<span class="sv-tenure-pct' + (barCls?' '+barCls:'') + '">' + pctHeld + '%</span>' +
         '</div>' +
         '<div class="sv-tenure-dl">' +
           '<span class="sv-tenure-held">ถือมา ' + (acct.daysHeld||0) + ' วัน</span>' +
-          '<span class="sv-tenure-exp">หมด ' + expLabel + (daysLeft!==null?' ('+daysLeft+'d)':'') + '</span>' +
+          '<span class="sv-tenure-exp">handover ' + expLabel + (daysLeft!==null?' ('+daysLeft+'d)':'') + '</span>' +
         '</div>' +
       '</div>' +
       '<div class="sv-band"></div>' +
-      '<div class="sv-stat-list">' +
-        '<div class="sv-stat-row"><span class="sv-stat-key">Runrate</span><span class="sv-stat-val">฿' + _sv_fmt(acct.runrate||0) + '</span></div>' +
-        '<div class="sv-stat-row"><span class="sv-stat-key">GMV เดือนที่แล้ว</span><span class="sv-stat-val">฿' + _sv_fmt(acct.lastMonthGmv||0) + '</span></div>' +
-        '<div class="sv-stat-row"><span class="sv-stat-key">Orders เดือนนี้</span><span class="sv-stat-val">' + (acct.ordersToDate||0) + ' ออเดอร์</span></div>' +
-        '<div class="sv-stat-row"><span class="sv-stat-key">Account type</span><span class="sv-stat-val">' + typeLabel + '</span></div>' +
-      '</div>';
+      chartHtml +
+      (chartHtml ? '<div class="sv-band"></div>' : '') +
+      skuHtml +
+      (skuHtml ? '<div class="sv-band"></div>' : '') +
+      catHtml;
+
   } catch(e) { console.warn('[Sales] open account failed:', e); }
 };
+
 
 // ══════════════════════════════════════════
 // SECTION:SALES_PIPELINE
