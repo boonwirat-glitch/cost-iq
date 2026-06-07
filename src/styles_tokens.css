@@ -27,6 +27,7 @@
   --tk-accent-dim:      rgba(38,96,200,.15); /* accent tint bg       → rgba(255,56,92,.08) */
   --tk-accent-dim-2:    rgba(38,96,200,.22); /* accent border        → rgba(255,56,92,.20) */
   --tk-accent-dim-3:    rgba(38,96,200,.35); /* nav pill active bg   → rgba(255,56,92,.15) */
+  --tk-accent-solid:    rgba(38,96,200,.60); /* solid-ish accent bg  → rgba(255,56,92,.60) */
 
   /* ── OK / POSITIVE SIGNAL (ไม่เปลี่ยน — semantic green) ── */
   --tk-ok:              #34C759;            /* positive result        KEEP */
