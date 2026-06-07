@@ -297,7 +297,7 @@ function renderSkuMovementHtml(sm){
     html+=sm.droppedSkus.map(s=>{
       const sub=skuSubstituteMapLM[s.name];
       if(sub){
-        return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0;background:rgba(38,96,200,.07);border-radius:8px;padding:8px 10px;margin-bottom:4px">
+        return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0;background:var(--tk-accent-dim);border-radius:8px;padding:8px 10px;margin-bottom:4px">
           <span class="kam-sku-ind substituted" style="margin-top:2px">→</span>
           <div style="flex:1;min-width:0">
             <div class="kam-sku-name">${s.name}</div>
@@ -652,7 +652,7 @@ function __legacyRenderKamThisMonthFallback(){
       const nameOp=dimmed?'opacity:.4':'';
       const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
-      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:rgba(38,96,200,.3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
+      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
@@ -2503,7 +2503,7 @@ function renderSkuDetailContent(sku,priceData){
     if(!show)return'';
     const mo=p.mo.split(' ')[0];
     const anchor=i===0?'start':i===pts.length-1?'end':'middle';
-    return`<text x="${p.x.toFixed(1)}" y="${H-4}" text-anchor="${anchor}" font-family="IBM Plex Sans Thai,sans-serif" font-size="8" fill="var(--n400)">${mo}</text>`;
+    return`<text x="${p.x.toFixed(1)}" y="${H-4}" text-anchor="${anchor}" font-family="Noto Sans Thai,sans-serif" font-size="8" fill="var(--n400)">${mo}</text>`;
   }).join('');
 
   // Dots — thin out for many points (show first/last/min/max only if >6 pts)
