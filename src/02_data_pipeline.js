@@ -373,7 +373,7 @@ function handleFileUpload(type,input){
         if(!byAccount[aid])byAccount[aid]={};if(!byAccount[aid][mo])byAccount[aid][mo]=[];
         byAccount[aid][mo].push({n:cat,s:gmv,p:0,c:''});
       });
-      const colors=['#00d070','#2266cc','#e8a000','#cc4444','#8855cc','#00aabb','#ff6633','#446644','#aa5599','#667788'];
+      const colors=['var(--tk-ok-500)','#2266cc','#e8a000','#cc4444','#8855cc','#00aabb','#ff6633','#446644','#aa5599','#667788'];
       Object.entries(byAccount).forEach(([aid,months])=>{
         Object.entries(months).forEach(([mo,cats])=>{
           const total=cats.reduce((s,c)=>s+c.s,0);
@@ -2728,7 +2728,7 @@ function _renderOverviewPaceAndStrip(){
     try{
       var el = document.getElementById(chipId(key));
       if(!el) return;
-      el.style.background = ok ? 'rgba(0,208,112,.18)' : 'rgba(0,0,0,.06)';
+      el.style.background = ok ? 'var(--tk-ok-dim-2)' : 'rgba(0,0,0,.06)';
       el.style.color = ok ? 'var(--g700)' : 'var(--n500)';
       el.style.fontWeight = ok ? '800' : '600';
       el.title = ok ? 'Loaded' : 'Not confirmed loaded';
