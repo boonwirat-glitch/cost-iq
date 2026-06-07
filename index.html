@@ -1,4 +1,4 @@
-<!-- Freshket Sense v413: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v414: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5388,6 +5388,14 @@ body.sales-mode .bnav {
   border-top: none !important;
   box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
 }
+
+/* ── DEBUG GAP HUNT ── */
+.portview-header { background: red !important; }
+.scr-teamview, #scr-teamview { background: blue !important; }
+#scr-portview { background: green !important; }
+body.kam-mode { background: yellow !important; }
+/* ── END DEBUG ── */
+
 </style>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
@@ -5412,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v413',
+      version: 'v414',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
