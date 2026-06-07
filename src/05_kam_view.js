@@ -2375,7 +2375,7 @@ function renderSparkline(sid,moKeys,w,h){
   const polyPts=pts.map(d=>`${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' ');
   const areaD=`M${first.x.toFixed(1)},${h} L${pts.map(d=>`${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' L')} L${last.x.toFixed(1)},${h}Z`;
   const pct=first.p>0?((delta/first.p)*100).toFixed(1):'0';
-  const pctC=delta<-0.05?'var(--g700)':delta>0.05?'#9a6500':'var(--n400)';
+  const pctC=delta<-0.05?'var(--tk-ok-text)':delta>0.05?'#9a6500':'var(--n400)';
   const pctSign=delta>0.05?'+':'';
   const title=pts.map(d=>d.mo.split(' ')[0]+' ฿'+d.p.toFixed(0)).join(', ');
   return`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;overflow:hidden;max-width:${w+4}px">
@@ -2462,7 +2462,7 @@ function renderSkuDetailContent(sku,priceData){
   const first=priceData[0],last=priceData[priceData.length-1];
   const delta=last.price-first.price;
   const deltaPct=first.price>0?((delta/first.price)*100).toFixed(1):'0';
-  const trendC=delta<-0.05?'var(--g700)':delta>0.05?'#9a6500':'var(--n600)';
+  const trendC=delta<-0.05?'var(--tk-ok-text)':delta>0.05?'#9a6500':'var(--n600)';
   const trendIcon=delta<-0.05?'▼':delta>0.05?'▲':'→';
   const trendSign=delta>0.05?'+':'';
 
@@ -2517,8 +2517,8 @@ function renderSkuDetailContent(sku,priceData){
 
   // Opportunity info
   const opp=OPPS.find(o=>String(o.curId)===String(sku.id));
-  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--g50);border:1px solid var(--tk-ok-dim-2);border-radius:10px;padding:10px 12px">
-    <div style="font-size:10px;font-weight:700;color:var(--g700);margin-bottom:4px">ประหยัดได้จากการเปลี่ยน SKU</div>
+  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--tk-ok-bg);border:1px solid var(--tk-ok-dim-2);border-radius:10px;padding:10px 12px">
+    <div style="font-size:10px;font-weight:700;color:var(--tk-ok-text);margin-bottom:4px">ประหยัดได้จากการเปลี่ยน SKU</div>
     <div style="font-size:12px;color:var(--n700);margin-bottom:4px">
       <span style="color:var(--n400);text-decoration:line-through;font-size:11px">${sku.n}</span><br>
       <strong>→ ${getAlt(opp).altName}</strong>
@@ -2551,7 +2551,7 @@ function renderSkuDetailContent(sku,priceData){
   <div style="display:flex;margin:6px 16px 0;border:1px solid var(--n100);border-radius:10px;overflow:hidden">
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
       <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">ต่ำสุด</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--g700)">฿${mnStr}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">฿${mnStr}</div>
     </div>
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
       <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">สูงสุด</div>
