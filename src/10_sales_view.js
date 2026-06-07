@@ -39,8 +39,15 @@ function getSalesPortviewData() {
     if (!email) return [];
     const role = getCurrentRole();
     const data = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
-    // portviewBulkData already filtered to this sales user via sales_portview_{key}.csv
-    // For sales_tl: data contains their whole team (loaded from team CSV if available)
+    // Bulk CSV: filter by kamEmail for Sales rep, tlEmail for Sales TL
+    // (sales_portview.csv contains all Sales reps — client-side filter)
+    if (role === 'sales') {
+      return data.filter(r => (r.kamEmail || '').toLowerCase() === email.toLowerCase());
+    }
+    if (role === 'sales_tl') {
+      // TL sees entire team — filter by tlEmail matching their own email
+      return data.filter(r => (r.tlEmail || '').toLowerCase() === email.toLowerCase());
+    }
     return data;
   } catch(e) { return []; }
 }
