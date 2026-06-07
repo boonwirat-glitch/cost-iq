@@ -4864,3 +4864,36 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
 #scr-sales-pipeline { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
 #scr-sales-commission { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
 #scr-sales-teamview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
+
+/* ── Sales-mode: hide KAM-specific floating/fixed elements ── */
+/* aifab: KAM AI chat FAB — dark green, must not appear on white Sales canvas */
+body.sales-mode .aifab,
+body.sales-mode #aifab { display: none !important; }
+
+/* data-load-pill: KAM data loading indicator — dark pill, wrong on Sales white bg */
+body.sales-mode #data-load-pill { display: none !important; }
+
+/* swipe-pill: restaurant/KAM mode swipe indicator */
+body.sales-mode #swipe-pill { display: none !important; }
+
+/* KAM AI panel and overlay — should not open in Sales mode */
+body.sales-mode .aipanel { display: none !important; }
+body.sales-mode .overlay { pointer-events: none; opacity: 0 !important; }
+
+/* pv-comm-sheet: KAM cohort detail sheet — wrong in Sales */
+body.sales-mode .pv-comm-sheet-overlay,
+body.sales-mode .pv-comm-sheet { display: none !important; }
+
+/* v213 drill coach tooltip — KAM only */
+body.sales-mode #v213-drill-coach { display: none !important; }
+
+/* ncs-sheet: NRR cohort sheet — KAM only */
+body.sales-mode #ncs-overlay,
+body.sales-mode #ncs-sheet { display: none !important; }
+
+/* CDS overlay — KAM only */
+body.sales-mode .cds-overlay,
+body.sales-mode .cds-sheet { display: none !important; }
+
+/* pb-footer: plan builder footer — KAM only */
+body.sales-mode .pb-footer { display: none !important; }
