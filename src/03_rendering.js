@@ -73,7 +73,7 @@ function __legacyRenderOverviewFallback(){
   const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
   const _rrGap=_rrH-_actH;
   const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">${fmtK(_cm.gmv_to_date)}</span>`:'';
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:rgba(0,204,106,0.9);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:rgba(0,204,106,0.1);border:1.5px dashed rgba(0,204,106,0.45);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--tk-ok-bright);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
 
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
@@ -207,7 +207,7 @@ function selectMonth(idx,init){
 
 // ── Overview KPI stats — 4 cards synced to selected bar month ──
 // ── Category color palette (tonal green family — overrides data colors) ──
-const CAT_PALETTE=['#00cc6a','#00888a','#2d6a4f','#52b788','#74c69d','#1e6091','var(--tk-accent)','#909090'];
+const CAT_PALETTE=['var(--tk-ok-bright)','#00888a','#2d6a4f','#52b788','#74c69d','#1e6091','var(--tk-accent)','#909090'];
 function catColor(i){return CAT_PALETTE[Math.min(i,CAT_PALETTE.length-1)];}
 
 // ── Interpretation Strip ──────────────────────────────────────────────────
@@ -508,7 +508,7 @@ function __legacyRenderPortfolioFallback(){
   const priceTotal=priceUp+priceDn;
   // ── Concentration card ──
   const topPctNum=parseFloat(top5pct)||0;
-  const conBarColor=topPctNum>70?'rgba(240,176,0,.9)':topPctNum>=50?'rgba(255,255,255,.55)':'rgba(0,204,106,.8)';
+  const conBarColor=topPctNum>70?'rgba(240,176,0,.9)':topPctNum>=50?'rgba(255,255,255,.55)':'var(--tk-ok-bright)';
   const conInterp=topPctNum>70?'พึ่งพาสินค้าหลักสูง — ถ้า SKU เหล่านี้ขาดหรือราคาขึ้น กระทบยอดทันที':topPctNum>=50?'พอร์ตกระจายพอสมควร — ยังมี SKU อื่นรองรับหากสินค้าหลักขาด':'พอร์ตกระจายดี — ไม่พึ่งพาสินค้าใดสินค้าหนึ่งมากเกินไป';
   const topSkuEl=document.getElementById('top-sku-card');
   if(topSkuEl){
