@@ -1,4 +1,4 @@
-<!-- Freshket Sense v372: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v373: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5230,7 +5230,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v372',
+      version: 'v373',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -40296,6 +40296,9 @@ window._salesOpenAccount = function(accountId, accountName) {
     const _bhData = typeof bulkHistoryData !== 'undefined' ? bulkHistoryData : {};
     const _skuData = typeof bulkSkuCurrentData !== 'undefined' ? bulkSkuCurrentData : {};
     const _catData = typeof bulkCatsData !== 'undefined' ? bulkCatsData : {};
+    // Debug: log available keys in bulkHistoryData vs accountId
+    const _bhKeys = Object.keys(_bhData).slice(0,5);
+    console.log('[Sales acct] accountId:', accountId, '| acct.id:', acct.id, '| bulkHistoryData sample keys:', _bhKeys);
     // Build candidate keys from acct object
     const _keys = [accountId, acct.id, acct.res_id, acct.user_id, String(acct.res_id||''), String(acct.user_id||'')].filter(Boolean);
     const _findData = (store) => { for (const k of _keys) { if (store[k] && store[k].length) return store[k]; } return []; };
