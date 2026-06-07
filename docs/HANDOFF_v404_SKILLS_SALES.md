@@ -1,5 +1,5 @@
 # Handoff — Skills & Sales Features
-## App version: v404 | Date: 2026-06-07
+## App version: v405 | Date: 2026-06-07
 
 ---
 
@@ -72,7 +72,7 @@ Hero card แสดง:
 
 ### Skills — Priority 1 (functional, รอแก้)
 
-**State button icons** (ออกแบบแล้ว session นี้ แต่ยังไม่ implement)
+**State button icons** ✅ Done v405
 
 4 icons ที่ตกลงกันไว้:
 ```
@@ -82,9 +82,7 @@ unlocked  → โล่ + checkmark (สีเขียว #34C759)
 mastered  → มงกุฎ (สีส้มทอง #FF9500)
 ```
 
-ตอนนี้ปุ่มแสดงแค่ dot + ข้อความ ต้องแทน dot ด้วย SVG icon ใน `_renderTLEvalButtons()` หรือ `_skTLSelectState()`
-
-ตำแหน่งใน code: `src/11_skills.js` → หา `sk-tl-btn` หรือ `stateButtons`
+SVG icons + dim behavior implemented. CSS: `sk-tl-btn-icon`, `sk-tl-btn-dim`.
 
 **RLS profiles — ไม่ต้องแก้แล้ว**
 
