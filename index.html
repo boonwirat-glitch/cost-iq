@@ -39938,7 +39938,7 @@ function getSalesProjection(outlets, pipeline, target) {
 function _sv_fmt(n) {
   if (!n || isNaN(n)) return '0';
   if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-  if (n >= 10000) return Math.round(n/1000) + 'K';
+  if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + 'K';
   if (n >= 500) return (n/1000).toFixed(1) + 'K';
   return Math.round(n).toLocaleString();
 }
@@ -39988,14 +39988,13 @@ function renderSalesHome(el, outlets, pipeline) {
     const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
     const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
     // Build breakdown string: runrate · pipeline · -handover
-    const bParts = [];
-    if (p.runratePart > 0) bParts.push('฿'+_sv_fmt(p.runratePart)+' runrate');
-    if (p.pipelinePart > 0) bParts.push('+฿'+_sv_fmt(p.pipelinePart)+' pipeline');
-    if (p.handoverPart > 0) bParts.push('−฿'+_sv_fmt(p.handoverPart)+' handover');
-    p.breakdown = bParts.join(' · ');
+    const bLines = [];
+    if (p.runratePart > 0) bLines.push('฿'+_sv_fmt(p.runratePart)+' runrate');
+    if (p.pipelinePart > 0) bLines.push('+฿'+_sv_fmt(p.pipelinePart)+' pipeline');
+    if (p.handoverPart > 0) bLines.push('−฿'+_sv_fmt(p.handoverPart)+' handover');
+    p.breakdown = bLines.join('<br>');
     return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
       <div class="sv-proj-mon">${p.label}</div>
-      <div class="sv-proj-note">${p.isCurrent ? 'runrate+pipeline' : 'projected'}</div>
       ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
       <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
       ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
@@ -40014,7 +40013,7 @@ function renderSalesHome(el, outlets, pipeline) {
       <div class="sv-hero-sub">
         <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
         <span style="color:#EBEBEB">·</span>
-        <span>${outlets.length} ร้าน active</span>
+        <span>${outlets.filter(o=>o.gmvToDate>0).length} / ${outlets.length} active</span>
         ${target === 0 ? '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>' : ''}
       </div>
       ${target > 0 ? `<div class="sv-tbar">
@@ -40084,7 +40083,7 @@ function renderSalesPortview() {
 }
 
 // ── Outlet list state ──────────────────────────────
-let _olSort = 'gmv';     // 'gmv' | 'expiry' | 'mtd'
+let _olSort = 'mtd';     // 'mtd' | 'expiry'
 let _olFilter = 'all';   // 'all' | 'ordered' | 'not-ordered' | 'stopped'
 let _olView = 'list';    // 'list' | 'grid'
 let _olCollapsed = {};   // accountId → boolean
@@ -40398,8 +40397,7 @@ window._salesOpenAccount = function(accountId, accountName) {
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:#FF385C">Runrate</div>' +
-          '<div class="sv-bl" style="color:#FF385C;font-size:8px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:9px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
         '</div>';
       })() : '') +
       '</div>' +
@@ -40416,8 +40414,7 @@ window._salesOpenAccount = function(accountId, accountName) {
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.min(100,Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100)) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:#FF385C">Runrate</div>' +
-          '<div class="sv-bl" style="color:#FF385C;font-size:8px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:9px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
         '</div>' +
       '</div>' +
       '</div>'
