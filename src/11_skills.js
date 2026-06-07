@@ -336,12 +336,17 @@ function _renderModuleGrid(module) {
     const lockIco = state === 'locked'
       ? `<div class="sk-lock-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>` : '';
     const starIco = state === 'mastered'
-      ? `<svg class="sk-master-star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>` : '';
+      ? `<svg class="sk-master-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>` : '';
+    const sparkHtml = state === 'mastered'
+      ? `<div class="sk-spark" style="width:3px;height:3px;top:14px;left:18px;animation:sk-spark 2.3s ease-in-out infinite;"></div><div class="sk-spark" style="width:2px;height:2px;top:10px;right:24px;animation:sk-spark 1.7s ease-in-out infinite .5s;"></div><div class="sk-spark" style="width:2px;height:2px;bottom:16px;left:12px;animation:sk-spark 2.0s ease-in-out infinite 1.0s;"></div><div class="sk-spark" style="width:3px;height:3px;bottom:12px;right:20px;animation:sk-spark 1.9s ease-in-out infinite .3s;"></div>` : '';
 
     if (isWide) {
       return `
 <div class="sk-card-wide state-${state}" onclick="skillsOpenDetail(${d.id})">
-  ${_skImgTag(d, { w:'90px', h:'90px', cls:'sk-card-img' })}
+  <div class="sk-card-img" style="width:90px;height:90px;flex-shrink:0;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { w:'90px', h:'90px', cls:'sk-card-img-inner' })}
+    ${sparkHtml}
+  </div>
   ${starIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
@@ -352,7 +357,10 @@ function _renderModuleGrid(module) {
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  ${_skImgTag(d, { h:'106px' })}
+  <div class="sk-card-img" style="height:106px;width:100%;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { h:'106px', cls:'sk-card-img-inner' })}
+    ${sparkHtml}
+  </div>
   ${lockIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
