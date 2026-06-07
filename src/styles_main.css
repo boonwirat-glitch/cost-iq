@@ -4822,8 +4822,10 @@ body.sales-mode .bnav #nav-portview     { display: none !important; }
 body.sales-mode .bnav #nav-teamview     { display: none !important; }
 
 /* Sales nav grid: 3 cols (portview + pipeline + commission) */
-body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
+body.sales-mode .bnav { grid-template-columns: repeat(3,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
+/* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
+body.sales-mode .bnav #nav-opportunities { display: none !important; }
 
 /* Sales uses same dark theme as KAM */
 /* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
@@ -4846,11 +4848,11 @@ body.sales-mode #scr-opportunities { display: none !important; }
 /* Sales user gets both .sales-mode AND .kam-mode
    Need higher specificity to override dark glass pill */
 body.sales-mode.kam-mode .bnav {
-  background: #FFFFFF !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: 1px solid rgba(0,0,0,.06) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.13), 0 20px 48px rgba(0,0,0,.09) !important;
+  background: rgba(255,255,255,.72) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255,255,255,.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
   border-top: none !important;
   border-radius: 999px !important;
 }
