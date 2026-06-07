@@ -462,7 +462,8 @@ function _renderPipelineList(el, leads) {
   // W2: connect to real target via _tgtGet (same Supabase targets table as KAM)
   const _email = (currentUserProfile && currentUserProfile.email) || '';
   const _period = _salesCurrentPeriod();
-  const tgt = getSalesTarget(_period, _email) || 1600000;
+  const tgt = getSalesTarget(_period, _email) || 0;
+  // No target = no gap display (don't show misleading -1.6M)
   const pipM = {}; pipM[m0]=0; pipM[m1]=0; pipM[m2]=0;
   leads.forEach(l => {
     const ym = (l.expected_start_date||'').substring(0,7);
