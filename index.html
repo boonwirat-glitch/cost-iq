@@ -5190,17 +5190,11 @@ body.sales-mode .topbar {
   border-bottom: 1px solid #EBEBEB !important;
 }
 body.sales-mode .topbar .logo { color: #222222 !important; }
-body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; }
-/* Sales: hide spinning star, show upward arrow via CSS */
-body.sales-mode .topbar .iq-icon { display: none !important; }
-body.sales-mode .topbar .iq-badge::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background-color: #FF385C;
-  clip-path: polygon(50% 0%, 20% 100%, 50% 72%, 80% 100%);
-  flex-shrink: 0;
+body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; animation: iq-pulse-sales 3.5s ease-in-out infinite !important; }
+body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
+@keyframes iq-pulse-sales {
+  0%,100%{box-shadow:0 0 6px rgba(255,56,92,.2),inset 0 0 4px rgba(255,56,92,.06)}
+  50%{box-shadow:0 0 14px rgba(255,56,92,.4),inset 0 0 8px rgba(255,56,92,.12)}
 }
 body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
 body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
