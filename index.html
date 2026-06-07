@@ -16418,10 +16418,9 @@ function setAiProvider(p){
   function getSpecs(){ try{ if(typeof R2_SPECS !== 'undefined') return R2_SPECS; }catch(e){} return baseData.r2Specs || {}; }
   function getFiles(){
     try{
-      // Base files from global R2_FILES (02_data_pipeline) or frozen default
-      // Sales routing handled by _patchR2FilesForSales() → shared sales_*.csv (all reps, client-side filter)
-      // Per-rep CSV approach removed — requires N files generated daily, doesn't scale
-      const base = (typeof R2_FILES !== 'undefined') ? R2_FILES : (baseData.r2Files || {});
+      // MUST read window.R2_FILES (global), NOT local R2_FILES (frozen closure copy).
+      // _patchR2FilesForSales() patches the global object — local const shadows it inside this closure.
+      const base = (typeof window.R2_FILES !== 'undefined') ? window.R2_FILES : (baseData.r2Files || {});
       return base;
     }catch(e){ return baseData.r2Files || {}; }
   }
