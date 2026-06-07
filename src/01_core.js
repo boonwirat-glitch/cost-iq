@@ -1294,7 +1294,7 @@ const SAMPLE = {
   cats:[
     {n:'เนื้อสัตว์',s:54793,p:31.1,c:'#f05000'},{n:'DG Food',s:36492,p:20.7,c:'#f0b000'},
     {n:'DG Non-food',s:23970,p:13.6,c:'#a0a0a0'},{n:'Processed',s:21150,p:12.0,c:'#f0a070'},
-    {n:'ผัก',s:15686,p:8.9,c:'#00d070'},{n:'เครื่องดื่ม',s:12866,p:7.3,c:'#5fe3a8'},
+    {n:'ผัก',s:15686,p:8.9,c:'var(--tk-ok-500)'},{n:'เครื่องดื่ม',s:12866,p:7.3,c:'#5fe3a8'},
     {n:'ไข่',s:6698,p:3.8,c:'#f0e0b0'},{n:'ปลา',s:4583,p:2.6,c:'#008060'},
   ],
   skus:[
@@ -1335,7 +1335,7 @@ const GOOD_SKUS=[
   {n:'หนังไก่, เนื้อหมูบด (main)',r:'ไม่มียี่ห้อ ราคาดีที่สุดในกลุ่มแล้ว'},
 ];
 
-const CAT_COLORS={'เนื้อสัตว์':'#f05000','DG Food':'#f0b000','DG Non-food':'#a0a0a0','Processed':'#f0a070','ผัก':'#00d070','เครื่องดื่ม':'#5fe3a8','ไข่':'#f0e0b0','ปลา':'#008060','Meat':'#f05000','Processed Food':'#f0a070','Fish & Seafood':'#008060','Vegetable':'#00d070','Egg':'#f0e0b0','Beverage Non-alcohol':'#5fe3a8','Beverage Alcohol':'#a0608c','Fruit':'#e06030','BASIC FOOD':'#f0b000','FROZEN FOOD':'#60b0d0','BAKERY':'#d09060','HOUSEHOLD':'#a0a0a0'};
+const CAT_COLORS={'เนื้อสัตว์':'#f05000','DG Food':'#f0b000','DG Non-food':'#a0a0a0','Processed':'#f0a070','ผัก':'var(--tk-ok-500)','เครื่องดื่ม':'#5fe3a8','ไข่':'#f0e0b0','ปลา':'#008060','Meat':'#f05000','Processed Food':'#f0a070','Fish & Seafood':'#008060','Vegetable':'var(--tk-ok-500)','Egg':'#f0e0b0','Beverage Non-alcohol':'#5fe3a8','Beverage Alcohol':'#a0608c','Fruit':'#e06030','BASIC FOOD':'#f0b000','FROZEN FOOD':'#60b0d0','BAKERY':'#d09060','HOUSEHOLD':'#a0a0a0'};
 const getCatColor=n=>CAT_COLORS[n]||'#d0d0d0';
 
 // HARDCODED OPPS (sample data fallback)
