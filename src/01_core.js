@@ -863,6 +863,12 @@ function _autoRouteAfterLogin() {
   if (isTLRole(role) || isAdminRole(role)) {
     setMode('kam');
     showScreen('teamview');
+  } else if (isSalesAny && isSalesAny(role)) {
+    // Sales: set body classes then route to Sales portview
+    document.body.classList.add('sales-mode');
+    if (isSalesTLRole && isSalesTLRole(role)) document.body.classList.add('sales-tl-mode');
+    setMode('kam');
+    showScreen('sales-portview');
   } else {
     setMode('kam');
     const myAccounts = getPortviewAccounts();
