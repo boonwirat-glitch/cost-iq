@@ -31,6 +31,8 @@
 
   /* ── OK / POSITIVE SIGNAL (ไม่เปลี่ยน — semantic green) ── */
   --tk-ok:              #34C759;            /* positive result        KEEP */
+  --tk-ok-bg:           #e8faf2;            /* ok tint bg (light)     → retheme */
+  --tk-ok-text:         #008060;            /* ok text (dark green)   → retheme */
   --tk-ok-bright:       #4ddc97;            /* bright green on dark   KEEP */
   --tk-ok-500:          #00d070;            /* green-500 brand        KEEP */
   --tk-ok-dim:          rgba(0,208,112,.10); /* ok tint bg            KEEP */
