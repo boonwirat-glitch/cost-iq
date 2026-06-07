@@ -19,7 +19,7 @@
 #tgt-portview-bar.fb-base{border-style:dashed;border-color:rgba(255,255,255,.22);}
 .tgt-bar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
 .tgt-bar-left{display:flex;align-items:baseline;gap:var(--sp-2);}
-.tgt-bar-pct{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:var(--fw-bold);line-height:1;letter-spacing:-1px;}
+.tgt-bar-pct{font-family:'IBM Plex Mono',monospace;font-size:var(--text-kpi);font-weight:var(--fw-bold);line-height:1;letter-spacing:-1px;}
 .tgt-bar-pct.great,.tgt-bar-pct.safe{color:var(--tk-ok-bright);}
 .tgt-bar-pct.warn{color:var(--amb,#f0b000);}
 .tgt-bar-pct.danger{color:#ff8888;}
