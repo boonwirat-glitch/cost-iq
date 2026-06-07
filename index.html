@@ -1,4 +1,4 @@
-<!-- Freshket Sense v361: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v362: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5170,7 +5170,7 @@ body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weig
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v361',
+      version: 'v362',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -29226,8 +29226,16 @@ function closeTargetSetup() {
   // Refresh target-dependent views after save
   setTimeout(() => {
     try{ renderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
-    try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
-    try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+    // Sales TL: refresh Sales teamview; KAM TL/Admin: refresh KAM teamview
+    const _closeRole = typeof isSalesTLRole === 'function' && isSalesTLRole(
+      currentUserProfile && currentUserProfile.role
+    );
+    if (_closeRole) {
+      try{ if(typeof renderSalesTeamview==='function') renderSalesTeamview(); }catch(e){ console.warn('[target refresh] sales teamview', e); }
+    } else {
+      try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
+      try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+    }
   }, 100);
 }
 
@@ -39969,8 +39977,96 @@ window._salesOpenTargetSetup = function() {
 
 // W4: TL drill into individual rep (show their portview)
 window._salesTLDrillRep = function(repEmail) {
-  // Future: filter portview to single rep and navigate
-  // For now: no-op placeholder
+  if (!repEmail) return;
+  // Find first outlet of this rep to get a display name
+  const allData = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+  const repRow = allData.find(r => (r.kamEmail||'').toLowerCase() === repEmail.toLowerCase());
+  const repName = repRow ? (repRow.kamName || repEmail.split('@')[0]) : repEmail.split('@')[0];
+
+  // Render a filtered portview scoped to this rep's outlets
+  const el = document.getElementById('scr-sales-teamview');
+  if (!el) return;
+
+  const repOutlets = allData.filter(r => (r.kamEmail||'').toLowerCase() === repEmail.toLowerCase());
+  const period = _salesCurrentPeriod();
+  const repTarget = (typeof _tgtGet === 'function') ? (_tgtGet(period, 'sales', repEmail) || 0) : 0;
+  const repRunrate = repOutlets.reduce((s,o) => s+(o.runrate||0), 0);
+  const repPct = repTarget > 0 ? Math.min(200, Math.round(repRunrate/repTarget*100)) : 0;
+  const tbarCls = repPct >= 100 ? 'ok' : repPct >= 75 ? 'warn' : 'ac';
+
+  // Sort outlets by expiry soonest first (same as Sales portview)
+  const sorted = [...repOutlets].sort((a,b) => {
+    const da = a.newUserExpDate || '9999-12-31';
+    const db = b.newUserExpDate || '9999-12-31';
+    return da.localeCompare(db);
+  });
+
+  let html = '<div class="sv-page-hd" style="display:flex;align-items:center;gap:10px;">' +
+    '<button class="sv-back-row" onclick="renderSalesTeamview()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+      '<span class="sv-back-label">ทีม</span>' +
+    '</button>' +
+    '<div>' +
+      '<div class="sv-page-eye">Sales Rep</div>' +
+      '<div class="sv-page-title">' + repName + '</div>' +
+    '</div>' +
+  '</div>';
+
+  // Mini hero for this rep
+  html += '<div class="sv-hero">' +
+    '<div class="sv-hero-eye">Runrate</div>' +
+    '<div><span class="sv-hero-num">฿' + _sv_fmt(repRunrate) + '</span></div>' +
+    '<div class="sv-hero-sub">' +
+      '<span>' + repOutlets.length + ' ร้าน</span>' +
+      (repTarget > 0
+        ? '<span class="sv-gap-badge' + (repPct>=100?' ok':'') + '">' +
+            (repPct>=100?'+':'−') + '฿' + _sv_fmt(Math.abs(repRunrate-repTarget)) + ' vs target</span>'
+        : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target</span>') +
+    '</div>' +
+    (repTarget > 0
+      ? '<div class="sv-tbar"><div class="sv-tbar-track"><div class="sv-tbar-fill ' + tbarCls + '" style="width:' + Math.min(100,repPct) + '%"></div></div>' +
+        '<div class="sv-tbar-meta"><span>' + repPct + '% of target</span><span>Target ฿' + _sv_fmt(repTarget) + '</span></div></div>'
+      : '') +
+  '</div>';
+
+  // Outlet list
+  html += '<div class="sv-sec"><span class="sv-sec-t">ร้านทั้งหมด</span><span class="sv-sec-c">' + sorted.length + ' ร้าน</span></div>';
+
+  if (!sorted.length) {
+    html += '<div class="sv-empty"><div class="sv-empty-title">ไม่มีร้านในพอร์ต</div></div>';
+  } else {
+    html += '<div class="sv-outlet-list">';
+    sorted.forEach(function(o) {
+      const daysLeft = _daysUntilExp(o.newUserExpDate);
+      const totalDays = (o.daysHeld||0) + (daysLeft !== null ? Math.max(0,daysLeft) : 0);
+      const pctHeld = totalDays > 0 ? Math.min(100, Math.round((o.daysHeld||0)/totalDays*100)) : 0;
+      const indCls = pctHeld >= 80 ? 'late' : pctHeld >= 60 ? 'mid' : 'ok';
+      const typeLabel = (o.accountType||'SA').toUpperCase();
+      const expLabel = o.newUserExpDate
+        ? new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
+      const daysLabel = daysLeft !== null ? (daysLeft<=0?'หมดแล้ว':daysLeft+'d') : '—';
+      html += '<div class="sv-ol-row">' +
+        '<div class="sv-ol-top">' +
+          '<div class="sv-ol-ind ' + indCls + '"></div>' +
+          '<div class="sv-ol-info">' +
+            '<div class="sv-ol-name">' + (o.name||o.id) + '</div>' +
+            '<div class="sv-ol-meta">ถือมา ' + (o.daysHeld||0) + ' วัน</div>' +
+          '</div>' +
+          '<div class="sv-ol-right">' +
+            '<div class="sv-ol-gmv">฿' + _sv_fmt(o.runrate||o.gmvToDate||0) + '</div>' +
+            '<div class="sv-ol-type ' + (indCls==='ok'?'ok':indCls==='mid'?'mid':'') + '">' + typeLabel + ' · ' + daysLabel + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sv-ol-bar-wrap">' +
+          '<div class="sv-days-track"><div class="sv-days-fill ' + indCls + '" style="width:' + pctHeld + '%"></div></div>' +
+          '<div class="sv-days-meta"><span></span><span class="sv-days-exp">หมด ' + expLabel + '</span></div>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
 };
 
 // ══════════════════════════════════════════
