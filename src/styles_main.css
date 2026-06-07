@@ -4897,3 +4897,29 @@ body.sales-mode .cds-sheet { display: none !important; }
 
 /* pb-footer: plan builder footer — KAM only */
 body.sales-mode .pb-footer { display: none !important; }
+
+/* Topbar: white background in sales-mode */
+body.sales-mode .topbar {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #EBEBEB !important;
+}
+body.sales-mode .topbar .logo { color: #222222 !important; }
+body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; }
+body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
+body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
+body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
+
+/* Save tab: hide in sales-mode (not yet enabled for Sales) */
+body.sales-mode .bnav .ni[onclick*="Save"],
+body.sales-mode .bnav .ni[onclick*="save"],
+body.sales-mode .bnav #nav-save-btn { display: none !important; }
+
+/* Nav pill glass effect in sales-mode (frosted white) */
+body.sales-mode .bnav {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0,0,0,.07) !important;
+  border-top: none !important;
+  box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
+}
