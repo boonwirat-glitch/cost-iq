@@ -873,7 +873,7 @@ function _tgtShowSkeleton() {
     const sub = document.createElement('div');
     sub.id = 'tgt-loading-sub';
     sub.style.cssText = 'font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;display:flex;align-items:center;gap:5px;padding:0 16px 10px';
-    sub.innerHTML = '<span class="ai-thinking"><svg width="9" height="9" viewBox="0 0 10 10" fill="rgba(0,208,112,.7)" style="animation:iq-spin 1.5s linear infinite;transform-origin:center;flex-shrink:0"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></span><span>กำลังดึงข้อมูล</span>';
+    sub.innerHTML = '<span class="ai-thinking"><svg width="9" height="9" viewBox="0 0 10 10" fill="var(--tk-ok-bright)" style="animation:iq-spin 1.5s linear infinite;transform-origin:center;flex-shrink:0"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></span><span>กำลังดึงข้อมูล</span>';
     titleWrap.appendChild(sub);
   }
   if (body) body.innerHTML = '';
@@ -1004,7 +1004,7 @@ function _renderAdminTLBlocks(months, moLabels) {
     const anchor = _tgtKamBaseline3mo(null, tl.email, 'tl');
     html += `<div class="tgt-person-block">
       <div class="tgt-person-name">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(0,208,112,.7)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tk-ok-bright)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
         ${tl.name}
       </div>
       <div class="tgt-person-meta">${tl.email}</div>
@@ -1197,7 +1197,7 @@ function renderTargetSettingsTab() {
   body.innerHTML = `
     <div class="tgt-nrr-config">
       <div class="tgt-nrr-config-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(0,208,112,.7)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="rgba(0,208,112,.7)"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tk-ok-bright)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="var(--tk-ok-bright)"/></svg>
         NRR Warning Threshold
       </div>
       <div class="tgt-nrr-config-row">
@@ -2277,14 +2277,14 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
-      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
+      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
       <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
       <div style="display:flex;gap:6px;margin:0 18px 8px">
-        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid rgba(77,220,151,.25);color:#4ddc97;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">History</button>
+        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid rgba(77,220,151,.25);color:var(--tk-ok-bright);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">History</button>
         <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">Rules</button>
       </div>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
@@ -2601,7 +2601,7 @@ window._commLoadHistory = _commLoadHistory;
       counter.title = loaded >= FOREGROUND_KEYS.length
         ? 'Foreground data loaded: portview, history, handover, categories, sku_current, outlets'
         : 'Core data is ready. Enhancement files may still load in background.';
-      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'var(--tk-ok-dim-2)' : 'rgba(38,96,200,.15)';
+      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'var(--tk-ok-dim-2)' : 'var(--tk-accent-dim)';
       counter.style.color = loaded >= FOREGROUND_KEYS.length ? 'var(--g700)' : 'var(--tk-accent-solid)';
     }
     return {loaded:loaded,total:FOREGROUND_KEYS.length,keys:FOREGROUND_KEYS.slice()};
