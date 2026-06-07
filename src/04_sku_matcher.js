@@ -633,7 +633,7 @@ function setAiProvider(p){
     const p = (async function(){
       record('_fetchCloudflareFile', 'start', { tab, force, heavy: !!spec.heavy, networkFirst });
       const dot = document.getElementById('sp-' + tab);
-      if(dot) dot.style.background = 'rgba(38,96,200,.12)';
+      if(dot) dot.style.background = 'var(--tk-accent-dim)';
       try{
         let text = null;
         let source = 'network';
@@ -684,7 +684,7 @@ function setAiProvider(p){
         if(ok){
           markLoaded(tab);
           v212RecordFreshness(tab, { source, bytes:text ? text.length : 0, networkFirst, force, ageMs: source === 'cache' || source === 'offline-cache' ? (cached && cached.ts ? Date.now() - cached.ts : null) : 0 });
-          if(dot){ dot.style.background = source === 'offline-cache' ? 'rgba(240,176,0,.18)' : 'rgba(0,208,112,.18)'; dot.style.color = source === 'offline-cache' ? '#9a6500' : 'var(--g700)'; }
+          if(dot){ dot.style.background = source === 'offline-cache' ? 'rgba(240,176,0,.18)' : 'var(--tk-ok-dim-2)'; dot.style.color = source === 'offline-cache' ? '#9a6500' : 'var(--g700)'; }
           record('_fetchCloudflareFile', 'done', { tab, ok:true, source, networkFirst });
         }else{
           if(dot){ dot.style.background = 'rgba(240,80,0,.12)'; dot.style.color = 'var(--org)'; }
