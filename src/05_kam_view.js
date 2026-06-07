@@ -111,7 +111,7 @@ function __legacyShowScreenFallback(name){
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
-  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview')?'none':'';
+  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills')?'none':'';
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();

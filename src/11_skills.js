@@ -75,12 +75,34 @@ let _skillViewMode = 'pending';  // TL: 'pending' | 'overview'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
 
 // ── Supabase helper ────────────────────────────────────────
+
+// ── JWT helper — ดึง access token จาก Supabase session ───
+function _skGetJWT() {
+  try {
+    // ใช้ supa client จาก 01_core.js ถ้ามี
+    if (typeof supa !== 'undefined' && supa.auth) {
+      const session = supa.auth.session ? supa.auth.session() : null;
+      if (session && session.access_token) return session.access_token;
+    }
+    // fallback: อ่านจาก localStorage โดยตรง
+    const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+    if (key) {
+      const sess = JSON.parse(localStorage.getItem(key));
+      return sess?.access_token || null;
+    }
+  } catch(_) {}
+  return null;
+}
 async function _skFetch(path, opts = {}) {
-  const key = window.SUPABASE_KEY || (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase && window.FreshketSenseConfig.supabase.anonKey) || '';
-  const res = await fetch(`${SKILLS_SUPABASE_URL}/rest/v1/${path}`, {
+  // ใช้ SUPA_KEY และ SUPA_URL จาก 01_core.js (โหลดก่อน 11_skills.js เสมอ)
+  const key = (typeof SUPA_KEY !== 'undefined' && SUPA_KEY) ||
+              (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase &&
+               (window.FreshketSenseConfig.supabase.publishableKey || window.FreshketSenseConfig.supabase.anonKey)) || '';
+  const baseUrl = (typeof SUPA_URL !== 'undefined' && SUPA_URL) || SKILLS_SUPABASE_URL;
+  const res = await fetch(`${baseUrl}/rest/v1/${path}`, {
     headers: {
       'apikey':        key,
-      'Authorization': `Bearer ${key}`,
+      'Authorization': `Bearer ${_skGetJWT() || key}`,
       'Content-Type':  'application/json',
       'Prefer':        opts.prefer || 'return=representation',
       ...opts.headers,

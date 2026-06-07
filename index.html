@@ -1,4 +1,4 @@
-<!-- Freshket Sense v395: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v396: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v395',
+      version: 'v396',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -19240,7 +19240,7 @@ function __legacyShowScreenFallback(name){
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
-  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview')?'none':'';
+  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills')?'none':'';
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
@@ -41209,12 +41209,34 @@ let _skillViewMode = 'pending';  // TL: 'pending' | 'overview'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
 
 // ── Supabase helper ────────────────────────────────────────
+
+// ── JWT helper — ดึง access token จาก Supabase session ───
+function _skGetJWT() {
+  try {
+    // ใช้ supa client จาก 01_core.js ถ้ามี
+    if (typeof supa !== 'undefined' && supa.auth) {
+      const session = supa.auth.session ? supa.auth.session() : null;
+      if (session && session.access_token) return session.access_token;
+    }
+    // fallback: อ่านจาก localStorage โดยตรง
+    const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+    if (key) {
+      const sess = JSON.parse(localStorage.getItem(key));
+      return sess?.access_token || null;
+    }
+  } catch(_) {}
+  return null;
+}
 async function _skFetch(path, opts = {}) {
-  const key = window.SUPABASE_KEY || (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase && window.FreshketSenseConfig.supabase.anonKey) || '';
-  const res = await fetch(`${SKILLS_SUPABASE_URL}/rest/v1/${path}`, {
+  // ใช้ SUPA_KEY และ SUPA_URL จาก 01_core.js (โหลดก่อน 11_skills.js เสมอ)
+  const key = (typeof SUPA_KEY !== 'undefined' && SUPA_KEY) ||
+              (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase &&
+               (window.FreshketSenseConfig.supabase.publishableKey || window.FreshketSenseConfig.supabase.anonKey)) || '';
+  const baseUrl = (typeof SUPA_URL !== 'undefined' && SUPA_URL) || SKILLS_SUPABASE_URL;
+  const res = await fetch(`${baseUrl}/rest/v1/${path}`, {
     headers: {
       'apikey':        key,
-      'Authorization': `Bearer ${key}`,
+      'Authorization': `Bearer ${_skGetJWT() || key}`,
       'Content-Type':  'application/json',
       'Prefer':        opts.prefer || 'return=representation',
       ...opts.headers,
