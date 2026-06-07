@@ -366,7 +366,7 @@ function _olRenderOutletRow(o, isChild) {
   const mtd = _sv_fmt(o.gmvToDate||0);
   const safeId = (o.id||'').replace(/"/g,'');
   const indent = isChild ? ' sv-ol-branch' : '';
-  return '<div class="sv-ol-row' + indent + '" onclick="window._salesOpenAccount(\"' + safeId + '\")">' +
+  return '<div class="sv-ol-row' + indent + '" data-acctid="' + safeId + '">' +
     '<div class="sv-ol-top">' +
       '<div class="sv-ol-ind ' + indCls + '"></div>' +
       '<div class="sv-ol-info">' +
@@ -455,14 +455,40 @@ function _renderSalesOutletList(el, outlets) {
     return;
   }
 
-  // ── Flat list ──
+  // ── Grouped list — account header + branch rows ──
   html += '<div class="sv-outlet-list">';
-  sorted.forEach(function(o) { html += _olRenderOutletRow(o, false); });
+  groups.forEach(function(g) {
+    if (g.outlets.length > 1) {
+      // Account group header — prominent, full-width
+      const gGmv = g.outlets.reduce(function(s,o){ return s+(o.runrate||0); }, 0);
+      const gId = g.outlets[0].id;
+      const collapsed = !!_olCollapsed[gId];
+      html += '<div class="sv-ol-acct-hd" data-gid="' + gId + '">' +
+        '<div class="sv-ol-acct-left">' +
+          '<div class="sv-ol-acct-name">' + g.name + '</div>' +
+          '<div class="sv-ol-acct-meta">' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '/เดือน</div>' +
+        '</div>' +
+        '<div class="sv-ol-acct-right">' +
+          '<div class="sv-ol-acct-toggle">' + (collapsed?'▸':'▾') + '</div>' +
+        '</div>' +
+      '</div>';
+      if (!collapsed) {
+        g.outlets.forEach(function(o) { html += _olRenderOutletRow(o, true); });
+      }
+    } else {
+      html += _olRenderOutletRow(g.outlets[0], false);
+    }
+  });
   html += '</div>';
 
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -773,6 +799,11 @@ function _renderPipelineList(el, leads) {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -988,6 +1019,11 @@ function renderSalesTeamview() {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -1095,6 +1131,11 @@ window._salesTLDrillRep = function(repEmail) {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
