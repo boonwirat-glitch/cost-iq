@@ -289,6 +289,9 @@ function renderSalesPortview() {
   // Load pipeline async then render home summary + outlet list
   _loadSalesPipeline().then(pipeline => {
     el.innerHTML = '';
+    el.onclick = null;
+    window.scrollTo(0, 0);
+    try { el.scrollTop = 0; } catch(e) {}
 
     // Home summary section at top
     const homeSec = document.createElement('div');
@@ -660,11 +663,14 @@ window._salesOpenAccount = function(accountId, accountName) {
       '</div></div>'
     ) : '';
 
+    // Clear outlet list click delegation before replacing innerHTML
+    el.onclick = null;
+
     el.innerHTML =
       '<div class="sv-page-hd" style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;">' +
         '<button onclick="renderSalesPortview()" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;">' +
           '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
-          '<span style="font-size:14px;font-weight:600;color:#FF385C;font-family:Noto Sans Thai,sans-serif">พอร์ต</span>' +
+          '<span style="font-size:14px;font-weight:600;color:#FF385C;font-family:\'Noto Sans Thai\',sans-serif">พอร์ต</span>' +
         '</button>' +
       '</div>' +
       '<div style="padding:0 16px 12px;">' +
@@ -689,6 +695,10 @@ window._salesOpenAccount = function(accountId, accountName) {
       skuHtml +
       (skuHtml ? '<div class="sv-band"></div>' : '') +
       catHtml;
+
+    // Scroll to top — body scrolls in Sales mode (not element)
+    window.scrollTo(0, 0);
+    try { el.scrollTop = 0; } catch(e) {}
 
   } catch(e) { console.warn('[Sales] open account failed:', e); }
 };
