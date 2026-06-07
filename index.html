@@ -1,4 +1,4 @@
-<!-- Freshket Sense v255: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v392: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v255',
+      version: 'v392',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -7910,12 +7910,22 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <span class="lb">Team</span>
 </button>
+<!-- Skills: ทักษะ — sales + sales_tl + future KAM -->
+<button class="ni sales-any-btn" id="nav-skills" onclick="showScreen('skills');skillsInit()">
+<div class="nwrap" style="position:relative">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+<span id="skills-nav-badge"></span>
+</div>
+<span class="lb">ทักษะ</span>
+</button>
 </nav>
 <!-- ══ SALES SCREENS ══ -->
 <div class="scr" id="scr-sales-portview"></div>
 <div class="scr" id="scr-sales-pipeline"></div>
 <div class="scr" id="scr-sales-commission"></div>
 <div class="scr" id="scr-sales-teamview"></div>
+<!-- ══ SKILLS SCREEN ══ -->
+<div class="scr" id="scr-skills"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:#0d1f3c">
 <div class="portview-header">
@@ -27643,6 +27653,7 @@ body.sales-mode #scr-sales-portview,
 body.sales-mode #scr-sales-pipeline,
 body.sales-mode #scr-sales-commission,
 body.sales-mode #scr-sales-teamview,
+body.sales-mode #scr-skills,
 body.sales-mode .sv-sheet,
 body.sales-mode .sv-sheet-overlay,
 body.sales-mode [class*="sv-"],
@@ -28422,8 +28433,11 @@ body.sales-mode [class*="sv-"] * {
 .sv-field-input[type="text"]:placeholder-shown { box-shadow: none; }
 input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; }
 
-/* ── Nav: 3-column grid for Sales rep (no Save, no Team tab) ── */
-body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(3,1fr) !important; }
+/* ── Nav: show sales-any-btn (ทักษะ) for all Sales roles ── */
+body.sales-mode .sales-any-btn { display: flex !important; }
+
+/* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
+body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
@@ -41084,11 +41098,12 @@ window._salesTLDrillRep = function(repEmail) {
       else if (name === 'sales-pipeline') { renderSalesPipeline(); _salesUpdateNavActive('nav-sales-pipeline'); }
       else if (name === 'sales-commission') { renderSalesCommission(); _salesUpdateNavActive('nav-sales-commission'); }
       else if (name === 'sales-teamview') { renderSalesTeamview(); _salesUpdateNavActive('nav-sales-teamview'); }
+      else if (name === 'skills') { _salesUpdateNavActive('nav-skills'); }
     } catch(e) { console.warn('[Sales router]', e); }
   };
 
   function _salesUpdateNavActive(activeId) {
-    const salesNavIds = ['nav-sales-portview','nav-sales-pipeline','nav-sales-commission','nav-sales-teamview'];
+    const salesNavIds = ['nav-sales-portview','nav-sales-pipeline','nav-sales-commission','nav-sales-teamview','nav-skills'];
     salesNavIds.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('on', id === activeId);
