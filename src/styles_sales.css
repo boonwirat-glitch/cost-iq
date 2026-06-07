@@ -147,8 +147,9 @@ body.sales-mode [class*="sv-"] * {
 }
 .sv-proj-cell {
   flex: 1;
-  padding: 12px 0 12px 14px;
+  padding: 12px 10px 12px 14px;
   position: relative;
+  min-width: 0;
 }
 .sv-proj-cell + .sv-proj-cell::before {
   content: '';
@@ -1167,6 +1168,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   justify-content: space-between;
   padding: 2.5px 0;
   border-top: 1px solid #F4F4F4;
+  gap: 4px;
 }
 .sv-pb-row:first-child { border-top: none; }
 .sv-pb-lbl {
