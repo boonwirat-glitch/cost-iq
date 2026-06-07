@@ -2194,7 +2194,7 @@ async function triggerRestAI(){
   if(OPPS.length===0){
     if(standbyOv){
       const orig=standbyOv.innerHTML;
-      standbyOv.innerHTML='<span style="font-size:7.5px;color:var(--org);text-align:center;font-family:\'IBM Plex Sans Thai\',sans-serif;font-weight:700;line-height:1.5">ยังไม่มีข้อมูล<br>อัปโหลดก่อน</span>';
+      standbyOv.innerHTML='<span style="font-size:7.5px;color:var(--org);text-align:center;font-family:\'Noto Sans Thai\',sans-serif;font-weight:700;line-height:1.5">ยังไม่มีข้อมูล<br>อัปโหลดก่อน</span>';
       setTimeout(()=>{standbyOv.innerHTML=orig;},2200);
     }
     return;
