@@ -155,8 +155,9 @@ async function _loadSkillUsers() {
     // ดึง unique user_ids จาก _skillProg แล้ว query profiles ครั้งเดียว
     const uids = [...new Set(Object.values(_skillProg).map(p => p.user_id))];
     if (uids.length === 0) return;
-    const q = uids.map(id => `id=eq.${id}`).join(',');
-    const rows = await _skFetch(`profiles?select=id,full_name,kam_name,email&or=(${q})`);
+    // Supabase REST: ใช้ id=in.(uuid1,uuid2,...) แทน or= — รองรับ 1 หรือหลาย uids
+    const inList = uids.join(',');
+    const rows = await _skFetch(`profiles?select=id,full_name,kam_name,email&id=in.(${inList})`);
     _skillUsers = {};
     (rows || []).forEach(r => { _skillUsers[r.id] = r; });
   } catch(e) {
@@ -530,8 +531,8 @@ function _renderTLPending() {
 <div class="sk-tl-hero">
   <div>
     <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
-    <div class="sk-tl-squad">Squad</div>
-    <div class="sk-tl-sub">Sales reps</div>
+    <div class="sk-tl-squad">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
+    <div class="sk-tl-sub">${Object.keys(Object.values(_skillProg).reduce((a,p)=>{a[p.user_id]=1;return a},{})).length} sales reps</div>
   </div>
   <div style="text-align:right;">
     <div class="sk-tl-pend-count" style="color:${heroColor};">${pendCount}</div>
@@ -573,7 +574,7 @@ function _renderTLOverview() {
       const pct2    = uTotal > 0 ? Math.round(uCount/uTotal*100) : 0;
       const fillCls = pct2 >= 50 ? 'sk-rep-fill-ok' : pct2 >= 25 ? 'sk-rep-fill-mid' : 'sk-rep-fill-low';
       const pendDot = tCount > 0 ? '<div class="sk-rep-pend-dot"></div>' : '';
-      const initials = uid.slice(0,2).toUpperCase();
+      const initials = _skUserInitials(uid);
       return `
 <div class="sk-rep-row" onclick="skillsTLOpenRepDetail('${uid}')">
   <div class="sk-rep-avatar">${initials}</div>
@@ -847,7 +848,7 @@ function skillsTLOpenRepDetail(userId) {
 </div>
 <div style="overflow-y:auto;flex:1;padding-bottom:84px;">
   <div class="sk-rep-det-hd">
-    <div class="sk-rep-det-avatar">${userId.slice(0,2).toUpperCase()}</div>
+    <div class="sk-rep-det-avatar">${_skUserInitials(userId)}</div>
     <div>
       <div class="sk-rep-det-name">${userId}</div>
       <div class="sk-rep-det-meta">Sales · ${uCount}/${uTotal} unlocked</div>
