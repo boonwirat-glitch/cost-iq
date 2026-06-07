@@ -69,7 +69,8 @@ let _skillDefs    = [];        // skill_definitions rows
 let _skillProg    = {};        // { skill_id: progress_row }
 let _skillsUserId = null;      // current auth user id
 let _skillsRole   = null;      // 'sales' | 'sales_tl' | 'kam' | 'tl' | 'admin'
-let _activeSkillId = null;     // currently open skill sheet
+let _activeSkillId = null;
+let _skillUsers   = {};        // { user_id: { full_name, kam_name, email } }     // currently open skill sheet
 let _skillViewMode = 'pending';  // TL: 'pending' | 'overview'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
 
@@ -113,6 +114,7 @@ async function skillsInit() {
     _loadSkillDefs(),
     _loadSkillProgress(),
   ]);
+  await _loadSkillUsers();   // โหลดชื่อ rep หลังรู้ว่ามี user_id อะไรบ้าง
 
   _renderSkillsScreen();
   _updateSkillsNavBadge();
@@ -143,6 +145,35 @@ async function _loadSkillProgress() {
   } catch(e) {
     console.error('[Skills] loadProgress:', e);
   }
+}
+
+// ── Load user profiles for TL (name display) ─────────
+async function _loadSkillUsers() {
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  if (!isTL) return;
+  try {
+    // ดึง unique user_ids จาก _skillProg แล้ว query profiles ครั้งเดียว
+    const uids = [...new Set(Object.values(_skillProg).map(p => p.user_id))];
+    if (uids.length === 0) return;
+    const q = uids.map(id => `id=eq.${id}`).join(',');
+    const rows = await _skFetch(`profiles?select=id,full_name,kam_name,email&or=(${q})`);
+    _skillUsers = {};
+    (rows || []).forEach(r => { _skillUsers[r.id] = r; });
+  } catch(e) {
+    console.error('[Skills] loadUsers:', e);
+  }
+}
+
+// helper — ชื่อแสดงผล: ใช้ kam_name > full_name > email prefix > UUID 8 chars
+function _skUserName(userId) {
+  const u = _skillUsers[userId];
+  if (!u) return userId ? userId.slice(0,8) : '?';
+  return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
+}
+
+function _skUserInitials(userId) {
+  const name = _skUserName(userId);
+  return name.slice(0,2).toUpperCase();
 }
 
 // ── Nav badge (TL: pending count) ─────────────────────────
@@ -468,12 +499,13 @@ function _renderTLPending() {
       ? Math.floor((Date.now() - new Date(p.updated_at)) / 86400000)
       : null;
     const dateLabel = daysAgo === null ? '' : daysAgo === 0 ? 'today' : `${daysAgo} day${daysAgo>1?'s':''} ago`;
-    const initials = (p.user_id || '?').slice(0,2).toUpperCase();
+    const initials  = _skUserInitials(p.user_id);
+    const repName   = _skUserName(p.user_id);
     return `
 <div class="sk-pend-row" onclick="skillsTLOpenEval('${p.user_id}',${p.skill_id})">
   <div class="sk-pend-avatar">${initials}</div>
   <div class="sk-pend-info">
-    <div class="sk-pend-name">${p.user_id}</div>
+    <div class="sk-pend-name">${repName}</div>
     <div class="sk-pend-skill">${code} · ${def.skill_name_en}</div>
     <div class="sk-pend-date">self-marked ${dateLabel}</div>
   </div>
@@ -680,9 +712,9 @@ async function skillsTLOpenEval(userId, skillId) {
   <div class="sk-tl-zone">
     <div class="sk-tl-eye">TL · Evaluation</div>
     <div class="sk-tl-rep-row">
-      <div class="sk-tl-avatar">${userId.slice(0,2).toUpperCase()}</div>
+      <div class="sk-tl-avatar">${_skUserInitials(userId)}</div>
       <div>
-        <div class="sk-tl-rep-name">${userId}</div>
+        <div class="sk-tl-rep-name">${_skUserName(userId)}</div>
         <div class="sk-tl-rep-meta">Sales · self-marked ${p&&p.updated_at?new Date(p.updated_at).toLocaleDateString('th-TH'):''}</div>
       </div>
     </div>
@@ -715,10 +747,13 @@ function _skTLSelectState(newState) {
 </button>`).join('');
 }
 
-async function skillsTLSave(userId, skillId, oldState) {
+async function skillsTLSave(userId, skillId) {
   const row      = document.getElementById('tl-state-row');
   const newState = row ? row.dataset.selected : null;
   const note     = (document.getElementById('tl-note')||{}).value || '';
+  // ดึง oldState จาก local cache (source of truth) ไม่ใช่จาก HTML parameter
+  const key      = `${userId}:${skillId}`;
+  const oldState = _skillProg[key] ? _skillProg[key].state : 'locked';
   if (!newState || newState === oldState) return;
 
   try {
@@ -752,9 +787,13 @@ async function skillsTLSave(userId, skillId, oldState) {
     }
 
     // Update local cache + re-render
-    const key = `${userId}:${skillId}`;
-    if (_skillProg[key]) _skillProg[key].state = newState;
-    _updateSkillsNavBadge();
+    const cacheKey = `${userId}:${skillId}`;
+    if (_skillProg[cacheKey]) {
+      _skillProg[cacheKey].state      = newState;
+      _skillProg[cacheKey].evaluated_by = _skillsUserId;
+      _skillProg[cacheKey].evaluated_at = new Date().toISOString();
+    }
+    _updateSkillsNavBadge();   // badge อัพเดททันทีหลัง save
     _skToast(`บันทึกแล้ว — ${SKILL_STATE_LABEL_TH[newState]}`);
     _skSetView('pending');
     _renderSkillsScreen();
