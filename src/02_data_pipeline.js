@@ -1266,7 +1266,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
     const _ft0=performance.now(); // v218b timing
     let _src='R2-full';           // v218b: track data source for debug log
     const dot=document.getElementById('sp-'+tab);
-    if(dot)dot.style.background='rgba(38,96,200,.12)';
+    if(dot)dot.style.background='var(--tk-accent-dim)';
     try{
       let text=null;
       const useCache=(cacheOverride!==undefined)?cacheOverride:!!spec.cache;
@@ -1285,7 +1285,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
               // v221c: 304 + already in memory = skip re-ingest entirely → no callback → no render
               if(_cloudLoadedTabs.has(tab)){
                 _senseDataLog(tab,'⚡ 304 skip-reingest — data current, no render needed');
-                if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';} // mark done
+                if(dot){dot.style.background='var(--tk-ok-dim-2)';dot.style.color='var(--g700)';} // mark done
                 return true;
               }
             } else if(_res.text){
@@ -1319,7 +1319,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         _cloudLoadedTabs.add(tab);
         if(tab==='skus')bulkSkusReady=true;
         if(tab==='alternatives')bulkAltsReady=true;
-        if(dot){dot.style.background='rgba(0,208,112,.18)';dot.style.color='var(--g700)';}
+        if(dot){dot.style.background='var(--tk-ok-dim-2)';dot.style.color='var(--g700)';}
         // v218b: log file completion — source tells you IndexedDB vs R2, ETag 304 vs 200
         _senseDataLog(tab,'✅',_src,(text?Math.round(text.length/1024):0)+'KB',Math.round(performance.now()-_ft0)+'ms');
         // v218a DATA GATE: when portview+history+handover all complete, fire ONE consolidated render.
