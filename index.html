@@ -1,4 +1,4 @@
-<!-- Freshket Sense v369: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v370: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5230,7 +5230,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v369',
+      version: 'v370',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -28490,34 +28490,43 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-days-fill.late ~ .sv-days-meta .sv-days-exp { color: var(--sv-ac); }
 
 /* Account group header */
+/* Account group header — prominent, clearly a parent */
 .sv-ol-acct-hd {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 9px 0 5px;
+  justify-content: space-between;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--sv-surface);
+  border-radius: 8px;
   cursor: pointer;
+  border-left: 3px solid var(--sv-ink);
 }
-.sv-ol-acct-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--sv-muted);
-  flex-shrink: 0;
-}
+.sv-ol-acct-left { flex: 1; min-width: 0; }
 .sv-ol-acct-name {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--sv-body);
+  color: var(--sv-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sv-ol-acct-meta {
-  font-size: 9.5px;
+  font-size: 10px;
   color: var(--sv-muted);
   font-family: 'IBM Plex Mono', monospace;
+  margin-top: 1px;
 }
-.sv-ol-acct-arrow {
-  font-size: 9px;
+.sv-ol-acct-right { flex-shrink: 0; margin-left: 10px; }
+.sv-ol-acct-toggle {
+  font-size: 11px;
   color: var(--sv-muted);
-  margin-left: auto;
+  font-weight: 700;
+}
+/* Branch rows indent under account header */
+.sv-ol-branch {
+  padding: 8px 0 8px 12px;
+  border-top: 1px solid var(--sv-hairline);
 }
 
 /* Compact grid */
@@ -40066,7 +40075,7 @@ function _olRenderOutletRow(o, isChild) {
   const mtd = _sv_fmt(o.gmvToDate||0);
   const safeId = (o.id||'').replace(/"/g,'');
   const indent = isChild ? ' sv-ol-branch' : '';
-  return '<div class="sv-ol-row' + indent + '" onclick="window._salesOpenAccount(\"' + safeId + '\")">' +
+  return '<div class="sv-ol-row' + indent + '" data-acctid="' + safeId + '">' +
     '<div class="sv-ol-top">' +
       '<div class="sv-ol-ind ' + indCls + '"></div>' +
       '<div class="sv-ol-info">' +
@@ -40155,14 +40164,40 @@ function _renderSalesOutletList(el, outlets) {
     return;
   }
 
-  // ── Flat list ──
+  // ── Grouped list — account header + branch rows ──
   html += '<div class="sv-outlet-list">';
-  sorted.forEach(function(o) { html += _olRenderOutletRow(o, false); });
+  groups.forEach(function(g) {
+    if (g.outlets.length > 1) {
+      // Account group header — prominent, full-width
+      const gGmv = g.outlets.reduce(function(s,o){ return s+(o.runrate||0); }, 0);
+      const gId = g.outlets[0].id;
+      const collapsed = !!_olCollapsed[gId];
+      html += '<div class="sv-ol-acct-hd" data-gid="' + gId + '">' +
+        '<div class="sv-ol-acct-left">' +
+          '<div class="sv-ol-acct-name">' + g.name + '</div>' +
+          '<div class="sv-ol-acct-meta">' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '/เดือน</div>' +
+        '</div>' +
+        '<div class="sv-ol-acct-right">' +
+          '<div class="sv-ol-acct-toggle">' + (collapsed?'▸':'▾') + '</div>' +
+        '</div>' +
+      '</div>';
+      if (!collapsed) {
+        g.outlets.forEach(function(o) { html += _olRenderOutletRow(o, true); });
+      }
+    } else {
+      html += _olRenderOutletRow(g.outlets[0], false);
+    }
+  });
   html += '</div>';
 
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -40473,6 +40508,11 @@ function _renderPipelineList(el, leads) {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -40688,6 +40728,11 @@ function renderSalesTeamview() {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
@@ -40795,6 +40840,11 @@ window._salesTLDrillRep = function(repEmail) {
   el.innerHTML = html;
   // Click delegation for outlet rows
   el.onclick = function(e) {
+    const acctHd = e.target.closest('[data-gid]');
+    if (acctHd) {
+      const gid = acctHd.getAttribute('data-gid');
+      if (gid) { window._olToggleGroup(gid); return; }
+    }
     const row = e.target.closest('[data-acctid]');
     if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
   };
