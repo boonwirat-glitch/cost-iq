@@ -24,6 +24,7 @@ body.sales-mode #scr-sales-portview,
 body.sales-mode #scr-sales-pipeline,
 body.sales-mode #scr-sales-commission,
 body.sales-mode #scr-sales-teamview,
+body.sales-mode #scr-skills,
 body.sales-mode .sv-sheet,
 body.sales-mode .sv-sheet-overlay,
 body.sales-mode [class*="sv-"],
@@ -803,8 +804,11 @@ body.sales-mode [class*="sv-"] * {
 .sv-field-input[type="text"]:placeholder-shown { box-shadow: none; }
 input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; }
 
-/* ── Nav: 3-column grid for Sales rep (no Save, no Team tab) ── */
-body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(3,1fr) !important; }
+/* ── Nav: show sales-any-btn (ทักษะ) for all Sales roles ── */
+body.sales-mode .sales-any-btn { display: flex !important; }
+
+/* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
+body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }

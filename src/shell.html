@@ -2977,12 +2977,22 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <span class="lb">Team</span>
 </button>
+<!-- Skills: ทักษะ — sales + sales_tl + future KAM -->
+<button class="ni sales-any-btn" id="nav-skills" onclick="showScreen('skills');skillsInit()">
+<div class="nwrap" style="position:relative">
+<svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+<span id="skills-nav-badge"></span>
+</div>
+<span class="lb">ทักษะ</span>
+</button>
 </nav>
 <!-- ══ SALES SCREENS ══ -->
 <div class="scr" id="scr-sales-portview"></div>
 <div class="scr" id="scr-sales-pipeline"></div>
 <div class="scr" id="scr-sales-commission"></div>
 <div class="scr" id="scr-sales-teamview"></div>
+<!-- ══ SKILLS SCREEN ══ -->
+<div class="scr" id="scr-skills"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:#0d1f3c">
 <div class="portview-header">

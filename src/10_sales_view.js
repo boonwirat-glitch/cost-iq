@@ -1286,11 +1286,12 @@ window._salesTLDrillRep = function(repEmail) {
       else if (name === 'sales-pipeline') { renderSalesPipeline(); _salesUpdateNavActive('nav-sales-pipeline'); }
       else if (name === 'sales-commission') { renderSalesCommission(); _salesUpdateNavActive('nav-sales-commission'); }
       else if (name === 'sales-teamview') { renderSalesTeamview(); _salesUpdateNavActive('nav-sales-teamview'); }
+      else if (name === 'skills') { _salesUpdateNavActive('nav-skills'); }
     } catch(e) { console.warn('[Sales router]', e); }
   };
 
   function _salesUpdateNavActive(activeId) {
-    const salesNavIds = ['nav-sales-portview','nav-sales-pipeline','nav-sales-commission','nav-sales-teamview'];
+    const salesNavIds = ['nav-sales-portview','nav-sales-pipeline','nav-sales-commission','nav-sales-teamview','nav-skills'];
     salesNavIds.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('on', id === activeId);
