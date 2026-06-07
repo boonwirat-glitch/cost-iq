@@ -1699,7 +1699,7 @@ async function loadFromCloudflareR2(){
       if(!_existingBanner){
         const _b=document.createElement('div');
         _b.id='offline-banner';
-        _b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:9998;background:rgba(220,60,0,.92);color:#fff;font-size:12px;font-family:"IBM Plex Sans Thai",sans-serif;text-align:center;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(8px)';
+        _b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:9998;background:rgba(220,60,0,.92);color:#fff;font-size:12px;font-family:"Noto Sans Thaiai",sans-serif;text-align:center;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(8px)';
         _b.innerHTML='<span>⚠ ไม่สามารถโหลดข้อมูลได้ — ตรวจสอบการเชื่อมต่อ</span><button onclick="document.getElementById(\x27offline-banner\x27)?.remove();reloadFromGoogleSheets();" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">Retry</button>';
         document.body.appendChild(_b);
         // Auto-dismiss banner when next successful load fires
