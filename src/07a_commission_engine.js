@@ -893,8 +893,16 @@ function closeTargetSetup() {
   // Refresh target-dependent views after save
   setTimeout(() => {
     try{ renderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
-    try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
-    try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+    // Sales TL: refresh Sales teamview; KAM TL/Admin: refresh KAM teamview
+    const _closeRole = typeof isSalesTLRole === 'function' && isSalesTLRole(
+      currentUserProfile && currentUserProfile.role
+    );
+    if (_closeRole) {
+      try{ if(typeof renderSalesTeamview==='function') renderSalesTeamview(); }catch(e){ console.warn('[target refresh] sales teamview', e); }
+    } else {
+      try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
+      try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+    }
   }, 100);
 }
 
