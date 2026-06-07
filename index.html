@@ -1,4 +1,4 @@
-<!-- Freshket Sense v373: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v374: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5230,7 +5230,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v373',
+      version: 'v374',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -27607,10 +27607,17 @@ flex-wrap:wrap;}
 /* --warn     #FF9500   caution               */
 
 /* ── Global font: Noto Sans Thai for all Sales UI ── */
-[class*="sv-"], .scr-sales-portview, #scr-sales-portview,
-#scr-sales-pipeline, #scr-sales-commission, #scr-sales-teamview,
-.sv-sheet, .sv-sheet-overlay {
-  font-family: 'Noto Sans Thai', sans-serif;
+/* Override body IBM Plex Sans Thai — high specificity on screen containers */
+body.sales-mode .scr,
+body.sales-mode #scr-sales-portview,
+body.sales-mode #scr-sales-pipeline,
+body.sales-mode #scr-sales-commission,
+body.sales-mode #scr-sales-teamview,
+body.sales-mode .sv-sheet,
+body.sales-mode .sv-sheet-overlay,
+body.sales-mode [class*="sv-"],
+body.sales-mode [class*="sv-"] * {
+  font-family: 'Noto Sans Thai', sans-serif !important;
 }
 
 
