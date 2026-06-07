@@ -578,6 +578,9 @@ window._salesOpenAccount = function(accountId, accountName) {
     const _bhData = typeof bulkHistoryData !== 'undefined' ? bulkHistoryData : {};
     const _skuData = typeof bulkSkuCurrentData !== 'undefined' ? bulkSkuCurrentData : {};
     const _catData = typeof bulkCatsData !== 'undefined' ? bulkCatsData : {};
+    // Debug: log available keys in bulkHistoryData vs accountId
+    const _bhKeys = Object.keys(_bhData).slice(0,5);
+    console.log('[Sales acct] accountId:', accountId, '| acct.id:', acct.id, '| bulkHistoryData sample keys:', _bhKeys);
     // Build candidate keys from acct object
     const _keys = [accountId, acct.id, acct.res_id, acct.user_id, String(acct.res_id||''), String(acct.user_id||'')].filter(Boolean);
     const _findData = (store) => { for (const k of _keys) { if (store[k] && store[k].length) return store[k]; } return []; };
