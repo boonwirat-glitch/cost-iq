@@ -301,6 +301,15 @@
   justify-content: center;
   position: relative;
 }
+/* inner img/div when wrapped by mastered spark container */
+.sk-card-img-inner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .sk-card-sil {
   font-size: 11px;
   font-weight: 600;
@@ -311,13 +320,44 @@
 /* state filters */
 .state-locked   .sk-card-img { filter: grayscale(1); opacity: .38; }
 .state-training .sk-card-img { filter: saturate(.35) brightness(.95); }
-.state-unlocked .sk-card-img,
-.state-mastered .sk-card-img { filter: none; }
+.state-unlocked .sk-card-img { filter: none; }
+.state-mastered .sk-card-img { filter: saturate(1.1) brightness(1.04); }
 
 /* state border */
 .state-training { border-bottom-color: var(--sk-info); }
 .state-unlocked { border-bottom-color: var(--sk-ok); }
-.state-mastered { border-bottom-color: var(--sk-warn); }
+
+/* ── MASTERED — Ragnarok glow ── */
+.state-mastered {
+  border-bottom: 3px solid var(--sk-warn);
+  background: #1A1200;
+  box-shadow:
+    0 0 0 1.5px rgba(255,149,0,.6),
+    0 0 10px rgba(255,149,0,.4),
+    0 0 24px rgba(255,149,0,.22),
+    0 0 48px rgba(255,149,0,.1);
+}
+/* gold beam — top edge */
+.state-mastered .sk-card-img::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  z-index: 2;
+  background: linear-gradient(90deg, transparent 5%, rgba(255,210,60,.95) 50%, transparent 95%);
+}
+/* ambient glow — bottom of image */
+.state-mastered .sk-card-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at 50% 90%, rgba(255,140,0,.3) 0%, transparent 65%);
+}
+.state-mastered .sk-card-body { background: #1A1200; }
+.state-mastered .sk-card-name { color: #FFD966; }
+.state-mastered .sk-card-code { color: #7A5A00; }
 
 .sk-card-body { padding: 8px 10px 10px; }
 .sk-state-row {
@@ -335,7 +375,7 @@
 .state-locked   .sk-dot { background: var(--sk-locked); }
 .state-training .sk-dot { background: var(--sk-info); }
 .state-unlocked .sk-dot { background: var(--sk-ok); }
-.state-mastered .sk-dot { background: var(--sk-warn); }
+.state-mastered .sk-dot { background: var(--sk-warn); box-shadow: 0 0 5px rgba(255,149,0,.9), 0 0 10px rgba(255,149,0,.5); }
 
 .sk-state-label {
   font-size: 8px;
@@ -384,15 +424,38 @@
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  background: var(--sk-surface);
-  border-bottom: 2.5px solid var(--sk-warn);
+  background: #1A1200;
+  border-bottom: 3px solid var(--sk-warn);
   position: relative;
+  box-shadow:
+    0 0 0 1.5px rgba(255,149,0,.6),
+    0 0 14px rgba(255,149,0,.45),
+    0 0 32px rgba(255,149,0,.24),
+    0 0 60px rgba(255,149,0,.12);
 }
+/* top beam on wide card image block */
+.sk-card-wide .sk-card-img::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px; z-index: 2;
+  background: linear-gradient(90deg, transparent 5%, rgba(255,210,60,.9) 50%, transparent 95%);
+}
+.sk-card-wide .sk-card-img::after {
+  content: '';
+  position: absolute;
+  inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at 50% 90%, rgba(255,140,0,.28) 0%, transparent 65%);
+}
+.sk-card-wide .sk-card-body { background: #1A1200; }
+.sk-card-wide .sk-card-name { color: #FFD966; }
+.sk-card-wide .sk-card-code { color: #7A5A00; }
 .sk-master-star {
   position: absolute;
   top: 8px; right: 10px;
   width: 16px; height: 16px;
   color: var(--sk-warn);
+  filter: drop-shadow(0 0 5px rgba(255,180,0,1)) drop-shadow(0 0 12px rgba(255,130,0,.7));
 }
 
 /* ══ SKILL DETAIL ════════════════════════════════════════ */
@@ -1223,5 +1286,18 @@
 .sk-toast-show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* ── Mastered spark particle animation ── */
+@keyframes sk-spark {
+  0%, 100% { opacity: .2; transform: scale(.8); }
+  50%       { opacity: 1;  transform: scale(1.8); }
+}
+.sk-spark {
+  position: absolute;
+  border-radius: 50%;
+  background: #FFD700;
+  pointer-events: none;
+  z-index: 3;
 }
 
