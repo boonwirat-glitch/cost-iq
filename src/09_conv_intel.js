@@ -67,7 +67,7 @@ const CI = (() => {
   const _CSS = `
 /* ── SPEC TOKENS ── */
 :root{
-  --n-0:#FFFFFF;--n-50:#F2F2F7;--n-100:#E5E5EA;--n-200:#6C6C70;--n-400:#636366;--n-900:#1C1C1E;
+  --n-0:#FFFFFF;--n-50:#FFFFFF;--n-100:#E5E5EA;--n-200:#6C6C70;--n-400:#636366;--n-900:#1C1C1E;
   --echo-ac:#FF385C;--echo-ac-h:#e02d50;
   --echo-ac-5:rgba(255,56,92,.05);--echo-ac-8:rgba(255,56,92,.08);--echo-ac-12:rgba(255,56,92,.12);--echo-ac-20:rgba(255,56,92,.20);
   --danger:#FF3B30;--danger-bg:rgba(255,59,48,.08);
@@ -1353,7 +1353,7 @@ ${text}`;
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  background:var(--n-50,#FFFFFF);
+  background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
@@ -1595,7 +1595,7 @@ ${text}`;
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  background:var(--n-50,#FFFFFF);
+  background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
@@ -1750,7 +1750,7 @@ ${text}`;
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  background:var(--n-50,#FFFFFF);
+  background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
