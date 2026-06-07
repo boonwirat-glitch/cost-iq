@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--canvas:#FFF;--surface:#F7F7F7;--ink:#222;--body:#3F3F3F;--muted:#6A6A6A;--hairline:#EBEBEB;--ac:#FF385C;--ac-dim:rgba(255,56,92,.08);--ok:#34C759;--warn:#FF9500;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans Thai',-apple-system,sans-serif;background:#D0D0D0;display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:28px 16px 56px;gap:20px;flex-wrap:wrap;}
+.pw{display:flex;flex-direction:column;align-items:center;gap:7px;}
+.pl{font-size:8.5px;font-family:'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#777;text-align:center;max-width:360px;}
+.phone{width:360px;background:var(--canvas);border-radius:40px;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 0 0 7px #1A1A1A,0 0 0 8px rgba(255,255,255,.1),0 28px 70px rgba(0,0,0,.45);min-height:660px;}
+.island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:90px;height:26px;background:#000;border-radius:999px;z-index:200;}
+.sbar{height:42px;padding:12px 18px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--ink);flex-shrink:0;}
+.topbar{padding:5px 14px 7px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--hairline);flex-shrink:0;}
+.tb-mark{font-size:13px;font-weight:700;color:var(--ink);}
+.chip{font-size:9px;font-weight:600;color:var(--ac);background:var(--ac-dim);border-radius:999px;padding:2px 8px;margin-left:5px;}
+.role-chip{font-size:10px;font-weight:700;color:var(--ac);background:var(--ac-dim);border-radius:999px;padding:3px 9px;}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:72px;}
+.screen::-webkit-scrollbar{display:none;}
+.bnav{position:absolute;bottom:7px;left:11px;right:11px;background:#fff;border-radius:999px;border:1px solid rgba(0,0,0,.07);padding:7px 9px;display:flex;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,.07),0 7px 24px rgba(0,0,0,.14);}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:3px 0;}
+.ni svg{width:20px;height:20px;opacity:.28;color:var(--ink);}
+.ni .lb{font-size:9px;font-weight:600;color:var(--muted);}
+.ni.on svg{opacity:1;color:var(--ac);filter:drop-shadow(0 0 3px rgba(255,56,92,.3));}
+.ni.on .lb{color:var(--ac);font-weight:700;}
+
+/* hero */
+.hero{margin:10px 14px 0;background:var(--surface);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--ac);border-radius:12px 12px 0 0;}
+.hero-eye{font-size:8px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ac);font-family:'IBM Plex Mono',monospace;margin-bottom:3px;}
+.hero-num{font-size:36px;font-weight:700;color:var(--ink);letter-spacing:-.03em;line-height:1;}
+.hero-sub{margin-top:4px;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);}
+.badge{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;}
+.badge.bad{color:var(--ac);background:var(--ac-dim);}
+.badge.ok{color:var(--ok);background:rgba(52,199,89,.09);}
+.tbar{margin-top:10px;}
+.tbar-t{height:2.5px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.tbar-f{height:100%;border-radius:2px;background:var(--warn);}
+.tbar-meta{display:flex;justify-content:space-between;margin-top:3px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+/* proj */
+.proj{display:flex;margin:8px 14px 0;background:var(--surface);border-radius:9px;overflow:hidden;}
+.pc{flex:1;padding:9px 0 9px 10px;position:relative;}
+.pc+.pc::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:1px;background:var(--hairline);}
+.pc.now{background:rgba(255,56,92,.04);}
+.pcm{font-size:7.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:1px;}
+.pcn{font-size:7px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;}
+.pc.now .pcm{color:var(--ac);}
+.pc.now .pcn{color:rgba(255,56,92,.5);}
+.pca{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.02em;}
+.pcg{font-size:8px;font-weight:700;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+.pcg.bad{color:var(--ac);}.pcg.ok{color:var(--ok);}
+
+/* handover summary */
+.sec{padding:11px 14px 6px;display:flex;justify-content:space-between;align-items:center;}
+.sec-t{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:4px;}
+.sec-t.ac{color:var(--ac);}
+.sec-c{font-size:9px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.hov-row{margin:0 14px;background:rgba(255,56,92,.04);border:1px solid rgba(255,56,92,.14);border-radius:9px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.hov-dot{width:5px;height:5px;border-radius:50%;background:var(--ac);margin-right:7px;flex-shrink:0;}
+.hov-label{font-size:12px;font-weight:600;color:var(--ac);}
+.hov-meta{font-size:9px;color:rgba(255,56,92,.55);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+.hov-gmv{font-size:14px;font-weight:700;color:var(--ac);}
+.hov-arrow{font-size:9px;color:rgba(255,56,92,.45);margin-top:1px;text-align:right;}
+
+/* sort + filter bar */
+.action-bar{padding:7px 14px 5px;display:flex;align-items:center;gap:5px;}
+/* filter pills */
+.fpill{font-size:9px;font-weight:700;color:var(--muted);background:var(--surface);border:1px solid var(--hairline);border-radius:999px;padding:3px 9px;cursor:pointer;font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+.fpill.on{color:var(--ok);background:rgba(52,199,89,.08);border-color:rgba(52,199,89,.25);}
+.fpill.warn{color:var(--warn);background:rgba(255,149,0,.07);border-color:rgba(255,149,0,.25);}
+.fpill.late{color:var(--ac);background:var(--ac-dim);border-color:rgba(255,56,92,.25);}
+/* icon buttons — small, refined */
+.icon-bar{margin-left:auto;display:flex;align-items:center;gap:3px;}
+.ib{width:22px;height:22px;border-radius:5px;border:1px solid var(--hairline);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.ib.on{border-color:rgba(255,56,92,.3);background:var(--ac-dim);}
+.ib svg{width:10px;height:10px;color:var(--muted);}
+.ib.on svg{color:var(--ac);}
+/* sort icon — separate button */
+.sort-ib{display:flex;align-items:center;gap:3px;padding:0 7px;height:22px;border-radius:5px;border:1px solid var(--hairline);background:var(--surface);cursor:pointer;}
+.sort-ib svg{width:9px;height:9px;color:var(--muted);}
+.sort-ib span{font-size:8.5px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.sort-ib.on{border-color:rgba(255,56,92,.3);background:var(--ac-dim);}
+.sort-ib.on svg,.sort-ib.on span{color:var(--ac);}
+
+/* outlet row — full */
+.ol-list{padding:0 14px;}
+.ol-row{padding:10px 0;border-top:1px solid var(--hairline);cursor:pointer;}
+/* account group header */
+.ol-acct-hd{padding:8px 0 4px;display:flex;align-items:center;gap:6px;cursor:pointer;}
+.ol-acct-dot{width:4px;height:4px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.ol-acct-name{font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--body);}
+.ol-acct-count{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.ol-acct-arrow{font-size:9px;color:var(--muted);margin-left:auto;}
+/* branch row — indented */
+.ol-branch{padding:7px 0 7px 10px;border-top:1px solid var(--hairline);cursor:pointer;}
+.ol-branch:last-child{padding-bottom:0;}
+.ol-top{display:flex;align-items:center;margin-bottom:4px;}
+.ol-ind{width:2.5px;height:26px;border-radius:1.5px;margin-right:7px;flex-shrink:0;}
+.ol-ind.ok{background:var(--ok);}.ol-ind.mid{background:var(--warn);}.ol-ind.late{background:var(--ac);}
+.ol-info{flex:1;min-width:0;}
+.ol-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ol-meta{font-size:10px;color:var(--muted);margin-top:1px;}
+.ol-right{text-align:right;flex-shrink:0;margin-left:7px;}
+.ol-gmv{font-size:13px;font-weight:700;color:var(--ink);}
+.ol-mtd{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.ol-type{font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+.ol-type.ok{color:var(--ok);}.ol-type.mid{color:var(--warn);}.ol-type.late{color:var(--ac);}
+.ol-bar-wrap{padding-left:9px;}
+.dt{height:2px;background:var(--hairline);border-radius:1px;overflow:hidden;margin-bottom:2px;}
+.df{height:100%;border-radius:1px;}
+.df.ok{background:var(--ok);}.df.mid{background:var(--warn);}.df.late{background:var(--ac);}
+.dm{display:flex;justify-content:flex-end;font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+
+/* compact card grid */
+.ol-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 14px;}
+.ol-card{background:var(--surface);border-radius:9px;padding:9px 11px;cursor:pointer;border-left:2.5px solid transparent;position:relative;}
+.ol-card.ok{border-left-color:var(--ok);}.ol-card.mid{border-left-color:var(--warn);}.ol-card.late{border-left-color:var(--ac);}
+.ol-card.dim{opacity:.5;}
+.oc-badge{position:absolute;top:7px;right:8px;font-size:7.5px;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.oc-badge.acct{color:var(--body);}
+.oc-name{font-size:11.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;padding-right:18px;}
+.oc-gmv{font-size:12px;font-weight:700;color:var(--ink);}
+.oc-sub{font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:1px;}
+
+/* account grouping in compact — account header card */
+.ol-acct-card{grid-column:1/-1;background:rgba(0,0,0,.03);border-radius:7px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;margin-top:2px;}
+.oac-name{font-size:10px;font-weight:700;color:var(--body);}
+.oac-meta{font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.oac-arrow{font-size:9px;color:var(--muted);}
+
+/* handover bottom sheet — full open, no expand btn */
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.32);z-index:150;display:flex;align-items:flex-end;}
+.sheet{background:#fff;border-radius:16px 16px 0 0;padding:12px 14px 20px;width:100%;max-height:72%;display:flex;flex-direction:column;}
+.s-handle{width:32px;height:2.5px;background:var(--hairline);border-radius:2px;margin:0 auto 10px;}
+.s-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+.s-sub{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:10px;}
+.s-scroll{overflow-y:auto;flex:1;}
+.s-row{display:flex;align-items:center;padding:8px 0;border-top:1px solid var(--hairline);}
+.s-dot{width:5px;height:5px;border-radius:50%;background:var(--ac);margin-right:8px;flex-shrink:0;}
+.s-name{flex:1;font-size:12px;font-weight:500;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.s-days{font-size:11px;font-weight:700;color:var(--ac);font-family:'IBM Plex Mono',monospace;margin-left:6px;}
+.s-gmv{font-size:11px;font-weight:700;color:var(--ink);margin-left:8px;}
+
+/* account view */
+.av-hd{padding:10px 14px 10px;display:flex;align-items:center;gap:7px;}
+.back{display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;}
+.back svg{width:15px;height:15px;color:var(--ac);}
+.back span{font-size:12px;font-weight:600;color:var(--ac);}
+.av-eye{font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ac);font-family:'IBM Plex Mono',monospace;}
+.av-name{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.025em;line-height:1.2;}
+.av-branch-row{display:flex;align-items:center;gap:4px;margin-top:3px;}
+.av-branch-pill{font-size:8.5px;font-weight:600;color:var(--body);background:var(--surface);border-radius:4px;padding:2px 6px;font-family:'IBM Plex Mono',monospace;}
+.tenure-sec{padding:10px 14px;}
+.t-eye{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:8px;}
+.t-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.t-track{flex:1;height:4px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.t-fill{height:100%;border-radius:2px;}
+.t-fill.late{background:var(--ac);}.t-fill.mid{background:var(--warn);}
+.t-pct{font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+.t-pct.late{color:var(--ac);}.t-pct.mid{color:var(--warn);}
+.t-dl{display:flex;justify-content:space-between;font-size:10px;}
+.t-held{color:var(--muted);}.t-exp{color:var(--ac);font-weight:700;}
+.band{height:6px;background:var(--surface);}
+.chart-sec{padding:10px 14px;}
+.c-eye{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:8px;}
+.bars{display:flex;align-items:flex-end;gap:6px;height:56px;margin-bottom:7px;}
+.bw{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.bv{font-size:8.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--ink);}
+.b{width:100%;border-radius:2.5px 2.5px 0 0;}
+.b.solid{background:var(--ac);opacity:.65;}
+.b.ghost{border:1.5px dashed rgba(255,56,92,.4);border-radius:2.5px;background:rgba(255,56,92,.04);}
+.bl{font-size:7.5px;font-family:'IBM Plex Mono',monospace;color:var(--muted);text-align:center;}
+.bw.now .bl{color:var(--ac);}
+.bw.now .bv{color:var(--ac);}
+.sku-list{padding:0 14px;}
+.sku-row{display:flex;align-items:center;padding:7px 0;border-top:1px solid var(--hairline);}
+.sku-name{flex:1;font-size:12px;font-weight:500;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sku-gmv{font-size:12px;font-weight:700;color:var(--ink);margin-left:7px;}
+.new-badge{font-size:8px;font-weight:700;color:var(--ok);background:rgba(52,199,89,.1);border-radius:999px;padding:1px 5px;margin-left:5px;font-family:'IBM Plex Mono',monospace;}
+.cat-row{display:flex;align-items:center;gap:7px;padding:6px 0;border-top:1px solid var(--hairline);}
+.cat-name{font-size:11px;font-weight:500;color:var(--ink);flex:1;}
+.cat-bar-wrap{width:60px;height:3px;background:var(--hairline);border-radius:2px;overflow:hidden;}
+.cat-fill{height:100%;border-radius:2px;background:var(--ac);opacity:.55;}
+.cat-pct{font-size:9px;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;width:22px;text-align:right;}
+</style>
+</head>
+<body>
+
+<!-- ── P1: Full list view + grouping ── -->
+<div class="pw">
+<div class="pl">1 · full list — account grouping + filter pills + refined icons</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="role-chip">Sales</span>
+  </div>
+  <div class="screen">
+    <div style="padding:12px 14px 5px;">
+      <div style="font-size:9px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:2px;">2026-06</div>
+      <div style="font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em;">พอร์ตของคุณ</div>
+    </div>
+    <div class="hero">
+      <div class="hero-eye">Runrate ในมือ</div>
+      <div class="hero-num">฿429K</div>
+      <div class="hero-sub"><span>57 ร้าน active</span><span class="badge bad">−฿171K vs target</span></div>
+      <div class="tbar"><div class="tbar-t"><div class="tbar-f" style="width:72%"></div></div><div class="tbar-meta"><span>72% target</span><span>฿600K</span></div></div>
+    </div>
+    <div class="proj">
+      <div class="pc now"><div class="pcm">มิ.ย.</div><div class="pcn">runrate+pipe</div><div class="pca">฿529K</div><div class="pcg bad">−฿71K</div></div>
+      <div class="pc"><div class="pcm">ก.ค.</div><div class="pcn">projected</div><div class="pca">฿361K</div><div class="pcg bad">−฿239K</div></div>
+      <div class="pc"><div class="pcm">ส.ค.</div><div class="pcn">projected</div><div class="pca">฿258K</div><div class="pcg bad">−฿342K</div></div>
+    </div>
+
+    <!-- Handover summary row -->
+    <div class="sec"><span class="sec-t ac"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg> Handover</span></div>
+    <div class="hov-row">
+      <div style="display:flex;align-items:center;"><div class="hov-dot"></div><div><div class="hov-label">13 ร้าน</div><div class="hov-meta">ภายใน 15 วัน</div></div></div>
+      <div style="text-align:right;"><div class="hov-gmv">฿182K</div><div class="hov-arrow">กดดูรายการ ›</div></div>
+    </div>
+
+    <!-- Action bar: filter pills + icon buttons -->
+    <div class="sec"><span class="sec-t">ร้านทั้งหมด</span><span class="sec-c">57 ร้าน</span></div>
+    <div class="action-bar">
+      <!-- filter pills — active state = "สั่งแล้ว" -->
+      <button class="fpill on">สั่งแล้ว</button>
+      <button class="fpill">ยังไม่สั่ง</button>
+      <button class="fpill">หยุดสั่ง</button>
+      <div class="icon-bar">
+        <!-- sort icon -->
+        <button class="sort-ib on">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>
+          <span>GMV</span>
+        </button>
+        <!-- view toggle: list -->
+        <button class="ib on">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <!-- view toggle: grid -->
+        <button class="ib">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Outlet list: account group header + branches -->
+    <div class="ol-list">
+      <!-- Account group: ร้านบ้านโกนมสด (3 สาขา) -->
+      <div class="ol-acct-hd">
+        <div class="ol-acct-dot"></div>
+        <span class="ol-acct-name">ร้านบ้านโกนมสด</span>
+        <span class="ol-acct-count">· 3 สาขา · ฿31K</span>
+        <span class="ol-acct-arrow">▾</span>
+      </div>
+      <!-- Branch 1 — indented -->
+      <div class="ol-branch">
+        <div class="ol-top">
+          <div class="ol-ind ok"></div>
+          <div class="ol-info">
+            <div class="ol-name">สาขาลาดพร้าว</div>
+            <div class="ol-meta">93 วัน · MC</div>
+          </div>
+          <div class="ol-right">
+            <div class="ol-gmv">฿14K</div>
+            <div class="ol-mtd">MTD ฿0</div>
+            <div class="ol-type ok">28d</div>
+          </div>
+        </div>
+        <div class="ol-bar-wrap"><div class="dt"><div class="df ok" style="width:69%"></div></div><div class="dm">หมด 15 มิ.ย.</div></div>
+      </div>
+      <!-- Branch 2 -->
+      <div class="ol-branch">
+        <div class="ol-top">
+          <div class="ol-ind ok"></div>
+          <div class="ol-info">
+            <div class="ol-name">สาขาอ่อนนุช</div>
+            <div class="ol-meta">80 วัน · MC</div>
+          </div>
+          <div class="ol-right">
+            <div class="ol-gmv">฿11K</div>
+            <div class="ol-mtd">MTD ฿3K</div>
+            <div class="ol-type ok">40d</div>
+          </div>
+        </div>
+        <div class="ol-bar-wrap"><div class="dt"><div class="df ok" style="width:55%"></div></div><div class="dm">หมด 25 มิ.ย.</div></div>
+      </div>
+      <!-- Branch 3 -->
+      <div class="ol-branch">
+        <div class="ol-top">
+          <div class="ol-ind mid"></div>
+          <div class="ol-info">
+            <div class="ol-name">สาขารังสิต</div>
+            <div class="ol-meta">85 วัน · MC</div>
+          </div>
+          <div class="ol-right">
+            <div class="ol-gmv">฿6K</div>
+            <div class="ol-mtd">MTD ฿0</div>
+            <div class="ol-type mid">18d</div>
+          </div>
+        </div>
+        <div class="ol-bar-wrap"><div class="dt"><div class="df mid" style="width:82%"></div></div><div class="dm">หมด 24 มิ.ย.</div></div>
+      </div>
+
+      <!-- Single outlet (ไม่มีสาขา) -->
+      <div class="ol-row">
+        <div class="ol-top">
+          <div class="ol-ind ok"></div>
+          <div class="ol-info">
+            <div class="ol-name">เต้งข้าวมันไก่</div>
+            <div class="ol-meta">62 วัน · SA</div>
+          </div>
+          <div class="ol-right">
+            <div class="ol-gmv">฿9K</div>
+            <div class="ol-mtd">MTD ฿3K</div>
+            <div class="ol-type ok">SA · 18d</div>
+          </div>
+        </div>
+        <div class="ol-bar-wrap"><div class="dt"><div class="df ok" style="width:60%"></div></div><div class="dm">หมด 24 มิ.ย.</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ── P2: Compact grid + grouping ── -->
+<div class="pw">
+<div class="pl">2 · compact grid — grouping + filter "ยังไม่สั่ง" active</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="role-chip">Sales</span>
+  </div>
+  <div class="screen">
+    <div style="padding:10px 14px 4px;font-size:22px;font-weight:700;color:var(--ink);">พอร์ตของคุณ</div>
+    <div class="hero" style="margin:6px 14px 0;">
+      <div class="hero-eye">Runrate ในมือ</div>
+      <div class="hero-num">฿429K</div>
+      <div class="hero-sub"><span>57 ร้าน</span><span class="badge bad">72% target</span></div>
+    </div>
+    <div class="sec"><span class="sec-t">ร้านทั้งหมด</span><span class="sec-c">57 ร้าน</span></div>
+    <div class="action-bar">
+      <button class="fpill">สั่งแล้ว</button>
+      <button class="fpill warn">ยังไม่สั่ง</button>
+      <button class="fpill">หยุดสั่ง</button>
+      <div class="icon-bar">
+        <button class="sort-ib">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>
+          <span>Expiry</span>
+        </button>
+        <button class="ib">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <button class="ib on">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid: filter = ยังไม่สั่ง -->
+    <!-- Account group header spans full width -->
+    <div class="ol-grid">
+      <div class="ol-acct-card">
+        <div><div class="oac-name">ร้านบ้านโกนมสด</div><div class="oac-meta">3 สาขา · ฿31K รวม</div></div>
+        <span class="oac-arrow">▾</span>
+      </div>
+      <!-- Branch cards under account -->
+      <div class="ol-card late">
+        <div class="oc-badge">MC</div>
+        <div class="oc-name">สาขาลาดพร้าว</div>
+        <div class="oc-gmv">฿14K</div>
+        <div class="oc-sub">หมด 15 มิ.ย. · 8d</div>
+      </div>
+      <div class="ol-card mid">
+        <div class="oc-badge">MC</div>
+        <div class="oc-name">สาขารังสิต</div>
+        <div class="oc-gmv">฿6K</div>
+        <div class="oc-sub">หมด 24 มิ.ย. · 18d</div>
+      </div>
+      <!-- Single outlet account -->
+      <div class="ol-acct-card">
+        <div><div class="oac-name">บ.เอส พากิสเซอรี่ จก.</div><div class="oac-meta">1 outlet</div></div>
+        <span class="oac-arrow">—</span>
+      </div>
+      <div class="ol-card late" style="grid-column:1/-1;">
+        <div class="oc-badge">Chain</div>
+        <div class="oc-name">บริษัท เอส พากิสเซอรี่ จำกัด (สำนักงานใหญ่)</div>
+        <div class="oc-gmv">฿8K</div>
+        <div class="oc-sub">หมด 15 มิ.ย. · 8d</div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ── P3: Handover sheet — full open, scroll ── -->
+<div class="pw">
+<div class="pl">3 · handover sheet — full open, user scrolls, no expand step</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="role-chip">Sales</span>
+  </div>
+  <div class="screen" style="opacity:.25;pointer-events:none;">
+    <div style="padding:12px 14px;font-size:22px;font-weight:700;color:var(--ink);">พอร์ตของคุณ</div>
+    <div class="hero"><div class="hero-num">฿429K</div></div>
+  </div>
+  <div class="sheet-bg">
+    <div class="sheet">
+      <div class="s-handle"></div>
+      <div class="s-title">Handover ภายใน 15 วัน</div>
+      <div class="s-sub">13 ร้าน · ฿182K/เดือน · scroll ดูเพิ่มเติม</div>
+      <div class="s-scroll">
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">ร้านบ้านโกนมสด (สาขาลาดพร้าว)</span><span class="s-days">8d</span><span class="s-gmv">฿14K</span></div>
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">บริษัท เอส พากิสเซอรี่ จำกัด</span><span class="s-days">8d</span><span class="s-gmv">฿8K</span></div>
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">เต้งข้าวมันไก่</span><span class="s-days">8d</span><span class="s-gmv">฿5K</span></div>
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">ร้านเดโย ข้าวมันไก่ สาขายานนาวา</span><span class="s-days">8d</span><span class="s-gmv">฿4K</span></div>
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">ซอราเบิล</span><span class="s-days">11d</span><span class="s-gmv">฿7K</span></div>
+        <div class="s-row"><div class="s-dot"></div><span class="s-name">ข้าวต้มอร่อย</span><span class="s-days">12d</span><span class="s-gmv">฿3K</span></div>
+        <div class="s-row" style="opacity:.5;"><div class="s-dot"></div><span class="s-name">ร้านชาบู ...</span><span class="s-days">14d</span><span class="s-gmv">฿2K</span></div>
+        <div style="text-align:center;padding:8px 0;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">↓ scroll ดู 6 ร้านที่เหลือ</div>
+      </div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ── P4: Account view ── -->
+<div class="pw">
+<div class="pl">4 · account view — GMV trend + SKU + category breakdown</div>
+<div class="phone">
+  <div class="island"></div>
+  <div class="sbar"><span>9:41</span><span>●●●</span></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;"><span class="tb-mark">freshket</span><span class="chip">Sense</span></div>
+    <span class="role-chip">Sales</span>
+  </div>
+  <div class="screen">
+    <div class="av-hd">
+      <button class="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg><span>พอร์ต</span></button>
+    </div>
+    <div style="padding:0 14px 10px;">
+      <div class="av-eye">MC</div>
+      <div class="av-name">ร้านบ้านโกนมสด</div>
+      <!-- Branch pills under name -->
+      <div class="av-branch-row">
+        <span class="av-branch-pill">สาขาลาดพร้าว ●</span>
+        <span class="av-branch-pill">สาขาอ่อนนุช</span>
+        <span class="av-branch-pill">สาขารังสิต</span>
+      </div>
+    </div>
+    <!-- Tenure -->
+    <div class="tenure-sec">
+      <div class="t-eye">ระยะเวลาในมือ</div>
+      <div class="t-row"><div class="t-track"><div class="t-fill late" style="width:92%"></div></div><span class="t-pct late">92%</span></div>
+      <div class="t-dl"><span class="t-held">ถือมา 93 วัน</span><span class="t-exp">หมด 15 มิ.ย. (8d)</span></div>
+    </div>
+    <div class="band"></div>
+    <!-- GMV trend -->
+    <div class="chart-sec">
+      <div class="c-eye">GMV ย้อนหลัง</div>
+      <div class="bars">
+        <div class="bw"><div class="bv">฿18K</div><div class="b solid" style="height:48px;"></div><div class="bl">เม.ย.</div></div>
+        <div class="bw"><div class="bv">฿14K</div><div class="b solid" style="height:36px;"></div><div class="bl">พ.ค.</div></div>
+        <div class="bw now"><div class="bv">฿0</div><div class="b ghost" style="height:36px;"></div><div class="bl">มิ.ย. MTD</div></div>
+      </div>
+      <div style="font-size:8px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">ghost bar = runrate ฿14K (วันที่ 5)</div>
+    </div>
+    <div class="band"></div>
+    <!-- SKU -->
+    <div class="sec"><span class="sec-t">SKU เดือนนี้</span><span class="sec-c">3 รายการ</span></div>
+    <div class="sku-list">
+      <div class="sku-row"><span class="sku-name">ข้าวหอมมะลิ 5 กก.</span><span class="sku-gmv">฿9K</span><span class="new-badge">ใหม่</span></div>
+      <div class="sku-row"><span class="sku-name">น้ำมันปาล์ม 5 ล.</span><span class="sku-gmv">฿4K</span></div>
+      <div class="sku-row"><span class="sku-name">หมูสามชั้น</span><span class="sku-gmv">฿1K</span></div>
+    </div>
+    <div class="band"></div>
+    <!-- Category -->
+    <div class="sec"><span class="sec-t">Category</span></div>
+    <div class="sku-list">
+      <div class="cat-row"><span class="cat-name">ข้าว/ธัญพืช</span><div class="cat-bar-wrap"><div class="cat-fill" style="width:64%;background:var(--ac);"></div></div><span class="cat-pct">64%</span></div>
+      <div class="cat-row"><span class="cat-name">น้ำมัน/ไขมัน</span><div class="cat-bar-wrap"><div class="cat-fill" style="width:29%;background:var(--warn);"></div></div><span class="cat-pct">29%</span></div>
+      <div class="cat-row"><span class="cat-name">เนื้อสัตว์</span><div class="cat-bar-wrap"><div class="cat-fill" style="width:7%;background:var(--muted);"></div></div><span class="cat-pct">7%</span></div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17h7M17 14v7"/></svg><span class="lb">พอร์ต</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="lb">Pipeline</span></div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span class="lb">Commission</span></div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>
