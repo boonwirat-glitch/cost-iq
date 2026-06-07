@@ -1,4 +1,4 @@
-<!-- Freshket Sense v407: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v408: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5242,7 +5242,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v407',
+      version: 'v408',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -38221,6 +38221,26 @@ const CI = (() => {
   //                 observable (สัญญาณที่ฟังออกได้จาก transcript)
   // B1 ตัดออก — เป็น pre-visit activity ไม่มีใน conversation
   //
+  // ── Echo code → skill_definitions.skill_code mapping ────────────────────
+  // ใช้ skill_code เพราะ id อาจ shift ถ้ามีการ seed ใหม่
+  // ตรงนี้คือ bridge ระหว่าง Echo internal codes กับ skill_definitions table
+  const ECHO_TO_SKILL_CODE = {
+    'APIPC': 'A01_PIPC',
+    'A5':    'A05_VALUE',
+    'A9':    'A09_PLANNING',
+    'A10':   'A10_PIPELINE',
+    'B2':    'B02_DM',
+    'B3':    'B03_APPT',
+    'B4':    'B04_PREVISIT',
+    'C0':    'C00_RAPPORT',
+    'C1':    'C01_DISCOVERY',
+    'C3':    'C03_ANALYZE',
+    'C4':    'C04_OBJECTION',
+    'C5':    'C05_CLOSE',
+    'D1':    'D01_WALLET',
+    'D2':    'D02_FOLLOWUP',
+  };
+
   const _SKILL_RUBRIC = [
     {
       code: 'APIPC',
@@ -38660,7 +38680,38 @@ ${text}`;
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
 
-    // 3. Update kam_visits latest snapshot (KAM only)
+    // 3. Write echo_skill_observations — bridge to Skills feature
+    //    Auto-send all skills (pass/developing/not_observed/not_applicable)
+    //    TL sees these as evidence in pending list — graceful fail if table not yet created
+    if (skillData?.skills?.length) {
+      try {
+        // Get current user_id from Supabase session
+        let _userId = null;
+        try {
+          const _sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+          if (_sk) { const _ss = JSON.parse(localStorage.getItem(_sk)); _userId = _ss?.user?.id || null; }
+        } catch(_) {}
+
+        if (_userId) {
+          const obsRows = skillData.skills.map(s => ({
+            session_id:    _sessionId || null,
+            user_id:       _userId,
+            skill_code:    ECHO_TO_SKILL_CODE[s.code] || s.code,
+            echo_code:     s.code,
+            ai_score:      s.score,
+            evidence:      s.evidence || s.evidence_summary || null,
+            coaching_note: s.coaching_note || null,
+            gap:           s.gap || null,
+            observed_at:   nowIso,
+          }));
+          const { error: obsErr } = await supa.from('echo_skill_observations').insert(obsRows);
+          if (obsErr) console.warn('[CI] echo_skill_observations insert (table may not exist yet):', obsErr.message);
+          else console.log('[CI] echo_skill_observations: saved', obsRows.length, 'rows');
+        }
+      } catch(e) { console.warn('[CI] echo_skill_observations unavailable:', e.message); }
+    }
+
+    // 4. Update kam_visits latest snapshot (KAM only)
     if (_accountGuid) {
       const { error: visitError } = await supa.from('kam_visits').upsert({
         kam_email: email, account_id: _accountGuid,
@@ -38671,7 +38722,7 @@ ${text}`;
       if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
     }
 
-    // 4. Write echo visit to localStorage (fast, for portview dot)
+    // 5. Write echo visit to localStorage (fast, for portview dot)
     if (_accountGuid) {
       try {
         const _echoKey = 'ciq_echo_visits';
