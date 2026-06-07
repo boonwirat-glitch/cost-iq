@@ -1030,11 +1030,11 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   margin-right: 8px;
   flex-shrink: 0;
 }
-.sv-hov-sum-label { font-size: 13px; font-weight: 600; color: #FF385C; }
+.sv-hov-sum-label { font-size: 16px; font-weight: 700; color: #FF385C; font-family: 'Noto Sans Thai', sans-serif; }
 .sv-hov-sum-meta { font-size: 9.5px; color: rgba(255,56,92,.55); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
 .sv-hov-sum-r { text-align: right; }
 .sv-hov-sum-gmv { font-size: 15px; font-weight: 700; color: #FF385C; }
-.sv-hov-sum-arrow { font-size: 9px; color: rgba(255,56,92,.45); margin-top: 2px; }
+.sv-hov-sum-arrow { font-size: 13px; color: rgba(255,56,92,.6); margin-top: 2px; font-family: 'Noto Sans Thai', sans-serif; }
 
 /* ══════════════════════════════════════════
    Handover bottom sheet
@@ -1137,10 +1137,11 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-cat-sec { }
 .sv-cat-list { padding: 0 16px; }
 .sv-cat-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 60px 56px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 0;
+  gap: 6px;
+  padding: 7px 0;
   border-top: 1px solid #EBEBEB;
 }
 .sv-cat-name { font-size: 13px; font-weight: 500; color: #222222; flex: 1; }
