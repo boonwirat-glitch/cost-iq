@@ -778,7 +778,7 @@ function __legacyRenderKamLastMonthFallback(){
       </div>
       <div class="kam-dc-insight" id="dc-insight-cost" style="display:none"></div>
       <div style="padding:0 14px 12px">
-        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:11px;font-weight:700;color:rgba(180,210,255,.85);background:rgba(38,96,200,.15);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--tk-font-body);display:inline-flex;align-items:center;gap:5px">
+        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:11px;font-weight:700;color:rgba(180,210,255,.85);background:var(--tk-accent-dim);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--tk-font-body);display:inline-flex;align-items:center;gap:5px">
           ดูทั้ง <span id="kam-opp-count-cta">—</span> รายการ →
         </button>
       </div>
