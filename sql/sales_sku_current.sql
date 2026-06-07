@@ -19,7 +19,7 @@ WITH sales_names AS (
 ),
 mtd_items AS (
   SELECT
-    o.account_id,
+    CAST(um.account_guid AS STRING)  AS account_id,
     o.order_id,
     o.delivery_date,
     i.item_id,
