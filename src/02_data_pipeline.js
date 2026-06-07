@@ -2044,8 +2044,9 @@ window.RenderBus = (function(){
          typeof renderTeamview === 'function') renderTeamview();
     }catch(e){}
     // Sales screens — render when sales-mode active
+    // Skip if user is inside account view (_salesInAccountView flag set by _salesOpenAccount)
     try{
-      if(document.body.classList.contains('sales-mode')){
+      if(document.body.classList.contains('sales-mode') && !window._salesInAccountView){
         var _salesScr=document.getElementById('scr-sales-portview');
         if(_salesScr&&_salesScr.classList.contains('on')&&typeof renderSalesPortview==='function'){
           renderSalesPortview();
