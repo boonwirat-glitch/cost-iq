@@ -114,13 +114,10 @@ async function _skFetch(path, opts = {}) {
     const txt = await res.text();
     throw new Error(`Skills API ${res.status}: ${txt}`);
   }
-  // handle 204 No Content และ 201 with empty body
-  if (res.status === 204 || res.status === 201) {
-    const txt = await res.text();
-    if (!txt || txt.trim() === '') return null;
-    try { return JSON.parse(txt); } catch(_) { return null; }
-  }
-  return res.json();
+  // handle empty body safely — ทุก status
+  const txt = await res.text();
+  if (!txt || txt.trim() === '') return null;
+  try { return JSON.parse(txt); } catch(_) { return null; }
 }
 
 // ── Initialise ─────────────────────────────────────────────
@@ -179,14 +176,29 @@ async function _loadSkillUsers() {
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   if (!isTL) return;
   try {
-    // ดึง unique user_ids จาก _skillProg แล้ว query profiles ครั้งเดียว
+    // Strategy 1: ดึงจาก portviewBulkData (มี kamEmail+kamName อยู่แล้ว ไม่ต้องผ่าน RLS)
+    const bulk = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+    if (bulk.length > 0) {
+      _skillUsers = {};
+      bulk.forEach(r => {
+        const email = (r.kamEmail || '').toLowerCase();
+        if (email && !_skillUsers[email]) {
+          _skillUsers[email] = { full_name: r.kamName || email, kam_name: r.kamName || email, email };
+        }
+      });
+      // _skillProg.user_id อาจเป็น UUID หรือ email — build index ทั้งคู่
+      return;
+    }
+    // Strategy 2: fallback query Supabase profiles (ถ้าไม่มี portviewBulkData)
     const uids = [...new Set(Object.values(_skillProg).map(p => p.user_id))];
     if (uids.length === 0) return;
-    // Supabase REST: ใช้ id=in.(uuid1,uuid2,...) แทน or= — รองรับ 1 หรือหลาย uids
     const inList = uids.join(',');
     const rows = await _skFetch(`profiles?select=id,full_name,kam_name,email&id=in.(${inList})`);
     _skillUsers = {};
-    (rows || []).forEach(r => { _skillUsers[r.id] = r; });
+    (rows || []).forEach(r => {
+      _skillUsers[r.id] = r;
+      if (r.email) _skillUsers[r.email.toLowerCase()] = r; // index by email too
+    });
   } catch(e) {
     console.error('[Skills] loadUsers:', e);
   }
@@ -194,8 +206,15 @@ async function _loadSkillUsers() {
 
 // helper — ชื่อแสดงผล: ใช้ kam_name > full_name > email prefix > UUID 8 chars
 function _skUserName(userId) {
-  const u = _skillUsers[userId];
-  if (!u) return userId ? userId.slice(0,8) : '?';
+  if (!userId) return '?';
+  // lookup by UUID ก่อน (Supabase strategy)
+  let u = _skillUsers[userId];
+  // ถ้าไม่เจอ — ลองหา profile ที่ match user_id จาก bulk data
+  if (!u && typeof portviewBulkData !== 'undefined') {
+    const match = portviewBulkData.find(r => r.kamEmail && r.kamEmail.toLowerCase() === userId.toLowerCase());
+    if (match) u = { kam_name: match.kamName, full_name: match.kamName, email: match.kamEmail };
+  }
+  if (!u) return userId.slice(0,8);
   return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
 }
 
