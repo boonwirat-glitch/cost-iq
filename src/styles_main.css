@@ -13,7 +13,7 @@
 
 /* ── SECTION 1: Main app CSS ── */
 :root {
-  --g500:var(--tk-ok-500);--g50:#e8faf2;--g70:#d0f5e8;--g700:#008060;--g800:var(--tk-bg-topbar);--g900:var(--tk-bg-topbar);
+  --g500:var(--tk-ok-500);--g50:var(--tk-ok-bg);--g70:var(--tk-ok-bg);--g700:var(--tk-ok-text);--g800:var(--tk-bg-topbar);--g900:var(--tk-bg-topbar);
   --amb:#f0b000;--amb50:#fff8e1;--org:#f05000;--red:#e53e3e;--red50:#fff5f5;
   --n0:#ffffff;--n50:#fafafa;--n100:#f0f0f0;--n200:#d0d0d0;--n300:#b0b0b0;
   --n400:#a0a0a0;--n600:#808080;--n700:#606060;--n900:#303030;
@@ -2622,7 +2622,7 @@ body.kam-sense-active .pct-badge-sm.med{
   background:rgba(240,176,0,.18);color:#f0b000;
 }
 /* ── Theme Light: reset all dark overrides ── */
-body.sdt-light.kam-sense-active{--n0:#ffffff;--n50:#fafafa;--n100:#f0f0f0;--n200:#d0d0d0;--n300:#b0b0b0;--n400:#a0a0a0;--n500:#808080;--n600:#808080;--n700:#606060;--n800:#404040;--n900:#303030;--bd:#e8e8e8;--sh:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);--shm:0 4px 20px rgba(0,0,0,.08);--g50:#e8faf2;--g70:#d0f5e8;--g800:var(--tk-bg-topbar)}
+body.sdt-light.kam-sense-active{--n0:#ffffff;--n50:#fafafa;--n100:#f0f0f0;--n200:#d0d0d0;--n300:#b0b0b0;--n400:#a0a0a0;--n500:#808080;--n600:#808080;--n700:#606060;--n800:#404040;--n900:#303030;--bd:#e8e8e8;--sh:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);--shm:0 4px 20px rgba(0,0,0,.08);--g50:var(--tk-ok-bg);--g70:#d0f5e8;--g800:var(--tk-bg-topbar)}
 body.sdt-light.kam-sense-active #swipe-grp-b{background:#fff}
 body.sdt-light.kam-sense-active{background:#f5f5f5}
 body.sdt-light.kam-sense-active .topbar{background:#ffffff!important;border-bottom:1px solid rgba(0,0,0,.08)}
