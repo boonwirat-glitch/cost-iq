@@ -4821,9 +4821,13 @@ body.sales-mode .bnav #nav-restaurant   { display: none !important; }
 body.sales-mode .bnav #nav-portview     { display: none !important; }
 body.sales-mode .bnav #nav-teamview     { display: none !important; }
 
-/* Sales nav grid: 3 cols (portview + pipeline + commission) */
-body.sales-mode .bnav { grid-template-columns: repeat(3,1fr); }
-body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(4,1fr); }
+/* Skills tab: sales + sales_tl only — hidden in KAM mode */
+.bnav .ni.sales-any-btn                    { display: none !important; }
+body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
+
+/* Sales nav grid: 3 cols (portview + pipeline + commission + skills) */
+body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
+body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
 body.sales-mode .bnav #nav-opportunities { display: none !important; }
 
