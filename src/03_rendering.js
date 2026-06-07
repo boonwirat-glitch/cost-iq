@@ -797,7 +797,7 @@ function renderPlanBuilder(opps){
         <div class="plan-tab-count">${isAll?fmt(allSave)+'/เดือน':opps.length+' รายการ'}</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
-        <div class="plan-tab-label"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="#4ddc97"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense หาสเปคใกล้เคียง</div>
+        <div class="plan-tab-label"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense หาสเปคใกล้เคียง</div>
         ${!verifyDone?`<div class="plan-tab-count" style="color:rgba(0,208,112,.7)">เทียบสเปค →</div>`:`<div class="plan-tab-count" style="color:rgba(77,220,151,.85)">${allHigh.length} รายการ ✓</div>`}
       </div>
     </div>
@@ -2825,7 +2825,7 @@ On cost-saving alternatives:
     if(claudeSection)claudeSection.style.pointerEvents=p==='gemini'?'none':'auto';
     if(badge){
       badge.textContent=p==='gemini'?'Gemini':'Claude';
-      badge.style.background=p==='gemini'?'rgba(124,58,237,.15)':'rgba(0,204,106,.12)';
+      badge.style.background=p==='gemini'?'rgba(124,58,237,.15)':'var(--tk-ok-dim)';
       badge.style.color=p==='gemini'?'#7c3aed':'var(--g700)';
       badge.style.borderColor=p==='gemini'?'rgba(124,58,237,.3)':'rgba(0,204,106,.25)';
     }
