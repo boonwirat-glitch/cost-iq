@@ -28770,12 +28770,42 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* Projection breakdown line */
 .sv-proj-breakdown {
-  font-size: 10px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  padding-top: 5px;
+}
+.sv-pb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2.5px 0;
+  border-top: 1px solid #F4F4F4;
+}
+.sv-pb-row:first-child { border-top: none; }
+.sv-pb-lbl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
   color: #6A6A6A;
   font-family: 'Noto Sans Thai', sans-serif;
-  margin-top: 4px;
-  line-height: 1.5;
 }
+.sv-pb-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sv-pb-dot.run  { background: #AEAEB2; }
+.sv-pb-dot.pipe { background: #34C759; }
+.sv-pb-dot.hov  { background: #FF385C; }
+.sv-pb-val {
+  font-size: 9px;
+  font-weight: 700;
+  color: #3F3F3F;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.sv-pb-val.pipe { color: #34C759; }
+.sv-pb-val.hov  { color: #FF385C; }
 
 /* Category — empty/not-purchased */
 .sv-cat-empty {
@@ -39988,16 +40018,16 @@ function renderSalesHome(el, outlets, pipeline) {
     const gapLabel = p.target > 0 ? (gap >= 0 ? `+${_sv_fmt(gap)}` : `−${_sv_fmt(Math.abs(gap))}`) : '';
     const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
     // Build breakdown string: runrate · pipeline · -handover
-    const bLines = [];
-    if (p.runratePart > 0) bLines.push('฿'+_sv_fmt(p.runratePart)+' runrate');
-    if (p.pipelinePart > 0) bLines.push('+฿'+_sv_fmt(p.pipelinePart)+' pipeline');
-    if (p.handoverPart > 0) bLines.push('−฿'+_sv_fmt(p.handoverPart)+' handover');
-    p.breakdown = bLines.join('<br>');
+    // Revolut-style breakdown rows: dot + label left, value right
+    const bRows = [];
+    if (p.runratePart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot run"></span>runrate</span><span class="sv-pb-val">฿'+_sv_fmt(p.runratePart)+'</span></div>');
+    if (p.pipelinePart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot pipe"></span>pipeline</span><span class="sv-pb-val pipe">+฿'+_sv_fmt(p.pipelinePart)+'</span></div>');
+    if (p.handoverPart > 0) bRows.push('<div class="sv-pb-row"><span class="sv-pb-lbl"><span class="sv-pb-dot hov"></span>handover</span><span class="sv-pb-val hov">−฿'+_sv_fmt(p.handoverPart)+'</span></div>');
+    p.breakdown = bRows.join('');
     return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
       <div class="sv-proj-mon">${p.label}</div>
-      ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
       <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
-      ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
+      ${p.breakdown ? `<div class="sv-proj-breakdown">${p.breakdown}</div>` : ''}
     </div>`;
   }).join('');
 
