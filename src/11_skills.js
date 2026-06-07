@@ -54,7 +54,7 @@ function _skImgTag(def, opts = {}) {
   const bg = MODULE_BG[def ? def.module : 'A'];
   const code = def ? def.skill_code.split('_')[0] : '';
   return `<div class="${cls}" style="width:${w};height:${h};background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-    <span style="font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;opacity:.3;">${code}</span>
+    <span style="font-size:10px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;opacity:.3;">${code}</span>
   </div>`;
 }
 
@@ -626,7 +626,7 @@ function _renderTLOverview() {
 <div class="sk-rep-row" onclick="skillsTLOpenRepDetail('${uid}')">
   <div class="sk-rep-avatar">${initials}</div>
   <div class="sk-rep-info">
-    <div class="sk-rep-name">${pendDot}${uid}</div>
+    <div class="sk-rep-name">${pendDot}${_skUserName(uid)}</div>
     <div class="sk-rep-prog-row">
       <div class="sk-rep-track"><div class="sk-rep-fill ${fillCls}" style="width:${pct2}%;"></div></div>
       <span class="sk-rep-count">${uCount}/${uTotal}</span>
@@ -729,11 +729,21 @@ async function skillsTLOpenEval(userId, skillId) {
 </div>`).join('');
 
   const modCode = def.skill_code.split('_')[0];
-  const stateButtons = ['locked','training','unlocked','mastered'].map(s => `
-<button class="sk-tl-btn${s===state?' sk-tl-btn-sel-'+s:''}" onclick="_skTLSelectState('${s}')">
-  <div class="sk-tl-btn-dot" style="background:var(--sk-state-${s});"></div>
+  const SK_BTN_ICONS = {
+    locked:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="currentColor" d="M12 2c0 0-4 4-4 9a4 4 0 008 0c0-5-4-9-4-9z"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/><polyline points="9 12 11 14 15 10"/></svg>',
+    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>',
+  };
+  const stateButtons = ['locked','training','unlocked','mastered'].map(s => {
+    const isSelected = s === state;
+    const dimCls = !isSelected ? ' sk-tl-btn-dim' : '';
+    const selCls = isSelected ? ` sk-tl-btn-sel-${s}` : '';
+    return `<button class="sk-tl-btn${selCls}${dimCls}" onclick="_skTLSelectState('${s}')" style="color:var(--sk-state-${s});">
+  <div class="sk-tl-btn-icon">${SK_BTN_ICONS[s]}</div>
   <span class="sk-tl-btn-label">${SKILL_STATE_LABEL_TH[s]}</span>
-</button>`).join('');
+</button>`;
+  }).join('');
 
   scr.innerHTML = `
 <div class="sk-cg-topbar">
@@ -782,17 +792,22 @@ function _skTLSelectState(newState) {
   const row = document.getElementById('tl-state-row');
   if (!row) return;
   row.dataset.selected = newState;
-  row.querySelectorAll('.sk-tl-btn').forEach(btn => {
-    const s = btn.querySelector('.sk-tl-btn-dot').style.background; // not ideal
-    btn.className = 'sk-tl-btn';
-  });
   // Re-render buttons with new selected
-  const cur = SKILL_STATES;
-  row.innerHTML = cur.map(s => `
-<button class="sk-tl-btn${s===newState?' sk-tl-btn-sel-'+s:''}" onclick="_skTLSelectState('${s}')">
-  <div class="sk-tl-btn-dot" style="background:var(--sk-state-${s});"></div>
+  const _btnIcons = {
+    locked:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="currentColor" d="M12 2c0 0-4 4-4 9a4 4 0 008 0c0-5-4-9-4-9z"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/><polyline points="9 12 11 14 15 10"/></svg>',
+    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>',
+  };
+  row.innerHTML = SKILL_STATES.map(s => {
+    const isSelected = s === newState;
+    const dimCls = !isSelected ? ' sk-tl-btn-dim' : '';
+    const selCls = isSelected ? ` sk-tl-btn-sel-${s}` : '';
+    return `<button class="sk-tl-btn${selCls}${dimCls}" onclick="_skTLSelectState('${s}')" style="color:var(--sk-state-${s});">
+  <div class="sk-tl-btn-icon">${_btnIcons[s]}</div>
   <span class="sk-tl-btn-label">${SKILL_STATE_LABEL_TH[s]}</span>
-</button>`).join('');
+</button>`;
+  }).join('');
 }
 
 async function skillsTLSave(userId, skillId) {
@@ -903,7 +918,7 @@ function skillsTLOpenRepDetail(userId) {
   <div class="sk-rep-det-hd">
     <div class="sk-rep-det-avatar">${_skUserInitials(userId)}</div>
     <div>
-      <div class="sk-rep-det-name">${userId}</div>
+      <div class="sk-rep-det-name">${_skUserName(userId)}</div>
       <div class="sk-rep-det-meta">Sales · ${uCount}/${uTotal} unlocked</div>
     </div>
     <div style="position:relative;width:36px;height:36px;margin-left:auto;">
@@ -912,7 +927,7 @@ function skillsTLOpenRepDetail(userId) {
         ${ringPct>0?`<circle cx="18" cy="18" r="15" fill="none" stroke="var(--sk-ac)" stroke-width="2.5"
           stroke-dasharray="94.25" stroke-dashoffset="${ringOff.toFixed(2)}" stroke-linecap="round"/>`:''}
       </svg>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);font-family:'IBM Plex Mono',monospace;">${uCount}/${uTotal}</div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
     </div>
   </div>
   <div class="sk-filter-row">
@@ -982,3 +997,4 @@ window._skSetOvToggle          = _skSetOvToggle;
 window._skTLSelectState        = _skTLSelectState;
 window._skRepFilter            = _skRepFilter;
 window._renderSkillsScreen     = _renderSkillsScreen;
+
