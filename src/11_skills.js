@@ -318,7 +318,7 @@ function _renderRepHome() {
     <div class="sk-eyebrow">Module ${m}</div>
     <div class="sk-mod-name">${meta.name}</div>
     <div class="sk-mod-sub">${meta.sub} · ${defs.length} skills</div>
-    ${(()=>{ const obs=defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0]; if(!obs) return ''; const col=_echoScoreColor(obs.ai_score); const lbl=_echoScoreLabel(obs.ai_score); const dt=new Date(obs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">🎙 '+lbl+'</span></div>'; })()}
+    ${(()=>{ const obs=defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0]; if(!obs) return ''; const col=_echoScoreColor(obs.ai_score); const lbl=_echoScoreLabel(obs.ai_score); const dt=new Date(obs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">'+lbl+'</span></div>'; })()}
   </div>
   <div class="sk-mod-right">
     <div class="sk-ring">
@@ -478,7 +478,7 @@ async function skillsOpenDetail(skillId) {
     <span class="sk-echo-row-score" style="color:${col};">${lbl}</span>
   </div>
   ${ev ? `<div class="sk-echo-row-ev">${ev}</div>` : ''}
-  ${note ? `<div class="sk-echo-row-note">💬 ${note}</div>` : ''}
+  ${note ? `<div class="sk-echo-row-note"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> ${note}</div>` : ''}
 </div>`;
   }).join('');
   const echoSection = _echoHistory.length > 0 ? `
