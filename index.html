@@ -1,4 +1,4 @@
-<!-- Freshket Sense v415: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v416: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2303,7 +2303,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
-body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px));margin-top:-40px} /* v200: was 148px — caused visible empty space at scroll-end */
+body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px));padding-top:var(--sense-topbar-h)} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
@@ -5414,7 +5414,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v415',
+      version: 'v416',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
