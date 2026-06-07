@@ -1301,3 +1301,61 @@
   z-index: 3;
 }
 
+/* ── Echo observation strip (module row + detail) ── */
+.sk-echo-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.sk-echo-strip svg { color: var(--sk-ac); flex-shrink: 0; }
+.sk-echo-date {
+  font-size: 9px;
+  color: var(--sk-muted);
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.sk-echo-score {
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+
+/* Echo session rows in skill detail */
+.sk-echo-list { display: flex; flex-direction: column; gap: 0; }
+.sk-echo-row {
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--sk-hairline);
+}
+.sk-echo-row:last-child { border-bottom: none; }
+.sk-echo-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.sk-echo-row-top svg { color: var(--sk-ac); flex-shrink: 0; }
+.sk-echo-row-date {
+  font-size: 10px;
+  color: var(--sk-muted);
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.sk-echo-row-score {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.sk-echo-row-ev {
+  font-size: 11px;
+  color: var(--sk-body);
+  line-height: 1.5;
+  font-family: 'Noto Sans Thai', sans-serif;
+  margin-bottom: 3px;
+}
+.sk-echo-row-note {
+  font-size: 10px;
+  color: var(--sk-ac);
+  font-style: italic;
+  line-height: 1.4;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+
