@@ -27762,8 +27762,9 @@ body.sales-mode [class*="sv-"] * {
 }
 .sv-proj-cell {
   flex: 1;
-  padding: 12px 0 12px 14px;
+  padding: 12px 10px 12px 14px;
   position: relative;
+  min-width: 0;
 }
 .sv-proj-cell + .sv-proj-cell::before {
   content: '';
@@ -28752,17 +28753,16 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-cat-sec { }
 .sv-cat-list { padding: 0 16px; }
 .sv-cat-row {
-  display: grid;
-  grid-template-columns: 1fr 60px 56px;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 7px 0;
   border-top: 1px solid #EBEBEB;
 }
-.sv-cat-name { font-size: 13px; font-weight: 500; color: #222222; flex: 1; }
-.sv-cat-bar-wrap { width: 56px; height: 3px; background: #EBEBEB; border-radius: 1.5px; overflow: hidden; }
+.sv-cat-name { flex: 1; font-size: 13px; font-weight: 500; color: #222222; min-width: 0; }
+.sv-cat-bar-wrap { width: 56px; flex-shrink: 0; height: 3px; background: #EBEBEB; border-radius: 1.5px; overflow: hidden; }
 .sv-cat-fill { height: 100%; border-radius: 1.5px; opacity: .65; }
-.sv-cat-pct { font-size: 11px; font-weight: 700; color: #6A6A6A; font-family: 'IBM Plex Mono', monospace; width: 32px; text-align: right; }
+.sv-cat-pct { font-size: 14px; font-weight: 700; color: #222222; font-family: 'IBM Plex Mono', monospace; width: 52px; text-align: right; flex-shrink: 0; }
 
 .sv-ol-row { cursor: pointer; }
 
@@ -28782,6 +28782,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   justify-content: space-between;
   padding: 2.5px 0;
   border-top: 1px solid #F4F4F4;
+  gap: 4px;
 }
 .sv-pb-row:first-child { border-top: none; }
 .sv-pb-lbl {
