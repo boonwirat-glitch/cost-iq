@@ -158,7 +158,7 @@ async function _loadSkillProgress() {
   try {
     const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
     const query = isTL
-      ? `${SKILLS_TABLE_PROG}?select=*`
+      ? `${SKILLS_TABLE_PROG}?select=*`                              // TL sees all (RLS handles team filter)
       : `${SKILLS_TABLE_PROG}?select=*&user_id=eq.${_skillsUserId}`;
     const rows = await _skFetch(query);
     _skillProg = {};
@@ -177,11 +177,8 @@ async function _loadSkillUsers() {
   if (!isTL) return;
   _skillUsers = {};
   try {
-    // ดึง unique UUIDs จาก _skillProg
     const uids = [...new Set(Object.values(_skillProg).map(p => p.user_id).filter(Boolean))];
     if (uids.length === 0) return;
-
-    // Query profiles by UUID list — RLS block จะ return [] ไม่ crash
     const rows = await _skFetch(`profiles?select=id,email,full_name,kam_name&id=in.(${uids.join(',')})`);
     (rows || []).forEach(r => {
       if (!r.id) return;
@@ -191,30 +188,205 @@ async function _loadSkillUsers() {
         email:     r.email || '',
       };
     });
-
-    // Enrich จาก portviewBulkData สำหรับ UUID ที่ RLS block
     const bulk = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
     if (bulk.length > 0) {
       const emailToName = {};
-      bulk.forEach(r => {
-        if (r.kamEmail && r.kamName) emailToName[r.kamEmail.toLowerCase()] = r.kamName;
-      });
-      // สำหรับ UUID ที่ยังไม่มีชื่อ ลอง match จาก email ที่รู้
+      bulk.forEach(r => { if (r.kamEmail && r.kamName) emailToName[r.kamEmail.toLowerCase()] = r.kamName; });
       uids.forEach(uid => {
-        if (_skillUsers[uid] && _skillUsers[uid].kam_name) return; // มีแล้ว
-        // ไม่รู้ email ของ UUID นี้ — ใช้ชื่อที่ดีที่สุดที่มี
-        if (_skillUsers[uid]) {
-          const em = (_skillUsers[uid].email || '').toLowerCase();
-          if (em && emailToName[em]) _skillUsers[uid].kam_name = emailToName[em];
-        }
+        const u = _skillUsers[uid];
+        if (u && u.email && !u.kam_name) u.kam_name = emailToName[u.email.toLowerCase()] || u.full_name;
       });
     }
-  } catch(e) {
-    console.error('[Skills] loadUsers:', e);
-  }
+  } catch(e) { console.error('[Skills] loadUsers:', e); }
 }
 
 
+function _skUserName(userId) {
+  if (!userId) return '?';
+  // lookup by UUID ก่อน (Supabase strategy)
+  let u = _skillUsers[userId];
+  // ถ้าไม่เจอ — ลองหา profile ที่ match user_id จาก bulk data
+  if (!u && typeof portviewBulkData !== 'undefined') {
+    const match = portviewBulkData.find(r => r.kamEmail && r.kamEmail.toLowerCase() === userId.toLowerCase());
+    if (match) u = { kam_name: match.kamName, full_name: match.kamName, email: match.kamEmail };
+  }
+  if (!u) return userId.slice(0,8);
+  return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
+}
+
+function _skUserInitials(userId) {
+  const name = _skUserName(userId);
+  return name.slice(0,2).toUpperCase();
+}
+
+// ── Nav badge (TL: pending count) ─────────────────────────
+function _updateSkillsNavBadge() {
+  const badge = document.getElementById('skills-nav-badge');
+  if (!badge) return;
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  if (!isTL) { badge.style.display = 'none'; return; }
+  const pending = Object.values(_skillProg).filter(p => p.state === 'training').length;
+  badge.style.display = pending > 0 ? 'block' : 'none';
+}
+
+// ── Main render dispatcher ─────────────────────────────────
+function _renderSkillsScreen() {
+  const scr = document.getElementById('scr-skills');
+  if (!scr) return;
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
+}
+
+// ══════════════════════════════════════════════════════════
+// REP SCREENS
+// ══════════════════════════════════════════════════════════
+
+function _renderRepHome() {
+  // Count unlocked+mastered
+  const unlocked = Object.values(_skillProg).filter(p => p.state === 'unlocked' || p.state === 'mastered').length;
+  const total    = _skillDefs.length;
+
+  // Find next skill in training
+  const trainingSkill = _skillDefs.find(d => {
+    const p = _skillProg[String(d.id)];
+    return p && p.state === 'training';
+  });
+  const nextLabel = trainingSkill ? `${trainingSkill.skill_code.split('_')[0]} · ${trainingSkill.skill_name_en}` : '—';
+  const pct = total > 0 ? Math.round(unlocked / total * 100) : 0;
+
+  // Group by module
+  const modules = ['A','B','C','D'];
+  const moduleRows = modules.map(m => {
+    const defs = _skillDefs.filter(d => d.module === m);
+    const uCount = defs.filter(d => {
+      const p = _skillProg[String(d.id)];
+      return p && (p.state === 'unlocked' || p.state === 'mastered');
+    }).length;
+    const tCount = defs.filter(d => {
+      const p = _skillProg[String(d.id)];
+      return p && p.state === 'training';
+    }).length;
+    const meta = MODULE_META[m];
+    const ringPct = defs.length > 0 ? uCount / defs.length : 0;
+    const ringOffset = 94.25 * (1 - ringPct);
+    const ringColor = uCount === defs.length ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : '#EBEBEB';
+    const dimClass = uCount === 0 && tCount === 0 ? ' sk-mod-dim' : '';
+    return `
+<div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}')">
+  ${_skModThumb(m)}
+  <div class="sk-mod-info">
+    <div class="sk-eyebrow">Module ${m}</div>
+    <div class="sk-mod-name">${meta.name}</div>
+    <div class="sk-mod-sub">${meta.sub} · ${defs.length} skills</div>
+  </div>
+  <div class="sk-mod-right">
+    <div class="sk-ring">
+      <svg viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+        ${ringPct > 0 ? `<circle cx="18" cy="18" r="15" fill="none" stroke="${ringColor}" stroke-width="2.5"
+          stroke-dasharray="94.25" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round"/>` : ''}
+      </svg>
+      <div class="sk-ring-label">${uCount}/${defs.length}</div>
+    </div>
+    <svg class="sk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  </div>
+</div>`;
+  }).join('');
+
+  return `
+<div class="sk-hero">
+  <div class="sk-eyebrow sk-eyebrow-ac" style="margin-bottom:5px;">SKILLS MASTERY</div>
+  <div class="sk-hero-top">
+    <div>
+      <div style="display:flex;align-items:flex-end;gap:3px;">
+        <span class="sk-big">${unlocked}</span><span class="sk-denom">/${total}</span>
+      </div>
+      <div class="sk-label">ทักษะที่ปลดล็อคแล้ว</div>
+    </div>
+    <div class="sk-next-block">
+      <div class="sk-next-eye">NEXT UP</div>
+      <div class="sk-next-name">${nextLabel}</div>
+      ${trainingSkill ? '<div class="sk-next-state">TRAINING</div>' : ''}
+    </div>
+  </div>
+  <div class="sk-track"><div class="sk-fill" style="width:${pct}%;"></div></div>
+  <div class="sk-meta"><span>${unlocked} UNLOCKED</span><span>${total - unlocked} REMAINING</span></div>
+</div>
+<div class="sk-sec"><span class="sk-eyebrow">Modules</span></div>
+<div class="sk-mod-list">${moduleRows}</div>
+<div style="padding:16px 14px;text-align:center;">
+  <span class="sk-eyebrow">TL ประเมินและ unlock ทักษะให้คุณ</span>
+</div>`;
+}
+
+function skillsOpenModule(module) {
+  const scr = document.getElementById('scr-skills');
+  if (!scr) return;
+  scr.innerHTML = _renderModuleGrid(module);
+}
+
+function _renderModuleGrid(module) {
+  const meta = MODULE_META[module];
+  const defs = _skillDefs.filter(d => d.module === module);
+
+  const cards = defs.map(d => {
+    const p     = _skillProg[String(d.id)];
+    const state = p ? p.state : 'locked';
+    const label = SKILL_STATE_LABEL_TH[state];
+    const isWide = state === 'mastered';
+    const lockIco = state === 'locked'
+      ? `<div class="sk-lock-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>` : '';
+    const starIco = state === 'mastered'
+      ? `<svg class="sk-master-star" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>` : '';
+
+    if (isWide) {
+      return `
+<div class="sk-card-wide state-${state}" onclick="skillsOpenDetail(${d.id})">
+  ${_skImgTag(d, { w:'90px', h:'90px', cls:'sk-card-img' })}
+  ${starIco}
+  <div class="sk-card-body">
+    <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
+    <div class="sk-card-name">${d.skill_name_en}</div>
+    <div class="sk-card-code">${d.skill_code.split('_')[0]} · สูงสุด</div>
+  </div>
+</div>`;
+    }
+    return `
+<div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
+  ${_skImgTag(d, { h:'106px' })}
+  ${lockIco}
+  <div class="sk-card-body">
+    <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
+    <div class="sk-card-name">${d.skill_name_en}</div>
+    <div class="sk-card-code">${d.skill_code.split('_')[0]}</div>
+  </div>
+</div>`;
+  }).join('');
+
+  return `
+<div class="sk-cg-topbar">
+  <button class="sk-back-btn" onclick="_renderSkillsScreen()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+    <span>ทักษะ</span>
+  </button>
+  <div style="text-align:right;">
+    <div class="sk-eyebrow">Module ${module}</div>
+    <div class="sk-cg-mod-name">${meta.name}</div>
+  </div>
+</div>
+<div style="overflow-y:auto;flex:1;padding-bottom:84px;">
+  <div class="sk-char-banner">
+    ${_skModThumb(module)}
+    <div class="sk-char-content">
+      <div class="sk-char-name">${meta.name}</div>
+      <div style="font-size:10px;color:var(--sk-muted);font-family:'Noto Sans Thai',sans-serif;margin-top:5px;line-height:1.45;">${meta.sub}</div>
+    </div>
+  </div>
+  <div class="sk-grid">${cards}</div>
+</div>`;
+}
+
+// ── Skill Detail Sheet ─────────────────────────────────────
 async function skillsOpenDetail(skillId) {
   _activeSkillId = skillId;
   const scr = document.getElementById('scr-skills');
