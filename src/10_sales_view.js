@@ -177,7 +177,8 @@ function getSalesProjection(outlets, pipeline, target) {
 function _sv_fmt(n) {
   if (!n || isNaN(n)) return '0';
   if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+  if (n >= 10000) return Math.round(n/1000) + 'K';
+  if (n >= 500) return (n/1000).toFixed(1) + 'K';
   return Math.round(n).toLocaleString();
 }
 
@@ -526,6 +527,8 @@ window._salesOpenHandoverSheet = function() {
     return d !== null && d <= 15;
   }).sort((a,b) => (a.newUserExpDate||'').localeCompare(b.newUserExpDate||''));
 
+  // Sort by runrate DESC
+  urgent.sort((a,b) => (b.runrate||0)-(a.runrate||0));
   const rows = urgent.map(o => {
     const d = _daysUntilExp(o.newUserExpDate);
     const expLabel = o.newUserExpDate ?
@@ -534,7 +537,7 @@ window._salesOpenHandoverSheet = function() {
       '<div class="sv-sheet-dot"></div>' +
       '<span class="sv-sheet-name">' + (o.name||o.id) + '</span>' +
       '<span class="sv-sheet-days">' + (d<=0?'หมด':d+'d') + '</span>' +
-      '<span class="sv-sheet-gmv">฿' + _sv_fmt(o.runrate||0) + '</span>' +
+      '<span class="sv-sheet-gmv">Runrate ฿' + _sv_fmt(o.runrate||0) + '</span>' +
     '</div>';
   }).join('');
 
@@ -617,8 +620,9 @@ window._salesOpenAccount = function(accountId, accountName) {
       sorted3.map((h,i) => {
         const ht = Math.round((h.s||0)/maxGmv*56);
         const isCurrent = i === sorted3.length-1;
+        const showLabel = ht >= 10; // hide amount label if bar too short to avoid overlap
         return '<div class="sv-bw' + (isCurrent?' now':'') + '">' +
-          '<div class="sv-bv">฿' + _sv_fmt(h.s||0) + '</div>' +
+          '<div class="sv-bv">' + (showLabel ? '฿'+_sv_fmt(h.s||0) : '') + '</div>' +
           '<div class="sv-b solid" style="height:' + Math.max(2,ht) + 'px"></div>' +
           '<div class="sv-bl">' + (h.m||'') + '</div>' +
         '</div>';
@@ -628,18 +632,35 @@ window._salesOpenAccount = function(accountId, accountName) {
         const ghostHt = Math.round((acct.runrate||0)/maxGmv*56);
         const mtdHt = Math.round((acct.gmvToDate||0)/maxGmv*56);
         return '<div class="sv-bw now">' +
-          '<div class="sv-bv" style="color:#FF385C">฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bv" style="color:#FF385C">฿' + _sv_fmt(acct.runrate||0) + '</div>' +
           '<div class="sv-b-ghost-wrap" style="height:' + Math.max(2,ghostHt) + 'px">' +
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:#FF385C">MTD</div>' +
+          '<div class="sv-bl" style="color:#FF385C">Runrate</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:8px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
         '</div>';
       })() : '') +
       '</div>' +
       // runrate shown as label on ghost bar, no separate note line +
       '</div>'
-    ) : '';
+    ) : (acct.gmvToDate > 0 ? (
+      // No history but has MTD: show MTD bar + runrate ghost
+      '<div class="sv-chart-sec">' +
+      '<div class="sv-c-eye">GMV เดือนนี้</div>' +
+      '<div class="sv-bars">' +
+        '<div class="sv-bw now">' +
+          '<div class="sv-bv" style="color:#FF385C">฿' + _sv_fmt(acct.runrate||0) + '</div>' +
+          '<div class="sv-b-ghost-wrap" style="height:42px">' +
+            '<div class="sv-b ghost"></div>' +
+            '<div class="sv-b-mtd-fill" style="height:' + Math.min(100,Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100)) + '%"></div>' +
+          '</div>' +
+          '<div class="sv-bl" style="color:#FF385C">Runrate</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:8px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '</div>'
+    ) : '');
 
     // SKU current
     const skus = _findData(_skuData);
@@ -648,7 +669,7 @@ window._salesOpenAccount = function(accountId, accountName) {
     const skusSorted = skus.slice().sort((a,b) => (b.gmv_to_date||0)-(a.gmv_to_date||0)).slice(0,6);
     const skuHtml = skusSorted.length ? (
       '<div class="sv-sku-sec">' +
-      '<div class="sv-sec"><span class="sv-sec-t">SKU เดือนนี้</span><span class="sv-sec-c">' + skusSorted.length + ' รายการ</span></div>' +
+      '<div class="sv-sec"><span class="sv-sec-t">SKU ที่สั่งเดือนนี้</span><span class="sv-sec-c">top ' + skusSorted.length + '</span></div>' +
       '<div class="sv-sku-list">' +
       skusSorted.map(s => {
         const isNew = !!s.is_new || false;
@@ -775,12 +796,14 @@ function _renderPipelineList(el, leads) {
   const _period = _salesCurrentPeriod();
   const tgt = getSalesTarget(_period, _email) || 0;
   // No target = no gap display (don't show misleading -1.6M)
-  const pipM = {}; pipM[m0]=0; pipM[m1]=0; pipM[m2]=0;
-  leads.forEach(l => {
-    const ym = (l.expected_start_date||'').substring(0,7);
-    const k = ym < m0 ? m0 : ym;
-    if(pipM[k]!==undefined) pipM[k] += parseFloat(l.expected_gmv)||0;
-  });
+  // Use _pipelineByMonth so Chain 90d spreads correctly across 3 months
+  // (old code dumped full GMV into start month only — wrong for multi-month tenure)
+  const pipM = _pipelineByMonth(leads);
+  // Clamp past months into M0
+  [m0,m1,m2].forEach(k => { if(!pipM[k]) pipM[k]=0; });
+  const pastKeys = Object.keys(pipM).filter(k => k < m0);
+  pastKeys.forEach(k => { pipM[m0] = (pipM[m0]||0) + pipM[k]; delete pipM[k]; });
+
   const gaps = [m0,m1,m2].map(function(ym) {
     const v = pipM[ym]||0;
     return {mon:_salesMonthLabel(ym),fill:Math.min(100,Math.round(v/tgt*100)),val:v-tgt,cls:v>=tgt?'ok':v/tgt>0.8?'warn':'bad'};
@@ -827,8 +850,18 @@ function _renderPipelineList(el, leads) {
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
           '</button>';
         var lType = (l.account_type||'SA').toUpperCase();
-        var tenureDays = lType==='SA' ? 45 : 90;
-        var typePill = '<span class="sv-lead-type-pill">' + lType + ' · ' + tenureDays + 'd</span>';
+        var spreadMonths = (lType==='MC'||lType==='CHAIN') ? 3 : 1;
+        var startYM = (l.expected_start_date||'').substring(0,7);
+        var endLabel = '';
+        if(startYM && spreadMonths > 1) {
+          var _sp = startYM.split('-').map(Number);
+          var _ed = new Date(_sp[0], _sp[1]-1+spreadMonths-1, 1);
+          var _moTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+          var _stMo = _moTH[_sp[1]-1];
+          var _edMo = _moTH[_ed.getMonth()];
+          endLabel = ' · ' + _stMo + '–' + _edMo;
+        }
+        var typePill = '<span class="sv-lead-type-pill">' + lType + endLabel + '</span>';
         html += '<div class="sv-lead-row">' +
           '<div class="sv-lead-info"><div class="sv-lead-name">' + (l.shop_name||'\u2014') + typePill + '</div><div class="sv-lead-date">\u0e40\u0e23\u0e34\u0e48\u0e21 ' + dateLabel + '</div></div>' +
           '<div class="sv-lead-gmv">\u0e3f' + _sv_fmt(l.expected_gmv) + '</div>' +
