@@ -538,9 +538,21 @@ function setAiProvider(p){
   function getSpecs(){ try{ if(typeof R2_SPECS !== 'undefined') return R2_SPECS; }catch(e){} return baseData.r2Specs || {}; }
   function getFiles(){
     try{
-      // MUST read window.R2_FILES (global), NOT local R2_FILES (frozen closure copy).
-      // _patchR2FilesForSales() patches the global object — local const shadows it inside this closure.
       const base = (typeof window.R2_FILES !== 'undefined') ? window.R2_FILES : (baseData.r2Files || {});
+      // Sales: return correct files based on role at fetch time
+      // R2_FILES is frozen (Object.freeze in shell.html) so mutation doesn't work
+      // Instead: build a new object for Sales without touching the frozen base
+      const role = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
+      if(role === 'sales' || role === 'sales_tl'){
+        return Object.assign({}, base, {
+          portview:    'sales_portview.csv',
+          history:     'sales_history.csv',
+          categories:  'sales_categories.csv',
+          sku_current: 'sales_sku_current.csv',
+          outlets:     'sales_outlets.csv',
+          handover:    ''
+        });
+      }
       return base;
     }catch(e){ return baseData.r2Files || {}; }
   }
