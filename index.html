@@ -1,4 +1,4 @@
-<!-- Freshket Sense v374: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v375: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -306,7 +306,9 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}html{overflow-x:clip}
-body{font-family:'IBM Plex Sans Thai',sans-serif;background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
+body:not(.sales-mode){font-family:'IBM Plex Sans Thai',sans-serif;}
+body.sales-mode{font-family:'Noto Sans Thai',sans-serif;}
+body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
 .mono{font-family:'IBM Plex Mono',monospace}
 
@@ -5230,7 +5232,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v374',
+      version: 'v375',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
