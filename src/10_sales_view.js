@@ -223,6 +223,7 @@ function renderSalesHome(el, outlets, pipeline) {
     const gapCls = gap >= 0 ? 'ok' : Math.abs(gap)/Math.max(p.target,1) < 0.2 ? 'warn' : 'bad';
     return `<div class="sv-proj-cell${p.isCurrent?' now':''}">
       <div class="sv-proj-mon">${p.label}</div>
+      <div class="sv-proj-note">${p.isCurrent ? 'runrate+pipeline' : 'projected'}</div>
       <div class="sv-proj-amt">฿${_sv_fmt(p.projected)}</div>
       ${p.target > 0 ? `<div class="sv-proj-gap ${gapCls}">${gapLabel}</div>` : ''}
     </div>`;
@@ -380,7 +381,7 @@ function _olRenderOutletRow(o, isChild) {
     '<div class="sv-ol-bar-wrap">' +
       '<div class="sv-days-track"><div class="sv-days-fill ' + indCls + '" style="width:' + pctHeld + '%"></div></div>' +
       '<div class="sv-days-meta">' +
-        '<span class="sv-tenure-held-sm">ถือมา ' + (o.daysHeld||0) + ' วัน</span>' +
+        '<span></span>' +
         '<span class="sv-days-exp">handover ' + expLabel + (daysLeft!==null?' ('+daysLeftLabel+')':'') + '</span>' +
       '</div>' +
     '</div>' +
@@ -437,13 +438,7 @@ function _renderSalesOutletList(el, outlets) {
     '<span>' + (_olSort==='expiry'?'Expiry':_olSort==='mtd'?'MTD':'GMV') + '</span>' +
   '</button>';
 
-  const viewHtml =
-    '<button class="sv-vt-btn' + (_olView==='list'?' on':'') + '" onclick="_olSetView(\'list\')" aria-label="list">' +
-      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>' +
-    '</button>' +
-    '<button class="sv-vt-btn' + (_olView==='grid'?' on':'') + '" onclick="_olSetView(\'grid\')" aria-label="grid">' +
-      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>' +
-    '</button>';
+  const viewHtml = ''; // view toggle removed
 
   let html = '<div class="sv-sec">' +
     '<span class="sv-sec-t">ร้านทั้งหมด</span>' +
@@ -460,50 +455,17 @@ function _renderSalesOutletList(el, outlets) {
     return;
   }
 
-  // ── Render groups ──
-  if (_olView === 'grid') {
-    html += '<div class="sv-ol-grid">';
-    groups.forEach(function(g) {
-      if (g.outlets.length > 1) {
-        const gGmv = g.outlets.reduce((s,o) => s+(o.runrate||0), 0);
-        const collapsed = !!_olCollapsed[g.outlets[0].id];
-        html += '<div class="sv-ol-acct-hd" onclick="window._olToggleGroup(\'" + g.outlets[0].id + "\')">' +
-          '<span class="sv-ol-acct-dot"></span>' +
-          '<span class="sv-ol-acct-name">' + g.name + '</span>' +
-          '<span class="sv-ol-acct-meta">· ' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '</span>' +
-          '<span class="sv-ol-acct-arrow">' + (collapsed?'▸':'▾') + '</span>' +
-        '</div>';
-        if (!collapsed) {
-          g.outlets.forEach(o => { html += _olRenderCardRow(o); });
-        }
-      } else {
-        html += _olRenderCardRow(g.outlets[0]);
-      }
-    });
-    html += '</div>';
-  } else {
-    html += '<div class="sv-outlet-list">';
-    groups.forEach(function(g) {
-      if (g.outlets.length > 1) {
-        const gGmv = g.outlets.reduce((s,o) => s+(o.runrate||0), 0);
-        const collapsed = !!_olCollapsed[g.outlets[0].id];
-        html += '<div class="sv-ol-acct-hd" onclick="window._olToggleGroup(\'" + g.outlets[0].id + "\')">' +
-          '<span class="sv-ol-acct-dot"></span>' +
-          '<span class="sv-ol-acct-name">' + g.name + '</span>' +
-          '<span class="sv-ol-acct-meta">· ' + g.outlets.length + ' สาขา · ฿' + _sv_fmt(gGmv) + '</span>' +
-          '<span class="sv-ol-acct-arrow">' + (collapsed?'▸':'▾') + '</span>' +
-        '</div>';
-        if (!collapsed) {
-          g.outlets.forEach(o => { html += _olRenderOutletRow(o, true); });
-        }
-      } else {
-        html += _olRenderOutletRow(g.outlets[0], false);
-      }
-    });
-    html += '</div>';
-  }
+  // ── Flat list ──
+  html += '<div class="sv-outlet-list">';
+  sorted.forEach(function(o) { html += _olRenderOutletRow(o, false); });
+  html += '</div>';
 
   el.innerHTML = html;
+  // Click delegation for outlet rows
+  el.onclick = function(e) {
+    const row = e.target.closest('[data-acctid]');
+    if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
+  };
 }
 
 // State setters — re-render outlet list only
@@ -529,7 +491,7 @@ window._salesOpenHandoverSheet = function() {
     return '<div class="sv-sheet-row">' +
       '<div class="sv-sheet-dot"></div>' +
       '<span class="sv-sheet-name">' + (o.name||o.id) + '</span>' +
-      '<span class="sv-sheet-days">' + (d<=0?'หมดแล้ว':d+'d') + '</span>' +
+      '<span class="sv-sheet-days">' + (d<=0?'หมด':d+'d') + '</span>' +
       '<span class="sv-sheet-gmv">฿' + _sv_fmt(o.runrate||0) + '</span>' +
     '</div>';
   }).join('');
@@ -809,6 +771,11 @@ function _renderPipelineList(el, leads) {
     ' \u0e40\u0e1e\u0e34\u0e48\u0e21 Lead</button>';
 
   el.innerHTML = html;
+  // Click delegation for outlet rows
+  el.onclick = function(e) {
+    const row = e.target.closest('[data-acctid]');
+    if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
+  };
 }
 
 // Add/Edit lead sheet
@@ -1019,6 +986,11 @@ function renderSalesTeamview() {
   }
 
   el.innerHTML = html;
+  // Click delegation for outlet rows
+  el.onclick = function(e) {
+    const row = e.target.closest('[data-acctid]');
+    if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
+  };
 }
 
 // W4: TL target setup trigger
@@ -1121,6 +1093,11 @@ window._salesTLDrillRep = function(repEmail) {
   }
 
   el.innerHTML = html;
+  // Click delegation for outlet rows
+  el.onclick = function(e) {
+    const row = e.target.closest('[data-acctid]');
+    if (row) { const aid = row.getAttribute('data-acctid'); if (aid) window._salesOpenAccount(aid); }
+  };
 };
 
 // ══════════════════════════════════════════
