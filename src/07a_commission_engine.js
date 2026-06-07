@@ -270,7 +270,7 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const p1Comm = p1Groups.reduce((s,g) => s + g.commission, 0);
     const p3Incr = p3Groups.reduce((s,g) => s + g.incremental, 0);
     const p3Comm = p3Groups.reduce((s,g) => s + g.commission, 0);
-    console.log('%c[Sense Upsell] ✓ result','color:'+((p1Comm+p3Comm)>0?'#4ddc97':'#aaa')+';font-weight:bold',
+    console.log('%c[Sense Upsell] ✓ result','color:'+((p1Comm+p3Comm)>0?'var(--tk-ok-bright)':'#aaa')+';font-weight:bold',
       {kamEmail, currLabel, p1_groups:p1Groups.length, p1_gmv:Math.round(p1Gmv), p1_comm:Math.round(p1Comm),
        p3_groups:p3Groups.length, p3_incr:Math.round(p3Incr), p3_comm:Math.round(p3Comm),
        total_comm:Math.round(p1Comm+p3Comm),
@@ -405,7 +405,7 @@ function _commComputeHandoverRetention(kamEmail) {
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
-    console.log('%c[Sense Handover] retention','color:'+(tier>=2?'#4ddc97':'#aaa')+';font-weight:bold',
+    console.log('%c[Sense Handover] retention','color:'+(tier>=2?'var(--tk-ok-bright)':'#aaa')+';font-weight:bold',
       {kamEmail, accounts:handoverRows.length,
        baseline_gmv:Math.round(baselineNorm), current_gmv:Math.round(perfNorm),
        retention_pct:Math.round(retentionPct*10)/10+'%',
@@ -2284,8 +2284,8 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
       <div style="display:flex;gap:6px;margin:0 18px 8px">
-        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(77,220,151,.10);border:1px solid rgba(77,220,151,.25);color:#4ddc97;font-size:12px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">History</button>
-        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Thai',sans-serif">Rules</button>
+        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid rgba(77,220,151,.25);color:#4ddc97;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">History</button>
+        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">Rules</button>
       </div>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
@@ -2586,7 +2586,7 @@ window._commLoadHistory = _commLoadHistory;
       var id = 'sp-' + keyToTab(key);
       var el = document.getElementById(id);
       if(!el) return;
-      el.style.background = ok ? 'rgba(0,208,112,.18)' : 'rgba(0,0,0,.06)';
+      el.style.background = ok ? 'var(--tk-ok-dim-2)' : 'rgba(0,0,0,.06)';
       el.style.color = ok ? 'var(--g700)' : 'var(--n500)';
       el.style.fontWeight = ok ? '800' : '600';
     }catch(e){}
@@ -2601,8 +2601,8 @@ window._commLoadHistory = _commLoadHistory;
       counter.title = loaded >= FOREGROUND_KEYS.length
         ? 'Foreground data loaded: portview, history, handover, categories, sku_current, outlets'
         : 'Core data is ready. Enhancement files may still load in background.';
-      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'rgba(0,208,112,.16)' : 'rgba(38,96,200,.15)';
-      counter.style.color = loaded >= FOREGROUND_KEYS.length ? 'var(--g700)' : 'rgba(38,96,200,.85)';
+      counter.style.background = loaded >= FOREGROUND_KEYS.length ? 'var(--tk-ok-dim-2)' : 'rgba(38,96,200,.15)';
+      counter.style.color = loaded >= FOREGROUND_KEYS.length ? 'var(--g700)' : 'var(--tk-accent-solid)';
     }
     return {loaded:loaded,total:FOREGROUND_KEYS.length,keys:FOREGROUND_KEYS.slice()};
   }
