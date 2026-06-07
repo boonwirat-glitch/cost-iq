@@ -1,4 +1,4 @@
-<!-- Freshket Sense v392: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v393: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v392',
+      version: 'v393',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -41170,6 +41170,34 @@ const MODULE_BG = {
   D: 'linear-gradient(160deg,#FFE8CC 0%,#FFF3CC 100%)',
 };
 
+
+// ── Image render helpers ───────────────────────────────────
+// card_image_url จาก skill_definitions → ใช้จริง
+// ถ้า null → fallback gradient (MODULE_BG)
+// CSS filter จัดการ state: locked/training ดูจาก .state-{state} class
+
+function _skImgTag(def, opts = {}) {
+  const w   = opts.w   || '100%';
+  const h   = opts.h   || '106px';
+  const cls = opts.cls || 'sk-card-img';
+  const url = def && def.card_image_url;
+  if (url) {
+    return `<img src="${url}" class="${cls}" style="width:${w};height:${h};object-fit:cover;object-position:top center;display:block;" alt="${def.skill_name_en || ''}">`;
+  }
+  // fallback: gradient placeholder
+  const bg = MODULE_BG[def ? def.module : 'A'];
+  const code = def ? def.skill_code.split('_')[0] : '';
+  return `<div class="${cls}" style="width:${w};height:${h};background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <span style="font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;opacity:.3;">${code}</span>
+  </div>`;
+}
+
+// Module thumb (50×50) — ใช้รูปจาก def แรกของ module นั้น (Navigator/Scout/etc.)
+function _skModThumb(module) {
+  const firstDef = _skillDefs.find(d => d.module === module);
+  return _skImgTag(firstDef, { w: '50px', h: '50px', cls: 'sk-mod-thumb-img' });
+}
+
 // ── Module-level state ─────────────────────────────────────
 let _skillDefs    = [];        // skill_definitions rows
 let _skillProg    = {};        // { skill_id: progress_row }
@@ -41305,9 +41333,7 @@ function _renderRepHome() {
     const dimClass = uCount === 0 && tCount === 0 ? ' sk-mod-dim' : '';
     return `
 <div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}')">
-  <div class="sk-mod-thumb" style="background:${MODULE_BG[m]}">
-    <span class="sk-mod-sil">${m}</span>
-  </div>
+  ${_skModThumb(m)}
   <div class="sk-mod-info">
     <div class="sk-eyebrow">Module ${m}</div>
     <div class="sk-mod-name">${meta.name}</div>
@@ -41376,9 +41402,7 @@ function _renderModuleGrid(module) {
     if (isWide) {
       return `
 <div class="sk-card-wide state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="width:90px;height:90px;flex-shrink:0;background:${MODULE_BG[module]};display:flex;align-items:center;justify-content:center;">
-    <span class="sk-card-sil">${d.skill_code.split('_')[0]}</span>
-  </div>
+  ${_skImgTag(d, { w:'90px', h:'90px', cls:'sk-card-img' })}
   ${starIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
@@ -41389,9 +41413,7 @@ function _renderModuleGrid(module) {
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="background:${MODULE_BG[module]};height:106px;display:flex;align-items:center;justify-content:center;">
-    <span class="sk-card-sil">${d.skill_code.split('_')[0]}</span>
-  </div>
+  ${_skImgTag(d, { h:'106px' })}
   ${lockIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
@@ -41414,9 +41436,7 @@ function _renderModuleGrid(module) {
 </div>
 <div style="overflow-y:auto;flex:1;padding-bottom:84px;">
   <div class="sk-char-banner">
-    <div class="sk-char-img" style="background:${MODULE_BG[module]};width:90px;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;">
-      <span style="font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;opacity:.35;">${module}</span>
-    </div>
+    ${_skModThumb(module)}
     <div class="sk-char-content">
       <div class="sk-char-name">${meta.name}</div>
       <div style="font-size:10px;color:var(--sk-muted);font-family:'Noto Sans Thai',sans-serif;margin-top:5px;line-height:1.45;">${meta.sub}</div>
@@ -41471,7 +41491,7 @@ async function skillsOpenDetail(skillId) {
   </button>
   <span class="sk-detail-code">${modCode}</span>
 </div>
-<div class="sk-img-zone" style="background:${MODULE_BG[def.module]};">
+<div class="sk-img-zone">${_skImgTag(def, { h:'190px', cls:'sk-img-zone-img' })}
   <div class="sk-img-fade"></div>
 </div>
 <div class="sk-detail-body">
@@ -41777,7 +41797,7 @@ async function skillsTLOpenEval(userId, skillId) {
   </button>
   <div class="sk-tl-role-chip">TL View</div>
 </div>
-<div class="sk-img-zone" style="height:150px;background:${MODULE_BG[def.module]};">
+<div class="sk-img-zone" style="height:150px;">${_skImgTag(def, { h:'150px', cls:'sk-img-zone-img' })}
   <div class="sk-img-fade"></div>
 </div>
 <div class="sk-detail-body">
