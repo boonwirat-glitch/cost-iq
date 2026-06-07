@@ -1153,7 +1153,7 @@ Guardrails:
     const _existSum=document.getElementById('dc-tm-summary-card');
     if(_existSum)_existSum.remove();
     if(cards){
-      const _labelClr={'Pace':'rgba(100,180,255,.8)','วัตถุดิบ':'rgba(0,208,112,.75)','โอกาสต้นทุน':'rgba(240,176,0,.85)'};
+      const _labelClr={'Pace':'rgba(100,180,255,.8)','วัตถุดิบ':'var(--tk-ok-bright)','โอกาสต้นทุน':'rgba(240,176,0,.85)'};
       const _insightRow=(label,txt)=>txt?`<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:${_labelClr[label]||'rgba(255,255,255,.4)'};margin-bottom:5px;border-bottom:1px solid ${_labelClr[label]||'rgba(255,255,255,.1)'};padding-bottom:3px">${label}</div><div style="font-size:12px;color:rgba(220,235,255,.88);line-height:1.7;font-style:italic">${txt}</div></div>`:'';
       const bodyHtml=_insightRow('Pace',brief.paceInsight)+_insightRow('วัตถุดิบ',brief.skuInsight)+_insightRow('โอกาสต้นทุน',brief.costInsight)+(brief.summary?`<div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:rgba(220,235,255,.85);line-height:1.75">${brief.summary}</div>`:'');
       if(bodyHtml){
@@ -2371,7 +2371,7 @@ function renderSparkline(sid,moKeys,w,h){
   const first=pts[0],last=pts[pts.length-1];
   const delta=last.p-first.p;
   const lc=delta<-0.05?'var(--g500)':delta>0.05?'var(--amb)':'var(--n300)';
-  const fc=delta<-0.05?'rgba(0,208,112,.07)':delta>0.05?'rgba(240,176,0,.07)':'rgba(160,160,160,.04)';
+  const fc=delta<-0.05?'var(--tk-ok-dim)':delta>0.05?'rgba(240,176,0,.07)':'rgba(160,160,160,.04)';
   const polyPts=pts.map(d=>`${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' ');
   const areaD=`M${first.x.toFixed(1)},${h} L${pts.map(d=>`${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' L')} L${last.x.toFixed(1)},${h}Z`;
   const pct=first.p>0?((delta/first.p)*100).toFixed(1):'0';
@@ -2477,7 +2477,7 @@ function renderSkuDetailContent(sku,priceData){
   const polyPts=pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const areaD=`M${pts[0].x.toFixed(1)},${pT+cH} L${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L')} L${pts[pts.length-1].x.toFixed(1)},${pT+cH}Z`;
   const lc=delta<-0.05?'var(--g500)':delta>0.05?'var(--amb)':'var(--n300)';
-  const fc=delta<-0.05?'rgba(0,208,112,.08)':delta>0.05?'rgba(240,176,0,.08)':'rgba(160,160,160,.05)';
+  const fc=delta<-0.05?'var(--tk-ok-dim)':delta>0.05?'rgba(240,176,0,.08)':'rgba(160,160,160,.05)';
 
   // Price labels — show at first, last, and distinct min/max
   const shownPrices=new Set();
@@ -2517,7 +2517,7 @@ function renderSkuDetailContent(sku,priceData){
 
   // Opportunity info
   const opp=OPPS.find(o=>String(o.curId)===String(sku.id));
-  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--g50);border:1px solid rgba(0,208,112,.2);border-radius:10px;padding:10px 12px">
+  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--g50);border:1px solid var(--tk-ok-dim-2);border-radius:10px;padding:10px 12px">
     <div style="font-size:10px;font-weight:700;color:var(--g700);margin-bottom:4px">ประหยัดได้จากการเปลี่ยน SKU</div>
     <div style="font-size:12px;color:var(--n700);margin-bottom:4px">
       <span style="color:var(--n400);text-decoration:line-through;font-size:11px">${sku.n}</span><br>
