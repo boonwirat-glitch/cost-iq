@@ -73,7 +73,7 @@ function __legacyRenderOverviewFallback(){
   const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
   const _rrGap=_rrH-_actH;
   const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">${fmtK(_cm.gmv_to_date)}</span>`:'';
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--tk-ok-bright);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--g700);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--g700);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--tk-ok-bright);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--tk-ok-text);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--tk-ok-text);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
 
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
@@ -512,9 +512,9 @@ function __legacyRenderPortfolioFallback(){
   const conInterp=topPctNum>70?'พึ่งพาสินค้าหลักสูง — ถ้า SKU เหล่านี้ขาดหรือราคาขึ้น กระทบยอดทันที':topPctNum>=50?'พอร์ตกระจายพอสมควร — ยังมี SKU อื่นรองรับหากสินค้าหลักขาด':'พอร์ตกระจายดี — ไม่พึ่งพาสินค้าใดสินค้าหนึ่งมากเกินไป';
   const topSkuEl=document.getElementById('top-sku-card');
   if(topSkuEl){
-    const conBg=topPctNum>70?'var(--amb50)':topPctNum<50?'var(--g50)':'var(--n50)';
+    const conBg=topPctNum>70?'var(--amb50)':topPctNum<50?'var(--tk-ok-bg)':'var(--n50)';
     const conBorder=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n200)';
-    const conTextColor=topPctNum>70?'#9a6500':topPctNum<50?'var(--g700)':'var(--n600)';
+    const conTextColor=topPctNum>70?'#9a6500':topPctNum<50?'var(--tk-ok-text)':'var(--n600)';
     const conNumColor=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n400)';
     topSkuEl.style.cssText=`background:${conBg};border-left:3px solid ${conBorder};border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px;display:block;box-shadow:none`;
     topSkuEl.innerHTML=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:${conNumColor}">${top5pct}%</span></div><div style="font-size:12px;color:${conTextColor};line-height:1.5;font-weight:500">${conInterp}</div>`;
@@ -682,7 +682,7 @@ function renderOpps(){
     const _senseMetrics2=getSenseScoreMetrics();
     const _score2=_senseMetrics2.score;
     const _circ=263.9;
-    const _sColor2=_score2>=72?'var(--g700)':_score2>=55?'var(--amb)':'var(--org)';
+    const _sColor2=_score2>=72?'var(--tk-ok-text)':_score2>=55?'var(--amb)':'var(--org)';
     const _schArc=document.getElementById('sch-darc');
     const _schTxt=document.getElementById('sch-score-txt');
     if(_schArc){_schArc.style.stroke=_score2>=72?'var(--g500)':_score2>=55?'var(--amb)':'var(--org)';setTimeout(()=>{_schArc.style.strokeDashoffset=String(_circ-(_score2/100)*_circ);},80);}
@@ -983,8 +983,8 @@ function sheetTogglePlan(id){
     const now=sel.has(id);
     btn.textContent=now?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน';
     btn.style.borderColor=now?'var(--tk-ok-500)':'var(--n200)';
-    btn.style.background=now?'var(--g50)':'var(--n0)';
-    btn.style.color=now?'var(--g700)':'var(--n700)';
+    btn.style.background=now?'var(--tk-ok-bg)':'var(--n0)';
+    btn.style.color=now?'var(--tk-ok-text)':'var(--n700)';
   }
   updatePbFooter();updateSim();
 }
@@ -1004,10 +1004,10 @@ function renderSingleCard(o){
   const altRows=o.alts.map((a,i)=>{
     const isSel=i===selIdx;
     const hasNote=a.note&&a.note.length>3;
-    return`<div class="oalt-row ${isSel?'selected':''}" onclick="selectAlt(event,${o.id},${i})"><div class="oalt-radio"><div class="oalt-radio-dot"></div></div><div class="oalt-info"><div class="oalt-name">${a.altName}${a.recommended?`<span class="oalt-rec">★ แนะนำ</span>`:''} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--n400);font-weight:400">#${a.altId}</span></div><div class="oalt-spec">${a.altSpec||''}${a.altSpec?' · ':''}<span style="font-size:9px;font-weight:700;color:${a.conf==='high'?'var(--g700)':'var(--amb)'}">${a.conf==='high'?'✓ มั่นใจสูง':'ทดลองก่อน'}</span></div>${hasNote?`<div class="oalt-note">${a.note}</div>`:''}</div><div class="oalt-right"><div class="oalt-price">฿${(a.altP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div><div class="oalt-save${a.conf!=='high'?' med':''}">${'−'+a.pct+'%'}</div></div></div>`;
+    return`<div class="oalt-row ${isSel?'selected':''}" onclick="selectAlt(event,${o.id},${i})"><div class="oalt-radio"><div class="oalt-radio-dot"></div></div><div class="oalt-info"><div class="oalt-name">${a.altName}${a.recommended?`<span class="oalt-rec">★ แนะนำ</span>`:''} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--n400);font-weight:400">#${a.altId}</span></div><div class="oalt-spec">${a.altSpec||''}${a.altSpec?' · ':''}<span style="font-size:9px;font-weight:700;color:${a.conf==='high'?'var(--tk-ok-text)':'var(--amb)'}">${a.conf==='high'?'✓ มั่นใจสูง':'ทดลองก่อน'}</span></div>${hasNote?`<div class="oalt-note">${a.note}</div>`:''}</div><div class="oalt-right"><div class="oalt-price">฿${(a.altP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div><div class="oalt-save${a.conf!=='high'?' med':''}">${'−'+a.pct+'%'}</div></div></div>`;
   }).join('');
   const confTag=chosen.conf==='high'
-    ?`<span style="color:var(--g700);font-weight:700">✓ มั่นใจสูง</span>`
+    ?`<span style="color:var(--tk-ok-text);font-weight:700">✓ มั่นใจสูง</span>`
     :`<span style="color:var(--amb);font-weight:700">— ทดลองก่อน</span>`;
   const _qtyUnit=deriveQtyUnit(o.curSpec,o.priceBasis);
   return`<div style="padding:12px 13px 8px;border-bottom:1px solid var(--n100)">
@@ -1033,7 +1033,7 @@ function renderSingleCard(o){
   </div>
   ${chosen.caveat?`<div class="onote" style="color:var(--amb);border-top:1px solid var(--n100);padding-top:8px">▲ ${chosen.caveat}</div>`:''}
   <div style="padding:12px 13px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--g50)':'var(--n0)'};color:${ck?'var(--g700)':'var(--n700)'};font-size:13px;font-weight:700;font-family:var(--tk-font-body);cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
+    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--tk-ok-bg)':'var(--n0)'};color:${ck?'var(--tk-ok-text)':'var(--n700)'};font-size:13px;font-weight:700;font-family:var(--tk-font-body);cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
   </div>`;
 }
 
@@ -1047,9 +1047,9 @@ function renderOppTable(opps){
       const a=getAlt(o);const ck=sel.has(o.id);const exp=expandedOpps.has(o.id);
       const altRows=exp?o.alts.map((alt,ai)=>{
         const isSe=(selAlt[o.id]??o.alts.findIndex(x=>x.recommended)??0)===ai;
-        return`<div class="ot-expand-row ${isSe?'ot-exp-sel':''}" onclick="selectAlt(event,${o.id},${ai})"><div style="width:14px;height:14px;border-radius:50%;border:2px solid ${isSe?'var(--g500)':'var(--n300)'};background:${isSe?'var(--g500)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:28px">${isSe?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':''}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${alt.altName}${alt.recommended?' <span style="font-size:9px;background:var(--g50);color:var(--g800);border-radius:10px;padding:2px 6px;font-weight:700">★</span>':''}</div><div style="font-size:11px;font-weight:600;color:${alt.conf==='high'?'var(--g700)':'var(--amb)'};margin-top:1px">${alt.conf==='high'?'✓ มั่นใจสูง':'— ทดลองก่อน'}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700;color:${alt.conf==='high'?'var(--g700)':'var(--amb)'};font-family:'IBM Plex Mono',monospace">${fmt(alt.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:2px">${fmt(alt.save*12)+'/ปี <span style="font-family:IBM Plex Mono,monospace;font-weight:700">−'+alt.pct+'%</span>'}</div></div></div>`;
+        return`<div class="ot-expand-row ${isSe?'ot-exp-sel':''}" onclick="selectAlt(event,${o.id},${ai})"><div style="width:14px;height:14px;border-radius:50%;border:2px solid ${isSe?'var(--g500)':'var(--n300)'};background:${isSe?'var(--g500)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:28px">${isSe?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':''}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${alt.altName}${alt.recommended?' <span style="font-size:9px;background:var(--tk-ok-bg);color:var(--g800);border-radius:10px;padding:2px 6px;font-weight:700">★</span>':''}</div><div style="font-size:11px;font-weight:600;color:${alt.conf==='high'?'var(--tk-ok-text)':'var(--amb)'};margin-top:1px">${alt.conf==='high'?'✓ มั่นใจสูง':'— ทดลองก่อน'}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700;color:${alt.conf==='high'?'var(--tk-ok-text)':'var(--amb)'};font-family:'IBM Plex Mono',monospace">${fmt(alt.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:2px">${fmt(alt.save*12)+'/ปี <span style="font-family:IBM Plex Mono,monospace;font-weight:700">−'+alt.pct+'%</span>'}</div></div></div>`;
       }).join(''):'';
-      return`<div class="ot-row-wrap${i>0?' ot-border-top':''}" id="otr-${o.id}"><div class="ot-main-row" onclick="toggleExpand(${o.id})"><div style="font-size:11px;color:var(--n600);font-weight:600;width:18px;flex-shrink:0">${i+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.curName}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${o.cat} · ${fmt(o.monthlyGmv)}/เดือน</div></div><div style="text-align:right;flex-shrink:0;margin-right:8px"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--g700)">${fmt(a.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${fmt(a.save*12)}/ปี · <strong style='font-family:IBM Plex Mono,monospace'>−${a.pct}%</strong></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="font-size:14px;color:var(--n400);transition:transform .2s;transform:rotate(${exp?180:0}deg)">▾</div><div class="ot-chk ${ck?'on':''}" onclick="event.stopPropagation();toggleOpp(${o.id})">${ck?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div></div></div>${exp?`<div class="ot-expand-body">${altRows}</div>`:''}</div>`;
+      return`<div class="ot-row-wrap${i>0?' ot-border-top':''}" id="otr-${o.id}"><div class="ot-main-row" onclick="toggleExpand(${o.id})"><div style="font-size:11px;color:var(--n600);font-weight:600;width:18px;flex-shrink:0">${i+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.curName}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${o.cat} · ${fmt(o.monthlyGmv)}/เดือน</div></div><div style="text-align:right;flex-shrink:0;margin-right:8px"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">${fmt(a.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${fmt(a.save*12)}/ปี · <strong style='font-family:IBM Plex Mono,monospace'>−${a.pct}%</strong></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="font-size:14px;color:var(--n400);transition:transform .2s;transform:rotate(${exp?180:0}deg)">▾</div><div class="ot-chk ${ck?'on':''}" onclick="event.stopPropagation();toggleOpp(${o.id})">${ck?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div></div></div>${exp?`<div class="ot-expand-body">${altRows}</div>`:''}</div>`;
     }).join('')+'</div>';
 }
 
@@ -2553,7 +2553,7 @@ function renderOutletCard(){
     // Row 2: tier dot + basket · shipping · timeslot
     const shipStr=shipAmt>0
       ?`<span style="color:var(--amb);font-weight:600">ค่าส่ง ${fmt(shipAmt)}</span>`
-      :'<span style="color:var(--g700)">ค่าส่งฟรี</span>';
+      :'<span style="color:var(--tk-ok-text)">ค่าส่งฟรี</span>';
     const slotStr=slot
       ?`<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--n400)">${slot}</span>`
       :'';
@@ -2826,7 +2826,7 @@ On cost-saving alternatives:
     if(badge){
       badge.textContent=p==='gemini'?'Gemini':'Claude';
       badge.style.background=p==='gemini'?'rgba(124,58,237,.15)':'var(--tk-ok-dim)';
-      badge.style.color=p==='gemini'?'#7c3aed':'var(--g700)';
+      badge.style.color=p==='gemini'?'#7c3aed':'var(--tk-ok-text)';
       badge.style.borderColor=p==='gemini'?'rgba(124,58,237,.3)':'var(--tk-ok-border)';
     }
   }
