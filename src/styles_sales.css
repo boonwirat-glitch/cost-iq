@@ -780,3 +780,15 @@
 }
 .sv-tl-target-btn:active { background: rgba(255,56,92,.15); }
 .sv-tl-target-btn svg { width: 13px; height: 13px; }
+
+/* ── Input: remove browser :invalid red border ── */
+.sv-field-input:invalid,
+.sv-field-input[type="text"]:placeholder-shown { box-shadow: none; }
+input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; }
+
+/* ── Nav: 3-column grid for Sales rep (no Save, no Team tab) ── */
+body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(3,1fr) !important; }
+
+/* ── Login transition: white bg from start, no flash ── */
+body.sales-mode { background: #FFFFFF !important; }
+body.sales-mode .scr { background: #FFFFFF !important; }
