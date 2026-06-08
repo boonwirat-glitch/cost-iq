@@ -1,4 +1,4 @@
-<!-- Freshket Sense v458: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v459: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v458',
+      version: 'v459',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10093,7 +10093,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 42%; opacity: 1; overflow: hidden; }
+.s3-sheet-peek     { height: 45%; opacity: 1; overflow: hidden; }
 .s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
@@ -10106,12 +10106,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* Peek hint */
 .s3-peek-hint {
-  padding: 0 16px 10px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
+  padding: 0 16px 12px;
 }
 .s3-teaser {
   font-size: 11.5px;
@@ -10127,6 +10122,21 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   flex-shrink: 0;
   margin-top: 2px;
   transition: transform .3s ease;
+}
+.s3-peek-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sk-ink);
+  line-height: 1.2;
+  margin: 8px 0 10px;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.s3-peek-cta {
+  /* CTA button inside peek — full width, no top margin needed */
+}
+.s3-peek-cta .sk-cta-btn {
+  width: 100%;
+  margin-top: 0;
 }
 .s3-sheet-expanded .s3-expand-chevron { transform: rotate(180deg); }
 
@@ -44016,15 +44026,19 @@ async function _doOpenDetail(skillId) {
   </div>
   <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
-    <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
-      <div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-          <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-          <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+    <div class="s3-peek-hint">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;" onclick="_s3ToggleSheet()">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+            <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+          </div>
+          <div class="s3-teaser">${teaserText}…</div>
         </div>
-        <div class="s3-teaser">${teaserText}…</div>
+        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:2px;"><path d="M18 15l-6-6-6 6"/></svg>
       </div>
-      <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
+      <div class="s3-peek-title">${def.skill_name_th || def.skill_name_en}</div>
+      ${cta ? `<div class="s3-peek-cta">${cta}</div>` : ''}
     </div>
     <div class="sk-detail-body s3-body-full" id="s3-body-content">
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
