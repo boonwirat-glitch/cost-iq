@@ -1,4 +1,4 @@
-<!-- Freshket Sense v449: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v450: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v449',
+      version: 'v450',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10038,14 +10038,17 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* Hero: natural flow, fits width, above ambient */
 .s3-hero {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  bottom: 130px;
   z-index: 1;
   overflow: hidden;
 }
 .s3-hero-img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
   display: block;
   position: relative;
   z-index: 1;
@@ -10146,68 +10149,20 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s3-sheet .sk-state-pill-row { animation-delay: .05s; }
 .s3-sheet .sk-skill-title    { animation-delay: .1s; }
 
-/* ══ S2 MODULE GRID — new layout ════════════════════════ */
-.s2-screen {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--sk-canvas);
-}
-.s2-hero {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.s2-char-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-  display: block;
-}
-.s2-hero-gradient {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,.45) 0%, transparent 50%);
-  pointer-events: none;
-}
-.s2-topbar {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 5;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.s2-topbar .sk-back-btn { color: #fff; }
-.s2-cg-mod-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
-}
-.s2-scroll {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 84px;
-}
-.s2-grid {
-  padding: 12px 14px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 /* ══ S1 MODULE ROW — missing classes restored ═══════════ */
 .sk-row-thumb {
-  width: 88px;
-  height: 88px;
-  flex-shrink: 0;
-  overflow: hidden;
+  width: 88px !important;
+  height: 88px !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
   border-radius: 10px;
+}
+.sk-row-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center top !important;
+  display: block !important;
 }
 .sk-row-thumb-img {
   width: 100%; height: 100%;
@@ -10272,6 +10227,59 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   width: 40px; height: 40px;
   display: block;
   overflow: visible;
+}
+
+/* ══ S2 MODULE GRID — mockup-correct structure ══════════ */
+.s2-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.s2-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 84px;
+}
+.s2-topbar {
+  padding: 44px 16px 10px;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0.5px solid rgba(0,0,0,.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.s2-back { color: var(--sk-ac) !important; }
+.s2-cg-mod-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sk-ink);
+}
+.s2-banner {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: #F7F0FA;
+}
+.s2-char-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.s2-grid {
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 </style>
 </head>
@@ -43886,21 +43894,20 @@ function _renderModuleGrid(module) {
 
   return `
 <div class="s2-screen">
-  <div class="s2-hero">
-    ${charImg}
-    <div class="s2-hero-gradient"></div>
+  <div class="s2-scroll">
     <div class="s2-topbar">
-      <button class="sk-back-btn" onclick="_renderSkillsScreen()">
+      <button class="sk-back-btn s2-back" onclick="_renderSkillsScreen()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
         <span>ทักษะ</span>
       </button>
       <div style="text-align:right;">
-        <div class="sk-eyebrow" style="color:rgba(255,255,255,.7);">Module ${module}</div>
+        <div class="sk-eyebrow">Module ${module}</div>
         <div class="s2-cg-mod-name">${meta.name}</div>
       </div>
     </div>
-  </div>
-  <div class="s2-scroll">
+    <div class="s2-banner">
+      ${charImg}
+    </div>
     <div class="sk-grid s2-grid">${cards}</div>
   </div>
 </div>`;
