@@ -1,4 +1,4 @@
-<!-- Freshket Sense v455: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v456: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v455',
+      version: 'v456',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8433,17 +8433,21 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin: 0 14px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--sk-hairline);
 }
 .sk-mod-row {
   display: flex;
   align-items: stretch;
   gap: 0;
   height: 120px;
-  border-top: 1px solid var(--sk-hairline);
+  border-top: 0.5px solid var(--sk-hairline);
   cursor: pointer;
   overflow: hidden;
 }
-.sk-mod-row:last-child { border-bottom: 1px solid var(--sk-hairline); }
+/* .sk-mod-row:last-child border removed */
 .sk-mod-row:active { background: var(--sk-surface); }
 .sk-mod-dim { opacity: .5; }
 .sk-mod-thumb {
@@ -8570,7 +8574,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-card:active { opacity: .85; }
 .sk-card-img {
   width: 100%;
-  height: 160px;
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8633,9 +8637,9 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .state-mastered .sk-card-body { background: #1A1200; }
 .state-mastered .sk-card-name { color: #FFD966; }
-.state-mastered .sk-card-code { color: #7A5A00; }
+.state-mastered .sk-card-code { display: none; }
 
-.sk-card-body { padding: 8px 10px 10px; }
+.sk-card-body { padding: 7px 10px 8px; }
 .sk-state-row {
   display: flex;
   align-items: center;
@@ -8673,10 +8677,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-card-code {
-  font-size: 8.5px;
-  color: var(--sk-muted);
-  font-family: 'Noto Sans Thai', sans-serif;
-  margin-top: 2px;
+  display: none;
 }
 .sk-lock-ico {
   position: absolute;
@@ -10151,7 +10152,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 28%;
+  object-position: center 38%;
   display: block;
 }
 .sk-row-thumb-fade {
@@ -10163,7 +10164,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-row-thumb-img {
   width: 100%; height: 100%;
   object-fit: cover;
-  object-position: center 28%;
+  object-position: center 38%;
   display: block;
   opacity: 0;
   transition: opacity .2s ease;
@@ -10265,9 +10266,10 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s2-banner {
   position: relative;
   width: 100%;
-  height: 280px;
+  height: 320px;
   overflow: hidden;
   background: #F7F0FA;
+  border-radius: 0 0 20px 20px;
 }
 .s2-char-img {
   width: 100%;
@@ -43901,21 +43903,19 @@ function _renderModuleGrid(module) {
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
     <div class="sk-card-name">${d.skill_name_en}</div>
-    <div class="sk-card-code">${d.skill_code.split('_')[0]} · สูงสุด</div>
   </div>
 </div>`;
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="height:160px;width:100%;position:relative;overflow:hidden;">
-    ${_skImgTag(d, { h:'160px', cls:'sk-card-img-inner' })}
+  <div class="sk-card-img" style="height:180px;width:100%;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { h:'180px', cls:'sk-card-img-inner' })}
     ${sparkHtml}
   </div>
   ${lockIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
     <div class="sk-card-name">${d.skill_name_en}</div>
-    <div class="sk-card-code">${d.skill_code.split('_')[0]}</div>
   </div>
 </div>`;
   }).join('');
