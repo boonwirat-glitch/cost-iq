@@ -29,7 +29,7 @@
 
 /* ── Screen container ── */
 #scr-skills {
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
@@ -37,6 +37,7 @@
   scrollbar-width: none;
   padding-bottom: 84px;
 }
+#scr-skills.on { display: flex; }
 #scr-skills::-webkit-scrollbar { display: none; }
 
 /* ── Eyebrow label (Noto Sans Thai) ── */
