@@ -297,10 +297,12 @@
 .sk-card:active { opacity: .85; }
 .sk-card-img {
   width: 100%;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow: hidden;
 }
 /* inner img/div when wrapped by mastered spark container */
 .sk-card-img-inner {
@@ -464,7 +466,8 @@
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
-  height: 260px;
+  height: 100svh;
+  max-height: 100svh;
 }
 .sk-img-fade {
   position: absolute;
@@ -1387,4 +1390,52 @@
   margin-top: 2px;
   font-family: 'IBM Plex Mono', monospace;
   letter-spacing: .04em;
+}
+
+/* ── Character banner ──────────────────────── */
+.sk-cg-banner {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sk-cg-banner-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 16px;
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+}
+.sk-cg-banner-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.sk-cg-banner-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.72);
+  margin-top: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ── Skill detail animations ────────────────── */
+.sk-detail-body {
+  animation: sk-slide-up .35s cubic-bezier(.32,.72,0,1) both;
+  animation-delay: .25s;
+}
+@keyframes sk-slide-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.sk-state-pill-row {
+  animation: sk-fade-in .3s ease both;
+  animation-delay: .35s;
+}
+@keyframes sk-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

@@ -363,7 +363,26 @@ function _renderRepHome() {
 function skillsOpenModule(module) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return;
+  scr.style.opacity = '0';
   scr.innerHTML = _renderModuleGrid(module);
+  // fade in banner ก่อน
+  requestAnimationFrame(() => {
+    scr.style.transition = 'opacity .2s ease';
+    scr.style.opacity = '1';
+    setTimeout(() => { scr.style.transition = ''; }, 220);
+  });
+  // stagger cards
+  const cards = scr.querySelectorAll('.sk-card, .sk-card-wide');
+  cards.forEach((c, i) => {
+    c.style.opacity = '0';
+    c.style.transform = 'translateY(16px)';
+    setTimeout(() => {
+      c.style.transition = 'opacity .25s ease, transform .25s ease';
+      c.style.opacity = '1';
+      c.style.transform = 'translateY(0)';
+      setTimeout(() => { c.style.transition = ''; }, 260);
+    }, 80 + i * 60);
+  });
 }
 
 function _renderModuleGrid(module) {
@@ -399,8 +418,8 @@ function _renderModuleGrid(module) {
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="height:106px;width:100%;position:relative;overflow:hidden;">
-    ${_skImgTag(d, { h:'106px', cls:'sk-card-img-inner' })}
+  <div class="sk-card-img" style="height:160px;width:100%;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { h:'160px', cls:'sk-card-img-inner' })}
     ${sparkHtml}
   </div>
   ${lockIco}
@@ -413,10 +432,12 @@ function _renderModuleGrid(module) {
   }).join('');
 
   // character banner — รูปแรกของ module ใช้เป็น hero
+  // full-width character banner — ใช้รูปแรกของ module
   const bannerDef = defs[0];
-  const bannerImg = bannerDef && bannerDef.card_image_url
-    ? `<img src="${bannerDef.card_image_url}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
-    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
+  const bannerUrl = bannerDef && bannerDef.card_image_url ? bannerDef.card_image_url : '';
+  const bannerImg = bannerUrl
+    ? `<img src="${bannerUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
+    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};opacity:.6;"></div>`;
 
   return `
 <div class="sk-cg-topbar">
@@ -437,12 +458,34 @@ function _renderModuleGrid(module) {
       <div style="font-size:10px;color:var(--sk-muted);font-family:'Noto Sans Thai',sans-serif;margin-top:5px;line-height:1.45;">${meta.sub}</div>
     </div>
   </div>
-  <div class="sk-grid">${cards}</div>
+  <div class="sk-cg-banner" id="sk-mod-banner">
+  ${bannerImg}
+  <div class="sk-cg-banner-overlay">
+    <div class="sk-cg-banner-name">${meta.name}</div>
+    <div class="sk-cg-banner-sub">Module ${module} — ${meta.sub}</div>
+  </div>
+</div>
+<div class="sk-grid">${cards}</div>
 </div>`;
 }
 
 // ── Skill Detail Sheet ─────────────────────────────────────
 async function skillsOpenDetail(skillId) {
+  // micro-interaction: ถ้า scr มี content อยู่ → fade out ก่อน แล้ว render
+  const scr = document.getElementById('scr-skills');
+  if (scr && scr.innerHTML) {
+    scr.style.transition = 'opacity .15s ease';
+    scr.style.opacity = '0';
+    setTimeout(() => {
+      scr.style.opacity = '';
+      scr.style.transition = '';
+      _doOpenDetail(skillId);
+    }, 150);
+    return;
+  }
+  _doOpenDetail(skillId);
+}
+async function _doOpenDetail(skillId) {
   _activeSkillId = skillId;
   const scr = document.getElementById('scr-skills');
   if (!scr) return;

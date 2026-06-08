@@ -1,4 +1,4 @@
-<!-- Freshket Sense v422: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v423: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v422',
+      version: 'v423',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050',
       backgroundColor: '#006050',
@@ -41522,7 +41522,26 @@ function _renderRepHome() {
 function skillsOpenModule(module) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return;
+  scr.style.opacity = '0';
   scr.innerHTML = _renderModuleGrid(module);
+  // fade in banner ก่อน
+  requestAnimationFrame(() => {
+    scr.style.transition = 'opacity .2s ease';
+    scr.style.opacity = '1';
+    setTimeout(() => { scr.style.transition = ''; }, 220);
+  });
+  // stagger cards
+  const cards = scr.querySelectorAll('.sk-card, .sk-card-wide');
+  cards.forEach((c, i) => {
+    c.style.opacity = '0';
+    c.style.transform = 'translateY(16px)';
+    setTimeout(() => {
+      c.style.transition = 'opacity .25s ease, transform .25s ease';
+      c.style.opacity = '1';
+      c.style.transform = 'translateY(0)';
+      setTimeout(() => { c.style.transition = ''; }, 260);
+    }, 80 + i * 60);
+  });
 }
 
 function _renderModuleGrid(module) {
@@ -41558,8 +41577,8 @@ function _renderModuleGrid(module) {
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="height:106px;width:100%;position:relative;overflow:hidden;">
-    ${_skImgTag(d, { h:'106px', cls:'sk-card-img-inner' })}
+  <div class="sk-card-img" style="height:160px;width:100%;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { h:'160px', cls:'sk-card-img-inner' })}
     ${sparkHtml}
   </div>
   ${lockIco}
@@ -41572,10 +41591,12 @@ function _renderModuleGrid(module) {
   }).join('');
 
   // character banner — รูปแรกของ module ใช้เป็น hero
+  // full-width character banner — ใช้รูปแรกของ module
   const bannerDef = defs[0];
-  const bannerImg = bannerDef && bannerDef.card_image_url
-    ? `<img src="${bannerDef.card_image_url}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
-    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
+  const bannerUrl = bannerDef && bannerDef.card_image_url ? bannerDef.card_image_url : '';
+  const bannerImg = bannerUrl
+    ? `<img src="${bannerUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
+    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};opacity:.6;"></div>`;
 
   return `
 <div class="sk-cg-topbar">
@@ -41596,12 +41617,34 @@ function _renderModuleGrid(module) {
       <div style="font-size:10px;color:var(--sk-muted);font-family:'Noto Sans Thai',sans-serif;margin-top:5px;line-height:1.45;">${meta.sub}</div>
     </div>
   </div>
-  <div class="sk-grid">${cards}</div>
+  <div class="sk-cg-banner" id="sk-mod-banner">
+  ${bannerImg}
+  <div class="sk-cg-banner-overlay">
+    <div class="sk-cg-banner-name">${meta.name}</div>
+    <div class="sk-cg-banner-sub">Module ${module} — ${meta.sub}</div>
+  </div>
+</div>
+<div class="sk-grid">${cards}</div>
 </div>`;
 }
 
 // ── Skill Detail Sheet ─────────────────────────────────────
 async function skillsOpenDetail(skillId) {
+  // micro-interaction: ถ้า scr มี content อยู่ → fade out ก่อน แล้ว render
+  const scr = document.getElementById('scr-skills');
+  if (scr && scr.innerHTML) {
+    scr.style.transition = 'opacity .15s ease';
+    scr.style.opacity = '0';
+    setTimeout(() => {
+      scr.style.opacity = '';
+      scr.style.transition = '';
+      _doOpenDetail(skillId);
+    }, 150);
+    return;
+  }
+  _doOpenDetail(skillId);
+}
+async function _doOpenDetail(skillId) {
   _activeSkillId = skillId;
   const scr = document.getElementById('scr-skills');
   if (!scr) return;
@@ -42546,10 +42589,12 @@ window._renderSkillsScreen     = _renderSkillsScreen;
 .sk-card:active { opacity: .85; }
 .sk-card-img {
   width: 100%;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  overflow: hidden;
 }
 /* inner img/div when wrapped by mastered spark container */
 .sk-card-img-inner {
@@ -42713,7 +42758,8 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
-  height: 260px;
+  height: 100svh;
+  max-height: 100svh;
 }
 .sk-img-fade {
   position: absolute;
@@ -43636,6 +43682,54 @@ window._renderSkillsScreen     = _renderSkillsScreen;
   margin-top: 2px;
   font-family: 'IBM Plex Mono', monospace;
   letter-spacing: .04em;
+}
+
+/* ── Character banner ──────────────────────── */
+.sk-cg-banner {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sk-cg-banner-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 16px;
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+}
+.sk-cg-banner-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.sk-cg-banner-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.72);
+  margin-top: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ── Skill detail animations ────────────────── */
+.sk-detail-body {
+  animation: sk-slide-up .35s cubic-bezier(.32,.72,0,1) both;
+  animation-delay: .25s;
+}
+@keyframes sk-slide-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.sk-state-pill-row {
+  animation: sk-fade-in .3s ease both;
+  animation-delay: .35s;
+}
+@keyframes sk-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 </style>
 <!-- Echo floating pill — shown when recording + minimized -->
