@@ -1,4 +1,4 @@
-<!-- Freshket Sense v443: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v444: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v443',
+      version: 'v444',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9843,7 +9843,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   position: relative; z-index: 2;
   margin: 12px 14px 0;
   border-radius: 18px; overflow: hidden;
-  height: 140px;
+  height: 220px;
 }
 .s2-char-img {
   width: 100%; height: 100%;
@@ -9915,11 +9915,10 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .s3-sheet {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
-  background: rgba(248,248,248,0.72);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
+  background: rgba(255,255,255,0.25);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: blur(28px) saturate(1.8);
   border-radius: 24px 24px 0 0;
-  height: 64%;
   overflow-y: auto;
   padding: 0 18px 90px;
   animation: s3-sheet-up .4s cubic-bezier(.32,.72,0,1) both;
@@ -9991,7 +9990,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   transition: height .42s cubic-bezier(.32,.72,0,1);
 }
 .s3-sheet-peek {
-  height: 30%;
+  height: 72px;
   overflow: hidden;
 }
 .s3-sheet-expanded {
@@ -43839,12 +43838,6 @@ async function _doOpenDetail(skillId) {
       <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
     </div>
     <div class="sk-detail-body s3-body-full">
-  <div class="sk-state-pill-row">
-    <div class="sk-state-pill pill-${state}">
-      <div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}
-    </div>
-    <span class="sk-detail-code">${def.skill_name_en} · ${modCode}</span>
-  </div>
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
 
   ${def.principle_th ? `
