@@ -1722,28 +1722,34 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     const email = currentUserProfile?.email;
     if (!email) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ไม่พบผู้ใช้งาน</div>'; return; }
     try {
-      // Query ci_sessions — all user sessions, newest first
+      const isTL = _canDebrief();
       let q = supa.from('ci_sessions')
-        .select('id,account_id,account_name,visited_at,duration_secs,skill_scores,next_actions,status')
-        .eq('owner_email', email)
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,status')
         .order('visited_at', { ascending: false })
-        .limit(50);
-      if (_accountGuid) {
-        q = q.eq('account_id', _accountGuid);
-      } else if (typeof isSalesRole === 'function' && isSalesRole(typeof getCurrentRole === 'function' ? getCurrentRole() : '')) {
-        // Sales mode: no account_id filter — show all own sessions, group by account_name
-        // (query already filtered by owner_email above)
+        .limit(isTL ? 100 : 50);
+
+      if (isTL) {
+        // TL — ดู sessions ของทุกคนในทีม (ใช้ portviewBulkData หา emails)
+        const teamEmails = _getTeamEmails();
+        if (teamEmails.length > 0) {
+          q = q.in('owner_email', teamEmails);
+        }
+        // ไม่ filter by account — TL เห็นทุก session ของทีม
+      } else {
+        // Sales — เห็นเฉพาะของตัวเอง
+        q = q.eq('owner_email', email);
+        if (_accountGuid) q = q.eq('account_id', _accountGuid);
       }
+
       const { data, error } = await q;
       if (error) throw error;
       if (!data || !data.length) {
         body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ Echo</div>';
         return;
       }
-      body.innerHTML = _renderInlineHistory(data);
+      body.innerHTML = isTL ? _renderTLTeamFeed(data) : _renderInlineHistory(data);
     } catch(e) {
       console.warn('[CI inline history]', e.message);
-      // Fallback to kam_skill_log if ci_sessions not ready
       const rows = await _loadHistory();
       const sessions = _groupHistoryBySessions(rows);
       if (!sessions.length) {
@@ -1752,6 +1758,275 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       }
       body.innerHTML = _renderLegacyHistory(sessions);
     }
+  }
+
+  function _getTeamEmails() {
+    // ดึง emails จาก portviewBulkData (KAM) หรือ salesBulkData (Sales team)
+    const emails = [];
+    const seen = new Set();
+    if (typeof portviewBulkData !== 'undefined' && portviewBulkData) {
+      portviewBulkData.forEach(r => {
+        if (r.owner_email && !seen.has(r.owner_email)) { seen.add(r.owner_email); emails.push(r.owner_email); }
+      });
+    }
+    if (typeof window.salesBulkData !== 'undefined' && window.salesBulkData) {
+      window.salesBulkData.forEach(r => {
+        if (r.owner_email && !seen.has(r.owner_email)) { seen.add(r.owner_email); emails.push(r.owner_email); }
+      });
+    }
+    // fallback: ใส่ email ตัวเองด้วย
+    const self = currentUserProfile?.email;
+    if (self && !seen.has(self)) emails.push(self);
+    return emails;
+  }
+
+  // ── TL Team Feed ──────────────────────────────────────────────────────────
+  function _renderTLTeamFeed(sessions) {
+    if (!sessions.length) return '<div style="text-align:center;padding:48px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มี session</div>';
+
+    return sessions.map(s => {
+      const repName  = s.owner_email ? s.owner_email.split('@')[0] : '—';
+      const acctLabel = s.account_name || '—';
+      const date     = new Date(s.visited_at).toLocaleDateString('th-TH', { day:'numeric', month:'short' });
+      const dur      = s.duration_secs ? _fmt(s.duration_secs) : '';
+      const reviewed = !!s.tl_reviewed_at;
+
+      // Skill dots
+      const skills = s.skill_scores?.skills || [];
+      const dots = skills.slice(0, 8).map(sk => {
+        const sc  = sk.tl_override || sk.score;
+        const col = sc==='pass'?'#34C759':sc==='developing'?'#FF9500':'#E5E5EA';
+        return `<span style="width:6px;height:6px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>`;
+      }).join('');
+
+      // Tone badge
+      let toneBadge = '';
+      if (s.tone_signals?.rep_confidence) {
+        const c = s.tone_signals.rep_confidence;
+        const col = c==='high'?'#34C759':c==='medium'?'#FF9500':'#FF3B30';
+        toneBadge = `<span style="font-size:9px;font-weight:500;color:${col};background:${col}18;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em">${c==='high'?'Confident':c==='medium'?'Steady':'Hesitant'}</span>`;
+      }
+
+      // Review badge
+      const reviewBadge = reviewed
+        ? `<span style="font-size:9px;font-weight:500;color:#34C759;background:#34C75918;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">✓ รีวิวแล้ว</span>`
+        : `<span style="font-size:9px;font-weight:500;color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">รอรีวิว</span>`;
+
+      return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 12px rgba(0,0,0,.04);padding:12px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,56,92,.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--ac,#FF385C);flex-shrink:0">${repName.slice(0,2).toUpperCase()}</div>
+      <div>
+        <div style="font-size:12px;font-weight:500;color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
+        <div style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel}</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${date}${dur?' · '+dur:''}</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
+    ${toneBadge}
+    ${reviewBadge}
+  </div>
+</div>`;
+    }).join('');
+  }
+
+  // ── Session Detail Sheet (TL) ──────────────────────────────────────────────
+  async function _openSessionDetail(sessionId) {
+    if (!_canDebrief()) return;
+
+    // Inject CSS once
+    if (!document.getElementById('ci-sess-detail-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-sess-detail-style';
+      s.textContent = `
+#ci-sess-detail { position:fixed;top:0;bottom:0;left:50%;width:100%;max-width:440px;transform:translateX(-50%) translateY(100%);z-index:10001;background:#FFFFFF;font-family:'Noto Sans Thai',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:transform 380ms cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
+#ci-sess-detail.open { transform:translateX(-50%) translateY(0); }
+.sd-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:0.5px solid #E5E5EA;flex-shrink:0; }
+.sd-title { font-size:15px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em; }
+.sd-close { font-size:15px;color:#636366;cursor:pointer;padding:4px 0 4px 12px; }
+.sd-body { flex:1;overflow-y:auto;padding:16px 20px 24px;-webkit-overflow-scrolling:touch; }
+.sd-body::-webkit-scrollbar { display:none; }
+.sd-section-hd { font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:16px 0 8px; }
+.sd-skill-row { display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid #F2F2F7; }
+.sd-skill-row:last-child { border-bottom:none; }
+.sd-skill-dot { width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0; }
+.sd-skill-name { font-size:12px;font-weight:500;color:#1C1C1E;margin-bottom:2px; }
+.sd-skill-ev { font-size:11px;color:#636366;line-height:1.5; }
+.sd-skill-note { font-size:11px;color:#FF385C;margin-top:3px;font-style:italic;line-height:1.4; }
+.sd-tone-row { display:flex;gap:10px;margin-bottom:12px; }
+.sd-tone-card { flex:1;padding:10px 12px;background:#F7F7F7;border-radius:10px; }
+.sd-tone-label { font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px; }
+.sd-tone-val { font-size:13px;font-weight:500; }
+.sd-tone-note { font-size:10px;color:#AEAEB2;margin-top:2px;line-height:1.4; }
+.sd-summary { font-size:12px;color:#636366;line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border-radius:10px;border:0.5px solid rgba(255,56,92,.12); }
+.sd-review-btn { width:100%;padding:14px;border-radius:14px;border:none;background:var(--ac,#FF385C);color:#fff;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;cursor:pointer;letter-spacing:-.02em;transition:opacity 80ms; }
+.sd-review-btn:active { opacity:.8; }
+.sd-review-btn.done { background:#34C759; }
+.sd-review-footer { padding:12px 20px 32px;flex-shrink:0;border-top:0.5px solid #E5E5EA; }
+      `;
+      document.head.appendChild(s);
+    }
+
+    document.getElementById('ci-sess-detail')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'ci-sess-detail';
+    sheet.innerHTML = `
+      <div class="sd-header">
+        <span class="sd-title">รายละเอียด Session</span>
+        <span class="sd-close" onclick="CI._closeSessionDetail()">ปิด</span>
+      </div>
+      <div class="sd-body" id="sd-body-inner">
+        <div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+      </div>
+      <div class="sd-review-footer" id="sd-review-footer" style="display:none"></div>`;
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+
+    // Load session data
+    try {
+      const { data, error } = await supa.from('ci_sessions')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,status')
+        .eq('id', sessionId)
+        .single();
+      if (error || !data) throw error || new Error('not found');
+      _renderSessionDetailContent(data);
+    } catch(e) {
+      const b = document.getElementById('sd-body-inner');
+      if (b) b.innerHTML = `<div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">โหลดไม่สำเร็จ: ${e.message}</div>`;
+    }
+  }
+
+  function _renderSessionDetailContent(s) {
+    const body   = document.getElementById('sd-body-inner');
+    const footer = document.getElementById('sd-review-footer');
+    if (!body) return;
+
+    const repName   = s.owner_email ? s.owner_email.split('@')[0] : '—';
+    const acctLabel = s.account_name || '—';
+    const date      = new Date(s.visited_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+    const dur       = s.duration_secs ? _fmt(s.duration_secs) : '—';
+    const reviewed  = !!s.tl_reviewed_at;
+
+    // ── Tone section
+    let toneHtml = '';
+    if (s.tone_signals) {
+      const t = s.tone_signals;
+      const cConf = t.rep_confidence==='high'?'#34C759':t.rep_confidence==='medium'?'#FF9500':'#FF3B30';
+      const cEng  = t.customer_engagement==='increasing'?'#34C759':t.customer_engagement==='stable'?'#FF9500':'#FF3B30';
+      const moments = (t.key_moments||[]).map(m =>
+        `<div style="font-size:11px;color:#636366;padding:5px 0;border-bottom:0.5px solid #F2F2F7;line-height:1.5">${m}</div>`
+      ).join('');
+      toneHtml = `
+<div class="sd-section-hd">Tone & Energy</div>
+<div class="sd-tone-row">
+  <div class="sd-tone-card">
+    <div class="sd-tone-label">Sales confidence</div>
+    <div class="sd-tone-val" style="color:${cConf}">${t.rep_confidence||'—'}</div>
+    <div class="sd-tone-note">${t.rep_confidence_note||''}</div>
+  </div>
+  <div class="sd-tone-card">
+    <div class="sd-tone-label">Customer engagement</div>
+    <div class="sd-tone-val" style="color:${cEng}">${t.customer_engagement||'—'}</div>
+    <div class="sd-tone-note">${t.customer_engagement_note||''}</div>
+  </div>
+</div>
+${moments ? `<div class="sd-section-hd">Key Moments</div>${moments}` : ''}`;
+    }
+
+    // ── Skills section
+    const skills = s.skill_scores?.skills || [];
+    const skillRows = skills.map(sk => {
+      const sc  = sk.tl_override || sk.score;
+      const col = sc==='pass'?'#34C759':sc==='developing'?'#FF9500':'#E5E5EA';
+      const bl  = sc==='pass'?'Pass':sc==='developing'?'Developing':sc==='not_applicable'?'N/A':'Not observed';
+      const ev  = sk.evidence && sk.evidence!=='-' ? `<div class="sd-skill-ev">${sk.evidence}</div>` : '';
+      const note= sk.coaching_note && sk.coaching_note!=='-' ? `<div class="sd-skill-note">${sk.coaching_note}</div>` : '';
+      return `<div class="sd-skill-row">
+  <div class="sd-skill-dot" style="background:${col}"></div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span class="sd-skill-name">${sk.code||sk.skill_code||''} · ${sk.name||''}</span>
+      <span style="font-size:9px;font-weight:500;color:${col};font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">${bl}</span>
+    </div>
+    ${ev}${note}
+  </div>
+</div>`;
+    }).join('');
+
+    // ── Transcript summary
+    const summaryHtml = s.transcript_summary
+      ? `<div class="sd-section-hd">สรุปบทสนทนา</div><div class="sd-summary">${s.transcript_summary}</div>`
+      : '';
+
+    // ── Overall
+    const overall = s.skill_scores?.overall;
+    const overallCol = overall==='strong'?'#34C759':overall==='developing'?'#FF9500':'#FF3B30';
+    const overallHtml = overall
+      ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:11px;font-weight:500;color:${overallCol}">${overall.toUpperCase()}</span>
+          <span style="font-size:10px;color:#AEAEB2">· ${s.skill_scores?.session_summary||''}</span>
+        </div>`
+      : '';
+
+    body.innerHTML = `
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+  <div>
+    <div style="font-size:14px;font-weight:500;color:#1C1C1E">${repName}</div>
+    <div style="font-size:11px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif">${acctLabel} · ${date} · ${dur}</div>
+  </div>
+  ${reviewed ? `<span style="font-size:10px;font-weight:500;color:#34C759;background:#34C75918;padding:3px 10px;border-radius:8px">✓ รีวิวแล้ว</span>` : ''}
+</div>
+${overallHtml}
+${toneHtml}
+${skillRows ? `<div class="sd-section-hd">Skills</div>${skillRows}` : ''}
+${summaryHtml}`;
+
+    // ── Review footer
+    if (footer) {
+      footer.style.display = 'block';
+      if (reviewed) {
+        const reviewedDate = new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+        footer.innerHTML = `<button class="sd-review-btn done" disabled>✓ รีวิวแล้ว · ${reviewedDate}</button>`;
+      } else {
+        footer.innerHTML = `<button class="sd-review-btn" onclick="CI._markSessionReviewed('${s.id}')">✓ รีวิว session นี้แล้ว</button>`;
+      }
+    }
+  }
+
+  async function _markSessionReviewed(sessionId) {
+    const btn = document.querySelector('.sd-review-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
+    try {
+      let reviewerId = null;
+      try {
+        const sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (sk) { const ss = JSON.parse(localStorage.getItem(sk)); reviewerId = ss?.user?.id || null; }
+      } catch(_) {}
+
+      const { error } = await supa.from('ci_sessions').update({
+        tl_reviewed_at: new Date().toISOString(),
+        tl_reviewed_by: reviewerId
+      }).eq('id', sessionId);
+
+      if (error) throw error;
+      if (btn) { btn.textContent = '✓ บันทึกแล้ว'; btn.classList.add('done'); }
+      // refresh feed in background
+      setTimeout(() => _loadInlineHistory(), 800);
+    } catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '✓ รีวิว session นี้แล้ว'; }
+      _toast('บันทึกไม่สำเร็จ: ' + e.message);
+    }
+  }
+
+  function _closeSessionDetail() {
+    const sheet = document.getElementById('ci-sess-detail');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    setTimeout(() => sheet.remove(), 400);
   }
 
   function _renderInlineHistory(sessions) {
@@ -2115,7 +2390,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed };
 
 })();
 
