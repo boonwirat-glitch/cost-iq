@@ -158,9 +158,9 @@
 .sk-mod-row:active { background: var(--sk-surface); }
 .sk-mod-dim { opacity: .5; }
 .sk-mod-thumb {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -464,7 +464,7 @@
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
-  height: 190px;
+  height: 260px;
 }
 .sk-img-fade {
   position: absolute;
@@ -1360,3 +1360,31 @@
   font-family: 'Noto Sans Thai', sans-serif;
 }
 
+
+/* ── Character banner (module grid) ─────────────────── */
+.sk-cg-banner {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sk-cg-banner-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 12px 16px;
+  background: linear-gradient(transparent, rgba(0,0,0,.52));
+}
+.sk-cg-banner-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.sk-cg-banner-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.75);
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: .04em;
+}

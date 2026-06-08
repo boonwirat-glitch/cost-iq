@@ -61,7 +61,7 @@ function _skImgTag(def, opts = {}) {
 // Module thumb (50×50) — ใช้รูปจาก def แรกของ module นั้น (Navigator/Scout/etc.)
 function _skModThumb(module) {
   const firstDef = _skillDefs.find(d => d.module === module);
-  return _skImgTag(firstDef, { w: '50px', h: '50px', cls: 'sk-mod-thumb-img' });
+  return _skImgTag(firstDef, { w: '64px', h: '64px', cls: 'sk-mod-thumb-img' });
 }
 
 // ── Module-level state ─────────────────────────────────────
@@ -412,6 +412,12 @@ function _renderModuleGrid(module) {
 </div>`;
   }).join('');
 
+  // character banner — รูปแรกของ module ใช้เป็น hero
+  const bannerDef = defs[0];
+  const bannerImg = bannerDef && bannerDef.card_image_url
+    ? `<img src="${bannerDef.card_image_url}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
+    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
+
   return `
 <div class="sk-cg-topbar">
   <button class="sk-back-btn" onclick="_renderSkillsScreen()">
@@ -510,7 +516,7 @@ async function skillsOpenDetail(skillId) {
   </button>
   <span class="sk-detail-code">${modCode}</span>
 </div>
-<div class="sk-img-zone">${_skImgTag(def, { h:'190px', cls:'sk-img-zone-img' })}
+<div class="sk-img-zone">${_skImgTag(def, { h:'260px', cls:'sk-img-zone-img' })}
   <div class="sk-img-fade"></div>
 </div>
 <div class="sk-detail-body">
