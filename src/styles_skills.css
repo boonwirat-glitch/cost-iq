@@ -58,21 +58,11 @@
 
 /* ══ HERO (Rep) ══════════════════════════════════════════ */
 .sk-hero {
-  margin: 10px 14px 0;
-  background: var(--sk-surface);
-  border-radius: 14px;
-  padding: 16px;
-  position: relative;
-  overflow: hidden;
+  margin: 0;
+  padding: 20px 14px 12px;
+  text-align: center;
 }
-.sk-hero::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--sk-ac);
-  border-radius: 14px 14px 0 0;
-}
+.sk-hero::before { display: none; }
 .sk-hero-top {
   display: flex;
   align-items: flex-start;
@@ -138,15 +128,17 @@
 .sk-meta {
   display: flex;
   justify-content: space-between;
-  margin-top: 3px;
+  margin-top: 6px;
   font-size: 8.5px;
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
+  padding: 0 2px;
 }
 
 /* ══ MODULE LIST ════════════════════════════════════════ */
 .sk-sec {
-  padding: 13px 14px 5px;
+  padding: 16px 14px 8px;
+  text-align: center;
 }
 .sk-mod-list {
   display: flex;
@@ -157,7 +149,7 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  height: 100px;
+  height: 120px;
   border-top: 1px solid var(--sk-hairline);
   cursor: pointer;
   overflow: hidden;
@@ -1891,10 +1883,12 @@
 .sk-row-info {
   flex: 1;
   min-width: 0;
-  padding: 12px 10px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 .sk-row-eye {
   font-size: 8px;
@@ -1911,17 +1905,11 @@
   color: var(--sk-ink);
   line-height: 1.2;
   margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .sk-row-sub {
   font-size: 11px;
   color: var(--sk-muted);
   margin-bottom: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .sk-row-badges {
   display: flex;
