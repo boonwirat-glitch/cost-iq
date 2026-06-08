@@ -144,17 +144,21 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin: 0 14px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--sk-hairline);
 }
 .sk-mod-row {
   display: flex;
   align-items: stretch;
   gap: 0;
   height: 120px;
-  border-top: 1px solid var(--sk-hairline);
+  border-top: 0.5px solid var(--sk-hairline);
   cursor: pointer;
   overflow: hidden;
 }
-.sk-mod-row:last-child { border-bottom: 1px solid var(--sk-hairline); }
+/* .sk-mod-row:last-child border removed */
 .sk-mod-row:active { background: var(--sk-surface); }
 .sk-mod-dim { opacity: .5; }
 .sk-mod-thumb {
@@ -281,7 +285,7 @@
 .sk-card:active { opacity: .85; }
 .sk-card-img {
   width: 100%;
-  height: 160px;
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -344,9 +348,9 @@
 }
 .state-mastered .sk-card-body { background: #1A1200; }
 .state-mastered .sk-card-name { color: #FFD966; }
-.state-mastered .sk-card-code { color: #7A5A00; }
+.state-mastered .sk-card-code { display: none; }
 
-.sk-card-body { padding: 8px 10px 10px; }
+.sk-card-body { padding: 7px 10px 8px; }
 .sk-state-row {
   display: flex;
   align-items: center;
@@ -384,10 +388,7 @@
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-card-code {
-  font-size: 8.5px;
-  color: var(--sk-muted);
-  font-family: 'Noto Sans Thai', sans-serif;
-  margin-top: 2px;
+  display: none;
 }
 .sk-lock-ico {
   position: absolute;
@@ -1862,7 +1863,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 28%;
+  object-position: center 38%;
   display: block;
 }
 .sk-row-thumb-fade {
@@ -1874,7 +1875,7 @@
 .sk-row-thumb-img {
   width: 100%; height: 100%;
   object-fit: cover;
-  object-position: center 28%;
+  object-position: center 38%;
   display: block;
   opacity: 0;
   transition: opacity .2s ease;
@@ -1976,9 +1977,10 @@
 .s2-banner {
   position: relative;
   width: 100%;
-  height: 280px;
+  height: 320px;
   overflow: hidden;
   background: #F7F0FA;
+  border-radius: 0 0 20px 20px;
 }
 .s2-char-img {
   width: 100%;
