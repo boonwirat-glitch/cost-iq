@@ -2161,6 +2161,8 @@ body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 .bnav{grid-template-columns:repeat(5,1fr)}
 .bnav .lb{font-size:10px}
 body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
+/* Echo hidden from KAM — Sales only */
+body.kam-mode .bnav #nav-echo-kam { display: none !important; }
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
 body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
 
@@ -4821,12 +4823,14 @@ body.sales-mode .bnav #nav-restaurant   { display: none !important; }
 body.sales-mode .bnav #nav-portview     { display: none !important; }
 body.sales-mode .bnav #nav-teamview     { display: none !important; }
 
-/* Skills tab: sales + sales_tl only — hidden in KAM mode */
+/* Skills + Echo tab: sales only — hidden in KAM mode */
 .bnav .ni.sales-any-btn                    { display: none !important; }
 body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
+/* Echo for Sales — re-use rest-only echo btn, show in sales-mode */
+body.sales-mode .bnav #nav-echo            { display: flex !important; }
 
-/* Sales nav grid: 3 cols (portview + pipeline + commission + skills) */
-body.sales-mode .bnav { grid-template-columns: repeat(4,1fr); }
+/* Sales nav grid: portview + pipeline + commission + skills + echo = 5 cols */
+body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
 body.sales-mode .bnav #nav-opportunities { display: none !important; }
