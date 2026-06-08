@@ -1804,7 +1804,7 @@
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 42%; opacity: 1; overflow: hidden; }
+.s3-sheet-peek     { height: 45%; opacity: 1; overflow: hidden; }
 .s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
@@ -1817,12 +1817,7 @@
 
 /* Peek hint */
 .s3-peek-hint {
-  padding: 0 16px 10px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
+  padding: 0 16px 12px;
 }
 .s3-teaser {
   font-size: 11.5px;
@@ -1838,6 +1833,21 @@
   flex-shrink: 0;
   margin-top: 2px;
   transition: transform .3s ease;
+}
+.s3-peek-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sk-ink);
+  line-height: 1.2;
+  margin: 8px 0 10px;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.s3-peek-cta {
+  /* CTA button inside peek — full width, no top margin needed */
+}
+.s3-peek-cta .sk-cta-btn {
+  width: 100%;
+  margin-top: 0;
 }
 .s3-sheet-expanded .s3-expand-chevron { transform: rotate(180deg); }
 
