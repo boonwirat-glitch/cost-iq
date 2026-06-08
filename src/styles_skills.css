@@ -38,6 +38,12 @@
   padding-bottom: 84px;
 }
 #scr-skills.on { display: flex !important; flex-direction: column !important; }
+/* S3 detail mode: lock scroll so absolute sheet works */
+#scr-skills.sk-detail-mode {
+  overflow: hidden !important;
+  padding-bottom: 0 !important;
+  height: 100% !important;
+}
 #scr-skills::-webkit-scrollbar { display: none; }
 
 /* ── Eyebrow label (Noto Sans Thai) ── */
@@ -1767,7 +1773,7 @@
 .s3-detail {
   position: relative;
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   overflow: hidden;
   background: #111;
   isolation: isolate;
@@ -1795,6 +1801,8 @@
   position: relative;
   width: 100%;
   z-index: 1;
+  max-height: calc(100% - 60px);
+  overflow: hidden;
 }
 .s3-hero-img {
   width: 100%;
