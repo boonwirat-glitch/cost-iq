@@ -2162,7 +2162,6 @@ body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 .bnav .lb{font-size:10px}
 body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
 /* Echo hidden from KAM — Sales only */
-body.kam-mode .bnav #nav-echo-kam { display: none !important; }
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
 body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
 
@@ -4826,10 +4825,15 @@ body.sales-mode .bnav #nav-teamview     { display: none !important; }
 /* Skills + Echo tab: sales only — hidden in KAM mode */
 .bnav .ni.sales-any-btn                    { display: none !important; }
 body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
-/* Echo for Sales — re-use rest-only echo btn, show in sales-mode */
-body.sales-mode .bnav #nav-echo            { display: flex !important; }
+/* Echo for Sales — show + center position */
+body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
+body.sales-mode .bnav #nav-sales-portview  { order: 1; }
+body.sales-mode .bnav #nav-sales-pipeline  { order: 2; }
+body.sales-mode .bnav #nav-sales-commission{ order: 4; }
+body.sales-mode .bnav #nav-skills          { order: 5; }
+body.sales-mode .bnav #nav-sales-teamview  { order: 6; }
 
-/* Sales nav grid: portview + pipeline + commission + skills + echo = 5 cols */
+/* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
 body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
 body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
