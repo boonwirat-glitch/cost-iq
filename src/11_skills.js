@@ -396,7 +396,7 @@ function _renderRepHome() {
     <div class="sk-row-eye" style="color:${meta.color}">MODULE ${m} · ${defs.length} SKILLS</div>
     <div class="sk-row-name">${meta.name}</div>
     <div class="sk-row-sub">${meta.sub}</div>
-    <div class="sk-row-badges">${stateBadge}${echoStrip}</div>
+    <div class="sk-row-badges">${stateBadge}</div>
   </div>
   <div class="sk-row-right">${ringSvg}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></div>
 </div>`;
