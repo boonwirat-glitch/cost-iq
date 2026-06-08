@@ -9877,53 +9877,19 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 
 /* ── Screen 3: Full-bleed Hero + Bottom Sheet ── */
-.s3-detail {
-  position: relative;
-  width: 100%; height: 100%;
-  overflow: hidden;
-}
-.s3-hero {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 0;
-}
-.s3-hero-img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-.s3-hero-gradient {
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,.25) 0%, transparent 25%, transparent 38%, rgba(0,0,0,.35) 80%, rgba(0,0,0,.5) 100%);
-}
-.s3-topbar {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-  padding: 12px 16px;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.s3-back {
-  display: inline-flex; align-items: center; gap: 5px;
-  color: #fff; font-size: 13px; font-weight: 600;
-  background: rgba(0,0,0,.32); border: none;
-  border-radius: 999px; padding: 6px 13px;
-  backdrop-filter: blur(8px); cursor: pointer;
-  font-family: 'Noto Sans Thai', sans-serif;
-}
-.s3-code-pill {
-  color: rgba(255,255,255,.85); font-size: 11px;
-  font-family: 'IBM Plex Mono', monospace;
-  background: rgba(0,0,0,.28); padding: 5px 11px;
-  border-radius: 999px; backdrop-filter: blur(8px);
-}
-/* s3-sheet moved below */
+
+
+
+
+
+
+
+
 @keyframes s3-sheet-up {
   from { transform: translateY(60px); opacity: .4; }
   to   { transform: translateY(0); opacity: 1; }
 }
-.s3-sheet-handle {
-  width: 36px; height: 4px;
-  background: #E0E0E0; border-radius: 99px;
-  margin: 10px auto 8px;
-}
+
 /* content stagger fade */
 .s3-sheet .sk-detail-body > * {
   animation: s3-fade-up .35s ease both;
@@ -9971,42 +9937,17 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   height: 100% !important;
   display: block !important;
 }
-#scr-skills.sk-detail-mode .s3-detail {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  width: 100%; height: 100%;
-}
+#scr-skills.sk-detail-mode 
 
 /* ══ S3 PEEK / EXPAND SHEET ══════════════════════════════ */
-.s3-sheet {
-  transition: height .42s cubic-bezier(.32,.72,0,1);
-}
-/* peek/expanded moved below */
-.s3-peek-hint {
-  padding: 0 18px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
-}
-.s3-expand-chevron {
-  flex-shrink: 0;
-  transition: transform .3s ease;
-}
-.s3-sheet-expanded .s3-expand-chevron {
-  transform: rotate(180deg);
-}
-.s3-body-full {
-  animation: s3-fade-up .3s ease both;
-  animation-delay: .12s;
-}
-.s3-sheet-peek .s3-body-full {
-  display: none;
-}
-.s3-sheet-expanded .s3-body-full {
-  display: block;
-}
+
+
+
+
+.s3-sheet-expanded 
+
+.s3-sheet-peek 
+.s3-sheet-expanded 
 
 /* ══ IMAGE LAZY FADE ═════════════════════════════════════ */
 .sk-img-lazy:not(.sk-img-loaded) {
@@ -10028,7 +9969,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-card:active, .sk-card-wide:active { transform: scale(.97); }
 
 /* S3 hero parallax — transform driven by JS scroll */
-.s3-hero { will-change: transform; }
+
 
 /* S3 sheet content stagger */
 .s3-body-full > * {
@@ -10047,7 +9988,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-cta-btn:active { transform: scale(.97); }
 
 /* Back button */
-.s3-back { transition: opacity .12s; }
+
 .s3-back:active { opacity: .7; }
 
 /* ── Skeleton shimmer (loading state) ── */
@@ -10098,37 +10039,124 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 
 
-/* ══ S3 AMBIENT + SHEET CONSOLIDATED ════════════════════ */
+
+
+
+
+
+
+
+
+
+/* ══════════════════════════════════════════════════════
+   S3 DETAIL — clean consolidated
+   ══════════════════════════════════════════════════════ */
+
+/* Container: fills #scr-skills */
+.s3-detail {
+  position: relative;
+  width: 100%;
+  background: #111;
+  overflow-x: hidden;
+}
+
+/* Hero: natural flow, fits width */
+.s3-hero {
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+.s3-hero-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Gradient overlay on hero */
+.s3-hero-gradient {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,.32) 0%, transparent 35%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Ambient bg — fills .s3-hero, blurred color wash */
 .s3-ambient-bg {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   background-size: cover;
-  background-position: center bottom;
+  background-position: center;
   filter: blur(40px) saturate(2.2) brightness(0.65);
   transform: scale(1.15);
-  z-index: -1;
+  z-index: 0;
   opacity: 0;
-  transition: opacity .5s ease .2s;
+  transition: opacity .5s ease .1s;
 }
 .s3-ambient-bg.loaded { opacity: 1; }
+
+/* Topbar: absolute on top of hero */
+.s3-topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.s3-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #fff; font-size: 13px; font-weight: 600;
+  background: rgba(0,0,0,.32); border: none;
+  border-radius: 999px; padding: 6px 13px;
+  backdrop-filter: blur(8px); cursor: pointer;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.s3-code-pill {
+  color: rgba(255,255,255,.85); font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  background: rgba(0,0,0,.28); padding: 5px 11px;
+  border-radius: 999px; backdrop-filter: blur(8px);
+}
+
+/* Sheet */
 .s3-sheet {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 5;
   background: rgba(255,255,255,0.25);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
   backdrop-filter: blur(28px) saturate(1.8);
   border-radius: 24px 24px 0 0;
-  padding: 0 18px 90px;
   margin-top: -24px;
-  transition: height .45s cubic-bezier(.32,.72,0,1);
+  overflow: hidden;
+  transition: height .45s cubic-bezier(.32,.72,0,1),
+              opacity .3s ease;
 }
-.s3-sheet-hidden   { height: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 120px; overflow: hidden; }
-.s3-sheet-expanded { height: 68vh; overflow-y: auto; }
+.s3-sheet-hidden   { height: 0; opacity: 0; transition: none; }
+.s3-sheet-peek     { height: 120px; overflow: hidden; opacity: 1; }
+.s3-sheet-expanded { height: 70vh; overflow-y: auto; opacity: 1; }
+
+/* Sheet handle */
+.s3-sheet-handle {
+  width: 36px; height: 4px;
+  background: rgba(0,0,0,.18); border-radius: 99px;
+  margin: 10px auto 6px;
+  cursor: pointer;
+}
+
+/* Peek hint row */
+.s3-peek-hint {
+  padding: 0 16px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
 .s3-teaser {
-  font-size: 12px;
-  color: rgba(30,30,30,0.65);
+  font-size: 11.5px;
+  color: rgba(20,20,20,0.6);
   line-height: 1.35;
   overflow: hidden;
   display: -webkit-box;
@@ -10136,6 +10164,17 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   -webkit-box-orient: vertical;
   margin-top: 3px;
 }
+.s3-expand-chevron {
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: transform .3s ease;
+}
+.s3-sheet-expanded .s3-expand-chevron { transform: rotate(180deg); }
+
+/* Body content */
+.s3-body-full { display: none; }
+.s3-sheet-peek .s3-body-full { display: none; }
+.s3-sheet-expanded .s3-body-full { display: block; }
 </style>
 </head>
 <body>
