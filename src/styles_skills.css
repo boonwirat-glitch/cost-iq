@@ -1486,10 +1486,15 @@
   object-fit: cover;
   object-position: center 30%;
   display: block;
-  opacity: 0;
-  transition: opacity .25s ease;
+  opacity: 1;
 }
-.mod-album-img.sk-img-loaded { opacity: 1; }
+.mod-album-img:not(.sk-img-loaded) {
+  animation: sk-img-fade .3s ease both;
+}
+@keyframes sk-img-fade {
+  from { opacity: .3; }
+  to   { opacity: 1; }
+}
 .mod-album-overlay {
   position: absolute; inset: 0;
   background: linear-gradient(to bottom, transparent 25%, rgba(0,0,0,.72) 100%);

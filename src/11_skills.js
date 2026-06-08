@@ -306,6 +306,17 @@ function _renderSkillsScreen() {
   if (!scr) return;
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
+  _markLoadedImages(scr);
+}
+
+// แก้ race condition: รูปที่โหลดจาก cache เสร็จก่อน onload ผูก → เช็ค .complete
+function _markLoadedImages(scr) {
+  if (!scr) return;
+  scr.querySelectorAll('img.mod-album-img, img.s2-char-img, img.s3-hero-img, img.sk-card-img-inner').forEach(img => {
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add('sk-img-loaded');
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -345,7 +356,7 @@ function _renderRepHome() {
     // album card — รูปแรกของ module เป็น hero
     const firstDef = defs[0];
     const bgImg = firstDef && firstDef.card_image_url
-      ? `<img src="${firstDef.card_image_url}" class="mod-album-img" alt="${meta.name}" loading="lazy" onload="this.classList.add('sk-img-loaded')">`
+      ? `<img src="${firstDef.card_image_url}" class="mod-album-img" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
       : `<div style="width:100%;height:100%;background:${MODULE_BG[m]};"></div>`;
     const ringStroke = ringPct >= 1 ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : 'rgba(255,255,255,.55)';
     const ringTxtCol = uCount > 0 || tCount > 0 ? '#fff' : 'rgba(255,255,255,.6)';
@@ -408,6 +419,7 @@ function skillsOpenModule(module) {
   const scr = _switchSkillsScreen('grid');
   if (!scr) return;
   scr.innerHTML = _renderModuleGrid(module);
+  _markLoadedImages(scr);
 }
 
 function _renderModuleGrid(module) {

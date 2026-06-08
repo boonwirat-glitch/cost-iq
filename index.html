@@ -1,4 +1,4 @@
-<!-- Freshket Sense v438: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v439: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v438',
+      version: 'v439',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9775,10 +9775,15 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   object-fit: cover;
   object-position: center 30%;
   display: block;
-  opacity: 0;
-  transition: opacity .25s ease;
+  opacity: 1;
 }
-.mod-album-img.sk-img-loaded { opacity: 1; }
+.mod-album-img:not(.sk-img-loaded) {
+  animation: sk-img-fade .3s ease both;
+}
+@keyframes sk-img-fade {
+  from { opacity: .3; }
+  to   { opacity: 1; }
+}
 .mod-album-overlay {
   position: absolute; inset: 0;
   background: linear-gradient(to bottom, transparent 25%, rgba(0,0,0,.72) 100%);
@@ -43386,6 +43391,17 @@ function _renderSkillsScreen() {
   if (!scr) return;
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
+  _markLoadedImages(scr);
+}
+
+// แก้ race condition: รูปที่โหลดจาก cache เสร็จก่อน onload ผูก → เช็ค .complete
+function _markLoadedImages(scr) {
+  if (!scr) return;
+  scr.querySelectorAll('img.mod-album-img, img.s2-char-img, img.s3-hero-img, img.sk-card-img-inner').forEach(img => {
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add('sk-img-loaded');
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -43425,7 +43441,7 @@ function _renderRepHome() {
     // album card — รูปแรกของ module เป็น hero
     const firstDef = defs[0];
     const bgImg = firstDef && firstDef.card_image_url
-      ? `<img src="${firstDef.card_image_url}" class="mod-album-img" alt="${meta.name}" loading="lazy" onload="this.classList.add('sk-img-loaded')">`
+      ? `<img src="${firstDef.card_image_url}" class="mod-album-img" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
       : `<div style="width:100%;height:100%;background:${MODULE_BG[m]};"></div>`;
     const ringStroke = ringPct >= 1 ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : 'rgba(255,255,255,.55)';
     const ringTxtCol = uCount > 0 || tCount > 0 ? '#fff' : 'rgba(255,255,255,.6)';
@@ -43488,6 +43504,7 @@ function skillsOpenModule(module) {
   const scr = _switchSkillsScreen('grid');
   if (!scr) return;
   scr.innerHTML = _renderModuleGrid(module);
+  _markLoadedImages(scr);
 }
 
 function _renderModuleGrid(module) {
