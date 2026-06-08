@@ -478,21 +478,19 @@ function _renderModuleGrid(module) {
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
     <div class="sk-card-name">${d.skill_name_en}</div>
-    <div class="sk-card-code">${d.skill_code.split('_')[0]} · สูงสุด</div>
   </div>
 </div>`;
     }
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
-  <div class="sk-card-img" style="height:160px;width:100%;position:relative;overflow:hidden;">
-    ${_skImgTag(d, { h:'160px', cls:'sk-card-img-inner' })}
+  <div class="sk-card-img" style="height:180px;width:100%;position:relative;overflow:hidden;">
+    ${_skImgTag(d, { h:'180px', cls:'sk-card-img-inner' })}
     ${sparkHtml}
   </div>
   ${lockIco}
   <div class="sk-card-body">
     <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
     <div class="sk-card-name">${d.skill_name_en}</div>
-    <div class="sk-card-code">${d.skill_code.split('_')[0]}</div>
   </div>
 </div>`;
   }).join('');
