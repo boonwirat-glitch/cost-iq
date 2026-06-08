@@ -3,8 +3,7 @@
 // CSS + HTML ตรงจาก ci_mockup_v2 — ห้ามแก้ design โดยไม่ update mockup ด้วย
 // =============================================================================
 
-var CI;
-CI = (() => {
+const CI = (() => {
   'use strict';
 
   // ── Constants ──────────────────────────────────────────────────────────────
@@ -2109,6 +2108,7 @@ ${text}`;
     } catch(e) { console.warn('[CI sales search]', e); }
   }
 
+
   // ── Public ─────────────────────────────────────────────────────────────────
   function _topbarLeft() {
     if (_phase === 'recording') { _minimize(); }
@@ -2117,14 +2117,7 @@ ${text}`;
 
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
-
-    // Force remove existing sheet immediately (handles minimize state where sheet is display:none)
-    const _existing = document.getElementById('ci-fullsheet');
-    if (_existing) { _existing.remove(); clearInterval(_timerRef); clearInterval(_waveRef); }
-    document.body.classList.remove('echo-active');
-    const _floatPill = document.getElementById('echo-float-pill');
-    if (_floatPill) _floatPill.classList.remove('visible');
-
+    _unmount();
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     _ownerType = (role === 'sales') ? 'sales' : 'kam';
