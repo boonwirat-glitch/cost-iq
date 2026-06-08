@@ -37,7 +37,7 @@
   scrollbar-width: none;
   padding-bottom: 84px;
 }
-#scr-skills.on { display: flex; }
+#scr-skills.on { display: flex !important; flex-direction: column !important; }
 #scr-skills::-webkit-scrollbar { display: none; }
 
 /* ── Eyebrow label (Noto Sans Thai) ── */
@@ -1678,6 +1678,9 @@
 #scr-skills.sk-detail-mode {
   overflow: hidden !important;
   padding-bottom: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: block !important;
 }
 #scr-skills.sk-detail-mode .s3-detail {
   position: absolute;

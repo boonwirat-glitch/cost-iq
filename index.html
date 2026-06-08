@@ -1,4 +1,4 @@
-<!-- Freshket Sense v437: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v438: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v437',
+      version: 'v438',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8326,7 +8326,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   scrollbar-width: none;
   padding-bottom: 84px;
 }
-#scr-skills.on { display: flex; }
+#scr-skills.on { display: flex !important; flex-direction: column !important; }
 #scr-skills::-webkit-scrollbar { display: none; }
 
 /* ── Eyebrow label (Noto Sans Thai) ── */
@@ -9967,6 +9967,9 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 #scr-skills.sk-detail-mode {
   overflow: hidden !important;
   padding-bottom: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: block !important;
 }
 #scr-skills.sk-detail-mode .s3-detail {
   position: absolute;
@@ -43367,9 +43370,11 @@ function _updateSkillsNavBadge() {
 function _switchSkillsScreen(mode) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return scr;
-  // reset ทุก state ก่อนเสมอ
+  // reset เฉพาะ property ที่เราตั้งเอง — ห้ามแตะ display (showScreen เป็นคนคุม)
   scr.classList.remove('sk-detail-mode');
-  scr.removeAttribute('style');
+  scr.style.opacity = '';
+  scr.style.transition = '';
+  scr.style.paddingBottom = '';
   if (mode === 'detail') {
     scr.classList.add('sk-detail-mode');
   }

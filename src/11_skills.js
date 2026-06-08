@@ -290,9 +290,11 @@ function _updateSkillsNavBadge() {
 function _switchSkillsScreen(mode) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return scr;
-  // reset ทุก state ก่อนเสมอ
+  // reset เฉพาะ property ที่เราตั้งเอง — ห้ามแตะ display (showScreen เป็นคนคุม)
   scr.classList.remove('sk-detail-mode');
-  scr.removeAttribute('style');
+  scr.style.opacity = '';
+  scr.style.transition = '';
+  scr.style.paddingBottom = '';
   if (mode === 'detail') {
     scr.classList.add('sk-detail-mode');
   }
