@@ -127,6 +127,19 @@ async function skillsInit() {
   const role = typeof getCurrentRole === 'function' ? getCurrentRole() : null;
   _skillsRole = role;
 
+  // Role guard: KAM/rep must not see skills — redirect back to portview
+  const _allowedRoles = ['sales','sales_tl','tl','admin'];
+  const _normRole = role ? role.toLowerCase() : '';
+  const _isAllowed = _allowedRoles.some(r => _normRole.includes(r));
+  if (!_isAllowed) {
+    console.warn('[Skills] role not allowed:', role, '→ redirecting to portview');
+    if (typeof showScreen === 'function') showScreen('portview');
+    return;
+  }
+
+  // Reset active state to prevent stale S3 detail from previous session
+  _activeSkillId = null;
+
   // get current user id from Supabase session
   const sessionKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
   if (sessionKey) {
@@ -306,6 +319,12 @@ function _switchSkillsScreen(mode) {
 function _renderSkillsScreen() {
   const scr = _switchSkillsScreen('home');
   if (!scr) return;
+  // Safety guard: if role not set or is KAM/rep, don't render
+  const _r = (_skillsRole || '').toLowerCase();
+  if (!_r || (!_r.includes('sales') && _r !== 'tl' && _r !== 'admin')) {
+    if (typeof showScreen === 'function') showScreen('portview');
+    return;
+  }
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
   _markLoadedImages(scr);
