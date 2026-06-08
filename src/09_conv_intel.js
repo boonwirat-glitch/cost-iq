@@ -8,7 +8,7 @@ const CI = (() => {
 
   // ── Constants ──────────────────────────────────────────────────────────────
   const WORKER_URL = 'https://freshket-sense-ai-proxy.boonwirat-t.workers.dev';
-  const MAX_SECS   = 180;
+  const MAX_SECS   = 7200; // 2hr safety cap — Gemini รับได้ถึง 2hr audio
 
   // ── State ──────────────────────────────────────────────────────────────────
   let _recorder    = null;
@@ -487,12 +487,14 @@ const CI = (() => {
       <button class="tab-btn on" onclick="CI._tab(0,this)">Skills</button>
       <button class="tab-btn" onclick="CI._tab(1,this)">ลูกค้า</button>
       <button class="tab-btn" onclick="CI._tab(2,this)">Next Steps</button>
+      <button class="tab-btn" onclick="CI._tab(3,this)">Transcript</button>
     </div>
   </div>
   <div class="result-body" id="ci-result-body">
     <div class="panel on" id="ci-p0"></div>
     <div class="panel" id="ci-p1"></div>
     <div class="panel" id="ci-p2"></div>
+    <div class="panel" id="ci-p3"></div>
   </div>
   <div class="result-cta">
     <button class="btn btn-ghost" onclick="CI.cancel()">ทิ้ง</button>
@@ -604,7 +606,7 @@ const CI = (() => {
     _recorder.stream.getTracks().forEach(t => t.stop());
     _phase = 'processing';
     _showScreen('ci-s-proc');
-    _setStep('Transcribing...', 'Whisper · ภาษาไทย', 14);
+    _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 14);
   }
 
   function cancel() {
@@ -634,43 +636,25 @@ const CI = (() => {
     if (pf) pf.style.width = pct + '%';
   }
 
-  // ── Audio → transcript ─────────────────────────────────────────────────────
+  // ── Audio → Gemini analyze (single call) ──────────────────────────────────
   async function _onStop() {
     const blob = new Blob(_chunks, { type: _recorder?.mimeType || 'audio/webm' });
     _chunks = [];
     try {
-      const form = new FormData();
-      form.append('audio', blob, 'recording.webm');
-      form.append('prompt', 'การสนทนาระหว่าง sales rep กับเจ้าของร้านอาหาร เรื่องวัตถุดิบ freshket');
-      const res = await fetch(`${WORKER_URL}/transcribe`, { method: 'POST', body: form });
-      if (!res.ok) throw new Error(`transcribe ${res.status}`);
-      const { text } = await res.json();
-      if (!text || text.trim().length < 5) throw new Error('transcript ว่างเปล่า');
+      _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 20);
 
-      // Minimum quality gate — skill scoring needs enough conversation
-      const _wordCount = text.trim().split(/\s+/).length;
-      const _SHORT_THRESHOLD = 80; // words
-      const _isShortTranscript = _wordCount < _SHORT_THRESHOLD;
-      // Pass flag to analyze functions — short transcript skips skill split
-      _lastTranscriptWordCount = _wordCount;
+      // Load rubric from DB if not cached yet
+      if (!_rubricCache) await _loadRubricFromDB();
 
-      const isShortTranscript = _lastTranscriptWordCount < 80;
-      if (isShortTranscript) {
-        _setStep('Analyzing skills...', `Claude Haiku · ${_lastTranscriptWordCount} คำ (short mode)`, 44);
-      } else {
-        _setStep('Analyzing skills...', 'Claude Haiku · 2 passes parallel', 44);
-      }
-      const skillData = await _analyzeSkills(text);
+      const result = await _analyzeWithGemini(blob);
 
-      _setStep('Reading customer signals...', 'Claude Sonnet · full account context', 74);
-      const intelData = await _analyzeIntel(text);
+      _setStep('กำลังบันทึก...', '', 92);
+      await _saveToSupabase(result.skillData, result.intelData, result.transcriptSummary, result.toneSignals);
 
-      _setStep('Saving...', '', 96);
-      await _saveToSupabase(skillData, intelData);
-
-      _setStep('Done', '', 100);
+      _setStep('เสร็จแล้ว', '', 100);
       setTimeout(() => {
-        _lastResult = { skillData, intelData };
+        _lastResult = { skillData: result.skillData, intelData: result.intelData,
+                        transcriptSummary: result.transcriptSummary, toneSignals: result.toneSignals };
         _renderResult();
         document.getElementById('ci-dur-chip').textContent = _durText;
         _showScreen('ci-s-result');
@@ -686,450 +670,230 @@ const CI = (() => {
 
   // ── AI Analysis ────────────────────────────────────────────────────────────
   //
-  // SKILL RUBRIC — source of truth จาก Modules Sales Lead (Feb 2026)
-  // แต่ละ skill มี: principle (ทำไม), pass_criteria (ผ่านต้องทำอะไรได้),
-  //                 observable (สัญญาณที่ฟังออกได้จาก transcript)
-  // B1 ตัดออก — เป็น pre-visit activity ไม่มีใน conversation
+  // ── AI Analysis — Gemini audio-native ────────────────────────────────────
   //
-  // ── Echo code → skill_definitions.skill_code mapping ────────────────────
-  // ใช้ skill_code เพราะ id อาจ shift ถ้ามีการ seed ใหม่
-  // ตรงนี้คือ bridge ระหว่าง Echo internal codes กับ skill_definitions table
+  // แทน Whisper+Haiku+Sonnet ด้วย Gemini call เดียว
+  // รับ audio blob โดยตรง — ไม่ต้อง transcribe ก่อน
+  // Rubric โหลดจาก skill_definitions (echo_enabled=true) ไม่ hardcode
+
+  // ── Echo code → skill_code bridge (ยังคงไว้เพราะ kam_skill_log ใช้) ──────
   const ECHO_TO_SKILL_CODE = {
-    'APIPC': 'A01_PIPC',
-    'A5':    'A05_VALUE',
-    'A9':    'A09_PLANNING',
-    'A10':   'A10_PIPELINE',
-    'B2':    'B02_DM',
-    'B3':    'B03_APPT',
-    'B4':    'B04_PREVISIT',
-    'C0':    'C00_RAPPORT',
-    'C1':    'C01_DISCOVERY',
-    'C3':    'C03_ANALYZE',
-    'C4':    'C04_OBJECTION',
-    'C5':    'C05_CLOSE',
-    'D1':    'D01_WALLET',
-    'D2':    'D02_FOLLOWUP',
+    'A01_PIPC':     'A01_PIPC',
+    'A05_VALUE':    'A05_VALUE',
+    'B02_DM':       'B02_DM',
+    'B03_APPT':     'B03_APPT',
+    'C00_RAPPORT':  'C00_RAPPORT',
+    'C01_DISCOVERY':'C01_DISCOVERY',
+    'C03_ANALYZE':  'C03_ANALYZE',
+    'C04_OBJECTION':'C04_OBJECTION',
+    'C05_CLOSE':    'C05_CLOSE',
+    'D01_WALLET':   'D01_WALLET',
+    'D02_FOLLOWUP': 'D02_FOLLOWUP',
+    // legacy short codes — backward compat
+    'APIPC':'A01_PIPC','A5':'A05_VALUE','B2':'B02_DM','B3':'B03_APPT',
+    'C0':'C00_RAPPORT','C1':'C01_DISCOVERY','C3':'C03_ANALYZE',
+    'C4':'C04_OBJECTION','C5':'C05_CLOSE','D1':'D01_WALLET','D2':'D02_FOLLOWUP',
   };
 
-  const _SKILL_RUBRIC = [
-    {
-      code: 'APIPC',
-      name: 'PIPC Framework',
-      principle: 'ทุกการสนทนาต้องเป็นไปตามลำดับ Prepare→Identify→Probe→Close — ไม่ใช่ script แต่เป็นเครื่องมือวินิจฉัย',
-      pass_criteria: [
-        'สามารถระบุได้ว่า benchmark กับใคร และนำ value ไปตอบโจทย์ได้เหมาะสม',
-        'ถ้า conversation เริ่มจาก price → สามารถ redirect กลับมาที่ value ได้',
-        'ครบ 4 ขั้นตอน: แนะนำตัว/FKT → ถามหา need/pain → เชื่อม solution → มี next step'
-      ],
-      observable: 'ลำดับการพูด — มีการ introduce ก่อน probe ก่อน pitch, ไม่ขาย product ก่อนถาม pain',
-      ci_scope: 'full'
-    },
-    {
-      code: 'A5',
-      name: 'Freshket Value & USP',
-      principle: 'เปลี่ยนมุมมองลูกค้าจาก "ซัพฯ อีกเจ้า" → "พันธมิตรที่ขจัดความเสี่ยงประจำวัน"',
-      pass_criteria: [
-        'อธิบาย 3-tier logic ได้: สิ่งที่ซัพฯ ทุกเจ้ามี / สิ่งที่ FKT ทำได้ดีกว่า / สิ่งที่ FKT เท่านั้นมี',
-        'เชื่อม value เข้ากับบริบทของร้านนั้นๆ ไม่ใช่แค่ list feature'
-      ],
-      observable: 'rep พูดถึง quality/delivery/completeness/OMS ในบริบทของปัญหาร้านนั้น ไม่ใช่ท่อง spec',
-      ci_scope: 'full'
-    },
-    {
-      code: 'A9',
-      name: 'Planning & Target Tracking',
-      principle: 'การวางแผนคือเครื่องมือคิด ไม่ใช่แบบฟอร์ม',
-      pass_criteria: [
-        'กล่าวถึง target/plan/priority ในการสนทนา — มีตรรกะรองรับตัวเลข ไม่ใช่แค่บอกว่าจะทำมากขึ้น'
-      ],
-      observable: 'rep mention เป้า/แผน/ลำดับความสำคัญระหว่างคุย — แต่ behavior จริงอยู่นอก conversation',
-      ci_scope: 'partial'
-    },
-    {
-      code: 'A10',
-      name: 'Pipeline Management',
-      principle: 'Lead ดีมีชัยไปกว่าครึ่ง',
-      pass_criteria: [
-        'กล่าวถึง stage ของลูกค้า + next activity ที่จะทำได้ชัดเจน',
-        'วิเคราะห์แยก Hot/Warm/Cold ได้พร้อม logic'
-      ],
-      observable: 'rep mention next step/stage/timeline ที่ชัดเจน — quality ของ pipeline จริงอยู่นอก conversation',
-      ci_scope: 'partial'
-    },
-    {
-      code: 'B2',
-      name: 'Finding the Decision Maker',
-      principle: 'เจอคนตัดสินใจ → ปิดขายเร็วขึ้น',
-      pass_criteria: [
-        'ระบุ stakeholder ที่คุยอยู่ได้: Gatekeeper / Decision Maker / User',
-        'มีวิธีคุยที่ต่างกันในแต่ละ role (owner / chef / จัดซื้อ / บัญชี / ผจก.ร้าน)',
-        'confirm authority ก่อน pitch จริงจัง'
-      ],
-      observable: 'rep ถามหรือ confirm role ของคนที่คุยด้วย ก่อนเริ่ม pitch ลึก',
-      ci_scope: 'full'
-    },
-    {
-      code: 'B3',
-      name: 'Making an Appointment',
-      principle: 'เป้าหมายการโทรไม่ใช่ขาย FKT แต่คือขาย "เวลา 20 นาที" ของเจ้าของร้าน',
-      pass_criteria: [
-        'พูดด้วยความมั่นใจ อธิบาย FKT ได้กระชับ',
-        'handle objection ได้อย่างน้อย 3 สถานการณ์',
-        'จบด้วยการนัด + ระบุ role ของลูกค้า + timeline ชัดเจน'
-      ],
-      observable: 'มีการนัดเวลาที่เฉพาะเจาะจง หรือ commit next meeting ในการสนทนา',
-      ci_scope: 'full'
-    },
-    {
-      code: 'B4',
-      name: 'Pre-Visit Preparation',
-      principle: 'rep ที่เตรียมดีจะถามคำถามได้ดีกว่า เพราะรู้แล้วว่าคำถามไหนสำคัญ',
-      pass_criteria: [
-        'ระบุ DM ที่น่าจะเป็นได้พร้อมเหตุผล',
-        'วิเคราะห์เมนูเพื่อหา SKU ที่เหมาะได้',
-        'มีสินค้า 3 รายการที่จะเสนอพร้อม logic'
-      ],
-      observable: 'อนุมานจากคุณภาพคำถาม — rep ที่เตรียมดีจะถามเจาะจง ไม่ถาม generic',
-      ci_scope: 'partial'
-    },
-    {
-      code: 'C0',
-      name: 'Rapport & Reading the Room',
-      principle: 'ขายของกับคนที่ยังไม่เชื่อใจไม่ได้ — ต้องอ่านทัศนคติลูกค้าก่อนแล้วปรับตัว',
-      pass_criteria: [
-        'วิเคราะห์ personality type ของลูกค้าได้ (BANK: Blueprint/Action/Nurturing/Knowledge)',
-        'เปิดใจลูกค้าได้ตาม type',
-        'รับมือ first impression เชิงลบได้ (ไม่เคยได้ยิน FKT / เคยมีประสบการณ์แย่ / ไม่มีอำนาจตัดสินใจ)'
-      ],
-      observable: 'ลูกค้า self-disclose pain/context เอง โดย rep ไม่ interrupt — มี small talk ก่อน pitch',
-      ci_scope: 'full'
-    },
-    {
-      code: 'C1',
-      name: 'Discovery — OCPB Framework',
-      principle: 'การตั้งคำถามเพื่อเข้าใจให้ถึงจุดที่ปิดการขายได้',
-      pass_criteria: [
-        'cover ครบ OCPB: Operation / Competitor+service+price / Payment+Billing / Business Plan',
-        'สรุปข้อมูลได้ลึก และระบุช่องโหว่ข้อมูลของตัวเองได้'
-      ],
-      observable: 'นับ dimensions ที่ rep ถามครอบคลุม: O=ถามเรื่อง ops ร้าน, C=ถามเรื่องซัพเดิม/ราคา, P=ถาม billing/credit, B=ถาม plan ร้าน',
-      ci_scope: 'full'
-    },
-    {
-      code: 'C3',
-      name: 'Analyze & Connect Pain to Solution',
-      principle: 'ปิดช่องว่างระหว่างสิ่งที่ได้ยิน กับสิ่งที่ FKT แก้ได้ — โดยใช้คำพูดของลูกค้าเอง',
-      pass_criteria: [
-        'ระบุ pain point จากข้อมูลที่ถามมาได้ชัดเจน',
-        'เชื่อม pain → FKT value ได้ถูกต้อง ไม่แค่ list feature',
-        'ใช้คำหรือ context ที่ลูกค้าพูดมาก่อนในการ pitch'
-      ],
-      observable: 'rep echo คำพูดลูกค้า + ลิ้งหา solution — ไม่ pitch แบบ generic ที่ไม่ relate กับร้านนั้น',
-      ci_scope: 'full'
-    },
-    {
-      code: 'C4',
-      name: 'Objection Handling',
-      principle: 'คำคัดค้านไม่ใช่การปฏิเสธ — เป็นสัญญาณว่าลูกค้ายังประเมินอยู่',
-      pass_criteria: [
-        'ใช้ sequence: Acknowledge → Clarify → Reframe → Confirm',
-        'ไม่ defend ทันที — รับทราบก่อน เข้าใจก่อน',
-        'handle ได้ใน 4 หัวข้อหลัก: Quality / Price / Completeness / Logistics'
-      ],
-      observable: 'เมื่อลูกค้า object: rep ไม่รีบโต้ตอบ มีการ acknowledge + ถามเพิ่ม ก่อน reframe',
-      ci_scope: 'full'
-    },
-    {
-      code: 'C5',
-      name: 'Close & Next Step',
-      principle: 'การปิดขายต้องมี next step ชัดว่า action อะไรที่จะทำให้เกิดการสั่งซื้อ',
-      pass_criteria: [
-        'ทวน pain ของลูกค้าก่อนปิด',
-        'ยืนยันวันที่ที่แน่นอน',
-        'มีอย่างน้อย 1 อย่างที่ลูกค้า commit จะทำ (customer action item)'
-      ],
-      observable: 'ending ของ conversation — มี pain recap + specific date + customer commitment',
-      ci_scope: 'full'
-    },
-    {
-      code: 'D1',
-      name: 'Estimating Wallet Size',
-      principle: 'จัดลำดับว่าควรลงทุนเวลากับลูกค้าคนนี้แค่ไหน',
-      pass_criteria: [
-        'ประเมิน Wallet Size และ Wallet Share ได้พร้อม logic',
-        'จัด Hot/Warm/Cold พร้อมหลักฐานที่เฉพาะเจาะจง'
-      ],
-      observable: 'อนุมานจากคำพูด — rep mention category mix / competitor share / potential order size',
-      ci_scope: 'partial'
-    },
-    {
-      code: 'D2',
-      name: 'Follow-Up with Purpose',
-      principle: 'ติดตามต้องมีวัตถุประสงค์ชัด + หา option/solution ใหม่',
-      pass_criteria: [
-        'มีกลยุทธ์ต่างกันชัดเจนใน 3 กลุ่ม: ยังไม่สั่ง / สั่งแล้วหาย / สั่งน้อยลง-เพิ่มขึ้น',
-        'ระบุ actions + timeline ที่เฉพาะเจาะจง'
-      ],
-      observable: 'next steps ที่ rep commit ใน conversation — มีความชัดเจนในแต่ละ scenario',
-      ci_scope: 'full'
-    }
-  ];
+  // ── Rubric cache — โหลดจาก DB ครั้งเดียว ──────────────────────────────────
+  let _rubricCache = null; // null = ยังไม่โหลด
 
-  const _SKILL_SYS = (() => {
-    const rubricText = _SKILL_RUBRIC.map(s =>
-      `[${s.code}] ${s.name} (${s.ci_scope === 'partial' ? 'partial — อนุมานจากบางส่วน' : 'ประเมินจาก conversation ได้'})
-Principle: ${s.principle}
-Pass criteria: ${s.pass_criteria.join(' | ')}
-สัญญาณที่ฟังได้: ${s.observable}`
-    ).join('\n\n');
+  async function _loadRubricFromDB() {
+    try {
+      const { data, error } = await supa
+        .from('skill_definitions')
+        .select('skill_code,skill_name_en,principle_th,pass_test_th,echo_observable,echo_enabled')
+        .eq('echo_enabled', true)
+        .order('skill_code');
+      if (error) throw error;
+      _rubricCache = data || [];
+      console.log('[CI] rubric loaded from DB:', _rubricCache.length, 'skills');
+    } catch(e) {
+      console.warn('[CI] rubric DB load failed, using empty fallback:', e.message);
+      _rubricCache = [];
+    }
+  }
+
+  // ── Build Gemini prompt จาก rubric + account context ──────────────────────
+  function _buildGeminiPrompt() {
+    const ctx = _ctx();
+    const fmtK = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(n);
+
+    // Account context
+    let acctSection = '';
+    if (_accountName || _accountGuid) {
+      acctSection = `\n\nข้อมูลร้าน (ใช้ประกอบการวิเคราะห์ D1/D2):
+- ชื่อ: ${ctx.name} | Segment: ${ctx.seg} | Class: ${ctx.account_class}
+- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่)' : ''}`;
+      if (ctx.gmv_mtd > 0) {
+        acctSection += `\n- GMV เดือนนี้: ${fmtK(ctx.gmv_mtd)} / baseline: ${fmtK(ctx.gmv_baseline)}`;
+        if (ctx.pace_pct) acctSection += ` | Pace: ${ctx.pace_pct}%`;
+      }
+      if (ctx.churn_count > 0)  acctSection += `\n- SKU หยุดสั่ง: ${ctx.churn_count} รายการ`;
+      if (ctx.missing_cats > 0) acctSection += `\n- Category ยังไม่สั่ง: ${ctx.missing_cats} หมวด`;
+      if (_ownerType === 'sales') acctSection += `\n- ประเภท: Sales lead (ยังไม่เป็นลูกค้า Freshket)`;
+    }
+
+    // Skill rubric จาก DB
+    const rubricText = (_rubricCache || []).map(s => {
+      const obs = s.echo_observable ? `\nสัญญาณในเสียง: ${s.echo_observable}` : '';
+      return `[${s.skill_code}] ${s.skill_name_en}
+หลักการ: ${s.principle_th || '-'}
+เกณฑ์ผ่าน: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}${obs}`;
+    }).join('\n\n');
 
     return `คุณคือ AI coach สำหรับ Freshket sales team
-วิเคราะห์ transcript การสนทนาระหว่าง Sales/KAM กับลูกค้าร้านอาหาร
-ประเมินตาม skill rubric ด้านล่าง — ใช้ pass_criteria เป็นเกณฑ์ตัดสิน ไม่ใช่แค่ความรู้สึก
+ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร${acctSection}
 
+ทำ 3 อย่างในคำตอบเดียว:
+
+1. แยก speaker: ระบุชัดว่าส่วนไหนคือ Sales พูด ส่วนไหนคือลูกค้าพูด
+2. วิเคราะห์ skills ตาม rubric ด้านล่าง — ประเมินจากสิ่งที่ได้ยินจริง ทั้งคำพูดและน้ำเสียง
+3. วิเคราะห์ customer intelligence ตาม OCPB framework
+
+SKILL RUBRIC (ประเมินเฉพาะ skills เหล่านี้):
 ${rubricText}
 
-scoring:
-- pass = เห็นหลักฐานชัดว่าทำตาม pass_criteria ได้ครบ
-- developing = เริ่มทำแต่ยังไม่ครบ หรือทำได้บางส่วน
-- not_observed = ไม่มีส่วนนี้ใน conversation เลย
-- not_applicable = skill นี้ไม่ใช้ใน context นี้ (เช่น B3 สำหรับ visit ที่ไม่มีการนัด)
+TONE & EMOTION signals ที่ต้องสังเกต:
+- rep_confidence: Sales พูดมั่นใจ ชัด หรือลังเล อ้อมค้อม?
+- customer_engagement: ลูกค้า engage มากขึ้นหรือน้อยลงตลอด session?
+- key_moments: จุดไหนที่ dynamics เปลี่ยน เช่น ลูกค้า warm ขึ้น หรือ push back
+
+OCPB framework (customer intel):
+- O: Operation — วิธีทำงาน ปัญหา ops ประจำวัน
+- C: Competitor/Service/Price — ซัพเดิมคือใคร ปัญหาอะไร เปรียบราคา
+- P: Payment/Billing — credit term, billing cycle
+- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
+
+Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | Action=ต้องการผลเร็ว | Nurturing=ให้ความสำคัญ trust | Knowledge=ต้องการ expertise
 
 ตอบ JSON เท่านั้น ไม่มี markdown ไม่มี preamble:
 {
+  "transcript_summary": "สรุปบทสนทนา 3-5 ประโยค ระบุว่าใครพูดอะไร จุดสำคัญคืออะไร",
+  "tone_signals": {
+    "rep_confidence": "high|medium|low",
+    "rep_confidence_note": "เหตุผลสั้นๆ",
+    "customer_engagement": "increasing|stable|decreasing",
+    "customer_engagement_note": "เหตุผลสั้นๆ",
+    "key_moments": ["จุดสำคัญ 1", "จุดสำคัญ 2"]
+  },
   "skills": [
     {
-      "code": "C0",
-      "name": "Rapport & Reading the Room",
+      "code": "A01_PIPC",
       "score": "pass|developing|not_observed|not_applicable",
-      "evidence": "คำพูดหรือพฤติกรรมจริงที่เห็นใน transcript (ถ้าไม่มีให้ใส่ '-')",
-      "gap": "สิ่งที่ขาดไปจาก pass_criteria (ถ้าผ่านแล้วใส่ '-')",
-      "coaching_note": "คำแนะนำสำหรับ TL ใช้ debrief กับ rep (1-2 ประโยค)"
+      "evidence": "คำพูดหรือพฤติกรรมจริงที่ได้ยิน",
+      "gap": "สิ่งที่ขาดจากเกณฑ์ผ่าน หรือ '-'",
+      "coaching_note": "คำแนะนำสำหรับ TL ใช้ debrief 1-2 ประโยค"
     }
   ],
   "pipc_stage": "Prepare|Identify|Probe|Close",
-  "pipc_reached": "ขั้นตอนสูงสุดที่ rep ทำถึงใน conversation นี้",
+  "pipc_reached": "ขั้นตอนสูงสุดที่ rep ทำถึง",
   "overall": "strong|developing|needs_work",
-  "session_summary": "สรุปภาพรวม 2-3 ประโยค — จุดเด่น จุดที่ต้องพัฒนา"
-}`;
-  })();
-
-  const _INTEL_SYS = `คุณคือ customer intelligence analyst สำหรับ Freshket
-วิเคราะห์ insight จากการสนทนากับลูกค้าร้านอาหาร
-ใช้ข้อมูลร้านที่ให้มาประกอบการวิเคราะห์
-
-OCPB framework (ตาม C1 Discovery):
-- O: Operation — วิธีทำงาน ปัญหา ops ประจำวัน
-- C: Competitor/Service/Price — ซัพเดิมคือใคร ปัญหาอะไร เปรียบเทียบราคา
-- P: Payment/Billing — credit term, billing cycle, วิธีจ่ายเงิน
-- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
-
-Buyer type (BANK framework) — ใช้ชื่อภาษาอังกฤษเท่านั้น:
-- Blueprint: ต้องการข้อมูลครบ process ชัด ตัดสินใจช้าแต่ละเอียด
-- Action: ต้องการผลลัพธ์เร็ว direct ไม่ชอบ process ยาว
-- Nurturing: ให้ความสำคัญกับความสัมพันธ์ trust ก่อน deal
-- Knowledge: ต้องการ expertise และ data รองรับทุกอย่าง
-
-ตอบ JSON เท่านั้น ไม่มี markdown:
-{
+  "session_summary": "สรุปภาพรวม skill 2-3 ประโยค จุดเด่น จุดที่ต้องพัฒนา",
   "buyer_type": "Blueprint|Action|Nurturing|Knowledge",
-  "buyer_evidence": "หลักฐานจากการสนทนาว่าทำไมถึง type นี้",
+  "buyer_evidence": "หลักฐานจาก audio",
   "ocpb_covered": ["O","C","P","B"],
   "ocpb_missing": ["dimension ที่ยังไม่ถาม"],
   "pain_points": [
-    {
-      "dimension": "Quality|Price|Delivery|Completeness|Service|Credit",
-      "severity": "high|medium|opportunity",
-      "summary": "สรุป pain ที่ลูกค้าพูด — ใช้ภาษาใกล้เคียงกับที่ลูกค้าพูด"
-    }
+    {"dimension": "Quality|Price|Delivery|Completeness|Service|Credit", "severity": "high|medium|opportunity", "summary": "สรุป pain"}
   ],
-  "upsell_signals": [
-    {"category": "หมวดสินค้า", "evidence": "หลักฐานที่บ่งชี้ถึงความต้องการ"}
-  ],
+  "upsell_signals": [{"category": "หมวดสินค้า", "evidence": "หลักฐาน"}],
   "wallet_estimate": "hot|warm|cold",
-  "wallet_logic": "เหตุผลที่ประเมิน hot/warm/cold",
+  "wallet_logic": "เหตุผล",
   "next_actions": [
-    {
-      "action": "สิ่งที่ต้องทำ",
-      "owner": "KAM|TL",
-      "urgency": "3_days|this_week|next_visit",
-      "reason": "ทำไมถึง urgent ระดับนี้"
-    }
+    {"action": "สิ่งที่ต้องทำ", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "reason": "ทำไม"}
   ]
 }`;
+  }
 
-  async function _ciCallAI(modelKey, system, userContent, maxTokens) {
-    // CI calls worker directly — bypasses callAI wrapper which returns empty string
-    const res = await fetch(WORKER_URL, {
+  // ── Gemini audio analyze — single call ────────────────────────────────────
+  async function _analyzeWithGemini(audioBlob) {
+    // Convert blob to base64
+    const arrayBuf = await audioBlob.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuf);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+    }
+    const b64audio = btoa(binary);
+    const mimeType = audioBlob.type || 'audio/webm';
+
+    _setStep('กำลังวิเคราะห์...', 'Gemini · ฟัง audio + skill rubric', 35);
+
+    const res = await fetch(`${WORKER_URL}/analyze-audio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'claude', modelKey, system, messages: [{ role: 'user', content: userContent }], maxTokens })
+      body: JSON.stringify({
+        audio_b64: b64audio,
+        mime_type: mimeType,
+        prompt: _buildGeminiPrompt(),
+      })
     });
-    if (!res.ok) throw new Error('worker ' + res.status);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.status);
+      throw new Error(`Gemini ${res.status}: ${errText}`);
+    }
     const data = await res.json();
-    const txt = data?.content?.[0]?.text || data?.text || '';
-    return txt.trim().replace(/```json\n?|```/g, '').trim();
+    const raw = data?.text || data?.content?.[0]?.text || '';
+    console.log('[CI Gemini raw]', raw.substring(0, 300));
+
+    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('Gemini no JSON: ' + raw.substring(0, 120));
+    const parsed = JSON.parse(raw.slice(s, e + 1));
+
+    // Split combined response into skillData + intelData + new fields
+    const skillData = {
+      skills:          parsed.skills || [],
+      pipc_stage:      parsed.pipc_stage || null,
+      pipc_reached:    parsed.pipc_reached || null,
+      overall:         parsed.overall || null,
+      session_summary: parsed.session_summary || null,
+    };
+    const intelData = {
+      buyer_type:       parsed.buyer_type || null,
+      buyer_evidence:   parsed.buyer_evidence || null,
+      ocpb_covered:     parsed.ocpb_covered || [],
+      ocpb_missing:     parsed.ocpb_missing || [],
+      pain_points:      parsed.pain_points || [],
+      upsell_signals:   parsed.upsell_signals || [],
+      wallet_estimate:  parsed.wallet_estimate || null,
+      wallet_logic:     parsed.wallet_logic || null,
+      next_actions:     parsed.next_actions || [],
+    };
+
+    return {
+      skillData,
+      intelData,
+      transcriptSummary: parsed.transcript_summary || null,
+      toneSignals:       parsed.tone_signals || null,
+    };
   }
 
-  // ── Skill analysis — 2-pass split ────────────────────────────────────────
-  // Pass 1: Observable skills (can be directly heard in transcript)
-  // Pass 2: Inference skills (partial — require reading between lines)
-  // Short transcripts (<80w): single pass, mark inference skills as not_applicable
-
-  const _OBSERVABLE_CODES = ['APIPC','A5','B2','B3','C0','C1','C3','C4','C5','D2'];
-  const _INFERENCE_CODES  = ['A9','A10','B4','D1'];
-
-  function _buildAccountContext() {
-    const ctx = _ctx();
-    if (!_accountGuid && !_accountName) return '';
-    const gmvK = ctx.gmv_mtd ? Math.round(ctx.gmv_mtd/1000) + 'K' : '-';
-    const baseK = ctx.gmv_baseline ? Math.round(ctx.gmv_baseline/1000) + 'K' : '-';
-    const pace = ctx.pace_pct ? ctx.pace_pct + '%' : '-';
-    return `\n\nAccount context (ใช้ประกอบการประเมิน D1/D2):
-- ชื่อ: ${ctx.name} | Segment: ${ctx.seg} | Class: ${ctx.account_class}
-- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่ — ยังไม่มี baseline)' : ''}
-- GMV เดือนนี้: ${gmvK} / baseline: ${baseK} | Pace: ${pace}
-- SKU หาย: ${ctx.churn_count} | Category ที่ยังไม่สั่ง: ${ctx.missing_cats}`;
-  }
-
-  function _buildSkillPromptPass1() {
-    const pass1Skills = _SKILL_RUBRIC.filter(s => _OBSERVABLE_CODES.includes(s.code));
-    const rubricText = pass1Skills.map(s =>
-      `[${s.code}] ${s.name}\nPrinciple: ${s.principle}\nPass criteria: ${s.pass_criteria.join(' | ')}\nสัญญาณที่ฟัง: ${s.observable}`
-    ).join('\n\n');
-    return `คุณคือ AI coach สำหรับ Freshket sales team
-วิเคราะห์ transcript ต่อไปนี้ ประเมินเฉพาะ ${pass1Skills.length} skills ที่สังเกตได้โดยตรงจากการสนทนา
-
-${rubricText}
-
-scoring: pass=เห็นหลักฐานชัด | developing=เริ่มทำแต่ยังไม่ครบ | not_observed=ไม่มีใน conversation | not_applicable=skill นี้ไม่เกี่ยวกับ context นี้
-
-ตอบ JSON เท่านั้น:
-{"skills":[{"code":"C0","name":"Rapport & Reading the Room","score":"pass|developing|not_observed|not_applicable","evidence":"คำพูดจริงหรือ '-'","gap":"สิ่งที่ขาดหรือ '-'","coaching_note":"คำแนะนำ TL 1-2 ประโยค"}],"pipc_stage":"Prepare|Identify|Probe|Close","pipc_reached":"ขั้นสูงสุด","overall":"strong|developing|needs_work","session_summary":"สรุป 2-3 ประโยค"}`;
-  }
-
-  function _buildSkillPromptPass2() {
-    const pass2Skills = _SKILL_RUBRIC.filter(s => _INFERENCE_CODES.includes(s.code));
-    const rubricText = pass2Skills.map(s =>
-      `[${s.code}] ${s.name}\nPrinciple: ${s.principle}\nPass criteria: ${s.pass_criteria.join(' | ')}\nวิธีอนุมาน: ${s.observable}`
-    ).join('\n\n');
-    return `คุณคือ AI coach สำหรับ Freshket sales team
-ประเมิน 4 skills ที่ต้องอนุมานจากสัญญาณอ้อมๆ ใน transcript — ไม่ได้สังเกตได้โดยตรง
-
-${rubricText}
-
-หมายเหตุ: skills เหล่านี้ประเมินจากคุณภาพของคำพูด ไม่ใช่พฤติกรรมนอก conversation
-scoring: pass|developing|not_observed|not_applicable
-
-ตอบ JSON เท่านั้น:
-{"skills":[{"code":"A9","name":"Planning & Target Tracking","score":"pass|developing|not_observed|not_applicable","evidence":"สัญญาณที่เห็นหรือ '-'","gap":"สิ่งที่ขาดหรือ '-'","coaching_note":"คำแนะนำ 1-2 ประโยค"}]}`;
-  }
-
-  async function _analyzeSkills(text) {
-    const acctCtx = _buildAccountContext();
-    const isShort = _lastTranscriptWordCount < 80;
-
-    if (isShort) {
-      // Short transcript: single pass, observable only, mark inference as not_applicable
-      const sys1 = _buildSkillPromptPass1();
-      const txt = await _ciCallAI('haiku', sys1, `Transcript:\n${text}${acctCtx}`, 5000);
-      console.log('[CI skills pass1 (short)]', txt.substring(0, 300));
-      const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-      if (s === -1 || e === -1) throw new Error('skills no JSON: ' + txt.substring(0, 80));
-      const result = JSON.parse(txt.slice(s, e + 1));
-      // Add inference skills as not_applicable
-      const inferenceNA = _INFERENCE_CODES.map(code => {
-        const rubric = _SKILL_RUBRIC.find(r => r.code === code);
-        return { code, name: rubric?.name||code, score:'not_applicable',
-                 evidence:'-', gap:'-', coaching_note:'Transcript สั้นเกินไปสำหรับ skill นี้' };
-      });
-      result.skills = [...(result.skills||[]), ...inferenceNA];
-      result._short_transcript = true;
-      result._word_count = _lastTranscriptWordCount;
-      return result;
-    }
-
-    // Full transcript: 2 passes in parallel
-    const [txt1, txt2] = await Promise.all([
-      _ciCallAI('haiku', _buildSkillPromptPass1(), `Transcript:\n${text}${acctCtx}`, 5000),
-      _ciCallAI('haiku', _buildSkillPromptPass2(), `Transcript:\n${text}${acctCtx}`, 3000)
-    ]);
-    console.log('[CI skills pass1]', txt1.substring(0, 200));
-    console.log('[CI skills pass2]', txt2.substring(0, 200));
-
-    // Parse pass 1
-    const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
-    if (s1 === -1 || e1 === -1) throw new Error('skills pass1 no JSON');
-    const result1 = JSON.parse(txt1.slice(s1, e1 + 1));
-
-    // Parse pass 2 — merge skills only
-    let inferenceSkills = [];
-    try {
-      const s2 = txt2.indexOf('{'), e2 = txt2.lastIndexOf('}');
-      if (s2 !== -1 && e2 !== -1) {
-        const result2 = JSON.parse(txt2.slice(s2, e2 + 1));
-        inferenceSkills = result2.skills || [];
-      }
-    } catch(e) { console.warn('[CI pass2 parse fail]', e.message); }
-
-    // Merge: result1 is authoritative for pipc/overall/summary
-    result1.skills = [...(result1.skills||[]), ...inferenceSkills];
-    result1._word_count = _lastTranscriptWordCount;
-    return result1;
-  }
-
-  async function _analyzeIntel(text) {
-    const ctx = _ctx();
-    const fmtK = n => n >= 1000000 ? (n/1000000).toFixed(1)+'M' : n >= 1000 ? Math.round(n/1000)+'K' : n.toString();
-
-    // Build rich account context for Sonnet
-    let acctSection = `ข้อมูลร้าน:
-- ชื่อ: ${ctx.name}
-- Segment: ${ctx.seg} | Class: ${ctx.account_class}
-- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่)' : ''}`;
-
-    if (ctx.gmv_mtd > 0) {
-      acctSection += `\n- GMV เดือนนี้: ${fmtK(ctx.gmv_mtd)} / baseline: ${fmtK(ctx.gmv_baseline)}`;
-      if (ctx.pace_pct) acctSection += ` | Pace: ${ctx.pace_pct}%`;
-    }
-    if (ctx.churn_count > 0)   acctSection += `\n- SKU ที่หยุดสั่ง: ${ctx.churn_count} รายการ (โอกาส win-back)`;
-    if (ctx.missing_cats > 0)  acctSection += `\n- Category ที่ยังไม่เคยสั่ง: ${ctx.missing_cats} หมวด (โอกาส upsell)`;
-    if (_ownerType === 'sales') acctSection += `\n- ประเภท: Sales lead (ยังไม่เป็นลูกค้า Freshket)`;
-
-    const userContent = `${acctSection}
-
-Transcript:
-${text}`;
-
-    const txt = await _ciCallAI('sonnet', _INTEL_SYS, userContent, 6000);
-    console.log('[CI intel raw]', txt.substring(0, 400));
-    const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('intel no JSON: ' + txt.substring(0, 80));
-    return JSON.parse(txt.slice(s, e + 1));
-  }
 
   // ── Supabase save ──────────────────────────────────────────────────────────
-  async function _saveToSupabase(skillData, intelData) {
+  async function _saveToSupabase(skillData, intelData, transcriptSummary, toneSignals) {
     if (!skillData && !intelData) return;
     const email = currentUserProfile?.email;
     if (!email) return;
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
 
-    // 1. Save ci_sessions row (append — every Echo session = 1 row)
-    //    Graceful fail if table doesn't exist yet
+    // 1. Save ci_sessions row
     try {
       const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
-        owner_email: email,
-        owner_type: _ownerType,
-        account_id: _accountGuid || null,
-        account_name: _accountName || null,
-        visited_at: nowIso,
-        duration_secs: _secs,
-        skill_scores: skillData || null,
-        customer_intel: intelData || null,
-        next_actions: intelData?.next_actions || [],
-        status: 'saved'
+        owner_email:        email,
+        owner_type:         _ownerType,
+        account_id:         _accountGuid || null,
+        account_name:       _accountName || null,
+        visited_at:         nowIso,
+        duration_secs:      _secs,
+        skill_scores:       skillData || null,
+        customer_intel:     intelData || null,
+        next_actions:       intelData?.next_actions || [],
+        transcript_summary: transcriptSummary || null,
+        tone_signals:       toneSignals || null,
+        status:             'saved'
       }).select('id').single();
       if (sessionErr) console.warn('[CI] ci_sessions insert (table may not exist yet):', sessionErr.message);
       else if (sessionRow) _sessionId = sessionRow.id;
@@ -1209,10 +973,11 @@ ${text}`;
 
   // ── Render result panels ───────────────────────────────────────────────────
   function _renderResult() {
-    const { skillData, intelData } = _lastResult;
+    const { skillData, intelData, transcriptSummary, toneSignals } = _lastResult;
     document.getElementById('ci-p0').innerHTML = _skillsPanel(skillData);
     document.getElementById('ci-p1').innerHTML = _customerPanel(intelData);
     document.getElementById('ci-p2').innerHTML = _actionsPanel(intelData);
+    document.getElementById('ci-p3').innerHTML = _transcriptPanel(transcriptSummary, toneSignals);
     const tlDiv = document.getElementById('ci-tl-actions');
     if (tlDiv) tlDiv.style.display = _canDebrief() ? 'flex' : 'none';
   }
@@ -1332,6 +1097,42 @@ ${text}`;
         ${reason}
       </div>`;
     }).join('');
+  }
+
+  function _transcriptPanel(summary, tone) {
+    if (!summary && !tone) {
+      return `<div style="padding:24px;text-align:center;font-size:13px;color:var(--tx3,#AEAEB2)">ไม่มีข้อมูล</div>`;
+    }
+    // Tone signals block
+    let toneHtml = '';
+    if (tone) {
+      const confColor = tone.rep_confidence==='high'?'var(--success,#34C759)':tone.rep_confidence==='medium'?'var(--warning,#FF9500)':'var(--danger,#FF3B30)';
+      const engColor  = tone.customer_engagement==='increasing'?'var(--success,#34C759)':tone.customer_engagement==='stable'?'var(--warning,#FF9500)':'var(--danger,#FF3B30)';
+      const moments   = (tone.key_moments||[]).map(m =>
+        `<div style="font-size:12px;color:var(--tx2,#636366);padding:6px 0;border-bottom:0.5px solid var(--br,#E5E5EA);line-height:1.5">${m}</div>`
+      ).join('');
+      toneHtml = `
+<div class="eyebrow" style="margin-bottom:10px">Tone & Energy</div>
+<div style="display:flex;gap:12px;margin-bottom:16px">
+  <div style="flex:1;padding:12px;background:rgba(0,0,0,.03);border-radius:10px">
+    <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px">Sales confidence</div>
+    <div style="font-size:14px;font-weight:500;color:${confColor}">${tone.rep_confidence||'-'}</div>
+    <div style="font-size:11px;color:var(--tx3,#AEAEB2);margin-top:2px">${tone.rep_confidence_note||''}</div>
+  </div>
+  <div style="flex:1;padding:12px;background:rgba(0,0,0,.03);border-radius:10px">
+    <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px">Customer engagement</div>
+    <div style="font-size:14px;font-weight:500;color:${engColor}">${tone.customer_engagement||'-'}</div>
+    <div style="font-size:11px;color:var(--tx3,#AEAEB2);margin-top:2px">${tone.customer_engagement_note||''}</div>
+  </div>
+</div>
+${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${moments}` : ''}`;
+    }
+    // Summary block
+    const summaryHtml = summary
+      ? `<div class="eyebrow" style="margin-top:20px;margin-bottom:8px">สรุปบทสนทนา</div>
+<div style="font-size:13px;color:var(--tx2,#636366);line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border-radius:10px;border:0.5px solid rgba(255,56,92,.12)">${summary}</div>`
+      : '';
+    return toneHtml + summaryHtml;
   }
 
 
@@ -1848,7 +1649,7 @@ ${text}`;
       bucket.total++;
     });
 
-    const skillCodes = _SKILL_RUBRIC.filter(s => s.ci_scope !== 'none').map(s => s.code);
+    const skillCodes = (_rubricCache || []).map(s => s.skill_code);
 
     const legend = `<div class="trend-legend">
       <div class="tl-legend-item"><span class="tl-dot" style="background:#34C759"></span>Pass</div>
