@@ -1,4 +1,4 @@
-<!-- Freshket Sense v432: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v433: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v432',
+      version: 'v433',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41233,56 +41233,110 @@ ${text}`;
   function _buildSalesPickerInline() {
     return `
       <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">คุณกำลังคุยกับร้านไหน?</div>
-      <input id="ci-sales-name-inline" type="text" placeholder="ค้นหาหรือพิมพ์ชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:13px 16px;border:1.5px solid #FF385C;border-radius:12px;font-size:15px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none;margin-bottom:8px"
-        oninput="CI._pickerSearchSalesInline(this.value)"
+      <input id="ci-sales-name-inline" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
+        style="width:100%;padding:13px 16px;border:1.5px solid #FF385C;border-radius:12px;font-size:15px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
         onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
-      <div id="ci-pk-list-sales-inline" style="max-height:200px;overflow-y:auto;margin-bottom:8px"></div>
       <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name-inline').value)"
         style="width:100%;padding:14px;border:none;border-radius:14px;background:#FF385C;color:#fff;font-size:15px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.02em">
         เริ่มบันทึก
       </button>
-      <div style="text-align:center;font-size:12px;color:#AEAEB2;padding:4px 0">เลือกจากรายการ หรือพิมพ์ชื่อใหม่แล้วกดปุ่ม</div>`;
+      <div style="text-align:center;font-size:12px;color:#AEAEB2;padding:4px 0">พิมพ์ชื่อร้าน แล้วกด Enter หรือปุ่มด้านบน</div>`;
   }
 
-  function _pickerSearchSalesInline(q) {
-    const list = document.getElementById('ci-pk-list-sales-inline');
+  // ── Build outlet index from bulkOutletsData ─────────────────────────────────
+  // Returns Map<outlet_name_lower → account_id>
+  // Built once per search session — cheap, ~1000 outlets max
+  function _buildOutletIndex() {
+    const idx = new Map();
+    try {
+      const od = window.bulkOutletsData || (typeof bulkOutletsData !== 'undefined' ? bulkOutletsData : null);
+      if (!od) return idx;
+      Object.entries(od).forEach(([accountId, months]) => {
+        // months = { 'พ.ค. 2569': [{outlet_id, outlet_name, ...}] }
+        const seen = new Set();
+        Object.values(months).forEach(outlets => {
+          (outlets||[]).forEach(o => {
+            const n = (o.outlet_name||'').trim();
+            if (n && !seen.has(n)) { seen.add(n); idx.set(n.toLowerCase(), accountId); }
+          });
+        });
+      });
+    } catch(e) { /* non-fatal */ }
+    return idx;
+  }
+
+  function _pickerSearchInline(q) {
+    const list = document.getElementById('ci-pk-list-inline');
     if (!list) return;
     try {
-      const src = (window.salesPortviewData && window.salesPortviewData.length)
-        ? window.salesPortviewData
-        : (window.portviewBulkData && window.portviewBulkData.length)
-          ? window.portviewBulkData
-          : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      const src = (window.portviewBulkData && window.portviewBulkData.length)
+        ? window.portviewBulkData
+        : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      const qLow = (q||'').toLowerCase().trim();
 
-      const qLow = (q || '').toLowerCase().trim();
       let filtered;
       if (!qLow) {
-        filtered = src.slice().sort((a, b) => (b.gmvToDate || b.gmv || 0) - (a.gmvToDate || a.gmv || 0)).slice(0, 6);
+        // Default: top accounts by GMV
+        filtered = src.slice().sort((a,b) => (b.gmvToDate||b.gmv||0)-(a.gmvToDate||a.gmv||0)).slice(0,8)
+          .map(r => ({ _r: r, _matchLabel: null }));
       } else {
-        filtered = src.filter(r => (r.name || r.outlet_name || '').toLowerCase().includes(qLow)).slice(0, 8);
+        // 1. Match by account_name (r.name)
+        const byAccount = src
+          .filter(r => (r.name||'').toLowerCase().includes(qLow))
+          .map(r => ({ _r: r, _matchLabel: null }));
+
+        // 2. Match by outlet_name via index — map back to account row
+        const outletIdx = _buildOutletIndex();
+        const outletMatches = [];
+        const seenIds = new Set(byAccount.map(x => x._r.id || x._r.account_guid));
+        outletIdx.forEach((accountId, outletNameLow) => {
+          if (!outletNameLow.includes(qLow)) return;
+          if (seenIds.has(accountId)) return; // already in account matches
+          const accountRow = src.find(r => (r.id||r.account_guid) === accountId);
+          if (!accountRow) return;
+          // Find the matching outlet name for display hint
+          const od = window.bulkOutletsData || (typeof bulkOutletsData !== 'undefined' ? bulkOutletsData : null);
+          let outletDisplayName = '';
+          if (od && od[accountId]) {
+            Object.values(od[accountId]).forEach(outlets => {
+              (outlets||[]).forEach(o => {
+                if ((o.outlet_name||'').toLowerCase().includes(qLow)) outletDisplayName = o.outlet_name;
+              });
+            });
+          }
+          seenIds.add(accountId);
+          outletMatches.push({ _r: accountRow, _matchLabel: outletDisplayName });
+        });
+
+        filtered = [...byAccount, ...outletMatches].slice(0, 8);
       }
 
       if (!filtered.length) {
-        list.innerHTML = '<div style="text-align:center;padding:12px 0;font-size:12px;color:#AEAEB2">'
-          + (q ? 'ไม่พบร้านค้า — กดปุ่มเริ่มบันทึกเพื่อใช้ชื่อที่พิมพ์' : '') + '</div>';
+        list.innerHTML = '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">' +
+          (src.length ? 'ไม่พบร้านค้า' : 'กำลังโหลดข้อมูล...') + '</div>';
         return;
       }
 
-      list.innerHTML = filtered.map(function(r) {
-        var name = r.name || r.outlet_name || '-';
-        var seg  = r.accountType || r.account_type || r.seg || '';
-        var safeN = name.replace(/'/g, '');
-        var html = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:rgba(255,56,92,.05);margin-bottom:4px;cursor:pointer"'
-          + ' onclick="document.getElementById(\'ci-sales-name-inline\').value=\'' + safeN + '\';CI._pickerConfirmSales(\'' + safeN + '\')">'
-          + '<span style="font-size:13px;font-weight:500;color:#1C1C1E">' + name + '</span>'
-          + (seg ? '<span style="font-size:10px;font-weight:600;color:#FF385C">' + seg + '</span>' : '')
-          + '</div>';
-        return html;
+      list.innerHTML = filtered.map(({ _r: r, _matchLabel }) => {
+        const name  = r.name || '-';
+        const guid  = r.id || r.account_guid || '';
+        const seg   = r.accountType || r.account_type || '';
+        const safeName = name.replace(/'/g,"\'").replace(/"/g,'&quot;');
+        // Outlet match hint — show outlet name in small text below account name
+        const hint  = _matchLabel
+          ? `<div style="font-size:11px;color:#6C6C70;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">outlet: ${_matchLabel}</div>`
+          : '';
+        return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left;margin-bottom:6px"
+          onclick="CI._pickerConfirmKam('${guid}','${safeName}','${seg}')">
+          <div style="flex:1;min-width:0;text-align:left">
+            <div style="font-size:13px;font-weight:500;color:#1C1C1E">${name}</div>
+            ${hint}
+          </div>
+          <span style="font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;flex-shrink:0;margin-left:8px">${seg}</span>
+        </button>`;
       }).join('');
-    } catch(e) { console.warn('[CI sales search]', e); }
+    } catch(e) { console.warn('[CI picker search]', e); }
   }
-
 
   // ── Public ─────────────────────────────────────────────────────────────────
   function _topbarLeft() {
@@ -41435,7 +41489,7 @@ ${text}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _pickerSearchSalesInline, _minimize, _switchMainTab, _topbarLeft };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft };
 
 })();
 
