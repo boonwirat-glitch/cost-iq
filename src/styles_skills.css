@@ -155,11 +155,12 @@
 }
 .sk-mod-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  align-items: stretch;
+  gap: 0;
+  height: 100px;
   border-top: 1px solid var(--sk-hairline);
   cursor: pointer;
+  overflow: hidden;
 }
 .sk-mod-row:last-child { border-bottom: 1px solid var(--sk-hairline); }
 .sk-mod-row:active { background: var(--sk-surface); }
@@ -1859,18 +1860,24 @@
 
 /* ══ S1 MODULE ROW — missing classes restored ═══════════ */
 .sk-row-thumb {
-  width: 88px !important;
-  height: 88px !important;
-  flex-shrink: 0 !important;
-  overflow: hidden !important;
-  border-radius: 10px;
+  width: 36%;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  align-self: stretch;
 }
 .sk-row-thumb img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: center top !important;
-  display: block !important;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.sk-row-thumb-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent 50%, #fff 100%);
+  pointer-events: none;
 }
 .sk-row-thumb-img {
   width: 100%; height: 100%;
@@ -1884,7 +1891,10 @@
 .sk-row-info {
   flex: 1;
   min-width: 0;
-  padding: 0;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .sk-row-eye {
   font-size: 8px;
@@ -1928,8 +1938,10 @@
 .badge-training { background: rgba(33,150,243,.1); color: #2196F3; }
 .badge-unlocked { background: rgba(52,199,89,.1); color: #34C759; }
 .sk-row-right {
-  padding-right: 4px;
+  padding: 0 12px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 .sk-row-ring {
   width: 40px; height: 40px;
@@ -1949,21 +1961,25 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 84px;
+  position: relative;
 }
 .s2-topbar {
   padding: 44px 16px 10px;
-  background: rgba(255,255,255,0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 0.5px solid rgba(0,0,0,.06);
-  position: sticky;
-  top: 0;
+  position: absolute;
+  top: 0; left: 0; right: 0;
   z-index: 10;
 }
-.s2-back { color: var(--sk-ac) !important; }
+.s2-back {
+  color: #fff !important;
+  background: rgba(0,0,0,.32) !important;
+  border-radius: 999px;
+  padding: 6px 13px;
+  backdrop-filter: blur(8px);
+  border: none;
+}
 .s2-cg-mod-name {
   font-size: 15px;
   font-weight: 700;
@@ -1972,7 +1988,7 @@
 .s2-banner {
   position: relative;
   width: 100%;
-  height: 200px;
+  height: 280px;
   overflow: hidden;
   background: #F7F0FA;
 }
@@ -1980,8 +1996,45 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center 22%;
   display: block;
+}
+.s2-banner-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,.28) 0%, transparent 40%);
+  pointer-events: none;
+}
+.s2-banner-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 16px 16px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.52) 100%);
+  pointer-events: none;
+}
+.s2-banner-mod-eye {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 3px;
+}
+.s2-banner-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.s2-banner-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.72);
+  margin-top: 2px;
+  font-family: 'Noto Sans Thai', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .06em;
 }
 .s2-grid {
   padding: 12px 14px;
