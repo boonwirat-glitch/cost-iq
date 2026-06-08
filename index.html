@@ -1,4 +1,4 @@
-<!-- Freshket Sense v440: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v441: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v440',
+      version: 'v441',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9881,7 +9881,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   overflow: hidden;
 }
 .s3-hero {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  position: absolute; top: 0; left: 0; right: 0; height: 60%;
   z-index: 0;
 }
 .s3-hero-img {
@@ -9890,7 +9890,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .s3-hero-gradient {
   position: absolute; inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,.18) 0%, transparent 28%, transparent 42%, rgba(0,0,0,.5) 100%);
+  background: linear-gradient(to bottom, rgba(0,0,0,.25) 0%, transparent 25%, transparent 38%, rgba(0,0,0,.35) 80%, rgba(0,0,0,.5) 100%);
 }
 .s3-topbar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 10;
@@ -9913,9 +9913,9 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .s3-sheet {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
-  background: rgba(255,255,255,0.82);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  backdrop-filter: blur(20px) saturate(1.8);
+  background: rgba(255,255,255,0.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
   border-radius: 24px 24px 0 0;
   height: 64%;
   overflow-y: auto;
