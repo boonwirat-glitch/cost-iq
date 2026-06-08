@@ -2116,7 +2116,14 @@ ${text}`;
 
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
-    _unmount();
+
+    // Force remove existing sheet immediately (handles minimize state where sheet is display:none)
+    const _existing = document.getElementById('ci-fullsheet');
+    if (_existing) { _existing.remove(); clearInterval(_timerRef); clearInterval(_waveRef); }
+    document.body.classList.remove('echo-active');
+    const _floatPill = document.getElementById('echo-float-pill');
+    if (_floatPill) _floatPill.classList.remove('visible');
+
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     _ownerType = (role === 'sales') ? 'sales' : 'kam';
