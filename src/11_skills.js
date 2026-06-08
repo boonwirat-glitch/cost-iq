@@ -508,28 +508,24 @@ function _renderModuleGrid(module) {
     : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
 
   return `
-<div class="s2-ambient">${ambientImg}</div>
-<div class="sk-cg-topbar s2-topbar">
-  <button class="sk-back-btn" onclick="_renderSkillsScreen()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
-    <span>ทักษะ</span>
-  </button>
-  <div style="text-align:right;">
-    <div class="sk-eyebrow">Module ${module}</div>
-    <div class="sk-cg-mod-name">${meta.name}</div>
-  </div>
-</div>
-<div class="s2-scroll" style="overflow-y:auto;flex:1;padding-bottom:84px;position:relative;z-index:2;">
-  <div class="s2-char">
+<div class="s2-screen">
+  <div class="s2-hero">
     ${charImg}
-    <div class="s2-char-overlay">
-      <div>
-        <div class="s2-char-name">${meta.name}</div>
-        <div class="s2-char-sub">Module ${module} — ${meta.sub}</div>
+    <div class="s2-hero-gradient"></div>
+    <div class="s2-topbar">
+      <button class="sk-back-btn" onclick="_renderSkillsScreen()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+        <span>ทักษะ</span>
+      </button>
+      <div style="text-align:right;">
+        <div class="sk-eyebrow" style="color:rgba(255,255,255,.7);">Module ${module}</div>
+        <div class="s2-cg-mod-name">${meta.name}</div>
       </div>
     </div>
   </div>
-  <div class="sk-grid s2-grid">${cards}</div>
+  <div class="s2-scroll">
+    <div class="sk-grid s2-grid">${cards}</div>
+  </div>
 </div>`;
 }
 
@@ -685,7 +681,11 @@ async function _doOpenDetail(skillId) {
     };
     scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
   }
-  // Sheet starts at peek immediately — no animation delay
+  // Set s3-detail height to actual viewport height (more reliable than 100vh)
+  const detailEl = document.getElementById('s3-detail-wrap');
+  if (detailEl) detailEl.style.height = window.innerHeight + 'px';
+
+  // Sheet starts at peek immediately
   const sh = document.getElementById('s3-sheet');
   if (sh) {
     sh.classList.remove('s3-sheet-hidden');
