@@ -378,8 +378,8 @@ function _renderRepHome() {
     const firstDef = defs[0];
     const thumbUrl = _skUrl(firstDef && (firstDef.module_banner_url || firstDef.card_image_url));
     const thumbHtml = thumbUrl
-      ? `<img src="${thumbUrl}" class="sk-row-thumb-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
-      : `<div class="sk-row-thumb-img" style="background:${MODULE_BG[m]}"></div>`;
+      ? `<img src="${thumbUrl}" class="sk-row-thumb-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')"><div class="sk-row-thumb-fade"></div>`
+      : `<div class="sk-row-thumb-img" style="background:${MODULE_BG[m]}"></div><div class="sk-row-thumb-fade"></div>`;
     const latestObs = defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0];
     const echoStrip = latestObs ? (()=>{ const col=_echoScoreColor(latestObs.ai_score); const lbl=_echoScoreLabel(latestObs.ai_score); const dt=new Date(latestObs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">'+lbl+'</span></div>'; })() : '';
     const stateBadge = tCount > 0 ? `<span class="sk-row-badge badge-training">${tCount} กำลังฝึก</span>`
@@ -393,12 +393,12 @@ function _renderRepHome() {
 <div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}',this)">
   <div class="sk-row-thumb">${thumbHtml}</div>
   <div class="sk-row-info">
-    <div class="sk-row-eye">MODULE ${m} · ${defs.length} SKILLS</div>
+    <div class="sk-row-eye" style="color:${meta.color}">MODULE ${m} · ${defs.length} SKILLS</div>
     <div class="sk-row-name">${meta.name}</div>
     <div class="sk-row-sub">${meta.sub}</div>
     <div class="sk-row-badges">${stateBadge}${echoStrip}</div>
   </div>
-  <div class="sk-row-right">${ringSvg}</div>
+  <div class="sk-row-right">${ringSvg}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></div>
 </div>`;
   }).join('');
 
@@ -512,16 +512,18 @@ function _renderModuleGrid(module) {
   <div class="s2-scroll">
     <div class="s2-topbar">
       <button class="sk-back-btn s2-back" onclick="_renderSkillsScreen()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
         <span>ทักษะ</span>
       </button>
-      <div style="text-align:right;">
-        <div class="sk-eyebrow">Module ${module}</div>
-        <div class="s2-cg-mod-name">${meta.name}</div>
-      </div>
     </div>
     <div class="s2-banner">
       ${charImg}
+      <div class="s2-banner-gradient"></div>
+      <div class="s2-banner-overlay">
+        <div class="s2-banner-mod-eye">Module ${module} · ${defs.length} Skills</div>
+        <div class="s2-banner-title">${meta.name}</div>
+        <div class="s2-banner-sub">${meta.sub}</div>
+      </div>
     </div>
     <div class="sk-grid s2-grid">${cards}</div>
   </div>
