@@ -553,11 +553,109 @@ async function _doOpenDetail(skillId) {
   const p     = _skillProg[String(skillId)];
   const state = p ? p.state : 'locked';
 
-  // Load eval log
+  const modCode = def.skill_code.split('_')[0];
+  const heroUrl = _skUrl(def.card_image_url);
+  const heroImg = heroUrl
+    ? `<img src="${heroUrl}" class="s3-hero-img sk-img-lazy" alt="${def.skill_name_en}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
+    : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
+  const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0].slice(0,72) : (def.skill_name_th || def.skill_name_en);
+
+  // CTA based on state
+  let cta = '';
+  if (state === 'locked') {
+    cta = `<button class="sk-cta-btn sk-cta-primary" onclick="skillsStartTraining(${skillId})">เริ่มฝึก</button>`;
+  } else if (state === 'training') {
+    cta = `
+<div class="sk-rep-hint">รอ TL ประเมินเพื่อ unlock ทักษะนี้</div>
+<button class="sk-cta-btn sk-cta-outline" onclick="_skToast('ส่งแล้ว — TL จะเห็นในรายการรอประเมิน')">แจ้ง TL ขอรับการประเมิน</button>`;
+  }
+
+  // ── RENDER SHELL IMMEDIATELY (no flash) ──────────────────
+  scr.innerHTML = `
+<div class="s3-detail" id="s3-detail-wrap">
+  <div class="s3-hero">
+    ${heroImg}
+    <div class="s3-hero-gradient"></div>
+  </div>
+  <div class="s3-topbar">
+    <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+      Module ${def.module}
+    </button>
+    <span class="s3-code-pill">${modCode}</span>
+  </div>
+  <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
+    <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
+    <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+          <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+        </div>
+        <div class="s3-teaser">${teaserText}…</div>
+      </div>
+      <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
+    </div>
+    <div class="sk-detail-body s3-body-full" id="s3-body-content">
+  <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
+
+  ${def.principle_th ? `
+  <div class="sk-rubric-block">
+    <div class="sk-rubric-eye">Principle — ทำไมสกิลนี้สำคัญ</div>
+    <div class="sk-rubric-text">${def.principle_th}</div>
+  </div>
+  <div class="sk-divider"></div>` : ''}
+
+  ${def.practice_th ? `
+  <div class="sk-rubric-block">
+    <div class="sk-rubric-eye">Practice — ต้องทำอะไร</div>
+    <div class="sk-rubric-text">${def.practice_th.split('|').map(t => t.trim()).filter(Boolean).map(t => '• ' + t).join('<br>')}</div>
+  </div>
+  <div class="sk-divider"></div>` : ''}
+
+  ${def.pass_test_th ? `
+  <div class="sk-rubric-block">
+    <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
+    <div class="sk-rubric-text">${def.pass_test_th.split('/').map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
+  </div>
+  <div class="sk-divider"></div>` : ''}
+
+  ${cta}
+  <div id="s3-async-section"></div>
+    </div>
+  </div>
+</div>`;
+
+  // ── Setup hero, parallax, ambient ────────────────────────
+  if (scr._s3ScrollHandler) scr.removeEventListener('scroll', scr._s3ScrollHandler);
+  scr._s3ScrollHandler = function() {
+    var hero = document.querySelector('.s3-hero');
+    if (hero) hero.style.transform = 'translateY(' + Math.min(scr.scrollTop * 0.4, 60) + 'px)';
+  };
+  scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
+
+  const detailEl = document.getElementById('s3-detail-wrap');
+  if (detailEl) detailEl.style.height = window.innerHeight + 'px';
+
+  const sh = document.getElementById('s3-sheet');
+  if (sh) {
+    sh.classList.remove('s3-sheet-hidden');
+    sh.classList.add('s3-sheet-peek');
+  }
+  if (heroUrl && detailEl) {
+    detailEl.style.setProperty('--s3-ambient-url', `url(${heroUrl})`);
+    setTimeout(() => detailEl.classList.add('s3-ambient-loaded'), 50);
+  }
+  _markLoadedImages(scr);
+
+  // ── FETCH log + echo AFTER render (no blocking flash) ────
   let logs = [];
   try {
     logs = await _skFetch(`${SKILLS_TABLE_LOG}?skill_id=eq.${skillId}&user_id=eq.${_skillsUserId}&order=changed_at.desc&limit=10`);
   } catch(_) {}
+
+  const asyncSection = document.getElementById('s3-async-section');
+  if (!asyncSection || _activeSkillId !== skillId) return; // navigated away
 
   const logRows = (logs || []).map(l => `
 <div class="sk-log-row">
@@ -568,7 +666,6 @@ async function _doOpenDetail(skillId) {
   </div>
 </div>`).join('');
 
-  // Echo history for this skill (rep view)
   const _echoHistory = (_echoObs[def.skill_code] || []).slice(0, 3);
   const echoRows = _echoHistory.map(o => {
     const col  = _echoScoreColor(o.ai_score);
@@ -598,107 +695,7 @@ async function _doOpenDetail(skillId) {
   <div class="sk-echo-list">${echoRows}</div>
 </div>` : '';
 
-  // CTA based on state
-  let cta = '';
-  if (state === 'locked') {
-    cta = `<button class="sk-cta-btn sk-cta-primary" onclick="skillsStartTraining(${skillId})">เริ่มฝึก</button>`;
-  } else if (state === 'training') {
-    cta = `
-<div class="sk-rep-hint">รอ TL ประเมินเพื่อ unlock ทักษะนี้</div>
-<button class="sk-cta-btn sk-cta-outline" onclick="_skToast('ส่งแล้ว — TL จะเห็นในรายการรอประเมิน')">แจ้ง TL ขอรับการประเมิน</button>`;
-  }
-
-  const modCode = def.skill_code.split('_')[0];
-  const heroUrl = _skUrl(def.card_image_url);
-  const heroImg = heroUrl
-    ? `<img src="${heroUrl}" class="s3-hero-img sk-img-lazy" alt="${def.skill_name_en}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
-    : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
-  const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0].slice(0,72) : (def.skill_name_th || def.skill_name_en);
-  scr.innerHTML = `
-<div class="s3-detail" id="s3-detail-wrap">
-  <div class="s3-hero">
-    ${heroImg}
-    <div class="s3-hero-gradient"></div>
-  </div>
-  <div class="s3-topbar">
-    <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
-      Module ${def.module}
-    </button>
-    <span class="s3-code-pill">${modCode}</span>
-  </div>
-  <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
-    <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
-    <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
-      <div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-          <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-          <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
-        </div>
-        <div class="s3-teaser">${teaserText}…</div>
-      </div>
-      <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
-    </div>
-    <div class="sk-detail-body s3-body-full">
-  <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
-
-  ${def.principle_th ? `
-  <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Principle — ทำไมสกิลนี้สำคัญ</div>
-    <div class="sk-rubric-text">${def.principle_th}</div>
-  </div>
-  <div class="sk-divider"></div>` : ''}
-
-  ${def.practice_th ? `
-  <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Practice — ต้องทำอะไร</div>
-    <div class="sk-rubric-text">${def.practice_th.split('|').map(t => t.trim()).filter(Boolean).map(t => '• ' + t).join('<br>')}</div>
-  </div>
-  <div class="sk-divider"></div>` : ''}
-
-  ${def.pass_test_th ? `
-  <div class="sk-rubric-block">
-    <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
-    <div class="sk-rubric-text">${def.pass_test_th.split('/').map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
-  </div>
-  <div class="sk-divider"></div>` : ''}
-
-  ${echoSection}
-
-  ${cta}
-
-  ${logRows ? `<div class="sk-log-eye">History</div>${logRows}` : ''}
-    </div>
-  </div>
-</div>`;
-  // ── Parallax: scroll → hero moves 40% speed
-  if (scr) {
-    if (scr._s3ScrollHandler) scr.removeEventListener('scroll', scr._s3ScrollHandler);
-    scr._s3ScrollHandler = function() {
-      var hero = document.querySelector('.s3-hero');
-      if (hero) hero.style.transform = 'translateY(' + Math.min(scr.scrollTop * 0.4, 60) + 'px)';
-    };
-    scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
-  }
-  // Set s3-detail height to actual viewport height (more reliable than 100vh)
-  const detailEl = document.getElementById('s3-detail-wrap');
-  if (detailEl) detailEl.style.height = window.innerHeight + 'px';
-
-  // Sheet starts at peek immediately
-  const sh = document.getElementById('s3-sheet');
-  if (sh) {
-    sh.classList.remove('s3-sheet-hidden');
-    sh.classList.add('s3-sheet-peek');
-  }
-  // Ambient bg: set on s3-detail as CSS var
-  if (heroUrl) {
-    const detailEl = document.getElementById('s3-detail-wrap');
-    if (detailEl) {
-      detailEl.style.setProperty('--s3-ambient-url', `url(${heroUrl})`);
-      setTimeout(() => detailEl.classList.add('s3-ambient-loaded'), 50);
-    }
-  }
-  _markLoadedImages(scr);
+  asyncSection.innerHTML = `${echoSection}${logRows ? `<div class="sk-log-eye">History</div>${logRows}` : ''}`;
 }
 // ── S3 sheet peek/expand toggle ────────────────────────────
 function _s3ToggleSheet() {
