@@ -10058,6 +10058,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   width: 100%;
   background: #111;
   overflow-x: hidden;
+  isolation: isolate;
 }
 
 /* Hero: natural flow, fits width */
@@ -10071,7 +10072,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   height: auto;
   display: block;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 /* Gradient overlay on hero */
@@ -10084,9 +10085,11 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 
 /* Ambient bg — fills .s3-hero, blurred color wash */
-.s3-ambient-bg {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+.s3-detail::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--s3-ambient-url);
   background-size: cover;
   background-position: center;
   filter: blur(40px) saturate(2.2) brightness(0.65);
@@ -10094,8 +10097,9 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   z-index: 0;
   opacity: 0;
   transition: opacity .5s ease .1s;
+  pointer-events: none;
 }
-.s3-ambient-bg.loaded { opacity: 1; }
+.s3-detail.s3-ambient-loaded::before { opacity: 1; }
 
 /* Topbar: absolute on top of hero */
 .s3-topbar {
@@ -43905,7 +43909,6 @@ async function _doOpenDetail(skillId) {
   <div class="s3-hero">
     ${heroImg}
     <div class="s3-hero-gradient"></div>
-    <div class="s3-ambient-bg" id="s3-ambient-bg"></div>
   </div>
   <div class="s3-topbar">
     <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
@@ -43975,12 +43978,12 @@ async function _doOpenDetail(skillId) {
       sh.classList.add('s3-sheet-peek');
     }
   }, 600);
-  // Ambient bg: blurred color wash
+  // Ambient bg: set on s3-detail as CSS var
   if (heroUrl) {
-    const ambEl = document.getElementById('s3-ambient-bg');
-    if (ambEl) {
-      ambEl.style.backgroundImage = `url(${heroUrl})`;
-      setTimeout(() => ambEl.classList.add('loaded'), 50);
+    const detailEl = document.getElementById('s3-detail-wrap');
+    if (detailEl) {
+      detailEl.style.setProperty('--s3-ambient-url', `url(${heroUrl})`);
+      setTimeout(() => detailEl.classList.add('s3-ambient-loaded'), 50);
     }
   }
   _markLoadedImages(scr);
