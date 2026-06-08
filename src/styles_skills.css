@@ -1810,7 +1810,7 @@
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 130px; opacity: 1; overflow: hidden; }
+.s3-sheet-peek     { height: 46%; opacity: 1; overflow: hidden; }
 .s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
