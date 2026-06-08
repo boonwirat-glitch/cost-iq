@@ -285,8 +285,22 @@ function _updateSkillsNavBadge() {
 }
 
 // ── Main render dispatcher ─────────────────────────────────
-function _renderSkillsScreen() {
+
+// ── Central screen switcher — reset scr-skills CSS state before every render ──
+function _switchSkillsScreen(mode) {
   const scr = document.getElementById('scr-skills');
+  if (!scr) return scr;
+  // reset ทุก state ก่อนเสมอ
+  scr.classList.remove('sk-detail-mode');
+  scr.removeAttribute('style');
+  if (mode === 'detail') {
+    scr.classList.add('sk-detail-mode');
+  }
+  return scr;
+}
+
+function _renderSkillsScreen() {
+  const scr = _switchSkillsScreen('home');
   if (!scr) return;
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
@@ -389,7 +403,7 @@ function _renderRepHome() {
 }
 
 function skillsOpenModule(module) {
-  const scr = document.getElementById('scr-skills');
+  const scr = _switchSkillsScreen('grid');
   if (!scr) return;
   scr.innerHTML = _renderModuleGrid(module);
 }
@@ -484,14 +498,13 @@ function _renderModuleGrid(module) {
 
 // ── Skill Detail Sheet ─────────────────────────────────────
 async function skillsOpenDetail(skillId) {
-  // micro-interaction: ถ้า scr มี content อยู่ → fade out ก่อน แล้ว render
   const scr = document.getElementById('scr-skills');
   if (scr && scr.innerHTML) {
     scr.style.transition = 'opacity .15s ease';
     scr.style.opacity = '0';
     setTimeout(() => {
-      scr.style.opacity = '';
       scr.style.transition = '';
+      scr.style.opacity = '';
       _doOpenDetail(skillId);
     }, 150);
     return;
@@ -500,7 +513,7 @@ async function skillsOpenDetail(skillId) {
 }
 async function _doOpenDetail(skillId) {
   _activeSkillId = skillId;
-  const scr = document.getElementById('scr-skills');
+  const scr = _switchSkillsScreen('detail');
   if (!scr) return;
 
   const def   = _skillDefs.find(d => d.id === skillId);
@@ -568,14 +581,11 @@ async function _doOpenDetail(skillId) {
   const heroImg = heroUrl
     ? `<img src="${heroUrl}" class="s3-hero-img" alt="${def.skill_name_en}">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
-  // ให้ scr เป็น positioning context เต็มจอ
-  scr.classList.add('sk-detail-mode');
-  scr.style.paddingBottom = '0';
   scr.innerHTML = `
 <div class="s3-detail">
   <div class="s3-hero">${heroImg}<div class="s3-hero-gradient"></div></div>
   <div class="s3-topbar">
-    <button class="s3-back" onclick="document.getElementById('scr-skills').classList.remove('sk-detail-mode');document.getElementById('scr-skills').style.paddingBottom='';skillsOpenModule('${def.module}')">
+    <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
       Module ${def.module}
     </button>
