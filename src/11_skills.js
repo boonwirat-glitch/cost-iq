@@ -568,11 +568,14 @@ async function _doOpenDetail(skillId) {
   const heroImg = heroUrl
     ? `<img src="${heroUrl}" class="s3-hero-img" alt="${def.skill_name_en}">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
+  // ให้ scr เป็น positioning context เต็มจอ
+  scr.classList.add('sk-detail-mode');
+  scr.style.paddingBottom = '0';
   scr.innerHTML = `
 <div class="s3-detail">
   <div class="s3-hero">${heroImg}<div class="s3-hero-gradient"></div></div>
   <div class="s3-topbar">
-    <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
+    <button class="s3-back" onclick="document.getElementById('scr-skills').classList.remove('sk-detail-mode');document.getElementById('scr-skills').style.paddingBottom='';skillsOpenModule('${def.module}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
       Module ${def.module}
     </button>
