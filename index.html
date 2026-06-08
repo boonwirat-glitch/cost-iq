@@ -1,4 +1,4 @@
-<!-- Freshket Sense v428: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v429: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v428',
+      version: 'v429',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41291,7 +41291,14 @@ ${text}`;
 
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
-    _unmount();
+
+    // Force remove existing sheet immediately (handles minimize state where sheet is display:none)
+    const _existing = document.getElementById('ci-fullsheet');
+    if (_existing) { _existing.remove(); clearInterval(_timerRef); clearInterval(_waveRef); }
+    document.body.classList.remove('echo-active');
+    const _floatPill = document.getElementById('echo-float-pill');
+    if (_floatPill) _floatPill.classList.remove('visible');
+
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     _ownerType = (role === 'sales') ? 'sales' : 'kam';
