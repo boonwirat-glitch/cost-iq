@@ -1743,3 +1743,84 @@
 .sk-img-lazy.sk-img-loaded {
   opacity: 1;
 }
+
+/* ══ MICRO-INTERACTIONS ══════════════════════════════════ */
+
+/* Module row tap */
+.sk-mod-row { transition: background .1s; }
+.sk-mod-row:active { background: rgba(255,56,92,.04) !important; transform: scale(.99); }
+
+/* Skill card tap */
+.sk-card, .sk-card-wide { transition: transform .12s cubic-bezier(.32,.72,0,1); }
+.sk-card:active, .sk-card-wide:active { transform: scale(.97); }
+
+/* S3 hero parallax — transform driven by JS scroll */
+.s3-hero { will-change: transform; }
+
+/* S3 sheet content stagger */
+.s3-body-full > * {
+  animation: s3-fade-up .32s ease both;
+}
+.s3-body-full > *:nth-child(1) { animation-delay: .06s; }
+.s3-body-full > *:nth-child(2) { animation-delay: .12s; }
+.s3-body-full > *:nth-child(3) { animation-delay: .18s; }
+.s3-body-full > *:nth-child(4) { animation-delay: .24s; }
+.s3-body-full > *:nth-child(5) { animation-delay: .30s; }
+
+/* CTA button press */
+.sk-cta-btn {
+  transition: transform .1s cubic-bezier(.32,.72,0,1), box-shadow .1s;
+}
+.sk-cta-btn:active { transform: scale(.97); }
+
+/* Back button */
+.s3-back { transition: opacity .12s; }
+.s3-back:active { opacity: .7; }
+
+/* ── Skeleton shimmer (loading state) ── */
+@keyframes sk-shimmer-move {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.sk-shimmer {
+  background: linear-gradient(90deg, #F0F0F0 25%, #E0E0E0 50%, #F0F0F0 75%);
+  background-size: 600px 100%;
+  animation: sk-shimmer-move 1.4s ease-in-out infinite;
+}
+.sk-skeleton-wrap {
+  padding: 10px 14px;
+}
+.sk-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid #F0F0F0;
+}
+.sk-skel-thumb {
+  width: 88px; height: 88px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.sk-skel-body { flex: 1; }
+.sk-skel-line {
+  height: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.sk-skel-line.w70 { width: 70%; }
+.sk-skel-line.w50 { width: 50%; }
+.sk-skel-line:last-child { margin-bottom: 0; }
+
+/* ── Toast slide-down from top ── */
+.sk-toast {
+  top: 60px !important;
+  bottom: auto !important;
+  transform: translateX(-50%) translateY(-16px) !important;
+  transition: opacity .22s ease, transform .22s cubic-bezier(.32,.72,0,1) !important;
+}
+.sk-toast.sk-toast-show {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
