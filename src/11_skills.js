@@ -685,14 +685,23 @@ async function _doOpenDetail(skillId) {
     };
     scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
   }
-  // Option C: auto-reveal sheet after 600ms
+  // Option C: auto-reveal sheet after 500ms
+  // Double rAF ensures browser paints height:0 before transitioning to 120px
   setTimeout(() => {
     const sh = document.getElementById('s3-sheet');
-    if (sh && sh.classList.contains('s3-sheet-hidden')) {
-      sh.classList.remove('s3-sheet-hidden');
-      sh.classList.add('s3-sheet-peek');
-    }
-  }, 600);
+    if (!sh || !sh.classList.contains('s3-sheet-hidden')) return;
+    sh.classList.remove('s3-sheet-hidden');
+    // Force a paint at height:0 before adding peek class
+    sh.style.height = '0px';
+    sh.style.opacity = '0';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        sh.style.height = '';
+        sh.style.opacity = '';
+        sh.classList.add('s3-sheet-peek');
+      });
+    });
+  }, 500);
   // Ambient bg: set on s3-detail as CSS var
   if (heroUrl) {
     const detailEl = document.getElementById('s3-detail-wrap');
