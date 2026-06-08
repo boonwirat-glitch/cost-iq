@@ -433,6 +433,25 @@ function skillsOpenModule(module) {
   if (!scr) return;
   scr.innerHTML = _renderModuleGrid(module);
   _markLoadedImages(scr);
+
+  // Option C: auto-reveal sheet after 600ms
+  setTimeout(() => {
+    const sh = document.getElementById('s3-sheet');
+    if (sh && sh.classList.contains('s3-sheet-hidden')) {
+      sh.classList.remove('s3-sheet-hidden');
+      sh.classList.add('s3-sheet-peek');
+    }
+  }, 600);
+
+  // Ambient bg: copy hero src → blurred color wash
+  if (heroUrl) {
+    const ambEl = document.getElementById('s3-ambient-bg');
+    if (ambEl) {
+      ambEl.style.backgroundImage = `url(${heroUrl})`;
+      // fade in after brief delay
+      setTimeout(() => ambEl.classList.add('loaded'), 50);
+    }
+  }
 }
 
 function _renderModuleGrid(module) {
@@ -602,9 +621,14 @@ async function _doOpenDetail(skillId) {
   const heroImg = heroUrl
     ? `<img src="${heroUrl}" class="s3-hero-img sk-img-lazy" alt="${def.skill_name_en}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
+  const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0].slice(0,72) : (def.skill_name_th || def.skill_name_en);
   scr.innerHTML = `
 <div class="s3-detail" id="s3-detail-wrap">
-  <div class="s3-hero">${heroImg}<div class="s3-hero-gradient"></div></div>
+  <div class="s3-hero">
+    ${heroImg}
+    <div class="s3-hero-gradient"></div>
+    <div class="s3-ambient-bg" id="s3-ambient-bg"></div>
+  </div>
   <div class="s3-topbar">
     <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
@@ -612,12 +636,15 @@ async function _doOpenDetail(skillId) {
     </button>
     <span class="s3-code-pill">${modCode}</span>
   </div>
-  <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
+  <div class="s3-sheet s3-sheet-hidden" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
     <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-        <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+          <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+        </div>
+        <div class="s3-teaser">${teaserText}…</div>
       </div>
       <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
     </div>
@@ -671,13 +698,8 @@ function _s3ToggleSheet() {
   const sheet = document.getElementById('s3-sheet');
   if (!sheet) return;
   const isExpanded = sheet.classList.contains('s3-sheet-expanded');
-  if (isExpanded) {
-    sheet.classList.remove('s3-sheet-expanded');
-    sheet.classList.add('s3-sheet-peek');
-  } else {
-    sheet.classList.remove('s3-sheet-peek');
-    sheet.classList.add('s3-sheet-expanded');
-  }
+  sheet.classList.remove('s3-sheet-hidden','s3-sheet-peek','s3-sheet-expanded');
+  sheet.classList.add(isExpanded ? 's3-sheet-peek' : 's3-sheet-expanded');
 }
 
 // ── Rep self-mark training ─────────────────────────────────
