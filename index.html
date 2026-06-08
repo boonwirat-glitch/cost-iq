@@ -1,4 +1,4 @@
-<!-- Freshket Sense v459: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v460: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v459',
+      version: 'v460',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10084,7 +10084,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   position: absolute;
   bottom: 0; left: 0; right: 0;
   z-index: 5;
-  background: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.72);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
   backdrop-filter: blur(28px) saturate(1.8);
   border-radius: 24px 24px 0 0;
@@ -10144,6 +10144,8 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s3-body-full { display: none; }
 .s3-sheet-peek .s3-body-full { display: none; }
 .s3-sheet-expanded .s3-body-full { display: block; }
+.s3-sheet-expanded .s3-peek-title { display: none; }
+.s3-sheet-expanded .s3-peek-cta   { display: none; }
 
 /* Content stagger */
 .s3-sheet .sk-detail-body > * { animation: s3-fade-up .35s ease both; }
