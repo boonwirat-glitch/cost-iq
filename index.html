@@ -1,4 +1,4 @@
-<!-- Freshket Sense v424: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v425: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2304,7 +2304,7 @@ body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{backgroun
 /* v199c: targeted navy bg — account view + overlay panel */
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
 body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
-body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
+body.kam-mode #rest-sheet-body{background:#fff}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
@@ -2744,7 +2744,7 @@ body.kam-mode #kam-nav-handle{display:none;}
   will-change:transform;
   transition:transform .35s cubic-bezier(.34,1.4,.64,1);
 }
-body.restaurant-sheet #rest-sheet-body { transform:translateX(-50%) translateY(0); transition-delay:.07s; }
+body.restaurant-sheet #rest-sheet-body { transform:translateX(-50%) translateY(0); transition-delay:.07s; z-index:210; }
 body.restaurant-sheet.rest-closing #rest-sheet-body {
   transform:translateX(-50%) translateY(102%) !important;
   transition:transform .28s cubic-bezier(0.4,0,1,1) !important;
@@ -5412,7 +5412,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v424',
+      version: 'v425',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
