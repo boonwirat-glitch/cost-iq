@@ -1210,6 +1210,7 @@ function skillsTLOpenRepDetail(userId) {
     <span class="sk-fpill" id="fp-all" onclick="_skRepFilter(true,'${userId}')">ดูทั้งหมด</span>
   </div>
   <div class="sk-det-skill-list" id="rep-det-list">${renderList(false)}</div>
+  ${_buildEchoSparkSection(userId)}
 </div>`;
 }
 
@@ -1280,7 +1281,92 @@ window.skillsOpenDetail        = skillsOpenDetail;
 window.skillsStartTraining     = skillsStartTraining;
 window.skillsTLOpenEval        = skillsTLOpenEval;
 window.skillsTLSave            = skillsTLSave;
-window.skillsTLOpenRepDetail   = skillsTLOpenRepDetail;
+// ── Echo Session Sparkline (TL rep detail) ─────────────────────────────────
+// แสดง skill score trend ย้อนหลัง 10 sessions ต่อ rep
+// อ่านจาก _echoObsTL ที่โหลดไว้แล้ว
+
+function _buildEchoSparkSection(userId) {
+  // รวม observations ทุก skill ของ user นี้ sort by date
+  const allObs = [];
+  Object.entries(_echoObsTL).forEach(([key, rows]) => {
+    if (!key.startsWith(userId + ':')) return;
+    const skillCode = key.split(':').slice(1).join(':');
+    rows.forEach(r => allObs.push({ ...r, skill_code: skillCode }));
+  });
+  if (!allObs.length) return '';
+
+  // Group by session (observed_at date) — แต่ละวัน = 1 session
+  const bySession = {};
+  allObs.forEach(r => {
+    const day = (r.observed_at || '').slice(0, 10);
+    if (!bySession[day]) bySession[day] = [];
+    bySession[day].push(r);
+  });
+  const sessions = Object.entries(bySession)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 10);
+
+  if (!sessions.length) return '';
+
+  // Per-skill trend: last 10 sessions
+  // Get skill codes that appear
+  const skillSet = new Set(allObs.map(r => r.skill_code));
+  const skillCodes = [...skillSet].slice(0, 11); // max 11 skills
+
+  const scoreVal = s => s === 'pass' ? 2 : s === 'developing' ? 1 : 0;
+  const scoreCol = s => s === 'pass' ? '#34C759' : s === 'developing' ? '#FF9500' : '#E5E5EA';
+
+  // Build sparkline rows — one per skill
+  const sparkRows = skillCodes.map(code => {
+    const shortCode = code.split('_')[0];
+    // Latest score for this skill
+    const latestObs = (allObs.filter(r => r.skill_code === code)
+      .sort((a, b) => (b.observed_at||'').localeCompare(a.observed_at||'')))[0];
+    const latestScore = latestObs?.ai_score || 'not_observed';
+    const latestCol   = scoreCol(latestScore);
+
+    // Dots for last 10 sessions (oldest → newest left to right)
+    const sessionDays = sessions.map(([day]) => day).reverse(); // oldest first
+    const dots = sessionDays.map(day => {
+      const obs = bySession[day]?.find(r => r.skill_code === code);
+      const sc  = obs?.ai_score || null;
+      const col = sc ? scoreCol(sc) : '#F2F2F7';
+      const opacity = sc ? '1' : '0.4';
+      return `<span style="width:8px;height:8px;border-radius:50%;background:${col};opacity:${opacity};flex-shrink:0;display:inline-block"></span>`;
+    }).join('');
+
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #F7F7F7">
+  <span style="font-size:10px;font-weight:500;color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;min-width:48px">${shortCode}</span>
+  <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
+  <span style="font-size:9px;font-weight:500;color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'Pass':latestScore==='developing'?'Developing':'—'}</span>
+</div>`;
+  }).join('');
+
+  // Legend header with session count labels (newest = rightmost)
+  const sessionLabels = sessions.map(([day]) => {
+    const d = new Date(day);
+    return d.toLocaleDateString('th-TH', { day:'numeric', month:'short' });
+  }).reverse().map(l =>
+    `<span style="font-size:8px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;flex:1;text-align:center;overflow:hidden">${l}</span>`
+  ).join('');
+
+  return `
+<div style="margin-top:20px;padding:0 2px">
+  <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:8px">Echo Skill Trend — ${sessions.length} sessions ล่าสุด</div>
+  <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:56px">
+    ${sessionLabels}
+    <span style="min-width:52px"></span>
+  </div>
+  ${sparkRows}
+  <div style="display:flex;gap:12px;margin-top:8px;padding-top:6px;border-top:0.5px solid #F2F2F7">
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#34C759;display:inline-block"></span>Pass</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#FF9500;display:inline-block"></span>Developing</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#E5E5EA;display:inline-block"></span>Not observed</span>
+  </div>
+</div>`;
+}
+
+
 window._skSetView              = _skSetView;
 window._skSetOvToggle          = _skSetOvToggle;
 window._skTLSelectState        = _skTLSelectState;
