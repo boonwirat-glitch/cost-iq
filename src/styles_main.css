@@ -1118,7 +1118,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ── PLAN BUILDER ── */
 /* ── PLAN SELECTOR ── */
-.plan-selector{background:linear-gradient(135deg,var(--tk-bg-base),var(--tk-bg-surface));border-radius:var(--r);padding:10px 11px;margin-bottom:10px;border:1px solid var(--tk-ok-dim-2)}
+.plan-selector{background:linear-gradient(135deg,#0d2a20,#1a4a35);border-radius:var(--r);padding:10px 11px;margin-bottom:10px;border:1px solid var(--tk-ok-dim-2)}
 .plan-sel-header{margin-bottom:8px}
 .plan-sel-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:1px}
 .plan-sel-sub{font-size:9px;color:rgba(255,255,255,.88);margin-top:2px}
