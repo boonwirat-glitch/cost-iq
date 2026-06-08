@@ -290,20 +290,6 @@ function _renderSkillsScreen() {
   if (!scr) return;
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
   scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
-  // stagger album cards entry (rep only)
-  if (!isTL) {
-    const albums = scr.querySelectorAll('.mod-album');
-    albums.forEach((a, i) => {
-      a.style.opacity = '0';
-      a.style.transform = 'translateY(14px)';
-      setTimeout(() => {
-        a.style.transition = 'opacity .3s ease, transform .3s ease';
-        a.style.opacity = '1';
-        a.style.transform = 'translateY(0)';
-        setTimeout(() => { a.style.transition = ''; }, 320);
-      }, 60 + i * 70);
-    });
-  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -405,26 +391,7 @@ function _renderRepHome() {
 function skillsOpenModule(module) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return;
-  scr.style.opacity = '0';
   scr.innerHTML = _renderModuleGrid(module);
-  // fade in banner ก่อน
-  requestAnimationFrame(() => {
-    scr.style.transition = 'opacity .2s ease';
-    scr.style.opacity = '1';
-    setTimeout(() => { scr.style.transition = ''; }, 220);
-  });
-  // stagger cards
-  const cards = scr.querySelectorAll('.sk-card, .sk-card-wide');
-  cards.forEach((c, i) => {
-    c.style.opacity = '0';
-    c.style.transform = 'translateY(16px)';
-    setTimeout(() => {
-      c.style.transition = 'opacity .25s ease, transform .25s ease';
-      c.style.opacity = '1';
-      c.style.transform = 'translateY(0)';
-      setTimeout(() => { c.style.transition = ''; }, 260);
-    }, 80 + i * 60);
-  });
 }
 
 function _renderModuleGrid(module) {
