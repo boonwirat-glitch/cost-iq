@@ -2292,7 +2292,7 @@ body.kam-mode #kam-nav-handle{display:none;}
   will-change:transform;
   transition:transform .35s cubic-bezier(.34,1.4,.64,1);
 }
-body.restaurant-sheet #rest-sheet-body { transform:translateX(-50%) translateY(0); transition-delay:.07s; }
+body.restaurant-sheet #rest-sheet-body { transform:translateX(-50%) translateY(0); transition-delay:.07s; z-index:210; }
 body.restaurant-sheet.rest-closing #rest-sheet-body {
   transform:translateX(-50%) translateY(102%) !important;
   transition:transform .28s cubic-bezier(0.4,0,1,1) !important;
