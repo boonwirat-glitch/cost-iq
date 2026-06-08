@@ -1,4 +1,4 @@
-<!-- Freshket Sense v445: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v446: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v445',
+      version: 'v446',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10090,7 +10090,6 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   position: relative;
   width: 100%;
   z-index: 1;
-  max-height: calc(100% - 60px);
   overflow: hidden;
 }
 .s3-hero-img {
@@ -10144,13 +10143,13 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
   backdrop-filter: blur(28px) saturate(1.8);
   border-radius: 24px 24px 0 0;
-  transition: height .45s cubic-bezier(.32,.72,0,1),
-              opacity .3s ease;
+  transition: height .5s cubic-bezier(.32,.72,0,1),
+              opacity .25s ease;
   overflow: hidden;
 }
-.s3-sheet-hidden   { height: 0; opacity: 0; transition: none; }
-.s3-sheet-peek     { height: 120px; opacity: 1; overflow: hidden; }
-.s3-sheet-expanded { height: 72%; opacity: 1; overflow-y: auto; }
+.s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
+.s3-sheet-peek     { height: 130px; opacity: 1; overflow: hidden; }
+.s3-sheet-expanded { height: calc(100% - 56px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
 .s3-sheet-handle {
@@ -43984,14 +43983,23 @@ async function _doOpenDetail(skillId) {
     };
     scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
   }
-  // Option C: auto-reveal sheet after 600ms
+  // Option C: auto-reveal sheet after 500ms
+  // Double rAF ensures browser paints height:0 before transitioning to 120px
   setTimeout(() => {
     const sh = document.getElementById('s3-sheet');
-    if (sh && sh.classList.contains('s3-sheet-hidden')) {
-      sh.classList.remove('s3-sheet-hidden');
-      sh.classList.add('s3-sheet-peek');
-    }
-  }, 600);
+    if (!sh || !sh.classList.contains('s3-sheet-hidden')) return;
+    sh.classList.remove('s3-sheet-hidden');
+    // Force a paint at height:0 before adding peek class
+    sh.style.height = '0px';
+    sh.style.opacity = '0';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        sh.style.height = '';
+        sh.style.opacity = '';
+        sh.classList.add('s3-sheet-peek');
+      });
+    });
+  }, 500);
   // Ambient bg: set on s3-detail as CSS var
   if (heroUrl) {
     const detailEl = document.getElementById('s3-detail-wrap');
