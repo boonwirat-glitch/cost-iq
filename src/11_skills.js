@@ -509,21 +509,20 @@ function _renderModuleGrid(module) {
 
   return `
 <div class="s2-screen">
-  <div class="s2-hero">
-    ${charImg}
-    <div class="s2-hero-gradient"></div>
+  <div class="s2-scroll">
     <div class="s2-topbar">
-      <button class="sk-back-btn" onclick="_renderSkillsScreen()">
+      <button class="sk-back-btn s2-back" onclick="_renderSkillsScreen()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
         <span>ทักษะ</span>
       </button>
       <div style="text-align:right;">
-        <div class="sk-eyebrow" style="color:rgba(255,255,255,.7);">Module ${module}</div>
+        <div class="sk-eyebrow">Module ${module}</div>
         <div class="s2-cg-mod-name">${meta.name}</div>
       </div>
     </div>
-  </div>
-  <div class="s2-scroll">
+    <div class="s2-banner">
+      ${charImg}
+    </div>
     <div class="sk-grid s2-grid">${cards}</div>
   </div>
 </div>`;
