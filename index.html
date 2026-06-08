@@ -1,4 +1,4 @@
-<!-- Freshket Sense v419: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v420: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5238,7 +5238,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v419',
+      version: 'v420',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8136,7 +8136,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* ── Screen container ── */
 #scr-skills {
-  display: flex;
+  display: none;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
@@ -8144,6 +8144,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   scrollbar-width: none;
   padding-bottom: 84px;
 }
+#scr-skills.on { display: flex; }
 #scr-skills::-webkit-scrollbar { display: none; }
 
 /* ── Eyebrow label (Noto Sans Thai) ── */
