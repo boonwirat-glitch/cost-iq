@@ -426,15 +426,7 @@ function _renderRepHome() {
 <div style="padding:16px 14px;text-align:center;">
   <span class="sk-eyebrow">TL ประเมินและ unlock ทักษะให้คุณ</span>
 </div>`;
-}
-
-function skillsOpenModule(module) {
-  const scr = _switchSkillsScreen('grid');
-  if (!scr) return;
-  scr.innerHTML = _renderModuleGrid(module);
-  _markLoadedImages(scr);
-
-  // Option C: auto-reveal sheet after 600ms
+ // Option C: auto-reveal sheet after 600ms
   setTimeout(() => {
     const sh = document.getElementById('s3-sheet');
     if (sh && sh.classList.contains('s3-sheet-hidden')) {
@@ -442,16 +434,21 @@ function skillsOpenModule(module) {
       sh.classList.add('s3-sheet-peek');
     }
   }, 600);
-
-  // Ambient bg: copy hero src → blurred color wash
+  // Ambient bg
   if (heroUrl) {
     const ambEl = document.getElementById('s3-ambient-bg');
     if (ambEl) {
       ambEl.style.backgroundImage = `url(${heroUrl})`;
-      // fade in after brief delay
       setTimeout(() => ambEl.classList.add('loaded'), 50);
     }
   }
+}
+
+function skillsOpenModule(module) {
+  const scr = _switchSkillsScreen('grid');
+  if (!scr) return;
+  scr.innerHTML = _renderModuleGrid(module);
+  _markLoadedImages(scr);
 }
 
 function _renderModuleGrid(module) {
@@ -680,7 +677,6 @@ async function _doOpenDetail(skillId) {
     </div>
   </div>
 </div>`;
-}
   // ── Parallax: scroll → hero moves 40% speed
   if (scr) {
     if (scr._s3ScrollHandler) scr.removeEventListener('scroll', scr._s3ScrollHandler);
@@ -690,9 +686,24 @@ async function _doOpenDetail(skillId) {
     };
     scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
   }
+  // Option C: auto-reveal sheet after 600ms
+  setTimeout(() => {
+    const sh = document.getElementById('s3-sheet');
+    if (sh && sh.classList.contains('s3-sheet-hidden')) {
+      sh.classList.remove('s3-sheet-hidden');
+      sh.classList.add('s3-sheet-peek');
+    }
+  }, 600);
+  // Ambient bg: blurred color wash
+  if (heroUrl) {
+    const ambEl = document.getElementById('s3-ambient-bg');
+    if (ambEl) {
+      ambEl.style.backgroundImage = `url(${heroUrl})`;
+      setTimeout(() => ambEl.classList.add('loaded'), 50);
+    }
+  }
   _markLoadedImages(scr);
-
-
+}
 // ── S3 sheet peek/expand toggle ────────────────────────────
 function _s3ToggleSheet() {
   const sheet = document.getElementById('s3-sheet');
