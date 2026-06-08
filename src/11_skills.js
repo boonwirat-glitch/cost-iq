@@ -38,17 +38,19 @@ const MODULE_BG = {
 
 
 // ── Image render helpers ───────────────────────────────────
-// card_image_url จาก skill_definitions → ใช้จริง
+// card_image_url / module_banner_url จาก skill_definitions → prepend R2 base
 // ถ้า null → fallback gradient (MODULE_BG)
-// CSS filter จัดการ state: locked/training ดูจาก .state-{state} class
+
+const SK_R2 = (window.FreshketSenseConfig&&window.FreshketSenseConfig.data&&window.FreshketSenseConfig.data.r2Base)||'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+function _skUrl(p){if(!p)return'';if(p.startsWith('http'))return p;return SK_R2+p;}
 
 function _skImgTag(def, opts = {}) {
   const w   = opts.w   || '100%';
   const h   = opts.h   || '106px';
   const cls = opts.cls || 'sk-card-img';
-  const url = def && def.card_image_url;
+  const url = _skUrl(def && def.card_image_url);
   if (url) {
-    return `<img src="${url}" class="${cls}" style="width:${w};height:${h};object-fit:cover;object-position:center 25%;display:block;" alt="${def.skill_name_en || ''}">`;
+    return `<img src="${url}" class="${cls} sk-img-lazy" style="width:${w};height:${h};object-fit:cover;object-position:center top;display:block;" alt="${def.skill_name_en||''}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`;
   }
   // fallback: gradient placeholder
   const bg = MODULE_BG[def ? def.module : 'A'];
@@ -353,39 +355,31 @@ function _renderRepHome() {
     const ringOffset = 94.25 * (1 - ringPct);
     const ringColor = uCount === defs.length ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : '#EBEBEB';
     const dimClass = uCount === 0 && tCount === 0 ? ' sk-mod-dim' : '';
-    // album card — รูปแรกของ module เป็น hero
+    // S1 row layout — module_banner_url thumbnail left, info right, ring
     const firstDef = defs[0];
-    const bgImg = firstDef && firstDef.card_image_url
-      ? `<img src="${firstDef.card_image_url}" class="mod-album-img" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
-      : `<div style="width:100%;height:100%;background:${MODULE_BG[m]};"></div>`;
-    const ringStroke = ringPct >= 1 ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : 'rgba(255,255,255,.55)';
-    const ringTxtCol = uCount > 0 || tCount > 0 ? '#fff' : 'rgba(255,255,255,.6)';
+    const thumbUrl = _skUrl(firstDef && (firstDef.module_banner_url || firstDef.card_image_url));
+    const thumbHtml = thumbUrl
+      ? `<img src="${thumbUrl}" class="sk-row-thumb-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
+      : `<div class="sk-row-thumb-img" style="background:${MODULE_BG[m]}"></div>`;
+    const latestObs = defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0];
+    const echoStrip = latestObs ? (()=>{ const col=_echoScoreColor(latestObs.ai_score); const lbl=_echoScoreLabel(latestObs.ai_score); const dt=new Date(latestObs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">'+lbl+'</span></div>'; })() : '';
+    const stateBadge = tCount > 0 ? `<span class="sk-row-badge badge-training">${tCount} กำลังฝึก</span>`
+      : uCount > 0 ? `<span class="sk-row-badge badge-unlocked">${uCount} ปลดล็อค</span>` : '';
+    const ringSvg = `<svg class="sk-row-ring" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
+      ${ringPct > 0 ? `<circle cx="18" cy="18" r="15" fill="none" stroke="${ringColor}" stroke-width="2.5" stroke-dasharray="94.25" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 18 18)"/>` : ''}
+      <text x="18" y="22" text-anchor="middle" font-size="8" font-weight="700" fill="#222">${uCount}/${defs.length}</text>
+    </svg>`;
     return `
-<div class="mod-album${dimClass}" onclick="skillsOpenModule('${m}')">
-  ${bgImg}
-  <div class="mod-album-overlay"></div>
-  <div class="mod-album-body">
-    <div class="mod-album-eye">Module ${m}</div>
-    <div class="mod-album-name">${meta.name}</div>
-    <div class="mod-album-sub">${meta.sub} · ${defs.length} skills</div>
-    ${(()=>{ const obs=defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0]; if(!obs) return ''; const col=_echoScoreColor(obs.ai_score); const lbl=_echoScoreLabel(obs.ai_score); const dt=new Date(obs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">'+lbl+'</span></div>'; })()}
+<div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}')">
+  <div class="sk-row-thumb">${thumbHtml}</div>
+  <div class="sk-row-info">
+    <div class="sk-row-eye">MODULE ${m} · ${defs.length} SKILLS</div>
+    <div class="sk-row-name">${meta.name}</div>
+    <div class="sk-row-sub">${meta.sub}</div>
+    <div class="sk-row-badges">${stateBadge}${echoStrip}</div>
   </div>
-  <div class="sk-mod-right">
-    <div class="sk-ring">
-      <svg viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r="15" fill="none" stroke="#EBEBEB" stroke-width="2.5"/>
-        ${ringPct > 0 ? `<circle cx="18" cy="18" r="15" fill="none" stroke="${ringColor}" stroke-width="2.5"
-          stroke-dasharray="94.25" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round"/>` : ''}
-      </svg>
-      <div class="sk-ring-label">${uCount}/${defs.length}</div>
-  </div>
-  <div class="mod-album-ring">
-    <svg viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r="13" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/>
-      ${ringPct > 0 ? `<circle cx="18" cy="18" r="13" fill="none" stroke="${ringStroke}" stroke-width="2" stroke-dasharray="81.68" stroke-dashoffset="${81.68*(1-ringPct)}" stroke-linecap="round" transform="rotate(-90 18 18)"/>` : ''}
-      <text x="18" y="22" text-anchor="middle" font-size="9" font-weight="700" fill="${ringTxtCol}">${uCount}/${defs.length}</text>
-    </svg>
-  </div>
+  <div class="sk-row-right">${ringSvg}</div>
 </div>`;
   }).join('');
 
@@ -468,20 +462,14 @@ function _renderModuleGrid(module) {
 </div>`;
   }).join('');
 
-  // character banner — รูปแรกของ module ใช้เป็น hero
-  // full-width character banner — ใช้รูปแรกของ module
+  // S2 character banner — module_banner_url (full portrait), not skill card
   const bannerDef = defs[0];
-  const bannerUrl = bannerDef && bannerDef.card_image_url ? bannerDef.card_image_url : '';
-  const bannerImg = bannerUrl
-    ? `<img src="${bannerUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center 18%;display:block;" alt="${meta.name}">`
-    : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};opacity:.6;"></div>`;
-
-  const heroUrl = bannerDef && bannerDef.card_image_url ? bannerDef.card_image_url : '';
-  const ambientImg = heroUrl
-    ? `<img src="${heroUrl}" class="s2-ambient-img" alt="">`
+  const bannerUrl = _skUrl(bannerDef && (bannerDef.module_banner_url || bannerDef.card_image_url));
+  const ambientImg = bannerUrl
+    ? `<img src="${bannerUrl}" class="s2-ambient-img sk-img-lazy" alt="" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
-  const charImg = heroUrl
-    ? `<img src="${heroUrl}" class="s2-char-img" alt="${meta.name}">`
+  const charImg = bannerUrl
+    ? `<img src="${bannerUrl}" class="s2-char-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[module]};"></div>`;
 
   return `
@@ -591,12 +579,12 @@ async function _doOpenDetail(skillId) {
   }
 
   const modCode = def.skill_code.split('_')[0];
-  const heroUrl = def.card_image_url || '';
+  const heroUrl = _skUrl(def.card_image_url);
   const heroImg = heroUrl
-    ? `<img src="${heroUrl}" class="s3-hero-img" alt="${def.skill_name_en}">`
+    ? `<img src="${heroUrl}" class="s3-hero-img sk-img-lazy" alt="${def.skill_name_en}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
   scr.innerHTML = `
-<div class="s3-detail">
+<div class="s3-detail" id="s3-detail-wrap">
   <div class="s3-hero">${heroImg}<div class="s3-hero-gradient"></div></div>
   <div class="s3-topbar">
     <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
@@ -605,9 +593,16 @@ async function _doOpenDetail(skillId) {
     </button>
     <span class="s3-code-pill">${modCode}</span>
   </div>
-  <div class="s3-sheet">
-    <div class="s3-sheet-handle"></div>
-    <div class="sk-detail-body">
+  <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
+    <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
+    <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+        <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+      </div>
+      <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
+    </div>
+    <div class="sk-detail-body s3-body-full">
   <div class="sk-state-pill-row">
     <div class="sk-state-pill pill-${state}">
       <div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}
@@ -645,6 +640,20 @@ async function _doOpenDetail(skillId) {
     </div>
   </div>
 </div>`;
+}
+
+// ── S3 sheet peek/expand toggle ────────────────────────────
+function _s3ToggleSheet() {
+  const sheet = document.getElementById('s3-sheet');
+  if (!sheet) return;
+  const isExpanded = sheet.classList.contains('s3-sheet-expanded');
+  if (isExpanded) {
+    sheet.classList.remove('s3-sheet-expanded');
+    sheet.classList.add('s3-sheet-peek');
+  } else {
+    sheet.classList.remove('s3-sheet-peek');
+    sheet.classList.add('s3-sheet-expanded');
+  }
 }
 
 // ── Rep self-mark training ─────────────────────────────────
