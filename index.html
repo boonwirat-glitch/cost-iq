@@ -1,4 +1,4 @@
-<!-- Freshket Sense v452: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v453: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v452',
+      version: 'v453',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8444,11 +8444,12 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .sk-mod-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  align-items: stretch;
+  gap: 0;
+  height: 100px;
   border-top: 1px solid var(--sk-hairline);
   cursor: pointer;
+  overflow: hidden;
 }
 .sk-mod-row:last-child { border-bottom: 1px solid var(--sk-hairline); }
 .sk-mod-row:active { background: var(--sk-surface); }
@@ -10148,18 +10149,24 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 
 /* ══ S1 MODULE ROW — missing classes restored ═══════════ */
 .sk-row-thumb {
-  width: 88px !important;
-  height: 88px !important;
-  flex-shrink: 0 !important;
-  overflow: hidden !important;
-  border-radius: 10px;
+  width: 36%;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  align-self: stretch;
 }
 .sk-row-thumb img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: center top !important;
-  display: block !important;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.sk-row-thumb-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent 50%, #fff 100%);
+  pointer-events: none;
 }
 .sk-row-thumb-img {
   width: 100%; height: 100%;
@@ -10173,7 +10180,10 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-row-info {
   flex: 1;
   min-width: 0;
-  padding: 0;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .sk-row-eye {
   font-size: 8px;
@@ -10217,8 +10227,10 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .badge-training { background: rgba(33,150,243,.1); color: #2196F3; }
 .badge-unlocked { background: rgba(52,199,89,.1); color: #34C759; }
 .sk-row-right {
-  padding-right: 4px;
+  padding: 0 12px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 .sk-row-ring {
   width: 40px; height: 40px;
@@ -10238,21 +10250,25 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 84px;
+  position: relative;
 }
 .s2-topbar {
   padding: 44px 16px 10px;
-  background: rgba(255,255,255,0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 0.5px solid rgba(0,0,0,.06);
-  position: sticky;
-  top: 0;
+  position: absolute;
+  top: 0; left: 0; right: 0;
   z-index: 10;
 }
-.s2-back { color: var(--sk-ac) !important; }
+.s2-back {
+  color: #fff !important;
+  background: rgba(0,0,0,.32) !important;
+  border-radius: 999px;
+  padding: 6px 13px;
+  backdrop-filter: blur(8px);
+  border: none;
+}
 .s2-cg-mod-name {
   font-size: 15px;
   font-weight: 700;
@@ -10261,7 +10277,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s2-banner {
   position: relative;
   width: 100%;
-  height: 200px;
+  height: 280px;
   overflow: hidden;
   background: #F7F0FA;
 }
@@ -10269,8 +10285,45 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center 22%;
   display: block;
+}
+.s2-banner-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,.28) 0%, transparent 40%);
+  pointer-events: none;
+}
+.s2-banner-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 16px 16px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.52) 100%);
+  pointer-events: none;
+}
+.s2-banner-mod-eye {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 3px;
+}
+.s2-banner-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  font-family: 'Noto Sans Thai', sans-serif;
+}
+.s2-banner-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.72);
+  margin-top: 2px;
+  font-family: 'Noto Sans Thai', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .06em;
 }
 .s2-grid {
   padding: 12px 14px;
@@ -43760,8 +43813,8 @@ function _renderRepHome() {
     const firstDef = defs[0];
     const thumbUrl = _skUrl(firstDef && (firstDef.module_banner_url || firstDef.card_image_url));
     const thumbHtml = thumbUrl
-      ? `<img src="${thumbUrl}" class="sk-row-thumb-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
-      : `<div class="sk-row-thumb-img" style="background:${MODULE_BG[m]}"></div>`;
+      ? `<img src="${thumbUrl}" class="sk-row-thumb-img sk-img-lazy" alt="${meta.name}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')"><div class="sk-row-thumb-fade"></div>`
+      : `<div class="sk-row-thumb-img" style="background:${MODULE_BG[m]}"></div><div class="sk-row-thumb-fade"></div>`;
     const latestObs = defs.flatMap(d=>(_echoObs[d.skill_code]||[]).slice(0,1)).sort((a,b)=>new Date(b.observed_at)-new Date(a.observed_at))[0];
     const echoStrip = latestObs ? (()=>{ const col=_echoScoreColor(latestObs.ai_score); const lbl=_echoScoreLabel(latestObs.ai_score); const dt=new Date(latestObs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'}); return '<div class="sk-echo-strip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16.243 7.757a6 6 0 010 8.486M7.757 7.757a6 6 0 000 8.486"/></svg><span class="sk-echo-date">'+dt+'</span><span class="sk-echo-score" style="color:'+col+'">'+lbl+'</span></div>'; })() : '';
     const stateBadge = tCount > 0 ? `<span class="sk-row-badge badge-training">${tCount} กำลังฝึก</span>`
@@ -43775,12 +43828,12 @@ function _renderRepHome() {
 <div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}',this)">
   <div class="sk-row-thumb">${thumbHtml}</div>
   <div class="sk-row-info">
-    <div class="sk-row-eye">MODULE ${m} · ${defs.length} SKILLS</div>
+    <div class="sk-row-eye" style="color:${meta.color}">MODULE ${m} · ${defs.length} SKILLS</div>
     <div class="sk-row-name">${meta.name}</div>
     <div class="sk-row-sub">${meta.sub}</div>
     <div class="sk-row-badges">${stateBadge}${echoStrip}</div>
   </div>
-  <div class="sk-row-right">${ringSvg}</div>
+  <div class="sk-row-right">${ringSvg}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#BDBDBD" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></div>
 </div>`;
   }).join('');
 
@@ -43894,16 +43947,18 @@ function _renderModuleGrid(module) {
   <div class="s2-scroll">
     <div class="s2-topbar">
       <button class="sk-back-btn s2-back" onclick="_renderSkillsScreen()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
         <span>ทักษะ</span>
       </button>
-      <div style="text-align:right;">
-        <div class="sk-eyebrow">Module ${module}</div>
-        <div class="s2-cg-mod-name">${meta.name}</div>
-      </div>
     </div>
     <div class="s2-banner">
       ${charImg}
+      <div class="s2-banner-gradient"></div>
+      <div class="s2-banner-overlay">
+        <div class="s2-banner-mod-eye">Module ${module} · ${defs.length} Skills</div>
+        <div class="s2-banner-title">${meta.name}</div>
+        <div class="s2-banner-sub">${meta.sub}</div>
+      </div>
     </div>
     <div class="sk-grid s2-grid">${cards}</div>
   </div>
