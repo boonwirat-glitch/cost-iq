@@ -622,12 +622,6 @@ async function _doOpenDetail(skillId) {
       <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
     </div>
     <div class="sk-detail-body s3-body-full">
-  <div class="sk-state-pill-row">
-    <div class="sk-state-pill pill-${state}">
-      <div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}
-    </div>
-    <span class="sk-detail-code">${def.skill_name_en} · ${modCode}</span>
-  </div>
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
 
   ${def.principle_th ? `
