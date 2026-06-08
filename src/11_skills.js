@@ -371,7 +371,7 @@ function _renderRepHome() {
       <text x="18" y="22" text-anchor="middle" font-size="8" font-weight="700" fill="#222">${uCount}/${defs.length}</text>
     </svg>`;
     return `
-<div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}')">
+<div class="sk-mod-row${dimClass}" onclick="skillsOpenModule('${m}',this)">
   <div class="sk-row-thumb">${thumbHtml}</div>
   <div class="sk-row-info">
     <div class="sk-row-eye">MODULE ${m} · ${defs.length} SKILLS</div>
@@ -641,6 +641,17 @@ async function _doOpenDetail(skillId) {
   </div>
 </div>`;
 }
+  // ── Parallax: scroll → hero moves 40% speed
+  if (scr) {
+    if (scr._s3ScrollHandler) scr.removeEventListener('scroll', scr._s3ScrollHandler);
+    scr._s3ScrollHandler = function() {
+      var hero = document.querySelector('.s3-hero');
+      if (hero) hero.style.transform = 'translateY(' + Math.min(scr.scrollTop * 0.4, 60) + 'px)';
+    };
+    scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
+  }
+  _markLoadedImages(scr);
+
 
 // ── S3 sheet peek/expand toggle ────────────────────────────
 function _s3ToggleSheet() {
@@ -1205,6 +1216,20 @@ function _skToast(msg) {
   setTimeout(() => t.classList.remove('sk-toast-show'), 2200);
 }
 
+// ── Micro-interaction helpers ─────────────────────────
+function _skCardRipple(el) {
+  if (!el) return;
+  el.style.transition = 'transform .12s cubic-bezier(.32,.72,0,1)';
+  el.style.transform = 'scale(.97)';
+  setTimeout(function(){ el.style.transform=''; el.style.transition=''; }, 200);
+}
+
+function _skShowSkeleton(scr) {
+  if (!scr) return;
+  var rows = [1,2,3,4].map(function(){ return '<div class="sk-skeleton-row"><div class="sk-skel-thumb sk-shimmer"></div><div class="sk-skel-body"><div class="sk-skel-line w70 sk-shimmer"></div><div class="sk-skel-line w50 sk-shimmer"></div></div></div>'; }).join('');
+  scr.innerHTML = '<div class="sk-skeleton-wrap">' + rows + '</div>';
+}
+
 // ── Expose globals ─────────────────────────────────────────
 window.skillsInit              = skillsInit;
 window.skillsOpenModule        = skillsOpenModule;
@@ -1218,4 +1243,6 @@ window._skSetOvToggle          = _skSetOvToggle;
 window._skTLSelectState        = _skTLSelectState;
 window._skRepFilter            = _skRepFilter;
 window._renderSkillsScreen     = _renderSkillsScreen;
+window._s3ToggleSheet          = _s3ToggleSheet;
+window._skCardRipple           = _skCardRipple;
 
