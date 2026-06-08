@@ -1,4 +1,4 @@
-<!-- Freshket Sense v446: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v447: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v446',
+      version: 'v447',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10149,7 +10149,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
 .s3-sheet-peek     { height: 130px; opacity: 1; overflow: hidden; }
-.s3-sheet-expanded { height: calc(100% - 56px); opacity: 1; overflow-y: auto; }
+.s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
 .s3-sheet-handle {
@@ -43930,7 +43930,7 @@ async function _doOpenDetail(skillId) {
     </button>
     <span class="s3-code-pill">${modCode}</span>
   </div>
-  <div class="s3-sheet s3-sheet-hidden" id="s3-sheet">
+  <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
     <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
       <div>
@@ -43983,23 +43983,12 @@ async function _doOpenDetail(skillId) {
     };
     scr.addEventListener('scroll', scr._s3ScrollHandler, {passive:true});
   }
-  // Option C: auto-reveal sheet after 500ms
-  // Double rAF ensures browser paints height:0 before transitioning to 120px
-  setTimeout(() => {
-    const sh = document.getElementById('s3-sheet');
-    if (!sh || !sh.classList.contains('s3-sheet-hidden')) return;
+  // Sheet starts at peek immediately — no animation delay
+  const sh = document.getElementById('s3-sheet');
+  if (sh) {
     sh.classList.remove('s3-sheet-hidden');
-    // Force a paint at height:0 before adding peek class
-    sh.style.height = '0px';
-    sh.style.opacity = '0';
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        sh.style.height = '';
-        sh.style.opacity = '';
-        sh.classList.add('s3-sheet-peek');
-      });
-    });
-  }, 500);
+    sh.classList.add('s3-sheet-peek');
+  }
   // Ambient bg: set on s3-detail as CSS var
   if (heroUrl) {
     const detailEl = document.getElementById('s3-detail-wrap');
