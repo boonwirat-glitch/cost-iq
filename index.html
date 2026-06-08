@@ -1,4 +1,4 @@
-<!-- Freshket Sense v422: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v423: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1570,7 +1570,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ── PLAN BUILDER ── */
 /* ── PLAN SELECTOR ── */
-.plan-selector{background:linear-gradient(135deg,#0d2a20,#1a4a35);border-radius:var(--r);padding:10px 11px;margin-bottom:10px;border:1px solid var(--tk-ok-dim-2)}
+.plan-selector{background:linear-gradient(135deg,var(--tk-bg-base),var(--tk-bg-surface));border-radius:var(--r);padding:10px 11px;margin-bottom:10px;border:1px solid var(--tk-ok-dim-2)}
 .plan-sel-header{margin-bottom:8px}
 .plan-sel-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:1px}
 .plan-sel-sub{font-size:9px;color:rgba(255,255,255,.88);margin-top:2px}
@@ -2758,13 +2758,13 @@ body.restaurant-sheet.rest-closing #rest-sheet-body {
   display:flex; align-items:flex-start; justify-content:center;
   padding-top:10px;
 }
-.rsc-pill { width:36px; height:4px; background:rgba(255,255,255,.45); border-radius:2px; }
+.rsc-pill { width:36px; height:4px; background:rgba(0,0,0,.18); border-radius:2px; }
 #rest-sheet-close {
   position:absolute; right:12px; top:8px;
   width:28px; height:28px; border-radius:50%;
-  background:rgba(0,0,0,.15); border:none; cursor:pointer;
+  background:rgba(0,0,0,.08); border:1px solid rgba(0,0,0,.1); cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  color:rgba(255,255,255,.8); font-size:14px; font-weight:600;
+  color:rgba(0,0,0,.55); font-size:14px; font-weight:600;
   pointer-events:auto; font-family:var(--tk-font-body);
   -webkit-tap-highlight-color:transparent;
 }
@@ -5412,7 +5412,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v422',
+      version: 'v423',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
