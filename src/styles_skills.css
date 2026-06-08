@@ -1795,7 +1795,7 @@
   position: absolute;
   bottom: 0; left: 0; right: 0;
   z-index: 5;
-  background: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.72);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
   backdrop-filter: blur(28px) saturate(1.8);
   border-radius: 24px 24px 0 0;
@@ -1855,6 +1855,8 @@
 .s3-body-full { display: none; }
 .s3-sheet-peek .s3-body-full { display: none; }
 .s3-sheet-expanded .s3-body-full { display: block; }
+.s3-sheet-expanded .s3-peek-title { display: none; }
+.s3-sheet-expanded .s3-peek-cta   { display: none; }
 
 /* Content stagger */
 .s3-sheet .sk-detail-body > * { animation: s3-fade-up .35s ease both; }
