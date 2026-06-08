@@ -624,7 +624,6 @@ async function _doOpenDetail(skillId) {
   <div class="s3-hero">
     ${heroImg}
     <div class="s3-hero-gradient"></div>
-    <div class="s3-ambient-bg" id="s3-ambient-bg"></div>
   </div>
   <div class="s3-topbar">
     <button class="s3-back" onclick="skillsOpenModule('${def.module}')">
@@ -694,12 +693,12 @@ async function _doOpenDetail(skillId) {
       sh.classList.add('s3-sheet-peek');
     }
   }, 600);
-  // Ambient bg: blurred color wash
+  // Ambient bg: set on s3-detail as CSS var
   if (heroUrl) {
-    const ambEl = document.getElementById('s3-ambient-bg');
-    if (ambEl) {
-      ambEl.style.backgroundImage = `url(${heroUrl})`;
-      setTimeout(() => ambEl.classList.add('loaded'), 50);
+    const detailEl = document.getElementById('s3-detail-wrap');
+    if (detailEl) {
+      detailEl.style.setProperty('--s3-ambient-url', `url(${heroUrl})`);
+      setTimeout(() => detailEl.classList.add('s3-ambient-loaded'), 50);
     }
   }
   _markLoadedImages(scr);
