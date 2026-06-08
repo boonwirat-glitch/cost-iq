@@ -586,15 +586,19 @@ async function _doOpenDetail(skillId) {
   </div>
   <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
-    <div class="s3-peek-hint" onclick="_s3ToggleSheet()">
-      <div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-          <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-          <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+    <div class="s3-peek-hint">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;" onclick="_s3ToggleSheet()">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+            <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+          </div>
+          <div class="s3-teaser">${teaserText}…</div>
         </div>
-        <div class="s3-teaser">${teaserText}…</div>
+        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:2px;"><path d="M18 15l-6-6-6 6"/></svg>
       </div>
-      <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M18 15l-6-6-6 6"/></svg>
+      <div class="s3-peek-title">${def.skill_name_th || def.skill_name_en}</div>
+      ${cta ? `<div class="s3-peek-cta">${cta}</div>` : ''}
     </div>
     <div class="sk-detail-body s3-body-full" id="s3-body-content">
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
