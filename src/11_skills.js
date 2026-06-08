@@ -173,24 +173,39 @@ async function _loadSkillProgress() {
 }
 
 // ── Load Echo observations (rep view only) ──────────
-let _echoObs = {}; // { 'B04_PREVISIT': [{ai_score, evidence, coaching_note, observed_at},...] }
+let _echoObs   = {}; // rep view  { skill_code: [rows...] }
+let _echoObsTL = {}; // TL view   { 'userId:skill_code': [rows...] }
 
 async function _loadEchoObs() {
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
-  if (isTL || !_skillsUserId) return;
+  if (isTL) {
+    _echoObsTL = {};
+    try {
+      const rows = await _skFetch(
+        'echo_skill_observations?order=observed_at.desc&limit=500'
+      );
+      (rows || []).forEach(r => {
+        const key = r.user_id + ':' + r.skill_code;
+        if (!_echoObsTL[key]) _echoObsTL[key] = [];
+        _echoObsTL[key].push(r);
+      });
+    } catch(e) { console.warn('[Skills] echoObsTL:', e.message); }
+    return;
+  }
   _echoObs = {};
   try {
     const rows = await _skFetch(
-      `echo_skill_observations?user_id=eq.${_skillsUserId}&order=observed_at.desc&limit=100`
+      'echo_skill_observations?user_id=eq.' + _skillsUserId + '&order=observed_at.desc&limit=100'
     );
     (rows || []).forEach(r => {
       if (!_echoObs[r.skill_code]) _echoObs[r.skill_code] = [];
       _echoObs[r.skill_code].push(r);
     });
-  } catch(e) {
-    // graceful — table may not exist yet
-    console.warn('[Skills] echo_skill_observations not available yet');
-  }
+  } catch(e) { console.warn('[Skills] echoObs:', e.message); }
+}
+
+function _tlEchoObs(userId, skillCode) {
+  return _echoObsTL[userId + ':' + skillCode] || [];
 }
 
 function _echoScoreLabel(score) {
@@ -680,6 +695,18 @@ function _renderTLPending() {
     const dateLabel = daysAgo === null ? '' : daysAgo === 0 ? 'today' : `${daysAgo} day${daysAgo>1?'s':''} ago`;
     const initials  = _skUserInitials(p.user_id);
     const repName   = _skUserName(p.user_id);
+    const echoObs   = _tlEchoObs(p.user_id, def.skill_code).slice(0,1)[0];
+    const echoStrip = echoObs ? (() => {
+      const col = _echoScoreColor(echoObs.ai_score);
+      const lbl = _echoScoreLabel(echoObs.ai_score);
+      const dt  = new Date(echoObs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+      const ev  = echoObs.evidence ? '<div class="sk-pend-echo-ev">' + echoObs.evidence.slice(0,80) + (echoObs.evidence.length>80?'…':'') + '</div>' : '';
+      return '<div class="sk-pend-echo-strip">'
+        + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>'
+        + '<span class="sk-pend-echo-date">' + dt + '</span>'
+        + '<span class="sk-pend-echo-score" style="color:' + col + ';">' + lbl + '</span>'
+        + '</div>' + ev;
+    })() : '';
     return `
 <div class="sk-pend-row" onclick="skillsTLOpenEval('${p.user_id}',${p.skill_id})">
   <div class="sk-pend-avatar">${initials}</div>
@@ -687,6 +714,7 @@ function _renderTLPending() {
     <div class="sk-pend-name">${repName}</div>
     <div class="sk-pend-skill">${code} · ${def.skill_name_en}</div>
     <div class="sk-pend-date">self-marked ${dateLabel}</div>
+    ${echoStrip}
   </div>
   <div class="sk-pend-right">
     <div class="sk-state-pill-sm"><div class="sk-pill-dot-sm"></div>Training</div>
@@ -898,6 +926,27 @@ async function skillsTLOpenEval(userId, skillId) {
     <div class="sk-rubric-text">${(def.pass_test_th||'').replace(/\//g,'<br>')}</div>
   </div>
   <div class="sk-divider"></div>
+  ${(() => {
+    const obs = _tlEchoObs(userId, def.skill_code).slice(0,3);
+    if (!obs.length) return '';
+    const rows = obs.map(o => {
+      const col  = _echoScoreColor(o.ai_score);
+      const lbl  = _echoScoreLabel(o.ai_score);
+      const dt   = new Date(o.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
+      const ev   = o.evidence    ? '<div class="sk-echo-row-ev">'   + o.evidence    + '</div>' : '';
+      const note = o.coaching_note ? '<div class="sk-echo-row-note"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> ' + o.coaching_note + '</div>' : '';
+      return '<div class="sk-echo-row">'
+        + '<div class="sk-echo-row-top">'
+        + '<div style="display:flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>'
+        + '<span class="sk-echo-row-date">' + dt + '</span></div>'
+        + '<span class="sk-echo-row-score" style="color:' + col + ';">' + lbl + '</span>'
+        + '</div>' + ev + note + '</div>';
+    }).join('');
+    return '<div class="sk-rubric-block">'
+      + '<div class="sk-rubric-eye" style="display:flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--sk-ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg> Echo Sessions</div>'
+      + '<div class="sk-echo-list">' + rows + '</div>'
+      + '</div><div class="sk-divider"></div>';
+  })()}
   <div class="sk-tl-zone">
     <div class="sk-tl-eye">TL · Evaluation</div>
     <div class="sk-tl-rep-row">
