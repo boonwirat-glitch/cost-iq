@@ -2499,7 +2499,7 @@ function initOliveAvatar(){
     window._visibilityGraceTimer = setTimeout(() => {
       window._visibilityGraceTimer = null;
       _pwaSilentSessionCheck('visibilitychange',3500);
-    }, 150);
+    }, 300); // v478-B4: 150→300ms — iOS token refresh needs more headroom before session check
   });
   _initFolderAutoLoad();
   // ── Guard C: pageshow — iOS bfcache restore ───────────────────────────────
