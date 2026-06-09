@@ -1761,23 +1761,26 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   }
 
   function _getTeamEmails() {
-    // ดึง emails จาก portviewBulkData (KAM) หรือ salesBulkData (Sales team)
-    const emails = [];
-    const seen = new Set();
+    const tlEmail = (currentUserProfile?.email || '').toLowerCase();
+    if (!tlEmail) return [];
+    const emails = new Set();
+    // KAM team — portviewBulkData มี tlEmail + kamEmail
     if (typeof portviewBulkData !== 'undefined' && portviewBulkData) {
       portviewBulkData.forEach(r => {
-        if (r.owner_email && !seen.has(r.owner_email)) { seen.add(r.owner_email); emails.push(r.owner_email); }
+        if (r.tlEmail && r.tlEmail.toLowerCase() === tlEmail && r.kamEmail)
+          emails.add(r.kamEmail.toLowerCase());
       });
     }
+    // Sales team — salesBulkData มี tl_email + owner_email
     if (typeof window.salesBulkData !== 'undefined' && window.salesBulkData) {
       window.salesBulkData.forEach(r => {
-        if (r.owner_email && !seen.has(r.owner_email)) { seen.add(r.owner_email); emails.push(r.owner_email); }
+        if (r.tl_email && r.tl_email.toLowerCase() === tlEmail && r.owner_email)
+          emails.add(r.owner_email.toLowerCase());
       });
     }
-    // fallback: ใส่ email ตัวเองด้วย
-    const self = currentUserProfile?.email;
-    if (self && !seen.has(self)) emails.push(self);
-    return emails;
+    // fallback: ถ้ายังไม่มี bulk data ให้ใส่ตัวเองไว้ก่อน
+    if (emails.size === 0) emails.add(tlEmail);
+    return [...emails];
   }
 
   // ── TL Team Feed ──────────────────────────────────────────────────────────
