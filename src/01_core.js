@@ -456,7 +456,7 @@ supa.auth.onAuthStateChange((event, session) => {
       _senseDataLog('AUTH','🔒 SIGNED_OUT confirmed — showing login');
       _profileCacheClear(currentUser?.id);
       _showLoginOverlayClean();
-    }, 800); // 800ms — gives auto-refresh more time to complete
+    }, 1200); // v478-B3: 800→1200ms — iOS Supabase token refresh can take >800ms, causing login flash
   }
 });
 
