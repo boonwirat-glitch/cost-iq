@@ -362,9 +362,13 @@ const CI = (() => {
     el.id = 'ci-fullsheet';
     el.innerHTML = _buildHTML();
     document.body.appendChild(el);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { el.classList.add('ci-open'); });
-    });
+    // v478-H4: double-rAF races with left:50% layout resolution on some iOS devices.
+    // left:50% is computed relative to viewport width, but translateX(-50%) is computed
+    // against the element's own width. If the browser hasn't reflowed yet, the combined
+    // transform resolves incorrectly (x offset only, no Y slide-in) → sheet lands off-screen.
+    // Fix: use setTimeout(50ms) instead of double-rAF to guarantee a full layout pass before
+    // adding ci-open. The 380ms CSS transition still provides a smooth slide-in animation.
+    setTimeout(() => { el.classList.add('ci-open'); }, 50);
     _initWaveform();
     _showScreen('ci-s-record');
   }
