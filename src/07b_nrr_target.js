@@ -1255,6 +1255,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   }
 
   window._commGatedRender = _commGatedRender;
+  // v479-G2: expose key reset so resetRuntimeSessionState() can invalidate
+  // commission cache on logout. Without this, _lastCommKey persists across
+  // login sessions → _commGatedRender skips render on re-login (key unchanged).
+  window._commResetKey = function(){ _lastCommKey = ''; };
 
   // Reset key on each refreshAll so commission re-renders after data refresh
   function _hookRefreshAll(){
