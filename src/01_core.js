@@ -126,6 +126,8 @@ function resetRuntimeSessionState(){
   try { bulkSkuCurrentData={}; } catch(e) {}
   try { bulkOutletsData={}; } catch(e) {}
   try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
+  // v479-G2: reset commission render key so _commGatedRender re-renders on next login
+  try { if(typeof window._commResetKey==='function') window._commResetKey(); } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
@@ -840,13 +842,14 @@ function hideLoginOverlay() {
           if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
           else if(typeof refreshAll==='function') refreshAll();
         }
-        // Safety: if ETag check somehow never fires (offline), clear shimmer + render after 3s
+        // v479-C5: shimmer safety fallback 3000→1500ms — ETag typically resolves <400ms;
+        // 3s was too long, user saw skeleton card stuck for 1-3s on warm resume.
         setTimeout(function(){
           if(window._pwaShimmerActive){
             if(typeof window._deactivatePortviewShimmer==='function') window._deactivatePortviewShimmer();
             if(typeof refreshAll==='function') refreshAll();
           }
-        }, 3000);
+        }, 1500);
       }catch(e){
         // Fallback: render without shimmer
         if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
