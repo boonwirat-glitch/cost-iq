@@ -900,7 +900,13 @@ function _autoRouteAfterLogin() {
     showScreen('sales-portview');
   } else {
     setMode('kam');
-    const myAccounts = getPortviewAccounts();
+    // v477-H5: guard IDB stale data — only auto-open single account when R2 data is settled.
+    // Root cause: IDB preload runs before auth completes; portviewBulkData may contain prev-session
+    // data → getPortviewAccounts().length===1 → wrong account auto-opens before fresh data arrives.
+    // Fix: skip auto-select if sheets are mid-load; RenderBus will re-render portview when data ready.
+    const _r2Settled = !(typeof sheetsLoadStarted !== 'undefined' && sheetsLoadStarted) ||
+                       (typeof allCriticalReady === 'function' && allCriticalReady());
+    const myAccounts = _r2Settled ? getPortviewAccounts() : [];
     if (myAccounts && myAccounts.length === 1) {
       portviewSelectAccount(myAccounts[0].id);
     } else {
@@ -1857,3 +1863,4 @@ function parseAlternatives(jsonText){try{const data=JSON.parse(jsonText);return 
 // ── v53 fix D: quoted-CSV row parser ──
 // Handles BigQuery CSV export where fields containing commas or quotes are double-quoted.
 // Returns array of trimmed field strings, same interface as l.split(',').
+
