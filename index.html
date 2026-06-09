@@ -1,4 +1,4 @@
-<!-- Freshket Sense v479: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v480: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v479',
+      version: 'v480',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7057,10 +7057,18 @@ body.sales-mode .bnav {
           console.warn('[pwa:v206a] service worker registration failed',swUrl,err);
         });
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
-        console.info('[pwa:v206f] service worker controller changed — reloading once');
+        console.info('[pwa:v480a] service worker controller changed — reloading once');
+        // v480-A1A3: use localStorage + 60s TTL instead of sessionStorage.
+        // Safari PWA clears sessionStorage on app kill → SW update on next open
+        // triggered reload loop. localStorage persists across kills; TTL prevents
+        // stale flag blocking legitimate future reloads after 60s.
         try{
-          if(!sessionStorage.getItem('freshket_sw_controller_reloaded')){
-            sessionStorage.setItem('freshket_sw_controller_reloaded', String(Date.now()));
+          var _LS_KEY='freshket_sw_ctrl_reloaded';
+          var _prev=localStorage.getItem(_LS_KEY);
+          var _now=Date.now();
+          var _tooSoon=_prev&&(_now-Number(_prev))<60000;
+          if(!_tooSoon){
+            localStorage.setItem(_LS_KEY,String(_now));
             setTimeout(()=>location.reload(), 120);
           }
         }catch(e){ setTimeout(()=>location.reload(), 120); }
@@ -12032,15 +12040,22 @@ supa.auth.onAuthStateChange((event, session) => {
           if(currentUserProfile && currentUserProfile.email){
             _doR2Fetch();
           } else {
-            // Profile not ready yet — wait for loadUserProfile() which is running in background
-            var _profileWait = 0;
-            var _profilePoll = setInterval(function(){
-              _profileWait += 50;
-              if((currentUserProfile && currentUserProfile.email) || _profileWait >= 2000){
-                clearInterval(_profilePoll);
-                _doR2Fetch();
-              }
-            }, 50);
+            // v480-E1: replace 50ms poll (max 2s) with direct supa.auth.getSession().
+            // On slow networks, loadUserProfile() can take >2s → poll expires → Sales gets
+            // KAM files. getSession() is a local JWT decode (no network) → always instant.
+            // Inject email into currentUserProfile so _patchR2FilesForSales() can read it.
+            (function(){
+              try{
+                supa.auth.getSession().then(function(result){
+                  var _sess = result && result.data && result.data.session;
+                  var _email = (_sess && _sess.user && _sess.user.email) || '';
+                  if(_email && currentUserProfile && !currentUserProfile.email){
+                    currentUserProfile.email = _email;
+                  }
+                  _doR2Fetch();
+                }).catch(function(){ _doR2Fetch(); });
+              }catch(e){ _doR2Fetch(); }
+            })();
           }
         }
         // v224d: ETag check fires immediately after IDB render (was 3000ms).
