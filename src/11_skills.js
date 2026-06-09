@@ -1092,7 +1092,7 @@ async function skillsTLOpenEval(userId, skillId) {
 
   scr.innerHTML = `
 <div style="position:relative;width:100%;overflow:hidden;">
-  ${_skImgTag(def, { cls:'sk-img-lazy', style:'width:100%;height:260px;object-fit:cover;object-position:center 30%;display:block;' })}
+  ${_skImgTag(def, { w:'100%', h:'260px', cls:'sk-img-lazy' })}
   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.42) 0%,transparent 45%,rgba(0,0,0,.58) 100%);pointer-events:none;"></div>
   <div style="position:absolute;top:0;left:0;right:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;z-index:10;">
     <button onclick="_skSetView('pending');_renderSkillsScreen()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.32);border:none;border-radius:999px;padding:6px 12px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
