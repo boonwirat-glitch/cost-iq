@@ -828,25 +828,26 @@ function _renderTLPending() {
   <div class="sk-empty-sub">ไม่มีทักษะที่รอการประเมิน<br>ดูภาพรวมทีมได้ที่ tab ถัดไป</div>
 </div>` : '';
 
+  const repCount = Object.keys(Object.values(_skillProg).reduce((a,p)=>{a[p.user_id]=1;return a},{})).length;
   return `
-<div class="sk-tl-hero">
+<div style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;">
   <div>
     <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
-    <div class="sk-tl-squad">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
-    <div class="sk-tl-sub">${Object.keys(Object.values(_skillProg).reduce((a,p)=>{a[p.user_id]=1;return a},{})).length} sales reps</div>
+    <div class="sk-tl-squad" style="margin-top:2px;">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
+    <div class="sk-tl-sub">${repCount} sales reps</div>
   </div>
   <div style="text-align:right;">
     <div class="sk-tl-pend-count" style="color:${heroColor};">${pendCount}</div>
     <div class="sk-eyebrow" style="color:${heroColor};">${heroLabel}</div>
   </div>
 </div>
-<div class="sk-tab-bar">
-  <div class="sk-tab sk-tab-on" onclick="_skSetView('pending')">
+<div class="sk-tab-bar" style="margin-top:12px;">
+  <div class="sk-tab sk-tab-on" onclick="_skSetView('pending');_renderSkillsScreen();">
     รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
   </div>
-  <div class="sk-tab" onclick="_skSetView('overview')">ภาพรวมทีม</div>
+  <div class="sk-tab" onclick="_skSetView('overview');_renderSkillsScreen();">ภาพรวมทีม</div>
 </div>
-${pendCount > 0 ? `<div class="sk-sec"><span class="sk-eyebrow">เรียงตาม · รอนานสุด</span></div><div class="sk-pend-list">${rows}</div>` : empty}`;
+${pendCount > 0 ? `<div style="padding:12px 14px 4px;"><span class="sk-eyebrow">เรียงตาม · รอนานสุด</span></div><div class="sk-pend-list">${rows}</div>` : empty}`;
 }
 
 function _renderTLOverview() {
@@ -915,7 +916,7 @@ function _renderTLOverview() {
     </div>
     <div class="sk-skill-bar-row">
       <div class="sk-skill-track"><div class="sk-skill-fill ${fillCls}" style="width:${pct3}%;"></div></div>
-      <span class="sk-skill-count">${passCount}/${userCount}</span>
+      <span class="sk-skill-count">${passCount}/${userCount} คน</span>
     </div>
   </div>
 </div>`;
@@ -924,32 +925,38 @@ function _renderTLOverview() {
     }).join('');
     viewContent = `
 <div class="sk-skill-list">${skillRows}</div>
-<div style="padding:10px 14px;display:flex;gap:14px;">
+<div style="padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;">
   <div style="display:flex;align-items:center;gap:5px;"><div class="sk-warn-dot sk-warn-dot-ac"></div><span class="sk-eyebrow">0 passed</span></div>
-  <div style="display:flex;align-items:center;gap:5px;"><div class="sk-warn-dot sk-warn-dot-warn"></div><span class="sk-eyebrow">&lt;40% · อ่อน</span></div>
+  <div style="display:flex;align-items:center;gap:5px;"><div class="sk-warn-dot sk-warn-dot-warn"></div><span class="sk-eyebrow">&lt;40% อ่อน</span></div>
+  <div style="display:flex;align-items:center;gap:5px;"><div class="sk-warn-dot sk-warn-dot-ok"></div><span class="sk-eyebrow">≥40% ดี</span></div>
 </div>`;
   }
 
   return `
-<div class="sk-ov-hero">
-  <div class="sk-eyebrow sk-eyebrow-ac" style="margin-bottom:6px;">TEAM SKILLS</div>
+<div style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;">
+  <div>
+    <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
+    <div class="sk-tl-squad" style="margin-top:2px;">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
+    <div class="sk-tl-sub">${Object.keys(userMap).length} sales reps</div>
+  </div>
+  <div style="text-align:right;">
+    <div class="sk-tl-pend-count" style="color:var(--sk-ink);">${unlocked}</div>
+    <div class="sk-eyebrow">/ ${total} unlocked</div>
+  </div>
+</div>
+<div class="sk-ov-hero" style="margin-top:10px;">
   <div class="sk-ov-hero-row">
-    <div>
-      <div style="display:flex;align-items:flex-end;gap:3px;">
-        <span class="sk-ov-big">${unlocked}</span><span class="sk-ov-denom">/${total}</span>
-      </div>
-      <div class="sk-ov-label">ทีม unlock แล้ว</div>
-    </div>
+    <div class="sk-ov-label">ทีม unlock แล้ว</div>
     <div class="sk-ov-pct">${pct}%</div>
   </div>
   <div class="sk-ov-track"><div class="sk-ov-fill" style="width:${pct}%;"></div></div>
-  <div class="sk-ov-meta"><span>${unlocked} UNLOCKED</span><span>${total-unlocked} REMAINING</span></div>
+  <div class="sk-ov-meta"><span>${unlocked} UNLOCKED</span><span>${total - unlocked} REMAINING</span></div>
 </div>
-<div class="sk-tab-bar">
-  <div class="sk-tab sk-tab-on" onclick="_skSetView('pending')">
-    รอประเมิน${pendCount>0?`<span class="sk-tab-badge">${pendCount}</span>`:''}
+<div class="sk-tab-bar" style="margin-top:10px;">
+  <div class="sk-tab" onclick="_skSetView('pending');_renderSkillsScreen();">
+    รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
   </div>
-  <div class="sk-tab sk-tab-on" onclick="_skSetView('overview')">ภาพรวมทีม</div>
+  <div class="sk-tab sk-tab-on" onclick="_skSetView('overview');_renderSkillsScreen();">ภาพรวมทีม</div>
 </div>
 <div class="sk-view-toggle">
   <div class="sk-vt ${byRepToggle}" onclick="_skSetOvToggle('rep')">By Rep</div>
