@@ -617,15 +617,31 @@ function showSenseSplash(onDone){
       try{if(typeof window._splashPreFade==='function'){window._splashPreFade();window._splashPreFade=null;}}catch(e){}
       splash.style.transition='opacity .38s ease';
       splash.style.opacity='0';
+      // v482-FADE: render content NOW (while splash is fading) instead of waiting 380ms for
+      // fade to complete. Eliminates ~400ms dark/empty screen between splash-gone and content-ready.
+      // Three guards required:
+      // 1. _suppressAnimN=true — prevents number count-up animations running invisibly under
+      //    the fading splash (user would see static numbers instead of animation).
+      // 2. RenderBus.markRender() — stamps settle window so background ETag signals that
+      //    arrive after this don't see lastRender=∞ and trigger a redundant second render.
+      // 3. _senseSplashActive stays true until setTimeout(380) — refreshAll splash-guard
+      //    still blocks any other callers; only this explicit early call bypasses it.
+      if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
+        window._pendingRefreshAll=false;
+        window._suppressAnimN=true;
+        if(window.RenderBus) window.RenderBus.markRender();
+        try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
+        // Re-enable animations after splash has fully disappeared
+        setTimeout(()=>{ window._suppressAnimN=false; },400);
+      }
       setTimeout(()=>{
         splash.style.display='none';
         splash.style.opacity='';splash.style.transition='';
         if(bar){bar.style.transition='none';bar.style.width='0';}
-        // v217 FIX B + v218: release splash guard; fire pending render only if data also ready.
         window._senseSplashActive=false;
+        // Safety: if early render didn't fire (data wasn't ready above), fire now
         if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
-          // v223: stamp RenderBus settle window so background files batch correctly after this
           if(window.RenderBus) window.RenderBus.markRender();
           try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         }
