@@ -832,9 +832,9 @@ function renderPlanBuilder(opps){
       <div class="pb-cat-hdr${collapsed?' collapsed':''}" onclick="togglePbCat('${cat.replace(/'/g,"\\'")}')">
         <div class="pb-cat-hdr-left">
           <span class="pb-cat-name">${cat}</span>
-          <span class="pb-cat-meta">${items.length} รายการ · ${fmt(catTotal)}/เดือน</span>
         </div>
         <div class="pb-cat-hdr-right">
+          <span class="pb-cat-spend">${fmt(catTotal)}/เดือน</span>
           <button class="pb-cat-badge ${badgeClass}" onclick="event.stopPropagation();selectCat('${cat.replace(/'/g,"\\'")}')">${badgeLabel}</button>
           <span class="pb-cat-chev">▾</span>
         </div>
@@ -1016,9 +1016,12 @@ function renderSingleCard(o){
         <div style="font-size:14px;font-weight:700;line-height:1.3">${o.curName}</div>
         <div style="font-size:12px;color:var(--n500);font-weight:500;margin-top:1px">${o.curSpec}</div>
       </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;flex-shrink:0;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--n500);margin-top:3px;white-space:nowrap">${fmt(o.monthlyGmv)}/เดือน</div>
+        <div style="font-size:10px;color:var(--n400);margin-top:1px;white-space:nowrap">${o.monthlyQty||'?'} ${_qtyUnit}</div>
+      </div>
     </div>
-    <div style="font-size:12px;color:var(--n500);margin-top:5px">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} ${_qtyUnit}</div>
   </div>
   <div class="oalt-section" style="padding-top:12px">${altRows}</div>
   <div class="osave">
