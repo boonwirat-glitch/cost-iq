@@ -1,4 +1,4 @@
-<!-- Freshket Sense v477: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v478: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2305,7 +2305,7 @@ body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{backgroun
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
 body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:#fff}
-body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1);transition:background .4s ease,border-top-color .4s ease}
+body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v477',
+      version: 'v478',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10469,21 +10469,35 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 // Without session: login overlay stays visible as before (CSS default display:flex).
 (function(){
   'use strict';
-  try{
-    var hasSession=false;
-    for(var i=0;i<localStorage.length;i++){
-      var k=localStorage.key(i);
-      if(k && /^sb-.+-auth-token$/.test(k)){
-        var v=localStorage.getItem(k);
-        if(v && v.length>20){ hasSession=true; break; }
+  function _checkSession(){
+    try{
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k && /^sb-.+-auth-token$/.test(k)){
+          var v=localStorage.getItem(k);
+          if(v && v.length>20){ return true; }
+        }
       }
-    }
-    if(hasSession){
-      var login=document.getElementById('login-overlay');
-      if(login){ login.style.display='none'; }
-      var splash=document.getElementById('sense-splash');
-      if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
-      try{ console.info('[Sense v216] boot cover applied — Supabase session detected, splash shown early to prevent 1-frame login flash'); }catch(e){}
+    }catch(e){}
+    return false;
+  }
+  function _applyBootCover(){
+    var login=document.getElementById('login-overlay');
+    if(login){ login.style.display='none'; }
+    var splash=document.getElementById('sense-splash');
+    if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
+  }
+  try{
+    if(_checkSession()){
+      // Pass 1: session found immediately (normal case)
+      _applyBootCover();
+    } else {
+      // v478-B1: Safari iOS sometimes hasn't flushed localStorage by first-paint.
+      // Re-check after 80ms — if session found, hide login before it becomes visible.
+      // 80ms is below human perception threshold (~100ms) for UI flicker.
+      setTimeout(function(){
+        try{ if(_checkSession()) _applyBootCover(); }catch(e){}
+      }, 80);
     }
   }catch(e){}
 })();
@@ -12100,7 +12114,7 @@ supa.auth.onAuthStateChange((event, session) => {
       _senseDataLog('AUTH','🔒 SIGNED_OUT confirmed — showing login');
       _profileCacheClear(currentUser?.id);
       _showLoginOverlayClean();
-    }, 800); // 800ms — gives auto-refresh more time to complete
+    }, 1200); // v478-B3: 800→1200ms — iOS Supabase token refresh can take >800ms, causing login flash
   }
 });
 
@@ -28217,7 +28231,7 @@ function initOliveAvatar(){
     window._visibilityGraceTimer = setTimeout(() => {
       window._visibilityGraceTimer = null;
       _pwaSilentSessionCheck('visibilitychange',3500);
-    }, 150);
+    }, 300); // v478-B4: 150→300ms — iOS token refresh needs more headroom before session check
   });
   _initFolderAutoLoad();
   // ── Guard C: pageshow — iOS bfcache restore ───────────────────────────────
@@ -40199,9 +40213,13 @@ const CI = (() => {
     el.id = 'ci-fullsheet';
     el.innerHTML = _buildHTML();
     document.body.appendChild(el);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { el.classList.add('ci-open'); });
-    });
+    // v478-H4: double-rAF races with left:50% layout resolution on some iOS devices.
+    // left:50% is computed relative to viewport width, but translateX(-50%) is computed
+    // against the element's own width. If the browser hasn't reflowed yet, the combined
+    // transform resolves incorrectly (x offset only, no Y slide-in) → sheet lands off-screen.
+    // Fix: use setTimeout(50ms) instead of double-rAF to guarantee a full layout pass before
+    // adding ci-open. The 380ms CSS transition still provides a smooth slide-in animation.
+    setTimeout(() => { el.classList.add('ci-open'); }, 50);
     _initWaveform();
     _showScreen('ci-s-record');
   }
