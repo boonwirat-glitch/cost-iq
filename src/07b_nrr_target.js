@@ -1249,9 +1249,24 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if (typeof allCriticalReady==='function' && !allCriticalReady()) return;
     var key = _dataKey();
     if (!key || key === _lastCommKey) return;
+    // v481-COMM: set key tentatively — will be cleared below if strip is still loading.
+    // Root cause: bulkUpsellData may not be loaded when _commGatedRender first fires.
+    // Old behaviour: _lastCommKey set unconditionally → subsequent refreshAll calls skip
+    // render (key unchanged) → commission strip stuck on loading/empty permanently.
+    // Fix: peek at buildCompactStrip result — if loading, clear _lastCommKey so next
+    // refreshAll retry will attempt render again. Network cost = zero (upsell has cache).
     _lastCommKey = key;
     try{ if(typeof syncCommissionAdminVisibility==='function') syncCommissionAdminVisibility(); }catch(e){}
-    try{ if(typeof ensureKamCommissionCard==='function') ensureKamCommissionCard(); }catch(e){}
+    try{
+      if(typeof ensureKamCommissionCard==='function'){
+        ensureKamCommissionCard();
+        // Peek: if strip is still in loading state, clear key so next refreshAll retries
+        var _slot = document.getElementById('pv-commission-strip');
+        if(_slot && _slot._lastCommHtml && _slot._lastCommHtml.indexOf('กำลังโหลด') !== -1){
+          _lastCommKey = '';
+        }
+      }
+    }catch(e){}
   }
 
   window._commGatedRender = _commGatedRender;
