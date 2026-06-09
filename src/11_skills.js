@@ -75,6 +75,8 @@ let _activeSkillId = null;
 let _skillUsers   = {};        // { user_id: { full_name, kam_name, email } }     // currently open skill sheet
 let _skillViewMode = 'pending';  // TL: 'pending' | 'overview'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
+let _tlSquad      = null;      // squad name of current TL (e.g. 'Tao', 'Yun')
+let _tlSquadEmails = [];       // emails of reps in TL's squad
 
 // ── Supabase helper ────────────────────────────────────────
 
@@ -149,6 +151,12 @@ async function skillsInit() {
     } catch(_) {}
   }
 
+  // TL: load squad + squad members from profiles first
+  const isTLInit = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  if (isTLInit) {
+    await _loadTLSquad();
+  }
+
   await Promise.all([
     _loadSkillDefs(),
     _loadSkillProgress(),
@@ -175,12 +183,11 @@ async function _loadSkillProgress() {
     const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
     let query;
     if (isTL) {
-      const tlEmail = window.currentUserProfile?.email || '';
-      const teamEmails = _getSquadEmails(tlEmail);
-      if (teamEmails.length > 0) {
-        const emailList = teamEmails.map(e => '"' + e + '"').join(',');
+      if (_tlSquadEmails.length > 0) {
+        const emailList = _tlSquadEmails.map(e => '"' + e + '"').join(',');
         query = SKILLS_TABLE_PROG + '?select=*&owner_email=in.(' + emailList + ')';
       } else {
+        // fallback: โหลดทั้งหมดแล้ว filter ที่ render-time
         query = SKILLS_TABLE_PROG + '?select=*';
       }
     } else {
@@ -197,22 +204,32 @@ async function _loadSkillProgress() {
   }
 }
 
+async function _loadTLSquad() {
+  _tlSquad = null;
+  _tlSquadEmails = [];
+  try {
+    const tlEmail = (window.currentUserProfile?.email || '').toLowerCase();
+    if (!tlEmail) return;
+    // 1. Get TL's own squad name
+    const tlRows = await _skFetch(`profiles?select=squad,sale_team&email=eq.${encodeURIComponent(tlEmail)}&limit=1`);
+    const tlRow = tlRows && tlRows[0];
+    const squadName = tlRow?.squad || tlRow?.sale_team || null;
+    if (!squadName) { console.warn('[Skills] TL squad not set for', tlEmail); return; }
+    _tlSquad = squadName;
+    // 2. Get all reps in same squad
+    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl)`);
+    _tlSquadEmails = (repRows || [])
+      .map(r => (r.email || '').toLowerCase())
+      .filter(e => e && e !== tlEmail); // exclude TL themselves
+    console.log('[Skills] TL squad:', squadName, '| members:', _tlSquadEmails);
+  } catch(e) {
+    console.warn('[Skills] _loadTLSquad failed:', e.message);
+  }
+}
+
 function _getSquadEmails(tlEmail) {
-  if (!tlEmail) return [];
-  const emails = new Set();
-  if (typeof portviewBulkData !== 'undefined' && Array.isArray(portviewBulkData)) {
-    portviewBulkData.forEach(r => {
-      if (r.tlEmail && r.tlEmail.toLowerCase() === tlEmail.toLowerCase() && r.kamEmail)
-        emails.add(r.kamEmail.toLowerCase());
-    });
-  }
-  if (typeof window.salesBulkData !== 'undefined' && Array.isArray(window.salesBulkData)) {
-    window.salesBulkData.forEach(r => {
-      if (r.tl_email && r.tl_email.toLowerCase() === tlEmail.toLowerCase() && r.owner_email)
-        emails.add(r.owner_email.toLowerCase());
-    });
-  }
-  return [...emails];
+  // Now purely uses _tlSquadEmails loaded from profiles
+  return _tlSquadEmails.length > 0 ? _tlSquadEmails : [];
 }
 
 // ── Load Echo observations (rep view only) ──────────
@@ -363,17 +380,12 @@ function _renderSkillsScreen() {
 
 // TL shell: render header + static tab bar once, swap only content zone
 function _renderTLShell(scr) {
-  // render-time squad filter — portviewBulkData may not be ready at load time
-  const tlEmail   = (window.currentUserProfile?.email || '').toLowerCase();
-  const squadEmails = _getSquadEmails(tlEmail);
-
-  // Filter _skillProg to only show squad members
-  // If no squad info yet (bulk data not loaded), show all but mark as unfiltered
+  // filter _skillProg using _tlSquadEmails (loaded from profiles at init)
   let _progFiltered;
-  if (squadEmails.length > 0) {
+  if (_tlSquadEmails.length > 0) {
     _progFiltered = Object.fromEntries(
       Object.entries(_skillProg).filter(([, p]) =>
-        p.owner_email && squadEmails.includes(p.owner_email.toLowerCase())
+        p.owner_email && _tlSquadEmails.includes(p.owner_email.toLowerCase())
       )
     );
   } else {
@@ -384,9 +396,8 @@ function _renderTLShell(scr) {
   const heroColor = pendCount === 0 ? 'var(--sk-ok)' : 'var(--sk-ac)';
   const heroLabel = pendCount === 0 ? 'ALL CLEAR' : 'PENDING';
   const repCount  = new Set(Object.values(_progFiltered).map(p => p.user_id).filter(Boolean)).size;
-  const squadName = (window.currentUserProfile && window.currentUserProfile.squad) || 'Squad';
+  const squadName = _tlSquad || (window.currentUserProfile && window.currentUserProfile.squad) || 'Squad';
 
-  // store filtered for content renderers
   window._tlProgFiltered = _progFiltered;
 
   scr.innerHTML = `
