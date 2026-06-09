@@ -2224,6 +2224,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="dp-mode-tabs" id="dp-mode-tabs">
 <button class="dp-mode-tab on" id="dp-tab-quick" onclick="setDpMode('quick')">ตั้งค่า</button>
 <button class="dp-mode-tab" id="dp-tab-bulk" onclick="setDpMode('bulk')">Bulk</button>
+<button class="dp-mode-tab" id="dp-tab-admin" onclick="setDpMode('admin')" style="display:none">Admin</button>
 </div>
 <!-- ══════════════════════════════
          QUICK SWITCH MODE
@@ -2427,6 +2428,31 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 </div>
 </div><!-- /dp-bulk -->
+
+<!-- ══════════════════════════════
+         ADMIN MODE — Echo Skill Config
+    ══════════════════════════════ -->
+<div id="dp-admin" style="display:none">
+  <div style="margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--ac,#FF385C);margin-bottom:2px;font-family:'IBM Plex Mono',monospace">Echo · Skill Rubric</div>
+    <div style="font-size:11px;color:var(--n500,#636366)">แก้ไขเพื่อส่งผลกับ Gemini ทันที — ไม่ต้อง redeploy</div>
+  </div>
+  <!-- Stats row -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px" id="adm-stats">
+    <div style="background:rgba(0,0,0,.04);border-radius:8px;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--n900,#1C1C1E);font-family:'IBM Plex Mono',monospace" id="adm-stat-total">—</div><div style="font-size:9px;color:var(--n400,#AEAEB2);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Skills</div></div>
+    <div style="background:rgba(52,199,89,.08);border-radius:8px;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:#1a8a3a;font-family:'IBM Plex Mono',monospace" id="adm-stat-echo">—</div><div style="font-size:9px;color:var(--n400,#AEAEB2);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Echo On</div></div>
+    <div style="background:rgba(255,56,92,.06);border-radius:8px;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:#FF385C;font-family:'IBM Plex Mono',monospace" id="adm-stat-obs">—</div><div style="font-size:9px;color:var(--n400,#AEAEB2);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Has Hint</div></div>
+  </div>
+  <!-- Add button -->
+  <button onclick="admOpenModal(null)" style="width:100%;padding:9px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    เพิ่ม Skill ใหม่
+  </button>
+  <!-- Skill list -->
+  <div id="adm-skill-list" style="display:flex;flex-direction:column;gap:1px;border:0.5px solid var(--n100,#E5E5EA);border-radius:10px;overflow:hidden;max-height:400px;overflow-y:auto">
+    <div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:12px" id="adm-list-loading">กำลังโหลด...</div>
+  </div>
+</div>
 </div>
 </div>
 <!-- KAM BRIEFING SECTION (shows in KAM mode, injected before main) -->

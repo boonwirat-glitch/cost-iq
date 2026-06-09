@@ -2430,7 +2430,7 @@ ${summaryHtml}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
@@ -2449,3 +2449,229 @@ function echoExpand() {
   if (sheet) { sheet.style.display = ''; sheet.classList.add('ci-open'); }
   else { CI.open(null); }
 }
+
+// ── Echo Admin — Skill Rubric Manager (Admin-only, lives in data panel) ────
+// Injects modal into body; list renders inside #adm-skill-list in dp-admin
+
+(function(){
+  'use strict';
+
+  let _admSkills = [];
+  let _admEditing = null; // id of skill being edited, null = new
+  let _admLoaded  = false;
+
+  // ── Supabase helper (reuses global `supa`) ────────────────────────────────
+  async function _supaReq(table, opts = {}) {
+    const { method = 'GET', filter = '', body = null, prefer = '' } = opts;
+    const url = `${supa.supabaseUrl}/rest/v1/${table}${filter}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'apikey': supa.supabaseKey,
+      'Authorization': 'Bearer ' + ((supa.auth.getSession ? (await supa.auth.getSession()).data?.session?.access_token : null) || supa.supabaseKey),
+    };
+    if (prefer) headers['Prefer'] = prefer;
+    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || res.status); }
+    return method === 'DELETE' ? null : res.json();
+  }
+
+  // ── Load & render list ────────────────────────────────────────────────────
+  window.admLoadSkills = async function(force) {
+    if (_admLoaded && !force) { _admRender(); return; }
+    const el = document.getElementById('adm-skill-list');
+    if (el) el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:12px">กำลังโหลด...</div>';
+    try {
+      _admSkills = await _supaReq('skill_definitions', { filter: '?select=*&order=skill_code.asc' });
+      _admLoaded = true;
+      _admRender();
+    } catch(e) {
+      if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:#FF3B30;font-size:12px">โหลดไม่ได้: ${e.message}</div>`;
+    }
+  };
+
+  function _admRender() {
+    const total = _admSkills.length;
+    const echoOn = _admSkills.filter(s => s.echo_enabled).length;
+    const withObs = _admSkills.filter(s => s.echo_observable && s.echo_observable.trim()).length;
+    const st = document.getElementById('adm-stat-total'); if (st) st.textContent = total;
+    const se = document.getElementById('adm-stat-echo');  if (se) se.textContent = echoOn;
+    const so = document.getElementById('adm-stat-obs');   if (so) so.textContent = withObs;
+
+    const el = document.getElementById('adm-skill-list');
+    if (!el) return;
+    if (!_admSkills.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:12px">ยังไม่มี Skill — กด เพิ่ม Skill ใหม่</div>'; return; }
+
+    el.innerHTML = _admSkills.map(s => `
+      <div onclick="admOpenModal('${s.id}')" style="display:grid;grid-template-columns:80px 1fr 56px;gap:8px;align-items:center;padding:10px 12px;background:#fff;cursor:pointer;border-bottom:0.5px solid var(--n100,#E5E5EA);transition:background .12s" onmouseover="this.style.background='#F7F7F7'" onmouseout="this.style.background='#fff'">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
+        <div>
+          <div style="font-size:12px;font-weight:500;color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
+          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?'🎧 '+s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
+        </div>
+        <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
+      </div>`).join('');
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  function _injectModal() {
+    if (document.getElementById('adm-modal-bg')) return;
+    const div = document.createElement('div');
+    div.id = 'adm-modal-bg';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000;padding:20px;display:none';
+    div.onclick = e => { if (e.target === div) admCloseModal(); };
+    div.innerHTML = `
+      <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:22px">
+        <div style="font-size:15px;font-weight:600;color:var(--n900,#1C1C1E);margin-bottom:2px" id="adm-m-title">เพิ่ม Skill ใหม่</div>
+        <div style="font-size:11px;color:var(--n400,#AEAEB2);margin-bottom:18px" id="adm-m-sub">กรอกข้อมูลแล้วกด บันทึก</div>
+
+        <div style="margin-bottom:13px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">Skill Code</div>
+          <input id="adm-f-code" placeholder="C06_NEW" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:'IBM Plex Mono',monospace" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px">
+          <div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">ชื่อ EN</div>
+            <input id="adm-f-en" placeholder="Rapport Building" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">ชื่อ TH</div>
+            <input id="adm-f-th" placeholder="สร้างความไว้วางใจ" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+          </div>
+        </div>
+        <div style="margin-bottom:13px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">หลักการ (Principle)</div>
+          <textarea id="adm-f-principle" rows="2" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+        </div>
+        <div style="margin-bottom:13px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">เกณฑ์ผ่าน (Pass Test)</div>
+          <textarea id="adm-f-pass" rows="2" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+        </div>
+        <div style="margin-bottom:15px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono',monospace">Echo Observable Hint <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
+          <textarea id="adm-f-obs" rows="3" placeholder="ฟัง: rep หยุดก่อนตอบไหม? น้ำเสียง defensive หรือ acknowledge ก่อน? ลูกค้า engage มากขึ้นหลังจาก rep ตอบไหม?" style="width:100%;padding:8px 11px;border:0.5px solid #FFB3BF;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5;background:rgba(255,56,92,.03)" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#FFB3BF'"></textarea>
+        </div>
+        <!-- Echo toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:#F7F7F7;border-radius:10px;border:0.5px solid #E5E5EA;margin-bottom:18px">
+          <div>
+            <div style="font-size:13px;font-weight:500;color:#1C1C1E">ส่งให้ Echo วิเคราะห์</div>
+            <div style="font-size:11px;color:#AEAEB2;margin-top:1px">ปิด = Gemini จะข้าม skill นี้</div>
+          </div>
+          <label style="position:relative;width:44px;height:26px;flex-shrink:0;cursor:pointer">
+            <input type="checkbox" id="adm-f-echo" checked style="opacity:0;width:0;height:0"/>
+            <span id="adm-toggle-slider" style="position:absolute;inset:0;background:#E5E5EA;border-radius:100px;transition:.2s;cursor:pointer">
+              <span id="adm-toggle-knob" style="position:absolute;width:20px;height:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+            </span>
+          </label>
+        </div>
+        <!-- Footer -->
+        <div style="display:flex;gap:8px" id="adm-m-footer">
+          <button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button>
+          <button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>
+        </div>
+      </div>`;
+    document.body.appendChild(div);
+
+    // Wire toggle
+    const cb = div.querySelector('#adm-f-echo');
+    const sl = div.querySelector('#adm-toggle-slider');
+    const kn = div.querySelector('#adm-toggle-knob');
+    cb.addEventListener('change', () => {
+      sl.style.background = cb.checked ? '#34C759' : '#E5E5EA';
+      kn.style.transform = cb.checked ? 'translateX(18px)' : 'translateX(0)';
+    });
+    // Init toggle visual
+    sl.style.background = '#34C759'; kn.style.transform = 'translateX(18px)';
+  }
+
+  window.admOpenModal = function(id) {
+    _injectModal();
+    _admEditing = id || null;
+    const s = id ? _admSkills.find(x => String(x.id) === String(id)) : null;
+    document.getElementById('adm-m-title').textContent = s ? 'แก้ไข Skill' : 'เพิ่ม Skill ใหม่';
+    document.getElementById('adm-m-sub').textContent = s ? s.skill_code : 'กรอกข้อมูล แล้วกด บันทึก';
+    const codeEl = document.getElementById('adm-f-code');
+    codeEl.value = s ? (s.skill_code || '') : '';
+    codeEl.disabled = !!s;
+    codeEl.style.background = s ? '#F7F7F7' : '';
+    document.getElementById('adm-f-en').value = s ? (s.skill_name_en || '') : '';
+    document.getElementById('adm-f-th').value = s ? (s.skill_name_th || '') : '';
+    document.getElementById('adm-f-principle').value = s ? (s.principle_th || '') : '';
+    document.getElementById('adm-f-pass').value = s ? (s.pass_test_th || '') : '';
+    document.getElementById('adm-f-obs').value = s ? (s.echo_observable || '') : '';
+    const cb = document.getElementById('adm-f-echo');
+    const sl = document.getElementById('adm-toggle-slider');
+    const kn = document.getElementById('adm-toggle-knob');
+    cb.checked = s ? !!s.echo_enabled : true;
+    sl.style.background = cb.checked ? '#34C759' : '#E5E5EA';
+    kn.style.transform = cb.checked ? 'translateX(18px)' : 'translateX(0)';
+
+    // Footer — add Delete button if editing
+    document.getElementById('adm-m-footer').innerHTML = s
+      ? `<button onclick="admDeleteSkill('${s.id}','${(s.skill_code||'').replace(/'/g,"\\'")}' )" style="flex:1;padding:10px;border:0.5px solid #FF3B30;border-radius:10px;font-size:13px;cursor:pointer;background:transparent;color:#FF3B30;font-family:inherit">ลบ</button><button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>`
+      : `<button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>`;
+
+    document.getElementById('adm-modal-bg').style.display = 'flex';
+  };
+
+  window.admCloseModal = function() {
+    const m = document.getElementById('adm-modal-bg');
+    if (m) m.style.display = 'none';
+    _admEditing = null;
+  };
+
+  window.admSaveSkill = async function() {
+    const btn = document.getElementById('adm-save-btn');
+    if (!btn) return;
+    btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+    const payload = {
+      skill_name_en:  document.getElementById('adm-f-en').value.trim(),
+      skill_name_th:  document.getElementById('adm-f-th').value.trim(),
+      principle_th:   document.getElementById('adm-f-principle').value.trim(),
+      pass_test_th:   document.getElementById('adm-f-pass').value.trim(),
+      echo_observable:document.getElementById('adm-f-obs').value.trim(),
+      echo_enabled:   document.getElementById('adm-f-echo').checked,
+    };
+    if (!payload.skill_name_en) { _admToast('กรุณากรอกชื่อ Skill (EN)','warn'); btn.disabled=false; btn.textContent='บันทึก'; return; }
+    try {
+      if (_admEditing) {
+        await _supaReq(`skill_definitions?id=eq.${_admEditing}`, { method: 'PATCH', body: payload, prefer: 'return=minimal' });
+      } else {
+        const code = document.getElementById('adm-f-code').value.trim().toUpperCase();
+        if (!code) { _admToast('กรุณากรอก Skill Code','warn'); btn.disabled=false; btn.textContent='บันทึก'; return; }
+        payload.skill_code = code;
+        await _supaReq('skill_definitions', { method: 'POST', body: payload, prefer: 'return=minimal' });
+      }
+      admCloseModal();
+      _admLoaded = false;
+      await admLoadSkills(true);
+      _admToast(_admEditing ? 'บันทึกสำเร็จ ✓' : 'เพิ่ม Skill แล้ว ✓', 'ok');
+      // Bust rubric cache so Echo picks up next time
+      if (typeof CI !== 'undefined' && CI._bustRubricCache) CI._bustRubricCache();
+    } catch(e) {
+      _admToast('Error: '+e.message,'err');
+      btn.disabled=false; btn.textContent='บันทึก';
+    }
+  };
+
+  window.admDeleteSkill = async function(id, code) {
+    if (!confirm(`ลบ "${code}" ออกจากระบบ?\nไม่สามารถย้อนกลับได้`)) return;
+    try {
+      await _supaReq(`skill_definitions?id=eq.${id}`, { method: 'DELETE' });
+      admCloseModal();
+      _admLoaded = false;
+      await admLoadSkills(true);
+      _admToast('ลบ '+code+' แล้ว','ok');
+      if (typeof CI !== 'undefined' && CI._bustRubricCache) CI._bustRubricCache();
+    } catch(e) { _admToast('Error: '+e.message,'err'); }
+  };
+
+  function _admToast(msg, type) {
+    let t = document.getElementById('adm-toast');
+    if (!t) { t = document.createElement('div'); t.id='adm-toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 18px;border-radius:100px;font-size:13px;font-weight:500;z-index:9999;color:#fff;white-space:nowrap;transition:opacity .3s;background:${type==='ok'?'#34C759':type==='warn'?'#FF9500':'#FF3B30'}`;
+    t.style.opacity='1';
+    clearTimeout(t._t);
+    t._t = setTimeout(() => { t.style.opacity='0'; }, 2500);
+  }
+})();

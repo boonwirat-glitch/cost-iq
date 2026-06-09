@@ -1834,17 +1834,28 @@ function openDataPanel(){
   document.getElementById('dataOverlay').classList.add('on');
   updateDpAccountCard();renderAccountLibrary();
   _initSheetsInput();
+  // Show Admin tab only for admin role
+  const adminTab=document.getElementById('dp-tab-admin');
+  if(adminTab){
+    const role=(typeof currentUserProfile!=='undefined'&&currentUserProfile)?currentUserProfile.role:'';
+    adminTab.style.display=(role==='admin')?'':'none';
+  }
 }
 
 function setDpMode(mode){
   const quick=document.getElementById('dp-quick');
   const bulk=document.getElementById('dp-bulk');
+  const admin=document.getElementById('dp-admin');
   const tabQ=document.getElementById('dp-tab-quick');
   const tabB=document.getElementById('dp-tab-bulk');
+  const tabA=document.getElementById('dp-tab-admin');
   if(quick)quick.style.display=mode==='quick'?'block':'none';
   if(bulk)bulk.style.display=mode==='bulk'?'block':'none';
+  if(admin)admin.style.display=mode==='admin'?'block':'none';
   if(tabQ)tabQ.classList.toggle('on',mode==='quick');
   if(tabB)tabB.classList.toggle('on',mode==='bulk');
+  if(tabA)tabA.classList.toggle('on',mode==='admin');
+  if(mode==='admin')admLoadSkills();
 }
 
 function useSampleData(){
