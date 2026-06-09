@@ -1,4 +1,4 @@
-<!-- Freshket Sense v478: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v479: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v478',
+      version: 'v479',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -11784,6 +11784,8 @@ function resetRuntimeSessionState(){
   try { bulkSkuCurrentData={}; } catch(e) {}
   try { bulkOutletsData={}; } catch(e) {}
   try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
+  // v479-G2: reset commission render key so _commGatedRender re-renders on next login
+  try { if(typeof window._commResetKey==='function') window._commResetKey(); } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
@@ -12498,13 +12500,14 @@ function hideLoginOverlay() {
           if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
           else if(typeof refreshAll==='function') refreshAll();
         }
-        // Safety: if ETag check somehow never fires (offline), clear shimmer + render after 3s
+        // v479-C5: shimmer safety fallback 3000→1500ms — ETag typically resolves <400ms;
+        // 3s was too long, user saw skeleton card stuck for 1-3s on warm resume.
         setTimeout(function(){
           if(window._pwaShimmerActive){
             if(typeof window._deactivatePortviewShimmer==='function') window._deactivatePortviewShimmer();
             if(typeof refreshAll==='function') refreshAll();
           }
-        }, 3000);
+        }, 1500);
       }catch(e){
         // Fallback: render without shimmer
         if(window.RenderBus) window.RenderBus.signal('resume-skip-splash');
@@ -15556,7 +15559,7 @@ window.RenderBus = (function(){
   var _timer = null;
   var _lastRender = 0;
   var _ready = new Set();
-  var SETTLE_MS = 2000; // ms — increased from 800ms: batches signals that arrive within 2s of each other
+  var SETTLE_MS = 800; // v479-D1: 2000→800ms — 2s caused double-renders when enhancement files arrived after critical batch
 
   function _flush(){
     _timer = null;
@@ -36871,6 +36874,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   }
 
   window._commGatedRender = _commGatedRender;
+  // v479-G2: expose key reset so resetRuntimeSessionState() can invalidate
+  // commission cache on logout. Without this, _lastCommKey persists across
+  // login sessions → _commGatedRender skips render on re-login (key unchanged).
+  window._commResetKey = function(){ _lastCommKey = ''; };
 
   // Reset key on each refreshAll so commission re-renders after data refresh
   function _hookRefreshAll(){
