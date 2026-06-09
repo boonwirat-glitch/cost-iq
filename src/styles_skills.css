@@ -689,7 +689,7 @@
 .sk-pend-list { padding: 0 14px; }
 .sk-pend-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 10px 0;
   border-top: 1px solid var(--sk-hairline);
@@ -709,6 +709,7 @@
   font-weight: 700;
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 .sk-pend-name {
   font-size: 13px;
