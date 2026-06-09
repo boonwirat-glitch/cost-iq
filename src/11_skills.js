@@ -173,18 +173,46 @@ async function _loadSkillProgress() {
   if (!_skillsUserId) return;
   try {
     const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
-    const query = isTL
-      ? `${SKILLS_TABLE_PROG}?select=*`
-      : `${SKILLS_TABLE_PROG}?select=*&user_id=eq.${_skillsUserId}`;
+    let query;
+    if (isTL) {
+      const tlEmail = window.currentUserProfile?.email || '';
+      const teamEmails = _getSquadEmails(tlEmail);
+      if (teamEmails.length > 0) {
+        const emailList = teamEmails.map(e => '"' + e + '"').join(',');
+        query = SKILLS_TABLE_PROG + '?select=*&owner_email=in.(' + emailList + ')';
+      } else {
+        query = SKILLS_TABLE_PROG + '?select=*';
+      }
+    } else {
+      query = SKILLS_TABLE_PROG + '?select=*&user_id=eq.' + _skillsUserId;
+    }
     const rows = await _skFetch(query);
     _skillProg = {};
     (rows || []).forEach(r => {
-      const key = isTL ? `${r.user_id}:${r.skill_id}` : String(r.skill_id);
+      const key = isTL ? r.user_id + ':' + r.skill_id : String(r.skill_id);
       _skillProg[key] = r;
     });
   } catch(e) {
     console.error('[Skills] loadProgress:', e);
   }
+}
+
+function _getSquadEmails(tlEmail) {
+  if (!tlEmail) return [];
+  const emails = new Set();
+  if (typeof portviewBulkData !== 'undefined' && Array.isArray(portviewBulkData)) {
+    portviewBulkData.forEach(r => {
+      if (r.tlEmail && r.tlEmail.toLowerCase() === tlEmail.toLowerCase() && r.kamEmail)
+        emails.add(r.kamEmail.toLowerCase());
+    });
+  }
+  if (typeof window.salesBulkData !== 'undefined' && Array.isArray(window.salesBulkData)) {
+    window.salesBulkData.forEach(r => {
+      if (r.tl_email && r.tl_email.toLowerCase() === tlEmail.toLowerCase() && r.owner_email)
+        emails.add(r.owner_email.toLowerCase());
+    });
+  }
+  return [...emails];
 }
 
 // ── Load Echo observations (rep view only) ──────────
@@ -319,15 +347,64 @@ function _switchSkillsScreen(mode) {
 function _renderSkillsScreen() {
   const scr = _switchSkillsScreen('home');
   if (!scr) return;
-  // Safety guard: if role not set or is KAM/rep, don't render
   const _r = (_skillsRole || '').toLowerCase();
   if (!_r || (!_r.includes('sales') && _r !== 'tl' && _r !== 'admin')) {
     if (typeof showScreen === 'function') showScreen('portview');
     return;
   }
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
-  scr.innerHTML = isTL ? _renderTLHome() : _renderRepHome();
+  if (isTL) {
+    _renderTLShell(scr);
+  } else {
+    scr.innerHTML = _renderRepHome();
+  }
   _markLoadedImages(scr);
+}
+
+// TL shell: render header + static tab bar once, swap only content zone
+function _renderTLShell(scr) {
+  const pendCount = Object.values(_skillProg).filter(p => p.state === 'training').length;
+  const heroColor = pendCount === 0 ? 'var(--sk-ok)' : 'var(--sk-ac)';
+  const heroLabel = pendCount === 0 ? 'ALL CLEAR' : 'PENDING';
+  const repCount  = new Set(Object.values(_skillProg).map(p => p.user_id).filter(Boolean)).size;
+  const squadName = (window.currentUserProfile && window.currentUserProfile.squad) || 'Squad';
+
+  scr.innerHTML = `
+<div id="sk-tl-header" style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;">
+  <div>
+    <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
+    <div class="sk-tl-squad" style="margin-top:2px;">${squadName}</div>
+    <div class="sk-tl-sub">${repCount} sales reps</div>
+  </div>
+  <div style="text-align:right;">
+    <div class="sk-tl-pend-count" style="color:${heroColor};">${pendCount}</div>
+    <div class="sk-eyebrow" style="color:${heroColor};">${heroLabel}</div>
+  </div>
+</div>
+<div id="sk-tl-tabs" class="sk-tab-bar" style="margin-top:12px;flex-shrink:0;">
+  <div class="sk-tab ${_skillViewMode==='pending'?'sk-tab-on':''}" onclick="_skSetView('pending');_renderTLContent();">
+    รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
+  </div>
+  <div class="sk-tab ${_skillViewMode==='overview'?'sk-tab-on':''}" onclick="_skSetView('overview');_renderTLContent();">ภาพรวมทีม</div>
+</div>
+<div id="sk-tl-content" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>`;
+
+  _renderTLContent();
+}
+
+// Only swap content zone — header + tab bar stay fixed
+function _renderTLContent() {
+  const content = document.getElementById('sk-tl-content');
+  if (!content) { _renderSkillsScreen(); return; }
+
+  // Update tab active state without re-rendering header
+  const tabs = document.querySelectorAll('#sk-tl-tabs .sk-tab');
+  tabs.forEach((t, i) => {
+    const isActive = (i === 0 && _skillViewMode === 'pending') || (i === 1 && _skillViewMode === 'overview');
+    t.classList.toggle('sk-tab-on', isActive);
+  });
+
+  content.innerHTML = _skillViewMode === 'pending' ? _renderTLPendingContent() : _renderTLOverviewContent();
 }
 
 // แก้ race condition: รูปที่โหลดจาก cache เสร็จก่อน onload ผูก → เช็ค .complete
@@ -731,6 +808,9 @@ async function skillsStartTraining(skillId) {
         user_name:  (typeof currentUserProfile !== 'undefined' && currentUserProfile)
                       ? (currentUserProfile.kam_name || currentUserProfile.full_name || currentUserProfile.email || '')
                       : '',
+        owner_email: (typeof currentUserProfile !== 'undefined' && currentUserProfile)
+                      ? (currentUserProfile.email || '').toLowerCase()
+                      : '',
         updated_at: new Date().toISOString(),
       }
     });
@@ -768,40 +848,44 @@ async function skillsStartTraining(skillId) {
 // ══════════════════════════════════════════════════════════
 
 function _renderTLHome() {
-  return _skillViewMode === 'pending' ? _renderTLPending() : _renderTLOverview();
+  return _renderTLPendingContent();
 }
 
-function _renderTLPending() {
-  const pending = Object.values(_skillProg).filter(p => p.state === 'training');
-  // Sort by updated_at asc (oldest first)
-  pending.sort((a,b) => new Date(a.updated_at||0) - new Date(b.updated_at||0));
+function _renderTLPending() { return _renderTLPendingContent(); }
 
+function _renderTLPendingContent() {
+  const pending = Object.values(_skillProg).filter(p => p.state === 'training');
+  pending.sort((a,b) => new Date(a.updated_at||0) - new Date(b.updated_at||0));
   const pendCount = pending.length;
-  const heroColor = pendCount === 0 ? 'var(--sk-ok)' : 'var(--sk-ac)';
-  const heroLabel = pendCount === 0 ? 'ALL CLEAR' : 'PENDING';
 
   const rows = pending.map(p => {
     const def = _skillDefs.find(d => d.id === p.skill_id);
     if (!def) return '';
     const code = def.skill_code.split('_')[0];
     const daysAgo = p.updated_at
-      ? Math.floor((Date.now() - new Date(p.updated_at)) / 86400000)
-      : null;
+      ? Math.floor((Date.now() - new Date(p.updated_at)) / 86400000) : null;
     const dateLabel = daysAgo === null ? '' : daysAgo === 0 ? 'today' : `${daysAgo} day${daysAgo>1?'s':''} ago`;
     const initials  = _skUserInitials(p.user_id);
     const repName   = _skUserName(p.user_id);
-    const echoObs   = _tlEchoObs(p.user_id, def.skill_code).slice(0,1)[0];
+
+    // Echo strip: แสดงเฉพาะ pass / developing เท่านั้น
+    const echoObs = _tlEchoObs(p.user_id, def.skill_code)
+      .filter(o => o.ai_score === 'pass' || o.ai_score === 'developing')
+      .slice(0, 1)[0];
     const echoStrip = echoObs ? (() => {
       const col = _echoScoreColor(echoObs.ai_score);
       const lbl = _echoScoreLabel(echoObs.ai_score);
       const dt  = new Date(echoObs.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
-      const ev  = echoObs.evidence ? '<div class="sk-pend-echo-ev">' + echoObs.evidence.slice(0,80) + (echoObs.evidence.length>80?'…':'') + '</div>' : '';
-      return '<div class="sk-pend-echo-strip">'
-        + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>'
-        + '<span class="sk-pend-echo-date">' + dt + '</span>'
-        + '<span class="sk-pend-echo-score" style="color:' + col + ';">' + lbl + '</span>'
-        + '</div>' + ev;
+      const ev  = echoObs.evidence
+        ? `<div class="sk-pend-echo-ev">${echoObs.evidence.slice(0,80)}${echoObs.evidence.length>80?'…':''}</div>`
+        : '';
+      return `<div class="sk-pend-echo-strip">`
+        + `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>`
+        + `<span class="sk-pend-echo-date">${dt}</span>`
+        + `<span class="sk-pend-echo-score" style="color:${col};">${lbl}</span>`
+        + `</div>${ev}`;
     })() : '';
+
     return `
 <div class="sk-pend-row" onclick="skillsTLOpenEval('${p.user_id}',${p.skill_id})">
   <div class="sk-pend-avatar">${initials}</div>
@@ -818,49 +902,31 @@ function _renderTLPending() {
 </div>`;
   }).join('');
 
-  const empty = pendCount === 0 ? `
+  if (pendCount === 0) return `
 <div class="sk-empty">
   <svg class="sk-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-    <polyline points="22 4 12 14.01 9 11.01"/>
+    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
   </svg>
   <div class="sk-empty-title">ทีมทุกคนเป็นปัจจุบัน</div>
-  <div class="sk-empty-sub">ไม่มีทักษะที่รอการประเมิน<br>ดูภาพรวมทีมได้ที่ tab ถัดไป</div>
-</div>` : '';
+  <div class="sk-empty-sub">ไม่มีทักษะที่รอการประเมิน</div>
+</div>`;
 
-  const repCount = Object.keys(Object.values(_skillProg).reduce((a,p)=>{a[p.user_id]=1;return a},{})).length;
   return `
-<div style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;">
-  <div>
-    <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
-    <div class="sk-tl-squad" style="margin-top:2px;">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
-    <div class="sk-tl-sub">${repCount} sales reps</div>
-  </div>
-  <div style="text-align:right;">
-    <div class="sk-tl-pend-count" style="color:${heroColor};">${pendCount}</div>
-    <div class="sk-eyebrow" style="color:${heroColor};">${heroLabel}</div>
-  </div>
-</div>
-<div class="sk-tab-bar" style="margin-top:12px;">
-  <div class="sk-tab sk-tab-on" onclick="_skSetView('pending');_renderSkillsScreen();">
-    รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
-  </div>
-  <div class="sk-tab" onclick="_skSetView('overview');_renderSkillsScreen();">ภาพรวมทีม</div>
-</div>
-${pendCount > 0 ? `<div style="padding:12px 14px 4px;"><span class="sk-eyebrow">เรียงตาม · รอนานสุด</span></div><div class="sk-pend-list">${rows}</div>` : empty}`;
+<div style="padding:12px 14px 4px;"><span class="sk-eyebrow">เรียงตาม · รอนานสุด</span></div>
+<div class="sk-pend-list">${rows}</div>`;
 }
 
-function _renderTLOverview() {
-  const allProg   = Object.values(_skillProg);
-  const total     = allProg.length;
-  const unlocked  = allProg.filter(p => p.state === 'unlocked' || p.state === 'mastered').length;
-  const pct       = total > 0 ? Math.round(unlocked / total * 100) : 0;
-  const pendCount = allProg.filter(p => p.state === 'training').length;
+function _renderTLOverview() { return _renderTLOverviewContent(); }
 
-  const byRepToggle = _ovToggle === 'rep' ? 'sk-tab-on' : '';
+function _renderTLOverviewContent() {
+  const allProg  = Object.values(_skillProg);
+  const total    = allProg.length;
+  const unlocked = allProg.filter(p => p.state==='unlocked'||p.state==='mastered').length;
+  const pct      = total > 0 ? Math.round(unlocked/total*100) : 0;
+
+  const byRepToggle   = _ovToggle === 'rep'   ? 'sk-tab-on' : '';
   const bySkillToggle = _ovToggle === 'skill' ? 'sk-tab-on' : '';
 
-  // Group progress by user for By Rep view
   const userMap = {};
   allProg.forEach(p => {
     if (!userMap[p.user_id]) userMap[p.user_id] = [];
@@ -876,10 +942,9 @@ function _renderTLOverview() {
       const pct2    = uTotal > 0 ? Math.round(uCount/uTotal*100) : 0;
       const fillCls = pct2 >= 50 ? 'sk-rep-fill-ok' : pct2 >= 25 ? 'sk-rep-fill-mid' : 'sk-rep-fill-low';
       const pendDot = tCount > 0 ? '<div class="sk-rep-pend-dot"></div>' : '';
-      const initials = _skUserInitials(uid);
       return `
 <div class="sk-rep-row" onclick="skillsTLOpenRepDetail('${uid}')">
-  <div class="sk-rep-avatar">${initials}</div>
+  <div class="sk-rep-avatar">${_skUserInitials(uid)}</div>
   <div class="sk-rep-info">
     <div class="sk-rep-name">${pendDot}${_skUserName(uid)}</div>
     <div class="sk-rep-prog-row">
@@ -892,20 +957,18 @@ function _renderTLOverview() {
     }).join('');
     viewContent = `<div class="sk-rep-list">${repRows}</div>`;
   } else {
-    // By Skill — A→D fixed order
-    const modules = ['A','B','C','D'];
-    const skillRows = modules.map(m => {
+    const skillRows = ['A','B','C','D'].map(m => {
       const defs = _skillDefs.filter(d => d.module === m);
-      if (defs.length === 0) return '';
+      if (!defs.length) return '';
       const userCount = Object.keys(userMap).length || 1;
       const hd = `<div class="sk-skill-mod-hd">Module ${m} — ${MODULE_META[m].sub}</div>`;
       const rows = defs.map(d => {
-        const progs    = allProg.filter(p => p.skill_id === d.id);
+        const progs     = allProg.filter(p => p.skill_id === d.id);
         const passCount = progs.filter(p => p.state==='unlocked'||p.state==='mastered').length;
-        const pct3     = userCount > 0 ? Math.round(passCount/userCount*100) : 0;
-        const fillCls  = pct3 === 0 ? 'sk-skill-fill-zero' : pct3 < 40 ? 'sk-skill-fill-low' : 'sk-skill-fill-ok';
-        const dotCls   = pct3 === 0 ? 'sk-warn-dot-ac' : pct3 < 40 ? 'sk-warn-dot-warn' : 'sk-warn-dot-ok';
-        const code     = d.skill_code.split('_')[0];
+        const pct3      = Math.round(passCount/userCount*100);
+        const fillCls   = pct3 === 0 ? 'sk-skill-fill-zero' : pct3 < 40 ? 'sk-skill-fill-low' : 'sk-skill-fill-ok';
+        const dotCls    = pct3 === 0 ? 'sk-warn-dot-ac'     : pct3 < 40 ? 'sk-warn-dot-warn'   : 'sk-warn-dot-ok';
+        const code      = d.skill_code.split('_')[0];
         return `
 <div class="sk-skill-row">
   <div class="sk-warn-dot ${dotCls}"></div>
@@ -932,33 +995,22 @@ function _renderTLOverview() {
 </div>`;
   }
 
+  // Hero stat — flat white, ไม่มี card wrapper
   return `
-<div style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;">
+<div style="padding:12px 14px 0;display:flex;align-items:flex-end;justify-content:space-between;">
   <div>
-    <div class="sk-eyebrow sk-eyebrow-ac">SKILLS</div>
-    <div class="sk-tl-squad" style="margin-top:2px;">${(window.currentUserProfile && window.currentUserProfile.squad) || 'Squad'}</div>
-    <div class="sk-tl-sub">${Object.keys(userMap).length} sales reps</div>
+    <div style="font-size:28px;font-weight:700;color:var(--sk-ink);letter-spacing:-.03em;line-height:1;">${unlocked}<span style="font-size:13px;font-weight:500;color:var(--sk-muted);">/${total}</span></div>
+    <div style="font-size:9px;color:var(--sk-muted);margin-top:2px;">ทีม unlock แล้ว</div>
   </div>
-  <div style="text-align:right;">
-    <div class="sk-tl-pend-count" style="color:var(--sk-ink);">${unlocked}</div>
-    <div class="sk-eyebrow">/ ${total} unlocked</div>
-  </div>
+  <div style="font-size:20px;font-weight:700;color:var(--sk-ac);">${pct}%</div>
 </div>
-<div class="sk-ov-hero" style="margin-top:10px;">
-  <div class="sk-ov-hero-row">
-    <div class="sk-ov-label">ทีม unlock แล้ว</div>
-    <div class="sk-ov-pct">${pct}%</div>
-  </div>
-  <div class="sk-ov-track"><div class="sk-ov-fill" style="width:${pct}%;"></div></div>
-  <div class="sk-ov-meta"><span>${unlocked} UNLOCKED</span><span>${total - unlocked} REMAINING</span></div>
+<div style="margin:8px 14px 0;height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
+  <div style="height:100%;border-radius:2px;background:var(--sk-ac);width:${pct}%;"></div>
 </div>
-<div class="sk-tab-bar" style="margin-top:10px;">
-  <div class="sk-tab" onclick="_skSetView('pending');_renderSkillsScreen();">
-    รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
-  </div>
-  <div class="sk-tab sk-tab-on" onclick="_skSetView('overview');_renderSkillsScreen();">ภาพรวมทีม</div>
+<div style="display:flex;justify-content:space-between;margin:3px 14px 0;font-size:7.5px;color:var(--sk-muted);">
+  <span>${unlocked} UNLOCKED</span><span>${total-unlocked} REMAINING</span>
 </div>
-<div class="sk-view-toggle">
+<div class="sk-view-toggle" style="margin-top:10px;">
   <div class="sk-vt ${byRepToggle}" onclick="_skSetOvToggle('rep')">By Rep</div>
   <div class="sk-vt ${bySkillToggle}" onclick="_skSetOvToggle('skill')">By Skill</div>
 </div>
@@ -1107,7 +1159,9 @@ async function skillsTLSave(userId, skillId) {
     // Update progress
     // ดึง user_name จาก cache ถ้ายังไม่มี
     const _tlProgKey = `${userId}:${skillId}`;
-    const _existingName = _skillProg[_tlProgKey] ? _skillProg[_tlProgKey].user_name : null;
+    const _existingRow = _skillProg[_tlProgKey] || {};
+    const _existingName = _existingRow.user_name || null;
+    const _existingEmail = _existingRow.owner_email || null;
     await _skFetch(`${SKILLS_TABLE_PROG}?user_id=eq.${userId}&skill_id=eq.${skillId}`, {
       method: 'PATCH',
       prefer: 'return=minimal',
@@ -1117,6 +1171,7 @@ async function skillsTLSave(userId, skillId) {
         evaluated_at: new Date().toISOString(),
         notes:        note || null,
         user_name:    _existingName || _skUserName(userId) || null,
+        owner_email:  _existingEmail || null,
       }
     });
 
@@ -1252,7 +1307,7 @@ function _skRepFilter(all, userId) {
 
 // ── Helpers ────────────────────────────────────────────────
 function _skSetView(v) { _skillViewMode = v; }
-function _skSetOvToggle(v) { _ovToggle = v; _renderSkillsScreen(); }
+function _skSetOvToggle(v) { _ovToggle = v; if (typeof _renderTLContent === 'function') { _renderTLContent(); } else { _renderSkillsScreen(); } }
 
 function _skToast(msg) {
   let t = document.getElementById('sk-toast');
@@ -1379,6 +1434,7 @@ window._skSetOvToggle          = _skSetOvToggle;
 window._skTLSelectState        = _skTLSelectState;
 window._skRepFilter            = _skRepFilter;
 window._renderSkillsScreen     = _renderSkillsScreen;
+window._renderTLContent        = _renderTLContent;
 window._s3ToggleSheet          = _s3ToggleSheet;
 window._skCardRipple           = _skCardRipple;
 
