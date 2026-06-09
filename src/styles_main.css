@@ -1247,6 +1247,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .pb-cat-badge.partial{border-color:var(--g500);background:var(--g50);color:var(--g700)}
 .pb-cat-badge.full{border-color:var(--g500);background:var(--g500);color:#fff}
 .pb-cat-chev{font-size:11px;color:var(--n400);transition:transform .2s;display:inline-block}
+.pb-cat-spend{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--n500);white-space:nowrap}
 .pb-cat-hdr.collapsed .pb-cat-chev{transform:rotate(-90deg)}
 
 .pb-item-wrap{border-bottom:1px solid var(--n100)}
