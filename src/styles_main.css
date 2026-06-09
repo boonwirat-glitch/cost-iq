@@ -2242,7 +2242,7 @@ body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infi
 body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
 body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
 /* label — same color/weight as other tabs, green only when active */
-.echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weight:600!important}
+.echo-nav-btn .lb{color:var(--n400);font-weight:500}
 body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weight:600!important}
 /* Floating recording pill (minimize state) */
 #echo-float-pill{
