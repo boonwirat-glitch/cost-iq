@@ -374,15 +374,22 @@ supa.auth.onAuthStateChange((event, session) => {
           if(currentUserProfile && currentUserProfile.email){
             _doR2Fetch();
           } else {
-            // Profile not ready yet — wait for loadUserProfile() which is running in background
-            var _profileWait = 0;
-            var _profilePoll = setInterval(function(){
-              _profileWait += 50;
-              if((currentUserProfile && currentUserProfile.email) || _profileWait >= 2000){
-                clearInterval(_profilePoll);
-                _doR2Fetch();
-              }
-            }, 50);
+            // v480-E1: replace 50ms poll (max 2s) with direct supa.auth.getSession().
+            // On slow networks, loadUserProfile() can take >2s → poll expires → Sales gets
+            // KAM files. getSession() is a local JWT decode (no network) → always instant.
+            // Inject email into currentUserProfile so _patchR2FilesForSales() can read it.
+            (function(){
+              try{
+                supa.auth.getSession().then(function(result){
+                  var _sess = result && result.data && result.data.session;
+                  var _email = (_sess && _sess.user && _sess.user.email) || '';
+                  if(_email && currentUserProfile && !currentUserProfile.email){
+                    currentUserProfile.email = _email;
+                  }
+                  _doR2Fetch();
+                }).catch(function(){ _doR2Fetch(); });
+              }catch(e){ _doR2Fetch(); }
+            })();
           }
         }
         // v224d: ETag check fires immediately after IDB render (was 3000ms).
