@@ -246,19 +246,39 @@ async function _loadTLSquad() {
   _tlSquad = null;
   _tlSquadEmails = [];
   try {
-    const tlEmail = (window.currentUserProfile?.email || '').toLowerCase();
-    if (!tlEmail) return;
+    // Get TL email — try multiple sources
+    let tlEmail = '';
+    // 1. supa.auth.getSession() — most reliable across browsers
+    if (!tlEmail && typeof supa !== 'undefined' && supa?.auth?.getSession) {
+      const { data } = await supa.auth.getSession();
+      tlEmail = (data?.session?.user?.email || '').toLowerCase();
+      if (data?.session?.access_token) window._skCachedJWT = data.session.access_token;
+    }
+    // 2. window.currentUserProfile (may not be set)
+    if (!tlEmail) tlEmail = (window.currentUserProfile?.email || '').toLowerCase();
+    // 3. localStorage/sessionStorage fallback
+    if (!tlEmail) {
+      for (const storage of [localStorage, sessionStorage]) {
+        const k = Object.keys(storage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (k) { try { const s = JSON.parse(storage.getItem(k)); tlEmail = (s?.user?.email || s?.data?.user?.email || '').toLowerCase(); } catch(_){} }
+        if (tlEmail) break;
+      }
+    }
+    if (!tlEmail) { console.warn('[Skills] _loadTLSquad: no TL email found'); return; }
+    console.log('[Skills] _loadTLSquad: tlEmail =', tlEmail);
+
     // 1. Get TL's own squad name
     const tlRows = await _skFetch(`profiles?select=squad,sale_team&email=eq.${encodeURIComponent(tlEmail)}&limit=1`);
     const tlRow = tlRows && tlRows[0];
     const squadName = tlRow?.squad || tlRow?.sale_team || null;
     if (!squadName) { console.warn('[Skills] TL squad not set for', tlEmail); return; }
     _tlSquad = squadName;
+
     // 2. Get all reps in same squad
     const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl)`);
     _tlSquadEmails = (repRows || [])
       .map(r => (r.email || '').toLowerCase())
-      .filter(e => e && e !== tlEmail); // exclude TL themselves
+      .filter(e => e && e !== tlEmail);
     console.log('[Skills] TL squad:', squadName, '| members:', _tlSquadEmails);
   } catch(e) {
     console.warn('[Skills] _loadTLSquad failed:', e.message);
