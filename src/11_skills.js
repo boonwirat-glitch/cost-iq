@@ -997,7 +997,7 @@ function _renderTLPendingContent() {
   <svg class="sk-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
   </svg>
-  <div class="sk-empty-title">ทีมทุกคนเป็นปัจจุบัน</div>
+  <div class="sk-empty-title">ไม่มีรายการรอประเมิน</div>
   <div class="sk-empty-sub">ไม่มีทักษะที่รอการประเมิน</div>
 </div>`;
 
@@ -1050,7 +1050,8 @@ function _renderTLOverviewContent() {
     const skillRows = ['A','B','C','D'].map(m => {
       const defs = _skillDefs.filter(d => d.module === m);
       if (!defs.length) return '';
-      const userCount = Object.keys(userMap).length || 1;
+      // userCount = จำนวน reps จริงในทีม ไม่ใช่จำนวนที่มี progress rows
+      const userCount = _tlSquadEmails.length > 0 ? _tlSquadEmails.length : (Object.keys(userMap).length || 1);
       const hd = `<div class="sk-skill-mod-hd">Module ${m} — ${MODULE_META[m].sub}</div>`;
       const rows = defs.map(d => {
         const progs     = allProg.filter(p => p.skill_id === d.id);
@@ -1061,9 +1062,9 @@ function _renderTLOverviewContent() {
         const code      = d.skill_code.split('_')[0];
         return `
 <div class="sk-skill-row">
-  <div class="sk-warn-dot ${dotCls}"></div>
-  <div class="sk-skill-info">
-    <div style="display:flex;align-items:center;gap:6px;">
+  <div class="sk-warn-dot ${dotCls}" style="flex-shrink:0;margin-top:3px;"></div>
+  <div class="sk-skill-info" style="flex:1;min-width:0;">
+    <div style="display:flex;align-items:center;gap:5px;">
       <span class="sk-skill-code">${code}</span>
       <span class="sk-skill-name">${d.skill_name_en}</span>
     </div>
