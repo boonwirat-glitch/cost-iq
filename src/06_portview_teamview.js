@@ -1352,7 +1352,9 @@ function __legacyRenderPortviewSummaryFallback(){
   const paceBarEl=document.getElementById('portview-pace-bar');
   // v224e: suppress pace bar if data not fully loaded — prevents low/0% flash
   const _dataReady = typeof allCriticalReady!=='function' || allCriticalReady();
-  if(paceBarEl&&acctWithPace.length>0&&!_preferTargetWidget&&_dataReady){
+  // v477-D2G1: also guard portfolioPace===0 with zero runrate — data not yet meaningful
+  const _paceDataMeaningful = portfolioPace > 0 || totalRunRate > 0;
+  if(paceBarEl&&acctWithPace.length>0&&!_preferTargetWidget&&_dataReady&&_paceDataMeaningful){
     const _pvDays=acctWithPace[0]?.paceSignal.daysElapsed||0;
     const _pvDaysInMo=acctWithPace[0]?.paceSignal.daysInMonth||30;
     const _totalGmv=acctWithPace.reduce((s,a)=>s+a.paceSignal.gmvToDate,0);
@@ -1752,11 +1754,27 @@ function __legacyRenderTeamviewFallback(){
   const titleEl=document.getElementById('tv-title');
   const backWrap=document.getElementById('tv-back-wrap');
   if(!portviewBulkData||!portviewBulkData.length){
-    document.getElementById('teamview-content').innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ยังไม่มีข้อมูลทีม</div><div class="portview-no-data-sub">อัปโหลด portview.csv (Q8E)<br>เพื่อดูพอร์ตของ KAM แต่ละคนในทีม</div></div>`;
+    // v477-C1a: distinguish "loading" from "truly no data" — show skeleton during R2 fetch,
+    // not empty-state. Prevents "ยังไม่มีข้อมูลทีม" flash on Admin/TL cold login.
+    const _tvR2Loading = typeof sheetsLoadStarted!=='undefined' && sheetsLoadStarted;
+    const _tvContent = document.getElementById('teamview-content');
+    if(_tvR2Loading){
+      // R2 in-flight — show silent skeleton, not error state
+      if(_tvContent && !_tvContent._tvSkeletonShown){
+        _tvContent._tvSkeletonShown = true;
+        _tvContent.innerHTML='<div style="padding:16px 0;opacity:.35"><div style="height:12px;background:rgba(255,255,255,.08);border-radius:6px;margin-bottom:10px;width:55%"></div><div style="height:8px;background:rgba(255,255,255,.05);border-radius:6px;width:100%"></div></div>';
+      }
+      if(titleEl)titleEl.textContent='ภาพรวมทีม';
+      if(backWrap)backWrap.style.display='none';
+      renderTeamviewSummary();
+      return;
+    }
+    if(_tvContent) _tvContent._tvSkeletonShown = false;
+    _tvContent.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ยังไม่มีข้อมูลทีม</div><div class="portview-no-data-sub">อัปโหลด portview.csv (Q8E)<br>เพื่อดูพอร์ตของ KAM แต่ละคนในทีม</div></div>`;
     if(titleEl)titleEl.textContent='ภาพรวมทีม';
     if(backWrap)backWrap.style.display='none';
     // v307: mark that teamview-content rendered with no data, so value guard forces re-render when data arrives
-    try{var _tvEl=document.getElementById('teamview-content');if(_tvEl)_tvEl._lastTvWasNoData=true;}catch(e){}
+    try{if(_tvContent)_tvContent._lastTvWasNoData=true;}catch(e){}
     renderTeamviewSummary();
     return;
   }
