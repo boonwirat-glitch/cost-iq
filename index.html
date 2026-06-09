@@ -1,4 +1,4 @@
-<!-- Freshket Sense v470: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v471: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v470',
+      version: 'v471',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43611,19 +43611,38 @@ let _tlSquadEmails = [];       // emails of reps in TL's squad
 // ── JWT helper — ดึง access token จาก Supabase session ───
 function _skGetJWT() {
   try {
-    // ใช้ supa client จาก 01_core.js ถ้ามี
-    if (typeof supa !== 'undefined' && supa.auth) {
-      const session = supa.auth.session ? supa.auth.session() : null;
-      if (session && session.access_token) return session.access_token;
-    }
-    // fallback: อ่านจาก localStorage โดยตรง
+    // v2: ใช้ currentUser จาก 01_core.js ที่โหลดก่อนแล้ว
+    if (typeof window._skCachedJWT === 'string' && window._skCachedJWT) return window._skCachedJWT;
+    // localStorage fallback (Android/Chrome)
     const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
     if (key) {
       const sess = JSON.parse(localStorage.getItem(key));
-      return sess?.access_token || null;
+      const token = sess?.access_token || sess?.data?.session?.access_token || null;
+      if (token) return token;
+    }
+    // sessionStorage fallback (Safari/iOS)
+    const skey = Object.keys(sessionStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+    if (skey) {
+      const sess = JSON.parse(sessionStorage.getItem(skey));
+      const token = sess?.access_token || sess?.data?.session?.access_token || null;
+      if (token) return token;
     }
   } catch(_) {}
   return null;
+}
+
+// Cache JWT async — called once at skillsInit so _skFetch works on Safari
+async function _skCacheJWT() {
+  try {
+    if (typeof supa !== 'undefined' && supa.auth && supa.auth.getSession) {
+      const { data } = await supa.auth.getSession();
+      if (data?.session?.access_token) {
+        window._skCachedJWT = data.session.access_token;
+        return;
+      }
+    }
+  } catch(_) {}
+  // fallback: already handled by _skGetJWT sync
 }
 async function _skFetch(path, opts = {}) {
   // ใช้ SUPA_KEY และ SUPA_URL จาก 01_core.js (โหลดก่อน 11_skills.js เสมอ)
@@ -43670,14 +43689,33 @@ async function skillsInit() {
   // Reset active state to prevent stale S3 detail from previous session
   _activeSkillId = null;
 
-  // get current user id from Supabase session
-  const sessionKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
-  if (sessionKey) {
-    try {
-      const sess = JSON.parse(localStorage.getItem(sessionKey));
-      _skillsUserId = sess?.user?.id || null;
-    } catch(_) {}
+  // Cache JWT first (async, handles Safari/iOS sessionStorage)
+  await _skCacheJWT();
+
+  // Get user id — prefer currentUser from 01_core, fallback to localStorage
+  if (typeof currentUser !== 'undefined' && currentUser?.id) {
+    _skillsUserId = currentUser.id;
+  } else {
+    const sessionKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+    if (sessionKey) {
+      try {
+        const sess = JSON.parse(localStorage.getItem(sessionKey));
+        _skillsUserId = sess?.user?.id || null;
+      } catch(_) {}
+    }
+    // Safari fallback: sessionStorage
+    if (!_skillsUserId) {
+      const sKey = Object.keys(sessionStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+      if (sKey) {
+        try {
+          const sess = JSON.parse(sessionStorage.getItem(sKey));
+          _skillsUserId = sess?.user?.id || null;
+        } catch(_) {}
+      }
+    }
   }
+
+  console.log('[Skills] init — role:', _skillsRole, '| userId:', _skillsUserId);
 
   // TL: load squad + squad members from profiles first
   const isTLInit = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
