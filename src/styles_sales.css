@@ -1070,6 +1070,15 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sv-sheet-title { font-size: 14px; font-weight: 700; color: #222222; margin-bottom: 2px; }
 .sv-sheet-sub { font-size: 11px; color: #6A6A6A; font-family: 'IBM Plex Mono', monospace; margin-bottom: 12px; }
 .sv-sheet-scroll { overflow-y: auto; flex: 1; }
+.sv-sheet-col-hd {
+  display: flex;
+  align-items: center;
+  padding: 4px 0 6px;
+  border-bottom: 0.5px solid #EBEBEB;
+}
+.sv-sheet-col-name { flex: 1; }
+.sv-sheet-col-days { width: 30px; flex-shrink: 0; }
+.sv-sheet-col-lbl  { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #AEAEB2; width: 52px; text-align: right; flex-shrink: 0; }
 .sv-sheet-row {
   display: flex;
   align-items: center;
@@ -1085,7 +1094,8 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 }
 .sv-sheet-name { flex: 1; font-size: 12.5px; font-weight: 500; color: #222222; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-sheet-days { font-size: 11px; font-weight: 700; color: #FF385C; font-family: 'IBM Plex Mono', monospace; width: 30px; text-align: right; flex-shrink: 0; }
-.sv-sheet-gmv  { font-size: 11px; font-weight: 700; color: #222222; width: 44px; text-align: right; flex-shrink: 0; }
+.sv-sheet-gmv  { font-size: 11px; font-weight: 700; color: #222222; width: 52px; text-align: right; flex-shrink: 0; }
+.sv-sheet-mtd  { font-size: 11px; font-weight: 500; color: #6A6A6A; width: 52px; text-align: right; flex-shrink: 0; }
 
 /* ══════════════════════════════════════════
    Account view — GMV chart
