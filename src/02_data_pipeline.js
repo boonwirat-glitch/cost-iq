@@ -2032,7 +2032,7 @@ window.RenderBus = (function(){
   var _timer = null;
   var _lastRender = 0;
   var _ready = new Set();
-  var SETTLE_MS = 2000; // ms — increased from 800ms: batches signals that arrive within 2s of each other
+  var SETTLE_MS = 800; // v479-D1: 2000→800ms — 2s caused double-renders when enhancement files arrived after critical batch
 
   function _flush(){
     _timer = null;
