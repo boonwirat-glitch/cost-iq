@@ -2098,21 +2098,35 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 // Without session: login overlay stays visible as before (CSS default display:flex).
 (function(){
   'use strict';
-  try{
-    var hasSession=false;
-    for(var i=0;i<localStorage.length;i++){
-      var k=localStorage.key(i);
-      if(k && /^sb-.+-auth-token$/.test(k)){
-        var v=localStorage.getItem(k);
-        if(v && v.length>20){ hasSession=true; break; }
+  function _checkSession(){
+    try{
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k && /^sb-.+-auth-token$/.test(k)){
+          var v=localStorage.getItem(k);
+          if(v && v.length>20){ return true; }
+        }
       }
-    }
-    if(hasSession){
-      var login=document.getElementById('login-overlay');
-      if(login){ login.style.display='none'; }
-      var splash=document.getElementById('sense-splash');
-      if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
-      try{ console.info('[Sense v216] boot cover applied — Supabase session detected, splash shown early to prevent 1-frame login flash'); }catch(e){}
+    }catch(e){}
+    return false;
+  }
+  function _applyBootCover(){
+    var login=document.getElementById('login-overlay');
+    if(login){ login.style.display='none'; }
+    var splash=document.getElementById('sense-splash');
+    if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
+  }
+  try{
+    if(_checkSession()){
+      // Pass 1: session found immediately (normal case)
+      _applyBootCover();
+    } else {
+      // v478-B1: Safari iOS sometimes hasn't flushed localStorage by first-paint.
+      // Re-check after 80ms — if session found, hide login before it becomes visible.
+      // 80ms is below human perception threshold (~100ms) for UI flicker.
+      setTimeout(function(){
+        try{ if(_checkSession()) _applyBootCover(); }catch(e){}
+      }, 80);
     }
   }catch(e){}
 })();
