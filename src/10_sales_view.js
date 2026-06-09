@@ -275,7 +275,7 @@ function renderSalesHome(el, outlets, pipeline) {
         <div class="sv-hov-sum-dot"></div>
         <div>
           <div class="sv-hov-sum-label">${urgentHandover.length} ร้าน</div>
-          <div class="sv-hov-sum-meta">ภายใน 15 วัน</div>
+          <div class="sv-hov-sum-meta">รอบ ${_sv_batchDate(urgentHandover)}</div>
         </div>
       </div>
       <div class="sv-hov-sum-r">
@@ -518,7 +518,18 @@ window._olSetFilter = function(f) { _olFilter=f; const el=document.getElementByI
 window._olSetView = function(v) { _olView=v; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
 window._olCycleSort = function() { const s=['mtd','expiry']; _olSort=s[(s.indexOf(_olSort)+1)%s.length]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
 window._olToggleGroup = function(id) { _olCollapsed[id]=!_olCollapsed[id]; const el=document.getElementById('sv-outlet-list'); if(el) { const outlets=getSalesPortviewData(); _renderSalesOutletList(el,outlets); } };
-// ── Handover bottom sheet ──────────────────────────────
+// Format max expire date of a batch of outlets as Thai date string
+function _sv_batchDate(outlets) {
+  if (!outlets || !outlets.length) return '—';
+  const maxDate = outlets.reduce((max, o) => {
+    const d = o.newUserExpDate || '';
+    return d > max ? d : max;
+  }, '');
+  if (!maxDate) return '—';
+  return new Date(maxDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+
 window._salesOpenHandoverSheet = function() {
   const outlets = getSalesPortviewData();
   const urgent = outlets.filter(o => {
@@ -530,17 +541,17 @@ window._salesOpenHandoverSheet = function() {
   urgent.sort((a,b) => (b.runrate||0)-(a.runrate||0));
   const rows = urgent.map(o => {
     const d = _daysUntilExp(o.newUserExpDate);
-    const expLabel = o.newUserExpDate ?
-      new Date(o.newUserExpDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '—';
     return '<div class="sv-sheet-row">' +
       '<div class="sv-sheet-dot"></div>' +
       '<span class="sv-sheet-name">' + (o.name||o.id) + '</span>' +
       '<span class="sv-sheet-days">' + (d<=0?'หมด':d+'d') + '</span>' +
-      '<span class="sv-sheet-gmv">Runrate ฿' + _sv_fmt(o.runrate||0) + '</span>' +
+      '<span class="sv-sheet-gmv">฿' + _sv_fmt(o.runrate||0) + '</span>' +
+      '<span class="sv-sheet-mtd">฿' + _sv_fmt(o.gmvToDate||0) + '</span>' +
     '</div>';
   }).join('');
 
   const totalGmv = urgent.reduce((s,o) => s+(o.runrate||0), 0);
+  const batchDate = _sv_batchDate(urgent);
 
   const overlay = document.createElement('div');
   overlay.className = 'sv-sheet-overlay';
@@ -548,8 +559,14 @@ window._salesOpenHandoverSheet = function() {
   overlay.innerHTML =
     '<div class="sv-sheet" id="sv-handover-sheet">' +
       '<div class="sv-sheet-handle"></div>' +
-      '<div class="sv-sheet-title">Handover ภายใน 15 วัน</div>' +
+      '<div class="sv-sheet-title">Handover รอบ ' + batchDate + '</div>' +
       '<div class="sv-sheet-sub">' + urgent.length + ' ร้าน · ฿' + _sv_fmt(totalGmv) + '/เดือน</div>' +
+      '<div class="sv-sheet-col-hd">' +
+        '<span class="sv-sheet-col-name"></span>' +
+        '<span class="sv-sheet-col-days"></span>' +
+        '<span class="sv-sheet-col-lbl">Runrate</span>' +
+        '<span class="sv-sheet-col-lbl">MTD</span>' +
+      '</div>' +
       '<div class="sv-sheet-scroll">' + rows + '</div>' +
     '</div>';
 
