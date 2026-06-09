@@ -1,4 +1,4 @@
-<!-- Freshket Sense v469: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v470: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v469',
+      version: 'v470',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8978,7 +8978,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .sk-pend-list { padding: 0 14px; }
 .sk-pend-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 10px 0;
   border-top: 1px solid var(--sk-hairline);
@@ -8998,6 +8998,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   font-weight: 700;
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 .sk-pend-name {
   font-size: 13px;
@@ -44619,7 +44620,7 @@ async function skillsTLOpenEval(userId, skillId) {
 
   scr.innerHTML = `
 <div style="position:relative;width:100%;overflow:hidden;">
-  ${_skImgTag(def, { cls:'sk-img-lazy', style:'width:100%;height:260px;object-fit:cover;object-position:center 30%;display:block;' })}
+  ${_skImgTag(def, { w:'100%', h:'260px', cls:'sk-img-lazy' })}
   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.42) 0%,transparent 45%,rgba(0,0,0,.58) 100%);pointer-events:none;"></div>
   <div style="position:absolute;top:0;left:0;right:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;z-index:10;">
     <button onclick="_skSetView('pending');_renderSkillsScreen()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.32);border:none;border-radius:999px;padding:6px 12px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
