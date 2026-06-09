@@ -116,6 +116,16 @@ function resetRuntimeSessionState(){
   // v202a bundle state
   try { _kamBundleLoaded.clear(); } catch(e) {}
   try { Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]); } catch(e) {}
+  // v465: cross-session state reset — prevent data/UI bleed between logins
+  // Bug: KAM→Sales→KAM left portviewLevel='rep-detail', portviewRepEmail=prev user, body class stale,
+  //      bulk data vars unpurged → wrong commission, wrong pace bar, ghost TL button, missing account data
+  try { portviewLevel='rep'; } catch(e) {}
+  try { portviewRepEmail=null; } catch(e) {}
+  try { bulkHistoryData={}; } catch(e) {}
+  try { bulkCatsData={}; } catch(e) {}
+  try { bulkSkuCurrentData={}; } catch(e) {}
+  try { bulkOutletsData={}; } catch(e) {}
+  try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
 }
 
 function _showLoginOverlayClean(){
