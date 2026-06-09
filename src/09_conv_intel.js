@@ -640,6 +640,15 @@ const CI = (() => {
   async function _onStop() {
     const blob = new Blob(_chunks, { type: _recorder?.mimeType || 'audio/webm' });
     _chunks = [];
+
+    // Guard: ถ้า audio เล็กเกินไปหรือ record น้อยกว่า 5 วินาที ยังไม่มีเสียงพอให้วิเคราะห์
+    if (blob.size < 8000 || _secs < 5) {
+      _phase = 'idle';
+      _unmount();
+      _toast('กรุณาบันทึกอย่างน้อย 5 วินาทีก่อนกด stop');
+      return;
+    }
+
     try {
       _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 20);
 
@@ -745,7 +754,10 @@ const CI = (() => {
     return `คุณคือ AI coach สำหรับ Freshket sales team
 ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร${acctSection}
 
-ทำ 3 อย่างในคำตอบเดียว:
+⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
+{"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "buyer_type": null, "buyer_evidence": null, "ocpb_covered": [], "ocpb_missing": [], "pain_points": [], "upsell_signals": [], "wallet_estimate": null, "wallet_logic": null, "next_actions": []}
+
+ถ้ามีเสียงคนพูด ทำ 3 อย่างในคำตอบเดียว:
 
 1. แยก speaker: ระบุชัดว่าส่วนไหนคือ Sales พูด ส่วนไหนคือลูกค้าพูด
 2. วิเคราะห์ skills ตาม rubric ด้านล่าง — ประเมินจากสิ่งที่ได้ยินจริง ทั้งคำพูดและน้ำเสียง
@@ -844,6 +856,7 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
 
     // Split combined response into skillData + intelData + new fields
     const skillData = {
+      no_speech:       parsed.no_speech || false,   // ← Gemini บอกว่าไม่มีเสียง
       skills:          parsed.skills || [],
       pipc_stage:      parsed.pipc_stage || null,
       pipc_reached:    parsed.pipc_reached || null,
@@ -974,6 +987,30 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
   // ── Render result panels ───────────────────────────────────────────────────
   function _renderResult() {
     const { skillData, intelData, transcriptSummary, toneSignals } = _lastResult;
+
+    // Guard: ถ้า Gemini บอกว่าไม่มีเสียง ให้แสดง error แทน
+    if (skillData?.no_speech) {
+      const noSpeechHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:16px">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          <div style="font-size:15px;font-weight:600;color:var(--tx,#1C1C1E)">ไม่พบเสียงการสนทนา</div>
+          <div style="font-size:13px;color:var(--tx2,#636366);line-height:1.6;max-width:260px">
+            Audio ที่ส่งไปไม่มีเสียงพูด หรือเสียงเบาเกินไป<br>กรุณาลองบันทึกใหม่ และตรวจสอบว่าไมโครโฟนทำงานได้
+          </div>
+        </div>`;
+      document.getElementById('ci-p0').innerHTML = noSpeechHTML;
+      document.getElementById('ci-p1').innerHTML = noSpeechHTML;
+      document.getElementById('ci-p2').innerHTML = noSpeechHTML;
+      document.getElementById('ci-p3').innerHTML = noSpeechHTML;
+      const tlDiv = document.getElementById('ci-tl-actions');
+      if (tlDiv) tlDiv.style.display = 'none';
+      return;
+    }
+
     document.getElementById('ci-p0').innerHTML = _skillsPanel(skillData);
     document.getElementById('ci-p1').innerHTML = _customerPanel(intelData);
     document.getElementById('ci-p2').innerHTML = _actionsPanel(intelData);
