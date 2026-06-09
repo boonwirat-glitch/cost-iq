@@ -1080,16 +1080,16 @@ async function skillsTLOpenEval(userId, skillId) {
   }).join('');
 
   scr.innerHTML = `
-<div class="sk-cg-topbar" style="position:relative;z-index:10;">
-  <button class="sk-back-btn" onclick="_skSetView('pending');_renderSkillsScreen()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
-    <span>รอประเมิน</span>
-  </button>
-  <div class="sk-tl-role-chip" style="font-size:9px;padding:2px 8px;">TL</div>
-</div>
-<div style="position:relative;width:100%;overflow:hidden;margin-top:-44px;">
+<div style="position:relative;width:100%;overflow:hidden;">
   ${_skImgTag(def, { cls:'sk-img-lazy', style:'width:100%;height:260px;object-fit:cover;object-position:center 30%;display:block;' })}
-  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.28) 0%,transparent 40%,rgba(0,0,0,.55) 100%);pointer-events:none;"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.42) 0%,transparent 45%,rgba(0,0,0,.58) 100%);pointer-events:none;"></div>
+  <div style="position:absolute;top:0;left:0;right:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;z-index:10;">
+    <button onclick="_skSetView('pending');_renderSkillsScreen()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.32);border:none;border-radius:999px;padding:6px 12px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+      <span style="font-size:12px;font-weight:600;color:#fff;">รอประเมิน</span>
+    </button>
+    <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(124,58,237,.45);border-radius:999px;padding:3px 9px;font-family:'Noto Sans Thai',sans-serif;backdrop-filter:blur(4px);">TL</div>
+  </div>
   <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 16px 18px;">
     <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);font-family:'IBM Plex Mono',monospace;">${modCode}</div>
     <div style="font-size:20px;font-weight:700;color:#fff;line-height:1.2;margin-top:2px;">${def.skill_name_en}</div>
