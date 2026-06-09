@@ -1,4 +1,4 @@
-<!-- Freshket Sense v466: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v467: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5420,7 +5420,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v466',
+      version: 'v467',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43887,11 +43887,31 @@ function _renderSkillsScreen() {
 
 // TL shell: render header + static tab bar once, swap only content zone
 function _renderTLShell(scr) {
-  const pendCount = Object.values(_skillProg).filter(p => p.state === 'training').length;
+  // render-time squad filter — portviewBulkData may not be ready at load time
+  const tlEmail   = (window.currentUserProfile?.email || '').toLowerCase();
+  const squadEmails = _getSquadEmails(tlEmail);
+
+  // Filter _skillProg to only show squad members
+  // If no squad info yet (bulk data not loaded), show all but mark as unfiltered
+  let _progFiltered;
+  if (squadEmails.length > 0) {
+    _progFiltered = Object.fromEntries(
+      Object.entries(_skillProg).filter(([, p]) =>
+        p.owner_email && squadEmails.includes(p.owner_email.toLowerCase())
+      )
+    );
+  } else {
+    _progFiltered = _skillProg;
+  }
+
+  const pendCount = Object.values(_progFiltered).filter(p => p.state === 'training').length;
   const heroColor = pendCount === 0 ? 'var(--sk-ok)' : 'var(--sk-ac)';
   const heroLabel = pendCount === 0 ? 'ALL CLEAR' : 'PENDING';
-  const repCount  = new Set(Object.values(_skillProg).map(p => p.user_id).filter(Boolean)).size;
+  const repCount  = new Set(Object.values(_progFiltered).map(p => p.user_id).filter(Boolean)).size;
   const squadName = (window.currentUserProfile && window.currentUserProfile.squad) || 'Squad';
+
+  // store filtered for content renderers
+  window._tlProgFiltered = _progFiltered;
 
   scr.innerHTML = `
 <div id="sk-tl-header" style="padding:14px 14px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;">
@@ -44378,7 +44398,8 @@ function _renderTLHome() {
 function _renderTLPending() { return _renderTLPendingContent(); }
 
 function _renderTLPendingContent() {
-  const pending = Object.values(_skillProg).filter(p => p.state === 'training');
+  const prog    = window._tlProgFiltered || _skillProg;
+  const pending = Object.values(prog).filter(p => p.state === 'training');
   pending.sort((a,b) => new Date(a.updated_at||0) - new Date(b.updated_at||0));
   const pendCount = pending.length;
 
@@ -44419,7 +44440,7 @@ function _renderTLPendingContent() {
     <div class="sk-pend-date">self-marked ${dateLabel}</div>
     ${echoStrip}
   </div>
-  <div class="sk-pend-right">
+  <div class="sk-pend-right" style="align-self:flex-start;min-width:72px;align-items:flex-end;">
     <div class="sk-state-pill-sm"><div class="sk-pill-dot-sm"></div>Training</div>
     <svg class="sk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
   </div>
@@ -44443,7 +44464,7 @@ function _renderTLPendingContent() {
 function _renderTLOverview() { return _renderTLOverviewContent(); }
 
 function _renderTLOverviewContent() {
-  const allProg  = Object.values(_skillProg);
+  const allProg  = Object.values(window._tlProgFiltered || _skillProg);
   const total    = allProg.length;
   const unlocked = allProg.filter(p => p.state==='unlocked'||p.state==='mastered').length;
   const pct      = total > 0 ? Math.round(unlocked/total*100) : 0;
@@ -44568,9 +44589,9 @@ async function skillsTLOpenEval(userId, skillId) {
   const modCode = def.skill_code.split('_')[0];
   const SK_BTN_ICONS = {
     locked:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
-    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="currentColor" d="M12 2c0 0-4 4-4 9a4 4 0 008 0c0-5-4-9-4-9z"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
-    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6l-8-4z"/><polyline points="9 12 11 14 15 10"/></svg>',
-    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>',
+    training: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+    unlocked: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    mastered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
   };
   const stateButtons = ['locked','training','unlocked','mastered'].map(s => {
     const isSelected = s === state;
@@ -44583,23 +44604,24 @@ async function skillsTLOpenEval(userId, skillId) {
   }).join('');
 
   scr.innerHTML = `
-<div class="sk-cg-topbar">
+<div class="sk-cg-topbar" style="position:relative;z-index:10;">
   <button class="sk-back-btn" onclick="_skSetView('pending');_renderSkillsScreen()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
     <span>รอประเมิน</span>
   </button>
-  <div class="sk-tl-role-chip">TL View</div>
+  <div class="sk-tl-role-chip" style="font-size:9px;padding:2px 8px;">TL</div>
 </div>
-<div class="sk-img-zone" style="height:150px;">${_skImgTag(def, { h:'150px', cls:'sk-img-zone-img' })}
-  <div class="sk-img-fade"></div>
+<div style="position:relative;width:100%;overflow:hidden;margin-top:-44px;">
+  ${_skImgTag(def, { cls:'sk-img-lazy', style:'width:100%;height:260px;object-fit:cover;object-position:center 30%;display:block;' })}
+  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.28) 0%,transparent 40%,rgba(0,0,0,.55) 100%);pointer-events:none;"></div>
+  <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 16px 18px;">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);font-family:'IBM Plex Mono',monospace;">${modCode}</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;line-height:1.2;margin-top:2px;">${def.skill_name_en}</div>
+    <div class="sk-state-pill pill-${state}" style="margin-top:8px;display:inline-flex;"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
+  </div>
 </div>
 <div class="sk-detail-body">
-  <div class="sk-state-pill-row">
-    <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-    <span class="sk-detail-code">${modCode}</span>
-  </div>
-  <div class="sk-skill-title">${def.skill_name_en}</div>
-  <div class="sk-rubric-block">
+  <div class="sk-rubric-block" style="margin-top:14px;">
     <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
     <div class="sk-rubric-text">${(def.pass_test_th||'').replace(/\//g,'<br>')}</div>
   </div>
@@ -44937,17 +44959,21 @@ function _buildEchoSparkSection(userId) {
   ).join('');
 
   return `
-<div style="margin-top:20px;padding:0 2px">
-  <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:8px">Echo Skill Trend — ${sessions.length} sessions ล่าสุด</div>
-  <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:56px">
+<div style="margin-top:16px;padding:0 14px;">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--sk-hairline,#EBEBEB);">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--sk-ac,#FF385C)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>
+    <span style="font-size:11px;font-weight:600;color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.01em;">Echo Skill Trend</span>
+    <span style="font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;">${sessions.length} sessions ล่าสุด</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:34px;">
     ${sessionLabels}
-    <span style="min-width:52px"></span>
+    <span style="min-width:52px;"></span>
   </div>
   ${sparkRows}
-  <div style="display:flex;gap:12px;margin-top:8px;padding-top:6px;border-top:0.5px solid #F2F2F7">
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#34C759;display:inline-block"></span>Pass</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#FF9500;display:inline-block"></span>Developing</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#AEAEB2"><span style="width:7px;height:7px;border-radius:50%;background:#E5E5EA;display:inline-block"></span>Not observed</span>
+  <div style="display:flex;gap:12px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--sk-hairline,#EBEBEB);">
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#34C759;display:inline-block"></span>Pass</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#FF9500;display:inline-block"></span>Developing</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#E5E5EA;display:inline-block"></span>Not observed</span>
   </div>
 </div>`;
 }
