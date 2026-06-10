@@ -54,6 +54,7 @@ function __legacyShowScreenFallback(name){
     // v207a: route into Sense should never inherit sheet scroll-lock; scroll the actual fixed container, not only window.
     document.body.style.overflow='';
     if(name==='opportunities'&&typeof renderOpps==='function')renderOpps();
+    if(name==='report'&&typeof renderReport==='function')renderReport();
     setTimeout(_injectKamSenseBackBtn,80);
     setTimeout(_initPlanTray,100);
     if(_grpB)try{_grpB.scrollTo({top:0,left:0,behavior:'instant'});}catch(e){_grpB.scrollTop=0;}
@@ -2065,6 +2066,120 @@ ${_languageContract}
     ldEl.querySelector('.mb').classList.remove('ld');
   }
   aiLoading=false;
+}
+
+// ── Share Report: html2canvas + jsPDF → navigator.share (iOS share sheet) ──
+var _shareLibsLoaded=false;
+var _shareLibsLoading=false;
+var _shareLibsCallbacks=[];
+
+function _loadShareLibs(cb){
+  if(_shareLibsLoaded){cb();return;}
+  _shareLibsCallbacks.push(cb);
+  if(_shareLibsLoading)return;
+  _shareLibsLoading=true;
+  var s1=document.createElement('script');
+  s1.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s1.onload=function(){
+    var s2=document.createElement('script');
+    s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s2.onload=function(){
+      _shareLibsLoaded=true;_shareLibsLoading=false;
+      _shareLibsCallbacks.forEach(function(f){try{f();}catch(e){}});
+      _shareLibsCallbacks=[];
+    };
+    s2.onerror=function(){_shareLibsLoading=false;_shareLibsCallbacks=[];console.error('[Share] jsPDF load failed');};
+    document.head.appendChild(s2);
+  };
+  s1.onerror=function(){_shareLibsLoading=false;_shareLibsCallbacks=[];console.error('[Share] html2canvas load failed');};
+  document.head.appendChild(s1);
+}
+
+function _setShareStatus(msg,isErr){
+  var el=document.getElementById('rpt2-share-status');
+  if(el){el.textContent=msg;el.style.color=isErr?'#e05555':'rgba(0,0,0,.4)';}
+}
+
+function _setShareBtnState(loading){
+  var btn=document.getElementById('rpt2-share-btn');
+  if(!btn)return;
+  if(loading){
+    btn.disabled=true;
+    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.22-8.56"/></svg>กำลังสร้างรายงาน...';
+  } else {
+    btn.disabled=false;
+    btn.innerHTML='<svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>แชร์รายงาน';
+  }
+}
+
+async function shareReport(){
+  _setShareBtnState(true);
+  _setShareStatus('กำลังโหลด...');
+  _loadShareLibs(async function(){
+    try{await _doShareReport();}catch(err){
+      console.error('[Share]',err);
+      _setShareStatus('เกิดข้อผิดพลาด — ลองใหม่อีกครั้ง',true);
+      _setShareBtnState(false);
+    }
+  });
+}
+
+async function _doShareReport(){
+  var doc=document.getElementById('rpt2-doc');
+  if(!doc){_setShareStatus('ไม่พบเนื้อหารายงาน',true);_setShareBtnState(false);return;}
+  _setShareStatus('กำลังสร้าง PDF...');
+  var origBg=doc.style.background;
+  doc.style.background='#fff';
+  var canvas=await window.html2canvas(doc,{
+    scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,
+    width:doc.scrollWidth,height:doc.scrollHeight,
+    windowWidth:doc.scrollWidth,windowHeight:doc.scrollHeight
+  });
+  doc.style.background=origBg;
+  var jsPDF=window.jspdf&&window.jspdf.jsPDF||window.jsPDF;
+  var pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+  var pdfW=pdf.internal.pageSize.getWidth();
+  var pdfH=pdf.internal.pageSize.getHeight();
+  var imgW=canvas.width;var imgH=canvas.height;
+  var ratio=pdfW/imgW;var scaledH=imgH*ratio;
+  var imgData=canvas.toDataURL('image/jpeg',0.92);
+  if(scaledH<=pdfH){
+    pdf.addImage(imgData,'JPEG',0,0,pdfW,scaledH);
+  } else {
+    var pageH=Math.floor(pdfH/ratio);var pages=Math.ceil(imgH/pageH);
+    var tmpCanvas=document.createElement('canvas');tmpCanvas.width=imgW;
+    var ctx2=tmpCanvas.getContext('2d');
+    for(var p=0;p<pages;p++){
+      var srcY=p*pageH;var srcH=Math.min(pageH,imgH-srcY);
+      tmpCanvas.height=srcH;ctx2.drawImage(canvas,0,srcY,imgW,srcH,0,0,imgW,srcH);
+      var sliceData=tmpCanvas.toDataURL('image/jpeg',0.92);
+      if(p>0)pdf.addPage();
+      pdf.addImage(sliceData,'JPEG',0,0,pdfW,srcH*ratio);
+    }
+  }
+  var acctName=typeof D!=='undefined'&&D.meta&&D.meta.accountName?D.meta.accountName:'ร้านอาหาร';
+  var dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'});
+  var fileName='Freshket_Sense_'+acctName.replace(/[^฀-๿a-zA-Z0-9]/g,'_').slice(0,30)+'_'+dateStr+'.pdf';
+  if(navigator.share&&navigator.canShare){
+    var pdfBlob=pdf.output('blob');
+    var pdfFile=new File([pdfBlob],fileName,{type:'application/pdf'});
+    if(navigator.canShare({files:[pdfFile]})){
+      _setShareStatus('');
+      try{
+        await navigator.share({files:[pdfFile],title:'Freshket Sense — Cost Report',text:'รายงานวิเคราะห์ต้นทุนวัตถุดิบโดย Freshket Sense'});
+        _setShareBtnState(false);return;
+      }catch(shareErr){
+        if(shareErr.name==='AbortError'){_setShareBtnState(false);_setShareStatus('');return;}
+        // Fall through to download
+      }
+    }
+  }
+  // Fallback: download
+  _setShareStatus('บันทึกแล้ว — เปิดจาก Files เพื่อแชร์ต่อ');
+  var blobUrl=URL.createObjectURL(pdf.output('blob'));
+  var a=document.createElement('a');a.href=blobUrl;a.download=fileName;a.click();
+  setTimeout(function(){URL.revokeObjectURL(blobUrl);},10000);
+  _setShareBtnState(false);
 }
 
 function shareLine(){

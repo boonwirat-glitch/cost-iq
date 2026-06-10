@@ -2953,9 +2953,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="rpt2-foot-sense"><svg fill="rgba(0,144,74,.5)" height="8" viewbox="0 0 10 10" width="8"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Freshket Sense</div>
 </div>
 </div>
-<div style="padding:14px 16px;display:flex;gap:8px">
-<button class="sbtn green" onclick="window.print()" style="flex:1"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="14"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 01-2-2V9a2 2 0 012-2h16a2 2 0 012 2v7a2 2 0 01-2 2h-2"></path><rect height="8" width="12" x="6" y="14"></rect></svg>พิมพ์ / Save PDF</button>
-<button class="sbtn line" onclick="shareLine()" style="flex:1">แชร์ LINE</button>
+<div id="rpt2-share-wrap" style="padding:14px 16px">
+<button id="rpt2-share-btn" class="sbtn green" onclick="shareReport()" style="width:100%;justify-content:center;gap:10px;font-size:14px;font-weight:700;padding:14px"><svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"></line></svg>แชร์รายงาน</button>
+<div id="rpt2-share-status" style="text-align:center;margin-top:8px;font-size:11px;color:rgba(0,0,0,.4);min-height:16px"></div>
 </div>
 </div>
 </div>

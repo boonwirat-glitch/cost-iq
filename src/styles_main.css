@@ -1713,6 +1713,11 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-foot{padding:6px 14px 10px;display:flex;align-items:center;justify-content:space-between;}
 .rpt2-foot-brand{font-size:7px;color:#ccc;font-family:'IBM Plex Mono',monospace;}
 .rpt2-foot-sense{font-size:7px;color:rgba(0,144,74,.5);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:3px;}
+/* Share button */
+#rpt2-share-wrap{background:#fff;}
+#rpt2-share-btn{display:flex;align-items:center;width:100%;justify-content:center;gap:10px;font-size:14px;font-weight:700;padding:14px;cursor:pointer;}
+#rpt2-share-btn:disabled{opacity:.65;cursor:not-allowed;}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media print{
   /* v495: comprehensive print CSS */
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
