@@ -1010,11 +1010,10 @@ function renderSingleCard(o){
     ?`<span style="color:var(--tk-ok-text);font-weight:700">✓ มั่นใจสูง</span>`
     :`<span style="color:var(--amb);font-weight:700">— ทดลองก่อน</span>`;
   const _qtyUnit=deriveQtyUnit(o.curSpec,o.priceBasis);
-  return`<div style="padding:12px 13px 8px;border-bottom:1px solid var(--n100)">
+  return`<div style="padding:8px 13px 10px;border-bottom:1px solid var(--n100)">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:700;line-height:1.3">${o.curName}</div>
-        <div style="font-size:12px;color:var(--n500);font-weight:500;margin-top:1px">${o.curSpec}</div>
+        <div style="font-size:12px;color:var(--n500);font-weight:500">${o.curSpec}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
