@@ -1019,8 +1019,6 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .opplist-muted .pb-cat-group:first-child,.opplist-muted .pb-cat-group:nth-child(2){opacity:.38;filter:blur(.3px)}
 .opplist-unmuting .pb-cat-group{transition:opacity .35s,filter .35s}
 /* ── Plan selector: pulse on first land ── */
-.plan-selector.plan-pulse{animation:plan-sel-pulse 1.8s ease-in-out 3}
-@keyframes plan-sel-pulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 6px var(--tk-ok-border),0 0 20px var(--tk-ok-dim-2)}}
 /* Hint below plan selector before user picks */
 #opplist-pick-hint{font-size:12px;font-weight:600;color:var(--n700);text-align:center;padding:8px 0 12px;font-family:var(--tk-font-body);animation:srh-bridge-in .35s ease both}
 /* Compact score header in opportunities (post-gate) */
@@ -1158,17 +1156,18 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .plan-tab{flex:1;border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px dashed rgba(0,160,80,.28);background:#fff;font-family:var(--tk-font-body);transition:border-color .2s,background .2s}
 .plan-tab.active{border:2px solid #00cc6a;background:#fff}
 .plan-tab:not(.active):hover{border-color:rgba(0,160,80,.5);background:#fff}
-.plan-tab-label{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--n700);margin-bottom:2px}
-.plan-tab.active .plan-tab-label{color:var(--n900)}
-.plan-tab-count{font-size:10px;color:var(--n500);font-family:'IBM Plex Mono',monospace}
-.plan-tab.active .plan-tab-count{color:#00cc6a}
+.plan-tab-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}
+.plan-tab-title{font-size:12px;font-weight:600;color:var(--n700);display:flex;align-items:center;gap:4px;min-width:0}
+.plan-tab-title.sense{color:var(--tk-ok-bright)}
+.plan-tab.active .plan-tab-title{color:var(--n900)}
+.plan-tab.active .plan-tab-title.sense{color:var(--tk-ok-bright)}
+.plan-tab-val{font-size:12px;font-weight:700;color:var(--n400);font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0}
+.plan-tab-val.on{color:#00cc6a}
+.plan-tab-val.sense{color:var(--tk-ok-bright)}
+.plan-tab-sub{font-size:10px;color:var(--n400);font-family:'IBM Plex Mono',monospace}
 /* Sense tab — preserves full identity (dark bg + glow) */
 .plan-tab.sense-tab{background:#fff;border-color:rgba(0,160,80,.35)}
 .plan-tab.sense-tab.active{border-color:var(--tk-ok-border);box-shadow:0 0 14px var(--tk-ok-dim)}
-.plan-tab.sense-tab .plan-tab-label{color:var(--tk-ok-bright)}
-.plan-tab.sense-tab.active .plan-tab-label{color:var(--tk-ok-bright)}
-.plan-tab.sense-tab .plan-tab-count{color:var(--tk-ok-border)}
-.plan-tab.sense-tab.active .plan-tab-count{color:var(--tk-ok-bright)}
 /* Scan shimmer on sense tab pre-verify */
 .plan-tab.sense-tab.cta-mode{position:relative;overflow:hidden}
 .plan-tab.sense-tab.cta-mode::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--tk-ok-dim),transparent);transform:translateX(-100%);animation:pvs-scan 3s ease-in-out infinite;pointer-events:none}
@@ -1348,7 +1347,6 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .oalt-rec{display:inline-flex;align-items:center;gap:2px;background:var(--g50);color:var(--g800);border-radius:10px;padding:2px 6px;font-size:9px;font-weight:700;margin-left:5px;white-space:nowrap;flex-shrink:0}
 
 /* ── TABLE VIEW ── */
-.opp-filter-info{font-size:13px;color:var(--n800);margin-bottom:10px;font-weight:600}
 /* ── VERIFY BANNER ── */
 .verify-banner{display:flex;align-items:center;gap:12px;background:var(--g50);border:1.5px solid var(--tk-ok-border);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;cursor:pointer;transition:all .2s}
 .verify-banner:hover{border-color:var(--g500);background:var(--tk-ok-dim)}
