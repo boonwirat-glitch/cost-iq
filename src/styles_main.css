@@ -2198,10 +2198,16 @@ body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
 body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transition:opacity .18s,filter .18s;}
 body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.9)) drop-shadow(0 0 18px rgba(255,255,255,.3));}
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
-/* v488: override #nav-opportunities ID specificity so Save icon inherits white in glass pill */
-body.kam-mode .bnav #nav-opportunities svg{color:rgba(255,255,255,.55)!important}
-body.kam-mode .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1}
-/* v490-B3: sdt-light Save mode — restore dark/green icon (white override is wrong in light theme) */
+/* v492: Save icon — green pulse in regular KAM pill, white when active (.on), dark in sdt-light Save mode */
+/* Regular KAM dark pill: green star draws attention to the feature */
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities svg{color:var(--g500)!important;opacity:.9}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities .lb{color:var(--g500)!important;font-weight:700!important}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1!important}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities.on .lb{color:#fff!important}
+/* kam-sense-active (Save mode) dark: inherit white from glass pill rules */
+body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities svg{color:rgba(255,255,255,.55)!important}
+body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1}
+/* sdt-light Save mode: dark icon idle, green when active */
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities svg{color:rgba(0,0,0,.38)!important}
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities.on svg{color:var(--g500)!important;opacity:1!important}
 /* v490-B4: hide Echo from Save mode 3-col nav (4 items → 3 columns caused overflow) */
@@ -3788,6 +3794,8 @@ body.kam-mode #nav-restaurant{position:relative;}
 body.kam-mode #nav-restaurant .nwrap{position:relative;border-radius:16px;padding:8px 13px!important;background:linear-gradient(135deg,var(--tk-accent-dim-3),rgba(13,31,60,.72));box-shadow:0 0 0 1px rgba(140,200,255,.22) inset,0 0 18px rgba(80,150,255,.12);transition:transform .18s ease,box-shadow .25s ease,background .25s ease;}
 body.kam-mode #nav-restaurant .nwrap:before{content:'';position:absolute;inset:-5px;border-radius:20px;background:radial-gradient(circle,rgba(140,200,255,.20),transparent 68%);opacity:.65;pointer-events:none;animation:v213-drill-halo 3.4s ease-in-out infinite;}
 body.kam-mode #nav-restaurant .lb{font-weight:850;color:rgba(225,238,255,.88)!important;}
+/* v492: in sdt-light Save mode, nav-restaurant label must be dark (light-bg context) */
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-restaurant .lb{color:rgba(0,0,0,.52)!important;font-weight:600!important;}
 body.kam-mode #nav-restaurant.v213-coach-pulse .nwrap{animation:v213-drill-pulse 1.6s ease 1 both;}
 body.kam-mode.restaurant-sheet #nav-restaurant .nwrap{background:linear-gradient(135deg,var(--tk-ok-border),var(--tk-accent-dim-3));box-shadow:0 0 0 1px var(--tk-ok-border) inset,0 0 22px var(--tk-ok-dim-2);}
 @keyframes v213-drill-halo{0%,100%{opacity:.42;transform:scale(.98)}50%{opacity:.82;transform:scale(1.05)}}
