@@ -1940,24 +1940,36 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
+/* v498: AD mode uses same dark KAM theme */
+body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
-body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
+body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+body.kad-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:#fff}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
+body.kad-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
 body.kam-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
 /* Active tab: white icon/label + blue pill background — override global green */
 body.kam-mode .bnav .ni.on{color:#fff}
 body.kam-mode .bnav .ni.on svg{color:#fff}
 body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700}
 body.kam-mode .bnav .ni.on .nwrap{background:var(--tk-accent-dim-3);border-radius:12px}
+body.kad-mode .bnav .ni.on{color:#fff}
+body.kad-mode .bnav .ni.on svg{color:#fff}
+body.kad-mode .bnav .ni.on .lb{color:#fff;font-weight:700}
+body.kad-mode .bnav .ni.on .nwrap{background:var(--tk-accent-dim-3);border-radius:12px}
 /* Active dot: light blue instead of green */
 
 /* Gear icon loaded state: blue tint in KAM mode (not green) */
 body.kam-mode .data-btn.loaded{background:var(--tk-accent-dim-3)}
 body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
+body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ══ KAM SUB-TABS (สรุป / Pace & Churn) ══ */
 .kam-subtabs{display:flex;background:rgba(255,255,255,.07);border-radius:10px;padding:3px;gap:2px;margin-bottom:14px}
@@ -2252,6 +2264,7 @@ body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 .bnav{grid-template-columns:repeat(5,1fr)}
 .bnav .lb{font-size:10px}
 body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
+body.kad-mode .bnav{grid-template-columns:repeat(3,1fr)}
 /* Echo hidden from KAM — Sales only */
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
 body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
@@ -2271,6 +2284,12 @@ body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
 /* In KAM mode: hide restaurant tabs, show KAM tabs */
 body.kam-mode .bnav .ni.rest-only { display: none !important; }
 body.kam-mode .bnav .ni.kam-only  { display: flex !important; }
+/* v498: AD mode mirrors KAM nav visibility */
+body.kad-mode .bnav .ni.rest-only { display: none !important; }
+body.kad-mode .bnav .ni.kam-only  { display: flex !important; }
+body.kad-mode .bnav .ni.sales-only    { display: none !important; }
+body.kad-mode .bnav .ni.sales-tl-only { display: none !important; }
+body.kad-mode .bnav .ni.tl-only       { display: none !important; }
 /* In restaurant mode: hide KAM tabs */
 body:not(.kam-mode) .bnav .ni.kam-only { display: none !important; }
 /* Default: kam-only hidden */
@@ -4934,6 +4953,8 @@ body.sales-mode .bnav #nav-teamview     { display: none !important; }
 /* Skills + Echo tab: sales only — hidden in KAM mode */
 .bnav .ni.sales-any-btn                    { display: none !important; }
 body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
+/* v498: AD also gets Skills nav */
+body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
 /* Echo for Sales — show + center position */
 body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
 body.sales-mode .bnav #nav-sales-portview  { order: 1; }
