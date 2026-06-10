@@ -1737,9 +1737,10 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .svt-btn#svt-price.on{background:linear-gradient(135deg,#1a4a3a,#006040);color:#00f088;box-shadow:0 0 8px var(--tk-ok-border),0 1px 3px rgba(0,0,0,.15)}
 
 /* ── SKU DETAIL SHEET ── */
-.sku-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
+/* v490-B7: bumped z-index above rest-sheet-body (210) so price-trend sheet appears in front */
+.sku-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s}
 .sku-detail-overlay.on{opacity:1;pointer-events:all}
-.sku-detail-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:var(--n0);border-radius:20px 20px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.16);z-index:201;transition:transform .35s cubic-bezier(.34,1.4,.64,1);max-height:84vh;overflow-y:auto}
+.sku-detail-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:var(--n0);border-radius:20px 20px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.16);z-index:301;transition:transform .35s cubic-bezier(.34,1.4,.64,1);max-height:84vh;overflow-y:auto}
 .sku-detail-sheet.open{transform:translateX(-50%) translateY(0)}
 .sku-detail-head{padding:16px 16px 12px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--n100);gap:10px}
 .sku-detail-title{font-size:13px;font-weight:700;color:var(--n900);flex:1;min-width:0;line-height:1.45}
@@ -2200,6 +2201,11 @@ body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ea
 /* v488: override #nav-opportunities ID specificity so Save icon inherits white in glass pill */
 body.kam-mode .bnav #nav-opportunities svg{color:rgba(255,255,255,.55)!important}
 body.kam-mode .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1}
+/* v490-B3: sdt-light Save mode — restore dark/green icon (white override is wrong in light theme) */
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities svg{color:rgba(0,0,0,.38)!important}
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities.on svg{color:var(--g500)!important;opacity:1!important}
+/* v490-B4: hide Echo from Save mode 3-col nav (4 items → 3 columns caused overflow) */
+body.kam-sense-active.kam-mode .bnav #nav-echo-kam{display:none!important}
 /* v488: echo-pill shrinks correctly inside flex glass pill */
 body.kam-mode .bnav .echo-pill{flex-shrink:1!important;width:auto!important;min-width:0}
 /* ── Echo nav pill — idle + active states ── */

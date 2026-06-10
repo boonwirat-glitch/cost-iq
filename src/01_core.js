@@ -700,6 +700,11 @@ function hideLoginOverlay() {
       ov.classList.remove('lgi-checking');
     }
 
+    // v490-B1: fallback path must also call _splashPreFade so correct role screen
+    // is applied before _autoRouteAfterLogin. Without this, body stays on white default
+    // background for ~1s (KAM white flash) because kam-mode CSS isn't confirmed yet.
+    try { if (typeof window._splashPreFade === 'function') { window._splashPreFade(); window._splashPreFade = null; } } catch(e) {}
+
     _autoRouteAfterLogin();
 
     setTimeout(() => {

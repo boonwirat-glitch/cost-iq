@@ -360,7 +360,10 @@ function openRestaurantSheet() {
   window._restFromKamSense = document.body.classList.contains('kam-sense-active');
   window._restSenseActivated = senseActivated; // save BEFORE renderOverview() resets it (L8366)
   if (window._restFromKamSense) {
+    // v490-B5: save tray open state before removing sense classes
+    window._restPlanTrayOpen = _planTrayOpen;
     document.body.classList.remove('kam-sense-active', 'sense-plan-expanded', 'sense-plan-active');
+    _planTrayOpen = false; // sync JS state with removed CSS class
   }
 
   window._preSheetScreen = document.querySelector('.scr.on')?.id || 'scr-overview';
@@ -457,6 +460,11 @@ function closeRestaurantSheet() {
       window._restFromKamSense = false;
       window._restSenseActivated = undefined;
       showScreen('opportunities'); // senseActivated=true → L16439 won't open gate
+      // v490-B5: restore tray open state after sense mode re-activated
+      if (window._restPlanTrayOpen) {
+        setTimeout(() => { if (typeof _openPlanTray === 'function') _openPlanTray(); }, 150);
+      }
+      window._restPlanTrayOpen = undefined;
     } else {
       const target = window._preSheetScreen || 'scr-overview';
       const screenName = target.replace('scr-', '');
