@@ -319,34 +319,65 @@
 .state-unlocked { border-bottom-color: var(--sk-ok); }
 
 /* ── MASTERED — Ragnarok glow ── */
-.state-mastered {
-  border-bottom: 3px solid var(--sk-warn);
-  background: #1A1200;
-  box-shadow:
-    0 0 0 1.5px rgba(255,149,0,.6),
-    0 0 10px rgba(255,149,0,.4),
-    0 0 24px rgba(255,149,0,.22),
-    0 0 48px rgba(255,149,0,.1);
+/* ── MASTERED — Ragnarok glow (portrait card, same layout) ── */
+@keyframes sk-aura-pulse {
+  0%,100% {
+    box-shadow:
+      0 0 0 1.5px rgba(255,185,0,.7),
+      0 0 12px rgba(255,149,0,.5),
+      0 0 28px rgba(255,120,0,.28),
+      0 0 55px rgba(255,100,0,.14);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(255,220,60,.95),
+      0 0 20px rgba(255,185,0,.68),
+      0 0 44px rgba(255,140,0,.38),
+      0 0 78px rgba(255,100,0,.2);
+  }
 }
-/* gold beam — top edge */
+@keyframes sk-beam-pulse {
+  0%,100% { opacity: .65; transform: scaleX(1); }
+  50%      { opacity: 1;   transform: scaleX(1.03); }
+}
+@keyframes sk-flame-flicker {
+  0%,100% { opacity: .25; }
+  33%      { opacity: .42; }
+  66%      { opacity: .18; }
+}
+.state-mastered {
+  border-bottom: 3px solid #FFD700;
+  background: #140E00;
+  animation: sk-aura-pulse 2.4s ease-in-out infinite;
+}
+/* gold beam — top edge, breathing */
 .state-mastered .sk-card-img::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  z-index: 2;
-  background: linear-gradient(90deg, transparent 5%, rgba(255,210,60,.95) 50%, transparent 95%);
+  height: 3px;
+  z-index: 3;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,230,60,.15) 15%,
+    rgba(255,215,30,1)   50%,
+    rgba(255,230,60,.15) 85%,
+    transparent 100%);
+  animation: sk-beam-pulse 2.4s ease-in-out infinite;
 }
-/* ambient glow — bottom of image */
+/* inner flame — center aura on image */
 .state-mastered .sk-card-img::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
-  background: radial-gradient(ellipse at 50% 90%, rgba(255,140,0,.3) 0%, transparent 65%);
+  z-index: 2;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(255,170,0,.65) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 55%,  rgba(255,210,0,.2)  0%, transparent 65%);
+  animation: sk-flame-flicker 1.8s ease-in-out infinite;
 }
-.state-mastered .sk-card-body { background: #1A1200; }
+.state-mastered .sk-card-body { background: #140E00; }
 .state-mastered .sk-card-name { color: #FFD966; }
 .state-mastered .sk-card-code { display: none; }
 
