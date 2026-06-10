@@ -1,4 +1,4 @@
-<!-- Freshket Sense v494: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v495: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1465,26 +1465,34 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
   100%{transform:scale(1.55);opacity:0;  border-width:.5px}
 }
 /* ── Sense Gate: tap hint pill ── */
+/* v495: tap-hint — upward chevron + plain text, no pill border */
 #sg-tap-hint{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:12px;font-weight:700;letter-spacing:.4px;
-  color:rgba(0,204,106,.95);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:600;letter-spacing:.3px;
+  color:rgba(0,204,106,.72);
   font-family:var(--tk-font-body);
-  text-align:center;margin-top:18px;
-  padding:8px 20px;
-  border:1.5px solid rgba(0,204,106,.45);
-  border-radius:999px;
-  background:rgba(0,204,106,.08);
-  animation:sg-pill-breathe 2.4s ease-in-out infinite;
-  transition:opacity .3s;cursor:pointer;
+  text-align:center;margin-top:20px;
+  padding:0;border:none;background:transparent;border-radius:0;
+  animation:sg-hint-breathe 2.2s ease-in-out infinite;
+  transition:opacity .3s;cursor:default;pointer-events:none;
 }
-#sg-tap-hint::after{content:'→';font-size:13px;opacity:.8;transition:transform .2s}
-#sg-tap-hint:active::after{transform:translateX(3px)}
-@keyframes sg-pill-breathe{
-  0%,100%{opacity:.75;box-shadow:0 0 0 0 rgba(0,204,106,0)}
-  50%    {opacity:1;  box-shadow:0 0 0 6px rgba(0,204,106,.1)}
+#sg-tap-hint::before{
+  content:'';
+  display:block;
+  width:0;height:0;
+  border-left:7px solid transparent;
+  border-right:7px solid transparent;
+  border-bottom:9px solid rgba(0,204,106,.55);
+  animation:sg-arrow-bob 1.8s ease-in-out infinite;
+}
+@keyframes sg-hint-breathe{
+  0%,100%{opacity:.55} 50%{opacity:.95}
+}
+@keyframes sg-arrow-bob{
+  0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)}
 }
 #sg-tap-hint.hidden{opacity:0;pointer-events:none;animation:none}
+#sg-tap-hint.hidden::before{animation:none}
 /* ── Sense Gate: data context — between ring and text area ── */
 #sg-ring-data{font-size:13px;font-weight:600;color:rgba(160,255,200,.9);font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;text-align:center;margin-bottom:10px;min-height:14px;transition:opacity .3s;pointer-events:none}
 /* ── Sense Gate: single-line thinking ticker ── */
@@ -2158,9 +2166,14 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-foot-brand{font-size:7px;color:#ccc;font-family:'IBM Plex Mono',monospace;}
 .rpt2-foot-sense{font-size:7px;color:rgba(0,144,74,.5);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:3px;}
 @media print{
-  /* v494: comprehensive print CSS — hide all mobile chrome, force A4 white layout */
+  /* v495: comprehensive print CSS */
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  .topbar,.bnav,.aifab,.aipanel,.overlay,.sbtn,.data-panel,.data-overlay,
+  /* Hide all mobile chrome — explicit specificity beats kam-mode overrides */
+  .topbar,.bnav,
+  body.kam-mode .bnav,body.kam-sense-active.kam-mode .bnav,
+  body.sdt-light.kam-sense-active.kam-mode .bnav,
+  body.kam-sense-active.sense-plan-expanded.kam-mode .bnav,
+  .aifab,.aipanel,.overlay,.sbtn,.data-panel,.data-overlay,
   .pb-footer,.quick-wins-sec,.dp-handle,.score-tooltip,
   .sku-detail-overlay,.sku-detail-sheet,.detail-sheet,
   #sense-gate,#sense-splash,#data-load-pill,
@@ -2173,14 +2186,28 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
   .rest-backdrop,#rest-backdrop,
   .kambar,#kambar,
   #scr-report .rpt-wrap>div:last-child{display:none!important}
-  html,body{max-width:100%!important;margin:0!important;padding:0!important;background:#fff!important;font-size:9px!important;}
-  body.kam-mode,body.kam-sense-active,body.sdt-light{background:#fff!important;}
+  /* Layout reset */
+  html,body{max-width:none!important;width:auto!important;margin:0!important;padding:0!important;background:#fff!important;font-size:9px!important;}
+  body,body.kam-mode,body.kam-sense-active,body.sdt-light,body.sdt-light.kam-sense-active{background:#fff!important;}
+  /* Break swipe container out of fixed positioning */
+  #swipe-grp-a,#swipe-grp-b,
+  body.kam-sense-active #swipe-grp-b{
+    position:static!important;width:auto!important;max-width:none!important;
+    left:auto!important;top:auto!important;bottom:auto!important;
+    transform:none!important;overflow:visible!important;
+    height:auto!important;min-height:0!important;
+    background:#fff!important;z-index:auto!important;
+  }
+  /* Show only report screen */
   .scr{display:none!important}
-  #scr-report{display:block!important;padding:0!important;background:#fff!important;}
-  .rpt-wrap{padding:0!important;background:#fff!important;}
-  .rpt2{max-width:100%!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;}
+  body.kam-sense-active #swipe-grp-b .scr,
+  body.kam-sense-active #swipe-grp-b .scr.on{display:none!important}
+  #scr-report{display:block!important;position:static!important;padding:0!important;background:#fff!important;width:auto!important;max-width:none!important;}
+  .rpt-wrap{padding:0!important;background:#fff!important;width:auto!important;}
+  .rpt2{width:100%!important;max-width:none!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;}
   .rpt2-head{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;border-radius:0!important;}
-  .rpt2-table-wrap{overflow:visible!important;}
+  .rpt2-table-wrap{overflow:visible!important;width:100%!important;}
+  .rpt2-table{width:100%!important;}
   .rpt2-table td,.rpt2-table th{padding:4px 6px!important;}
   .rpt2-sku-name{white-space:normal!important;}
   .rpt2-sku-meta{white-space:normal!important;}
@@ -5497,7 +5524,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v494',
+      version: 'v495',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6417,7 +6444,14 @@ body.sales-mode .bnav {
   function renderRows(model){
     var c = model.context;
     if(!model.selectedItems.length){
-      return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      var oppsLen = arr(model.context.OPPS).length;
+      var selSize = (model.context.sel && typeof model.context.sel.size === 'number') ? model.context.sel.size : 0;
+      var msg = oppsLen === 0
+        ? 'กำลังสแกนราคาวัตถุดิบ — กลับมาอีกครั้งหลังสแกนเสร็จ'
+        : selSize === 0
+          ? 'ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก'
+          : 'ไม่พบรายการที่เลือก — ลองกดรีเฟรช';
+      return '<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:12px">'+msg+'</td></tr>';
     }
     var rowNum = 0;
     return model.groups.map(function(g){
@@ -6479,7 +6513,7 @@ body.sales-mode .bnav {
   }
 
   function validate(){
-    const requiredIds = ['rpt2-acct','rpt2-date','rpt2-kam','rpt2-sum-label','rpt2-sum-mo','rpt2-sum-yr','rpt2-tbody','rpt2-tfoot','rpt2-note'];
+    const requiredIds = ['rpt2-acct','rpt2-date','rpt2-kam','rpt2-kpi-spend','rpt2-kpi-save-mo','rpt2-tbody','rpt2-tfoot','rpt2-note'];
     const ids = requiredIds.map(function(id){ return { id:id, exists:!!el(id) }; });
     return { ok: ids.every(function(x){ return x.exists; }), ids: ids, behaviorChanged: BEHAVIOR_CHANGED };
   }
@@ -17925,7 +17959,10 @@ function __legacyRenderReportFallback(){
   const tbody=document.getElementById('rpt2-tbody');
   if(tbody){
     if(!selItems.length){
-      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      const _oppsLen=(typeof OPPS!=='undefined'?OPPS.length:0);
+      const _selSz=(typeof sel!=='undefined'&&sel&&typeof sel.size==='number'?sel.size:0);
+      const _msg=_oppsLen===0?'กำลังสแกนราคาวัตถุดิบ — กลับมาอีกครั้งหลังสแกนเสร็จ':_selSz===0?'ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก':'ไม่พบรายการที่เลือก — ลองกดรีเฟรช';
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:12px">'+_msg+'</td></tr>';
     } else {
       const catMap={};const catOrder=[];
       selItems.forEach(o=>{const cat=o.cat||'อื่นๆ';if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}catMap[cat].push(o);});

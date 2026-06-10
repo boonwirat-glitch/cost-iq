@@ -1180,7 +1180,10 @@ function __legacyRenderReportFallback(){
   const tbody=document.getElementById('rpt2-tbody');
   if(tbody){
     if(!selItems.length){
-      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      const _oppsLen=(typeof OPPS!=='undefined'?OPPS.length:0);
+      const _selSz=(typeof sel!=='undefined'&&sel&&typeof sel.size==='number'?sel.size:0);
+      const _msg=_oppsLen===0?'กำลังสแกนราคาวัตถุดิบ — กลับมาอีกครั้งหลังสแกนเสร็จ':_selSz===0?'ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก':'ไม่พบรายการที่เลือก — ลองกดรีเฟรช';
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:12px">'+_msg+'</td></tr>';
     } else {
       const catMap={};const catOrder=[];
       selItems.forEach(o=>{const cat=o.cat||'อื่นๆ';if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}catMap[cat].push(o);});

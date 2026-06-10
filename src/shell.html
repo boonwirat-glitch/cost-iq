@@ -1228,7 +1228,14 @@
   function renderRows(model){
     var c = model.context;
     if(!model.selectedItems.length){
-      return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      var oppsLen = arr(model.context.OPPS).length;
+      var selSize = (model.context.sel && typeof model.context.sel.size === 'number') ? model.context.sel.size : 0;
+      var msg = oppsLen === 0
+        ? 'กำลังสแกนราคาวัตถุดิบ — กลับมาอีกครั้งหลังสแกนเสร็จ'
+        : selSize === 0
+          ? 'ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก'
+          : 'ไม่พบรายการที่เลือก — ลองกดรีเฟรช';
+      return '<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:12px">'+msg+'</td></tr>';
     }
     var rowNum = 0;
     return model.groups.map(function(g){
@@ -1290,7 +1297,7 @@
   }
 
   function validate(){
-    const requiredIds = ['rpt2-acct','rpt2-date','rpt2-kam','rpt2-sum-label','rpt2-sum-mo','rpt2-sum-yr','rpt2-tbody','rpt2-tfoot','rpt2-note'];
+    const requiredIds = ['rpt2-acct','rpt2-date','rpt2-kam','rpt2-kpi-spend','rpt2-kpi-save-mo','rpt2-tbody','rpt2-tfoot','rpt2-note'];
     const ids = requiredIds.map(function(id){ return { id:id, exists:!!el(id) }; });
     return { ok: ids.every(function(x){ return x.exists; }), ids: ids, behaviorChanged: BEHAVIOR_CHANGED };
   }
