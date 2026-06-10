@@ -2378,7 +2378,9 @@ function detectDisplayMode(subclass,packSize){
   // Liquid subclasses
   if(/MINERAL.WATER|DRINKING.WATER|STILL.WATER|SPARKLING|COLA|SODA|SYRUP|JUICE|MIXER|BEER|WINE|SPIRIT|LIQUOR|COCKTAIL|COFFEE.DRINK|ENERGY.DRINK|TEA.DRINK/.test(sub)) return 'per_liter';
   // Liquid by pack_size pattern (e.g. "12 x 500 ml./pack", "6 x 1.5 litres/pack")
-  if(/\d+\s*x\s*[\d.]+\s*(ml|liter|litre|l\.)/i.test(ps)||/[\d.]+\s*(ml|liter|litre)\s*[/.]\b/i.test(ps)) return 'per_liter';
+  // Liquid by pack_size: "830 ml./bottle", "18 litre./tank", "12 x 500 ml./pack" etc.
+  // v_fix3: unified regex — previous missed "ml./X" due to \b after [/.]
+  if(/(?:\d+\s*x\s*)?[\d.]+\s*(ml|liter|litre|l)[\s./]/i.test(ps)) return 'per_liter';
   return 'per_kg';
 }
 
