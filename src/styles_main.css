@@ -1053,7 +1053,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .svb-sub{font-size:10px;color:rgba(255,255,255,.45);line-height:1.4;}
 .svb-arrow{font-size:13px;color:var(--tk-ok-border);font-weight:700;flex-shrink:0;}
 /* ── SENSE SCORE BAR ── */
-.sense-score-bar{display:flex;align-items:center;gap:14px;border-radius:var(--r);border:1.5px solid var(--tk-ok-border);background:var(--n0);padding:14px 16px;margin-bottom:12px;position:relative;animation:ssb-border-glow 3.4s ease-in-out infinite;}
+.sense-score-bar{display:flex;align-items:center;gap:14px;padding:14px 0 14px 0;margin-bottom:8px;position:relative;}
 @keyframes ssb-border-glow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}55%{box-shadow:0 0 0 2px var(--tk-ok-dim),0 0 16px var(--tk-ok-dim);}}
 .ssb-ring-wrap{position:relative;flex-shrink:0;width:90px;height:90px;display:flex;align-items:center;justify-content:center;}
 .ssb-glow-ring{position:absolute;inset:-2px;border-radius:50%;pointer-events:none;animation:ssb-ring-glow 2.8s ease-in-out infinite;}
@@ -1118,9 +1118,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ── PLAN BUILDER ── */
 /* ── PLAN SELECTOR ── */
-.plan-selector{background:linear-gradient(135deg,var(--tk-bg-base),var(--tk-bg-surface));border-radius:var(--r);padding:10px 11px;margin-bottom:10px;border:1px solid var(--tk-ok-dim-2)}
+.plan-selector{padding:0 0 10px 0;margin-bottom:4px;}
 .plan-sel-header{margin-bottom:8px}
-.plan-sel-title{font-size:12px;font-weight:700;color:#fff;margin-bottom:1px}
+.plan-sel-title{font-size:12px;font-weight:700;color:var(--n700);margin-bottom:6px}
 .plan-sel-sub{font-size:9px;color:rgba(255,255,255,.88);margin-top:2px}
 .plan-toggle-row{display:flex;gap:6px}
 .plan-card{border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .22s cubic-bezier(.4,0,.2,1);border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05)}
@@ -1155,15 +1155,15 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ── PLAN TABS (replaces accordion cards) ── */
 .plan-tabs{display:flex;gap:4px;margin-bottom:8px}
-.plan-tab{flex:1;border-radius:9px;padding:9px 10px;cursor:pointer;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);font-family:var(--tk-font-body);transition:all .22s cubic-bezier(.4,0,.2,1)}
-.plan-tab.active{border-color:var(--tk-ok-border);background:var(--tk-ok-dim)}
-.plan-tab:not(.active):hover{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.07)}
-.plan-tab-label{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:rgba(255,255,255,.78);margin-bottom:2px}
-.plan-tab.active .plan-tab-label{color:#fff}
-.plan-tab-count{font-size:10px;color:rgba(255,255,255,.58);font-family:'IBM Plex Mono',monospace}
-.plan-tab.active .plan-tab-count{color:rgba(255,255,255,.75)}
+.plan-tab{flex:1;border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px dashed rgba(0,160,80,.28);background:#fff;font-family:var(--tk-font-body);transition:border-color .2s,background .2s}
+.plan-tab.active{border:2px solid #00cc6a;background:#fff}
+.plan-tab:not(.active):hover{border-color:rgba(0,160,80,.5);background:#fff}
+.plan-tab-label{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--n700);margin-bottom:2px}
+.plan-tab.active .plan-tab-label{color:var(--n900)}
+.plan-tab-count{font-size:10px;color:var(--n500);font-family:'IBM Plex Mono',monospace}
+.plan-tab.active .plan-tab-count{color:#00cc6a}
 /* Sense tab — preserves full identity (dark bg + glow) */
-.plan-tab.sense-tab{background:#0a1f14;border-color:var(--tk-ok-border);animation:pvc-border-glow 3.2s ease-in-out infinite}
+.plan-tab.sense-tab{background:#fff;border-color:rgba(0,160,80,.35)}
 .plan-tab.sense-tab.active{border-color:var(--tk-ok-border);box-shadow:0 0 14px var(--tk-ok-dim)}
 .plan-tab.sense-tab .plan-tab-label{color:var(--tk-ok-bright)}
 .plan-tab.sense-tab.active .plan-tab-label{color:var(--tk-ok-bright)}
@@ -2635,7 +2635,7 @@ body.sdt-light.kam-sense-active .iq-badge svg{stroke:none!important}
 body.sdt-light.kam-sense-active .topbar button:not(.data-btn):not(.mbtn){background:rgba(0,0,0,.06)!important}
 body.sdt-light.kam-sense-active .mode-toggle{background:rgba(0,0,0,.08)!important}
 body.sdt-light.kam-sense-active .mbtn{color:rgba(0,0,0,.5)!important}
-body.sdt-light.kam-sense-active .sense-score-bar{background:var(--n0);border-color:var(--tk-ok-border)}
+body.sdt-light.kam-sense-active .sense-score-bar{background:transparent;}
 body.sdt-light.kam-sense-active .pill.on{background:var(--g900);border-color:var(--g900);color:#fff}
 body.sdt-light.kam-sense-active .pill:hover:not(.on){border-color:var(--g500);color:var(--g700)}
 body.sdt-light.kam-sense-active .oalt-row{background:var(--n0)}
