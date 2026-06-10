@@ -2496,12 +2496,48 @@ async function runMatcherInApp(vsMode=false){
     });
   });
 
-  // ── v52: MERGE strategy instead of REPLACE ──
-  // For source SKUs that were verified in this run → drop their old pairs, add new verified ones
-  // For source SKUs not in this run (still unverified or previously verified) → keep as-is
+  // ── v_fix: CONFIDENCE UPDATE strategy ──
+  // matcher never removes alts — only updates confidence of alts it reviewed
+  // alts AI approved → confidence from matcher result
+  // alts AI rejected (is_substitutable=false) → confidence = 'low' (still shown, not recommended)
+  // alts not in this run → keep confidence as-is (unverified or previously verified)
   const verifiedSourceIds=new Set(groups.map(g=>parseInt(g.id)));
-  const keptPairs=(D.alts||[]).filter(p=>!verifiedSourceIds.has(p.source_item_id));
-  const mergedPairs=[...keptPairs,...pairs];
+  // Build a map of alt_item_id → verified result for quick lookup
+  const verifiedAltMap=new Map(); // key: `${source_item_id}-${alt_item_id}` → {confidence, note_th, caveat_th}
+  pairs.forEach(p=>{
+    verifiedAltMap.set(`${p.source_item_id}-${p.alt_item_id}`,
+      {confidence:p.confidence,note_th:p.note_th||'',caveat_th:p.caveat_th||''});
+  });
+  // Also track which alt_ids AI explicitly rejected per source
+  const rejectedAltMap=new Map(); // key: source_item_id → Set of rejected alt_item_ids
+  groups.forEach(g=>{
+    if(!g.result?.verified)return;
+    const sid=parseInt(g.id);
+    g.result.verified.forEach(v=>{
+      if(!v.is_substitutable){
+        if(!rejectedAltMap.has(sid))rejectedAltMap.set(sid,new Set());
+        rejectedAltMap.get(sid).add(parseInt(v.catalog_item_id));
+      }
+    });
+  });
+  // Update existing alts with new confidence, never remove
+  const existingPairs=(D.alts||[]).map(p=>{
+    const key=`${p.source_item_id}-${p.alt_item_id}`;
+    if(verifiedAltMap.has(key)){
+      // AI reviewed and approved this pair — update confidence/notes
+      const v=verifiedAltMap.get(key);
+      return {...p,confidence:v.confidence,note_th:v.note_th,caveat_th:v.caveat_th};
+    }
+    if(rejectedAltMap.has(p.source_item_id)&&rejectedAltMap.get(p.source_item_id).has(p.alt_item_id)){
+      // AI explicitly rejected this alt — mark low confidence but keep in list
+      return {...p,confidence:'low'};
+    }
+    return p; // not reviewed — keep as-is
+  });
+  // Add new pairs from matcher that didn't exist in D.alts before
+  const existingKeys=new Set(existingPairs.map(p=>`${p.source_item_id}-${p.alt_item_id}`));
+  const newPairs=pairs.filter(p=>!existingKeys.has(`${p.source_item_id}-${p.alt_item_id}`));
+  const mergedPairs=[...existingPairs,...newPairs];
 
   const altData={generated:new Date().toISOString(),pairs:mergedPairs};
   D.alts=parseAlternatives(JSON.stringify(altData));
