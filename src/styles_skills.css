@@ -1640,6 +1640,10 @@
   padding-bottom: 0 !important;
   min-height: 0 !important;
   height: 100% !important;
+  /* display controlled by .on — never override here */
+}
+/* detail mode only applies when screen IS visible */
+#scr-skills.on.sk-detail-mode {
   display: block !important;
 }
 #scr-skills.sk-detail-mode 
