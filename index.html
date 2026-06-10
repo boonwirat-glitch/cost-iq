@@ -1,4 +1,4 @@
-<!-- Freshket Sense v499: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v_stab1: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5557,7 +5557,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v499',
+      version: 'v_stab1',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15264,12 +15264,21 @@ function _kamSafeKey(email){
 function _getKamEmailForAccount(accountId){
   if(!accountId)return null;
   if(!portviewBulkData||!portviewBulkData.length){
-    console.warn('[v202 debug] _getKamEmailForAccount: portviewBulkData not loaded yet for',accountId);
+    // v_stab1: portviewBulkData temporarily empty (token refresh race).
+    // Fallback: rep role → their own email IS their kamEmail.
+    const _role=currentUserProfile&&currentUserProfile.role||'';
+    if(_role!=='tl'&&_role!=='admin'&&currentUser&&currentUser.email){
+      return currentUser.email;
+    }
     return null;
   }
   const row=portviewBulkData.find(r=>r.id===accountId);
   const email=(row&&row.kamEmail)||null;
-  if(!email)console.warn('[v202 debug] _getKamEmailForAccount: no kamEmail for account',accountId,'(row found:',!!row,')');
+  // Fallback for unassigned accounts: rep sees own email; TL/admin gets null (handled upstream)
+  if(!email){
+    const _role2=currentUserProfile&&currentUserProfile.role||'';
+    if(_role2!=='tl'&&_role2!=='admin'&&currentUser&&currentUser.email)return currentUser.email;
+  }
   return email;
 }
 
@@ -15992,6 +16001,21 @@ function refreshAll(){
     _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — splash active');
     window._pendingRefreshAll=true; return;
   }
+  // v_stab1: pending account re-render (user tapped account while data was loading)
+  // When data now available, re-render account overview and clear the flag.
+  try{
+    if(window._pvPendingAccountRerender&&typeof D!=='undefined'&&D.history&&D.history.length>0){
+      const _pid=window._pvPendingAccountRerender;
+      if(_pid===currentAccountId){
+        window._pvPendingAccountRerender=null;
+        const _kload=document.getElementById('kam-loading2');
+        if(_kload)_kload.style.display='none';
+        if(typeof renderKamOverview==='function')setTimeout(renderKamOverview,50);
+      } else {
+        window._pvPendingAccountRerender=null;
+      }
+    }
+  }catch(_e){}
   // v218 DATA GATE: block render until portview+history+handover all loaded.
   if(!allCriticalReady()){
     var _pending=[];
@@ -27478,9 +27502,28 @@ function _pvInitCollapseObserver(){
       }
     }
   }
+  function _scrollable(){
+    // v_stab2: guard against short-list scroll thrash.
+    // When portview filter leaves only a few accounts, the list is too short to scroll.
+    // In that case, the collapsible header tries to collapse/expand but scroll never
+    // reaches COLLAPSE_AT — causing a fight between collapse logic and the render guard.
+    // If total page height < threshold, force expanded and bail out.
+    const docH = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+      screen ? screen.scrollHeight : 0
+    );
+    const winH = window.innerHeight || document.documentElement.clientHeight || 600;
+    return (docH - winH) > COLLAPSE_AT;
+  }
   function _check(){
     raf=0;
     if(!screen.classList.contains('on'))return;
+    // v_stab2: if content too short to scroll, force expand and stop
+    if(!_scrollable()){
+      _apply(false);
+      return;
+    }
     const y=_scrollTop();
     if(y>COLLAPSE_AT){
       _apply(true);
@@ -27704,11 +27747,13 @@ function portviewSelectAccount(accountId){
     // v224e: TL/Admin — eagerly start bundle fetch BEFORE switchAccount
     // so bundle is in-flight while UI transitions, reducing SKU movement wait time
     const _pvRole=(currentUserProfile&&currentUserProfile.role)||'';
-    if(_pvRole==='tl'||_pvRole==='admin'){
-      const _pvKamEmail=typeof _getKamEmailForAccount==='function'?_getKamEmailForAccount(accountId):null;
-      if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
-        _fetchKamBundle(_pvKamEmail).catch(()=>{});
-      }
+    // v_stab1: eager bundle fetch for ALL roles — rep included.
+    // If portviewBulkData is briefly empty (token refresh), kamEmail lookup returns null.
+    // Fallback: for rep role, currentUser.email IS their kamEmail.
+    const _pvKamEmail=(typeof _getKamEmailForAccount==='function'?_getKamEmailForAccount(accountId):null)
+      || ((_pvRole!=='tl'&&_pvRole!=='admin')&&currentUser&&currentUser.email?currentUser.email:null);
+    if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
+      _fetchKamBundle(_pvKamEmail).catch(()=>{});
     }
     switchAccount(accountId);
     showScreen('overview');
@@ -27724,6 +27769,18 @@ function portviewSelectAccount(accountId){
         if(kamCards)kamCards.style.display='block';
         // Re-enable nav buttons now account is selected
         if(typeof _updateKamNavDisabled==='function')_updateKamNavDisabled();
+        // v_stab1: if data is blank (token-refresh race or slow bundle),
+        // show loading spinner and register a one-shot re-render when bundle arrives.
+        const _hasData=typeof D!=='undefined'&&D.history&&D.history.length>0;
+        if(!_hasData){
+          const _kload=document.getElementById('kam-loading2');
+          const _kstep=document.getElementById('kam-loading-step');
+          if(_kload){_kload.style.display='block';}
+          if(_kstep){_kstep.textContent='กำลังโหลดข้อมูลร้าน...';}
+          // One-shot: re-render when bundle/data arrives (RenderBus will call refreshAll)
+          // Set a flag so we re-show data once it's ready
+          window._pvPendingAccountRerender=accountId;
+        }
       }
       setKamSubtab('thismonth');
     },300);
@@ -36125,12 +36182,24 @@ window._commRetroactivePeriod = null;
 // SECTION:NRR_COMPUTE
 function _tgtComputeKamNRR(kamEmail, tlEmail) {
   if (typeof bulkHistoryData === 'undefined' || !bulkHistoryData) return null;
-  const allAccounts = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
+  let allAccounts = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
     .filter(a => {
       if (kamEmail) return a.kamEmail === kamEmail;
       if (tlEmail)  return a.tlEmail  === tlEmail;
       return true;
     });
+  // v_stab1: portviewBulkData can be briefly empty during token refresh.
+  // If allAccounts is empty but we have a kamEmail and history data, build a minimal account list
+  // from bulkHistoryData keys so NRR+Expansion+Comeback still compute correctly.
+  if (!allAccounts.length && kamEmail && typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+    const _fallbackIds = Object.keys(bulkHistoryData).filter(id => {
+      const rows = bulkHistoryData[id];
+      return rows && rows.length > 0;
+    });
+    if (_fallbackIds.length > 0) {
+      allAccounts = _fallbackIds.map(id => ({ id, kamEmail, tlEmail: '' }));
+    }
+  }
   if (!allAccounts.length) return null;
 
   const mo = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
