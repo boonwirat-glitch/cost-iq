@@ -1,12 +1,24 @@
 // SECTION:NRR_COMPUTE
 function _tgtComputeKamNRR(kamEmail, tlEmail) {
   if (typeof bulkHistoryData === 'undefined' || !bulkHistoryData) return null;
-  const allAccounts = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
+  let allAccounts = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
     .filter(a => {
       if (kamEmail) return a.kamEmail === kamEmail;
       if (tlEmail)  return a.tlEmail  === tlEmail;
       return true;
     });
+  // v_stab1: portviewBulkData can be briefly empty during token refresh.
+  // If allAccounts is empty but we have a kamEmail and history data, build a minimal account list
+  // from bulkHistoryData keys so NRR+Expansion+Comeback still compute correctly.
+  if (!allAccounts.length && kamEmail && typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+    const _fallbackIds = Object.keys(bulkHistoryData).filter(id => {
+      const rows = bulkHistoryData[id];
+      return rows && rows.length > 0;
+    });
+    if (_fallbackIds.length > 0) {
+      allAccounts = _fallbackIds.map(id => ({ id, kamEmail, tlEmail: '' }));
+    }
+  }
   if (!allAccounts.length) return null;
 
   const mo = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
