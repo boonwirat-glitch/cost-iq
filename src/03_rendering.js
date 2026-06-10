@@ -787,18 +787,18 @@ function renderPlanBuilder(opps){
   <div id="opp-custom-row" style="display:${_f==='custom'?'block':'none'};margin:4px 0 8px">
     <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:var(--tk-font-body);outline:none" oninput="renderOpps()">
   </div>
-  <div id="opp-filter-info" class="opp-filter-info">${opps.length} รายการ · ยอดซื้อปัจจุบัน ${fmt(opps.reduce((s,o)=>s+o.monthlyGmv,0))}/เดือน</div>`;
+`;
 
   let smartHtml=`<div class="plan-selector">
     <div class="plan-sel-title">เลือกแผนของคุณ</div>
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
-        <div class="plan-tab-label"><span style="font-size:11px;color:${isAll?'var(--g500)':'rgba(255,255,255,.5)'}">${isAll?'◆':'◇'}</span> คุ้มที่สุดที่ Sense หาได้</div>
-        <div class="plan-tab-count">${isAll?fmt(allSave)+'/เดือน':opps.length+' รายการ'}</div>
+        <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}</span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
+        <div class="plan-tab-sub">ประหยัดได้ · ${opps.length} รายการ</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
-        <div class="plan-tab-label"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense หาสเปคใกล้เคียง</div>
-        ${!verifyDone?`<div class="plan-tab-count" style="color:var(--tk-ok-bright)">เทียบสเปค →</div>`:`<div class="plan-tab-count" style="color:var(--tk-ok-bright)">${allHigh.length} รายการ ✓</div>`}
+        <div class="plan-tab-row"><span class="plan-tab-title sense"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense ตรวจสเปค</span><span class="plan-tab-val sense">${!verifyDone?'เทียบสเปค →':(fmt(highSave)+'/เดือน')}</span></div>
+        <div class="plan-tab-sub">${!verifyDone?'ยังไม่ได้ตรวจ':(allHigh.length+' รายการ ✓')}</div>
       </div>
     </div>
     <div class="plan-tab-panel">${tabPanel}</div>
