@@ -1392,12 +1392,21 @@ function _kamSafeKey(email){
 function _getKamEmailForAccount(accountId){
   if(!accountId)return null;
   if(!portviewBulkData||!portviewBulkData.length){
-    console.warn('[v202 debug] _getKamEmailForAccount: portviewBulkData not loaded yet for',accountId);
+    // v_stab1: portviewBulkData temporarily empty (token refresh race).
+    // Fallback: rep role → their own email IS their kamEmail.
+    const _role=currentUserProfile&&currentUserProfile.role||'';
+    if(_role!=='tl'&&_role!=='admin'&&currentUser&&currentUser.email){
+      return currentUser.email;
+    }
     return null;
   }
   const row=portviewBulkData.find(r=>r.id===accountId);
   const email=(row&&row.kamEmail)||null;
-  if(!email)console.warn('[v202 debug] _getKamEmailForAccount: no kamEmail for account',accountId,'(row found:',!!row,')');
+  // Fallback for unassigned accounts: rep sees own email; TL/admin gets null (handled upstream)
+  if(!email){
+    const _role2=currentUserProfile&&currentUserProfile.role||'';
+    if(_role2!=='tl'&&_role2!=='admin'&&currentUser&&currentUser.email)return currentUser.email;
+  }
   return email;
 }
 
@@ -2120,6 +2129,21 @@ function refreshAll(){
     _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — splash active');
     window._pendingRefreshAll=true; return;
   }
+  // v_stab1: pending account re-render (user tapped account while data was loading)
+  // When data now available, re-render account overview and clear the flag.
+  try{
+    if(window._pvPendingAccountRerender&&typeof D!=='undefined'&&D.history&&D.history.length>0){
+      const _pid=window._pvPendingAccountRerender;
+      if(_pid===currentAccountId){
+        window._pvPendingAccountRerender=null;
+        const _kload=document.getElementById('kam-loading2');
+        if(_kload)_kload.style.display='none';
+        if(typeof renderKamOverview==='function')setTimeout(renderKamOverview,50);
+      } else {
+        window._pvPendingAccountRerender=null;
+      }
+    }
+  }catch(_e){}
   // v218 DATA GATE: block render until portview+history+handover all loaded.
   if(!allCriticalReady()){
     var _pending=[];
