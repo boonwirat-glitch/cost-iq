@@ -1,4 +1,4 @@
-<!-- Freshket Sense v486: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v487: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -931,7 +931,7 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .ni.on svg,.ni.on .lb{color:var(--g700)}
 .ni.on .lb{font-weight:700}
 .nwrap{position:relative}
-.nbadge{position:absolute;top:-4px;right:-6px;background:var(--org);color:#fff;font-size:9px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700}
+.nbadge{position:absolute;top:-4px;right:-6px;background:var(--org);color:#fff;font-size:9px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;z-index:10}
 
 /* ── Home button — "พอร์ต" feels like home in both modes ── */
 .ni.nav-home .nwrap{padding:5px 9px;border-radius:11px;transition:background .2s,box-shadow .25s}
@@ -2602,7 +2602,7 @@ body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ── Sense nav tab: default state — green sparkle + pulse ── */
 #nav-opportunities svg { color: var(--g500); }
-@keyframes sense-nav-pulse { 0%,100%{filter:drop-shadow(0 0 3px var(--tk-ok-border));} 50%{filter:drop-shadow(0 0 7px var(--tk-ok-bright));} }
+@keyframes sense-nav-pulse { 0%,100%{opacity:.85;} 50%{opacity:1;} }
 #nav-opportunities .nwrap { animation: sense-nav-pulse 2.6s ease-in-out infinite; }
 #nav-opportunities .lb { color: var(--g500); font-weight: 700; }
 /* After senseActivated (class sense-lit): amber/gold glow */
@@ -2643,7 +2643,7 @@ body.kam-mode.tl-mode .bnav .ni.tl-only { display: none !important; }
 body.kam-mode .bnav #nav-opportunities{display:flex!important;}
 body.kam-mode #nav-portview{display:none!important;}
 body.kam-mode .bnav{background:rgba(14,24,45,.52);border:1px solid rgba(255,255,255,.18);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.35);}
-body.kam-mode .bnav .ni{flex:1;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;}
+body.kam-mode .bnav .ni{flex:1;min-width:0;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;overflow:hidden;}
 body.kam-mode .bnav .ni .lb{display:block!important;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.2px;transition:color .18s,font-weight .18s;white-space:nowrap;}
 body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
 body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transition:opacity .18s,filter .18s;}
@@ -5419,7 +5419,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v486',
+      version: 'v487',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -17607,11 +17607,10 @@ function renderSingleCard(o){
     ?`<span style="color:var(--tk-ok-text);font-weight:700">✓ มั่นใจสูง</span>`
     :`<span style="color:var(--amb);font-weight:700">— ทดลองก่อน</span>`;
   const _qtyUnit=deriveQtyUnit(o.curSpec,o.priceBasis);
-  return`<div style="padding:12px 13px 8px;border-bottom:1px solid var(--n100)">
+  return`<div style="padding:8px 13px 10px;border-bottom:1px solid var(--n100)">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:700;line-height:1.3">${o.curName}</div>
-        <div style="font-size:12px;color:var(--n500);font-weight:500;margin-top:1px">${o.curSpec}</div>
+        <div style="font-size:12px;color:var(--n500);font-weight:500">${o.curSpec}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
