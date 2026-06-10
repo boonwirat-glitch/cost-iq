@@ -278,8 +278,10 @@ function computeOPPS(){
     const alts=verifiedPairs.map(p=>{
       let save,srcDisplay,altDisplay,diffDisplay,pct;
 
+      // v_fix2: compute pct from unit prices (display unit, any basis)
+      // then save = gmv × pct — unit-agnostic, correct regardless of pack size / unit
+      // Replaces: price_diff × qty_kg (qty_kg = pack count, not actual kg → wrong for non-1kg packs)
       if(_displayMode==='per_egg'){
-        // Per-egg: use unit prices / egg count per pack
         const srcEggs=extractEggCount(p.source_pack_size)||1;
         const altEggs=extractEggCount(p.pack_size)||srcEggs;
         const srcUP=p.source_unit_price||0;
@@ -289,25 +291,19 @@ function computeOPPS(){
           altDisplay=parseFloat((altUP/altEggs).toFixed(2));
           diffDisplay=parseFloat((srcDisplay-altDisplay).toFixed(2));
           pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
-          const eggsPerMonth=(p.monthly_qty_commercial||0)*srcEggs;
-          save=Math.round(diffDisplay*eggsPerMonth);
         } else {
-          // fallback per_kg
           srcDisplay=p.source_price;diffDisplay=p.price_diff;
           altDisplay=Math.max(0,srcDisplay-diffDisplay);
           pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
-          const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
-          save=Math.min(Math.round(p.price_diff*(estQty||0)), sku.gmv||Infinity);
         }
       } else {
-        // per_liter OR per_kg — calculation identical (Q4B uses weight, label changes for liquids)
+        // per_kg OR per_liter
         srcDisplay=p.source_price;
         diffDisplay=p.price_diff;
         altDisplay=Math.max(0,srcDisplay-diffDisplay);
         pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
-        const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
-        save=Math.min(Math.round(p.price_diff*(estQty||0)), sku.gmv||Infinity);
       }
+      save=Math.round((sku.gmv||0)*(pct/100));
 
       return{
         altId:p.alt_item_id,altName:p.alt_item_name,
