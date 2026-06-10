@@ -707,7 +707,7 @@ async function _doOpenDetail(skillId) {
   const heroImg = heroUrl
     ? `<img src="${heroUrl}" class="s3-hero-img sk-img-lazy" alt="${def.skill_name_en}" onload="this.classList.add('sk-img-loaded')" onerror="this.classList.add('sk-img-loaded')">`
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
-  const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0].slice(0,72) : (def.skill_name_th || def.skill_name_en);
+  const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0] : (def.skill_name_th || def.skill_name_en);
 
   // CTA based on state
   let cta = '';
@@ -742,7 +742,7 @@ async function _doOpenDetail(skillId) {
             <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
             <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
           </div>
-          <div class="s3-teaser">${teaserText}…</div>
+          <div class="s3-teaser">${teaserText}</div>
         </div>
         <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:2px;"><path d="M18 15l-6-6-6 6"/></svg>
       </div>
