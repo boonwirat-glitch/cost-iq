@@ -2729,6 +2729,8 @@ function _sgSetState(state){
     if(sub){sub.style.opacity='1';}
     if(tapHint){tapHint.classList.remove('hidden');tapHint.style.display='';}
     if(beacon)beacon.style.display='';
+    // v493: show all 3 beacon rings on standby
+    ['sg-beacon-2','sg-beacon-3'].forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='';});
     if(ringData){ringData.style.opacity='1';ringData.style.display='';}
   }
 }
@@ -2741,6 +2743,8 @@ async function sgOrbTap(){
   const beacon=document.getElementById('sg-beacon');
   if(tapHint)tapHint.classList.add('hidden');
   if(beacon)beacon.style.display='none';
+  // v493: hide all 3 beacon rings on tap
+  ['sg-beacon-2','sg-beacon-3'].forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='none';});
   _sgRunThinking();  // animation starts now (8-10s window = enough time to download)
   // If data not ready, load in background while animation is already running
   if(!D.alts.length||!D.skus.length){

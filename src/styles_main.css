@@ -997,12 +997,41 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .sg-done-desc{font-size:11px;color:rgba(200,255,220,.85);text-align:center;font-family:var(--tk-font-body);margin-bottom:14px}
 .sg-cta-btn{width:100%;padding:14px;border-radius:14px;border:none;background:var(--g500);color:#003820;font-family:var(--tk-font-body);font-size:15px;font-weight:700;cursor:pointer;transition:background .15s}
 .sg-cta-btn:active{background:#00b85e}
-/* ── Sense Gate: beacon pulse ── */
-#sg-beacon{position:absolute;inset:0;border-radius:50%;border:2px solid var(--tk-ok-border);animation:sg-beacon-pulse 2.5s ease-out infinite;pointer-events:none}
-@keyframes sg-beacon-pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.28);opacity:0}}
-/* ── Sense Gate: tap hint ── */
-#sg-tap-hint{font-size:13px;font-weight:600;color:rgba(160,255,200,.9);font-family:var(--tk-font-body);text-align:center;margin-top:10px;letter-spacing:.2px;animation:sg-hint-blink 2.2s ease-in-out infinite;transition:opacity .3s}
-@keyframes sg-hint-blink{0%,100%{opacity:.5}55%{opacity:1}}
+/* ── Sense Gate: 3-ring beacon (Apple AirDrop / FaceTime style tap affordance) ── */
+/* v493: each ring expands from orb edge outward at 0.8s stagger, fades to 0 */
+#sg-beacon,#sg-beacon-2,#sg-beacon-3{
+  position:absolute;border-radius:50%;pointer-events:none;
+  border:1.5px solid rgba(0,204,106,.65);
+  inset:-2px; /* start just outside the orb edge */
+}
+#sg-beacon  {animation:sg-beacon-ring 2.4s ease-out infinite 0s}
+#sg-beacon-2{animation:sg-beacon-ring 2.4s ease-out infinite .8s}
+#sg-beacon-3{animation:sg-beacon-ring 2.4s ease-out infinite 1.6s}
+@keyframes sg-beacon-ring{
+  0%  {transform:scale(1);   opacity:.72;border-width:1.5px}
+  40% {transform:scale(1.22);opacity:.42;border-width:1px}
+  100%{transform:scale(1.55);opacity:0;  border-width:.5px}
+}
+/* ── Sense Gate: tap hint pill ── */
+#sg-tap-hint{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:700;letter-spacing:.4px;
+  color:rgba(0,204,106,.95);
+  font-family:var(--tk-font-body);
+  text-align:center;margin-top:18px;
+  padding:8px 20px;
+  border:1.5px solid rgba(0,204,106,.45);
+  border-radius:999px;
+  background:rgba(0,204,106,.08);
+  animation:sg-pill-breathe 2.4s ease-in-out infinite;
+  transition:opacity .3s;cursor:pointer;
+}
+#sg-tap-hint::after{content:'→';font-size:13px;opacity:.8;transition:transform .2s}
+#sg-tap-hint:active::after{transform:translateX(3px)}
+@keyframes sg-pill-breathe{
+  0%,100%{opacity:.75;box-shadow:0 0 0 0 rgba(0,204,106,0)}
+  50%    {opacity:1;  box-shadow:0 0 0 6px rgba(0,204,106,.1)}
+}
 #sg-tap-hint.hidden{opacity:0;pointer-events:none;animation:none}
 /* ── Sense Gate: data context — between ring and text area ── */
 #sg-ring-data{font-size:13px;font-weight:600;color:rgba(160,255,200,.9);font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;text-align:center;margin-bottom:10px;min-height:14px;transition:opacity .3s;pointer-events:none}
