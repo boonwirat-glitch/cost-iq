@@ -1489,9 +1489,13 @@ async function _fetchUpsellBundle(kamEmail){
       if(ok){
         _upsellBundleLoaded.add(safeKey);
         console.log('%c[Sense] upsell bundle ✓','color:#4ddc97',kamEmail);
-        // Clear strip cache and force full re-render pipeline
+        // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
+        // Root cause: _dataKey() uses portviewBulkData.length (unchanged after upsell loads),
+        // so key === _lastCommKey → _commGatedRender early-returns even after _lastCommHtml cleared.
+        // Fix: force key mismatch via _commResetKey, then call gated render.
         setTimeout(()=>{
           try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+          try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
           try{ if(typeof _commGatedRender==='function') _commGatedRender(); }catch(e){}
           try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
         }, 100);

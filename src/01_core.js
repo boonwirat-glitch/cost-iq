@@ -111,7 +111,10 @@ function resetRuntimeSessionState(){
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
   try { _sgRevealPending=false; } catch(e) {}
   try { footerUnlocked=false; } catch(e) {}       // prevent opportunity screen from being unlocked
-  try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash)
+  // v491-A: remove stale role classes BEFORE setMode so kam-mode add is not immediately undone.
+  // Previous order: setMode adds kam-mode, then remove() strips it → body loses dark bg on re-login.
+  try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
+  try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
   try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
   try { _kamBundleLoaded.clear(); } catch(e) {}
@@ -125,7 +128,6 @@ function resetRuntimeSessionState(){
   try { bulkCatsData={}; } catch(e) {}
   try { bulkSkuCurrentData={}; } catch(e) {}
   try { bulkOutletsData={}; } catch(e) {}
-  try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
   // v479-G2: reset commission render key so _commGatedRender re-renders on next login
   try { if(typeof window._commResetKey==='function') window._commResetKey(); } catch(e) {}
 }
@@ -837,6 +839,10 @@ function hideLoginOverlay() {
     }else{
       _senseDataLog('RESUME','⚡ skip splash — warm IDB boot (no saved state)');
     }
+    // v491-B: ensure kam-mode on body BEFORE anything shows, preventing white body flash
+    // in skip-splash path. resetRuntimeSessionState removes kam-mode on signout;
+    // _autoRouteAfterLogin adds it back inside setMode, but that's after first paint.
+    try { document.body.classList.add('kam-mode'); } catch(e) {}
     // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
