@@ -276,11 +276,16 @@
 }
 .sk-card {
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;  /* allow box-shadow glow to bleed outside card */
   cursor: pointer;
   background: var(--sk-surface);
   position: relative;
   border-bottom: 2.5px solid transparent;
+}
+/* keep image crop inside card shape */
+.sk-card > .sk-card-img {
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
 }
 .sk-card:active { opacity: .85; }
 .sk-card-img {
@@ -348,7 +353,11 @@
 .state-mastered {
   border-bottom: 3px solid #FFD700;
   background: var(--sk-surface);
-  animation: sk-aura-pulse 2.4s ease-in-out infinite;
+}
+/* override sk-card-in entry animation for mastered cards */
+.sk-card.state-mastered,
+.s2-grid .sk-card.state-mastered {
+  animation: sk-aura-pulse 2.4s ease-in-out infinite !important;
 }
 /* gold beam — top edge, breathing */
 .state-mastered .sk-card-img::before {
@@ -473,6 +482,7 @@
   position: absolute;
   top: 8px; right: 10px;
   width: 16px; height: 16px;
+  z-index: 5;
   color: var(--sk-warn);
   filter: drop-shadow(0 0 5px rgba(255,180,0,1)) drop-shadow(0 0 12px rgba(255,130,0,.7));
 }
