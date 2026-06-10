@@ -1185,7 +1185,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   let _debriefOverrides = {}; // { skillCode: { score, note } }
 
   function _canDebrief() {
-    return isTLRole(getCurrentRole()) || isAdminRole(getCurrentRole());
+    // v498: ad_tl can also debrief their team sessions
+    return isTLRole(getCurrentRole()) || isAdminRole(getCurrentRole()) || isADTLRole(getCurrentRole());
   }
 
   function _buildDebriefCSS() {
@@ -1812,6 +1813,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
           emails.add(r.kamEmail.toLowerCase());
       });
     }
+    // v498: AD team — portviewBulkData uses same tlEmail+kamEmail columns for AD reps
+    // (AD rep kamEmail is stored identically to KAM — no separate column needed)
     // Sales team — salesBulkData มี tl_email + owner_email
     if (typeof window.salesBulkData !== 'undefined' && window.salesBulkData) {
       window.salesBulkData.forEach(r => {
@@ -2074,8 +2077,10 @@ ${summaryHtml}`;
   }
 
   function _renderInlineHistory(sessions) {
+    // v498: AD uses KAM-style grouping (by month), not sales-style (by account)
     const _salesMode = typeof isSalesRole === 'function' &&
-      isSalesRole(typeof getCurrentRole === 'function' ? getCurrentRole() : '');
+      isSalesRole(typeof getCurrentRole === 'function' ? getCurrentRole() : '') &&
+      !isADAny(typeof getCurrentRole === 'function' ? getCurrentRole() : '');
     const _groupBySales = _salesMode && !_accountGuid;
 
     function _renderSessionCard(s, opts) {
@@ -2294,7 +2299,8 @@ ${summaryHtml}`;
     _unmount();
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
-    _ownerType = (role === 'sales') ? 'sales' : 'kam';
+    // v498: AD uses KAM picker (existing accounts) not Sales name-input
+    _ownerType = (role === 'sales') ? 'sales' : (role === 'ad' || role === 'ad_tl') ? 'ad' : 'kam';
 
     if (_ownerType === 'sales') {
       // Sales always sees name input first
