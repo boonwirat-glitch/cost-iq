@@ -12881,6 +12881,16 @@ async function loadUserProfile() {
     normalizeCurrentUserProfileRole();
     console.warn('[loadUserProfile] exception:', e.message);
   }
+  // v497: invalidate portview account cache after profile loads so email filter uses correct email
+  try{ if(typeof _pvClearAccountCache==='function') _pvClearAccountCache(); }catch(e){}
+  // Re-render portview if it's currently visible (was rendered with empty email before profile loaded)
+  try{
+    const _pvScr=document.getElementById('scr-portview-screen')||document.getElementById('scr-portview');
+    if(_pvScr&&(_pvScr.classList.contains('on')||document.querySelector('.scr.on#scr-portview-screen'))){
+      if(typeof renderPortview==='function') setTimeout(renderPortview, 80);
+      else if(typeof refreshAll==='function') setTimeout(refreshAll, 80);
+    }
+  }catch(e){}
 }
 
 async function doSignOut() {
