@@ -25,6 +25,9 @@ function normalizeRole(role){
   if(r === 'team_lead' || r === 'team lead') return 'tl';
   if(r === 'sales' || r === 'sale' || r === 'sales_rep') return 'sales';
   if(r === 'sales_tl' || r === 'sales_lead' || r === 'sales_team_lead') return 'sales_tl';
+  // v498: AD (Account Development) — uses KAM data stack, KAM UI
+  if(r === 'ad' || r === 'account_development' || r === 'account development') return 'ad';
+  if(r === 'ad_tl' || r === 'ad_lead' || r === 'ad_team_lead') return 'ad_tl';
   return r || 'rep';
 }
 function getCurrentRole(){
@@ -36,7 +39,11 @@ function isRepRole(role){ return normalizeRole(role) === 'rep'; }
 function isSalesRole(role){ return normalizeRole(role) === 'sales'; }
 function isSalesTLRole(role){ return normalizeRole(role) === 'sales_tl'; }
 function isSalesAny(role){ const r=normalizeRole(role); return r==='sales'||r==='sales_tl'; }
-function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'; }
+// v498: AD role helpers
+function isADRole(role){ return normalizeRole(role) === 'ad'; }
+function isADTLRole(role){ return normalizeRole(role) === 'ad_tl'; }
+function isADAny(role){ const r=normalizeRole(role); return r==='ad'||r==='ad_tl'; }
+function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'||r==='ad'||r==='ad_tl'; }
 function roleLabel(role){
   const r = normalizeRole(role);
   if(r === 'rep') return 'KAM';
@@ -44,6 +51,8 @@ function roleLabel(role){
   if(r === 'admin') return 'Admin';
   if(r === 'sales') return 'Sales';
   if(r === 'sales_tl') return 'Sales TL';
+  if(r === 'ad') return 'AD';
+  if(r === 'ad_tl') return 'AD TL';
   return role || '';
 }
 function normalizeCurrentUserProfileRole(){
@@ -65,6 +74,9 @@ try{
   window.isSalesRole = isSalesRole;
   window.isSalesTLRole = isSalesTLRole;
   window.isSalesAny = isSalesAny;
+  window.isADRole = isADRole;
+  window.isADTLRole = isADTLRole;
+  window.isADAny = isADAny;
   window.isEchoUser = isEchoUser;
   window.roleLabel = roleLabel;
 }catch(e){}
@@ -113,7 +125,7 @@ function resetRuntimeSessionState(){
   try { footerUnlocked=false; } catch(e) {}       // prevent opportunity screen from being unlocked
   // v491-A: remove stale role classes BEFORE setMode so kam-mode add is not immediately undone.
   // Previous order: setMode adds kam-mode, then remove() strips it → body loses dark bg on re-login.
-  try { document.body.classList.remove('sales-mode','sales-tl-mode','kam-mode'); } catch(e) {}
+  try { document.body.classList.remove('sales-mode','sales-tl-mode','kad-mode','ad-tl-mode','kam-mode'); } catch(e) {}
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
   try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
@@ -727,6 +739,13 @@ function hideLoginOverlay() {
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
+      else if(_pf_role==='ad'||_pf_role==='ad_tl'){
+        // v498: AD uses KAM data stack — same portview, same dark theme
+        document.body.classList.add('kad-mode');
+        if(_pf_role==='ad_tl') document.body.classList.add('ad-tl-mode');
+        if(typeof setMode==='function') setMode('kam');
+        if(typeof showScreen==='function') showScreen('portview');
+      }
       else{if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
@@ -935,6 +954,20 @@ function _autoRouteAfterLogin() {
     if (isSalesTLRole && isSalesTLRole(role)) document.body.classList.add('sales-tl-mode');
     setMode('kam');
     showScreen('sales-portview');
+  } else if (isADAny && isADAny(role)) {
+    // v498: AD — uses KAM data stack, KAM portview, KAM dark theme
+    document.body.classList.add('kad-mode');
+    if (isADTLRole && isADTLRole(role)) document.body.classList.add('ad-tl-mode');
+    setMode('kam');
+    // AD IC: same portview flow as KAM rep
+    const _r2Settled = !(typeof sheetsLoadStarted !== 'undefined' && sheetsLoadStarted) ||
+                       (typeof allCriticalReady === 'function' && allCriticalReady());
+    const myAccounts = _r2Settled ? getPortviewAccounts() : [];
+    if (myAccounts && myAccounts.length === 1) {
+      portviewSelectAccount(myAccounts[0].id);
+    } else {
+      showScreen('portview');
+    }
   } else {
     setMode('kam');
     // v477-H5: guard IDB stale data — only auto-open single account when R2 data is settled.
