@@ -2136,14 +2136,21 @@ async function _doShareReport(){
   var doc=document.getElementById('rpt2-doc');
   if(!doc){_setShareStatus('ไม่พบเนื้อหารายงาน',true);_setShareBtnState(false);return;}
   _setShareStatus('กำลังสร้าง PDF...');
-  var origBg=doc.style.background;
-  doc.style.background='#fff';
-  var canvas=await window.html2canvas(doc,{
+  // v_rpt1: capture at 595px (A4 pt width) so font sizes are correct in PDF
+  // Previous: captured at mobile width ~390px → scaled 1.5× → font too large in PDF
+  var _captureW=595;
+  var _wrapper=document.createElement('div');
+  _wrapper.style.cssText='position:fixed;left:-9999px;top:0;width:'+_captureW+'px;background:#fff;z-index:-1;';
+  var _clone=doc.cloneNode(true);
+  _clone.style.cssText='width:'+_captureW+'px;border-radius:0;box-shadow:none;background:#fff;';
+  _wrapper.appendChild(_clone);
+  document.body.appendChild(_wrapper);
+  var canvas=await window.html2canvas(_clone,{
     scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,
-    width:doc.scrollWidth,height:doc.scrollHeight,
-    windowWidth:doc.scrollWidth,windowHeight:doc.scrollHeight
+    width:_captureW,height:_clone.scrollHeight,
+    windowWidth:_captureW,windowHeight:_clone.scrollHeight
   });
-  doc.style.background=origBg;
+  document.body.removeChild(_wrapper);
   var jsPDF=window.jspdf&&window.jspdf.jsPDF||window.jsPDF;
   var pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
   var pdfW=pdf.internal.pageSize.getWidth();
