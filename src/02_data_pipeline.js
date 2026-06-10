@@ -297,7 +297,7 @@ function computeOPPS(){
           altDisplay=Math.max(0,srcDisplay-diffDisplay);
           pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
           const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
-          save=Math.round(p.price_diff*(estQty||0));
+          save=Math.min(Math.round(p.price_diff*(estQty||0)), sku.gmv||Infinity);
         }
       } else {
         // per_liter OR per_kg — calculation identical (Q4B uses weight, label changes for liquids)
@@ -306,7 +306,7 @@ function computeOPPS(){
         altDisplay=Math.max(0,srcDisplay-diffDisplay);
         pct=srcDisplay>0?parseFloat(((diffDisplay/srcDisplay)*100).toFixed(1)):0;
         const estQty=sku.qty_kg||(p.source_price>0?sku.gmv/p.source_price:0);
-        save=Math.round(p.price_diff*(estQty||0));
+        save=Math.min(Math.round(p.price_diff*(estQty||0)), sku.gmv||Infinity);
       }
 
       return{
