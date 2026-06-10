@@ -1137,6 +1137,7 @@ function renderReport(){
         sel: sel,
         getAlt: getAlt,
         totalSel: totalSel,
+        curSpend: (typeof curSpend === 'function' ? curSpend : function(){ return 0; }),
         fmt: fmt
       });
       if(result && result.ok) return result;
@@ -1153,41 +1154,60 @@ function __legacyRenderReportFallback(){
   const acctName=D.meta.accountName||'ร้านอาหาร';
   const kamName=D.meta.kamName||'—';
   const lastMo=last.m||'—';
+  const spend=typeof curSpend==='function'?curSpend():0;
+  // v494: sort by save desc, group by category
   const selItems=[...OPPS.filter(o=>sel.has(o.id))].sort((a,b)=>getAlt(b).save-getAlt(a).save);
   const selSave=totalSel();
+  const savPct=spend>0?(selSave/spend*100).toFixed(1):'—';
+  const highCount=selItems.filter(o=>getAlt(o).conf==='high').length;
+  const medCount=selItems.length-highCount;
   const dateStr=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
 
   // Header
-  const acctEl=document.getElementById('rpt2-acct');if(acctEl)acctEl.textContent=acctName;
-  const dateEl=document.getElementById('rpt2-date');if(dateEl)dateEl.textContent=dateStr;
-  const kamEl=document.getElementById('rpt2-kam');if(kamEl)kamEl.textContent='KAM: '+kamName;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('rpt2-acct',acctName);
+  set('rpt2-date',dateStr);
+  set('rpt2-kam','KAM: '+kamName);
+  set('rpt2-kpi-spend',fmt(spend));
+  set('rpt2-kpi-save-mo',fmt(selSave));
+  set('rpt2-kpi-save-count',selItems.length+' รายการที่เลือก');
+  set('rpt2-kpi-save-yr',fmt(selSave*12));
+  set('rpt2-kpi-pct',(savPct!=='—'?savPct+'%':'—')+' ของยอดซื้อ');
+  set('rpt2-kpi-high',highCount+' รายการ — ใช้แทนได้เลย');
+  set('rpt2-kpi-med',medCount+' รายการ — แนะนำทดสอบก่อน');
 
-  // Summary strip
-  const sumLbl=document.getElementById('rpt2-sum-label');
-  if(sumLbl)sumLbl.textContent='Sense หาวัตถุดิบที่ราคาคุ้มกว่าได้ '+selItems.length+' รายการ';
-  const sumMo=document.getElementById('rpt2-sum-mo');
-  if(sumMo)sumMo.textContent=fmt(selSave)+' / เดือน';
-  const sumYr=document.getElementById('rpt2-sum-yr');
-  if(sumYr)sumYr.textContent=fmt(selSave*12)+' / ปี';
-
-  // Table rows
+  // Table rows — grouped by category
   const tbody=document.getElementById('rpt2-tbody');
   if(tbody){
     if(!selItems.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
     } else {
-      tbody.innerHTML=selItems.map((o,i)=>{
-        const a=getAlt(o);
-        const curPriceStr=o.curP>0?fmt(o.curP)+'/'+o.curU:'—';
-        const altPriceStr=a.altP>0?fmt(a.altP)+'/'+a.altU:'—';
-        const confHigh=a.conf==='high';
-        return`<tr>
-          <td class="rpt2-num">${i+1}</td>
-          <td><div class="rpt2-sku-name">${o.curName}</div><div class="rpt2-sku-meta">#${o.curId}${o.curSpec?' · '+o.curSpec:''}${curPriceStr!=='—'?' · '+curPriceStr:''}</div></td>
-          <td class="rpt2-arr">→</td>
-          <td><div class="rpt2-sku-name">${a.altName}</div><div class="rpt2-sku-meta">#${a.altId}${a.altSpec?' · '+a.altSpec:''}${altPriceStr!=='—'?' · '+altPriceStr:''}</div></td>
-          <td class="rpt2-save"><div class="rpt2-save-amt">${fmt(a.save)}</div><div class="rpt2-save-pct${confHigh?' high':''}">−${a.pct}%</div></td>
-        </tr>`;
+      const catMap={};const catOrder=[];
+      selItems.forEach(o=>{const cat=o.cat||'อื่นๆ';if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}catMap[cat].push(o);});
+      let rowNum=0;
+      tbody.innerHTML=catOrder.map(cat=>{
+        const gItems=catMap[cat];
+        const gSave=gItems.reduce((s,o)=>s+getAlt(o).save,0);
+        const catRow=`<tr class="rpt2-cat-row"><td colspan="7"><span class="rpt2-cat-name">${cat}</span><span class="rpt2-cat-meta">${gItems.length} รายการ</span><span class="rpt2-cat-save">${fmt(gSave)} / เดือน</span></td></tr>`;
+        const rows=gItems.map(o=>{
+          rowNum++;
+          const a=getAlt(o);
+          const confHigh=a.conf==='high';
+          const confMed=a.conf==='medium';
+          const curMeta=`#${o.curId}${o.curSpec?' · '+o.curSpec:''}${o.curP>0?' · ฿'+o.curP+'/'+o.curU:''}`;
+          const altMeta=`#${a.altId}${a.altSpec?' · '+a.altSpec:''}${a.altP>0?' · ฿'+a.altP+'/'+a.altU:''}`;
+          const dotCls=confHigh?'rpt2-dot-hi':confMed?'rpt2-dot-med':'rpt2-dot-lo';
+          return`<tr>
+            <td class="rpt2-num">${rowNum}</td>
+            <td><div class="rpt2-sku-name">${o.curName}</div><div class="rpt2-sku-meta">${curMeta}</div></td>
+            <td class="rpt2-arr">→</td>
+            <td><div class="rpt2-sku-name">${a.altName}</div><div class="rpt2-sku-meta">${altMeta}</div></td>
+            <td class="rpt2-gmv"><div class="rpt2-gmv-val">${fmt(o.monthlyGmv||0)}</div><div class="rpt2-gmv-qty">${o.monthlyQty>0?+(+o.monthlyQty).toFixed(1)+' '+(o.qu||''):''}</div></td>
+            <td class="rpt2-save"><div class="rpt2-save-amt">${fmt(a.save)}</div><div><span class="rpt2-save-pct${confHigh?' high':''}">−${a.pct}%</span></div></td>
+            <td class="rpt2-conf"><span class="rpt2-dot ${dotCls}"></span></td>
+          </tr>`;
+        }).join('');
+        return catRow+rows;
       }).join('');
     }
   }
@@ -1196,12 +1216,12 @@ function __legacyRenderReportFallback(){
   const tfoot=document.getElementById('rpt2-tfoot');
   if(tfoot&&selItems.length>0){
     tfoot.innerHTML=`<tr class="rpt2-total-row">
-      <td colspan="4"><span class="rpt2-total-label">รวม ${selItems.length} รายการ</span></td>
-      <td><div class="rpt2-total-amt">${fmt(selSave)}</div><div class="rpt2-total-yr">${fmt(selSave*12)} / ปี</div></td>
+      <td colspan="5"><span class="rpt2-total-label">รวม ${selItems.length} รายการที่เลือกในแผน</span></td>
+      <td class="rpt2-save"><div class="rpt2-total-amt">${fmt(selSave)} / เดือน</div><div class="rpt2-total-yr">${fmt(selSave*12)} / ปี</div></td>
+      <td></td>
     </tr>`;
   } else if(tfoot){tfoot.innerHTML='';}
 
-  // Note
   const noteEl=document.getElementById('rpt2-note');
   if(noteEl)noteEl.textContent='* ประมาณการจากยอดซื้อและราคาสินค้า '+lastMo+' — ตัวเลขจริงอาจต่างกันตามปริมาณและราคาที่เปลี่ยนแปลง';
 }

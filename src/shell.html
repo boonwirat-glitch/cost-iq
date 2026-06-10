@@ -1168,6 +1168,7 @@
       sel: ctx.sel || global.sel || new Set(),
       getAlt: ctx.getAlt || global.getAlt,
       totalSel: ctx.totalSel || global.totalSel,
+      curSpend: ctx.curSpend || global.curSpend || function(){ return 0; },
       fmt: ctx.fmt || global.fmt || function(v){ return String(v == null ? '' : v); }
     };
   }
@@ -1190,6 +1191,23 @@
     const last = hist[hist.length - 1] || { s:0, m:'' };
     const items = selectedItems(c);
     const save = call(function(){ return c.totalSel(); }, 0);
+    var spend = call(function(){ return c.curSpend(); }, 0);
+    var savPct = spend > 0 ? (save / spend * 100).toFixed(1) : '—';
+    var highCount = items.filter(function(o){ return call(function(){ return c.getAlt(o).conf === 'high'; }, false); }).length;
+    var medCount = items.length - highCount;
+    // Group by category (o.cat) preserving save-desc order within each group
+    var catMap = {};
+    var catOrder = [];
+    items.forEach(function(o){
+      var cat = o.cat || 'อื่นๆ';
+      if(!catMap[cat]){ catMap[cat] = []; catOrder.push(cat); }
+      catMap[cat].push(o);
+    });
+    var groups = catOrder.map(function(cat){
+      var gItems = catMap[cat];
+      var gSave = gItems.reduce(function(s,o){ return s + call(function(){ return c.getAlt(o).save; }, 0); }, 0);
+      return { cat: cat, items: gItems, save: gSave };
+    });
     return {
       accountName: meta.accountName || 'ร้านอาหาร',
       kamName: meta.kamName || '—',
@@ -1197,37 +1215,56 @@
       dateStr: new Date().toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' }),
       selectedItems: items,
       selectedSave: save,
+      spend: spend,
+      savPct: savPct,
+      highCount: highCount,
+      medCount: medCount,
+      groups: groups,
       context: c,
       ts: now()
     };
   }
 
   function renderRows(model){
-    const c = model.context;
+    var c = model.context;
     if(!model.selectedItems.length){
-      return '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
+      return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--n400);font-size:12px">ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก</td></tr>';
     }
-    return model.selectedItems.map(function(o,i){
-      const a = call(function(){ return c.getAlt(o); }, {});
-      const curPriceStr = o.curP > 0 ? c.fmt(o.curP) + '/' + o.curU : '—';
-      const altPriceStr = a.altP > 0 ? c.fmt(a.altP) + '/' + a.altU : '—';
-      const confHigh = a.conf === 'high';
-      return '<tr>'+
-        '<td class="rpt2-num">'+(i+1)+'</td>'+
-        '<td><div class="rpt2-sku-name">'+text(o.curName)+'</div><div class="rpt2-sku-meta">#'+text(o.curId)+(o.curSpec?' · '+text(o.curSpec):'')+(curPriceStr!=='—'?' · '+curPriceStr:'')+'</div></td>'+
-        '<td class="rpt2-arr">→</td>'+
-        '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">#'+text(a.altId)+(a.altSpec?' · '+text(a.altSpec):'')+(altPriceStr!=='—'?' · '+altPriceStr:'')+'</div></td>'+
-        '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</div></td>'+
-      '</tr>';
+    var rowNum = 0;
+    return model.groups.map(function(g){
+      var catSave = call(function(){ return c.fmt(g.save); }, '—');
+      var catRow = '<tr class="rpt2-cat-row"><td colspan="7">'+
+        '<span class="rpt2-cat-name">'+text(g.cat)+'</span>'+
+        '<span class="rpt2-cat-meta">'+g.items.length+' รายการ</span>'+
+        '<span class="rpt2-cat-save">'+catSave+' / เดือน</span>'+
+      '</td></tr>';
+      var itemRows = g.items.map(function(o){
+        rowNum++;
+        var a = call(function(){ return c.getAlt(o); }, {});
+        var confHigh = a.conf === 'high';
+        var curMeta = '#'+text(o.curId)+(o.curSpec?' · '+text(o.curSpec):'')+(o.curP>0?' · ฿'+o.curP+'/'+text(o.curU):'');
+        var altMeta = '#'+text(a.altId)+(a.altSpec?' · '+text(a.altSpec):'')+(a.altP>0?' · ฿'+a.altP+'/'+text(a.altU):'');
+        return '<tr>'+
+          '<td class="rpt2-num">'+rowNum+'</td>'+
+          '<td><div class="rpt2-sku-name">'+text(o.curName)+'</div><div class="rpt2-sku-meta">'+curMeta+'</div></td>'+
+          '<td class="rpt2-arr">→</td>'+
+          '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">'+altMeta+'</div></td>'+
+          '<td class="rpt2-gmv"><div class="rpt2-gmv-val">'+c.fmt(o.monthlyGmv||0)+'</div><div class="rpt2-gmv-qty">'+(o.monthlyQty>0?(+o.monthlyQty.toFixed(1))+' '+(o.qu||''):'')+'</div></td>'+
+          '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div><span class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</span></div></td>'+
+          '<td class="rpt2-conf"><span class="rpt2-dot'+(confHigh?' rpt2-dot-hi':a.conf==='medium'?' rpt2-dot-med':' rpt2-dot-lo')+'"></span></td>'+
+        '</tr>';
+      }).join('');
+      return catRow + itemRows;
     }).join('');
   }
 
   function renderTotal(model){
-    const c = model.context;
+    var c = model.context;
     if(!model.selectedItems.length) return '';
     return '<tr class="rpt2-total-row">'+
-      '<td colspan="4"><span class="rpt2-total-label">รวม '+model.selectedItems.length+' รายการ</span></td>'+
-      '<td><div class="rpt2-total-amt">'+c.fmt(model.selectedSave)+'</div><div class="rpt2-total-yr">'+c.fmt(model.selectedSave*12)+' / ปี</div></td>'+
+      '<td colspan="5"><span class="rpt2-total-label">รวม '+model.selectedItems.length+' รายการที่เลือกในแผน</span></td>'+
+      '<td class="rpt2-save"><div class="rpt2-total-amt">'+c.fmt(model.selectedSave)+' / เดือน</div><div class="rpt2-total-yr">'+c.fmt(model.selectedSave*12)+' / ปี</div></td>'+
+      '<td></td>'+
     '</tr>';
   }
 
@@ -1238,9 +1275,13 @@
     setText('rpt2-acct', model.accountName);
     setText('rpt2-date', model.dateStr);
     setText('rpt2-kam', 'KAM: ' + model.kamName);
-    setText('rpt2-sum-label', 'Sense หาวัตถุดิบที่ราคาคุ้มกว่าได้ ' + model.selectedItems.length + ' รายการ');
-    setText('rpt2-sum-mo', c.fmt(model.selectedSave) + ' / เดือน');
-    setText('rpt2-sum-yr', c.fmt(model.selectedSave*12) + ' / ปี');
+    setText('rpt2-kpi-spend', c.fmt(model.spend));
+    setText('rpt2-kpi-save-mo', c.fmt(model.selectedSave));
+    setText('rpt2-kpi-save-count', model.selectedItems.length + ' รายการที่เลือก');
+    setText('rpt2-kpi-save-yr', c.fmt(model.selectedSave * 12));
+    setText('rpt2-kpi-pct', (model.savPct !== '—' ? model.savPct + '%' : '—') + ' ของยอดซื้อ');
+    setText('rpt2-kpi-high', model.highCount + ' รายการ — ใช้แทนได้เลย');
+    setText('rpt2-kpi-med', model.medCount + ' รายการ — แนะนำทดสอบก่อน');
     setHTML('rpt2-tbody', renderRows(model));
     setHTML('rpt2-tfoot', renderTotal(model));
     setText('rpt2-note', '* ประมาณการจากยอดซื้อและราคาสินค้า ' + model.lastMonth + ' — ตัวเลขจริงอาจต่างกันตามปริมาณและราคาที่เปลี่ยนแปลง');
@@ -2855,9 +2896,8 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- ══ ยืนยันแผน ══ -->
 <!-- ══ REPORT ══ -->
 <div class="scr" id="scr-report">
-<div class="rpt-wrap" style="padding:12px 0 80px">
+<div class="rpt-wrap" style="padding:0 0 80px">
 <div class="rpt2" id="rpt2-doc">
-<!-- Header -->
 <div class="rpt2-head">
 <div class="rpt2-brand">
 <div class="rpt2-logo-box"><img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/></div>
@@ -2872,22 +2912,37 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="rpt2-kam" id="rpt2-kam">—</div>
 </div>
 </div>
-<!-- Summary strip -->
-<div class="rpt2-summary">
-<div class="rpt2-sum-label"><svg fill="var(--g500)" height="10" viewbox="0 0 10 10" width="10"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg><span id="rpt2-sum-label">Sense หาวัตถุดิบที่ราคาคุ้มกว่าได้</span></div>
-<div class="rpt2-sum-nums"><div class="rpt2-sum-mo" id="rpt2-sum-mo">฿—/เดือน</div><div class="rpt2-sum-yr" id="rpt2-sum-yr">฿— / ปี</div></div>
+<div class="rpt2-kpi-strip">
+<div class="rpt2-kpi">
+<div class="rpt2-kpi-lbl">ยอดซื้อ / เดือน</div>
+<div class="rpt2-kpi-val" id="rpt2-kpi-spend">—</div>
+<div class="rpt2-kpi-sub" id="rpt2-kpi-spend-mo">จากยอดซื้อเดือนล่าสุด</div>
 </div>
-<!-- Swap table -->
+<div class="rpt2-kpi">
+<div class="rpt2-kpi-lbl">ประหยัดได้ / เดือน</div>
+<div class="rpt2-kpi-val rpt2-kpi-green" id="rpt2-kpi-save-mo">—</div>
+<div class="rpt2-kpi-sub" id="rpt2-kpi-save-count">— รายการที่เลือก</div>
+</div>
+<div class="rpt2-kpi">
+<div class="rpt2-kpi-lbl">ประหยัดได้ / ปี</div>
+<div class="rpt2-kpi-val rpt2-kpi-green" id="rpt2-kpi-save-yr">—</div>
+<div class="rpt2-kpi-sub" id="rpt2-kpi-pct">— ของยอดซื้อ</div>
+</div>
+</div>
+<div class="rpt2-conf-strip">
+<div class="rpt2-conf-item"><span class="rpt2-dot rpt2-dot-hi"></span><span id="rpt2-kpi-high">— รายการ — ใช้แทนได้เลย</span></div>
+<div class="rpt2-conf-item"><span class="rpt2-dot rpt2-dot-med"></span><span id="rpt2-kpi-med">— รายการ — แนะนำทดสอบก่อน</span></div>
+</div>
 <div class="rpt2-table-wrap">
 <table class="rpt2-table">
-<thead><tr><th style="width:28px">#</th><th>สินค้าปัจจุบัน</th><th style="width:20px"></th><th>สินค้าแนะนำ</th><th class="rpt2-th-save">ประหยัด/เดือน</th></tr></thead>
+<thead><tr><th class="rpt2-th-num">#</th><th class="rpt2-th-sku">สินค้าปัจจุบัน</th><th class="rpt2-th-arr"></th><th class="rpt2-th-sku">สินค้าแนะนำ</th><th class="rpt2-th-gmv">ยอดซื้อ / เดือน</th><th class="rpt2-th-save">ประหยัด / เดือน</th><th class="rpt2-th-conf">มั่นใจ</th></tr></thead>
 <tbody id="rpt2-tbody"></tbody>
 <tfoot id="rpt2-tfoot"></tfoot>
 </table>
 </div>
 <div class="rpt2-note" id="rpt2-note">* ประมาณการจากยอดซื้อและราคาสินค้าเดือนล่าสุด</div>
 <div class="rpt2-foot">
-<div class="rpt2-foot-brand">freshket.co · Internal Use Only</div>
+<div class="rpt2-foot-brand">freshket.co · เฉพาะใช้ภายใน</div>
 <div class="rpt2-foot-sense"><svg fill="rgba(0,144,74,.5)" height="8" viewbox="0 0 10 10" width="8"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Freshket Sense</div>
 </div>
 </div>
