@@ -149,7 +149,8 @@ async function skillsInit() {
   _skillsRole = role;
 
   // Role guard: KAM/rep must not see skills — redirect back to portview
-  const _allowedRoles = ['sales','sales_tl','tl','admin'];
+  // v498: rep=KAM IC, ad=Account Development, ad_tl=AD TL — all use Skills
+  const _allowedRoles = ['sales','sales_tl','tl','admin','rep','ad','ad_tl'];
   const _normRole = role ? role.toLowerCase() : '';
   const _isAllowed = _allowedRoles.some(r => _normRole.includes(r));
   if (!_isAllowed) {
@@ -190,7 +191,7 @@ async function skillsInit() {
   console.log('[Skills] init — role:', _skillsRole, '| userId:', _skillsUserId);
 
   // TL: load squad + squad members from profiles first
-  const isTLInit = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  const isTLInit = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (isTLInit) {
     await _loadTLSquad();
   }
@@ -218,7 +219,7 @@ async function _loadSkillDefs() {
 async function _loadSkillProgress() {
   if (!_skillsUserId) return;
   try {
-    const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+    const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
     let query;
     if (isTL) {
       if (_tlSquadEmails.length > 0) {
@@ -275,7 +276,8 @@ async function _loadTLSquad() {
     _tlSquad = squadName;
 
     // 2. Get all reps in same squad
-    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl)`);
+    // v498: include ad/ad_tl in squad member query
+    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl,ad,ad_tl)`);
     _tlSquadEmails = (repRows || [])
       .map(r => (r.email || '').toLowerCase())
       .filter(e => e && e !== tlEmail);
@@ -295,7 +297,7 @@ let _echoObs   = {}; // rep view  { skill_code: [rows...] }
 let _echoObsTL = {}; // TL view   { 'userId:skill_code': [rows...] }
 
 async function _loadEchoObs() {
-  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (isTL) {
     _echoObsTL = {};
     try {
@@ -347,7 +349,7 @@ function _echoLatestStrip(skillCode) {
 
 // ── Load user profiles for TL (name display) ─────────
 async function _loadSkillUsers() {
-  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (!isTL) return;
   _skillUsers = {};
   try {
@@ -396,7 +398,7 @@ function _skUserInitials(userId) {
 function _updateSkillsNavBadge() {
   const badge = document.getElementById('skills-nav-badge');
   if (!badge) return;
-  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (!isTL) { badge.style.display = 'none'; return; }
   const pending = Object.values(_skillProg).filter(p => p.state === 'training').length;
   badge.style.display = pending > 0 ? 'block' : 'none';
@@ -423,11 +425,13 @@ function _renderSkillsScreen() {
   const scr = _switchSkillsScreen('home');
   if (!scr) return;
   const _r = (_skillsRole || '').toLowerCase();
-  if (!_r || (!_r.includes('sales') && _r !== 'tl' && _r !== 'admin')) {
+  // v498: allow rep/ad/ad_tl (KAM stack users)
+  const _allowedToRender = _r.includes('sales') || _r === 'tl' || _r === 'admin' || _r === 'rep' || _r === 'ad' || _r === 'ad_tl';
+  if (!_r || !_allowedToRender) {
     if (typeof showScreen === 'function') showScreen('portview');
     return;
   }
-  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin';
+  const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (isTL) {
     _renderTLShell(scr);
   } else {
