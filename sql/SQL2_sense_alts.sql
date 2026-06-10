@@ -22,8 +22,9 @@ CREATE TEMP FUNCTION extract_pack_liters(ps STRING) AS ((
     WHEN REGEXP_CONTAINS(ps, r'(?i)\d+\.?\d*\s*[xX]\s*\d+\.?\d*\s*(?:liter|litre|lt|L)\b')
       THEN CAST(REGEXP_EXTRACT(ps, r'(?i)(\d+\.?\d*)\s*[xX]') AS FLOAT64)
            * CAST(REGEXP_EXTRACT(ps, r'(?i)[xX]\s*(\d+\.?\d*)\s*(?:liter|litre|lt|L)') AS FLOAT64)
-    -- N liter/litre/lt  (e.g. "18 liter/Tin", "13.75Litre/each", "1 liter/bottle")
-    WHEN REGEXP_CONTAINS(ps, r'(?i)\d+\.?\d*\s*(?:liter|litre|lt)\b')
+    -- N liter/litre/lt  (e.g. "18 liter/Tin", "18 litre./tank", "13.75Litre/each", "1 liter/bottle")
+    -- v_fix: use [\s./] instead of \b to catch "litre." (dot after unit)
+    WHEN REGEXP_CONTAINS(ps, r'(?i)\d+\.?\d*\s*(?:liter|litre|lt)[\s./]')
       THEN CAST(REGEXP_EXTRACT(ps, r'(?i)(\d+\.?\d*)\s*(?:liter|litre|lt)') AS FLOAT64)
     -- Single "L" (e.g. "5 L/bottle") — must be preceded by digit to avoid false matches
     WHEN REGEXP_CONTAINS(ps, r'\d+\.?\d*\s*L\b')
