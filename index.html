@@ -45809,8 +45809,10 @@ function _buildEchoSparkSection(userId) {
       return `<span style="width:8px;height:8px;border-radius:50%;background:${col};opacity:${opacity};flex-shrink:0;display:inline-block"></span>`;
     }).join('');
 
+    const def = Array.isArray(_skillDefs) ? _skillDefs.find(d => d.skill_code === code || d.skill_code.startsWith(code + '_')) : null;
+    const skillLabel = def ? (def.skill_name_th || def.skill_name_en || shortCode) : shortCode;
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #F7F7F7">
-  <span style="font-size:10px;font-weight:500;color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;min-width:48px">${shortCode}</span>
+  <span style="font-size:10px;font-weight:500;color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;min-width:0;flex:0 0 auto;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillLabel}</span>
   <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
   <span style="font-size:9px;font-weight:500;color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'Pass':latestScore==='developing'?'Developing':'—'}</span>
 </div>`;
