@@ -2931,7 +2931,7 @@ function _sgRevealScore(){
   }
   // Score in ring — SENSE SCORE label underneath
   if(scoreNum){scoreNum.style.color='#ffffff';scoreNum.textContent='0';}
-  if(scoreUnit){scoreUnit.textContent='SENSE SCORE';scoreUnit.style.cssText='font-size:8px;color:rgba(160,255,200,.6);font-family:\'Noto Sans Thai\',sans-serif;margin-top:5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;';}
+  if(scoreUnit){scoreUnit.textContent='SAVE SCORE';scoreUnit.style.cssText='font-size:8px;color:rgba(160,255,200,.6);font-family:\'Noto Sans Thai\',sans-serif;margin-top:5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;';}
   requestAnimationFrame(()=>{
     if(scoreWrap)scoreWrap.classList.add('visible');
     if(scoreNum){
