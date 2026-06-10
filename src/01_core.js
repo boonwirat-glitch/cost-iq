@@ -1791,7 +1791,14 @@ function loadFromStorage(targetId){
     D.cats=cMoKeys.length?D.cats_monthly[cMoKeys[0]]:[];
     D.skus_monthly=bulkSkusData[aid]||{};
     const sMoKeys=Object.keys(D.skus_monthly).sort((a,b)=>_moSortBulk(b)-_moSortBulk(a));
-    D.skus=sMoKeys.length?D.skus_monthly[sMoKeys[0]]:[];
+    // v_fix: use last COMPLETE month for save calculations — not current MTD
+    // MTD has partial data → qty/gmv lower than reality → underestimates savings
+    // currentMonthLabel comes from bulkCurrentMonthData (same Thai format as sMoKeys)
+    const _curMoLabel=(bulkCurrentMonthData[aid]&&bulkCurrentMonthData[aid].month_label)||'';
+    const _skuRefKey=(_curMoLabel&&sMoKeys.length>1&&sMoKeys[0]===_curMoLabel)
+      ? sMoKeys[1]   // current month is MTD → use previous complete month
+      : sMoKeys[0];  // no MTD or only 1 month available → use latest
+    D.skus=_skuRefKey?D.skus_monthly[_skuRefKey]:[];
     D.outlets_monthly=bulkOutletsData[aid]||{};
     // Inject sku_current from Q7B bulk if exists, else keep per-account upload from localStorage
     if(bulkSkuCurrentData[aid])D.sku_current=bulkSkuCurrentData[aid];
