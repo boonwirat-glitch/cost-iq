@@ -1053,7 +1053,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .svb-sub{font-size:10px;color:rgba(255,255,255,.45);line-height:1.4;}
 .svb-arrow{font-size:13px;color:var(--tk-ok-border);font-weight:700;flex-shrink:0;}
 /* ── SENSE SCORE BAR ── */
-.sense-score-bar{display:flex;align-items:center;gap:14px;padding:14px 0 14px 0;margin-bottom:8px;position:relative;}
+.sense-score-bar{display:flex;align-items:center;gap:14px;padding:12px 0;margin-bottom:4px;position:relative;}
 @keyframes ssb-border-glow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}55%{box-shadow:0 0 0 2px var(--tk-ok-dim),0 0 16px var(--tk-ok-dim);}}
 .ssb-ring-wrap{position:relative;flex-shrink:0;width:90px;height:90px;display:flex;align-items:center;justify-content:center;}
 .ssb-glow-ring{position:absolute;inset:-2px;border-radius:50%;pointer-events:none;animation:ssb-ring-glow 2.8s ease-in-out infinite;}
@@ -1120,7 +1120,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 /* ── PLAN SELECTOR ── */
 .plan-selector{padding:0 0 10px 0;margin-bottom:4px;}
 .plan-sel-header{margin-bottom:8px}
-.plan-sel-title{font-size:12px;font-weight:700;color:var(--n700);margin-bottom:6px}
+.plan-sel-title{font-size:11px;font-weight:600;color:var(--n600);margin-bottom:8px;letter-spacing:.02em}
 .plan-sel-sub{font-size:9px;color:rgba(255,255,255,.88);margin-top:2px}
 .plan-toggle-row{display:flex;gap:6px}
 .plan-card{border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .22s cubic-bezier(.4,0,.2,1);border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05)}
@@ -1154,7 +1154,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .pvc-cta{font-size:10px;font-weight:700;color:var(--tk-ok-bright);display:flex;align-items:center;gap:3px;}
 
 /* ── PLAN TABS (replaces accordion cards) ── */
-.plan-tabs{display:flex;gap:4px;margin-bottom:8px}
+.plan-tabs{display:flex;flex-direction:column;gap:8px;margin-bottom:0}
 .plan-tab{flex:1;border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px dashed rgba(0,160,80,.28);background:#fff;font-family:var(--tk-font-body);transition:border-color .2s,background .2s}
 .plan-tab.active{border:2px solid #00cc6a;background:#fff}
 .plan-tab:not(.active):hover{border-color:rgba(0,160,80,.5);background:#fff}
@@ -1173,9 +1173,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .plan-tab.sense-tab.cta-mode{position:relative;overflow:hidden}
 .plan-tab.sense-tab.cta-mode::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--tk-ok-dim),transparent);transform:translateX(-100%);animation:pvs-scan 3s ease-in-out infinite;pointer-events:none}
 /* Tab content panel */
-.plan-tab-panel{padding:2px 0 4px}
-.ptc-desc{font-size:11px;color:rgba(255,255,255,.72);line-height:1.5;margin-bottom:5px}
-.ptc-nums{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.88);line-height:1.4}
+.plan-tab-panel{padding:6px 0 2px}
+.ptc-desc{font-size:11px;color:var(--n600);line-height:1.5;margin-bottom:4px}
+.ptc-nums{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--n800);line-height:1.4}
 .ptc-nums .plan-save{font-size:15px;font-weight:700;color:var(--g500)}
 .ptc-rerun{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:7px 14px;border-radius:20px;border:1.5px solid var(--tk-ok-border);background:var(--tk-ok-dim);font-size:11px;font-weight:700;color:var(--tk-ok-bright);cursor:pointer;font-family:var(--tk-font-body);animation:pvc-border-glow 3.2s ease-in-out infinite;transition:background .2s,border-color .2s}
 .ptc-rerun:hover{background:var(--tk-ok-border);border-color:var(--tk-ok-bright)}
