@@ -2185,7 +2185,8 @@ function _commCloseKamSelfSheet() {
 function _commOpenTlDetailSheet(opts) {
   opts = opts || {};
   const role = getCurrentRole ? getCurrentRole() : '';
-  if (!isTLRole(role) && !isAdminRole(role)) return;
+  // v499: ad_tl can also open TL commission detail sheet
+  if (!isTLRole(role) && !isAdminRole(role) && !(typeof isADTLRole==='function' && isADTLRole(role))) return;
   // v230-fix: force-fetch upsell_team from R2 on first open if not in memory.
   // Root cause: _cloudInitialPromise is nulled after FOREGROUND load, and upsell_team
   // fetch silently fails (not in IDB cache + R2 fetch error) → bulkUpsellTeamData stays empty.
