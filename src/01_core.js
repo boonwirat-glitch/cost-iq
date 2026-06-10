@@ -934,7 +934,9 @@ function _autoRouteAfterLogin() {
   const role = getCurrentRole();
   _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
-  if(isRepRole(role)&&currentUser&&currentUser.email){
+  // v499: AD IC also uses KAM bundle (same portview data stack)
+  const _needsKamBundle = isRepRole(role) || (typeof isADRole==='function' && isADRole(role));
+  if(_needsKamBundle&&currentUser&&currentUser.email){
     // v225: removed _bundlePreWarming flag — consistent with TL prewarm removal
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
       // v223: RenderBus batches with concurrent file arrivals
@@ -943,8 +945,8 @@ function _autoRouteAfterLogin() {
     });
   }
   // v206d: TL/Admin pre-warm is deliberately throttled and capped.
-  // Old behavior fetched every KAM bundle sequentially after 5s, causing console noise + memory/CPU pressure.
-  if(isTLRole(role)||isAdminRole(role))_startTlBundlePrewarm();
+  // v499: AD TL also pre-warms team bundles
+  if(isTLRole(role)||isAdminRole(role)||(typeof isADTLRole==='function'&&isADTLRole(role)))_startTlBundlePrewarm();
   if (isTLRole(role) || isAdminRole(role)) {
     setMode('kam');
     showScreen('teamview');
@@ -956,6 +958,19 @@ function _autoRouteAfterLogin() {
     showScreen('sales-portview');
   } else if (isADAny && isADAny(role)) {
     // v498: AD — uses KAM data stack, KAM portview, KAM dark theme
+    // v499: clear any stale Sales IDB entries so AD never gets Sales CSVs from cache
+    try{
+      const _dbReq=indexedDB.open('ciq-csv-v1',1);
+      _dbReq.onsuccess=function(e){
+        const _db=e.target.result;
+        try{
+          const _tx=_db.transaction('csv','readwrite');
+          const _store=_tx.objectStore('csv');
+          ['portview','history','sku_current','categories','outlets'].forEach(function(k){_store.delete(k);});
+          console.log('[Sense] IDB cleared for AD login (prevent Sales CSV bleed)');
+        }catch(ex){}
+      };
+    }catch(ex){}
     document.body.classList.add('kad-mode');
     if (isADTLRole && isADTLRole(role)) document.body.classList.add('ad-tl-mode');
     setMode('kam');
