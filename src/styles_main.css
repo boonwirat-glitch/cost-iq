@@ -2197,6 +2197,11 @@ body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
 body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transition:opacity .18s,filter .18s;}
 body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.9)) drop-shadow(0 0 18px rgba(255,255,255,.3));}
 body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
+/* v488: override #nav-opportunities ID specificity so Save icon inherits white in glass pill */
+body.kam-mode .bnav #nav-opportunities svg{color:rgba(255,255,255,.55)!important}
+body.kam-mode .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1}
+/* v488: echo-pill shrinks correctly inside flex glass pill */
+body.kam-mode .bnav .echo-pill{flex-shrink:1;width:auto;min-width:0}
 /* ── Echo nav pill — idle + active states ── */
 /* ── Echo nav — Pattern B wave · 4px bars · uniform with other tabs ── */
 .echo-pill{
