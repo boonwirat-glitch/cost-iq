@@ -2982,19 +2982,6 @@ function sgCommit(){
     const _oppListEl=document.getElementById('opplist');
     if(_oppListEl&&!footerUnlocked)_oppListEl.classList.add('opplist-muted');
     _scheduleOppReveal();
-    // Pulse plan selector to guide user's next action
-    setTimeout(()=>{
-      const planSel=document.querySelector('.plan-selector');
-      if(planSel){
-        planSel.classList.add('plan-pulse');
-        planSel.addEventListener('animationend',(e)=>{
-          if(e.animationName==='plan-sel-pulse')planSel.classList.remove('plan-pulse');
-        },{once:true});
-      }
-      // Re-assert mute after plan-pulse (belt-and-suspenders)
-      const oppList=document.getElementById('opplist');
-      if(oppList&&!footerUnlocked)oppList.classList.add('opplist-muted');
-    },420);
   },300);
   setTimeout(()=>{
     if(gate){gate.style.display='none';gate.classList.remove('sg-exit');}
