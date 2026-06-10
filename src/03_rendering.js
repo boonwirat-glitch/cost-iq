@@ -790,7 +790,7 @@ function renderPlanBuilder(opps){
   <div id="opp-filter-info" class="opp-filter-info">${opps.length} รายการ · ยอดซื้อปัจจุบัน ${fmt(opps.reduce((s,o)=>s+o.monthlyGmv,0))}/เดือน</div>`;
 
   let smartHtml=`<div class="plan-selector">
-    <div class="plan-sel-header"><div class="plan-sel-title">เลือกแผนของคุณ</div></div>
+    <div class="plan-sel-title">เลือกแผนของคุณ</div>
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
         <div class="plan-tab-label"><span style="font-size:11px;color:${isAll?'var(--g500)':'rgba(255,255,255,.5)'}">${isAll?'◆':'◇'}</span> คุ้มที่สุดที่ Sense หาได้</div>
@@ -1018,8 +1018,7 @@ function renderSingleCard(o){
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--n500);margin-top:3px;white-space:nowrap">${fmt(o.monthlyGmv)}/เดือน</div>
-        <div style="font-size:10px;color:var(--n400);margin-top:1px;white-space:nowrap">${o.monthlyQty||'?'} ${_qtyUnit}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--n500);margin-top:3px;white-space:nowrap">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} ${_qtyUnit}</div>
       </div>
     </div>
   </div>
