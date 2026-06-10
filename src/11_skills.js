@@ -629,8 +629,7 @@ function _renderModuleGrid(module) {
       ? `<div class="sk-lock-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>` : '';
     const starIco = state === 'mastered'
       ? `<svg class="sk-master-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l4-4 5 3 5-3 4 4-2 3h-4l-3 8-3-8H5L3 9z"/></svg>` : '';
-    const sparkHtml = state === 'mastered'
-      ? `<div class="sk-spark" style="width:3px;height:3px;top:14%;left:12%;animation:sk-spark 2.3s ease-in-out infinite;"></div><div class="sk-spark" style="width:2px;height:2px;top:8%;right:15%;animation:sk-spark 1.7s ease-in-out infinite .5s;"></div><div class="sk-spark" style="width:2px;height:2px;top:35%;left:8%;animation:sk-spark 2.0s ease-in-out infinite 1.0s;"></div><div class="sk-spark" style="width:3px;height:3px;top:20%;right:10%;animation:sk-spark 1.9s ease-in-out infinite .3s;"></div><div class="sk-spark" style="width:2px;height:2px;bottom:20%;left:18%;animation:sk-spark 2.5s ease-in-out infinite .8s;"></div><div class="sk-spark" style="width:2px;height:2px;bottom:18%;right:14%;animation:sk-spark 2.1s ease-in-out infinite 1.4s;"></div>` : '';
+    const sparkHtml = ''; // foil/gleam style — no spark particles
     return `
 <div class="sk-card state-${state}" onclick="skillsOpenDetail(${d.id})">
   <div class="sk-card-img" style="height:180px;width:100%;position:relative;overflow:hidden;">
