@@ -1564,6 +1564,12 @@ function __legacySetModeFallback(mode){
   }
   // Apply/remove dark KAM theme
   document.body.classList.toggle('kam-mode',isKAM);
+  // v499: .kad-mode (AD body class) must follow kam-mode so KAM CSS stays active
+  // AD starts login with .kad-mode; toggling kam-mode here would strip it.
+  // Solution: when isKAM and body has kad-mode, also add kam-mode (KAM CSS activates)
+  if(isKAM && document.body.classList.contains('kad-mode')){
+    document.body.classList.add('kam-mode');
+  }
   try{localStorage.setItem('sense_mode',mode);}catch(e){}
   // Swap nav label + icon: ภาพรวม/home ↔ พอร์ต/grid
   const ovLabel=document.getElementById('nav-overview-label');
@@ -1573,15 +1579,17 @@ function __legacySetModeFallback(mode){
   if(icoNonKam)icoNonKam.style.display=isKAM?'none':'';
   if(icoKam)icoKam.style.display=isKAM?'':'none';
   // Show Team tab for TL/admin only
-  const isTL=currentUserProfile&&(currentUserProfile.role==='tl'||currentUserProfile.role==='admin');
+  // v499: include ad_tl so AD TL also gets tl-mode (Team tab + portview-team-btn)
+  const isTL=currentUserProfile&&(currentUserProfile.role==='tl'||currentUserProfile.role==='admin'||currentUserProfile.role==='ad_tl');
   const _isSales=typeof isSalesAny==='function'&&isSalesAny(currentUserProfile&&currentUserProfile.role);
   const _isSalesTL=typeof isSalesTLRole==='function'&&isSalesTLRole(currentUserProfile&&currentUserProfile.role);
+  const _isADTL=typeof isADTLRole==='function'&&isADTLRole(currentUserProfile&&currentUserProfile.role);
   // Add tl-mode class for 3-col grid + Team tab visibility (CSS .tl-only handles display)
   document.body.classList.toggle('tl-mode',isKAM&&isTL);
   // Sales body classes — controls Sales-specific nav/content visibility
   document.body.classList.toggle('sales-mode',_isSales);
   document.body.classList.toggle('sales-tl-mode',isKAM&&_isSalesTL);
-  // v183: Show Team button in portview header for TL/Admin only
+  // v499: Show Team button in portview header for TL/Admin/AD TL
   const _portviewTeamBtn = document.getElementById('portview-team-btn');
   if (_portviewTeamBtn) _portviewTeamBtn.style.display = (isTL||_isSalesTL) ? 'flex' : 'none';
   const _portviewTgtBtn = document.getElementById('portview-target-btn');
@@ -1589,7 +1597,7 @@ function __legacySetModeFallback(mode){
     _portviewTgtBtn.style.display = (isTL||_isSalesTL) ? 'flex' : 'none';
     // Store mode so button knows admin vs tl
     window._tgtAdminMode = (currentUserProfile && currentUserProfile.role === 'admin') ? 'admin' :
-                           (_isSalesTL ? 'sales_tl' : 'tl');
+                           (_isSalesTL ? 'sales_tl' : _isADTL ? 'ad_tl' : 'tl');
   }
   // v183: Sync bnav disabled state
   if (typeof _updateKamNavDisabled === 'function') _updateKamNavDisabled();
