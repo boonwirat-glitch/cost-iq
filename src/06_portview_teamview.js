@@ -288,6 +288,10 @@ function _initPlanTray(){
 // ─────────────────────────────────────────────────────────────────────────────
 // ── KAM Sense Mode helpers (v190) ──────────────────────────────────────────
 function _injectKamSenseBackBtn(){
+  // v484: skip back button when user entered via SenseGate (senseActivated=true)
+  // — they can return via portview nav icon. Show back only when entering
+  // from portview account view (senseActivated=false = sheet/brief entry path).
+  if(typeof senseActivated !== 'undefined' && senseActivated) return;
   if(document.getElementById('kam-sense-back-btn'))return;
   const scr=document.getElementById('scr-opportunities');
   if(!scr)return;
