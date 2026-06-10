@@ -1256,9 +1256,28 @@ function _pvInitCollapseObserver(){
       }
     }
   }
+  function _scrollable(){
+    // v_stab2: guard against short-list scroll thrash.
+    // When portview filter leaves only a few accounts, the list is too short to scroll.
+    // In that case, the collapsible header tries to collapse/expand but scroll never
+    // reaches COLLAPSE_AT — causing a fight between collapse logic and the render guard.
+    // If total page height < threshold, force expanded and bail out.
+    const docH = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+      screen ? screen.scrollHeight : 0
+    );
+    const winH = window.innerHeight || document.documentElement.clientHeight || 600;
+    return (docH - winH) > COLLAPSE_AT;
+  }
   function _check(){
     raf=0;
     if(!screen.classList.contains('on'))return;
+    // v_stab2: if content too short to scroll, force expand and stop
+    if(!_scrollable()){
+      _apply(false);
+      return;
+    }
     const y=_scrollTop();
     if(y>COLLAPSE_AT){
       _apply(true);
@@ -1482,11 +1501,13 @@ function portviewSelectAccount(accountId){
     // v224e: TL/Admin — eagerly start bundle fetch BEFORE switchAccount
     // so bundle is in-flight while UI transitions, reducing SKU movement wait time
     const _pvRole=(currentUserProfile&&currentUserProfile.role)||'';
-    if(_pvRole==='tl'||_pvRole==='admin'){
-      const _pvKamEmail=typeof _getKamEmailForAccount==='function'?_getKamEmailForAccount(accountId):null;
-      if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
-        _fetchKamBundle(_pvKamEmail).catch(()=>{});
-      }
+    // v_stab1: eager bundle fetch for ALL roles — rep included.
+    // If portviewBulkData is briefly empty (token refresh), kamEmail lookup returns null.
+    // Fallback: for rep role, currentUser.email IS their kamEmail.
+    const _pvKamEmail=(typeof _getKamEmailForAccount==='function'?_getKamEmailForAccount(accountId):null)
+      || ((_pvRole!=='tl'&&_pvRole!=='admin')&&currentUser&&currentUser.email?currentUser.email:null);
+    if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
+      _fetchKamBundle(_pvKamEmail).catch(()=>{});
     }
     switchAccount(accountId);
     showScreen('overview');
@@ -1502,6 +1523,18 @@ function portviewSelectAccount(accountId){
         if(kamCards)kamCards.style.display='block';
         // Re-enable nav buttons now account is selected
         if(typeof _updateKamNavDisabled==='function')_updateKamNavDisabled();
+        // v_stab1: if data is blank (token-refresh race or slow bundle),
+        // show loading spinner and register a one-shot re-render when bundle arrives.
+        const _hasData=typeof D!=='undefined'&&D.history&&D.history.length>0;
+        if(!_hasData){
+          const _kload=document.getElementById('kam-loading2');
+          const _kstep=document.getElementById('kam-loading-step');
+          if(_kload){_kload.style.display='block';}
+          if(_kstep){_kstep.textContent='กำลังโหลดข้อมูลร้าน...';}
+          // One-shot: re-render when bundle/data arrives (RenderBus will call refreshAll)
+          // Set a flag so we re-show data once it's ready
+          window._pvPendingAccountRerender=accountId;
+        }
       }
       setKamSubtab('thismonth');
     },300);
