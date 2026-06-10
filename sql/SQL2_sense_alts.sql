@@ -94,26 +94,29 @@ account_items AS (
     item.pack_size AS account_pack_size,
     TRIM(SPLIT(item.item_name_th, ' ตรา')[OFFSET(0)]) AS core_name,
     -- per_kg: weight items — same as v2
-    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY o.account_id, item.item_id)
-          / NULLIF(SUM(item.weight_kg) OVER (PARTITION BY o.account_id, item.item_id), 0), 2)
+    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY ko.account_id, item.item_id)
+          / NULLIF(SUM(item.weight_kg) OVER (PARTITION BY ko.account_id, item.item_id), 0), 2)
           AS avg_price_per_kg,
     -- per_liter: liquid items (weight_kg=0, pack_size has volume) — new in v3
     ROUND(
-      SAFE_DIVIDE(SUM(item.gmv_ex_vat) OVER (PARTITION BY o.account_id, item.item_id),
-                  NULLIF(SUM(item.qty) OVER (PARTITION BY o.account_id, item.item_id), 0))
+      SAFE_DIVIDE(SUM(item.gmv_ex_vat) OVER (PARTITION BY ko.account_id, item.item_id),
+                  NULLIF(SUM(item.qty) OVER (PARTITION BY ko.account_id, item.item_id), 0))
       / NULLIF(extract_pack_liters(item.pack_size), 0)
     , 2) AS avg_price_per_liter,
     -- price_basis: determines which normalized price to use
     CASE
-      WHEN SUM(item.weight_kg) OVER (PARTITION BY o.account_id, item.item_id) > 0 THEN 'per_kg'
+      WHEN SUM(item.weight_kg) OVER (PARTITION BY ko.account_id, item.item_id) > 0 THEN 'per_kg'
       WHEN extract_pack_liters(item.pack_size) IS NOT NULL THEN 'per_liter'
       ELSE NULL
     END AS price_basis,
-    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY o.account_id, item.item_id)
-          / NULLIF(SUM(item.qty) OVER (PARTITION BY o.account_id, item.item_id), 0), 2)
+    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY ko.account_id, item.item_id)
+          / NULLIF(SUM(item.qty) OVER (PARTITION BY ko.account_id, item.item_id), 0), 2)
           AS avg_unit_price,
-    ROUND(SUM(item.qty)        OVER (PARTITION BY o.account_id, item.item_id), 2) AS monthly_qty,
-    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY o.account_id, item.item_id), 2) AS monthly_gmv
+    -- v_fix: PARTITION BY ko.account_id (account_guid) ไม่ใช่ o.account_id (outlet/user_id)
+    -- o.account_id = outlet level → SUM แยกตาม outlet → ร้านหลาย outlet ได้ qty ต่ำกว่าจริง
+    -- ko.account_id = account_guid → SUM รวมทุก outlet ของ account → ถูกต้อง
+    ROUND(SUM(item.qty)        OVER (PARTITION BY ko.account_id, item.item_id), 2) AS monthly_qty,
+    ROUND(SUM(item.gmv_ex_vat) OVER (PARTITION BY ko.account_id, item.item_id), 2) AS monthly_gmv
   FROM `freshket-rn.dwh.order` o, UNNEST(o.item) AS item
   INNER JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
   WHERE DATE_TRUNC(o.delivery_date, MONTH) = DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
@@ -121,7 +124,7 @@ account_items AS (
     AND item.category_high_level != 'DG Non-food'
     AND (item.weight_kg > 0                                                -- per_kg path (เดิม)
          OR extract_pack_liters(item.pack_size) IS NOT NULL)               -- per_liter path (ใหม่)
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.account_id, item.item_id ORDER BY o.delivery_date DESC) = 1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY ko.account_id, item.item_id ORDER BY o.delivery_date DESC) = 1
 ),
 
 -- catalog ใช้ทุก account เป็น reference ราคากลาง (ไม่ filter KAM)
