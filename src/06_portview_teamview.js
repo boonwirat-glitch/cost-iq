@@ -718,7 +718,8 @@ function getPortviewAccounts(){
     if(_pvAcctCacheResult&&_pvAcctCacheKey===_ck&&(Date.now()-_pvAcctCacheTs)<1200)return _pvAcctCacheResult;
     const userEmail=(currentUserProfile&&currentUserProfile.email)||'';
     const role=(currentUserProfile&&currentUserProfile.role)||'rep';
-    const isTL=(role==='tl'||role==='admin');
+    // v499: ad_tl sees whole team portfolio (same as KAM TL)
+    const isTL=(role==='tl'||role==='admin'||role==='ad_tl');
 
     // ── Determine filtered set ──
     let result=null;
@@ -1742,7 +1743,8 @@ function __legacyRenderTeamviewFallback(){
   if(aiOut)aiOut.style.display='none';
   // Show TL/Admin action buttons in teamview header
   const _roleNow=getCurrentRole();
-  const _isTLAdmin=(isTLRole(_roleNow)||isAdminRole(_roleNow));
+  // v499: ad_tl also gets teamview access
+  const _isTLAdmin=(isTLRole(_roleNow)||isAdminRole(_roleNow)||isADTLRole(_roleNow));
   const _tvPortBtn=document.getElementById('tv-portfolio-btn');
   if(_tvPortBtn) _tvPortBtn.style.display=_isTLAdmin?'flex':'none';
   const _tvTgtBtn=document.getElementById('tv-target-btn');
@@ -2046,7 +2048,8 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
 
   const groups=_buildKamGroups();
   // Pre-fetch visit data from Supabase for TL/Admin (so "ทำการบ้าน" shows KAM's actual visits)
-  const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin');
+  // v499: ad_tl also uses team visit map (manages a portfolio of accounts)
+  const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin'||currentUserProfile.role==='ad_tl');
   if(_isTLAdmin && typeof getTeamVisitMapFromSupabase === 'function'){
     const kamEmails = [...new Set(groups.map(g=>g.kamEmail).filter(Boolean))];
     window._tvVisitMap = await getTeamVisitMapFromSupabase(kamEmails);
