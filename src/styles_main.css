@@ -535,6 +535,10 @@ body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflo
 body.kam-mode #swipe-grp-a,body.kam-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kam-mode #swipe-grp-a .scr,body.kam-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
 body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important}
+/* v499: kad-mode (AD) mirrors kam-mode swipe-grp layout */
+body.kad-mode #swipe-grp-a,body.kad-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
+body.kad-mode #swipe-grp-a .scr,body.kad-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
+body.kad-mode #swipe-grp-a .scr.on,body.kad-mode #swipe-grp-b .scr.on{display:block!important}
 body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
 
 body:not(.kam-mode) #nav-report{display:none!important}
@@ -1947,6 +1951,7 @@ body.kam-mode #scr-overview{background:var(--tk-bg-base)}
 body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
 body.kad-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:#fff}
+body.kad-mode #rest-sheet-body{background:#fff}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
 body.kad-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
 body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
@@ -1968,6 +1973,7 @@ body.kad-mode .bnav .ni.on .nwrap{background:var(--tk-accent-dim-3);border-radiu
 
 /* Gear icon loaded state: blue tint in KAM mode (not green) */
 body.kam-mode .data-btn.loaded{background:var(--tk-accent-dim-3)}
+body.kad-mode .data-btn.loaded{background:var(--tk-accent-dim-3)}
 body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
 body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
@@ -2268,6 +2274,7 @@ body.kad-mode .bnav{grid-template-columns:repeat(3,1fr)}
 /* Echo hidden from KAM — Sales only */
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
 body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
+body.kad-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
 
 /* ══ PORTVIEW NO DATA ══ */
 .portview-no-data{padding:40px 20px;text-align:center}
