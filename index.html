@@ -1,4 +1,4 @@
-<!-- Freshket Sense v_save_pct: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v_unit_label: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5551,7 +5551,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v_save_pct',
+      version: 'v_unit_label',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -22182,7 +22182,9 @@ function detectDisplayMode(subclass,packSize){
   // Liquid subclasses
   if(/MINERAL.WATER|DRINKING.WATER|STILL.WATER|SPARKLING|COLA|SODA|SYRUP|JUICE|MIXER|BEER|WINE|SPIRIT|LIQUOR|COCKTAIL|COFFEE.DRINK|ENERGY.DRINK|TEA.DRINK/.test(sub)) return 'per_liter';
   // Liquid by pack_size pattern (e.g. "12 x 500 ml./pack", "6 x 1.5 litres/pack")
-  if(/\d+\s*x\s*[\d.]+\s*(ml|liter|litre|l\.)/i.test(ps)||/[\d.]+\s*(ml|liter|litre)\s*[/.]\b/i.test(ps)) return 'per_liter';
+  // Liquid by pack_size: "830 ml./bottle", "18 litre./tank", "12 x 500 ml./pack" etc.
+  // v_fix3: unified regex — previous missed "ml./X" due to \b after [/.]
+  if(/(?:\d+\s*x\s*)?[\d.]+\s*(ml|liter|litre|l)[\s./]/i.test(ps)) return 'per_liter';
   return 'per_kg';
 }
 
