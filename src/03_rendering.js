@@ -1191,7 +1191,7 @@ function __legacyRenderReportFallback(){
       tbody.innerHTML=catOrder.map(cat=>{
         const gItems=catMap[cat];
         const gSave=gItems.reduce((s,o)=>s+getAlt(o).save,0);
-        const catRow=`<tr class="rpt2-cat-row"><td colspan="7"><span class="rpt2-cat-name">${cat}</span><span class="rpt2-cat-meta">${gItems.length} รายการ</span><span class="rpt2-cat-save">${fmt(gSave)} / เดือน</span></td></tr>`;
+        const catRow=`<tr class="rpt2-cat-row"><td colspan="6"><span class="rpt2-cat-name">${cat}</span><span class="rpt2-cat-meta">${gItems.length} รายการ</span></td></tr>`;
         const rows=gItems.map(o=>{
           rowNum++;
           const a=getAlt(o);
@@ -1199,15 +1199,13 @@ function __legacyRenderReportFallback(){
           const confMed=a.conf==='medium';
           const curMeta=`#${o.curId}${o.curSpec?' · '+o.curSpec:''}${o.curP>0?' · ฿'+o.curP+'/'+o.curU:''}`;
           const altMeta=`#${a.altId}${a.altSpec?' · '+a.altSpec:''}${a.altP>0?' · ฿'+a.altP+'/'+a.altU:''}`;
-          const dotCls=confHigh?'rpt2-dot-hi':confMed?'rpt2-dot-med':'rpt2-dot-lo';
           return`<tr>
             <td class="rpt2-num">${rowNum}</td>
             <td><div class="rpt2-sku-name">${o.curName}</div><div class="rpt2-sku-meta">${curMeta}</div></td>
             <td class="rpt2-arr">→</td>
             <td><div class="rpt2-sku-name">${a.altName}</div><div class="rpt2-sku-meta">${altMeta}</div></td>
             <td class="rpt2-gmv"><div class="rpt2-gmv-val">${fmt(o.monthlyGmv||0)}</div><div class="rpt2-gmv-qty">${o.monthlyQty>0?+(+o.monthlyQty).toFixed(1)+' '+(o.qu||''):''}</div></td>
-            <td class="rpt2-save"><div class="rpt2-save-amt">${fmt(a.save)}</div><div><span class="rpt2-save-pct${confHigh?' high':''}">−${a.pct}%</span></div></td>
-            <td class="rpt2-conf"><span class="rpt2-dot ${dotCls}"></span></td>
+            <td class="rpt2-save"><div class="rpt2-save-amt">${fmt(a.save)}</div><span class="rpt2-save-pct${confHigh?' high':''}">−${a.pct}%</span></td>
           </tr>`;
         }).join('');
         return catRow+rows;
@@ -1219,9 +1217,9 @@ function __legacyRenderReportFallback(){
   const tfoot=document.getElementById('rpt2-tfoot');
   if(tfoot&&selItems.length>0){
     tfoot.innerHTML=`<tr class="rpt2-total-row">
-      <td colspan="5"><span class="rpt2-total-label">รวม ${selItems.length} รายการที่เลือกในแผน</span></td>
-      <td class="rpt2-save"><div class="rpt2-total-amt">${fmt(selSave)} / เดือน</div><div class="rpt2-total-yr">${fmt(selSave*12)} / ปี</div></td>
+      <td colspan="4"><span class="rpt2-total-label">รวม ${selItems.length} รายการที่เลือกในแผน</span></td>
       <td></td>
+      <td class="rpt2-save"><div class="rpt2-total-amt">${fmt(selSave)} / เดือน</div><div class="rpt2-total-yr">${fmt(selSave*12)} / ปี</div></td>
     </tr>`;
   } else if(tfoot){tfoot.innerHTML='';}
 
