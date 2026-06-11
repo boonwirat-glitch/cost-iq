@@ -8,7 +8,7 @@ const CI = (() => {
 
   // ── Constants ──────────────────────────────────────────────────────────────
   const WORKER_URL = 'https://freshket-sense-ai-proxy.boonwirat-t.workers.dev';
-  const MAX_SECS   = 7200; // 2hr safety cap — Gemini รับได้ถึง 2hr audio
+  const MAX_SECS   = 5400; // 90min — 16kbps opus = ~14.8MB base64, under Gemini 20MB inline limit
 
   // ── State ──────────────────────────────────────────────────────────────────
   let _recorder    = null;
@@ -27,6 +27,7 @@ const CI = (() => {
   let _ownerType   = 'kam';
   let _showPicker  = false; // show account picker section in record screen // 'kam' | 'sales'
   let _floatTimer  = null; // minimize timer ref
+  let _audioCtx    = null; // AudioContext keep-alive — prevents iOS from suspending audio session
   let _sessionId   = null; // ci_sessions UUID after save
   let _histFilterMode = 'week'; // 'week' | 'month' | 'all'  — inline history filter
 
@@ -166,6 +167,13 @@ const CI = (() => {
 .waveform{display:flex;align-items:center;gap:2.5px;height:44px;padding:0 28px;width:100%;}
 .wb{flex:1;border-radius:3px;background:var(--echo-ac-20);height:3px;min-height:3px;transition:height .11s ease,opacity .11s ease;opacity:.25;}
 .is-rec .wb{opacity:.55;}
+/* ── AMBIENT WAVE (recording active) ── */
+.ci-wave-wrap{display:flex;align-items:flex-end;justify-content:center;gap:4px;height:40px;}
+.ci-wb{display:inline-block;width:3px;min-height:3px;border-radius:3px;}
+/* ── RECORDING ACTIVE CENTER ── */
+#ci-rec-active{display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:8px;}
+/* ── ORB — remove pulse rings in active state ── */
+.orb-ambient,.orb-ring{display:none;}
 
 /* ── RECORD BOTTOM ── */
 .rec-bottom{padding:8px 24px 40px;display:flex;flex-direction:column;gap:10px;}
@@ -373,8 +381,9 @@ const CI = (() => {
     setTimeout(() => { el.classList.add('ci-open'); }, 50);
     _initWaveform();
     _showScreen('ci-s-record');
-    // Load visit badge after mount (async, non-blocking)
+    // Load visit counts after mount (async, non-blocking)
     setTimeout(_loadVisitBadge, 200);
+    setTimeout(_loadVisitHero, 250);
   }
 
   function _unmount() {
@@ -432,21 +441,18 @@ const CI = (() => {
   <div id="ci-picker-sec" style="display:${_showPicker?'flex':'none'};flex-direction:column;flex:1;padding:0 24px 24px;gap:12px;overflow-y:auto">
     ${_ownerType==='sales' ? _buildSalesPickerInline() : _buildKamPickerInline()}
   </div>
-  <div id="ci-chip-wrap" style="padding:4px 24px 12px;display:${_showPicker?'none':''}">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <div class="chip" style="flex:1;min-width:0">
-        <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
-        <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
-        <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
+  <!-- chip — shown after account selected -->
+  <div id="ci-chip-wrap" style="padding:4px 24px 10px;display:${_showPicker?'none':''}">
+    <div class="chip" style="display:inline-flex">
+      <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}">
       </div>
-      <span id="ci-visit-badge" style="display:none;font-size:9px;font-weight:500;color:var(--ac,#FF385C);background:rgba(255,56,92,.08);border:0.5px solid rgba(255,56,92,.2);padding:2px 8px;border-radius:100px;white-space:nowrap;flex-shrink:0;font-family:'Noto Sans Thai',sans-serif"></span>
+      <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
+      <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
     </div>
   </div>
+  <!-- idle center — orb, shown before startRecording() -->
   <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
     <div class="orb-wrap">
-      <div class="orb-ambient"></div>
-      <div class="orb-ring orb-ring-1"></div>
-      <div class="orb-ring orb-ring-2"></div>
       <div class="orb-outer" onclick="CI.startRecording()">
         <div class="orb-core">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -459,15 +465,38 @@ const CI = (() => {
       </div>
     </div>
     <div class="timer-block">
-      <div class="timer-val" id="ci-tval">0:00</div>
       <div class="timer-hint" id="ci-thint">กดเพื่อเริ่มบันทึก</div>
     </div>
   </div>
-  <div class="waveform" id="ci-wf" style="${_showPicker?'display:none':''}" ></div>
-  <div class="rec-bottom" style="${_showPicker?'display:none':''}">
-    <button class="btn-stop" onclick="CI.stopRecording()">หยุด &amp; วิเคราะห์</button>
-    <span class="stop-hint">ระบบจะ transcribe และวิเคราะห์ด้วย AI อัตโนมัติ</span>
+  <!-- active recording center — wave + timer -->
+  <div id="ci-rec-active" style="display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:12px">
+    <div class="ci-wave-wrap" id="ci-wf"></div>
+    <div class="timer-val" id="ci-tval">0:00</div>
+    <div class="timer-hint" id="ci-rec-hint">echo กำลังรับฟัง · ทำงานอยู่เบื้องหลัง</div>
+  </div>
+  <!-- visit hero — weekly dots + quarterly count -->
+  <div id="ci-visit-hero" style="display:${_showPicker?'none':''};padding:0 24px 10px">
+    <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:14px;padding:12px 14px;transition:background .7s ease,border-color .7s ease">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div id="ci-vh-wlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">สัปดาห์นี้</div>
+          <div id="ci-vh-wnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-wsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+        </div>
+        <div id="ci-vh-div" style="width:0.5px;background:rgba(255,56,92,.12);align-self:stretch;transition:background .7s ease"></div>
+        <div style="text-align:right">
+          <div id="ci-vh-qlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">ไตรมาสนี้</div>
+          <div id="ci-vh-qnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-qsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+        </div>
+      </div>
+      <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
     </div>
+  </div>
+  <!-- stop button — only during recording -->
+  <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
+    <button id="ci-stop-btn" onclick="CI.stopRecording()" style="width:100%;padding:14px;border:none;border-radius:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;background:rgba(0,0,0,.05);color:#AEAEB2;border:0.5px solid rgba(0,0,0,.07);transition:background .7s ease,color .7s ease,border-color .7s ease">หยุด &amp; วิเคราะห์</button>
+  </div>
   <!-- inline history panel — shown when tab=history -->
   <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px max(32px,calc(env(safe-area-inset-bottom,0px) + 80px));-webkit-overflow-scrolling:touch">
     <div id="ci-inline-hist-body" style="padding-top:8px">
@@ -530,25 +559,26 @@ const CI = (() => {
   function _initWaveform() {
     const wf = document.getElementById('ci-wf');
     if (!wf) return;
-    for (let i = 0; i < 34; i++) {
+    // Build 11 bars — slow ambient wave, same style as float pill
+    for (let i = 0; i < 11; i++) {
       const b = document.createElement('div');
-      b.className = 'wb'; wf.appendChild(b);
+      b.className = 'ci-wb';
+      b.style.cssText = 'width:3px;border-radius:3px;transform-origin:bottom;background:rgba(255,56,92,.35);display:inline-block;margin:0 2px;transition:background .7s ease';
+      wf.appendChild(b);
     }
     let t = 0;
+    // Heights pattern — creates natural wave feel without randomness
+    const baseH = [6,12,20,30,36,30,20,12,6,14,22];
     _waveRef = setInterval(() => {
-      t++;
-      const bars = wf.querySelectorAll('.wb');
-      const isRec = _phase === 'recording';
+      t += 0.06;
+      const bars = wf.querySelectorAll('.ci-wb');
       bars.forEach((b, i) => {
-        if (isRec) {
-          b.style.height = (3 + Math.random() * 32) + 'px';
-          b.style.opacity = (.3 + Math.random() * .65).toFixed(2);
-        } else {
-          b.style.height = (3 + Math.sin(t/4 + i * .42) * 1.6) + 'px';
-          b.style.opacity = '.22';
-        }
+        // Slow sinusoidal — ambient, not frantic
+        const h = baseH[i] * (0.45 + 0.55 * Math.abs(Math.sin(t + i * 0.55)));
+        b.style.height = h.toFixed(1) + 'px';
+        b.style.opacity = (0.3 + 0.4 * Math.abs(Math.sin(t * 0.7 + i * 0.4))).toFixed(2);
       });
-    }, 105);
+    }, 80);
   }
 
   // ── Tab pill ───────────────────────────────────────────────────────────────
@@ -579,7 +609,8 @@ const CI = (() => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime   = _bestMime();
-      _recorder    = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+      // audioBitsPerSecond:16000 — opus speech quality, 90min = ~14.8MB base64 (under Gemini 20MB inline limit)
+      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 16000 });
       _chunks      = [];
       _secs        = 0;
       _recorder.ondataavailable = e => { if (e.data?.size > 0) _chunks.push(e.data); };
@@ -587,17 +618,18 @@ const CI = (() => {
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
+      // AudioContext keep-alive — connect stream source to prevent iOS from suspending audio session on screen lock
+      try {
+        _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        _audioCtx.createMediaStreamSource(stream); // connected but no output = silent keep-alive
+      } catch(_) {}
 
-      // UI
-      document.getElementById('ci-rec-center')?.classList.add('is-rec');
-      document.getElementById('ci-rdot')?.classList.add('on');
-      const rlbl = document.getElementById('ci-rlbl');
-      if (rlbl) rlbl.textContent = 'REC';
-      const thint = document.getElementById('ci-thint');
-      if (thint) thint.textContent = 'กำลังบันทึก';
+      // UI — dark mode transition (silent recording feel)
+      _applyRecordingTheme(true);
 
       _timerRef = setInterval(() => {
-        _secs++;
+        // Use Date.now() diff — avoids drift when JS is throttled on screen lock
+        _secs = Math.floor((Date.now() - _startTime) / 1000);
         const el = document.getElementById('ci-tval');
         if (el) el.textContent = _fmt(_secs);
         if (_secs >= MAX_SECS) stopRecording();
@@ -633,6 +665,9 @@ const CI = (() => {
       _recorder.stop();
       _recorder.stream?.getTracks().forEach(t => t.stop());
     }
+    // Close AudioContext keep-alive
+    try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    _applyRecordingTheme(false);
     _phase = 'idle'; _recorder = null; _chunks = [];
     _unmount();
   }
@@ -1797,7 +1832,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       if (histBtn) histBtn.classList.add('on');
       if (recArea) recArea.style.display = 'none';
       if (wf) wf.style.display = 'none';
-      if (recBottom) recBottom.style.display = 'none';
+      const recActive = document.getElementById('ci-rec-active'); if (recActive) recActive.style.display = 'none';
+      const recBottom2 = document.getElementById('ci-rec-bottom'); if (recBottom2) recBottom2.style.display = 'none';
       if (chip) chip.style.display = 'none';
       if (histPanel) {
         histPanel.style.display = 'block';
@@ -1824,9 +1860,10 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       if (pill) { pill.style.left = '3px'; pill.style.width = 'calc(50% - 3px)'; }
       if (recBtn) recBtn.classList.add('on');
       if (histBtn) histBtn.classList.remove('on');
-      if (recArea) recArea.style.display = '';
+      if (recArea) recArea.style.display = _phase === 'recording' ? 'none' : '';
       if (wf) wf.style.display = '';
-      if (recBottom) recBottom.style.display = '';
+      const recActive2 = document.getElementById('ci-rec-active'); if (recActive2) recActive2.style.display = _phase === 'recording' ? 'flex' : 'none';
+      const recBottom3 = document.getElementById('ci-rec-bottom'); if (recBottom3) recBottom3.style.display = _phase === 'recording' ? 'block' : 'none';
       if (chip) chip.style.display = '';
       if (histPanel) histPanel.style.display = 'none';
     }
@@ -2584,7 +2621,161 @@ ${summaryHtml}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  // ── Dark mode theme transition (recording ↔ idle) ─────────────────────────
+  function _applyRecordingTheme(isRec) {
+    const sheet = document.getElementById('ci-fullsheet');
+    if (!sheet) return;
+
+    // Show/hide centers
+    const idleCenter = document.getElementById('ci-rec-center');
+    const recActive  = document.getElementById('ci-rec-active');
+    const recBottom  = document.getElementById('ci-rec-bottom');
+    if (idleCenter) idleCenter.style.display = isRec ? 'none' : '';
+    if (recActive)  { recActive.style.display  = isRec ? 'flex' : 'none'; }
+    if (recBottom)  { recBottom.style.display   = isRec ? 'block' : 'none'; }
+
+    // Status label
+    const rlbl = document.getElementById('ci-rlbl');
+    if (rlbl) {
+      rlbl.textContent = isRec ? 'รับฟังอยู่' : 'พร้อมบันทึก';
+      rlbl.style.fontWeight = isRec ? '400' : '500';
+    }
+    // Topbar left
+    const tbLeft = document.getElementById('ci-topbar-left-label');
+    if (tbLeft) tbLeft.textContent = isRec ? 'ย่อ' : 'ยกเลิก';
+    const tbIcon = document.getElementById('ci-topbar-left-icon');
+    if (tbIcon) tbIcon.style.display = isRec ? 'none' : '';
+
+    if (isRec) {
+      // → DARK
+      sheet.style.transition = 'background .7s ease';
+      sheet.style.background = '#111111';
+      _themeEl('ci-rlbl',       'color', 'rgba(255,255,255,.25)');
+      _themeEl('ci-topbar-left','color', 'rgba(255,255,255,.22)');
+      _themeEl('ci-tab-pill',   'background', 'rgba(255,255,255,.1)');
+      // chip
+      const chip = sheet.querySelector('.chip');
+      if (chip) chip.style.background = 'rgba(255,255,255,.06)';
+      const chipTxt = sheet.querySelector('.chip-txt');
+      if (chipTxt) chipTxt.style.color = 'rgba(255,255,255,.28)';
+      // visit hero
+      const vhCard = document.getElementById('ci-vh-card');
+      if (vhCard) { vhCard.style.background = 'rgba(255,255,255,.04)'; vhCard.style.borderColor = 'rgba(255,255,255,.07)'; }
+      _themeEl('ci-vh-div',    'background', 'rgba(255,255,255,.08)');
+      _themeEl('ci-vh-wlabel', 'color', 'rgba(255,255,255,.2)');
+      _themeEl('ci-vh-qlabel', 'color', 'rgba(255,255,255,.2)');
+      _themeEl('ci-vh-wnum',   'color', 'rgba(255,255,255,.28)');
+      _themeEl('ci-vh-qnum',   'color', 'rgba(255,255,255,.28)');
+      _themeEl('ci-vh-wsub',   'color', 'rgba(255,255,255,.18)');
+      _themeEl('ci-vh-qsub',   'color', 'rgba(255,255,255,.18)');
+      // dots
+      sheet.querySelectorAll('.ci-vh-dot-fill').forEach(d => d.style.background = 'rgba(255,56,92,.45)');
+      sheet.querySelectorAll('.ci-vh-dot-gold').forEach(d => d.style.background = 'rgba(255,179,0,.45)');
+      sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,255,255,.08)');
+      // stop btn
+      const sb = document.getElementById('ci-stop-btn');
+      if (sb) { sb.style.background='rgba(255,255,255,.06)'; sb.style.color='rgba(255,255,255,.28)'; sb.style.borderColor='rgba(255,255,255,.08)'; }
+      // tab bar
+      const tabRec = document.getElementById('ci-tab-rec');
+      if (tabRec) { tabRec.style.background='rgba(255,255,255,.1)'; tabRec.style.color='rgba(255,255,255,.4)'; tabRec.style.boxShadow='none'; }
+      const tabHist = document.getElementById('ci-tab-hist');
+      if (tabHist) tabHist.style.color = 'rgba(255,255,255,.2)';
+      const tabBar = document.getElementById('ci-main-tabs');
+      if (tabBar) tabBar.style.background = 'rgba(255,255,255,.06)';
+    } else {
+      // → LIGHT
+      sheet.style.background = '#ffffff';
+      _themeEl('ci-rlbl',       'color', 'var(--ac,#FF385C)');
+      _themeEl('ci-topbar-left','color', 'var(--tx2,#636366)');
+      // chip
+      const chip = sheet.querySelector('.chip');
+      if (chip) chip.style.background = 'rgba(0,0,0,.04)';
+      const chipTxt = sheet.querySelector('.chip-txt');
+      if (chipTxt) chipTxt.style.color = '';
+      // visit hero
+      const vhCard = document.getElementById('ci-vh-card');
+      if (vhCard) { vhCard.style.background = 'rgba(255,56,92,.04)'; vhCard.style.borderColor = 'rgba(255,56,92,.13)'; }
+      _themeEl('ci-vh-div',    'background', 'rgba(255,56,92,.12)');
+      _themeEl('ci-vh-wlabel', 'color', '#AEAEB2');
+      _themeEl('ci-vh-qlabel', 'color', '#AEAEB2');
+      _themeEl('ci-vh-wnum',   'color', '#1C1C1E');
+      _themeEl('ci-vh-qnum',   'color', '#1C1C1E');
+      _themeEl('ci-vh-wsub',   'color', '#AEAEB2');
+      _themeEl('ci-vh-qsub',   'color', '#AEAEB2');
+      // dots
+      sheet.querySelectorAll('.ci-vh-dot-fill').forEach(d => d.style.background = '#FF385C');
+      sheet.querySelectorAll('.ci-vh-dot-gold').forEach(d => d.style.background = '#FFB300');
+      sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,56,92,.15)');
+      // stop btn
+      const sb = document.getElementById('ci-stop-btn');
+      if (sb) { sb.style.background='rgba(0,0,0,.05)'; sb.style.color='#AEAEB2'; sb.style.borderColor='rgba(0,0,0,.07)'; }
+      // tab bar
+      const tabRec = document.getElementById('ci-tab-rec');
+      if (tabRec) { tabRec.style.background='#fff'; tabRec.style.color='#1C1C1E'; tabRec.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'; }
+      const tabHist = document.getElementById('ci-tab-hist');
+      if (tabHist) tabHist.style.color = 'var(--tx3,#AEAEB2)';
+      const tabBar = document.getElementById('ci-main-tabs');
+      if (tabBar) tabBar.style.background = '';
+    }
+  }
+
+  function _themeEl(id, prop, val) {
+    const el = document.getElementById(id);
+    if (el) el.style[prop.replace(/-([a-z])/g, (_,c) => c.toUpperCase())] = val;
+  }
+
+  // ── Load visit hero (weekly + quarterly counts from ci_sessions) ──────────
+  async function _loadVisitHero() {
+    const dots  = document.getElementById('ci-vh-dots');
+    const wnum  = document.getElementById('ci-vh-wnum');
+    const qnum  = document.getElementById('ci-vh-qnum');
+    if (!dots || !wnum || !qnum) return;
+    const email = currentUserProfile?.email;
+    if (!email || _canDebrief()) return; // TL/Admin don't see hero
+    try {
+      const now = new Date();
+      // Week start (Mon)
+      const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+      const weekStart = new Date(now); weekStart.setHours(0,0,0,0); weekStart.setDate(now.getDate() - dow);
+      // Quarter start (Jan/Apr/Jul/Oct)
+      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+
+      const [wRes, qRes] = await Promise.all([
+        supa.from('ci_sessions').select('*', { count: 'exact', head: true })
+          .eq('owner_email', email).gte('visited_at', weekStart.toISOString()),
+        supa.from('ci_sessions').select('*', { count: 'exact', head: true })
+          .eq('owner_email', email).gte('visited_at', qStart.toISOString()),
+      ]);
+
+      const wCount = wRes.count ?? 0;
+      const qCount = qRes.count ?? 0;
+
+      wnum.textContent = wCount;
+      qnum.textContent = qCount;
+
+      // Build dots: 1-5 red, 6-10 gold, empty up to next milestone of 5
+      const totalDots = Math.max(5, Math.ceil(wCount / 5) * 5);
+      let dotsHtml = '';
+      for (let i = 1; i <= totalDots; i++) {
+        if (i <= Math.min(wCount, 5)) {
+          dotsHtml += '<div class="ci-vh-dot-fill" style="width:8px;height:8px;border-radius:50%;background:#FF385C;flex-shrink:0;transition:background .7s ease"></div>';
+        } else if (i > 5 && i <= wCount) {
+          dotsHtml += '<div class="ci-vh-dot-gold" style="width:8px;height:8px;border-radius:50%;background:#FFB300;flex-shrink:0;transition:background .7s ease"></div>';
+        } else {
+          dotsHtml += '<div class="ci-vh-dot-empty" style="width:8px;height:8px;border-radius:50%;background:rgba(255,56,92,.15);flex-shrink:0;transition:background .7s ease"></div>';
+        }
+      }
+      // Add count label after dots
+      const countLabel = wCount > 5
+        ? `<span style="font-size:10px;color:#FFB300;font-weight:500;margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} visits</span>`
+        : `<span style="font-size:10px;color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} / 5</span>`;
+      dots.innerHTML = dotsHtml + countLabel;
+    } catch(e) {
+      console.warn('[CI hero]', e.message);
+    }
+  }
+
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
@@ -2845,3 +3036,4 @@ function echoExpand() {
     t._t = setTimeout(() => { t.style.opacity='0'; }, 2500);
   }
 })();
+
