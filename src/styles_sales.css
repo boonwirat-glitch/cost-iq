@@ -810,7 +810,9 @@ body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr)
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
 body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
-/* Echo CSS is fully scoped under #ci-fullsheet — no overrides needed */
+/* Echo recording dark mode — is-rec class toggled by JS */
+body.sales-mode #ci-fullsheet.is-rec,
+body.sales-mode #ci-fullsheet.is-rec .scr { background: #111111 !important; }
 
 
 /* ══════════════════════════════════════════
