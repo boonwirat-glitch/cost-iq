@@ -57,11 +57,19 @@
     return true;
   }
 
-  // ── Inject the save-plan-card into plan-cards container ───────────────────
+  // ── Inject the save-plan-card after .plan-tabs inside #opplist ───────────
+  // NOTE: #opplist.innerHTML is rewritten by renderPlanBuilder on every renderOpps call.
+  // So we inject fresh each time savePlanBadge_onCustom fires (after renderOpps).
+  // _spcInited tracks DOM presence only within the current render cycle.
   function _injectBadgeCard(){
-    if(_spcInited) return;
-    var planCards = document.querySelector('.plan-cards');
-    if(!planCards) return;
+    // Target: .plan-tabs is inside .plan-selector inside #opplist
+    var planTabs = document.querySelector('#opplist .plan-tabs');
+    if(!planTabs) return false;
+
+    // Remove any stale card first (opplist was re-rendered)
+    var stale = document.getElementById('save-plan-card');
+    if(stale) stale.parentNode && stale.parentNode.removeChild(stale);
+
     var card = document.createElement('div');
     card.id = 'save-plan-card';
     card.className = 'save-plan-card hidden';
@@ -75,8 +83,12 @@
         '</div>' +
         '<button class="spc-btn cta" id="spc-btn" onclick="doSavePlan()">บันทึก</button>' +
       '</div>';
-    planCards.appendChild(card);
+
+    // Insert after .plan-tabs as next sibling inside .plan-selector
+    var planSelector = planTabs.parentNode;
+    planSelector.insertBefore(card, planTabs.nextSibling);
     _spcInited = true;
+    return true;
   }
 
   // ── Show card with slide-in animation ─────────────────────────────────────
@@ -103,6 +115,7 @@
     setTimeout(function(){
       card.className = 'save-plan-card hidden';
       _spcVisible = false;
+      _spcInited = false; // allow re-inject after next renderOpps
     }, 230);
   }
 
@@ -117,23 +130,30 @@
 
   // ── HOOK: called from toggleOpp (user ticked/unticked a SKU) ─────────────
   window.savePlanBadge_onCustom = function(){
-    _injectBadgeCard();
+    // opplist was just re-rendered by renderOpps — reset inject flag so we re-inject fresh
+    _spcInited = false;
+    var injected = _injectBadgeCard();
+    if(!injected) return; // .plan-tabs not in DOM yet — skip
     _patchSpsCta();
-    _showCard();
-    _updateCardCount();
-    // If previously saved and user changes selection → flip back to unsaved
+
     if(_spcSaved){
+      // User changed selection after saving — flip card back to unsaved
       _spcSaved = false;
       var card = document.getElementById('save-plan-card');
       if(card) card.className = 'save-plan-card spc-unsaved';
       var lbl = document.getElementById('spc-label');
       var sub = document.getElementById('spc-sub');
       var btn = document.getElementById('spc-btn');
-      var dot = document.querySelector('#spc-left .spc-dot');
       if(lbl) lbl.textContent = 'บันทึกแผนนี้';
-      if(sub){ sub.className = 'spc-sub'; sub.innerHTML = 'เลือกไว้ <span id="spc-count">0</span> รายการ · ยังไม่บันทึก'; _updateCardCount(); }
+      if(sub){ sub.className = 'spc-sub'; sub.innerHTML = 'เลือกไว้ <span id="spc-count">0</span> รายการ · ยังไม่บันทึก'; }
       if(btn){ btn.textContent = 'บันทึก'; btn.className = 'spc-btn cta'; }
+      var dot = document.querySelector('#spc-left .spc-dot');
       if(dot) dot.remove();
+      _updateCardCount();
+      _spcVisible = true;
+    } else {
+      _updateCardCount();
+      _showCard();
     }
   };
 
