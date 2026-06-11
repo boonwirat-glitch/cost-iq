@@ -1881,6 +1881,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     ${toneBadge}
     ${reviewBadge}
   </div>
+  ${s.tl_note ? `<div style="font-size:10px;color:#534AB7;font-style:italic;line-height:1.5;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(83,74,183,.12);font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div>` : ''}
 </div>`;
     }).join('');
   }
