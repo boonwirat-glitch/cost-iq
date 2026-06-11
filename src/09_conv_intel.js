@@ -31,6 +31,7 @@ const CI = (() => {
   let _sessionId   = null; // ci_sessions UUID after save
   let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // 'week' | 'month' | 'all'  — inline history filter
+  let _mainTab     = 'record'; // 'record' | 'history' — main tab (state machine input)
   let _checkinCache = null; // { rep_lat, rep_lng, checked_in_at, account_guid } — GPS from check-in orb
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -47,19 +48,20 @@ const CI = (() => {
   }
   function _ctx() {
     if (typeof portviewBulkData !== 'undefined' && _accountGuid) {
-      const row = portviewBulkData.find(r => r.account_guid === _accountGuid);
+      // v552: real bulk fields are id/name/accountType (not account_guid/res_name) — support both
+      const row = portviewBulkData.find(r => (r.id || r.account_guid) === _accountGuid);
       if (row) return {
-        name: row.res_name||'-',
-        seg: row.account_type||'-',
-        days: row.days_with_current_kam||0,
+        name: row.name||row.res_name||'-',
+        seg: row.accountType||row.account_type||'-',
+        days: row.daysWithCurrentKam||row.days_with_current_kam||0,
         // enriched fields for AI context
-        gmv_mtd: row.gmv_to_date||0,
-        gmv_baseline: row.baseline_gmv||row.gmv_last_month||0,
-        pace_pct: row.pace_pct||null,
-        churn_count: row.churned_sku_count||0,
-        missing_cats: row.missing_cat_count||0,
-        account_class: row.account_class||'-',
-        is_new: (row.days_with_current_kam||0) <= 30
+        gmv_mtd: row.gmvToDate||row.gmv_to_date||0,
+        gmv_baseline: (row.paceSignal&&row.paceSignal.baselineGmv)||row.lastGmv||0,
+        pace_pct: (row.paceSignal&&row.paceSignal.pct)||null,
+        churn_count: row.churnedSkuCount||row.churned_sku_count||0,
+        missing_cats: row.missingCatCount||row.missing_cat_count||0,
+        account_class: row.accountType||'-',
+        is_new: (row.daysWithCurrentKam||0) > 0 && (row.daysWithCurrentKam||0) <= 30
       };
     }
     return { name: _accountName||'-', seg: _accountSeg||'-', days: 0,
@@ -176,6 +178,13 @@ const CI = (() => {
 #ci-rec-active{display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:8px;}
 /* ── ORB — remove pulse rings in active state ── */
 .orb-ambient,.orb-ring{display:none;}
+
+/* ── ORB CHECK-IN FEEDBACK (v552) ── */
+@keyframes orb-snap-pulse{0%,100%{box-shadow:inset 0 1.5px 0 rgba(255,255,255,1),0 3px 14px rgba(0,0,0,.09)}50%{box-shadow:inset 0 1.5px 0 rgba(255,255,255,1),0 4px 24px rgba(255,56,92,.30)}}
+.orb-snapping{animation:orb-snap-pulse 1s ease-in-out infinite;}
+.orb-snapping svg{opacity:.45;transition:opacity .2s;}
+@keyframes orb-ok-flash{0%{box-shadow:0 0 0 0 rgba(52,199,89,.5)}100%{box-shadow:0 0 0 30px rgba(52,199,89,0)}}
+.orb-checkin-ok{animation:orb-ok-flash .9s ease-out 1;}
 
 /* ── CHECK-IN BAR ── */
 .ci-checkin-bar{display:none;margin:0 24px 4px;background:rgba(52,199,89,.06);border:0.5px solid rgba(52,199,89,.2);border-radius:12px;padding:8px 12px;align-items:center;gap:8px;}
@@ -409,17 +418,10 @@ const CI = (() => {
     setTimeout(() => { el.classList.add('ci-open'); }, 50);
     _initWaveform();
     _showScreen('ci-s-record');
+    _renderEchoState();   // v552: state machine — single visibility pass
     // Load visit counts after mount (async, non-blocking)
     setTimeout(_loadVisitBadge, 200);
-    // Visit hero: rep sees own count, TL sees covisit hero
     if (_canDebrief()) {
-      const hero = document.getElementById('ci-visit-hero');
-      if (hero) hero.style.display = 'none';
-      // TL: hide orb, show covisit panel
-      const recCenter = document.getElementById('ci-rec-center');
-      const cvPanel = document.getElementById('ci-covisit-panel');
-      if (recCenter) recCenter.style.display = 'none';
-      if (cvPanel) { cvPanel.style.display = 'flex'; }
       setTimeout(_loadCovisitHero, 250);
       setTimeout(_loadCovisitList, 300);
     } else {
@@ -733,8 +735,8 @@ const CI = (() => {
     // Close AudioContext keep-alive
     try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
     // Restore white theme before proc/result screens
-    _applyRecordingTheme(false);
     _phase = 'processing';
+    _applyRecordingTheme(false);
     _showScreen('ci-s-proc');
     _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 14);
   }
@@ -754,8 +756,9 @@ const CI = (() => {
     }
     // Close AudioContext keep-alive
     try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    _phase = 'idle';
     _applyRecordingTheme(false);
-    _phase = 'idle'; _recorder = null; _chunks = [];
+    _recorder = null; _chunks = [];
     _unmount();
   }
 
@@ -1926,72 +1929,67 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     }
   }
 
+  // ── ECHO STATE MACHINE — single source of truth for section visibility ────
+  // Spec: docs/echo-state-spec.md (Table 1) — ห้าม toggle display ที่อื่น
+  function _renderEchoState() {
+    const isTL = _canDebrief();
+    const rec  = _mainTab === 'record';
+    const show = {
+      'ci-chip-wrap':     rec && !isTL && !_showPicker && _phase !== 'recording',
+      'ci-visit-hero':    rec && !_showPicker && _phase !== 'recording',
+      'ci-picker-sec':    rec && !isTL && _showPicker && _phase === 'idle',
+      'ci-rec-center':    rec && !isTL && !_showPicker && _phase === 'idle',
+      'ci-covisit-panel': rec && isTL && _phase !== 'recording',
+      'ci-rec-active':    rec && _phase === 'recording',
+      'ci-rec-bottom':    rec && _phase === 'recording',
+      'ci-inline-hist':   !rec,
+    };
+    const DISPLAY = {
+      'ci-picker-sec':'flex', 'ci-rec-center':'flex', 'ci-covisit-panel':'flex',
+      'ci-rec-active':'flex', 'ci-rec-bottom':'block', 'ci-inline-hist':'block',
+    };
+    Object.entries(show).forEach(([id, on]) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = on ? (DISPLAY[id] || '') : 'none';
+    });
+  }
+
   // ── Main tab switch (บันทึก / ประวัติ) ────────────────────────────────────────
   function _switchMainTab(tab) {
-    const pill = document.getElementById('ci-tab-pill');
-    const recBtn = document.getElementById('ci-tab-rec');
+    _mainTab = tab === 'history' ? 'history' : 'record';
+    const pill    = document.getElementById('ci-tab-pill');
+    const recBtn  = document.getElementById('ci-tab-rec');
     const histBtn = document.getElementById('ci-tab-hist');
-    const recArea = document.getElementById('ci-rec-center');
-    const cvPanel = document.getElementById('ci-covisit-panel');
-    const wf = document.getElementById('ci-wf');
-    const histPanel = document.getElementById('ci-inline-hist');
-    const chip = document.querySelector('#ci-s-record .chip')?.parentElement;
-    const isTL = _canDebrief();
-
-    if (tab === 'history') {
+    const isTL    = _canDebrief();
+    if (_mainTab === 'history') {
       if (pill) { pill.style.left = 'calc(50%)'; pill.style.width = 'calc(50% - 3px)'; }
-      if (recBtn) recBtn.classList.remove('on');
+      if (recBtn)  recBtn.classList.remove('on');
       if (histBtn) histBtn.classList.add('on');
-      // Hide record-side panels (both orb and covisit panel)
-      if (recArea) recArea.style.display = 'none';
-      if (cvPanel) cvPanel.style.display = 'none';
-      if (wf) wf.style.display = 'none';
-      const recActive = document.getElementById('ci-rec-active'); if (recActive) recActive.style.display = 'none';
-      const recBottom2 = document.getElementById('ci-rec-bottom'); if (recBottom2) recBottom2.style.display = 'none';
-      if (chip) chip.style.display = 'none';
-      const visitHero = document.getElementById('ci-visit-hero'); if (visitHero) visitHero.style.display = 'none';
-      if (histPanel) {
-        histPanel.style.display = 'block';
-        // Inject filter chips bar once (rep only — TL sees all, no filter needed)
-        if (!isTL && !document.getElementById('ci-hist-filter-bar')) {
-          const bar = document.createElement('div');
-          bar.id = 'ci-hist-filter-bar';
-          bar.style.cssText = 'padding:8px 0 4px;display:flex;gap:6px;flex-shrink:0;';
-          bar.innerHTML = [
-            {key:'week', label:'สัปดาห์นี้'},
-            {key:'month', label:'เดือนนี้'},
-            {key:'all', label:'ทั้งหมด'}
-          ].map(({key, label}) =>
-            `<button onclick="CI._histFilter('${key}')" id="ci-hf-${key}"
-              style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
-          ).join('');
-          const histBody = document.getElementById('ci-inline-hist-body');
-          if (histBody) histPanel.insertBefore(bar, histBody);
-        }
-        _loadInlineHistory();
-      }
     } else {
-      // → record tab
       if (pill) { pill.style.left = '3px'; pill.style.width = 'calc(50% - 3px)'; }
-      if (recBtn) recBtn.classList.add('on');
+      if (recBtn)  recBtn.classList.add('on');
       if (histBtn) histBtn.classList.remove('on');
-      if (histPanel) histPanel.style.display = 'none';
-      // Restore visit hero visibility (TL hero is handled by _loadCovisitHero)
-      const visitHero2 = document.getElementById('ci-visit-hero');
-      if (visitHero2) visitHero2.style.display = '';
-      if (isTL) {
-        // TL: restore covisit panel, keep orb hidden
-        if (recArea) recArea.style.display = 'none';
-        if (cvPanel) cvPanel.style.display = 'flex';
-      } else {
-        // Rep: restore orb (respecting recording state)
-        if (recArea) recArea.style.display = _phase === 'recording' ? 'none' : '';
-        if (cvPanel) cvPanel.style.display = 'none';
-        if (wf) wf.style.display = '';
-        const recActive2 = document.getElementById('ci-rec-active'); if (recActive2) recActive2.style.display = _phase === 'recording' ? 'flex' : 'none';
-        const recBottom3 = document.getElementById('ci-rec-bottom'); if (recBottom3) recBottom3.style.display = _phase === 'recording' ? 'block' : 'none';
+    }
+    _renderEchoState();
+    if (_mainTab === 'history') {
+      const histPanel = document.getElementById('ci-inline-hist');
+      // Inject filter chips bar once (rep only — TL sees all, no filter needed)
+      if (histPanel && !isTL && !document.getElementById('ci-hist-filter-bar')) {
+        const bar = document.createElement('div');
+        bar.id = 'ci-hist-filter-bar';
+        bar.style.cssText = 'padding:8px 0 4px;display:flex;gap:6px;flex-shrink:0;';
+        bar.innerHTML = [
+          {key:'week', label:'สัปดาห์นี้'},
+          {key:'month', label:'เดือนนี้'},
+          {key:'all', label:'ทั้งหมด'}
+        ].map(({key, label}) =>
+          `<button onclick="CI._histFilter('${key}')" id="ci-hf-${key}"
+            style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
+        ).join('');
+        const histBody = document.getElementById('ci-inline-hist-body');
+        if (histBody) histPanel.insertBefore(bar, histBody);
       }
-      if (chip) chip.style.display = isTL ? 'none' : '';
+      _loadInlineHistory();
     }
   }
 
@@ -2199,6 +2197,17 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
+      // v552: merge verified จาก local cache + covisit_events (spec: source of truth)
+      if (!data.covisit_verified) {
+        if (_cvDoneCache()[data.id]) data.covisit_verified = true;
+        else {
+          try {
+            const { data: ev } = await supa.from('covisit_events')
+              .select('session_id').eq('session_id', data.id).eq('verified', true).limit(1);
+            if (ev && ev.length) data.covisit_verified = true;
+          } catch(_) {}
+        }
+      }
       _renderSessionDetailContent(data);
     } catch(e) {
       const b = document.getElementById('sd-body-inner');
@@ -2318,11 +2327,6 @@ ${summaryHtml}`;
   >${existingNote}</textarea>
 </div>
 <div style="padding:10px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));display:flex;gap:8px">
-  ${!cvVerified ? `<button class="sd-review-btn" id="sd-covisit-btn"
-    style="flex:0 0 auto;background:#1C1C1E;font-size:13px;padding:14px 16px;white-space:nowrap"
-    onclick="CI._covisitVerify('${s.id}','${s.owner_email||''}')">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit
-  </button>` : ''}
   <button class="sd-review-btn" id="sd-save-note-btn"
     style="flex:1;background:#534AB7;font-size:14px"
     onclick="CI._saveTLSessionNote('${s.id}', ${reviewed})">
@@ -2394,81 +2398,7 @@ ${summaryHtml}`;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
-  // ── Co-visit GPS verify — TL taps button in session detail footer ───────────
-  async function _covisitVerify(sessionId, repEmail) {
-    const btn = document.getElementById('sd-covisit-btn');
-    const badge = document.getElementById('sd-cv-badge');
-    if (btn) { btn.disabled = true; btn.textContent = 'กำลังระบุตำแหน่ง...'; }
-
-    const THRESHOLD_M = 150; // 150m threshold
-
-    try {
-      // 1. Snap TL GPS
-      const pos = await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) { reject(new Error('อุปกรณ์นี้ไม่รองรับ GPS')); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
-        });
-      });
-      const tlLat = pos.coords.latitude;
-      const tlLng = pos.coords.longitude;
-
-      if (btn) btn.textContent = 'กำลังบันทึก...';
-
-      // 2. Get TL user_id
-      let tlUserId = null;
-      try {
-        const sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
-        if (sk) { const ss = JSON.parse(localStorage.getItem(sk)); tlUserId = ss?.user?.id || null; }
-      } catch(_) {}
-
-      const tlEmail = currentUserProfile?.email || null;
-      const proximity_m = null; // rep GPS not available client-side — TL-only snap
-      const verified = true;    // TL physically present → auto-verify
-
-      // 3. Upsert covisit_events (graceful fail if table not yet created)
-      try {
-        const { error: cvErr } = await supa.from('covisit_events').upsert({
-          session_id:  sessionId,
-          tl_email:    tlEmail,
-          rep_email:   repEmail || null,
-          tl_lat:      tlLat,
-          tl_lng:      tlLng,
-          rep_lat:     null,
-          rep_lng:     null,
-          proximity_m: proximity_m,
-          verified:    verified,
-          checked_at:  new Date().toISOString(),
-        }, { onConflict: 'session_id' });
-        if (cvErr) console.warn('[CI] covisit_events upsert:', cvErr.message);
-      } catch(e) { console.warn('[CI] covisit_events unavailable:', e.message); }
-
-      // 4. Update ci_sessions.covisit_verified flag
-      try {
-        await supa.from('ci_sessions').update({ covisit_verified: true }).eq('id', sessionId);
-      } catch(e) { console.warn('[CI] ci_sessions covisit_verified update:', e.message); }
-
-      // 5. Update UI — show badge, hide button
-      if (btn) btn.remove();
-      if (badge) {
-        badge.style.display = 'flex';
-        badge.innerHTML = `
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          ✓ Co-visit ยืนยันแล้ว`;
-        badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
-      }
-      // Refresh history feed so co-visit badge appears on session card
-      setTimeout(() => _loadInlineHistory(), 600);
-
-    } catch(e) {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit'; }
-      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — กรุณาอนุญาตตำแหน่งในการตั้งค่า'
-                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองใหม่กลางแจ้ง'
-                : e.code === 3 ? 'GPS timeout — ลองใหม่อีกครั้ง'
-                : 'GPS error: ' + e.message;
-      _toast(msg);
-    }
-  }
+  // (v552: duplicate _covisitVerify removed — เหลือตัวเดียวด้านล่าง รองรับทั้ง 2 entry)
 
   function _closeSessionDetail() {
     const sheet = document.getElementById('ci-sess-detail');
@@ -2487,7 +2417,7 @@ ${summaryHtml}`;
     function _renderSessionCard(s, opts) {
       const date = new Date(s.visited_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
       const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
-      const acctLabel = s.account_name || (portviewBulkData?.find(r=>r.account_guid===s.account_id)?.res_name) || s.account_id || '—';
+      const acctLabel = s.account_name || (portviewBulkData?.find(r=>(r.id||r.account_guid)===s.account_id)?.name) || s.account_id || '—';
       const skills = s.skill_scores?.skills || [];
       const skillDots = skills.slice(0,6).map(sk => {
         const sc = sk.tl_override || sk.score;
@@ -2570,21 +2500,40 @@ ${summaryHtml}`;
     }).join('');
   }
 
+  // ── Data scope (spec Table 2): rep เห็นเฉพาะพอร์ตตัวเอง ─────────────────────
+  function _scopedPortview(rows) {
+    if (_canDebrief()) return rows; // TL/Admin — full team (แต่ TL ไม่มี picker อยู่แล้ว)
+    const me = (currentUserProfile && currentUserProfile.email || '').toLowerCase();
+    if (!me || !rows || !rows.length) return rows || [];
+    const hasOwnerField = rows.some(r => r.kamEmail || r.kam_email || r.owner_email);
+    if (!hasOwnerField) return rows; // dataset ไม่มี owner column — อย่าทำ picker ว่างผิดๆ
+    return rows.filter(r => {
+      const e = (r.kamEmail || r.kam_email || r.owner_email || '');
+      return e && e.toLowerCase() === me;
+    });
+  }
+
   // ── Inline picker builders (Echo design system) ──────────────────────────────
   function _buildKamPickerInline() {
     let recentRows = '';
     try {
       if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
-        const sorted = portviewBulkData
-          .filter(r => r.res_name)
-          .sort((a,b) => (b.gmv_mtd||0) - (a.gmv_mtd||0))
+        // v552: real fields = id/name/accountType + ownership scope
+        const sorted = _scopedPortview(portviewBulkData)
+          .filter(r => r.name || r.res_name)
+          .sort((a,b) => (b.gmvToDate||b.gmv_mtd||0) - (a.gmvToDate||a.gmv_mtd||0))
           .slice(0, 6);
-        recentRows = sorted.map(r => `
+        recentRows = sorted.map(r => {
+          const _n = r.name || r.res_name || '-';
+          const _g = r.id || r.account_guid || '';
+          const _s = r.accountType || r.account_type || '';
+          return `
           <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
-            onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
-            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${r.res_name}</span>
-            <span style="font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em">${r.account_type||''}</span>
-          </button>`).join('');
+            onclick="CI._pickerConfirmKam('${_g}','${_n.replace(/'/g,"\\'")}','${_s}')">
+            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${_n}</span>
+            <span style="font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em">${_s}</span>
+          </button>`;
+        }).join('');
       }
     } catch(e) {}
     const emptyMsg = recentRows ? '' : '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลร้านค้า</div>';
@@ -2600,16 +2549,61 @@ ${summaryHtml}`;
   }
 
   function _buildSalesPickerInline() {
-    return `
-      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">คุณกำลังคุยกับร้านไหน?</div>
-      <input id="ci-sales-name-inline" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
+    // v552: hybrid (spec Table 2) — ร้านในพอร์ตตัวเอง + Lead free-text
+    const own = _scopedPortview(
+      (window.portviewBulkData && window.portviewBulkData.length)
+        ? window.portviewBulkData
+        : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
+    ).filter(r => r.name || r.res_name);
+    const ownRows = own
+      .sort((a,b) => (b.gmvToDate||0) - (a.gmvToDate||0))
+      .slice(0, 5)
+      .map(r => _salesAcctRow(r)).join('');
+    const acctSection = own.length ? `
+      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านในพอร์ตของคุณ</div>
+      <input id="ci-sales-acct-search" type="search" placeholder="ค้นหาร้านในพอร์ต..." autocomplete="off"
+        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        oninput="CI._salesPickerSearch(this.value)" />
+      <div id="ci-sales-acct-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto">${ownRows}</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="flex:1;height:0.5px;background:#E5E5EA"></div><span style="font-size:10px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif">หรือ</span><div style="flex:1;height:0.5px;background:#E5E5EA"></div></div>` : '';
+    return acctSection + `
+      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านใหม่ / Lead</div>
+      <input id="ci-sales-name-inline" type="text" placeholder="พิมพ์ชื่อร้านใหม่..." autocomplete="off"
         style="width:100%;padding:13px 16px;border:1.5px solid #FF385C;border-radius:12px;font-size:15px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
         onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
       <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name-inline').value)"
         style="width:100%;padding:14px;border:none;border-radius:14px;background:#FF385C;color:#fff;font-size:15px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.02em">
-        เริ่มบันทึก
-      </button>
-      <div style="text-align:center;font-size:12px;color:#AEAEB2;padding:4px 0">พิมพ์ชื่อร้าน แล้วกด Enter หรือปุ่มด้านบน</div>`;
+        เริ่มบันทึก (Lead)
+      </button>`;
+  }
+
+  function _salesAcctRow(r) {
+    const _n = r.name || r.res_name || '-';
+    const _g = r.id || r.account_guid || '';
+    const _s = r.accountType || r.account_type || 'SA';
+    return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:0.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
+      onclick="CI._pickerConfirmKam('${_g}','${_n.replace(/'/g,"\\'")}','${_s}')">
+      <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${_n}</span>
+      <span style="font-size:10px;font-weight:600;color:#FF385C;letter-spacing:.06em">${_s}</span>
+    </button>`;
+  }
+
+  function _salesPickerSearch(q) {
+    const list = document.getElementById('ci-sales-acct-list');
+    if (!list) return;
+    const own = _scopedPortview(
+      (window.portviewBulkData && window.portviewBulkData.length)
+        ? window.portviewBulkData
+        : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
+    ).filter(r => r.name || r.res_name);
+    const qLow = (q||'').toLowerCase().trim();
+    const filtered = (qLow
+      ? own.filter(r => ((r.name||r.res_name||'').toLowerCase().includes(qLow)))
+      : own.sort((a,b) => (b.gmvToDate||0) - (a.gmvToDate||0))
+    ).slice(0, 8);
+    list.innerHTML = filtered.length
+      ? filtered.map(r => _salesAcctRow(r)).join('')
+      : '<div style="text-align:center;padding:16px 0;font-size:12px;color:#AEAEB2">ไม่พบในพอร์ต — ใช้ช่อง Lead ด้านล่าง</div>';
   }
 
   // ── Build outlet index from bulkOutletsData ─────────────────────────────────
@@ -2638,9 +2632,10 @@ ${summaryHtml}`;
     const list = document.getElementById('ci-pk-list-inline');
     if (!list) return;
     try {
-      const src = (window.portviewBulkData && window.portviewBulkData.length)
+      const _rawSrc = (window.portviewBulkData && window.portviewBulkData.length)
         ? window.portviewBulkData
         : (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+      const src = _scopedPortview(_rawSrc); // v552: rep เห็นเฉพาะพอร์ตตัวเอง (spec Table 2)
       const qLow = (q||'').toLowerCase().trim();
 
       let filtered;
@@ -2715,7 +2710,16 @@ ${summaryHtml}`;
 
   function open(accountGuid) {
     _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null; _isOwnRecording = false;
+    _mainTab = 'record';
     _unmount();
+    // v552: TL/Admin — covisit panel only, picker ห้ามเปิดเด็ดขาด (spec Table 3)
+    if (_canDebrief()) {
+      _accountGuid = null; _accountName = ''; _accountSeg = '';
+      _showPicker = false;
+      _ownerType = 'kam';
+      setTimeout(_mount, 50);
+      return;
+    }
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     // v498: AD uses KAM picker (existing accounts) not Sales name-input
@@ -2802,7 +2806,9 @@ ${summaryHtml}`;
   // ── GPS check-in — snap location, cache, show bar + mic orb ──────────────
   async function _doCheckin() {
     const hint = document.getElementById('ci-thint');
+    const core = document.getElementById('ci-orb-core');
     if (hint) hint.textContent = 'กำลังระบุตำแหน่ง...';
+    if (core) core.classList.add('orb-snapping');   // v552: visual feedback ระหว่าง GPS snap
     try {
       const pos = await new Promise((resolve, reject) => {
         if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
@@ -2820,16 +2826,25 @@ ${summaryHtml}`;
       // Persist to localStorage so it survives app restart within session
       try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
 
-      // Show check-in pill in chip row
+      // v552: success feedback — green flash + toast + pill บอกเวลาหมดอายุ (90 นาที)
+      if (core) {
+        core.classList.remove('orb-snapping');
+        core.classList.add('orb-checkin-ok');
+        setTimeout(() => core.classList.remove('orb-checkin-ok'), 1100);
+      }
+      const _tStr = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      const _expStr = new Date(now.getTime() + 90*60000).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      if (typeof showToast === 'function') showToast('เช็คอินสำเร็จ ' + _tStr, '✓');
       const pill = document.getElementById('ci-checkin-pill');
       const timeEl = document.getElementById('ci-checkin-time');
-      if (timeEl) timeEl.textContent = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      if (timeEl) timeEl.textContent = _tStr + ' · ถึง ' + _expStr;
       if (pill) pill.style.display = 'flex';
 
       // Switch orb to mic
       _showMicOrb();
 
     } catch(e) {
+      if (core) core.classList.remove('orb-snapping');
       const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
                 : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
                 : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
@@ -2841,16 +2856,10 @@ ${summaryHtml}`;
 
   function _hidePicker() {
     // Hide inline picker, reveal record UI + update chip
-    const pickerSec = document.getElementById('ci-picker-sec');
-    const recCenter = document.getElementById('ci-rec-center');   // orb idle center
-    const visitHero = document.getElementById('ci-visit-hero');   // visit counts card
-    const chip      = document.getElementById('ci-chip-wrap');
-    if (pickerSec)  pickerSec.style.display  = 'none';
-    if (recCenter)  recCenter.style.display   = '';    // show orb
-    if (visitHero)  visitHero.style.display   = '';    // show visit hero card
-    // ci-rec-active + ci-rec-bottom stay hidden (shown only after startRecording())
+    // v552: visibility via state machine (callers set _showPicker=false first)
+    _renderEchoState();
+    const chip = document.getElementById('ci-chip-wrap');
     if (chip) {
-      chip.style.display = '';
       // Update chip text
       const ctx = _ctx();
       const nameEl = chip.querySelector('.chip-txt');
@@ -2876,7 +2885,9 @@ ${summaryHtml}`;
           const pill = document.getElementById('ci-checkin-pill');
           const timeEl = document.getElementById('ci-checkin-time');
           const t = new Date(cached.checked_in_at);
-          if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+          const _exp = new Date(t.getTime() + 90*60000);
+          if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' })
+            + ' · ถึง ' + _exp.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
           if (pill) pill.style.display = 'flex';
           _showMicOrb();
           return;
@@ -2953,18 +2964,8 @@ ${summaryHtml}`;
     const sheet = document.getElementById('ci-fullsheet');
     if (!sheet) return;
 
-    // Show/hide centers
-    const idleCenter = document.getElementById('ci-rec-center');
-    const recActive  = document.getElementById('ci-rec-active');
-    const recBottom  = document.getElementById('ci-rec-bottom');
-    const chipWrap   = document.getElementById('ci-chip-wrap');
-    if (idleCenter) idleCenter.style.display = isRec ? 'none' : '';
-    if (recActive)  { recActive.style.display  = isRec ? 'flex' : 'none'; }
-    if (recBottom)  { recBottom.style.display   = isRec ? 'block' : 'none'; }
-    if (chipWrap)   chipWrap.style.display = isRec ? 'none' : '';
-    // Hide visit hero during recording — more focus on wave + timer
-    const visitHeroEl = document.getElementById('ci-visit-hero');
-    if (visitHeroEl) visitHeroEl.style.display = isRec ? 'none' : '';
+    // v552: visibility via state machine only (spec Table 1)
+    _renderEchoState();
 
     // Status label
     const rlbl = document.getElementById('ci-rlbl');
@@ -2981,7 +2982,7 @@ ${summaryHtml}`;
     if (isRec) {
       sheet.classList.add('is-rec');
       // → DARK
-      sheet.style.transition = 'background .7s ease';
+      sheet.style.transition = 'transform 380ms cubic-bezier(0.16,1,0.3,1), background .7s ease';
       sheet.style.background = '#111111';
       const tb = sheet.querySelector('.topbar');
       if (tb) { tb.style.background='rgba(255,255,255,.04)'; tb.style.borderColor='rgba(255,255,255,.06)'; }
@@ -3174,6 +3175,26 @@ ${summaryHtml}`;
     } catch(e) { console.warn('[CI covisit hero]', e.message); }
   }
 
+  // ── Co-visit verified local cache — กัน DB lag/RLS ทำ row กลับมา "พร้อม" ──
+  const CV_DONE_KEY = 'ci_covisit_done';
+  function _cvDoneCache() {
+    try {
+      const m = JSON.parse(localStorage.getItem(CV_DONE_KEY) || '{}');
+      const cutoff = Date.now() - 24*3600*1000;
+      let dirty = false;
+      Object.keys(m).forEach(k => { if (m[k] < cutoff) { delete m[k]; dirty = true; } });
+      if (dirty) localStorage.setItem(CV_DONE_KEY, JSON.stringify(m));
+      return m;
+    } catch(_) { return {}; }
+  }
+  function _cvMarkDone(sessionId) {
+    try {
+      const m = _cvDoneCache();
+      m[sessionId] = Date.now();
+      localStorage.setItem(CV_DONE_KEY, JSON.stringify(m));
+    } catch(_) {}
+  }
+
   // ── TL Co-visit List — load today's check-ins from team ───────────────────
   let _cvSelected = null; // { session_id, rep_email, rep_lat, rep_lng, checked_in_at }
 
@@ -3193,7 +3214,22 @@ ${summaryHtml}`;
         .gte('checked_in_at', todayStart.toISOString())
         .order('checked_in_at', { ascending: false });
       if (error) throw error;
-      body.innerHTML = _renderCovisitList(data || []);
+      // v552: covisit_events คือ source of truth (spec) — ci_sessions flag อาจโดน RLS block
+      const verifiedIds = new Set();
+      try {
+        const ids = (data || []).map(s => s.id);
+        if (ids.length) {
+          const { data: evs } = await supa.from('covisit_events')
+            .select('session_id').eq('verified', true).in('session_id', ids);
+          (evs || []).forEach(e => verifiedIds.add(e.session_id));
+        }
+      } catch(_) {}
+      const localDone = _cvDoneCache();
+      const merged = (data || []).map(s => ({
+        ...s,
+        covisit_verified: !!(s.covisit_verified || verifiedIds.has(s.id) || localDone[s.id])
+      }));
+      body.innerHTML = _renderCovisitList(merged);
     } catch(e) {
       console.warn('[CI covisit list]', e.message);
       body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">โหลดไม่สำเร็จ</div>';
@@ -3332,6 +3368,7 @@ ${summaryHtml}`;
           checked_at:  nowIso,
         }, { onConflict: 'session_id' });
         if (cvErr) console.warn('[CI] covisit_events upsert:', cvErr.message);
+        else _cvMarkDone(target.session_id);  // v552: local truth — กัน verify ซ้ำหลัง re-open
       } catch(e) { console.warn('[CI] covisit_events unavailable:', e.message); }
 
       // 6. Update ci_sessions.covisit_verified
@@ -3389,7 +3426,7 @@ ${summaryHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 

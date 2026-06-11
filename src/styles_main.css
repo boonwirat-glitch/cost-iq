@@ -5125,11 +5125,8 @@ body.sales-mode .topbar:not(#ci-fullsheet *) {
   background: #FFFFFF !important;
   border-bottom: 1px solid #EBEBEB !important;
 }
-/* Echo recording: topbar goes dark with fullsheet */
-body.sales-mode #ci-fullsheet.is-rec .topbar {
-  background: rgba(255,255,255,.04) !important;
-  border-color: rgba(255,255,255,.06) !important;
-}
+/* v552 CSS Contract: Echo topbar dark/light = inline style + Echo's own transition
+   (ถอด !important override — มันฆ่า fade .7s ของ Echo) */
 body.sales-mode .topbar .logo { color: #222222 !important; }
 body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; animation: iq-pulse-sales 3.5s ease-in-out infinite !important; }
 body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
