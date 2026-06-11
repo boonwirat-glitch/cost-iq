@@ -2617,11 +2617,18 @@ function echoExpand() {
   // ── Supabase helper (reuses global `supa`) ────────────────────────────────
   async function _supaReq(table, opts = {}) {
     const { method = 'GET', filter = '', body = null, prefer = '' } = opts;
-    const url = `${supa.supabaseUrl}/rest/v1/${table}${filter}`;
+    // Use global SUPA_URL/SUPA_KEY (from 01_core.js) — supa.supabaseKey is undefined in Supabase JS v2
+    const _key = (typeof SUPA_KEY !== 'undefined' && SUPA_KEY) ||
+                 (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase &&
+                  (window.FreshketSenseConfig.supabase.publishableKey || window.FreshketSenseConfig.supabase.anonKey)) || '';
+    const _url = (typeof SUPA_URL !== 'undefined' && SUPA_URL) || supa.supabaseUrl || '';
+    const url = `${_url}/rest/v1/${table}${filter}`;
+    let _jwt = _key;
+    try { const _s = await supa.auth.getSession(); _jwt = _s?.data?.session?.access_token || _key; } catch(_) {}
     const headers = {
       'Content-Type': 'application/json',
-      'apikey': supa.supabaseKey,
-      'Authorization': 'Bearer ' + ((supa.auth.getSession ? (await supa.auth.getSession()).data?.session?.access_token : null) || supa.supabaseKey),
+      'apikey': _key,
+      'Authorization': 'Bearer ' + _jwt,
     };
     if (prefer) headers['Prefer'] = prefer;
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
