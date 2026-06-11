@@ -2626,7 +2626,10 @@ function echoExpand() {
     if (prefer) headers['Prefer'] = prefer;
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || res.status); }
-    return method === 'DELETE' ? null : res.json();
+    // 204 No Content (DELETE, PATCH/POST with return=minimal) — no body to parse
+    if (res.status === 204 || method === 'DELETE') return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   }
 
   // ── Load & render list ────────────────────────────────────────────────────
