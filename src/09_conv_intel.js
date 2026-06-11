@@ -279,7 +279,7 @@ const CI = (() => {
 .action-who{font-size:10px;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;}
 
 /* RESULT CTA */
-.result-cta{display:flex;gap:8px;padding:14px 24px 40px;}
+.result-cta{display:flex;gap:8px;padding:14px 24px max(40px,calc(env(safe-area-inset-bottom,0px) + 20px));}
 .btn{flex:1;padding:14px;border-radius:14px;border:none;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.02em;cursor:pointer;transition:opacity 60ms linear,transform 60ms linear;}
 .btn:active{transform:scale(.97);opacity:.85;}
 .btn-primary{background:var(--ac);color:#fff;}
@@ -463,7 +463,7 @@ const CI = (() => {
     <span class="stop-hint">ระบบจะ transcribe และวิเคราะห์ด้วย AI อัตโนมัติ</span>
     </div>
   <!-- inline history panel — shown when tab=history -->
-  <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px 32px;-webkit-overflow-scrolling:touch">
+  <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px max(32px,calc(env(safe-area-inset-bottom,0px) + 80px));-webkit-overflow-scrolling:touch">
     <div id="ci-inline-hist-body" style="padding-top:8px">
       <div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>
     </div>
