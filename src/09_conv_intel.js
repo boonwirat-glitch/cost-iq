@@ -307,7 +307,7 @@ const CI = (() => {
   transform:translateX(-50%) translateY(100%);
   z-index:9999;
   padding-top:env(safe-area-inset-top,44px);
-  background:#FFFFFF!important;
+  background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
@@ -316,8 +316,9 @@ const CI = (() => {
   color:#1C1C1E!important;
 }
 #ci-fullsheet .topbar{
-  background:#fff!important;
+  background:transparent;
   border-bottom:0.5px solid rgba(0,0,0,.07);
+  transition:background .7s ease,border-color .7s ease;
 }
 #ci-fullsheet.ci-open { transform:translateX(-50%) translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
@@ -570,7 +571,7 @@ const CI = (() => {
     // Heights pattern — creates natural wave feel without randomness
     const baseH = [6,12,20,30,36,30,20,12,6,14,22];
     _waveRef = setInterval(() => {
-      t += 0.06;
+      t += 0.18;
       const bars = wf.querySelectorAll('.ci-wb');
       bars.forEach((b, i) => {
         // Slow sinusoidal — ambient, not frantic
@@ -2533,14 +2534,13 @@ ${summaryHtml}`;
   function _hidePicker() {
     // Hide inline picker, reveal record UI + update chip
     const pickerSec = document.getElementById('ci-picker-sec');
-    const recCenter = document.getElementById('ci-rec-center');
-    const wf = document.getElementById('ci-wf');
-    const recBottom = document.querySelector('#ci-s-record .rec-bottom');
-    const chip = document.getElementById('ci-chip-wrap');
-    if (pickerSec) pickerSec.style.display = 'none';
-    if (recCenter) recCenter.style.display = '';
-    if (wf) wf.style.display = '';
-    if (recBottom) recBottom.style.display = '';
+    const recCenter = document.getElementById('ci-rec-center');   // orb idle center
+    const visitHero = document.getElementById('ci-visit-hero');   // visit counts card
+    const chip      = document.getElementById('ci-chip-wrap');
+    if (pickerSec)  pickerSec.style.display  = 'none';
+    if (recCenter)  recCenter.style.display   = '';    // show orb
+    if (visitHero)  visitHero.style.display   = '';    // show visit hero card
+    // ci-rec-active + ci-rec-bottom stay hidden (shown only after startRecording())
     if (chip) {
       chip.style.display = '';
       // Update chip text
@@ -2650,6 +2650,8 @@ ${summaryHtml}`;
       // → DARK
       sheet.style.transition = 'background .7s ease';
       sheet.style.background = '#111111';
+      const tb = sheet.querySelector('.topbar');
+      if (tb) { tb.style.background='rgba(255,255,255,.04)'; tb.style.borderColor='rgba(255,255,255,.06)'; }
       _themeEl('ci-rlbl',       'color', 'rgba(255,255,255,.25)');
       _themeEl('ci-topbar-left','color', 'rgba(255,255,255,.22)');
       _themeEl('ci-tab-pill',   'background', 'rgba(255,255,255,.1)');
@@ -2685,6 +2687,8 @@ ${summaryHtml}`;
     } else {
       // → LIGHT
       sheet.style.background = '#ffffff';
+      const tbL = sheet.querySelector('.topbar');
+      if (tbL) { tbL.style.background=''; tbL.style.borderColor=''; }
       _themeEl('ci-rlbl',       'color', 'var(--ac,#FF385C)');
       _themeEl('ci-topbar-left','color', 'var(--tx2,#636366)');
       // chip
