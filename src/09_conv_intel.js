@@ -28,6 +28,7 @@ const CI = (() => {
   let _showPicker  = false; // show account picker section in record screen // 'kam' | 'sales'
   let _floatTimer  = null; // minimize timer ref
   let _sessionId   = null; // ci_sessions UUID after save
+  let _histFilterMode = 'week'; // 'week' | 'month' | 'all'  — inline history filter
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function _fmt(s) {
@@ -372,6 +373,8 @@ const CI = (() => {
     setTimeout(() => { el.classList.add('ci-open'); }, 50);
     _initWaveform();
     _showScreen('ci-s-record');
+    // Load visit badge after mount (async, non-blocking)
+    setTimeout(_loadVisitBadge, 200);
   }
 
   function _unmount() {
@@ -430,10 +433,13 @@ const CI = (() => {
     ${_ownerType==='sales' ? _buildSalesPickerInline() : _buildKamPickerInline()}
   </div>
   <div id="ci-chip-wrap" style="padding:4px 24px 12px;display:${_showPicker?'none':''}">
-    <div class="chip">
-      <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
-      <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
-      <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div class="chip" style="flex:1;min-width:0">
+        <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
+        <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
+        <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
+      </div>
+      <span id="ci-visit-badge" style="display:none;font-size:9px;font-weight:500;color:var(--ac,#FF385C);background:rgba(255,56,92,.08);border:0.5px solid rgba(255,56,92,.2);padding:2px 8px;border-radius:100px;white-space:nowrap;flex-shrink:0;font-family:'Noto Sans Thai',sans-serif"></span>
     </div>
   </div>
   <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
@@ -1729,6 +1735,51 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   }
 
 
+  // ── History filter ─────────────────────────────────────────────────────────
+  function _histFilter(mode) {
+    _histFilterMode = mode;
+    // Update chip active styles
+    ['week','month','all'].forEach(k => {
+      const btn = document.getElementById('ci-hf-' + k);
+      if (!btn) return;
+      const isActive = k === mode;
+      btn.style.background = isActive ? 'var(--ac,#FF385C)' : 'rgba(0,0,0,.04)';
+      btn.style.color = isActive ? '#fff' : 'var(--tx2,#636366)';
+      btn.style.border = isActive ? '0.5px solid var(--ac,#FF385C)' : '0.5px solid rgba(0,0,0,.14)';
+    });
+    _loadInlineHistory();
+  }
+
+  // ── Visit badge (rep sees own week count) ──────────────────────────────────
+  async function _loadVisitBadge() {
+    const badge = document.getElementById('ci-visit-badge');
+    if (!badge) return;
+    const email = currentUserProfile?.email;
+    if (!email || _canDebrief()) { badge.style.display = 'none'; return; }
+    try {
+      const now = new Date();
+      const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+      const weekStart = new Date(now);
+      weekStart.setHours(0,0,0,0);
+      weekStart.setDate(now.getDate() - dow);
+      const { data, error } = await supa
+        .from('ci_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_email', email)
+        .gte('visited_at', weekStart.toISOString());
+      if (error) throw error;
+      const count = data?.length ?? 0;
+      if (count > 0) {
+        badge.textContent = count + ' visits this week';
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch(e) {
+      badge.style.display = 'none';
+    }
+  }
+
   // ── Main tab switch (บันทึก / ประวัติ) ────────────────────────────────────────
   function _switchMainTab(tab) {
     const pill = document.getElementById('ci-tab-pill');
@@ -1748,7 +1799,27 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       if (wf) wf.style.display = 'none';
       if (recBottom) recBottom.style.display = 'none';
       if (chip) chip.style.display = 'none';
-      if (histPanel) { histPanel.style.display = 'block'; _loadInlineHistory(); }
+      if (histPanel) {
+        histPanel.style.display = 'block';
+        // Inject filter chips bar once
+        if (!document.getElementById('ci-hist-filter-bar')) {
+          const bar = document.createElement('div');
+          bar.id = 'ci-hist-filter-bar';
+          bar.style.cssText = 'padding:8px 0 4px;display:flex;gap:6px;flex-shrink:0;';
+          bar.innerHTML = [
+            {key:'week', label:'สัปดาห์นี้'},
+            {key:'month', label:'เดือนนี้'},
+            {key:'all', label:'ทั้งหมด'}
+          ].map(({key, label}) =>
+            `<button onclick="CI._histFilter('${key}')" id="ci-hf-${key}"
+              style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
+          ).join('');
+          // Insert before ci-inline-hist-body
+          const histBody = document.getElementById('ci-inline-hist-body');
+          if (histBody) histPanel.insertBefore(bar, histBody);
+        }
+        _loadInlineHistory();
+      }
     } else {
       if (pill) { pill.style.left = '3px'; pill.style.width = 'calc(50% - 3px)'; }
       if (recBtn) recBtn.classList.add('on');
@@ -1774,6 +1845,19 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
         .order('visited_at', { ascending: false })
         .limit(isTL ? 100 : 50);
 
+      // Date filter (rep only — TL always sees all for context)
+      if (!isTL && _histFilterMode !== 'all') {
+        const now = new Date();
+        let since;
+        if (_histFilterMode === 'week') {
+          const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+          since = new Date(now); since.setHours(0,0,0,0); since.setDate(now.getDate() - dow);
+        } else { // month
+          since = new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+        q = q.gte('visited_at', since.toISOString());
+      }
+
       if (isTL) {
         // TL — ดู sessions ของทุกคนในทีม (ใช้ portviewBulkData หา emails)
         const teamEmails = _getTeamEmails();
@@ -1790,7 +1874,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       const { data, error } = await q;
       if (error) throw error;
       if (!data || !data.length) {
-        body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ Echo</div>';
+        const emptyMsg = _histFilterMode === 'week' ? 'ยังไม่มี visit สัปดาห์นี้' : _histFilterMode === 'month' ? 'ยังไม่มี visit เดือนนี้' : 'ยังไม่มีประวัติ Echo';
+        body.innerHTML = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">${emptyMsg}</div>`;
         return;
       }
       body.innerHTML = isTL ? _renderTLTeamFeed(data) : _renderInlineHistory(data);
@@ -2107,8 +2192,8 @@ ${summaryHtml}`;
           btn.style.background = '#534AB7';
         }, 1800);
       }
-      // refresh feed in background
-      setTimeout(() => _loadInlineHistory(), 800);
+      // refresh feed + badge in background
+      setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); }, 800);
     } catch(e) {
       if (btn) { btn.disabled = false; btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'; }
       _toast('บันทึกไม่สำเร็จ: ' + e.message);
@@ -2144,13 +2229,26 @@ ${summaryHtml}`;
       ).join('');
       const titleLeft = opts?.showAccount ? acctLabel : ((_accountGuid || _groupBySales) ? date : acctLabel);
       const titleRight = opts?.showAccount ? date + (dur?' · '+dur:'') : ((_accountGuid || _groupBySales) ? dur : date + (dur?' · '+dur:''));
-      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+      // TL coaching note — purple dot indicator + read-only note (rep sees this)
+      const hasTLNote = !!(s.tl_note && s.tl_note.trim());
+      const tlNoteDot = hasTLNote
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#534AB7;font-family:'Noto Sans Thai',sans-serif">` +
+          `<span style="width:5px;height:5px;border-radius:50%;background:#534AB7;flex-shrink:0"></span>TL note</span>` : '';
+      const tlNoteHtml = hasTLNote
+        ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(83,74,183,.06);border-radius:8px;border:0.5px solid rgba(83,74,183,.16)">` +
+          `<div style="font-size:9px;font-weight:500;letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px">TL NOTE</div>` +
+          `<div style="font-size:11px;color:#3D3680;line-height:1.6;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
+      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${titleLeft}</span>
-          <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${titleRight}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${tlNoteDot}
+            <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${titleRight}</span>
+          </div>
         </div>
-        ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${actions?'8px':'0'}">${skillDots}</div>` : ''}
-        ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div>` : ''}
+        ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${(actions||hasTLNote)?'8px':'0'}">${skillDots}</div>` : ''}
+        ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${hasTLNote?'8px':'0'}">${actions}</div>` : ''}
+        ${tlNoteHtml}
       </div>`;
     }
 
@@ -2486,7 +2584,7 @@ ${summaryHtml}`;
         </button>`).join('');
     } catch(e) {}
   }
-  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
