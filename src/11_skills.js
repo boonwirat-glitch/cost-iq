@@ -925,7 +925,7 @@ async function _doOpenDetail(skillId) {
   ${def.principle_th ? `
   <div class="sk-rubric-block">
     <div class="sk-rubric-eye">Principle — ทำไมสกิลนี้สำคัญ</div>
-    <div class="sk-rubric-text">${def.principle_th}</div>
+    <div class="sk-rubric-text" style="white-space:pre-wrap">${def.principle_th}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
@@ -939,7 +939,7 @@ async function _doOpenDetail(skillId) {
   ${def.pass_test_th ? `
   <div class="sk-rubric-block">
     <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
-    <div class="sk-rubric-text">${def.pass_test_th.split('/').map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
+    <div class="sk-rubric-text">${(def.pass_test_th.includes('\n') ? def.pass_test_th.split('\n') : def.pass_test_th.split('/')).map((t,i) => t.trim()).filter(Boolean).map((t,i) => (i+1)+'. '+t).join('<br>')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
@@ -1322,7 +1322,7 @@ async function skillsTLOpenEval(userId, skillId) {
 <div class="sk-detail-body">
   <div class="sk-rubric-block" style="margin-top:14px;">
     <div class="sk-rubric-eye">Pass Test — เกณฑ์ผ่าน</div>
-    <div class="sk-rubric-text">${(def.pass_test_th||'').replace(/\//g,'<br>')}</div>
+    <div class="sk-rubric-text">${((def.pass_test_th||'').includes('\n') ? (def.pass_test_th||'').split('\n') : (def.pass_test_th||'').split('/')).map((t,i)=>t.trim()).filter(Boolean).map((t,i)=>(i+1)+'. '+t).join('<br>')}</div>
   </div>
   <div class="sk-divider"></div>
   ${(() => {
