@@ -1,4 +1,4 @@
-<!-- Freshket Sense v526: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v527: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5627,7 +5627,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v526',
+      version: 'v527',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10328,7 +10328,7 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   position: relative;
   width: 100%;
   height: 100%;  /* JS overrides with window.innerHeight inline */
-  overflow: hidden;
+  overflow: visible;
   background: #111;
   isolation: isolate;
 }
@@ -10354,9 +10354,9 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s3-hero {
   position: relative;
   width: 100%;
-  height: 50%;
+  height: 55%;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
 }
 .s3-hero-img {
@@ -10408,17 +10408,18 @@ body.sales-mode .scr { background: #FFFFFF !important; }
   position: absolute;
   bottom: 0; left: 0; right: 0;
   z-index: 5;
-  background: rgba(255,255,255,0.65);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  backdrop-filter: blur(28px) saturate(1.8);
-  border-radius: 24px 24px 0 0;
+  background: rgba(255,255,255,0.92);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  backdrop-filter: blur(32px) saturate(1.6);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18), 0 -2px 8px rgba(0,0,0,.08);
   transition: height .5s cubic-bezier(.32,.72,0,1),
               opacity .25s ease;
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 50%; opacity: 1; overflow: hidden; }
-.s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
+.s3-sheet-peek     { height: 58%; opacity: 1; overflow: hidden; }
+.s3-sheet-expanded { height: calc(100% - 120px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
 .s3-sheet-handle {
@@ -10466,9 +10467,8 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 .s3-body-full { display: none; }
 .s3-sheet-peek .s3-body-full { display: none; }
 .s3-sheet-expanded .s3-body-full { display: block; }
-.s3-sheet-expanded .s3-peek-title { display: none; }
-.s3-sheet-expanded .s3-peek-cta   { display: none; }
-.s3-sheet-expanded .s3-peek-hint  { display: none; }
+/* Peek static section: visible in peek, hidden in expanded (full body replaces it) */
+.s3-sheet-expanded .s3-peek-static { display: none; }
 
 /* Content stagger */
 .s3-sheet .sk-detail-body > * { animation: s3-fade-up .35s ease both; }
@@ -46179,20 +46179,23 @@ async function _doOpenDetail(skillId) {
   </div>
   <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
-    <div class="s3-peek-hint">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;" onclick="_s3ToggleSheet()">
-        <div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+    <!-- Peek: title + principle always visible -->
+    <div class="s3-peek-static" style="padding:0 16px 4px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
             <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
             <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
           </div>
-          <div class="s3-teaser">${teaserText}</div>
+          <div style="font-size:18px;font-weight:800;color:var(--sk-ink);line-height:1.2;margin-bottom:10px;font-family:'Noto Sans Thai',sans-serif;">${def.skill_name_th || def.skill_name_en}</div>
+          ${def.principle_th ? `
+          <div class="sk-rubric-eye" style="margin-bottom:5px;">Principle — ทำไมสกิลนี้สำคัญ</div>
+          <div class="sk-rubric-text" style="white-space:pre-wrap;">${def.principle_th}</div>` : ''}
         </div>
-        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:2px;"><path d="M18 15l-6-6-6 6"/></svg>
+        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:4px;margin-left:10px;" onclick="_s3ToggleSheet()"><path d="M18 15l-6-6-6 6"/></svg>
       </div>
-      <div class="s3-peek-title">${def.skill_name_th || def.skill_name_en}</div>
-      ${cta ? `<div class="s3-peek-cta">${cta}</div>` : ''}
     </div>
+    <!-- Expanded-only: practice + pass test + cta -->
     <div class="sk-detail-body s3-body-full" id="s3-body-content">
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
 
