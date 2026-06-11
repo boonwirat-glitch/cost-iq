@@ -1762,13 +1762,13 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       const weekStart = new Date(now);
       weekStart.setHours(0,0,0,0);
       weekStart.setDate(now.getDate() - dow);
-      const { data, error } = await supa
+      const { count: _visitCount, error } = await supa
         .from('ci_sessions')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('owner_email', email)
         .gte('visited_at', weekStart.toISOString());
       if (error) throw error;
-      const count = data?.length ?? 0;
+      const count = _visitCount ?? 0;
       if (count > 0) {
         badge.textContent = count + ' visits this week';
         badge.style.display = '';
