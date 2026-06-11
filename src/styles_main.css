@@ -1431,7 +1431,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .simbar-fill{height:100%;border-radius:3px;background:var(--amb);transition:width .6s cubic-bezier(.25,.8,.25,1)}
 
 /* ── REPORT — redesigned ── */
-.rpt-wrap{padding:0 16px 16px}
+.rpt-wrap{padding:0 16px 16px;overflow-x:hidden}
 .rpt{background:var(--n0);border:1px solid var(--n100);border-radius:16px;overflow:hidden}
 .rpt-head{background:var(--g900);padding:22px;color:#fff;position:relative;overflow:hidden}
 .rpt-head::after{content:'';position:absolute;right:-40px;bottom:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
@@ -1663,8 +1663,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-date{font-size:7.5px;color:rgba(255,255,255,.4);margin-top:2px;}
 .rpt2-kam{font-size:7.5px;color:rgba(255,255,255,.35);margin-top:1px;}
 /* KPI strip */
-.rpt2-kpi-strip{display:flex;border-bottom:1px solid #e4ebe4;}
-.rpt2-kpi{flex:1;padding:8px 14px;border-right:0.5px solid #e4ebe4;}
+.rpt2-kpi-strip{display:flex;border-bottom:1px solid #e4ebe4;min-width:0;overflow:hidden;}
+.rpt2-kpi{flex:1;padding:8px 8px;border-right:0.5px solid #e4ebe4;min-width:0;overflow:hidden;}
 .rpt2-kpi:last-child{border-right:none;}
 .rpt2-kpi-lbl{font-size:6.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8aaa8a;margin-bottom:3px;}
 .rpt2-kpi-val{font-size:15px;font-weight:700;color:#3a3a3a;font-family:'IBM Plex Mono',monospace;line-height:1;letter-spacing:-.3px;}
@@ -3336,7 +3336,7 @@ body.kam-sense-active.sense-plan-expanded #sense-plan-section{
   margin:0 0 2px 0!important;
 }
 body.kam-sense-active.sense-plan-expanded .sps-info{padding-left:0!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:0!important;width:44px!important;height:44px!important;}
+body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:6px!important;width:44px!important;height:44px!important;}
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.78),rgba(218,240,228,.9))!important;
 }
@@ -3402,7 +3402,7 @@ body.kam-sense-active.sense-plan-expanded .sps-info{min-width:0!important;paddin
 body.kam-sense-active.sense-plan-expanded .sps-label,
 body.kam-sense-active.sense-plan-expanded .sps-sub{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
 body.kam-sense-active.sense-plan-expanded .sps-amt{font-size:26px!important;line-height:1.05!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta{width:48px!important;height:48px!important;margin:0!important;align-self:center!important;}
+body.kam-sense-active.sense-plan-expanded .sps-cta{width:44px!important;height:44px!important;margin-right:6px!important;align-self:center!important;}
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.9),rgba(218,240,228,.97))!important;
   border:1px solid rgba(0,160,80,.16)!important;
