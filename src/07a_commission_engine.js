@@ -680,12 +680,24 @@ async function loadTargets(quarter) {
   }
 
   try {
+    // v559 PARAMS READBACK FIX: load ALL target_settings keys.
+    // Cockpit component params are saved under '{metric}_params' but only
+    // 'nrr_threshold' was ever read back — cockpit edits never reached other
+    // sessions, so the engine silently computed payouts with hardcoded
+    // defaults. Now every key is hydrated into _tgtSettings on loadTargets.
     const { data: sets, error: setsErr } = await supa.from('target_settings')
-      .select('key,value')
-      .eq('key', 'nrr_threshold')
-      .single();
-    if (setsErr && setsErr.code !== 'PGRST116') throw new Error(setsErr.message);
-    if (sets) _tgtSettings.nrr_threshold = parseFloat(sets.value) || 98;
+      .select('key,value');
+    if (setsErr) throw new Error(setsErr.message);
+    (sets || []).forEach(s => {
+      if (!s || !s.key) return;
+      if (s.key === 'nrr_threshold') { _tgtSettings.nrr_threshold = parseFloat(s.value) || 98; return; }
+      if (/_params$/.test(s.key)) {
+        try { _tgtSettings[s.key] = JSON.parse(s.value); }
+        catch(e2) { _tgtSettings[s.key] = s.value; } // _commGetConfig parses string values too
+        return;
+      }
+      _tgtSettings[s.key] = s.value;
+    });
   } catch (e) {
     console.warn('[Target] settings load failed:', e.message);
   }
