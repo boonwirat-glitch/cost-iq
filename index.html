@@ -1,4 +1,4 @@
-<!-- Freshket Sense v531: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v532: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5627,7 +5627,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v531',
+      version: 'v532',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10208,17 +10208,8 @@ body.sales-mode .scr { background: #FFFFFF !important; }
 #scr-skills.on.sk-detail-mode {
   display: block !important;
 }
-#scr-skills.sk-detail-mode 
 
 /* ══ S3 PEEK / EXPAND SHEET ══════════════════════════════ */
-
-
-
-
-.s3-sheet-expanded 
-
-.s3-sheet-peek 
-.s3-sheet-expanded 
 
 /* ══ IMAGE LAZY FADE ═════════════════════════════════════ */
 .sk-img-lazy:not(.sk-img-loaded) {
@@ -42823,13 +42814,13 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       const weekStart = new Date(now);
       weekStart.setHours(0,0,0,0);
       weekStart.setDate(now.getDate() - dow);
-      const { data, error } = await supa
+      const { count: _visitCount, error } = await supa
         .from('ci_sessions')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('owner_email', email)
         .gte('visited_at', weekStart.toISOString());
       if (error) throw error;
-      const count = data?.length ?? 0;
+      const count = _visitCount ?? 0;
       if (count > 0) {
         badge.textContent = count + ' visits this week';
         badge.style.display = '';
@@ -45345,6 +45336,7 @@ let _skillDefs    = [];        // skill_definitions rows
 let _skillProg    = {};        // { skill_id: progress_row }
 let _skillsUserId = null;      // current auth user id
 let _skillsRole   = null;      // 'sales' | 'sales_tl' | 'kam' | 'tl' | 'admin'
+let _skillsInitRole = null;    // role at last successful init — guard against double-fetch
 let _activeSkillId = null;
 let _skillUsers   = {};        // { user_id: { full_name, kam_name, email } }     // currently open skill sheet
 let _skillViewMode = 'pending';  // TL: 'pending' | 'overview' | 'visits'
@@ -45423,6 +45415,14 @@ async function skillsInit() {
   const role = typeof getCurrentRole === 'function' ? getCurrentRole() : null;
   _skillsRole = role;
 
+  // Idempotency guard: same role + data already loaded → just re-render, no re-fetch
+  // Prevents double network calls when user taps Skills nav repeatedly
+  if (role === _skillsInitRole && _skillDefs.length > 0) {
+    _renderSkillsScreen();
+    _updateSkillsNavBadge();
+    return;
+  }
+
   // Role guard: KAM/rep must not see skills — redirect back to portview
   // v498: rep=KAM IC, ad=Account Development, ad_tl=AD TL — all use Skills
   const _allowedRoles = ['sales','sales_tl','tl','admin','rep','ad','ad_tl'];
@@ -45478,6 +45478,7 @@ async function skillsInit() {
   ]);
   await _loadSkillUsers();   // โหลดชื่อ rep หลังรู้ว่ามี user_id อะไรบ้าง
 
+  _skillsInitRole = role;  // mark init complete for this role
   _renderSkillsScreen();
   _updateSkillsNavBadge();
 }
