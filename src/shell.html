@@ -3031,11 +3031,11 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span class="lb">Echo</span>
 </button>
 <!-- Sense — restaurant mode + KAM overlay mode (v183) -->
-<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="(isKAM&amp;&amp;document.body.classList.contains('restaurant-sheet'))?_overlayNav('opportunities'):showScreen('opportunities')">
+<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="(isKAM&amp;&amp;document.body.classList.contains('restaurant-sheet'))?_overlayNav('opportunities'):(showScreen('opportunities'),document.body.classList.remove('sense-on-report'))">
 <div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-sense"></use></svg><span class="nbadge" id="opp-nav-badge" style="display:none">0</span></div>
 <span class="lb">Save</span>
 </button>
-<button class="ni rest-only" id="nav-report" onclick="showScreen('report')">
+<button class="ni rest-only" id="nav-report" onclick="showScreen('report');document.body.classList.add('sense-on-report');if(typeof savePlanBadge_onReport==='function')savePlanBadge_onReport();">
 <div class="nwrap"><svg height="22" width="22"><use href="#ico-doc"></use></svg></div>
 <span class="lb">รายงาน</span>
 </button>
