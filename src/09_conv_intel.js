@@ -478,10 +478,6 @@ const CI = (() => {
       <button class="tab-btn" id="ci-tab-hist" onclick="CI._switchMainTab('history')">ประวัติ</button>
     </div>
   </div>
-  <!-- Inline picker section — shown when no account selected -->
-  <div id="ci-picker-sec" style="display:${_showPicker?'flex':'none'};flex-direction:column;flex:1;padding:0 24px 24px;gap:12px;overflow-y:auto">
-    ${_ownerType==='sales' ? _buildSalesPickerInline() : _buildKamPickerInline()}
-  </div>
   <!-- chip — shown after account selected -->
   <div id="ci-chip-wrap" style="padding:4px 24px 10px;display:${_showPicker?'none':''}">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -496,8 +492,8 @@ const CI = (() => {
       </div>
     </div>
   </div>
-  <!-- visit hero — weekly dots + quarterly count -->
-  <div id="ci-visit-hero" style="padding:0 24px 10px">
+  <!-- visit hero — hide during picker state, show after account selected -->
+  <div id="ci-visit-hero" style="padding:0 24px 10px;${_showPicker?'display:none':''}">
     <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:14px;padding:12px 14px;transition:background .7s ease,border-color .7s ease">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div>
@@ -514,6 +510,10 @@ const CI = (() => {
       </div>
       <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
     </div>
+  </div>
+  <!-- Inline picker section — shown when no account selected, after visit hero -->
+  <div id="ci-picker-sec" style="display:${_showPicker?'flex':'none'};flex-direction:column;flex:1;padding:0 24px 24px;gap:12px;overflow-y:auto">
+    ${_ownerType==='sales' ? _buildSalesPickerInline() : _buildKamPickerInline()}
   </div>
   <!-- idle center — orb, shown before startRecording() -->
   <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
