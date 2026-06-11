@@ -1770,7 +1770,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     try {
       const isTL = _canDebrief();
       let q = supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,status')
         .order('visited_at', { ascending: false })
         .limit(isTL ? 100 : 50);
 
@@ -1940,7 +1940,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     // Load session data
     try {
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,status')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -2036,20 +2036,41 @@ ${toneHtml}
 ${skillRows ? `<div class="sd-section-hd">Skills</div>${skillRows}` : ''}
 ${summaryHtml}`;
 
-    // ── Review footer
+    // ── Review footer — TL coaching note + save
     if (footer) {
       footer.style.display = 'block';
-      if (reviewed) {
-        const reviewedDate = new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
-        footer.innerHTML = `<button class="sd-review-btn done" disabled>✓ รีวิวแล้ว · ${reviewedDate}</button>`;
-      } else {
-        footer.innerHTML = `<button class="sd-review-btn" onclick="CI._markSessionReviewed('${s.id}')">✓ รีวิว session นี้แล้ว</button>`;
-      }
+      const existingNote = s.tl_note || '';
+      const reviewedDate = reviewed
+        ? new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' })
+        : null;
+      footer.innerHTML = `
+<div style="padding:14px 20px 0">
+  <div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:6px">
+    TL COACHING NOTE${reviewedDate ? ' · รีวิวแล้ว ' + reviewedDate : ''}
+  </div>
+  <textarea id="sd-tl-note" placeholder="บันทึก coaching note สำหรับ session นี้ (optional)" rows="3"
+    style="width:100%;padding:10px 12px;border:0.5px solid rgba(83,74,183,.25);border-radius:10px;background:rgba(83,74,183,.05);color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;font-size:13px;line-height:1.6;resize:none;-webkit-appearance:none;outline:none"
+    onfocus="this.style.borderColor='rgba(83,74,183,.5)'" onblur="this.style.borderColor='rgba(83,74,183,.25)'"
+  >${existingNote}</textarea>
+</div>
+<div style="padding:10px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));display:flex;gap:8px">
+  <button class="sd-review-btn" id="sd-save-note-btn"
+    style="flex:1;background:#534AB7;font-size:14px"
+    onclick="CI._saveTLSessionNote('${s.id}', ${reviewed})">
+    ${reviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'}
+  </button>
+</div>`;
     }
   }
 
   async function _markSessionReviewed(sessionId) {
-    const btn = document.querySelector('.sd-review-btn');
+    await _saveTLSessionNote(sessionId, false);
+  }
+
+  async function _saveTLSessionNote(sessionId, alreadyReviewed) {
+    const btn  = document.getElementById('sd-save-note-btn');
+    const ta   = document.getElementById('sd-tl-note');
+    const note = ta ? ta.value.trim() : '';
     if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
     try {
       let reviewerId = null;
@@ -2058,17 +2079,30 @@ ${summaryHtml}`;
         if (sk) { const ss = JSON.parse(localStorage.getItem(sk)); reviewerId = ss?.user?.id || null; }
       } catch(_) {}
 
-      const { error } = await supa.from('ci_sessions').update({
-        tl_reviewed_at: new Date().toISOString(),
-        tl_reviewed_by: reviewerId
-      }).eq('id', sessionId);
+      const payload = { tl_note: note || null };
+      if (!alreadyReviewed) {
+        payload.tl_reviewed_at = new Date().toISOString();
+        payload.tl_reviewed_by = reviewerId;
+      }
+
+      const { error } = await supa.from('ci_sessions')
+        .update(payload)
+        .eq('id', sessionId);
 
       if (error) throw error;
-      if (btn) { btn.textContent = '✓ บันทึกแล้ว'; btn.classList.add('done'); }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✓ บันทึกแล้ว';
+        btn.style.background = '#34C759';
+        setTimeout(() => {
+          btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : '✓ บันทึก + รีวิวแล้ว';
+          btn.style.background = '#534AB7';
+        }, 1800);
+      }
       // refresh feed in background
       setTimeout(() => _loadInlineHistory(), 800);
     } catch(e) {
-      if (btn) { btn.disabled = false; btn.textContent = '✓ รีวิว session นี้แล้ว'; }
+      if (btn) { btn.disabled = false; btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'; }
       _toast('บันทึกไม่สำเร็จ: ' + e.message);
     }
   }
