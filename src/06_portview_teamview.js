@@ -277,7 +277,7 @@ function _initPlanTray(){
   if(!bnav)return;
   const sps=document.createElement('div');
   sps.id='sense-plan-section';
-  sps.innerHTML=`<div class="sps-info"><div class="sps-label">แผนที่เลือก · <span id="spr-count">—</span></div><div class="sps-amt" id="spr-amt">—</div><div class="sps-sub" id="spr-sub">—</div></div><button class="sps-cta" onclick="showScreen('report')" title="ส่งรายงาน"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:translate(-1px,1px)"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2" fill="none"/></svg></button>`;
+  sps.innerHTML=`<div class="sps-info"><div class="sps-label">แผนที่เลือก · <span id="spr-count">—</span></div><div class="sps-amt" id="spr-amt">—</div><div class="sps-sub" id="spr-sub">—</div></div><div class="sps-cta-col"><button class="sps-cta" onclick="showScreen('report')" title="ส่งรายงาน"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:translate(-1px,1px)"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2" fill="none"/></svg></button></div>`;
   bnav.insertBefore(sps,bnav.firstChild);
   const senseNav=document.getElementById('nav-opportunities');
   if(senseNav&&!senseNav.querySelector('.sense-plan-dot')){
