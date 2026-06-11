@@ -1,4 +1,4 @@
-<!-- Freshket Sense v515: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v516: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2392,6 +2392,36 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
 /* Skills uses white canvas regardless of KAM/AD dark theme */
 body.kam-mode #scr-skills,body.kad-mode #scr-skills{background:#fff!important;}
+/* Skills active: override topbar + floating nav pill to white/light theme */
+body.kam-mode:has(#scr-skills.on) .topbar,
+body.kad-mode:has(#scr-skills.on) .topbar{background:#FFFFFF!important;border-bottom:1px solid #EBEBEB!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .logo,
+body.kad-mode:has(#scr-skills.on) .topbar .logo{color:#222!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .iq-badge,
+body.kad-mode:has(#scr-skills.on) .topbar .iq-badge{color:#FF385C!important;border-color:rgba(255,56,92,.35)!important;background:rgba(255,56,92,.07)!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .iq-icon,
+body.kad-mode:has(#scr-skills.on) .topbar .iq-icon{fill:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .topbar button svg,
+body.kad-mode:has(#scr-skills.on) .topbar button svg{stroke:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .topbar button,
+body.kad-mode:has(#scr-skills.on) .topbar button{background:rgba(0,0,0,.05)!important;}
+/* Floating nav pill → light style when Skills active */
+body.kam-mode:has(#scr-skills.on) .bnav,
+body.kad-mode:has(#scr-skills.on) .bnav{background:rgba(255,255,255,.92)!important;border:1px solid #EBEBEB!important;box-shadow:0 4px 20px rgba(0,0,0,.12)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni,
+body.kad-mode:has(#scr-skills.on) .bnav .ni{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni svg,
+body.kad-mode:has(#scr-skills.on) .bnav .ni svg{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni .lb,
+body.kad-mode:has(#scr-skills.on) .bnav .ni .lb{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on svg,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on svg{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on .lb,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on .lb{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on .nwrap,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on .nwrap{background:rgba(255,56,92,.08)!important;border-radius:12px!important;}
 /* v498: AD mode uses same dark KAM theme */
 body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
@@ -5595,7 +5625,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v515',
+      version: 'v516',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -45678,9 +45708,14 @@ async function _renderTLVisitContent(container) {
     html += `<div style="margin:0 14px;">`;
     sorted.forEach(email => {
       const d = repMap[email];
-      const uKey = Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
+      // Name lookup: portviewBulkData first (most reliable for KAM/AD), then _skillUsers, then email prefix
+      const _pvBulkNames = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+      const _pvNameMatch = _pvBulkNames.find(r => (r.kamEmail || '').toLowerCase() === email);
+      const uKey = !_pvNameMatch && Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
       const uRec = uKey ? _skillUsers[uKey] : null;
-      const rawName = uRec ? (uRec.kam_name || uRec.full_name || email.split('@')[0]) : email.split('@')[0];
+      const rawName = (_pvNameMatch && (_pvNameMatch.kamName || ''))
+        || (uRec && (uRec.kam_name || uRec.full_name))
+        || email.split('@')[0];
       const nick    = _skNickname(rawName);
       const acctTgt = acctPerRep[email] || 0;
       const qPct    = acctTgt > 0 ? Math.min(100, Math.round((d.thisQuarter / acctTgt) * 100)) : 0;
