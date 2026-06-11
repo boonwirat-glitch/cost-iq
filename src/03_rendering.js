@@ -888,6 +888,10 @@ function renderPlanBuilder(opps){
 
   const pickHintHtml=(!footerUnlocked&&senseActivated)?'<div id="opplist-pick-hint">เลือกแบบด้านบนก่อน</div>':'';
   document.getElementById('opplist').innerHTML=smartHtml+pickHintHtml+groupsHtml;
+  // v504: signal badge system that DOM is fresh — custom mode only
+  if(currentPlanMode==='custom'&&typeof savePlanBadge_onCustom==='function'){
+    setTimeout(savePlanBadge_onCustom,0);
+  }
 }
 
 function togglePbCat(cat){
@@ -1080,8 +1084,9 @@ function toggleOpp(id){
   sel.has(id)?sel.delete(id):sel.add(id);
   currentPlanMode='custom';
   footerUnlocked=true; // Sprint 2: individual selection also earns the footer
-  if(typeof savePlanBadge_onCustom==='function')savePlanBadge_onCustom();
   renderOpps();updateSim();updatePbFooter();
+  // v504: badge called AFTER renderOpps (which calls renderPlanBuilder → innerHTML)
+  if(typeof savePlanBadge_onCustom==='function')savePlanBadge_onCustom();
 }
 
 // ════════════════════════════════════════
