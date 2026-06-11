@@ -110,6 +110,7 @@ function resetRuntimeSessionState(){
   try { loginTransitionRunning = false; } catch(e) {}
   // Fix v194: reset auth flags so stale state never blocks next login attempt
   try { window._doLoginHandled = false; } catch(e) {}
+  try { window._coldRetryFired = false; } catch(e) {}
   try { window._sessionCheckHandling = false; } catch(e) {}
   try { if (window._visibilityGraceTimer) { clearTimeout(window._visibilityGraceTimer); window._visibilityGraceTimer = null; } } catch(e) {}
   try { if (window._pgsGraceTimer) { clearTimeout(window._pgsGraceTimer); window._pgsGraceTimer = null; } } catch(e) {}
@@ -658,6 +659,22 @@ function showSenseSplash(onDone){
           window._pendingRefreshAll=false;
           if(window.RenderBus) window.RenderBus.markRender();
           try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
+        }
+        // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
+        // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.
+        if(!dataReady && !window._coldRetryFired){
+          window._coldRetryFired=true;
+          setTimeout(function(){
+            try{
+              var _pvLen=(typeof portviewBulkData!=='undefined'&&portviewBulkData)?portviewBulkData.length:0;
+              if(_pvLen===0){
+                _senseDataLog('COLD-RETRY','⚡ portview empty after splash — retrying R2 fetch');
+                // Reset load guard so loadFromCloudflareR2 re-runs
+                if(typeof sheetsLoadStarted!=='undefined') sheetsLoadStarted=false;
+                if(typeof loadFromCloudflareR2==='function') loadFromCloudflareR2();
+              }
+            }catch(e){ console.warn('[cold-retry]',e); }
+          }, 2500);
         }
       },380);
     },220);
