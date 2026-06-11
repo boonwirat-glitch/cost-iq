@@ -2957,6 +2957,7 @@ ${summaryHtml}`;
     if (tbIcon) tbIcon.style.display = isRec ? 'none' : '';
 
     if (isRec) {
+      sheet.classList.add('is-rec');
       // → DARK
       sheet.style.transition = 'background .7s ease';
       sheet.style.background = '#111111';
@@ -2996,6 +2997,7 @@ ${summaryHtml}`;
       const tabBar = document.getElementById('ci-main-tabs');
       if (tabBar) tabBar.style.background = 'rgba(255,255,255,.06)';
     } else {
+      sheet.classList.remove('is-rec');
       // → LIGHT
       sheet.style.background = '#ffffff';
       const tbL = sheet.querySelector('.topbar');
