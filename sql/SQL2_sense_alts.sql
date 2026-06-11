@@ -156,6 +156,13 @@ catalog AS (
           / NULLIF(SUM(item.qty) OVER (PARTITION BY item.item_id), 0), 2)
           AS catalog_unit_price
   FROM `freshket-rn.dwh.order` o, UNNEST(o.item) AS item
+
+  -- v208: filter discontinued SKUs — แนะนำเฉพาะสินค้าที่ยังขายอยู่
+  JOIN `freshket-rn.bi_source.item_master_merchandise` im
+    ON item.item_id = im.item_id
+   AND im.is_active          = true   -- ยังเปิดขาย customer-facing
+   AND im.is_active_internal = true   -- ยังใช้งานภายใน
+
   WHERE DATE_TRUNC(o.delivery_date, MONTH) = DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)
     AND o.account_type != 'enduser'
     AND item.gmv_ex_vat > 0
