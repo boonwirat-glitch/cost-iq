@@ -2112,7 +2112,7 @@
         (document.body||document.documentElement).appendChild(d);
       }catch(e){}
     }
-    window.SenseSentinel={count:function(){return _count;},list:function(){return _session.slice();},flush:_flush};
+    window.SenseSentinel={count:function(){return _count;},list:function(){return _session.slice();},flush:_flush,report:function(kind,msg){_record(String(kind||'report'),msg,'',0,0,'');}};
   })();
 </script>
 <script>

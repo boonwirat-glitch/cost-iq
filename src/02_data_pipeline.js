@@ -1253,6 +1253,60 @@ function _finishDataPill(text,hideMs=1200){return window.FreshketSenseRuntime.da
 
 async function _fetchTextWithTimeout(url,timeoutMs){return window.FreshketSenseRuntime.data.fetchTextWithTimeout(url,timeoutMs);}
 
+// ── v557 CSV SENTINEL — data-quality gate at the single ingest chokepoint ──
+// Validates CSV text BEFORE it is cached to IndexedDB or ingested to memory.
+// Bad update + good cache  → keep serving cache (never overwrite good data with bad).
+// Bad file  + no fallback  → degraded ingest + visible toast + Sentinel telemetry.
+// Rules are intentionally conservative (structure-level) to never false-alarm:
+//   minCols  = header must have at least N columns (below = file truncated/wrong query)
+//   emailCol = owner email column must contain '@' in >=1 of first 20 data rows
+//              (catches the live sales_portview.csv missing-kamEmail class of failure)
+const _csvSentinelSpec={
+  portview:{minCols:18,emailCol:17,emailLabel:'owner email col[17]'},
+  history:{minCols:5},
+  categories:{minCols:4},
+  sku_current:{minCols:6},
+  outlets:{minCols:4},
+  handover:{minCols:8},
+  upsell_team:{minCols:5},
+  current_movements:{minCols:8}
+};
+const _csvQuarantineToasted=new Set();
+function _senseCsvSentinel(tab,text){
+  try{
+    const s=_csvSentinelSpec[tab];
+    if(!s)return{ok:true};
+    if(!text||!text.trim())return{ok:false,reason:'empty file'};
+    // sample first ~200KB only — cheap even for multi-MB cached files on every 304
+    const lines=text.slice(0,200000).split('\n');
+    if(lines.length<2||!lines[1]||!lines[1].trim())return{ok:false,reason:'no data rows'};
+    const header=parseCSVRow(lines[0]);
+    if(header.length<s.minCols)return{ok:false,reason:'header '+header.length+' cols < required '+s.minCols};
+    if(s.emailCol!=null){
+      const sample=lines.slice(1,21).filter(l=>l&&l.trim());
+      const hasEmail=sample.some(l=>{const p=parseCSVRow(l);return String(p[s.emailCol]||'').indexOf('@')!==-1;});
+      if(!hasEmail)return{ok:false,reason:s.emailLabel+' missing in first '+sample.length+' rows'};
+    }
+    return{ok:true};
+  }catch(e){return{ok:true};} // sentinel must never block ingest on its own bug
+}
+function _senseCsvQuarantine(tab,reason,srcLabel,usedFallback){
+  try{
+    console.warn('[CSV SENTINEL] '+tab+' rejected: '+reason+' (src: '+srcLabel+')'+(usedFallback?' — serving previous good data':''));
+    if(window.SenseSentinel&&typeof window.SenseSentinel.report==='function'){
+      window.SenseSentinel.report('data_quality','csv '+tab+': '+reason+' | src='+srcLabel+' | fallback='+(usedFallback?'cache':'none'));
+    }
+    if(!_csvQuarantineToasted.has(tab)){
+      _csvQuarantineToasted.add(tab);
+      if(typeof showToast==='function'){
+        showToast(usedFallback
+          ?('ไฟล์ '+(R2_FILES[tab]||tab)+' ชุดล่าสุดผิดปกติ — ใช้ข้อมูลชุดก่อนหน้า')
+          :('ไฟล์ '+(R2_FILES[tab]||tab)+' ผิดปกติ — แสดงข้อมูลเท่าที่มี'),'⚠');
+      }
+    }
+  }catch(e){}
+}
+
 async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
   if(!spec||!spec.tab)return false;
   const tab=spec.tab;
@@ -1278,6 +1332,9 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
               _src='IDB→ETag304'; // v218b: cache hit, unchanged
               text=cached.text;  // 304: file unchanged, extend cache life
               _csvCacheSet(tab,text,_res.etag);
+              // v557 CSV SENTINEL: cached copy may predate sentinel — report (refetch would 304 the same bytes)
+              const _v304=_senseCsvSentinel(tab,text);
+              if(!_v304.ok)_senseCsvQuarantine(tab,_v304.reason,'ETag304',false);
               // v221c: 304 + already in memory = skip re-ingest entirely → no callback → no render
               if(_cloudLoadedTabs.has(tab)){
                 _senseDataLog(tab,'⚡ 304 skip-reingest — data current, no render needed');
@@ -1286,8 +1343,19 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
               }
             } else if(_res.text){
               _src='IDB→ETag200(UPDATED)'; // v218b: cache hit, server has new data
-              text=_res.text;    // 200: new file → store below with new ETag
-              _csvCacheSet(tab,text,_res.etag);
+              // v557 CSV SENTINEL: validate update BEFORE overwriting good cache
+              const _v200=_senseCsvSentinel(tab,_res.text);
+              if(_v200.ok){
+                text=_res.text;    // 200: new file → store with new ETag
+                _csvCacheSet(tab,text,_res.etag);
+              } else if(cached.text&&_senseCsvSentinel(tab,cached.text).ok){
+                text=cached.text;  // bad update + good cache → keep serving cache
+                _src='IDB-fallback(bad-update)';
+                _senseCsvQuarantine(tab,_v200.reason,'ETag200',true);
+              } else {
+                text=_res.text;    // bad update + no good cache → degraded ingest
+                _senseCsvQuarantine(tab,_v200.reason,'ETag200',false);
+              }
             }
             // else: fetch threw → fall through to re-fetch (handled by catch below)
           }catch(e){
@@ -1307,8 +1375,11 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
           return{text:t,etag:null,notModified:false};
         });
         text=_fr.text;
+        // v557 CSV SENTINEL: never persist a bad file to IndexedDB
+        const _vFresh=text?_senseCsvSentinel(tab,text):{ok:true};
+        if(text&&!_vFresh.ok)_senseCsvQuarantine(tab,_vFresh.reason,'R2-full',false);
         // Cache only the lightweight/core CSVs. Heavy files are intentionally not cached.
-        if(useCache&&text)_csvCacheSet(tab,text,_fr.etag);
+        if(useCache&&text&&_vFresh.ok)_csvCacheSet(tab,text,_fr.etag);
       }
       const ok=await ingestCSVText(spec.type,text,{timeoutMs:_specIngestTimeout(spec)});
       if(ok){

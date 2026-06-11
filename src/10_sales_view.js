@@ -307,6 +307,23 @@ function renderSalesPortview() {
     window.scrollTo(0, 0);
     try { el.scrollTop = 0; } catch(e) {}
 
+    // v557: explicit empty-state — never show a silently blank portfolio.
+    // outlets empty + bulk rows present = ownership column issue (e.g. kamEmail missing in CSV)
+    if (!outlets.length) {
+      const allRows = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+      const note = document.createElement('div');
+      note.style.cssText = "margin:14px 16px 4px;padding:14px 16px;background:#F7F7F7;border-radius:14px;font-family:'Noto Sans Thai',sans-serif";
+      note.innerHTML = allRows.length > 0
+        ? '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px">ยังเชื่อมพอร์ตของคุณไม่สำเร็จ</div>'
+          + '<div style="font-size:12px;color:rgba(34,34,34,.55);line-height:1.6">ไฟล์ข้อมูลชุดล่าสุดไม่มีข้อมูลเจ้าของพอร์ตของ ' + (email || 'บัญชีนี้') + ' — ระบบบันทึกแจ้งทีมข้อมูลแล้ว ข้อมูลจะกลับมาหลังรอบอัปเดตถัดไป</div>'
+        : '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px">กำลังโหลดข้อมูลพอร์ต</div>'
+          + '<div style="font-size:12px;color:rgba(34,34,34,.55);line-height:1.6">ถ้าหน้านี้ค้างนานกว่า 1 นาที ลองปิดแล้วเปิดแอพใหม่อีกครั้ง</div>';
+      el.appendChild(note);
+      if (allRows.length > 0 && window.SenseSentinel && typeof window.SenseSentinel.report === 'function') {
+        window.SenseSentinel.report('data_quality', 'sales portview empty for ' + email + ' (' + allRows.length + ' bulk rows present)');
+      }
+    }
+
     // Home summary section at top
     const homeSec = document.createElement('div');
     homeSec.id = 'sv-home-section';
