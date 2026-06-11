@@ -388,19 +388,14 @@
   };
 
   // ── Init: wait for plan tray to be created, then patch ────────────────────
-  function _tryInit(){
-    var patched = _patchSpsCta();
-    if(!patched){
-      // _initPlanTray hasn't fired yet — retry
-      setTimeout(_tryInit, 300);
+  // Poll continuously — re-patch whenever _initPlanTray creates a fresh .sps-cta
+  // (one-shot setTimeout fails because _initPlanTray runs on every showScreen)
+  setInterval(function(){
+    var cta = document.querySelector('.sps-cta');
+    if(cta && !cta.querySelector('.icon-report')){
+      _patchSpsCta();
     }
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_tryInit, 500); });
-  } else {
-    setTimeout(_tryInit, 500);
-  }
+  }, 400);
 
   // ── Hook: restore plan when account changes (restaurant sheet opens) ───────
   // Poll for currentAccountId changes — lightweight, fires only when non-null
