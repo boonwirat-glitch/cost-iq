@@ -419,6 +419,7 @@ const CI = (() => {
     _initWaveform();
     _showScreen('ci-s-record');
     _renderEchoState();   // v552: state machine — single visibility pass
+    setTimeout(_checkRecoverBuffer, 400); // v555: เช็คบันทึกค้างจาก session ก่อน
     // Load visit counts after mount (async, non-blocking)
     setTimeout(_loadVisitBadge, 200);
     if (_canDebrief()) {
@@ -683,6 +684,102 @@ const CI = (() => {
     if (rb) rb.scrollTop = 0;
   }
 
+  // ── IndexedDB recording buffer (v555) — กู้ session ถ้าแอพถูก kill กลางทาง ──
+  const IDB_NAME = 'echo_buffer';
+  function _idbOpen() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(IDB_NAME, 1);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        if (!db.objectStoreNames.contains('chunks')) db.createObjectStore('chunks', { autoIncrement: true });
+        if (!db.objectStoreNames.contains('meta'))   db.createObjectStore('meta');
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror   = () => rej(r.error);
+    });
+  }
+  function _idbPutChunk(blob) {
+    _idbOpen().then(db => { db.transaction('chunks','readwrite').objectStore('chunks').add(blob); }).catch(()=>{});
+  }
+  function _idbSetMeta(meta) {
+    _idbOpen().then(db => { db.transaction('meta','readwrite').objectStore('meta').put(meta,'current'); }).catch(()=>{});
+  }
+  function _idbGetMeta() {
+    return _idbOpen().then(db => new Promise(res => {
+      const r = db.transaction('meta').objectStore('meta').get('current');
+      r.onsuccess = () => res(r.result || null);
+      r.onerror   = () => res(null);
+    })).catch(() => null);
+  }
+  function _idbGetChunks() {
+    return _idbOpen().then(db => new Promise(res => {
+      const r = db.transaction('chunks').objectStore('chunks').getAll();
+      r.onsuccess = () => res(r.result || []);
+      r.onerror   = () => res([]);
+    })).catch(() => []);
+  }
+  function _idbClear() {
+    return _idbOpen().then(db => {
+      const tx = db.transaction(['chunks','meta'],'readwrite');
+      tx.objectStore('chunks').clear();
+      tx.objectStore('meta').clear();
+    }).catch(()=>{});
+  }
+
+  // ── Recovery — เช็ค buffer ค้างตอนเปิด Echo (rep เท่านั้น, idle เท่านั้น) ──
+  async function _checkRecoverBuffer() {
+    if (_phase !== 'idle' || _canDebrief()) return;
+    const meta = await _idbGetMeta();
+    if (!meta) return;
+    const chunks = await _idbGetChunks();
+    const approxSecs = chunks.length; // timeslice 1s ต่อ chunk
+    if (approxSecs < 5) { _idbClear(); return; }
+    if (Date.now() - (meta.started_at || 0) > 24*3600*1000) { _idbClear(); return; } // เก่าเกิน 24 ชม. ทิ้ง
+    _showRecoverBanner(meta, approxSecs);
+  }
+
+  function _showRecoverBanner(meta, secs) {
+    const scr = document.getElementById('ci-s-record');
+    if (!scr || document.getElementById('ci-recover-banner')) return;
+    const div = document.createElement('div');
+    div.id = 'ci-recover-banner';
+    div.style.cssText = 'margin:4px 24px 8px;padding:12px 14px;border-radius:14px;background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.25)';
+    div.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:#995500;margin-bottom:2px;font-family:'Noto Sans Thai',sans-serif">พบการบันทึกค้าง ${_fmt(secs)} นาที</div>
+      <div style="font-size:11px;color:#8e8e93;margin-bottom:8px;font-family:'Noto Sans Thai',sans-serif">${meta.account_name || 'ไม่ระบุร้าน'} · แอพถูกปิดก่อนวิเคราะห์เสร็จ</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="CI._recoverBuffer()" style="flex:1;padding:9px;border:none;border-radius:10px;background:#FF9500;color:#fff;font-size:12px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;cursor:pointer">วิเคราะห์ต่อ</button>
+        <button onclick="CI._discardBuffer()" style="padding:9px 14px;border:0.5px solid rgba(0,0,0,.12);border-radius:10px;background:transparent;color:#8e8e93;font-size:12px;font-family:'Noto Sans Thai',sans-serif;cursor:pointer">ทิ้ง</button>
+      </div>`;
+    const anchor = document.getElementById('ci-chip-wrap');
+    if (anchor && anchor.parentElement === scr) scr.insertBefore(div, anchor);
+    else scr.appendChild(div);
+  }
+
+  async function _recoverBuffer() {
+    const meta   = await _idbGetMeta();
+    const chunks = await _idbGetChunks();
+    document.getElementById('ci-recover-banner')?.remove();
+    if (!chunks.length) { _toast('ไม่พบข้อมูลเสียง'); _idbClear(); return; }
+    _accountGuid = meta?.account_guid || null;
+    _accountName = meta?.account_name || '';
+    _accountSeg  = meta?.account_seg  || '';
+    _ownerType   = meta?.owner_type   || _ownerType;
+    _secs = chunks.length; _durText = _fmt(_secs);
+    _isOwnRecording = true;
+    const blob = new Blob(chunks, { type: meta?.mime || 'audio/webm' });
+    _phase = 'processing';
+    _renderEchoState();
+    _showScreen('ci-s-proc');
+    _setStep('กำลังวิเคราะห์...', 'กู้คืนจากบันทึกค้าง', 14);
+    _processBlob(blob);
+  }
+
+  async function _discardBuffer() {
+    document.getElementById('ci-recover-banner')?.remove();
+    await _idbClear();
+  }
+
   // ── Recording ─────────────────────────────────────────────────────────────
   async function startRecording() {
     document.body.classList.add('echo-active');
@@ -694,8 +791,12 @@ const CI = (() => {
       _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 });
       _chunks      = [];
       _secs        = 0;
-      _recorder.ondataavailable = e => { if (e.data?.size > 0) _chunks.push(e.data); };
+      _recorder.ondataavailable = e => { if (e.data?.size > 0) { _chunks.push(e.data); _idbPutChunk(e.data); } };
       _recorder.onstop = _onStop;
+      // v555: เคลียร์ buffer เก่า + เขียน meta ก่อนเริ่ม — กู้คืนได้ถ้าแอพถูก kill
+      try { await _idbClear(); } catch(_) {}
+      _idbSetMeta({ account_guid: _accountGuid, account_name: _accountName, account_seg: _accountSeg,
+                    owner_type: _ownerType, started_at: Date.now(), mime: mime || 'audio/webm' });
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
@@ -759,6 +860,7 @@ const CI = (() => {
     _phase = 'idle';
     _applyRecordingTheme(false);
     _recorder = null; _chunks = [];
+    _idbClear(); // ยกเลิกโดยตั้งใจ — ไม่ต้องกู้
     _unmount();
   }
 
@@ -780,11 +882,16 @@ const CI = (() => {
     // Guard: ถ้า audio เล็กเกินไปหรือ record น้อยกว่า 5 วินาที ยังไม่มีเสียงพอให้วิเคราะห์
     if (blob.size < 8000 || _secs < 5) {
       _phase = 'idle';
+      _idbClear();
       _unmount();
       _toast('กรุณาบันทึกอย่างน้อย 5 วินาทีก่อนกด stop');
       return;
     }
+    _processBlob(blob);
+  }
 
+  // v555: shared pipeline — เรียกจาก _onStop ปกติ และจาก recovery flow
+  async function _processBlob(blob) {
     try {
       _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 20);
 
@@ -795,6 +902,8 @@ const CI = (() => {
 
       _setStep('กำลังบันทึก...', '', 92);
       await _saveToSupabase(result.skillData, result.intelData, result.transcriptSummary, result.toneSignals);
+
+      _idbClear(); // วิเคราะห์ + บันทึกสำเร็จ — buffer ไม่จำเป็นแล้ว
 
       _setStep('เสร็จแล้ว', '', 100);
       setTimeout(() => {
@@ -809,7 +918,8 @@ const CI = (() => {
     } catch (err) {
       _phase = 'idle';
       _unmount();
-      _toast('วิเคราะห์ไม่สำเร็จ: ' + err.message);
+      // buffer คงไว้ — เปิด Echo ใหม่จะเจอ banner กู้คืน วิเคราะห์ซ้ำได้
+      _toast('วิเคราะห์ไม่สำเร็จ: ' + err.message + ' — เปิด Echo ใหม่เพื่อลองอีกครั้ง');
     }
   }
 
@@ -3073,9 +3183,19 @@ ${summaryHtml}`;
         _secs = Math.floor((Date.now() - _startTime) / 1000);
         el.textContent = _fmt(_secs);
       }
-      // Check if MediaRecorder is still alive
-      if (_recorder && _recorder.state === 'inactive') {
-        _toast('การบันทึกหยุดชั่วคราว — กด "จบ & วิเคราะห์" เพื่อวิเคราะห์เสียงที่มีอยู่');
+      // v555: MediaRecorder ถูก OS หยุด — กู้ chunks ที่มีไปวิเคราะห์ทันที
+      // เช็ค _chunks.length กัน double-run (ถ้า onstop เคย fire แล้ว chunks ถูกเคลียร์)
+      if (_recorder && _recorder.state === 'inactive' && _chunks.length > 0) {
+        clearInterval(_timerRef);
+        _durText = _fmt(_secs);
+        try { _recorder.stream?.getTracks().forEach(t => t.stop()); } catch(_) {}
+        try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+        _phase = 'processing';
+        _applyRecordingTheme(false);
+        _showScreen('ci-s-proc');
+        _setStep('กำลังวิเคราะห์...', 'การบันทึกถูกหยุดโดยระบบ — ใช้เสียงที่มี', 14);
+        _toast('การบันทึกถูกหยุดโดยระบบ — กำลังวิเคราะห์เสียงที่มี');
+        _onStop();
       }
     });
   })();
@@ -3426,7 +3546,7 @@ ${summaryHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
