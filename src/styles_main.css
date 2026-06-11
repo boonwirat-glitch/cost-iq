@@ -1658,8 +1658,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-logo-box img{width:26px;height:26px;object-fit:cover;display:block;}
 .rpt2-wordmark{font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;letter-spacing:-.2px;}
 .rpt2-sub{font-size:7px;color:rgba(255,255,255,.38);margin-top:2px;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px;text-transform:uppercase;}
-.rpt2-info{text-align:right;}
-.rpt2-acct{font-size:10.5px;font-weight:700;color:#fff;}
+.rpt2-info{text-align:right;min-width:0;overflow:hidden;}
+.rpt2-acct{font-size:10.5px;font-weight:700;color:#fff;word-break:break-word;}
 .rpt2-date{font-size:7.5px;color:rgba(255,255,255,.4);margin-top:2px;}
 .rpt2-kam{font-size:7.5px;color:rgba(255,255,255,.35);margin-top:1px;}
 /* KPI strip */
