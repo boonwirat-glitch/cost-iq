@@ -158,9 +158,29 @@
   };
 
   // ── HOOK: called from smartSelect (user tapped card 1 or 2) ──────────────
+  // User selected a plan → always show the save card (this IS the trigger to show it)
   window.savePlanBadge_onDefault = function(){
-    // Hide only if not yet saved — if saved, leave visible (user's plan still persists)
-    _hideCard();
+    _spcInited = false; // opplist was re-rendered by smartSelect → re-inject fresh
+    var injected = _injectBadgeCard();
+    if(!injected) return;
+    _patchSpsCta();
+    if(_spcSaved){
+      // Was already saved — flip back to unsaved since user picked a new plan
+      _spcSaved = false;
+      var card = document.getElementById('save-plan-card');
+      if(card) card.className = 'save-plan-card spc-unsaved';
+      var lbl = document.getElementById('spc-label');
+      var sub = document.getElementById('spc-sub');
+      var btn = document.getElementById('spc-btn');
+      if(lbl) lbl.textContent = 'บันทึกแผนนี้';
+      if(sub){ sub.className = 'spc-sub'; sub.innerHTML = 'เลือกไว้ <span id="spc-count">0</span> รายการ · ยังไม่บันทึก'; }
+      if(btn){ btn.textContent = 'บันทึก'; btn.className = 'spc-btn cta'; }
+      var dot = document.querySelector('#spc-left .spc-dot');
+      if(dot) dot.remove();
+      _spcVisible = true;
+    }
+    _updateCardCount();
+    _showCard();
   };
 
   // ── HOOK: called when entering report screen ───────────────────────────────
@@ -420,3 +440,4 @@
   }, 800);
 
 })();
+
