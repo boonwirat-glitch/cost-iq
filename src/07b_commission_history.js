@@ -138,6 +138,18 @@ window._commOpenHistoryDetail = function(period) {
   var focusRow = myKam || myTl || pRows[0];
   if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(188,215,255,.4)">ไม่มีข้อมูล</div>'; return; }
 
+  // v560: rates from the snapshot's frozen config (audit truth) → live cfg → engine default.
+  // History must show the rates that were USED at lock time, not today's settings.
+  var _cs = focusRow.config_snapshot || {};
+  function _rateP(csKey, metric, param, dflt){
+    var v = _cs[csKey];
+    if (v == null) { try { v = typeof _commGetConfig==='function' ? _commGetConfig(metric, param, dflt) : dflt; } catch(e){ v = dflt; } }
+    return Math.round(Number(v)*1000)/10;
+  }
+  var _p1Pct  = _rateP('upsell_sku_p1_rate','upsell_sku','p1_rate',0.03);
+  var _p3Pct  = _rateP('upsell_sku_p3_rate','upsell_sku','p3_rate',0.03);
+  var _expPct = _rateP('upsell_outlet_rate','upsell_outlet','rate',0.015);
+
   var bd = focusRow.breakdown || {};
   var isTlRow = focusRow.beneficiary_role === 'tl';
   var ho = bd.handover || {};
@@ -223,21 +235,21 @@ window._commOpenHistoryDetail = function(period) {
 
     // P1
     if (Number(p1.comm||0) > 0 || p1GroupCount > 0) {
-      var p1Sub = 'GMV '+moneyK(p1.gmv||0)+' · 3%';
+      var p1Sub = 'GMV '+moneyK(p1.gmv||0)+' · '+_p1Pct+'%';
       if (p1GroupCount) p1Sub += ' · '+p1GroupCount+' กลุ่มสินค้า';
       bodyHtml += srcRow('สินค้าใหม่', p1Sub, moneyFull(p1.comm||0), '#ffe08a');
     }
 
     // P3
     if (Number(p3.comm||0) > 0 || p3GroupCount > 0) {
-      var p3Sub = 'Incremental '+moneyK(p3.gmv_incremental||0)+' · 3%';
+      var p3Sub = 'Incremental '+moneyK(p3.gmv_incremental||0)+' · '+_p3Pct+'%';
       if (p3GroupCount) p3Sub += ' · '+p3GroupCount+' กลุ่มสินค้า';
       bodyHtml += srcRow('ยอดเติบโต', p3Sub, moneyFull(p3.comm||0), '#ffe08a');
     }
 
     // Expansion
     if (Number(expOutlet.commission||0) > 0 || expOutletCount > 0) {
-      var expSub = 'GMV '+moneyK(expOutlet.outlet_gmv||0)+' · 1.5%';
+      var expSub = 'GMV '+moneyK(expOutlet.outlet_gmv||0)+' · '+_expPct+'%';
       if (expOutletCount) expSub += ' · '+expOutletCount+' outlets';
       bodyHtml += srcRow('Expansion (ร้านขยาย)', expSub, moneyFull(expOutlet.commission||0), '#00c8b0');
     }

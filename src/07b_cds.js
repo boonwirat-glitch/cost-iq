@@ -571,13 +571,15 @@
       ?'<span>Outlet</span><span style="text-align:right">GMV</span><span style="text-align:right">Comm</span>'
       :'<span>Outlet</span><span style="text-align:right">Base</span><span style="text-align:right">Incr</span><span style="text-align:right">Comm</span>';
     var colsHdGrid=type==='p1'?'grid-template-columns:1fr 64px 56px 20px':'grid-template-columns:1fr 52px 56px 52px 20px';
+    var _dcB=window._pvCommDrillCfg||{};
+    var _badgeRate=(type==='p1'?_dcB.p1Rate:_dcB.p3Rate); if(_badgeRate==null)_badgeRate=3; // v560: live rate badge (was hardcoded × 3%)
 
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
       +'<div style="flex-shrink:0"><div class="pv-comm-sheet-handle"></div>'
       +'<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(188,215,255,.10)">'
       +'<button onclick="_commDrillBack()" style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.78);font-size:15px;cursor:pointer;font-family:inherit">‹</button>'
       +'<div style="flex:1"><div style="font-size:15px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px">'+es(titleLabel)
-      +'<span style="font-size:9px;font-weight:850;padding:3px 8px;border-radius:999px;background:'+badgeColor+';color:'+badgeText+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">× 3%</span></div></div>'
+      +'<span style="font-size:9px;font-weight:850;padding:3px 8px;border-radius:999px;background:'+badgeColor+';color:'+badgeText+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">× '+_badgeRate+'%</span></div></div>'
       +'<button onclick="_commCloseKamSelfSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.42);font-size:13px;cursor:pointer;font-family:inherit">✕</button>'
       +'</div>'
       +'<div style="padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid rgba(188,215,255,.10)">'
@@ -762,6 +764,8 @@
     function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     var p1comm=p1g.reduce(function(s,g){return s+(g.commission||0);},0);
     var p3comm=p3g.reduce(function(s,g){return s+(g.commission||0);},0);
+    var _dc=window._pvCommDrillCfg||{};
+    var _p1R=(_dc.p1Rate!=null)?_dc.p1Rate:3, _p3R=(_dc.p3Rate!=null)?_dc.p3Rate:3; // v560: live rates (was hardcoded 3%)
     if(p1g.length&&!p3g.length){window._commOpenUpsellDrill('p1');return;}
     if(p3g.length&&!p1g.length){window._commOpenUpsellDrill('p3');return;}
     var html='<div class="pv-comm-sheet" style="display:flex;flex-direction:column;touch-action:pan-y">'
@@ -770,7 +774,7 @@
       +(p1g.length
         ?'<div id="pvChooseP1" style="padding:16px;border-radius:12px;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
           +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">กลุ่มสินค้าใหม่</div>'
-          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × 3%</div></div>'
+          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p1g.length+' outlet × group · GMV × '+_p1R+'%</div></div>'
           +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+mon(p1comm)+'</div>'
           +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
           +'</div>'
@@ -778,7 +782,7 @@
       +(p3g.length
         ?'<div id="pvChooseP3" style="padding:16px;border-radius:12px;background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.18);cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
           +'<div><div style="font-size:14px;font-weight:700;color:rgba(225,238,255,.88)">ยอดเติบโต</div>'
-          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p3g.length+' outlet × group · Incr × 3%</div></div>'
+          +'<div style="font-size:11px;color:rgba(225,238,255,.40);margin-top:3px">'+p3g.length+' outlet × group · Incr × '+_p3R+'%</div></div>'
           +'<div style="text-align:right"><div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(p3comm)+'</div>'
           +'<div style="font-size:13px;color:rgba(188,215,255,.35)">›</div></div>'
           +'</div>'
@@ -1385,9 +1389,15 @@ window._cdsRenderL1 = function(src, st) {
   var upSub    = (p1cnt?'สินค้าใหม่ '+p1cnt+' รายการ':'')+(p1cnt&&p3cnt?' · ':'')+(p3cnt?'ยอดเติบโต '+p3cnt+' รายการ':'');
   if(!upSub) upSub='สินค้าใหม่ + ยอดเติบโต';
   var ed       = src.upsell_outlet_detail;
-  var expSub   = ed&&ed.outlet_gmv>0?'สาขาใหม่ × 1.5% · GMV '+fmt(ed.outlet_gmv):' สาขาใหม่/comeback × 1.5%';
+  // v560: live config (was hardcoded 1.5% / ฿2,500 tiers)
+  var _cfgQ    = function(k,p,d){ try{ return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){ return d; } };
+  var _orPct   = Math.round(_cfgQ('upsell_outlet','rate',0.015)*1000)/10;
+  var _ht2     = _cfgQ('handover','tier2_pct',100), _ht3 = _cfgQ('handover','tier3_pct',120);
+  var _ht2Pay  = Number(_cfgQ('handover','tier2_payout',2500)).toLocaleString('en-US');
+  var _ht3Bon  = Number(_cfgQ('handover','tier3_bonus',2500)).toLocaleString('en-US');
+  var expSub   = ed&&ed.outlet_gmv>0?'สาขาใหม่ × '+_orPct+'% · GMV '+fmt(ed.outlet_gmv):' สาขาใหม่/comeback × '+_orPct+'%';
   var hd       = src.handover_detail||{};
-  var hoSub    = hd.accounts?hd.accounts+' account · retention '+(hd.retention_pct||0)+'%':'≥100% = ฿2,500 · ≥120% = +฿2,500';
+  var hoSub    = hd.accounts?hd.accounts+' account · retention '+(hd.retention_pct||0)+'%':'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
 
   function srcRow(tabKey, dotColor, name, sub, amt) {
     var earned = amt > 0;
