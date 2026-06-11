@@ -172,6 +172,19 @@ async function skillsInit() {
   // Reset active state to prevent stale S3 detail from previous session
   _activeSkillId = null;
 
+  // v561: first-open feedback — nav switches to scr-skills immediately (showScreen)
+  // but content stayed blank until every fetch resolved. Show light skeleton now;
+  // revisits keep previous content visible during refresh (better continuity).
+  try {
+    const _scr0 = document.getElementById('scr-skills');
+    if (_scr0 && !_scr0.innerHTML.trim()) {
+      _scr0.innerHTML = '<div style="padding:56px 24px;display:flex;flex-direction:column;align-items:center;gap:14px">'
+        + '<div class="skel-light" style="width:120px;height:120px;border-radius:24px"></div>'
+        + '<div class="skel-light" style="width:180px;height:16px"></div>'
+        + '<div class="skel-light" style="width:120px;height:12px"></div></div>';
+    }
+  } catch(e) {}
+
   // Cache JWT first (async, handles Safari/iOS sessionStorage)
   await _skCacheJWT();
 

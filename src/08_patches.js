@@ -453,3 +453,55 @@
 
 })();
 
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PATCH: v561-render-telemetry
+//////////////////////////////////////////////////////////////////////////////
+
+// v561 RENDER TELEMETRY — counts render calls, NEVER changes behavior.
+// Purpose: Phase-4 evidence. Instead of guessing where flicker happens,
+// real devices report 'render_storm' through Sense Sentinel when any key
+// renderer fires >=7x within 10s. Fix what production proves, surgically.
+// Inspect live: window._senseRenderStats()
+(function(global){
+  'use strict';
+  var WINDOW_MS = 10000, STORM_N = 7;
+  var counters = {}; var reported = {};
+  function instrument(name){
+    try{
+      var fn = global[name];
+      if (typeof fn !== 'function' || fn.__v561Counted) return;
+      var w = function(){
+        try{
+          var now = Date.now();
+          var arr = counters[name] || (counters[name] = []);
+          arr.push(now);
+          while (arr.length && now - arr[0] > WINDOW_MS) arr.shift();
+          if (arr.length >= STORM_N && !reported[name]) {
+            reported[name] = true; // once per session per fn
+            var scr = document.querySelector('.scr.on');
+            if (global.SenseSentinel && typeof global.SenseSentinel.report === 'function')
+              global.SenseSentinel.report('render_storm', name + ' fired ' + arr.length + 'x in 10s | screen=' + (scr ? scr.id : '-'));
+          }
+        }catch(e){}
+        return fn.apply(this, arguments);
+      };
+      w.__v561Counted = true;
+      global[name] = w;
+      // Rebind the lexical global binding too (same trick as v213 rails) so
+      // intra-script direct calls go through the wrapper as well.
+      try { eval(name + '=w'); } catch(e) {}
+    }catch(e){}
+  }
+  var TARGETS = ['renderPortviewList','renderPortviewSummary','renderTeamview','renderTeamviewSummary',
+                 'renderTeamviewKamList','renderSalesPortview','renderSalesHome','renderKamOverview',
+                 'renderPortviewTargetBar','renderCompactStrip','refreshAll'];
+  function installAll(){ TARGETS.forEach(instrument); }
+  // Install late so we wrap the FINAL versions (after v213 rails and other wrappers).
+  if (document.readyState === 'complete') setTimeout(installAll, 1200);
+  else global.addEventListener('load', function(){ setTimeout(installAll, 1200); });
+  global._senseRenderStats = function(){
+    var o = {}; Object.keys(counters).forEach(function(k){ o[k] = counters[k].length; }); return o;
+  };
+})(window);
