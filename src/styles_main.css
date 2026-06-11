@@ -1940,6 +1940,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
 /* Skills uses white canvas regardless of KAM/AD dark theme */
 body.kam-mode #scr-skills,body.kad-mode #scr-skills{background:#fff!important;}
+/* Ensure Skills fills full viewport height so dark body bg doesn't bleed through */
+body.kam-mode #scr-skills.on,body.kad-mode #scr-skills.on{min-height:100dvh;background:#fff!important;}
 /* Skills active: override topbar + floating nav pill to white/light theme */
 body.kam-mode:has(#scr-skills.on) .topbar,
 body.kad-mode:has(#scr-skills.on) .topbar{background:#FFFFFF!important;border-bottom:1px solid #EBEBEB!important;}
