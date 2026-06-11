@@ -762,6 +762,8 @@ function renderPlanBuilder(opps){
   const highSave=allHigh.reduce((s,o)=>s+getAlt(o).save,0);
   const allSave=opps.reduce((s,o)=>s+getAlt(o).save,0);
   const verifyDone=allHigh.length>0;
+  // Dynamic price month label for disclaimer
+  const _priceMo=(D.history&&D.history.length)?D.history[D.history.length-1].m:'เดือนล่าสุด';
   // Plan selector panel
   // ── PLAN TABS ──
   const isAll=currentPlanMode==='all';
@@ -794,11 +796,11 @@ function renderPlanBuilder(opps){
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
         <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:400;color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">ประมาณการเบื้องต้น — ควรตรวจสเปคก่อนเสนอลูกค้า</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">ประมาณการเบื้องต้น จากราคาเดือน ${_priceMo} — ควรตรวจสเปคก่อนนำเสนอลูกค้า</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
         <div class="plan-tab-row"><span class="plan-tab-title sense"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense ตรวจสเปค</span><span class="plan-tab-val sense">${!verifyDone?'เทียบสเปค →':(fmt(highSave)+'/เดือน')}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">${!verifyDone?'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง':'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง'}</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">AI ช่วยคัดเบื้องต้นจากเกรด แบรนด์ และสเปคที่ร้านใช้ — ควรยืนยันกับร้านอีกครั้ง</div>
       </div>
     </div>
     <div class="plan-tab-panel">${tabPanel}</div>
@@ -2872,3 +2874,4 @@ On cost-saving alternatives:
 // This lets inline handlers and legacy call sites continue to work during modular migration.
 window.FreshketSenseRuntime = window.FreshketSenseRuntime || { ai:{ OLIVE_BASE:'', oliveToneClean:function(t){return String(t||'').trim();} }, aiClient:{} };
 var OLIVE_BASE = window.FreshketSenseRuntime.ai && window.FreshketSenseRuntime.ai.OLIVE_BASE || '';
+
