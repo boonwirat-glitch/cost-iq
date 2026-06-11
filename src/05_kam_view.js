@@ -2088,6 +2088,18 @@ function _loadShareLibs(cb){
   _shareLibsLoading=true;
   var s1=document.createElement('script');
   s1.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  // v564: on CDN failure, callbacks MUST be invoked with an error.
+  // Previously they were silently dropped → shareReport never resumed →
+  // button stuck disabled on 'กำลังสร้างรายงาน...' forever (only reload escaped).
+  // _shareLibsLoading=false means the next tap retries the load cleanly.
+  function _shareLibsFail(which){
+    _shareLibsLoading=false;
+    var cbs=_shareLibsCallbacks; _shareLibsCallbacks=[];
+    console.error('[Share] '+which+' load failed');
+    try{ if(window.SenseSentinel&&typeof window.SenseSentinel.report==='function')
+      window.SenseSentinel.report('resource','share libs CDN load failed: '+which); }catch(e){}
+    cbs.forEach(function(f){try{f(new Error(which+' load failed'));}catch(e){}});
+  }
   s1.onload=function(){
     var s2=document.createElement('script');
     s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -2096,10 +2108,10 @@ function _loadShareLibs(cb){
       _shareLibsCallbacks.forEach(function(f){try{f();}catch(e){}});
       _shareLibsCallbacks=[];
     };
-    s2.onerror=function(){_shareLibsLoading=false;_shareLibsCallbacks=[];console.error('[Share] jsPDF load failed');};
+    s2.onerror=function(){_shareLibsFail('jsPDF');};
     document.head.appendChild(s2);
   };
-  s1.onerror=function(){_shareLibsLoading=false;_shareLibsCallbacks=[];console.error('[Share] html2canvas load failed');};
+  s1.onerror=function(){_shareLibsFail('html2canvas');};
   document.head.appendChild(s1);
 }
 
@@ -2123,7 +2135,13 @@ function _setShareBtnState(loading){
 async function shareReport(){
   _setShareBtnState(true);
   _setShareStatus('กำลังโหลด...');
-  _loadShareLibs(async function(){
+  _loadShareLibs(async function(loadErr){
+    if(loadErr){
+      // v564: CDN failed — tell the user and re-enable the button (next tap retries)
+      _setShareStatus('โหลดตัวสร้าง PDF ไม่สำเร็จ — เช็คอินเทอร์เน็ตแล้วแตะลองใหม่',true);
+      _setShareBtnState(false);
+      return;
+    }
     try{await _doShareReport();}catch(err){
       console.error('[Share]',err);
       _setShareStatus('เกิดข้อผิดพลาด — ลองใหม่อีกครั้ง',true);
