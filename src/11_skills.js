@@ -905,20 +905,23 @@ async function _doOpenDetail(skillId) {
   </div>
   <div class="s3-sheet s3-sheet-peek" id="s3-sheet">
     <div class="s3-sheet-handle" onclick="_s3ToggleSheet()" style="cursor:pointer;padding:6px 0 2px;"></div>
-    <div class="s3-peek-hint">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;" onclick="_s3ToggleSheet()">
-        <div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+    <!-- Peek: title + principle always visible -->
+    <div class="s3-peek-static" style="padding:0 16px 4px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
             <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
             <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
           </div>
-          <div class="s3-teaser">${teaserText}</div>
+          <div style="font-size:18px;font-weight:800;color:var(--sk-ink);line-height:1.2;margin-bottom:10px;font-family:'Noto Sans Thai',sans-serif;">${def.skill_name_th || def.skill_name_en}</div>
+          ${def.principle_th ? `
+          <div class="sk-rubric-eye" style="margin-bottom:5px;">Principle — ทำไมสกิลนี้สำคัญ</div>
+          <div class="sk-rubric-text" style="white-space:pre-wrap;">${def.principle_th}</div>` : ''}
         </div>
-        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:2px;"><path d="M18 15l-6-6-6 6"/></svg>
+        <svg class="s3-expand-chevron" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" width="20" height="20" style="flex-shrink:0;margin-top:4px;margin-left:10px;" onclick="_s3ToggleSheet()"><path d="M18 15l-6-6-6 6"/></svg>
       </div>
-      <div class="s3-peek-title">${def.skill_name_th || def.skill_name_en}</div>
-      ${cta ? `<div class="s3-peek-cta">${cta}</div>` : ''}
     </div>
+    <!-- Expanded-only: practice + pass test + cta -->
     <div class="sk-detail-body s3-body-full" id="s3-body-content">
   <div class="sk-skill-title">${def.skill_name_th || def.skill_name_en}</div>
 
