@@ -655,10 +655,21 @@ function showSenseSplash(onDone){
         if(bar){bar.style.transition='none';bar.style.width='0';}
         window._senseSplashActive=false;
         // Safety: if early render didn't fire (data wasn't ready above), fire now
+        // v563 COLD-LOGIN FIX: route through RenderBus.flushNow() — the full flush
+        // includes the Sales/teamview/portview screen branches. Bare refreshAll()
+        // here meant renderSalesPortview was NEVER called when all files finished
+        // during the splash (signals are queued as a boolean during splash, and no
+        // later signal arrives to trigger _flush). Sales cold login → empty portfolio
+        // until manual tap. _splashPreFade has already run at this point, so
+        // sales-mode class + active screen are set — flush conditions are satisfied.
         if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
           window._pendingRefreshAll=false;
-          if(window.RenderBus) window.RenderBus.markRender();
-          try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
+          if(window.RenderBus && typeof window.RenderBus.flushNow==='function'){
+            try{window.RenderBus.flushNow();}catch(e){}
+          } else {
+            if(window.RenderBus) window.RenderBus.markRender();
+            try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
+          }
         }
         // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
         // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.

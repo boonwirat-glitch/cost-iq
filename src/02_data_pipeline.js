@@ -2187,7 +2187,16 @@ window.RenderBus = (function(){
     _senseDataLog('RENDERBUS','🔄 reset (reload/resume)');
   }
 
-  return { signal: signal, markRender: markRender, reset: reset };
+  // v563: immediate full flush — doFade's post-splash render must go through
+  // _flush() (covers portview/teamview/SALES branches), not bare refreshAll().
+  // Bare refreshAll() never called renderSalesPortview → Sales cold login showed
+  // an empty portfolio until the user tapped the nav icon (manual re-render).
+  function flushNow(){
+    clearTimeout(_timer); _timer = null;
+    _flush();
+  }
+
+  return { signal: signal, markRender: markRender, reset: reset, flushNow: flushNow };
 })();
 
 function refreshAll(){
