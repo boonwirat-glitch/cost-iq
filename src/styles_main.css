@@ -4995,6 +4995,8 @@ body.sales-mode .bnav #nav-teamview     { display: none !important; }
 body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
 /* v498: AD also gets Skills nav */
 body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* KAM TL (tl role, kam-mode) also gets Skills nav */
+body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
 /* Echo for Sales — show + center position */
 body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
 body.sales-mode .bnav #nav-sales-portview  { order: 1; }
