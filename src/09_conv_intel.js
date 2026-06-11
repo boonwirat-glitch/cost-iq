@@ -629,8 +629,8 @@ const CI = (() => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime   = _bestMime();
-      // audioBitsPerSecond:16000 — opus speech quality, 90min = ~14.8MB base64 (under Gemini 20MB inline limit)
-      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 16000 });
+      // audioBitsPerSecond:24000 — opus speech quality balanced with Gemini recognition accuracy
+      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 });
       _chunks      = [];
       _secs        = 0;
       _recorder.ondataavailable = e => { if (e.data?.size > 0) _chunks.push(e.data); };
@@ -638,10 +638,13 @@ const CI = (() => {
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
-      // AudioContext keep-alive — connect stream source to prevent iOS from suspending audio session on screen lock
+      // AudioContext keep-alive — iOS audio session keep-alive
+      // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
+      // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
       try {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        _audioCtx.createMediaStreamSource(stream); // connected but no output = silent keep-alive
+        // Resume in case browser suspended it (iOS requires user gesture)
+        if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
       } catch(_) {}
 
       // UI — dark mode transition (silent recording feel)
