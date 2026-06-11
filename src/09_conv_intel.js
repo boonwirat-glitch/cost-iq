@@ -2986,7 +2986,7 @@ ${summaryHtml}`;
       sheet.style.background = '#111111';
       const tb = sheet.querySelector('.topbar');
       if (tb) { tb.style.background='rgba(255,255,255,.04)'; tb.style.borderColor='rgba(255,255,255,.06)'; }
-      _themeEl('ci-tval', 'color', 'rgba(255,255,255,.82)'); // timer visible on dark bg
+      _themeEl('ci-tval', 'color', 'rgba(255,255,255,.28)'); // v553: dim — working silently feel
       _themeEl('ci-rlbl',       'color', 'rgba(255,255,255,.25)');
       _themeEl('ci-topbar-left','color', 'rgba(255,255,255,.22)');
       _themeEl('ci-tab-pill',   'background', 'rgba(255,255,255,.1)');
