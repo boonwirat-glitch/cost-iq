@@ -152,6 +152,10 @@
       _updateCardCount();
       _spcVisible = true;
     } else {
+      // opplist was re-rendered → DOM card is a freshly-injected hidden element
+      // _spcVisible may still be true from before the re-render, which would
+      // make _showCard() bail out immediately. Reset so the new card animates in.
+      _spcVisible = false;
       _updateCardCount();
       _showCard();
     }
