@@ -31,6 +31,7 @@ const CI = (() => {
   let _sessionId   = null; // ci_sessions UUID after save
   let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // 'week' | 'month' | 'all'  — inline history filter
+  let _checkinCache = null; // { rep_lat, rep_lng, checked_in_at, account_guid } — GPS from check-in orb
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function _fmt(s) {
@@ -175,6 +176,31 @@ const CI = (() => {
 #ci-rec-active{display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:8px;}
 /* ── ORB — remove pulse rings in active state ── */
 .orb-ambient,.orb-ring{display:none;}
+
+/* ── CHECK-IN BAR ── */
+.ci-checkin-bar{display:none;margin:0 24px 4px;background:rgba(52,199,89,.06);border:0.5px solid rgba(52,199,89,.2);border-radius:12px;padding:8px 12px;align-items:center;gap:8px;}
+.ci-checkin-bar.show{display:flex;}
+.ci-checkin-icon{width:18px;height:18px;border-radius:50%;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ci-checkin-txt{font-size:12px;font-weight:500;color:#1C1C1E;}
+.ci-checkin-sub{font-size:10px;color:#8e8e93;}
+
+/* ── COVISIT LIST (TL screen) ── */
+.cv-list-wrap{flex:1;overflow-y:auto;padding:0 0 max(32px,calc(env(safe-area-inset-bottom,0px)+80px));-webkit-overflow-scrolling:touch;}
+.cv-section-hd{font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:12px 24px 6px;}
+.cv-row{display:flex;align-items:center;gap:10px;padding:10px 24px;border-bottom:0.5px solid #E5E5EA;}
+.cv-row:last-child{border-bottom:none;}
+.cv-avatar{width:30px;height:30px;border-radius:50%;background:rgba(255,56,92,.1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#FF385C;flex-shrink:0;}
+.cv-name{font-size:13px;font-weight:500;color:#1C1C1E;}
+.cv-sub{font-size:10px;color:#AEAEB2;margin-top:1px;font-family:'Noto Sans Thai',sans-serif;}
+.cv-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:100px;font-size:9px;font-weight:500;white-space:nowrap;}
+.cv-badge-ready{background:rgba(52,199,89,.1);color:#1A7A3A;}
+.cv-badge-wait{background:rgba(255,149,0,.1);color:#995500;}
+.cv-badge-done{background:rgba(52,199,89,.1);color:#1A7A3A;}
+.cv-badge-expired{background:rgba(255,59,48,.08);color:#CC2200;}
+.cv-verify-btn{display:block;margin:12px 24px 4px;width:calc(100% - 48px);padding:14px;border-radius:14px;border:none;background:#FF385C;color:#fff;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.02em;cursor:pointer;transition:opacity 80ms;}
+.cv-verify-btn:disabled{background:#E5E5EA;color:#AEAEB2;cursor:not-allowed;}
+.cv-verify-btn:active{opacity:.85;}
+.cv-note{text-align:center;font-size:10px;color:#AEAEB2;padding:4px 24px 16px;line-height:1.5;font-family:'Noto Sans Thai',sans-serif;}
 
 /* ── RECORD BOTTOM ── */
 .rec-bottom{padding:8px 24px 40px;display:flex;flex-direction:column;gap:10px;}
@@ -385,10 +411,17 @@ const CI = (() => {
     _showScreen('ci-s-record');
     // Load visit counts after mount (async, non-blocking)
     setTimeout(_loadVisitBadge, 200);
-    // Visit hero: hide entirely for TL/Admin (they manage team, not their own visits)
+    // Visit hero: rep sees own count, TL sees covisit hero
     if (_canDebrief()) {
       const hero = document.getElementById('ci-visit-hero');
       if (hero) hero.style.display = 'none';
+      // TL: hide orb, show covisit panel
+      const recCenter = document.getElementById('ci-rec-center');
+      const cvPanel = document.getElementById('ci-covisit-panel');
+      if (recCenter) recCenter.style.display = 'none';
+      if (cvPanel) { cvPanel.style.display = 'flex'; }
+      setTimeout(_loadCovisitHero, 250);
+      setTimeout(_loadCovisitList, 300);
     } else {
       setTimeout(_loadVisitHero, 250);
     }
@@ -480,19 +513,43 @@ const CI = (() => {
   <!-- idle center — orb, shown before startRecording() -->
   <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
     <div class="orb-wrap">
-      <div class="orb-outer" onclick="CI.startRecording()">
-        <div class="orb-core">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <div class="orb-outer" onclick="CI._orbTap()">
+        <div class="orb-core" id="ci-orb-core">
+          <svg id="ci-orb-icon-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
             <line x1="12" y1="19" x2="12" y2="22"/>
             <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
+          <svg id="ci-orb-icon-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5"/>
           </svg>
         </div>
       </div>
     </div>
     <div class="timer-block">
       <div class="timer-hint" id="ci-thint">กดเพื่อเริ่มบันทึก</div>
+    </div>
+  </div>
+  <!-- check-in bar — shown after rep checks in -->
+  <div class="ci-checkin-bar" id="ci-checkin-bar">
+    <div class="ci-checkin-icon">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div>
+      <div class="ci-checkin-txt">เช็คอินแล้ว · <span id="ci-checkin-time">—</span></div>
+      <div class="ci-checkin-sub">GPS บันทึกแล้ว</div>
+    </div>
+  </div>
+  <!-- TL covisit panel — shown for TL/Admin instead of orb -->
+  <div id="ci-covisit-panel" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+    <div class="cv-list-wrap" id="ci-cv-list-body">
+      <div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+    </div>
+    <div id="ci-cv-verify-wrap" style="display:none">
+      <button class="cv-verify-btn" id="ci-cv-verify-btn" onclick="CI._covisitVerify()">📍 ยืนยัน Co-visit</button>
+      <div class="cv-note">GPS จะเปรียบเทียบตำแหน่งกับน้อง · ต้องอยู่ในรัศมี 150 เมตร และภายใน 90 นาที</div>
     </div>
   </div>
   <!-- active recording center — wave + timer -->
@@ -1000,10 +1057,19 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
         next_actions:       intelData?.next_actions || [],
         transcript_summary: transcriptSummary || null,
         tone_signals:       toneSignals || null,
+        // Check-in GPS — merged from _checkinCache (rep tapped check-in orb before recording)
+        rep_lat:            _checkinCache?.rep_lat || null,
+        rep_lng:            _checkinCache?.rep_lng || null,
+        checked_in_at:      _checkinCache?.checked_in_at || null,
         status:             'saved'
       }).select('id').single();
       if (sessionErr) console.warn('[CI] ci_sessions insert (table may not exist yet):', sessionErr.message);
-      else if (sessionRow) _sessionId = sessionRow.id;
+      else if (sessionRow) {
+        _sessionId = sessionRow.id;
+        // Clear checkin cache after successful save
+        _checkinCache = null;
+        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+      }
     } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
 
     // 2. Save skill log rows (all roles — Sales uses account_name fallback when no guid)
@@ -2685,6 +2751,77 @@ ${summaryHtml}`;
     if (el) el.remove();
   }
 
+  // ── Orb tap dispatcher — check-in state vs record state ───────────────────
+  function _orbTap() {
+    if (_phase !== 'idle') return;
+    const hint = document.getElementById('ci-thint');
+    if (hint && hint.dataset.mode === 'checkin') {
+      _doCheckin();
+    } else {
+      startRecording();
+    }
+  }
+
+  // ── Show check-in orb (map-pin) — after picker confirm, before check-in ───
+  function _showCheckinOrb() {
+    const mic = document.getElementById('ci-orb-icon-mic');
+    const pin = document.getElementById('ci-orb-icon-pin');
+    const hint = document.getElementById('ci-thint');
+    if (mic) mic.style.display = 'none';
+    if (pin) pin.style.display = '';
+    if (hint) { hint.textContent = 'กดเพื่อเช็คอิน'; hint.dataset.mode = 'checkin'; }
+  }
+
+  // ── Show mic orb — after check-in done ────────────────────────────────────
+  function _showMicOrb() {
+    const mic = document.getElementById('ci-orb-icon-mic');
+    const pin = document.getElementById('ci-orb-icon-pin');
+    const hint = document.getElementById('ci-thint');
+    if (mic) mic.style.display = '';
+    if (pin) pin.style.display = 'none';
+    if (hint) { hint.textContent = 'กดเพื่อเริ่มบันทึก'; hint.dataset.mode = 'record'; }
+  }
+
+  // ── GPS check-in — snap location, cache, show bar + mic orb ──────────────
+  async function _doCheckin() {
+    const hint = document.getElementById('ci-thint');
+    if (hint) hint.textContent = 'กำลังระบุตำแหน่ง...';
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+        });
+      });
+      const now = new Date();
+      _checkinCache = {
+        rep_lat:       pos.coords.latitude,
+        rep_lng:       pos.coords.longitude,
+        checked_in_at: now.toISOString(),
+        account_guid:  _accountGuid,
+      };
+      // Persist to localStorage so it survives app restart within session
+      try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
+
+      // Show check-in bar
+      const bar = document.getElementById('ci-checkin-bar');
+      const timeEl = document.getElementById('ci-checkin-time');
+      if (timeEl) timeEl.textContent = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      if (bar) bar.classList.add('show');
+
+      // Switch orb to mic
+      _showMicOrb();
+
+    } catch(e) {
+      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
+                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
+                : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
+                : 'GPS error: ' + e.message;
+      _toast(msg);
+      if (hint) { hint.textContent = 'กดเพื่อเช็คอิน'; hint.dataset.mode = 'checkin'; }
+    }
+  }
+
   function _hidePicker() {
     // Hide inline picker, reveal record UI + update chip
     const pickerSec = document.getElementById('ci-picker-sec');
@@ -2712,6 +2849,24 @@ ${summaryHtml}`;
     _accountGuid = guid; _accountName = name; _accountSeg = seg || '';
     _showPicker = false;
     _hidePicker();
+    // Restore checkin cache if same account was checked-in this session
+    try {
+      const cached = JSON.parse(localStorage.getItem('ci_checkin_cache') || 'null');
+      if (cached && cached.account_guid === guid) {
+        const minsAgo = (Date.now() - new Date(cached.checked_in_at).getTime()) / 60000;
+        if (minsAgo < 90) {
+          _checkinCache = cached;
+          const bar = document.getElementById('ci-checkin-bar');
+          const timeEl = document.getElementById('ci-checkin-time');
+          const t = new Date(cached.checked_in_at);
+          if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+          if (bar) bar.classList.add('show');
+          _showMicOrb();
+          return;
+        }
+      }
+    } catch(_) {}
+    _showCheckinOrb();
   }
 
   function _pickerConfirmSales(name) {
@@ -2719,6 +2874,7 @@ ${summaryHtml}`;
     _accountGuid = null; _accountName = name.trim(); _accountSeg = 'LEAD';
     _showPicker = false;
     _hidePicker();
+    _showCheckinOrb();
   }
 
   function _buildKamPickerHTML() {
@@ -2958,7 +3114,233 @@ ${summaryHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  // ── TL Co-visit Hero — query covisit_events ────────────────────────────────
+  async function _loadCovisitHero() {
+    const dots = document.getElementById('ci-vh-dots');
+    const wnum = document.getElementById('ci-vh-wnum');
+    const qnum = document.getElementById('ci-vh-qnum');
+    const wlabel = document.getElementById('ci-vh-wlabel');
+    if (!dots || !wnum || !qnum) return;
+    const email = currentUserProfile?.email;
+    if (!email) return;
+    if (wlabel) wlabel.textContent = 'Co-visit สัปดาห์นี้';
+    // Show hero card for TL
+    const hero = document.getElementById('ci-visit-hero');
+    if (hero) hero.style.display = '';
+    try {
+      const now = new Date();
+      const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+      const weekStart = new Date(now); weekStart.setHours(0,0,0,0); weekStart.setDate(now.getDate() - dow);
+      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      const [wRes, qRes] = await Promise.all([
+        supa.from('covisit_events').select('*', { count: 'exact', head: true })
+          .eq('tl_email', email).eq('verified', true).gte('checked_at', weekStart.toISOString()),
+        supa.from('covisit_events').select('*', { count: 'exact', head: true })
+          .eq('tl_email', email).eq('verified', true).gte('checked_at', qStart.toISOString()),
+      ]);
+      const wCount = wRes.count ?? 0;
+      const qCount = qRes.count ?? 0;
+      wnum.textContent = wCount;
+      qnum.textContent = qCount;
+      const totalDots = Math.max(5, Math.ceil(wCount / 5) * 5);
+      let dotsHtml = '';
+      for (let i = 1; i <= totalDots; i++) {
+        if (i <= Math.min(wCount, 5)) dotsHtml += '<div style="width:8px;height:8px;border-radius:50%;background:#FF385C;flex-shrink:0"></div>';
+        else if (i > 5 && i <= wCount) dotsHtml += '<div style="width:8px;height:8px;border-radius:50%;background:#FFB300;flex-shrink:0"></div>';
+        else dotsHtml += '<div style="width:8px;height:8px;border-radius:50%;background:rgba(255,56,92,.15);flex-shrink:0"></div>';
+      }
+      dots.innerHTML = dotsHtml + `<span style="font-size:10px;color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif">${wCount} co-visits</span>`;
+    } catch(e) { console.warn('[CI covisit hero]', e.message); }
+  }
+
+  // ── TL Co-visit List — load today's check-ins from team ───────────────────
+  let _cvSelected = null; // { session_id, rep_email, rep_lat, rep_lng, checked_in_at }
+
+  async function _loadCovisitList() {
+    const body = document.getElementById('ci-cv-list-body');
+    if (!body) return;
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>';
+    _cvSelected = null;
+    _updateCvVerifyBtn();
+    try {
+      const teamEmails = _getTeamEmails();
+      if (!teamEmails.length) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">ไม่พบน้องในทีม</div>'; return; }
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const { data, error } = await supa.from('ci_sessions')
+        .select('id,owner_email,account_name,checked_in_at,rep_lat,rep_lng,covisit_verified')
+        .in('owner_email', teamEmails)
+        .gte('checked_in_at', todayStart.toISOString())
+        .order('checked_in_at', { ascending: false });
+      if (error) throw error;
+      body.innerHTML = _renderCovisitList(data || []);
+    } catch(e) {
+      console.warn('[CI covisit list]', e.message);
+      body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">โหลดไม่สำเร็จ</div>';
+    }
+  }
+
+  function _renderCovisitList(rows) {
+    if (!rows.length) return '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">ยังไม่มีน้องเช็คอินวันนี้</div>';
+    const now = Date.now();
+    const WINDOW_MS = 90 * 60 * 1000;
+    return `<div class="cv-section-hd">วันนี้</div>` + rows.map(s => {
+      const repName = s.owner_email ? s.owner_email.split('@')[0] : '—';
+      const initials = repName.slice(0,2).toUpperCase();
+      const acct = s.account_name || '—';
+      const checkinMs = new Date(s.checked_in_at).getTime();
+      const checkinTime = new Date(s.checked_in_at).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      const elapsed = now - checkinMs;
+      const verified = !!s.covisit_verified;
+      let badgeHtml, clickable;
+      if (verified) {
+        badgeHtml = `<span class="cv-badge cv-badge-done"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified</span>`;
+        clickable = false;
+      } else if (elapsed > WINDOW_MS) {
+        badgeHtml = `<span class="cv-badge cv-badge-expired">หมดเวลา</span>`;
+        clickable = false;
+      } else {
+        badgeHtml = `<span class="cv-badge cv-badge-ready"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>พร้อม</span>`;
+        clickable = true;
+      }
+      const selStyle = clickable ? 'cursor:pointer;' : 'opacity:.6;';
+      const onclickAttr = clickable
+        ? `onclick="CI._cvSelectRow('${s.id}','${s.owner_email}',${s.rep_lat||'null'},${s.rep_lng||'null'},'${s.checked_in_at}','${repName}')"`
+        : '';
+      return `<div class="cv-row" id="cv-row-${s.id}" style="${selStyle}" ${onclickAttr}>
+        <div class="cv-avatar">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div class="cv-name">${repName}</div>
+          <div class="cv-sub">${acct} · เช็คอิน ${checkinTime}</div>
+        </div>
+        ${badgeHtml}
+      </div>`;
+    }).join('');
+  }
+
+  function _cvSelectRow(sessionId, repEmail, repLat, repLng, checkedInAt, repName) {
+    _cvSelected = { session_id: sessionId, rep_email: repEmail, rep_lat: repLat, rep_lng: repLng, checked_in_at: checkedInAt };
+    // Highlight selected row
+    document.querySelectorAll('.cv-row').forEach(r => r.style.background = '');
+    const row = document.getElementById(`cv-row-${sessionId}`);
+    if (row) row.style.background = 'rgba(255,56,92,.04)';
+    // Update verify button
+    const btn = document.getElementById('ci-cv-verify-btn');
+    if (btn) btn.textContent = `📍 ยืนยัน Co-visit กับ ${repName}`;
+    _updateCvVerifyBtn();
+  }
+
+  function _updateCvVerifyBtn() {
+    const wrap = document.getElementById('ci-cv-verify-wrap');
+    if (wrap) wrap.style.display = _cvSelected ? 'block' : 'none';
+  }
+
+  // ── Co-visit Verify — rework: Haversine + time window ─────────────────────
+  async function _covisitVerify(sessionId, repEmail) {
+    // Support both direct call (from session detail v541) and new TL flow (_cvSelected)
+    const target = _cvSelected || (sessionId ? { session_id: sessionId, rep_email: repEmail, rep_lat: null, rep_lng: null, checked_in_at: null } : null);
+    if (!target) return;
+
+    const btn = document.getElementById('ci-cv-verify-btn') || document.getElementById('sd-covisit-btn');
+    const badge = document.getElementById('sd-cv-badge');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังระบุตำแหน่ง...'; }
+
+    const THRESHOLD_M = 150;
+    const WINDOW_MS = 90 * 60 * 1000;
+
+    try {
+      // 1. TL GPS snap
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+        });
+      });
+      const tlLat = pos.coords.latitude;
+      const tlLng = pos.coords.longitude;
+
+      // 2. Time window check (if we have checked_in_at)
+      if (target.checked_in_at) {
+        const elapsed = Date.now() - new Date(target.checked_in_at).getTime();
+        if (elapsed > WINDOW_MS) {
+          throw new Error(`หมดเวลา — น้องเช็คอินไปแล้ว ${Math.floor(elapsed/60000)} นาที (ต้องอยู่ใน 90 นาที)`);
+        }
+      }
+
+      // 3. Haversine check (if rep has GPS)
+      let proximityM = null;
+      if (target.rep_lat && target.rep_lng) {
+        proximityM = Math.round(_haversine(tlLat, tlLng, target.rep_lat, target.rep_lng));
+        if (proximityM > THRESHOLD_M) {
+          throw new Error(`ไกลเกินไป — ห่างกัน ${proximityM} เมตร (ต้องอยู่ใน ${THRESHOLD_M} เมตร)`);
+        }
+      }
+
+      if (btn) btn.textContent = 'กำลังบันทึก...';
+
+      // 4. Get TL user id
+      let tlUserId = null;
+      try {
+        const sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (sk) { const ss = JSON.parse(localStorage.getItem(sk)); tlUserId = ss?.user?.id || null; }
+      } catch(_) {}
+
+      const tlEmail = currentUserProfile?.email || null;
+      const nowIso = new Date().toISOString();
+
+      // 5. Upsert covisit_events
+      try {
+        const { error: cvErr } = await supa.from('covisit_events').upsert({
+          session_id:  target.session_id,
+          tl_email:    tlEmail,
+          rep_email:   target.rep_email || null,
+          tl_lat:      tlLat,
+          tl_lng:      tlLng,
+          rep_lat:     target.rep_lat || null,
+          rep_lng:     target.rep_lng || null,
+          proximity_m: proximityM,
+          verified:    true,
+          checked_at:  nowIso,
+        }, { onConflict: 'session_id' });
+        if (cvErr) console.warn('[CI] covisit_events upsert:', cvErr.message);
+      } catch(e) { console.warn('[CI] covisit_events unavailable:', e.message); }
+
+      // 6. Update ci_sessions.covisit_verified
+      try {
+        await supa.from('ci_sessions').update({ covisit_verified: true }).eq('id', target.session_id);
+      } catch(e) { console.warn('[CI] ci_sessions covisit_verified update:', e.message); }
+
+      // 7. Update UI
+      _cvSelected = null;
+      // If in session detail sheet
+      if (btn && btn.id === 'sd-covisit-btn') {
+        btn.remove();
+        if (badge) {
+          badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
+          badge.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>✓ Co-visit ยืนยันแล้ว`;
+        }
+      }
+      // If in TL covisit panel
+      if (btn && btn.id === 'ci-cv-verify-btn') {
+        setTimeout(() => {
+          _updateCvVerifyBtn();
+          setTimeout(_loadCovisitList, 400);
+          setTimeout(_loadCovisitHero, 500);
+        }, 600);
+      }
+      setTimeout(() => _loadInlineHistory(), 800);
+      if (typeof showToast === 'function') showToast('✓ Co-visit ยืนยันแล้ว', '✓');
+
+    } catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = btn.id === 'sd-covisit-btn' ? '📍 ยืนยัน Co-visit' : `📍 ยืนยัน Co-visit กับ ${_cvSelected?.rep_email?.split('@')[0] || ''}` ; }
+      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
+                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
+                : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
+                : e.message;
+      _toast(msg);
+    }
+  }
+
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
