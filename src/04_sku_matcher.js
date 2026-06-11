@@ -2166,7 +2166,7 @@ schema: {"pack_size_issue":false,"verified":[{"catalog_item_id":"12345","catalog
   const sysDetail=sharedCriteria+`
 
 ตอบเป็น JSON เท่านั้น schema:
-{"pack_size_issue":false,"pack_size_note":"","verified":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":99.0,"pack_size":"1 kg./pack","price_diff":9.0,"is_substitutable":true,"confidence":"high|medium|low","note_th":"ใช้แทนได้","caveat_th":""}],"excluded":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":47.0,"pack_size":"...","reason_th":"เหตุผลที่ exclude"}],"summary_th":"สรุปสั้นๆ"}`;
+{"pack_size_issue":false,"pack_size_note":"","verified":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":99.0,"pack_size":"1 kg./pack","price_diff":9.0,"is_substitutable":true,"confidence":"high|medium|low","caveat_th":""}],"excluded":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":47.0,"pack_size":"...","reason_th":"เหตุผลที่ exclude"}],"summary_th":"สรุปสั้นๆ"}`;
 
   const sys=matcherMode==='fast'?sysFast:sysDetail;
   const maxTok=matcherMode==='fast'?1000:4096;
@@ -3259,3 +3259,4 @@ function toggleSsbTooltip(){
 
 
 //////////////////////////////////////////////////////////////////////////////
+
