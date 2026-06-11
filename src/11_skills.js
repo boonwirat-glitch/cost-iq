@@ -615,9 +615,14 @@ async function _renderTLVisitContent(container) {
     html += `<div style="margin:0 14px;">`;
     sorted.forEach(email => {
       const d = repMap[email];
-      const uKey = Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
+      // Name lookup: portviewBulkData first (most reliable for KAM/AD), then _skillUsers, then email prefix
+      const _pvBulkNames = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+      const _pvNameMatch = _pvBulkNames.find(r => (r.kamEmail || '').toLowerCase() === email);
+      const uKey = !_pvNameMatch && Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
       const uRec = uKey ? _skillUsers[uKey] : null;
-      const rawName = uRec ? (uRec.kam_name || uRec.full_name || email.split('@')[0]) : email.split('@')[0];
+      const rawName = (_pvNameMatch && (_pvNameMatch.kamName || ''))
+        || (uRec && (uRec.kam_name || uRec.full_name))
+        || email.split('@')[0];
       const nick    = _skNickname(rawName);
       const acctTgt = acctPerRep[email] || 0;
       const qPct    = acctTgt > 0 ? Math.min(100, Math.round((d.thisQuarter / acctTgt) * 100)) : 0;
