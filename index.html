@@ -1,4 +1,4 @@
-<!-- Freshket Sense v533: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v534: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v533',
+      version: 'v534',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43283,7 +43283,7 @@ ${summaryHtml}`;
         }, 1800);
       }
       // refresh feed + badge in background
-      setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); }, 800);
+      setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); _loadVisitHero(); }, 800);
     } catch(e) {
       if (btn) { btn.disabled = false; btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'; }
       _toast('บันทึกไม่สำเร็จ: ' + e.message);
