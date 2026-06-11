@@ -1,4 +1,4 @@
-<!-- Freshket Sense v521: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v522: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5627,7 +5627,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v521',
+      version: 'v522',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43672,11 +43672,18 @@ function echoExpand() {
   // ── Supabase helper (reuses global `supa`) ────────────────────────────────
   async function _supaReq(table, opts = {}) {
     const { method = 'GET', filter = '', body = null, prefer = '' } = opts;
-    const url = `${supa.supabaseUrl}/rest/v1/${table}${filter}`;
+    // Use global SUPA_URL/SUPA_KEY (from 01_core.js) — supa.supabaseKey is undefined in Supabase JS v2
+    const _key = (typeof SUPA_KEY !== 'undefined' && SUPA_KEY) ||
+                 (window.FreshketSenseConfig && window.FreshketSenseConfig.supabase &&
+                  (window.FreshketSenseConfig.supabase.publishableKey || window.FreshketSenseConfig.supabase.anonKey)) || '';
+    const _url = (typeof SUPA_URL !== 'undefined' && SUPA_URL) || supa.supabaseUrl || '';
+    const url = `${_url}/rest/v1/${table}${filter}`;
+    let _jwt = _key;
+    try { const _s = await supa.auth.getSession(); _jwt = _s?.data?.session?.access_token || _key; } catch(_) {}
     const headers = {
       'Content-Type': 'application/json',
-      'apikey': supa.supabaseKey,
-      'Authorization': 'Bearer ' + ((supa.auth.getSession ? (await supa.auth.getSession()).data?.session?.access_token : null) || supa.supabaseKey),
+      'apikey': _key,
+      'Authorization': 'Bearer ' + _jwt,
     };
     if (prefer) headers['Prefer'] = prefer;
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
