@@ -2130,11 +2130,11 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-table{width:100%;border-collapse:collapse;table-layout:fixed;}
 .rpt2-table thead tr{background:#fafafa;}
 .rpt2-table th{padding:5px 7px 4px;text-align:left;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#bbb;border-bottom:1px solid #e8e8e8;}
-.rpt2-th-num{width:10px;}
-.rpt2-th-sku{width:auto;}
-.rpt2-th-arr{width:10px;}
-.rpt2-th-gmv{width:60px;text-align:right;}
-.rpt2-th-save{width:60px;text-align:right;}
+.rpt2-th-num{width:4%;}
+.rpt2-th-sku{width:34%;}
+.rpt2-th-arr{width:4%;}
+.rpt2-th-gmv{width:13%;text-align:right;}
+.rpt2-th-save{width:11%;text-align:right;}
 .rpt2-table td{padding:5px 5px;border-bottom:0.5px solid #f2f2f2;vertical-align:top;}
 /* Category row */
 .rpt2-cat-row td{background:#f6faf6;border-bottom:0.5px solid #dde8dd;padding:4px 7px!important;}
@@ -3162,7 +3162,7 @@ body.sense-plan-active:not(.sense-plan-expanded) .sense-plan-dot{display:block}
 /* ── Save Plan Badge card (v500) ── */
 @keyframes spc-in{0%{opacity:0;transform:translateY(-6px) scaleY(0.8);max-height:0;}60%{opacity:1;transform:translateY(1px) scaleY(1.02);}100%{opacity:1;transform:translateY(0) scaleY(1);max-height:80px;}}
 @keyframes spc-out{0%{opacity:1;transform:translateY(0);max-height:80px;}100%{opacity:0;transform:translateY(-5px);max-height:0;}}
-.save-plan-card{border-radius:10px;padding:10px 12px;transform-origin:top center;overflow:hidden;}
+.save-plan-card{border-radius:10px;padding:10px 12px;transform-origin:top center;overflow:hidden;margin-top:8px;}
 .save-plan-card.hidden{display:none;}
 .save-plan-card.spc-entering{animation:spc-in .32s cubic-bezier(.34,1.4,.64,1) both;border:1.5px dashed rgba(0,160,80,.38);background:var(--n0);}
 .save-plan-card.spc-exiting{animation:spc-out .22s ease forwards;}
@@ -5562,6 +5562,7 @@ body.sales-mode .bnav {
   border-top: none !important;
   box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
 }
+
 </style>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
@@ -10916,7 +10917,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <div id="mm-sonnet" onclick="setMatcherModel('sonnet')" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--n200);background:var(--n50);cursor:pointer;transition:all .15s">
 <div style="font-size:12px;font-weight:700;color:var(--n700)">Detail</div>
-<div style="font-size:10px;color:var(--n400);margin-top:2px">มี note · ช้ากว่า</div>
+<div style="font-size:10px;color:var(--n400);margin-top:2px">ละเอียด · ช้ากว่า</div>
 </div>
 </div>
 <!-- API key (dev-only direct browser mode) -->
@@ -17732,6 +17733,8 @@ function renderPlanBuilder(opps){
   const highSave=allHigh.reduce((s,o)=>s+getAlt(o).save,0);
   const allSave=opps.reduce((s,o)=>s+getAlt(o).save,0);
   const verifyDone=allHigh.length>0;
+  // Dynamic price month label for disclaimer
+  const _priceMo=(D.history&&D.history.length)?D.history[D.history.length-1].m:'เดือนล่าสุด';
   // Plan selector panel
   // ── PLAN TABS ──
   const isAll=currentPlanMode==='all';
@@ -17764,11 +17767,11 @@ function renderPlanBuilder(opps){
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
         <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:400;color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">ประมาณการเบื้องต้น — ควรตรวจสเปคก่อนเสนอลูกค้า</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">ประมาณการเบื้องต้น จากราคาเดือน ${_priceMo} — ควรตรวจสเปคก่อนนำเสนอลูกค้า</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
         <div class="plan-tab-row"><span class="plan-tab-title sense"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense ตรวจสเปค</span><span class="plan-tab-val sense">${!verifyDone?'เทียบสเปค →':(fmt(highSave)+'/เดือน')}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">${!verifyDone?'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง':'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง'}</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">AI ช่วยคัดเบื้องต้นจากเกรด แบรนด์ และสเปคที่ร้านใช้ — ควรยืนยันกับร้านอีกครั้ง</div>
       </div>
     </div>
     <div class="plan-tab-panel">${tabPanel}</div>
@@ -19842,6 +19845,7 @@ On cost-saving alternatives:
 // This lets inline handlers and legacy call sites continue to work during modular migration.
 window.FreshketSenseRuntime = window.FreshketSenseRuntime || { ai:{ OLIVE_BASE:'', oliveToneClean:function(t){return String(t||'').trim();} }, aiClient:{} };
 var OLIVE_BASE = window.FreshketSenseRuntime.ai && window.FreshketSenseRuntime.ai.OLIVE_BASE || '';
+
 // SECTION:AI_CLIENT
 function oliveToneClean(t){ return window.FreshketSenseRuntime.ai && window.FreshketSenseRuntime.ai.oliveToneClean ? window.FreshketSenseRuntime.ai.oliveToneClean(t) : String(t||'').trim(); }
 function getAiProxyUrl(){ return window.FreshketSenseRuntime.aiClient && window.FreshketSenseRuntime.aiClient.getAiProxyUrl ? window.FreshketSenseRuntime.aiClient.getAiProxyUrl() : ''; }
@@ -22010,7 +22014,7 @@ schema: {"pack_size_issue":false,"verified":[{"catalog_item_id":"12345","catalog
   const sysDetail=sharedCriteria+`
 
 ตอบเป็น JSON เท่านั้น schema:
-{"pack_size_issue":false,"pack_size_note":"","verified":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":99.0,"pack_size":"1 kg./pack","price_diff":9.0,"is_substitutable":true,"confidence":"high|medium|low","note_th":"ใช้แทนได้","caveat_th":""}],"excluded":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":47.0,"pack_size":"...","reason_th":"เหตุผลที่ exclude"}],"summary_th":"สรุปสั้นๆ"}`;
+{"pack_size_issue":false,"pack_size_note":"","verified":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":99.0,"pack_size":"1 kg./pack","price_diff":9.0,"is_substitutable":true,"confidence":"high|medium|low","caveat_th":""}],"excluded":[{"catalog_item_id":"12345","catalog_item_name":"...","catalog_price":47.0,"pack_size":"...","reason_th":"เหตุผลที่ exclude"}],"summary_th":"สรุปสั้นๆ"}`;
 
   const sys=matcherMode==='fast'?sysFast:sysDetail;
   const maxTok=matcherMode==='fast'?1000:4096;
@@ -23103,6 +23107,7 @@ function toggleSsbTooltip(){
 
 
 //////////////////////////////////////////////////////////////////////////////
+
 // SECTION:SCREEN_NAV
 function showScreen(name){
   const controller = window.FreshketSenseNavigationRuntime;
@@ -30205,7 +30210,7 @@ function _updateRestSwipe(grp,idx,opts){
 </div>
 <div id="vs-sonnet" onclick="setMatcherModel('sonnet');vsUpdateMode()" style="flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--n200);background:var(--n50);cursor:pointer;transition:all .15s">
 <div style="font-size:12px;font-weight:700;color:var(--n700)">Detail</div>
-<div style="font-size:10px;color:var(--n400);margin-top:2px">มี note · ช้ากว่า</div>
+<div style="font-size:10px;color:var(--n400);margin-top:2px">ละเอียด · ช้ากว่า</div>
 </div>
 </div>
 <div style="font-size:10px;font-weight:700;color:var(--n600);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">ขอบเขต</div>
@@ -40677,9 +40682,29 @@ window.closeCommissionHistory = closeCommissionHistory;
   };
 
   // ── HOOK: called from smartSelect (user tapped card 1 or 2) ──────────────
+  // User selected a plan → always show the save card (this IS the trigger to show it)
   window.savePlanBadge_onDefault = function(){
-    // Hide only if not yet saved — if saved, leave visible (user's plan still persists)
-    _hideCard();
+    _spcInited = false; // opplist was re-rendered by smartSelect → re-inject fresh
+    var injected = _injectBadgeCard();
+    if(!injected) return;
+    _patchSpsCta();
+    if(_spcSaved){
+      // Was already saved — flip back to unsaved since user picked a new plan
+      _spcSaved = false;
+      var card = document.getElementById('save-plan-card');
+      if(card) card.className = 'save-plan-card spc-unsaved';
+      var lbl = document.getElementById('spc-label');
+      var sub = document.getElementById('spc-sub');
+      var btn = document.getElementById('spc-btn');
+      if(lbl) lbl.textContent = 'บันทึกแผนนี้';
+      if(sub){ sub.className = 'spc-sub'; sub.innerHTML = 'เลือกไว้ <span id="spc-count">0</span> รายการ · ยังไม่บันทึก'; }
+      if(btn){ btn.textContent = 'บันทึก'; btn.className = 'spc-btn cta'; }
+      var dot = document.querySelector('#spc-left .spc-dot');
+      if(dot) dot.remove();
+      _spcVisible = true;
+    }
+    _updateCardCount();
+    _showCard();
   };
 
   // ── HOOK: called when entering report screen ───────────────────────────────
@@ -40939,6 +40964,7 @@ window.closeCommissionHistory = closeCommissionHistory;
   }, 800);
 
 })();
+
 </script>
 <script id="freshket-conv-intel">
 // =============================================================================
@@ -46531,4 +46557,5 @@ window._skCardRipple           = _skCardRipple;
 </div>
 </body>
 </html>
+
 
