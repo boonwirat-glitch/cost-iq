@@ -1,4 +1,4 @@
-<!-- Freshket Sense v550: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v551: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5633,7 +5633,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v550',
+      version: 'v551',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41604,7 +41604,7 @@ const CI = (() => {
       <div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
     </div>
     <div id="ci-cv-verify-wrap" style="display:none">
-      <button class="cv-verify-btn" id="ci-cv-verify-btn" onclick="CI._covisitVerify()">📍 ยืนยัน Co-visit</button>
+      <button class="cv-verify-btn" id="ci-cv-verify-btn" onclick="CI._covisitVerify()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit</button>
       <div class="cv-note">GPS จะเปรียบเทียบตำแหน่งกับน้อง · ต้องอยู่ในรัศมี 150 เมตร และภายใน 90 นาที</div>
     </div>
   </div>
@@ -42399,7 +42399,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
 
   function _canDebrief() {
     // v498: ad_tl can also debrief their team sessions
-    return isTLRole(getCurrentRole()) || isAdminRole(getCurrentRole()) || isADTLRole(getCurrentRole());
+    // v551: sales_tl added — sees covisit panel + team history
+    return isTLRole(getCurrentRole()) || isAdminRole(getCurrentRole()) || isADTLRole(getCurrentRole()) || isSalesTLRole(getCurrentRole());
   }
 
   function _buildDebriefCSS() {
@@ -42992,24 +42993,28 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     const recBtn = document.getElementById('ci-tab-rec');
     const histBtn = document.getElementById('ci-tab-hist');
     const recArea = document.getElementById('ci-rec-center');
+    const cvPanel = document.getElementById('ci-covisit-panel');
     const wf = document.getElementById('ci-wf');
-    const recBottom = document.querySelector('#ci-s-record .rec-bottom');
     const histPanel = document.getElementById('ci-inline-hist');
     const chip = document.querySelector('#ci-s-record .chip')?.parentElement;
+    const isTL = _canDebrief();
 
     if (tab === 'history') {
       if (pill) { pill.style.left = 'calc(50%)'; pill.style.width = 'calc(50% - 3px)'; }
       if (recBtn) recBtn.classList.remove('on');
       if (histBtn) histBtn.classList.add('on');
+      // Hide record-side panels (both orb and covisit panel)
       if (recArea) recArea.style.display = 'none';
+      if (cvPanel) cvPanel.style.display = 'none';
       if (wf) wf.style.display = 'none';
       const recActive = document.getElementById('ci-rec-active'); if (recActive) recActive.style.display = 'none';
       const recBottom2 = document.getElementById('ci-rec-bottom'); if (recBottom2) recBottom2.style.display = 'none';
       if (chip) chip.style.display = 'none';
+      const visitHero = document.getElementById('ci-visit-hero'); if (visitHero) visitHero.style.display = 'none';
       if (histPanel) {
         histPanel.style.display = 'block';
-        // Inject filter chips bar once
-        if (!document.getElementById('ci-hist-filter-bar')) {
+        // Inject filter chips bar once (rep only — TL sees all, no filter needed)
+        if (!isTL && !document.getElementById('ci-hist-filter-bar')) {
           const bar = document.createElement('div');
           bar.id = 'ci-hist-filter-bar';
           bar.style.cssText = 'padding:8px 0 4px;display:flex;gap:6px;flex-shrink:0;';
@@ -43021,22 +43026,33 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
             `<button onclick="CI._histFilter('${key}')" id="ci-hf-${key}"
               style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
           ).join('');
-          // Insert before ci-inline-hist-body
           const histBody = document.getElementById('ci-inline-hist-body');
           if (histBody) histPanel.insertBefore(bar, histBody);
         }
         _loadInlineHistory();
       }
     } else {
+      // → record tab
       if (pill) { pill.style.left = '3px'; pill.style.width = 'calc(50% - 3px)'; }
       if (recBtn) recBtn.classList.add('on');
       if (histBtn) histBtn.classList.remove('on');
-      if (recArea) recArea.style.display = _phase === 'recording' ? 'none' : '';
-      if (wf) wf.style.display = '';
-      const recActive2 = document.getElementById('ci-rec-active'); if (recActive2) recActive2.style.display = _phase === 'recording' ? 'flex' : 'none';
-      const recBottom3 = document.getElementById('ci-rec-bottom'); if (recBottom3) recBottom3.style.display = _phase === 'recording' ? 'block' : 'none';
-      if (chip) chip.style.display = '';
       if (histPanel) histPanel.style.display = 'none';
+      // Restore visit hero visibility (TL hero is handled by _loadCovisitHero)
+      const visitHero2 = document.getElementById('ci-visit-hero');
+      if (visitHero2) visitHero2.style.display = '';
+      if (isTL) {
+        // TL: restore covisit panel, keep orb hidden
+        if (recArea) recArea.style.display = 'none';
+        if (cvPanel) cvPanel.style.display = 'flex';
+      } else {
+        // Rep: restore orb (respecting recording state)
+        if (recArea) recArea.style.display = _phase === 'recording' ? 'none' : '';
+        if (cvPanel) cvPanel.style.display = 'none';
+        if (wf) wf.style.display = '';
+        const recActive2 = document.getElementById('ci-rec-active'); if (recActive2) recActive2.style.display = _phase === 'recording' ? 'flex' : 'none';
+        const recBottom3 = document.getElementById('ci-rec-bottom'); if (recBottom3) recBottom3.style.display = _phase === 'recording' ? 'block' : 'none';
+      }
+      if (chip) chip.style.display = isTL ? 'none' : '';
     }
   }
 
@@ -43156,6 +43172,11 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
         ? `<span style="font-size:9px;font-weight:500;color:#34C759;background:#34C75918;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">✓ รีวิวแล้ว</span>`
         : `<span style="font-size:9px;font-weight:500;color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">รอรีวิว</span>`;
 
+      // Co-visit badge
+      const cvBadge = s.covisit_verified
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;background:#34C75918;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>`
+        : '';
+
       return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 12px rgba(0,0,0,.04);padding:12px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
     <div style="display:flex;align-items:center;gap:7px">
@@ -43172,6 +43193,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
     <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
     ${toneBadge}
+    ${cvBadge}
     ${reviewBadge}
   </div>
   ${s.tl_note ? `<div style="font-size:10px;color:#534AB7;font-style:italic;line-height:1.5;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(83,74,183,.12);font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div>` : ''}
@@ -43360,7 +43382,7 @@ ${summaryHtml}`;
   ${!cvVerified ? `<button class="sd-review-btn" id="sd-covisit-btn"
     style="flex:0 0 auto;background:#1C1C1E;font-size:13px;padding:14px 16px;white-space:nowrap"
     onclick="CI._covisitVerify('${s.id}','${s.owner_email||''}')">
-    📍 ยืนยัน Co-visit
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit
   </button>` : ''}
   <button class="sd-review-btn" id="sd-save-note-btn"
     style="flex:1;background:#534AB7;font-size:14px"
@@ -43500,7 +43522,7 @@ ${summaryHtml}`;
       setTimeout(() => _loadInlineHistory(), 600);
 
     } catch(e) {
-      if (btn) { btn.disabled = false; btn.textContent = '📍 ยืนยัน Co-visit'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit'; }
       const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — กรุณาอนุญาตตำแหน่งในการตั้งค่า'
                 : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองใหม่กลางแจ้ง'
                 : e.code === 3 ? 'GPS timeout — ลองใหม่อีกครั้ง'
@@ -44279,13 +44301,13 @@ ${summaryHtml}`;
 
   function _cvSelectRow(sessionId, repEmail, repLat, repLng, checkedInAt, repName) {
     _cvSelected = { session_id: sessionId, rep_email: repEmail, rep_lat: repLat, rep_lng: repLng, checked_in_at: checkedInAt };
-    // Highlight selected row
+    // Highlight selected row, deselect others
     document.querySelectorAll('.cv-row').forEach(r => r.style.background = '');
     const row = document.getElementById(`cv-row-${sessionId}`);
     if (row) row.style.background = 'rgba(255,56,92,.04)';
-    // Update verify button
+    // Update verify button (SVG pin, no emoji)
     const btn = document.getElementById('ci-cv-verify-btn');
-    if (btn) btn.textContent = `📍 ยืนยัน Co-visit กับ ${repName}`;
+    if (btn) btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit กับ ${repName}`;
     _updateCvVerifyBtn();
   }
 
@@ -44303,6 +44325,15 @@ ${summaryHtml}`;
     const btn = document.getElementById('ci-cv-verify-btn') || document.getElementById('sd-covisit-btn');
     const badge = document.getElementById('sd-cv-badge');
     if (btn) { btn.disabled = true; btn.textContent = 'กำลังระบุตำแหน่ง...'; }
+
+    // Optimistic lock: hide verify wrap + lock selected row immediately
+    const verifyWrap = document.getElementById('ci-cv-verify-wrap');
+    const selectedRow = target.session_id ? document.getElementById(`cv-row-${target.session_id}`) : null;
+    if (selectedRow) {
+      selectedRow.style.opacity = '0.5';
+      selectedRow.style.pointerEvents = 'none';
+      selectedRow.onclick = null;
+    }
 
     const THRESHOLD_M = 150;
     const WINDOW_MS = 90 * 60 * 1000;
@@ -44379,19 +44410,38 @@ ${summaryHtml}`;
           badge.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>✓ Co-visit ยืนยันแล้ว`;
         }
       }
-      // If in TL covisit panel
+      // If in TL covisit panel — update row badge optimistically before re-fetch
       if (btn && btn.id === 'ci-cv-verify-btn') {
-        setTimeout(() => {
-          _updateCvVerifyBtn();
-          setTimeout(_loadCovisitList, 400);
-          setTimeout(_loadCovisitHero, 500);
-        }, 600);
+        if (selectedRow) {
+          // Swap badge to Verified immediately
+          const badgeEl = selectedRow.querySelector('.cv-badge');
+          if (badgeEl) {
+            badgeEl.className = 'cv-badge cv-badge-done';
+            badgeEl.innerHTML = `<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified`;
+          }
+          selectedRow.style.opacity = '0.6';
+          selectedRow.style.pointerEvents = 'none';
+        }
+        if (verifyWrap) verifyWrap.style.display = 'none';
+        // Re-fetch after short delay to confirm from DB
+        setTimeout(_loadCovisitList, 1000);
+        setTimeout(_loadCovisitHero, 1100);
       }
       setTimeout(() => _loadInlineHistory(), 800);
       if (typeof showToast === 'function') showToast('✓ Co-visit ยืนยันแล้ว', '✓');
 
     } catch(e) {
-      if (btn) { btn.disabled = false; btn.textContent = btn.id === 'sd-covisit-btn' ? '📍 ยืนยัน Co-visit' : `📍 ยืนยัน Co-visit กับ ${_cvSelected?.rep_email?.split('@')[0] || ''}` ; }
+      // Restore locked row on error
+      if (selectedRow) { selectedRow.style.opacity = ''; selectedRow.style.pointerEvents = ''; }
+      const repName = _cvSelected?.rep_email?.split('@')[0] || '';
+      if (btn) {
+        btn.disabled = false;
+        if (btn.id === 'sd-covisit-btn') {
+          btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit`;
+        } else {
+          btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit กับ ${repName}`;
+        }
+      }
       const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
                 : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
                 : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
