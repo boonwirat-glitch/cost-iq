@@ -2129,7 +2129,7 @@ function getScopedSkus(groups){
 // MATCHER CORE — ported verbatim from matcher_artifact_v3.html
 // processItem: 1 API call per source SKU, top-6 alts, 30s timeout
 // ════════════════════════════════════════
-async function processItem(g){
+async function processItem(g, _retryLeft=1){
   // Diversity sort: mix high-confidence + high-savings for better AI coverage
   const _allAlts=[...g.alternatives];
   const _highConf=_allAlts.filter(a=>(a.grading||'').toLowerCase()==='a'||a.pack_size===g.pack_size).sort((a,b)=>b.price_diff-a.price_diff).slice(0,3);
@@ -2186,9 +2186,21 @@ ${altLines}
 
 ตอบ JSON`;
 
-  const fetchPromise=callAI(matcherModel==='sonnet'?'sonnet':'haiku',sys,[{role:'user',content:userMsg}],maxTok);
-  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout (30s) — ลอง process ใหม่')),30000));
-  const text=await Promise.race([fetchPromise,timeoutPromise]);
+  let text;
+  try{
+    const fetchPromise=callAI(matcherModel==='sonnet'?'sonnet':'haiku',sys,[{role:'user',content:userMsg}],maxTok);
+    const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout (30s) — ลอง process ใหม่')),30000));
+    text=await Promise.race([fetchPromise,timeoutPromise]);
+  }catch(e){
+    const msg=(e&&e.message)||'';
+    const isOverload=msg.includes('429')||msg.includes('529')||msg.toLowerCase().includes('overload')||msg.toLowerCase().includes('rate');
+    if(isOverload&&_retryLeft>0){
+      console.warn('[Matcher] rate-limited on "'+g.name.slice(0,20)+'" — retry in 2s');
+      await new Promise(r=>setTimeout(r,2000));
+      return processItem(g,_retryLeft-1);
+    }
+    throw e;
+  }
   let jsonStr=text.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
   const st=jsonStr.indexOf('{');
   if(st===-1)throw new Error('No JSON in response');
@@ -2438,27 +2450,27 @@ async function runMatcherInApp(vsMode=false){
   }
 
   let processed=0;
-  for(const g of groups){
-    const det=_g('progDetail');if(det)det.textContent=`กำลังวิเคราะห์: ${g.name.substring(0,28)}...`;
-    try{
-      await processItem(g);
-    }catch(e){
-      g.status='error';g.result={status:'error',ai_note:e.message};
-      console.warn('processItem error:',g.name,e.message);
-    }
-    processed++;
-
-    // Update live progress
-    const pct=Math.round(processed/total*100);
-    const fill=_g('fill');if(fill)fill.style.width=pct+'%';
-    const skuEl=_g('progSku');if(skuEl)skuEl.textContent=`ตรวจสอบ ${processed} / ${total} SKU`;
-    const verifiedCount=groups.filter(x=>x.status==='done_yes'||x.status==='done_flag').reduce((s,x)=>(s+(x.result?.verified?.length||0)),0);
-    const foundEl=_g('progFound');if(foundEl)foundEl.textContent=`พบ ${verifiedCount} ตัวเลือก`;
-
-    // Log to SKU list — pass verified + excluded
-    appendSkuLog(g.name, g.result?.verified?.length||0, g.status, g.result?.excluded||[], g.result?.pack_size_issue, vsMode);
-
-    await new Promise(r=>setTimeout(r,400)); // 400ms sleep between items (same as original)
+  const CONCURRENCY=3; // Tier 1 safe: 3 concurrent × ~1.5s/batch ≈ 120 RPM; retry handles occasional 429
+  for(let i=0;i<total;i+=CONCURRENCY){
+    const batch=groups.slice(i,i+CONCURRENCY);
+    // Show first item name in batch as progress hint
+    const det=_g('progDetail');if(det)det.textContent=`กำลังวิเคราะห์: ${batch[0].name.substring(0,28)}...`;
+    const results=await Promise.allSettled(batch.map(g=>processItem(g)));
+    results.forEach((res,bi)=>{
+      const g=batch[bi];
+      if(res.status==='rejected'){
+        g.status='error';g.result={status:'error',ai_note:(res.reason&&res.reason.message)||'error'};
+        console.warn('[Matcher] batch item error:',g.name,(res.reason&&res.reason.message));
+      }
+      processed++;
+      // Update live progress
+      const pct=Math.round(processed/total*100);
+      const fill=_g('fill');if(fill)fill.style.width=pct+'%';
+      const skuEl=_g('progSku');if(skuEl)skuEl.textContent=`ตรวจสอบ ${processed} / ${total} SKU`;
+      const verifiedCount=groups.filter(x=>x.status==='done_yes'||x.status==='done_flag').reduce((s,x)=>(s+(x.result?.verified?.length||0)),0);
+      const foundEl=_g('progFound');if(foundEl)foundEl.textContent=`พบ ${verifiedCount} ตัวเลือก`;
+      appendSkuLog(g.name,g.result?.verified?.length||0,g.status,g.result?.excluded||[],g.result?.pack_size_issue,vsMode);
+    });
   }
 
   // Build alternatives.json format from verified results
