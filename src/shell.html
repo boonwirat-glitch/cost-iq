@@ -1256,7 +1256,7 @@
           '<td><div class="rpt2-sku-name">'+text(o.curName)+'</div><div class="rpt2-sku-meta">'+curMeta+'</div></td>'+
           '<td class="rpt2-arr">→</td>'+
           '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">'+altMeta+'</div></td>'+
-          '<td class="rpt2-gmv"><div class="rpt2-gmv-val">'+c.fmt(o.monthlyGmv||0)+'</div><div class="rpt2-gmv-qty">'+(o.monthlyQty>0?(+o.monthlyQty.toFixed(1))+' '+(o.qu||''):'')+'</div></td>'+
+          '<td class="rpt2-gmv"><div class="rpt2-gmv-val">'+c.fmt(o.monthlyGmv||0)+'</div><div class="rpt2-gmv-qty">'+(o.monthlyQty>0?(+o.monthlyQty.toFixed(1))+' '+(typeof deriveQtyUnit==='function'?deriveQtyUnit(o.curSpec,o.priceBasis):(o.qu||'')):'')+'</div></td>'+
           '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div><span class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</span></div></td>'+
           /* rpt2-conf td removed */
         '</tr>';
