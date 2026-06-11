@@ -475,14 +475,37 @@ async function saveCommissionComponentRates() {
   }
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const toUpsert = [];
+  // v562 COMPLETE-ROW SAVE FIX. Two bugs fixed here:
+  // (1) `existing` was read from _commRuleConfig.rules — the NRR-only compat path,
+  //     ALWAYS empty for component metrics → every save wrote only the touched
+  //     fields, producing partial DB rows (e.g. gmv_gate_params missing cap_1).
+  //     Now merges with _tgtSettings (real DB readback, v559).
+  // (2) Self-heal: every save persists the COMPLETE param catalog for the metric
+  //     using the engine's effective values — rows can never be partial again.
+  const _COMPONENT_CATALOG = {
+    upsell_sku:    { p1_rate:0.03, p3_rate:0.03, p3_threshold_pct:2.00, p1_min_gmv:5000, p3_min_incremental:5000 },
+    upsell_outlet: { rate:0.015 },
+    handover:      { tier2_pct:100, tier3_pct:120, tier2_payout:2500, tier3_bonus:2500 },
+    gmv_gate:      { threshold_1:95, threshold_2:90, cap_1:0.70, cap_2:0.35 }
+  }; // defaults mirror 07a engine defaults exactly
   for (const [metricCode, params] of Object.entries(_commComponentPending)) {
-    // Merge with existing params
     const existing = {};
-    try {
+    try { // compat path first (lowest priority)
       const rules = _commRuleConfig.rules && _commRuleConfig.rules[metricCode];
       if (rules && rules[0] && rules[0].params) Object.assign(existing, rules[0].params);
     } catch(e) {}
+    try { // real DB-backed params override compat
+      const raw = _tgtSettings && _tgtSettings[metricCode + '_params'];
+      if (raw) Object.assign(existing, typeof raw === 'object' ? raw : JSON.parse(raw));
+    } catch(e) {}
     const merged = { ...existing, ...params };
+    const cat = _COMPONENT_CATALOG[metricCode] || {};
+    Object.keys(cat).forEach(p => {
+      if (merged[p] === undefined || merged[p] === null) {
+        try { merged[p] = typeof _commGetConfig==='function' ? _commGetConfig(metricCode, p, cat[p]) : cat[p]; }
+        catch(e) { merged[p] = cat[p]; }
+      }
+    });
     toUpsert.push({ metric_code: metricCode, params: merged, updated_by: actor });
   }
   try {
