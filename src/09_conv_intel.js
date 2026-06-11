@@ -165,7 +165,7 @@ const CI = (() => {
 .timer-block{text-align:center;}
 .timer-val{font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums;}
 .timer-hint{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
-.is-rec .timer-hint{color:var(--ac);}
+.is-rec .timer-hint{color:rgba(255,255,255,.18);}
 
 /* ── WAVEFORM ── */
 .waveform{display:flex;align-items:center;gap:2.5px;height:44px;padding:0 28px;width:100%;}
@@ -559,19 +559,19 @@ const CI = (() => {
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
     <div style="display:flex;align-items:center;gap:10px">
       <button id="ci-stop-btn" onclick="CI.stopRecording()"
-        style="flex:1;padding:15px 0;border:none;border-radius:16px;font-size:15px;font-weight:500;cursor:pointer;
-               font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.01em;
-               background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
-               border:0.5px solid rgba(255,255,255,.15);
+        style="padding:10px 28px;border:0.5px solid rgba(255,255,255,.16);border-radius:100px;
+               background:transparent;color:rgba(255,255,255,.35);
+               font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
+               font-family:'Noto Sans Thai',sans-serif;cursor:pointer;
                transition:background .7s ease,color .7s ease,border-color .7s ease">
         จบ &amp; วิเคราะห์
       </button>
       <button onclick="CI.cancel()"
-        style="width:44px;height:44px;flex-shrink:0;border:none;border-radius:14px;cursor:pointer;
-               background:rgba(255,255,255,.06);color:rgba(255,255,255,.35);
-               font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;
+        style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;cursor:pointer;
+               background:rgba(255,255,255,.05);color:rgba(255,255,255,.22);
+               display:flex;align-items:center;justify-content:center;
                transition:background .7s ease,color .7s ease" title="ยกเลิก session">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   </div>
@@ -3011,7 +3011,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,255,255,.08)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(255,255,255,.08)'; sb.style.color='rgba(255,255,255,.7)'; sb.style.borderColor='rgba(255,255,255,.15)'; }
+      if (sb) { sb.style.background='transparent'; sb.style.color='rgba(255,255,255,.35)'; sb.style.borderColor='rgba(255,255,255,.16)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='rgba(255,255,255,.1)'; tabRec.style.color='rgba(255,255,255,.4)'; tabRec.style.boxShadow='none'; }
@@ -3049,7 +3049,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,56,92,.15)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(0,0,0,.05)'; sb.style.color='rgba(0,0,0,.5)'; sb.style.borderColor='rgba(0,0,0,.1)'; }
+      if (sb) { sb.style.background='transparent'; sb.style.color='rgba(0,0,0,.35)'; sb.style.borderColor='rgba(0,0,0,.14)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='#fff'; tabRec.style.color='#1C1C1E'; tabRec.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'; }
