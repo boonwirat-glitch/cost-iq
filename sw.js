@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v555
+// Freshket Sense — Service Worker v556
 // Strategy: Cache-first, background revalidate (stale-while-revalidate)
 //
 // v225 rewrite: fixed all redirect-related ERR_FAILED bugs.
@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v555';
+const CACHE_NAME = 'sense-v556';
 const APP_URL = '/index.html';
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
@@ -46,7 +46,14 @@ self.addEventListener('install', event => {
       return caches.open(CACHE_NAME).then(cache => cache.put(APP_URL, response.clone())).catch(()=>{});
     })
   );
-  self.skipWaiting(); // activate immediately so new SW takes effect without waiting
+  // v556: skipWaiting() REMOVED from install. New SW stays `waiting` until the
+  // page explicitly requests activation (update pill tap) or all clients close.
+  // Eliminates mid-use forced reload on deploy.
+});
+
+// ── v556: page-controlled activation ─────────────────────────────────────────
+self.addEventListener('message', event => {
+  if (event && event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // ── Activate: clear old caches ───────────────────────────────────────────────

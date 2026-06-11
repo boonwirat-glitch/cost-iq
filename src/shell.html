@@ -1976,6 +1976,146 @@
 })(window);
 </script>
 <script>
+  // ── v556 SENSE SENTINEL — global error trap + telemetry + recovery (Phase 0) ──
+  // Catches window errors + unhandled rejections from all app modules.
+  // Queue → localStorage → flush to Supabase app_errors when session exists.
+  // Storm detector + boot watchdog → non-blocking recovery banner (no silent hang).
+  // Debug overlay: localStorage senseDebug=1 → ERR badge bottom-left.
+  (function(){
+    'use strict';
+    var Q_KEY='sense_err_queue_v1';
+    var MAX_Q=30, MAX_SESSION=40, DEDUP_MS=30000;
+    var _session=[]; var _count=0; var _stamps=[];
+    var _bannerShown=false; var _flushTimer=null;
+
+    function _ver(){ try{return (window.FreshketSenseConfig&&window.FreshketSenseConfig.app&&window.FreshketSenseConfig.app.version)||'';}catch(e){return '';} }
+    function _screen(){ try{var s=document.querySelector('.scr.on');return s?s.id:'';}catch(e){return '';} }
+    function _role(){ try{return typeof getCurrentRole==='function'?(getCurrentRole()||''):'';}catch(e){return '';} }
+    function _email(){ try{return (typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email)||(typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||'';}catch(e){return '';} }
+    function _loadQ(){ try{return JSON.parse(localStorage.getItem(Q_KEY)||'[]');}catch(e){return [];} }
+    function _saveQ(q){ try{localStorage.setItem(Q_KEY,JSON.stringify(q.slice(-MAX_Q)));}catch(e){} }
+
+    function _record(kind,msg,srcFile,line,col,stack){
+      try{
+        if(_count>=MAX_SESSION)return;
+        msg=String(msg||'').slice(0,500);
+        var now=Date.now();
+        var last=_session[_session.length-1];
+        if(last&&last.message===msg&&last.lineno===(line||0)&&(now-last._ts)<DEDUP_MS){
+          last.count=(last.count||1)+1; last._ts=now;
+          var qm=_loadQ(); if(qm.length){var c={};for(var k in last){if(k!=='_ts')c[k]=last[k];}qm[qm.length-1]=c;_saveQ(qm);}
+          return;
+        }
+        _count++;
+        var row={kind:kind,message:msg,source:String(srcFile||'').slice(0,200),lineno:line||0,colno:col||0,
+          stack:String(stack||'').slice(0,1200),version:_ver(),screen:_screen(),role:_role(),
+          user_email:_email(),ua:navigator.userAgent.slice(0,180),count:1,client_ts:new Date(now).toISOString()};
+        _session.push(Object.assign({_ts:now},row)); if(_session.length>MAX_Q)_session.shift();
+        var q=_loadQ(); q.push(row); _saveQ(q);
+        _stamps.push(now); while(_stamps.length&&now-_stamps[0]>10000)_stamps.shift();
+        if(_stamps.length>=8)_showBanner('แอพทำงานผิดปกติ');
+        _scheduleFlush(4000);
+        _updateBadge();
+      }catch(e){}
+    }
+
+    // boot watchdog: 25s after load — logged in, trapped errors, critical data never ready
+    window.addEventListener('load',function(){
+      setTimeout(function(){
+        try{
+          if(_count>0 && typeof currentUser!=='undefined' && currentUser &&
+             typeof allCriticalReady==='function' && !allCriticalReady()){
+            _showBanner('โหลดข้อมูลไม่สำเร็จ');
+          }
+        }catch(e){}
+      },25000);
+    });
+
+    function _showBanner(reason){
+      if(_bannerShown)return; _bannerShown=true;
+      try{
+        var b=document.createElement('div');
+        b.id='sense-recovery-banner';
+        b.style.cssText='position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);z-index:99990;background:#0d1f3c;border:1px solid rgba(188,215,255,.25);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:92vw;cursor:pointer';
+        b.innerHTML='<div style="font-family:\'Noto Sans Thai\',sans-serif;font-size:12px;color:rgba(225,238,255,.92);line-height:1.4;white-space:nowrap">'+reason+' · แตะเพื่อโหลดใหม่</div>'
+          +'<button id="sense-recovery-x" style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);border:none;color:rgba(225,238,255,.55);font-size:11px;cursor:pointer;flex-shrink:0;line-height:1">✕</button>';
+        b.addEventListener('click',function(ev){
+          if(ev.target&&ev.target.id==='sense-recovery-x'){ev.stopPropagation();b.remove();return;}
+          try{location.reload();}catch(e){}
+        });
+        (document.body||document.documentElement).appendChild(b);
+      }catch(e){}
+    }
+
+    function _scheduleFlush(ms){ if(_flushTimer)return; _flushTimer=setTimeout(function(){_flushTimer=null;_flush();},ms||4000); }
+    function _flush(){
+      try{
+        if(typeof supa==='undefined'||!supa){_retryLater();return;}
+        if(typeof currentUser==='undefined'||!currentUser){_retryLater();return;}
+        var q=_loadQ(); if(!q.length)return;
+        var rows=q.slice(0,MAX_Q);
+        _saveQ([]);
+        supa.from('app_errors').insert(rows).then(function(res){
+          if(res&&res.error){var back=_loadQ();_saveQ(rows.concat(back));}
+        },function(){var back=_loadQ();_saveQ(rows.concat(back));});
+      }catch(e){}
+    }
+    function _retryLater(){ _scheduleFlush(20000); }
+    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden')_flush(); });
+    window.addEventListener('load',function(){ setTimeout(_flush,8000); });
+
+    window.addEventListener('error',function(ev){
+      try{
+        var t=ev&&ev.target;
+        if(t&&t!==window&&t.tagName){
+          // resource load error — record only SCRIPT/LINK (critical); IMG fallbacks are expected noise
+          if(t.tagName==='SCRIPT'||t.tagName==='LINK'){
+            _record('resource','load failed: '+(t.src||t.href||''),'',0,0,'');
+          }
+          return;
+        }
+        var er=ev&&ev.error;
+        _record('error',ev&&ev.message,ev&&ev.filename,ev&&ev.lineno,ev&&ev.colno,er&&er.stack);
+      }catch(e){}
+    },true);
+    window.addEventListener('unhandledrejection',function(ev){
+      try{
+        var r=ev&&ev.reason;
+        _record('rejection',(r&&(r.message||String(r)))||'unhandled rejection','',0,0,r&&r.stack);
+      }catch(e){}
+    });
+
+    function _updateBadge(){
+      try{
+        if(localStorage.getItem('senseDebug')!=='1')return;
+        var b=document.getElementById('sense-err-badge');
+        if(!b){
+          b=document.createElement('div'); b.id='sense-err-badge';
+          b.style.cssText='position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);left:10px;z-index:99989;background:#0d1f3c;border:1px solid rgba(255,107,61,.5);color:#ff6b3d;border-radius:10px;padding:4px 9px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;cursor:pointer';
+          b.addEventListener('click',_toggleLog);
+          (document.body||document.documentElement).appendChild(b);
+        }
+        b.textContent='ERR '+_count;
+      }catch(e){}
+    }
+    function _toggleLog(){
+      try{
+        var ex=document.getElementById('sense-err-log'); if(ex){ex.remove();return;}
+        var d=document.createElement('div'); d.id='sense-err-log';
+        d.style.cssText='position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 116px);max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:99989;background:#0d1f3c;border:1px solid rgba(188,215,255,.2);border-radius:12px;padding:10px;font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:rgba(225,238,255,.85)';
+        d.innerHTML=_session.map(function(r){
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(188,215,255,.08)">'
+            +'<div style="color:#ff6b3d">'+r.kind+(r.count>1?' ×'+r.count:'')+' · '+(r.screen||'-')+'</div>'
+            +'<div style="word-break:break-all">'+String(r.message).replace(/</g,'&lt;')+'</div>'
+            +'<div style="color:rgba(188,215,255,.4)">'+(r.source?r.source+':'+r.lineno:'')+'</div></div>';
+        }).join('')||'<div>no errors</div>';
+        (document.body||document.documentElement).appendChild(d);
+      }catch(e){}
+    }
+    window.SenseSentinel={count:function(){return _count;},list:function(){return _session.slice();},flush:_flush};
+  })();
+</script>
+<script>
   // v206a: PWA lifecycle diagnostics. Keep registration non-blocking, but never fail silently.
   (function(){
     if(!('serviceWorker' in navigator))return;
@@ -1987,6 +2127,42 @@
           window._freshketSwRegistration=reg;
           try{reg.update&&reg.update();}catch(e){}
           console.info('[pwa:v206a] service worker registered',swUrl);
+          // v556 POLITE UPDATE: sw.js no longer calls skipWaiting() on install.
+          // New SW waits → pill invites user to update → tap → SKIP_WAITING message
+          // → controllerchange handler below reloads ONCE. No more mid-use force reload.
+          function _showUpdatePill(){
+            try{
+              if(document.getElementById('sense-update-pill'))return;
+              if(sessionStorage.getItem('sense_update_pill_dismissed')==='1')return;
+              var p=document.createElement('div');
+              p.id='sense-update-pill';
+              p.style.cssText='position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 76px);left:50%;transform:translateX(-50%);z-index:99988;background:#0d1f3c;border:1px solid rgba(188,215,255,.3);border-radius:999px;padding:9px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);cursor:pointer';
+              p.innerHTML='<span id="sense-update-pill-txt" style="font-family:\'Noto Sans Thai\',sans-serif;font-size:12px;font-weight:700;color:rgba(225,238,255,.92);white-space:nowrap">เวอร์ชันใหม่พร้อมใช้ · แตะเพื่ออัปเดต</span>'
+                +'<button id="sense-update-x" style="width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.08);border:none;color:rgba(225,238,255,.5);font-size:10px;cursor:pointer;flex-shrink:0;line-height:1">✕</button>';
+              p.addEventListener('click',function(ev){
+                if(ev.target&&ev.target.id==='sense-update-x'){
+                  ev.stopPropagation();
+                  try{sessionStorage.setItem('sense_update_pill_dismissed','1');}catch(e){}
+                  p.remove();return;
+                }
+                try{
+                  if(reg.waiting){
+                    reg.waiting.postMessage('SKIP_WAITING');
+                    var t=document.getElementById('sense-update-pill-txt');
+                    if(t)t.textContent='กำลังอัปเดต...';
+                  }
+                }catch(e){}
+              });
+              (document.body||document.documentElement).appendChild(p);
+            }catch(e){}
+          }
+          if(reg.waiting&&navigator.serviceWorker.controller)_showUpdatePill();
+          reg.addEventListener('updatefound',function(){
+            var nw=reg.installing; if(!nw)return;
+            nw.addEventListener('statechange',function(){
+              if(nw.state==='installed'&&navigator.serviceWorker.controller)_showUpdatePill();
+            });
+          });
         })
         .catch(err=>{
           window._freshketSwError={url:swUrl,message:err&&err.message||String(err),ts:Date.now()};
