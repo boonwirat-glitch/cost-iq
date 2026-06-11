@@ -888,10 +888,8 @@ function renderPlanBuilder(opps){
 
   const pickHintHtml=(!footerUnlocked&&senseActivated)?'<div id="opplist-pick-hint">เลือกแบบด้านบนก่อน</div>':'';
   document.getElementById('opplist').innerHTML=smartHtml+pickHintHtml+groupsHtml;
-  // v504: signal badge system that DOM is fresh — custom mode only
-  if(currentPlanMode==='custom'&&typeof savePlanBadge_onCustom==='function'){
-    setTimeout(savePlanBadge_onCustom,0);
-  }
+  // v506: setTimeout removed — badge called by toggleOpp AFTER updateSim completes
+  // (updateSim calls renderOpps again which would overwrite the card)
 }
 
 function togglePbCat(cat){
