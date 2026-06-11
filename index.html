@@ -43124,10 +43124,17 @@ ${summaryHtml}`;
         payload.tl_reviewed_by = reviewerId;
       }
 
-      const { error } = await supa.from('ci_sessions')
+      let { error } = await supa.from('ci_sessions')
         .update(payload)
         .eq('id', sessionId);
 
+      // Graceful degrade: if tl_note column doesn't exist yet, retry without it
+      if (error && error.message && error.message.includes('tl_note')) {
+        const fallback = { ...payload };
+        delete fallback.tl_note;
+        const res2 = await supa.from('ci_sessions').update(fallback).eq('id', sessionId);
+        error = res2.error;
+      }
       if (error) throw error;
       if (btn) {
         btn.disabled = false;
