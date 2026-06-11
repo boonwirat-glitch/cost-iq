@@ -1301,8 +1301,8 @@
 function _cdsFormulaContent(key) {
   function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
   var texts = {
-    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',2500)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
-    p3: 'สินค้าเดิมแต่ยอดเพิ่ม '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'x vs baseline · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
+    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
+    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
     ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
@@ -2230,6 +2230,24 @@ function openCommissionRulebook() {
   }
 
   function cfg(k,p,d){ try{ return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){ return d; } }
+
+  // v558 CONFIG-READY GATE: never present fallback defaults as truth.
+  // _tgtLoaded flips true when loadTargets() completes (cache-hit or fresh path).
+  // Until then the badge reads SYNCING, an amber strip warns in Thai, and we
+  // re-render this sheet automatically the moment real settings arrive.
+  var _cfgReady = (typeof _tgtLoaded !== 'undefined') ? !!_tgtLoaded : true;
+  if (!_cfgReady && !window._rbCfgPoll) {
+    var _rbTries = 0;
+    window._rbCfgPoll = setInterval(function(){
+      _rbTries++;
+      var ready = (typeof _tgtLoaded !== 'undefined') ? !!_tgtLoaded : true;
+      if (ready || _rbTries > 40) {
+        clearInterval(window._rbCfgPoll); window._rbCfgPoll = null;
+        if (ready && document.getElementById('comm-rulebook-overlay')) openCommissionRulebook();
+      }
+    }, 500);
+  }
+  var _syncStrip = '<div style="margin:2px 0 14px;padding:9px 12px;border-radius:10px;background:rgba(255,180,84,.08);border:1px solid rgba(255,180,84,.25);font-size:11px;color:#ffb454;font-family:\'Noto Sans Thai\',sans-serif;line-height:1.5">กำลังซิงค์ค่าจริงจากระบบ — ตัวเลขจะอัปเดตอัตโนมัติในไม่กี่วินาที</div>';
   function fmtB(n){ var v=Math.round(Number(n||0)); return '฿'+v.toLocaleString('en-US'); }
   function fmtPctRaw(n){ return Number(n||0)+'%'; }
 
@@ -2237,8 +2255,9 @@ function openCommissionRulebook() {
   var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
   var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
   var p3Thresh  = cfg('upsell_sku','p3_threshold_pct',2.00);
+  var p3GrowPct = Math.round((p3Thresh-1)*100); // v558: unified phrasing — multiplier AND growth-%
   var p1MinGmv  = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
-  var p3MinIncr = fmtB(cfg('upsell_sku','p3_min_incremental',8000));
+  var p3MinIncr = fmtB(cfg('upsell_sku','p3_min_incremental',5000)); // v558: default aligned to engine (was 8000)
   var outRate   = Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10;
   var hoT2Pct   = cfg('handover','tier2_pct',100);
   var hoT3Pct   = cfg('handover','tier3_pct',120);
@@ -2410,7 +2429,7 @@ function openCommissionRulebook() {
   // Component rates — all roles see this
   html += secHdr('Upsell', '#ffe08a');
   html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × กลุ่มสินค้า · min '+p1MinGmv);
-  html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · โต > '+p3Thresh+'× baseline · min incremental '+p3MinIncr);
+  html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · ยอดเกิน '+p3Thresh+'× baseline (เพิ่ม >'+p3GrowPct+'%) · incremental ขั้นต่ำ '+p3MinIncr);
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
@@ -2438,11 +2457,11 @@ function openCommissionRulebook() {
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0d1c34;z-index:1;border-bottom:1px solid rgba(188,215,255,.08)">'
       +'<div style="font-size:15px;font-weight:900;color:#fff">กฎค่าคอมฯ</div>'
       +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<div style="font-size:9px;color:rgba(188,215,255,.40);font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">LIVE CONFIG</div>'
+        +'<div style="font-size:9px;color:'+(_cfgReady?'rgba(188,215,255,.40)':'#ffb454')+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:.04em">'+(_cfgReady?'LIVE CONFIG':'SYNCING CONFIG')+'</div>'
         +'<button onclick="closeCommissionRulebook()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.55);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
       +'</div>'
     +'</div>'
-    +'<div style="padding:0 18px 32px">'+html+'</div>'
+    +'<div style="padding:0 18px 32px">'+(_cfgReady?'':_syncStrip)+html+'</div>'
     +'</div>';
 
   requestAnimationFrame(function(){
