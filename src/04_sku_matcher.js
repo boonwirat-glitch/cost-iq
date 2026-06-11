@@ -2776,38 +2776,40 @@ function _sgSetState(state){
 async function sgOrbTap(){
   if(_sgRunning||senseActivated)return;
   _sgRunning=true;
-  // v201b: hide tap hint + start animation IMMEDIATELY — don't wait for data load
+  // hide tap hint + start animation IMMEDIATELY
   const tapHint=document.getElementById('sg-tap-hint');
   const beacon=document.getElementById('sg-beacon');
   if(tapHint)tapHint.classList.add('hidden');
   if(beacon)beacon.style.display='none';
-  // v493: hide all 3 beacon rings on tap
   ['sg-beacon-2','sg-beacon-3'].forEach(function(id){const el=document.getElementById(id);if(el)el.style.display='none';});
-  _sgRunThinking();  // animation starts now (8-10s window = enough time to download)
-  // If data not ready, load in background while animation is already running
+  const _sgTapAt=Date.now();
+  _sgRunThinking();  // start animation; reveal timer is now data-driven (see below)
   if(!D.alts.length||!D.skus.length){
-    console.log('[SenseGate] lazy-load start (animation already running) | alts:'+D.alts.length+' skus:'+D.skus.length);
+    // COLD PATH: data not in memory — load now, reveal immediately when done
+    console.log('[SenseGate] cold-load start | alts:'+D.alts.length+' skus:'+D.skus.length);
     if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
-    console.log('[SenseGate] ensureSenseData done | alts:'+D.alts.length+' skus:'+D.skus.length+' _sgRunning:'+_sgRunning);
+    console.log('[SenseGate] cold-load done | alts:'+D.alts.length+' skus:'+D.skus.length);
     if(!D.alts.length||!D.skus.length){
-      // Load failed — abort animation, reset to standby
-      console.warn('[SenseGate] ❌ lazy-load failed — aborting animation');
+      console.warn('[SenseGate] load failed — aborting');
       _sgSetState('standby');
       const sub=document.getElementById('sg-sub');
       if(sub){sub.style.opacity='1';sub.textContent='ยังไม่มีข้อมูลเพียงพอสำหรับร้านนี้';setTimeout(()=>{sub.textContent='';},2200);}
       return;
     }
-    console.log('[SenseGate] data ready mid-animation | alts:'+D.alts.length+' skus:'+D.skus.length);
-    // reveal timer may have fired while waiting — trigger now if pending
-    if(_sgRevealPending&&_sgRunning&&!senseActivated){
-      console.log('[SenseGate] _sgRevealPending=true — triggering delayed reveal now');
-      _sgRevealPending=false;
-      _sgRevealScore();
-    }
+    // Cancel the fallback timer set by _sgRunThinking — we reveal now
+    if(_sgRevealTimer){clearTimeout(_sgRevealTimer);_sgRevealTimer=null;}
+    if(_sgRunning&&!senseActivated) _sgRevealScore();
   } else {
-    console.log('[SenseGate] data already ready, starting scan | alts:'+D.alts.length+' skus:'+D.skus.length);
+    // WARM PATH: data already in memory — wait minimum 1200ms so animation feels real, then reveal
+    console.log('[SenseGate] warm — data ready, scheduling reveal at 1200ms min | alts:'+D.alts.length+' skus:'+D.skus.length);
+    const elapsed=Date.now()-_sgTapAt;
+    const wait=Math.max(0,1200-elapsed);
+    if(_sgRevealTimer){clearTimeout(_sgRevealTimer);_sgRevealTimer=null;}
+    _sgRevealTimer=setTimeout(()=>{
+      _sgRevealTimer=null;
+      if(_sgRunning&&!senseActivated) _sgRevealScore();
+    },wait);
   }
-  // _sgRevealTimer will fire in ~8-10s and call _sgRevealScore() with data ready
 }
 
 let _sgElectronRAF=null;
@@ -2897,7 +2899,7 @@ function _sgRunThinking(){
   if(title)title.style.opacity='0';
   if(sub)sub.style.opacity='0';
   if(ticker)ticker.style.display='block';
-  // Phases — keep original wording (confirmed by Bucci)
+  // Phases — ticker text only; reveal is now data-driven from sgOrbTap
   const n=OPPS.length||D.skus.length||0;
   const phases=[
     'กำลังตรวจ '+(n||'—')+' รายการของร้าน',
@@ -2906,9 +2908,9 @@ function _sgRunThinking(){
     'Sense จัดลำดับโอกาสสำหรับคุณ',
     'ทบทวนผลการวิเคราะห์',
   ];
-  // Random total duration 8000–10000ms
-  const totalMs=8000+Math.floor(Math.random()*2001);
-  const baseSlice=totalMs/phases.length;
+  // Phase ticker: spread across 10s window so text cycles naturally regardless of reveal timing
+  const tickerMs=10000;
+  const baseSlice=tickerMs/phases.length;
   let t=0;
   const timings=[];
   phases.forEach((_,i)=>{
@@ -2926,16 +2928,16 @@ function _sgRunThinking(){
       },390);
     },start);
   });
+  // Safety-net fallback only — sgOrbTap cancels this and reveals earlier via data-ready path
   _sgRevealTimer=setTimeout(()=>{
     _sgRevealTimer=null;
     if(!D.alts.length||!D.skus.length){
-      // data not ready yet (Tier 2 still loading) — hold reveal until sgOrbTap gets data
-      console.log('[SenseGate] reveal timer fired but data not ready — setting _sgRevealPending');
+      console.log('[SenseGate] safety-net: data still not ready after 12s');
       _sgRevealPending=true;
       return;
     }
-    _sgRevealScore();
-  },totalMs+600);
+    if(_sgRunning&&!senseActivated) _sgRevealScore();
+  },12000);
 }
 
 function _sgRevealScore(){
