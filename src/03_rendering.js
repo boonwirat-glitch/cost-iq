@@ -908,6 +908,7 @@ function smartSelect(mode,e){
   if(mode==='high'){opps.filter(o=>getAlt(o).conf==='high').forEach(o=>sel.add(o.id));}
   else{opps.forEach(o=>sel.add(o.id));}
   footerUnlocked=true; // Sprint 2: plan tapped = savings earned
+  if(typeof savePlanBadge_onDefault==='function')savePlanBadge_onDefault();
   // Unmute cards with reveal animation
   const oppList=document.getElementById('opplist');
   if(oppList&&oppList.classList.contains('opplist-muted')){
@@ -1079,6 +1080,7 @@ function toggleOpp(id){
   sel.has(id)?sel.delete(id):sel.add(id);
   currentPlanMode='custom';
   footerUnlocked=true; // Sprint 2: individual selection also earns the footer
+  if(typeof savePlanBadge_onCustom==='function')savePlanBadge_onCustom();
   renderOpps();updateSim();updatePbFooter();
 }
 
