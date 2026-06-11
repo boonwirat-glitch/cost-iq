@@ -1678,12 +1678,12 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-table{width:100%;border-collapse:collapse;table-layout:fixed;}
 .rpt2-table thead tr{background:#fafafa;}
 .rpt2-table th{padding:5px 7px 4px;text-align:left;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#bbb;border-bottom:1px solid #e8e8e8;}
-.rpt2-th-num{width:12px;}
+.rpt2-th-num{width:10px;}
 .rpt2-th-sku{width:auto;}
-.rpt2-th-arr{width:12px;}
-.rpt2-th-gmv{width:68px;text-align:right;}
-.rpt2-th-save{width:68px;text-align:right;}
-.rpt2-table td{padding:5px 7px;border-bottom:0.5px solid #f2f2f2;vertical-align:top;}
+.rpt2-th-arr{width:10px;}
+.rpt2-th-gmv{width:60px;text-align:right;}
+.rpt2-th-save{width:60px;text-align:right;}
+.rpt2-table td{padding:5px 5px;border-bottom:0.5px solid #f2f2f2;vertical-align:top;}
 /* Category row */
 .rpt2-cat-row td{background:#f6faf6;border-bottom:0.5px solid #dde8dd;padding:4px 7px!important;}
 .rpt2-cat-name{font-size:7.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#4a7a4a;}
@@ -1691,7 +1691,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .rpt2-cat-save{font-size:7.5px;font-weight:700;color:#006430;font-family:'IBM Plex Mono',monospace;float:right;}
 /* SKU rows */
 .rpt2-num{font-size:8px;color:#ccc;text-align:center;font-family:'IBM Plex Mono',monospace;}
-.rpt2-sku-name{font-size:8.5px;font-weight:700;color:#1a1a1a;line-height:1.25;overflow:hidden;text-overflow:ellipsis;}
+.rpt2-sku-name{font-size:8.5px;font-weight:700;color:#1a1a1a;line-height:1.25;word-break:break-word;white-space:normal;}
 .rpt2-sku-meta{font-size:6.5px;color:#9a9a9a;font-family:'IBM Plex Mono',monospace;margin-top:1.5px;overflow:hidden;text-overflow:ellipsis;}
 .rpt2-arr{color:#ccc;font-size:9px;text-align:center;}
 .rpt2-gmv{text-align:right;}
@@ -2688,7 +2688,7 @@ body.kam-sense-active.sense-plan-expanded #sense-plan-section{display:flex;align
 .sps-amt{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;font-size:24px;font-weight:800;color:var(--amb);line-height:1;letter-spacing:-.8px;}
 .sps-unit{font-size:12px;font-weight:500;opacity:.65;margin-left:3px;vertical-align:2px;}
 .sps-sub{font-size:11px;color:rgba(255,255,255,.55);margin-top:3px;font-family:var(--tk-font-body);}
-.sps-cta{background:var(--tk-ok-500);border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,opacity .15s;box-shadow:0 2px 10px rgba(0,160,80,.4);margin-right:6px;}
+.sps-cta{background:var(--tk-ok-500);border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,opacity .15s;box-shadow:0 2px 10px rgba(0,160,80,.4);margin-right:14px;}
 .sps-cta:active{transform:scale(.92);opacity:.85;}
 .sps-cta:active{opacity:.78;}
 /* Pill nav base */
@@ -3336,7 +3336,7 @@ body.kam-sense-active.sense-plan-expanded #sense-plan-section{
   margin:0 0 2px 0!important;
 }
 body.kam-sense-active.sense-plan-expanded .sps-info{padding-left:0!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:6px!important;width:44px!important;height:44px!important;}
+body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:14px!important;width:44px!important;height:44px!important;}
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.78),rgba(218,240,228,.9))!important;
 }
@@ -3402,7 +3402,7 @@ body.kam-sense-active.sense-plan-expanded .sps-info{min-width:0!important;paddin
 body.kam-sense-active.sense-plan-expanded .sps-label,
 body.kam-sense-active.sense-plan-expanded .sps-sub{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
 body.kam-sense-active.sense-plan-expanded .sps-amt{font-size:26px!important;line-height:1.05!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta{width:44px!important;height:44px!important;margin-right:6px!important;align-self:center!important;}
+body.kam-sense-active.sense-plan-expanded .sps-cta{width:44px!important;height:44px!important;margin-right:14px!important;align-self:center!important;}
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.9),rgba(218,240,228,.97))!important;
   border:1px solid rgba(0,160,80,.16)!important;
