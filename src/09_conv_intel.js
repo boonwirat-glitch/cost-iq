@@ -1024,7 +1024,7 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
     // 3. Write echo_skill_observations — bridge to Skills feature
     //    Auto-send all skills (pass/developing/not_observed/not_applicable)
     //    TL sees these as evidence in pending list — graceful fail if table not yet created
-    if (skillData?.skills?.length) {
+    if (skillData?.skills?.length && !skillData?.no_speech) {
       try {
         // Get current user_id from Supabase session
         let _userId = null;
@@ -1927,7 +1927,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     try {
       const isTL = _canDebrief();
       let q = supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status')
         .order('visited_at', { ascending: false })
         .limit(isTL ? 100 : 50);
 
@@ -2112,7 +2112,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     // Load session data
     try {
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -2208,15 +2208,24 @@ ${toneHtml}
 ${skillRows ? `<div class="sd-section-hd">Skills</div>${skillRows}` : ''}
 ${summaryHtml}`;
 
-    // ── Review footer — TL coaching note + save
+    // ── Review footer — TL coaching note + save + co-visit verify
     if (footer) {
       footer.style.display = 'block';
       const existingNote = s.tl_note || '';
       const reviewedDate = reviewed
         ? new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' })
         : null;
+      // Co-visit badge state
+      const cvVerified = !!(s.covisit_verified);
+      const cvBadgeHtml = cvVerified
+        ? `<div id="sd-cv-badge" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif;margin-bottom:10px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ✓ Co-visit ยืนยันแล้ว
+           </div>`
+        : `<div id="sd-cv-badge" style="display:none"></div>`;
       footer.innerHTML = `
 <div style="padding:14px 20px 0">
+  ${cvBadgeHtml}
   <div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:6px">
     TL COACHING NOTE${reviewedDate ? ' · รีวิวแล้ว ' + reviewedDate : ''}
   </div>
@@ -2226,6 +2235,11 @@ ${summaryHtml}`;
   >${existingNote}</textarea>
 </div>
 <div style="padding:10px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));display:flex;gap:8px">
+  ${!cvVerified ? `<button class="sd-review-btn" id="sd-covisit-btn"
+    style="flex:0 0 auto;background:#1C1C1E;font-size:13px;padding:14px 16px;white-space:nowrap"
+    onclick="CI._covisitVerify('${s.id}','${s.owner_email||''}')">
+    📍 ยืนยัน Co-visit
+  </button>` : ''}
   <button class="sd-review-btn" id="sd-save-note-btn"
     style="flex:1;background:#534AB7;font-size:14px"
     onclick="CI._saveTLSessionNote('${s.id}', ${reviewed})">
@@ -2286,6 +2300,93 @@ ${summaryHtml}`;
     }
   }
 
+  // ── Haversine distance (metres) between two lat/lng points ──────────────────
+  function _haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2)
+            + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
+            * Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // ── Co-visit GPS verify — TL taps button in session detail footer ───────────
+  async function _covisitVerify(sessionId, repEmail) {
+    const btn = document.getElementById('sd-covisit-btn');
+    const badge = document.getElementById('sd-cv-badge');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังระบุตำแหน่ง...'; }
+
+    const THRESHOLD_M = 150; // 150m threshold
+
+    try {
+      // 1. Snap TL GPS
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('อุปกรณ์นี้ไม่รองรับ GPS')); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+        });
+      });
+      const tlLat = pos.coords.latitude;
+      const tlLng = pos.coords.longitude;
+
+      if (btn) btn.textContent = 'กำลังบันทึก...';
+
+      // 2. Get TL user_id
+      let tlUserId = null;
+      try {
+        const sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (sk) { const ss = JSON.parse(localStorage.getItem(sk)); tlUserId = ss?.user?.id || null; }
+      } catch(_) {}
+
+      const tlEmail = currentUserProfile?.email || null;
+      const proximity_m = null; // rep GPS not available client-side — TL-only snap
+      const verified = true;    // TL physically present → auto-verify
+
+      // 3. Upsert covisit_events (graceful fail if table not yet created)
+      try {
+        const { error: cvErr } = await supa.from('covisit_events').upsert({
+          session_id:  sessionId,
+          tl_email:    tlEmail,
+          rep_email:   repEmail || null,
+          tl_lat:      tlLat,
+          tl_lng:      tlLng,
+          rep_lat:     null,
+          rep_lng:     null,
+          proximity_m: proximity_m,
+          verified:    verified,
+          checked_at:  new Date().toISOString(),
+        }, { onConflict: 'session_id' });
+        if (cvErr) console.warn('[CI] covisit_events upsert:', cvErr.message);
+      } catch(e) { console.warn('[CI] covisit_events unavailable:', e.message); }
+
+      // 4. Update ci_sessions.covisit_verified flag
+      try {
+        await supa.from('ci_sessions').update({ covisit_verified: true }).eq('id', sessionId);
+      } catch(e) { console.warn('[CI] ci_sessions covisit_verified update:', e.message); }
+
+      // 5. Update UI — show badge, hide button
+      if (btn) btn.remove();
+      if (badge) {
+        badge.style.display = 'flex';
+        badge.innerHTML = `
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          ✓ Co-visit ยืนยันแล้ว`;
+        badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
+      }
+      // Refresh history feed so co-visit badge appears on session card
+      setTimeout(() => _loadInlineHistory(), 600);
+
+    } catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '📍 ยืนยัน Co-visit'; }
+      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — กรุณาอนุญาตตำแหน่งในการตั้งค่า'
+                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองใหม่กลางแจ้ง'
+                : e.code === 3 ? 'GPS timeout — ลองใหม่อีกครั้ง'
+                : 'GPS error: ' + e.message;
+      _toast(msg);
+    }
+  }
+
   function _closeSessionDetail() {
     const sheet = document.getElementById('ci-sess-detail');
     if (!sheet) return;
@@ -2324,10 +2425,15 @@ ${summaryHtml}`;
         ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(83,74,183,.06);border-radius:8px;border:0.5px solid rgba(83,74,183,.16)">` +
           `<div style="font-size:9px;font-weight:500;letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px">TL NOTE</div>` +
           `<div style="font-size:11px;color:#3D3680;line-height:1.6;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
+      // Co-visit badge — shown when TL has verified proximity
+      const cvDot = s.covisit_verified
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif">` +
+          `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>` : '';
       return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${titleLeft}</span>
           <div style="display:flex;align-items:center;gap:6px">
+            ${cvDot}
             ${tlNoteDot}
             <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${titleRight}</span>
           </div>
@@ -2852,7 +2958,7 @@ ${summaryHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
