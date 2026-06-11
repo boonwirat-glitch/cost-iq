@@ -130,6 +130,10 @@
 
   // ── HOOK: called from toggleOpp (user ticked/unticked a SKU) ─────────────
   window.savePlanBadge_onCustom = function(){
+    // Remember whether the card was visible BEFORE renderOpps wiped the DOM.
+    // If it was already visible we re-inject silently (no animation).
+    var wasVisible = _spcVisible;
+
     // opplist was just re-rendered by renderOpps — reset inject flag so we re-inject fresh
     _spcInited = false;
     var injected = _injectBadgeCard();
@@ -151,10 +155,14 @@
       if(dot) dot.remove();
       _updateCardCount();
       _spcVisible = true;
+    } else if(wasVisible){
+      // Card was already showing — re-inject silently, no slide-in animation
+      var card2 = document.getElementById('save-plan-card');
+      if(card2) card2.className = 'save-plan-card spc-unsaved';
+      _spcVisible = true;
+      _updateCardCount();
     } else {
-      // opplist was re-rendered → DOM card is a freshly-injected hidden element
-      // _spcVisible may still be true from before the re-render, which would
-      // make _showCard() bail out immediately. Reset so the new card animates in.
+      // First time showing — slide in with animation
       _spcVisible = false;
       _updateCardCount();
       _showCard();
