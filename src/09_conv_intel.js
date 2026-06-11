@@ -2230,7 +2230,7 @@ ${summaryHtml}`;
         }, 1800);
       }
       // refresh feed + badge in background
-      setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); }, 800);
+      setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); _loadVisitHero(); }, 800);
     } catch(e) {
       if (btn) { btn.disabled = false; btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'; }
       _toast('บันทึกไม่สำเร็จ: ' + e.message);
