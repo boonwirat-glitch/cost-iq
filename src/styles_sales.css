@@ -809,9 +809,10 @@ body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr)
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
-body.sales-mode .scr { background: #FFFFFF !important; }
-/* Echo recording dark mode — higher specificity wins over sales-mode white */
-body.sales-mode #ci-fullsheet.is-rec { background: #111111 !important; }
+body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
+/* Echo recording dark mode — is-rec on fullsheet + children */
+body.sales-mode #ci-fullsheet.is-rec,
+body.sales-mode #ci-fullsheet.is-rec .scr { background: #111111 !important; }
 
 
 /* ══════════════════════════════════════════

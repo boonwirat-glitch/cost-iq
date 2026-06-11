@@ -1,4 +1,4 @@
-<!-- Freshket Sense v545: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v546: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v545',
+      version: 'v546',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8157,9 +8157,10 @@ body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr)
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
-body.sales-mode .scr { background: #FFFFFF !important; }
-/* Echo recording dark mode — higher specificity wins over sales-mode white */
-body.sales-mode #ci-fullsheet.is-rec { background: #111111 !important; }
+body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
+/* Echo recording dark mode — is-rec on fullsheet + children */
+body.sales-mode #ci-fullsheet.is-rec,
+body.sales-mode #ci-fullsheet.is-rec .scr { background: #111111 !important; }
 
 
 /* ══════════════════════════════════════════
