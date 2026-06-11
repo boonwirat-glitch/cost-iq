@@ -1,4 +1,4 @@
-<!-- Freshket Sense v537: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v538: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v537',
+      version: 'v538',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41682,8 +41682,8 @@ const CI = (() => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime   = _bestMime();
-      // audioBitsPerSecond:16000 — opus speech quality, 90min = ~14.8MB base64 (under Gemini 20MB inline limit)
-      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 16000 });
+      // audioBitsPerSecond:24000 — opus speech quality balanced with Gemini recognition accuracy
+      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 });
       _chunks      = [];
       _secs        = 0;
       _recorder.ondataavailable = e => { if (e.data?.size > 0) _chunks.push(e.data); };
@@ -41691,10 +41691,13 @@ const CI = (() => {
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
-      // AudioContext keep-alive — connect stream source to prevent iOS from suspending audio session on screen lock
+      // AudioContext keep-alive — iOS audio session keep-alive
+      // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
+      // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
       try {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        _audioCtx.createMediaStreamSource(stream); // connected but no output = silent keep-alive
+        // Resume in case browser suspended it (iOS requires user gesture)
+        if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
       } catch(_) {}
 
       // UI — dark mode transition (silent recording feel)
