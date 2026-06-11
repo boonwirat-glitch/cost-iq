@@ -5120,10 +5120,15 @@ body.sales-mode .cds-sheet { display: none !important; }
 /* pb-footer: plan builder footer — KAM only */
 body.sales-mode .pb-footer { display: none !important; }
 
-/* Topbar: white background in sales-mode */
-body.sales-mode .topbar {
+/* Topbar: white background in sales-mode — exclude Echo fullsheet */
+body.sales-mode .topbar:not(#ci-fullsheet *) {
   background: #FFFFFF !important;
   border-bottom: 1px solid #EBEBEB !important;
+}
+/* Echo recording: topbar goes dark with fullsheet */
+body.sales-mode #ci-fullsheet.is-rec .topbar {
+  background: rgba(255,255,255,.04) !important;
+  border-color: rgba(255,255,255,.06) !important;
 }
 body.sales-mode .topbar .logo { color: #222222 !important; }
 body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; animation: iq-pulse-sales 3.5s ease-in-out infinite !important; }
