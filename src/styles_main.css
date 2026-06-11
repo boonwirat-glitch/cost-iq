@@ -2707,7 +2707,42 @@ body.sense-plan-active:not(.sense-plan-expanded) .sense-plan-dot{display:block}
 /* Pulse */
 @keyframes sbt-pulse-amt{0%{transform:scale(1);}35%{transform:scale(1.08);}65%{transform:scale(.97);}100%{transform:scale(1);}}
 .sbt-pulse{animation:sbt-pulse-amt 400ms cubic-bezier(.34,1.56,.64,1) both;}
-/* ── Topbar: match theme surface ── */
+/* ── Save Plan Badge card (v500) ── */
+@keyframes spc-in{0%{opacity:0;transform:translateY(-6px) scaleY(0.8);max-height:0;}60%{opacity:1;transform:translateY(1px) scaleY(1.02);}100%{opacity:1;transform:translateY(0) scaleY(1);max-height:80px;}}
+@keyframes spc-out{0%{opacity:1;transform:translateY(0);max-height:80px;}100%{opacity:0;transform:translateY(-5px);max-height:0;}}
+.save-plan-card{border-radius:10px;padding:10px 12px;transform-origin:top center;overflow:hidden;}
+.save-plan-card.hidden{display:none;}
+.save-plan-card.spc-entering{animation:spc-in .32s cubic-bezier(.34,1.4,.64,1) both;border:1.5px dashed rgba(0,160,80,.38);background:var(--n0);}
+.save-plan-card.spc-exiting{animation:spc-out .22s ease forwards;}
+.save-plan-card.spc-unsaved{border:1.5px dashed rgba(0,160,80,.38);background:var(--n0);}
+.save-plan-card.spc-saved{border:2px solid rgba(0,160,80,.55);background:var(--g50);transition:border-color .25s ease,background .25s ease;}
+.spc-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.spc-left{flex:1;min-width:0;display:flex;align-items:center;gap:7px;}
+.spc-text{min-width:0;}
+.spc-label{font-size:12px;font-weight:600;color:var(--n700);}
+.spc-sub{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--n400);margin-top:1px;}
+.spc-sub.green{color:var(--g700);}
+.spc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.spc-dot.saved{background:var(--g500);}
+@keyframes spc-dot-pop{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.3);}100%{transform:scale(1);opacity:1;}}
+.spc-dot.pop{animation:spc-dot-pop .35s cubic-bezier(.34,1.56,.64,1) both;}
+.spc-btn{font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;transition:transform .12s,opacity .12s;}
+.spc-btn:active{transform:scale(.92);}
+.spc-btn.cta{background:var(--g500);color:#fff;}
+.spc-btn.done{background:var(--n100);color:var(--n400);cursor:default;}
+/* sps-cta icon swap: report vs share */
+.sps-cta .icon-report{display:block;}
+.sps-cta .icon-share{display:none;}
+body.sense-on-report .sps-cta .icon-report{display:none;}
+body.sense-on-report .sps-cta .icon-share{display:block;}
+body.sense-on-report .sps-cta{background:#1a7dd0;box-shadow:0 2px 10px rgba(26,125,208,.35);}
+/* share button full-width in report screen */
+#rpt2-share-btn.sharing-loading{background:#1a7dd0!important;pointer-events:none;}
+#rpt2-share-btn.sharing-success{background:var(--g500)!important;}
+@keyframes share-pop{0%{transform:scale(1)}20%{transform:scale(.93)}55%{transform:scale(1.04)}100%{transform:scale(1)}}
+#rpt2-share-btn.sharing-success{animation:share-pop .35s cubic-bezier(.34,1.56,.64,1);}
+@keyframes icon-spin{to{transform:rotate(360deg)}}
+.spin-icon{display:inline-block;animation:icon-spin .7s linear infinite;}
 body.kam-sense-active .topbar{background:#1a1e26!important;transition:background .25s ease;}
 /* ── Theme A overrides ── */
 body.sdt-a.kam-sense-active{--n0:#1e1e1e;--n50:#252525}
