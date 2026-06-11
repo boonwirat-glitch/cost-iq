@@ -484,11 +484,16 @@ const CI = (() => {
   </div>
   <!-- chip — shown after account selected -->
   <div id="ci-chip-wrap" style="padding:4px 24px 10px;display:${_showPicker?'none':''}">
-    <div class="chip" style="display:inline-flex">
-      <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="chip" style="display:inline-flex">
+        <div class="chip-dot" style="${_accountSeg==='LEAD'?'background:#FF9500':''}"></div>
+        <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
+        <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
       </div>
-      <span class="chip-txt">${ctx.name||'ร้านค้า'}</span>
-      <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
+      <div id="ci-checkin-pill" style="display:none;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;background:rgba(52,199,89,.1);border:0.5px solid rgba(52,199,89,.25)">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span style="font-size:10px;font-weight:500;color:#1A7A3A;font-family:'Noto Sans Thai',sans-serif">เช็คอิน <span id="ci-checkin-time">—</span></span>
+      </div>
     </div>
   </div>
   <!-- visit hero — weekly dots + quarterly count -->
@@ -530,16 +535,6 @@ const CI = (() => {
     </div>
     <div class="timer-block">
       <div class="timer-hint" id="ci-thint">กดเพื่อเริ่มบันทึก</div>
-    </div>
-  </div>
-  <!-- check-in bar — shown after rep checks in -->
-  <div class="ci-checkin-bar" id="ci-checkin-bar">
-    <div class="ci-checkin-icon">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-    </div>
-    <div>
-      <div class="ci-checkin-txt">เช็คอินแล้ว · <span id="ci-checkin-time">—</span></div>
-      <div class="ci-checkin-sub">GPS บันทึกแล้ว</div>
     </div>
   </div>
   <!-- TL covisit panel — shown for TL/Admin instead of orb -->
@@ -2803,11 +2798,11 @@ ${summaryHtml}`;
       // Persist to localStorage so it survives app restart within session
       try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
 
-      // Show check-in bar
-      const bar = document.getElementById('ci-checkin-bar');
+      // Show check-in pill in chip row
+      const pill = document.getElementById('ci-checkin-pill');
       const timeEl = document.getElementById('ci-checkin-time');
       if (timeEl) timeEl.textContent = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
-      if (bar) bar.classList.add('show');
+      if (pill) pill.style.display = 'flex';
 
       // Switch orb to mic
       _showMicOrb();
@@ -2856,11 +2851,11 @@ ${summaryHtml}`;
         const minsAgo = (Date.now() - new Date(cached.checked_in_at).getTime()) / 60000;
         if (minsAgo < 90) {
           _checkinCache = cached;
-          const bar = document.getElementById('ci-checkin-bar');
+          const pill = document.getElementById('ci-checkin-pill');
           const timeEl = document.getElementById('ci-checkin-time');
           const t = new Date(cached.checked_in_at);
           if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
-          if (bar) bar.classList.add('show');
+          if (pill) pill.style.display = 'flex';
           _showMicOrb();
           return;
         }
@@ -2940,9 +2935,11 @@ ${summaryHtml}`;
     const idleCenter = document.getElementById('ci-rec-center');
     const recActive  = document.getElementById('ci-rec-active');
     const recBottom  = document.getElementById('ci-rec-bottom');
+    const chipWrap   = document.getElementById('ci-chip-wrap');
     if (idleCenter) idleCenter.style.display = isRec ? 'none' : '';
     if (recActive)  { recActive.style.display  = isRec ? 'flex' : 'none'; }
     if (recBottom)  { recBottom.style.display   = isRec ? 'block' : 'none'; }
+    if (chipWrap)   chipWrap.style.display = isRec ? 'none' : '';
     // Hide visit hero during recording — more focus on wave + timer
     const visitHeroEl = document.getElementById('ci-visit-hero');
     if (visitHeroEl) visitHeroEl.style.display = isRec ? 'none' : '';
