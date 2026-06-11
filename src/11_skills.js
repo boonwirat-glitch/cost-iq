@@ -73,10 +73,11 @@ let _skillsUserId = null;      // current auth user id
 let _skillsRole   = null;      // 'sales' | 'sales_tl' | 'kam' | 'tl' | 'admin'
 let _activeSkillId = null;
 let _skillUsers   = {};        // { user_id: { full_name, kam_name, email } }     // currently open skill sheet
-let _skillViewMode = 'pending';  // TL: 'pending' | 'overview'
+let _skillViewMode = 'pending';  // TL: 'pending' | 'overview' | 'visits'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
 let _tlSquad      = null;      // squad name of current TL (e.g. 'Tao', 'Yun')
 let _tlSquadEmails = [];       // emails of reps in TL's squad
+let _tlBrowseMode = false;     // TL: true เมื่ออยู่ใน skill-card browse mode
 
 // ── Supabase helper ────────────────────────────────────────
 
@@ -433,6 +434,7 @@ function _renderSkillsScreen() {
   }
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (isTL) {
+    _tlBrowseMode = false; // reset browse mode เมื่อกลับ TL shell
     _renderTLShell(scr);
   } else {
     scr.innerHTML = _renderRepHome();
@@ -479,6 +481,8 @@ function _renderTLShell(scr) {
     รอประเมิน${pendCount > 0 ? `<span class="sk-tab-badge">${pendCount}</span>` : ''}
   </div>
   <div class="sk-tab ${_skillViewMode==='overview'?'sk-tab-on':''}" onclick="_skSetView('overview');_renderTLContent();">ภาพรวมทีม</div>
+  <div class="sk-tab ${_skillViewMode==='visits'?'sk-tab-on':''}" onclick="_skSetView('visits');_renderTLContent();">Visits</div>
+  <div class="sk-tab" onclick="_tlBrowseMode=true;const _bs=_switchSkillsScreen('home');if(_bs){_bs.innerHTML=_renderRepHome();_markLoadedImages(_bs);}">อ่าน Skills</div>
 </div>
 <div id="sk-tl-content" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>`;
 
@@ -493,12 +497,128 @@ function _renderTLContent() {
   // Update tab active state without re-rendering header
   const tabs = document.querySelectorAll('#sk-tl-tabs .sk-tab');
   tabs.forEach((t, i) => {
-    const isActive = (i === 0 && _skillViewMode === 'pending') || (i === 1 && _skillViewMode === 'overview');
+    const isActive = (i === 0 && _skillViewMode === 'pending') ||
+                     (i === 1 && _skillViewMode === 'overview') ||
+                     (i === 2 && _skillViewMode === 'visits');
     t.classList.toggle('sk-tab-on', isActive);
   });
 
-  content.innerHTML = _skillViewMode === 'pending' ? _renderTLPendingContent() : _renderTLOverviewContent();
+  if (_skillViewMode === 'pending') {
+    content.innerHTML = _renderTLPendingContent();
+  } else if (_skillViewMode === 'visits') {
+    _renderTLVisitContent(content);
+  } else {
+    content.innerHTML = _renderTLOverviewContent();
+  }
 }
+
+// ── TL Visit Tracker ───────────────────────────────────────
+async function _renderTLVisitContent(container) {
+  if (!container) return;
+  const _loadingMsg = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">กำลังโหลด...</div>`;
+  const _emptyTeam  = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">ไม่พบข้อมูลทีม</div>`;
+  const _noData     = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">ยังไม่มี visit ที่บันทึกไว้</div>`;
+  const _errMsg     = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">โหลดข้อมูลไม่สำเร็จ</div>`;
+  container.innerHTML = _loadingMsg;
+
+  try {
+    const emails = _tlSquadEmails.length > 0 ? _tlSquadEmails : [];
+    if (!emails.length) { container.innerHTML = _emptyTeam; return; }
+
+    const since = new Date(Date.now() - 35 * 86400000).toISOString();
+    const emailFilter = emails.map(e => `"${e}"`).join(',');
+    const rows = await _skFetch(
+      `ci_sessions?select=owner_email,visited_at,account_name,duration_secs` +
+      `&owner_email=in.(${emailFilter})&visited_at=gte.${since}&order=visited_at.desc&limit=500`
+    );
+    if (!rows || !rows.length) { container.innerHTML = _noData; return; }
+
+    // Week boundaries (Mon–Sun)
+    const now = new Date();
+    const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const thisMonStart = new Date(now); thisMonStart.setHours(0,0,0,0); thisMonStart.setDate(now.getDate() - dow);
+    const lastMonStart = new Date(thisMonStart); lastMonStart.setDate(thisMonStart.getDate() - 7);
+    const monthStart   = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const repMap = {};
+    emails.forEach(e => { repMap[e] = { thisWeek:0, lastWeek:0, thisMonth:0, lastVisit:null }; });
+    rows.forEach(r => {
+      const e = (r.owner_email || '').toLowerCase();
+      if (!repMap[e]) return;
+      const d = new Date(r.visited_at);
+      if (d >= thisMonStart) repMap[e].thisWeek++;
+      else if (d >= lastMonStart) repMap[e].lastWeek++;
+      if (d >= monthStart) repMap[e].thisMonth++;
+      if (!repMap[e].lastVisit || d > new Date(repMap[e].lastVisit)) repMap[e].lastVisit = r.visited_at;
+    });
+
+    const totalThis = emails.reduce((s,e) => s + repMap[e].thisWeek, 0);
+    const avgThis   = emails.length ? (totalThis / emails.length).toFixed(1) : 0;
+    const lowCount  = emails.filter(e => repMap[e].thisWeek < 3).length;
+    const maxW      = Math.max(...emails.map(e => repMap[e].thisWeek), 1);
+    const totalMonth = emails.reduce((s,e) => s + repMap[e].thisMonth, 0);
+    const todayStr  = now.toLocaleDateString('th-TH', {weekday:'short', day:'numeric', month:'short'});
+
+    let html = `
+<div style="padding:14px 14px 10px;flex-shrink:0;">
+  <div class="sk-eyebrow sk-eyebrow-ac" style="margin-bottom:3px;">VISITS · สัปดาห์นี้</div>
+  <div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;">${todayStr}</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 14px;">
+  <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
+    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${totalThis}</div>
+    <div class="sk-eyebrow" style="margin-top:3px;">total/week</div>
+  </div>
+  <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
+    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${avgThis}</div>
+    <div class="sk-eyebrow" style="margin-top:3px;">avg/rep</div>
+  </div>
+  <div style="background:${lowCount > 0 ? 'rgba(255,56,92,.07)' : 'var(--sk-surface)'};border-radius:8px;padding:10px 12px;${lowCount > 0 ? 'border:1px solid rgba(255,56,92,.18);' : ''}">
+    <div style="font-size:20px;font-weight:700;color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono',monospace;">${lowCount}</div>
+    <div class="sk-eyebrow" style="margin-top:3px;color:${lowCount > 0 ? 'var(--sk-ac)' : ''};">ต่ำกว่า 3</div>
+  </div>
+</div>`;
+
+    const sorted = [...emails].sort((a,b) => repMap[b].thisWeek - repMap[a].thisWeek);
+    html += `<div style="margin:0 14px;">`;
+    sorted.forEach(email => {
+      const d = repMap[email];
+      const uKey = Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
+      const uRec = uKey ? _skillUsers[uKey] : null;
+      const name = uRec ? (uRec.full_name || uRec.kam_name || email.split('@')[0]) : email.split('@')[0];
+      const initials = name.slice(0,2).toUpperCase();
+      const barPct = maxW > 0 ? Math.round((d.thisWeek / maxW) * 100) : 0;
+      const isLow  = d.thisWeek < 3;
+      const barColor = isLow ? 'var(--sk-ac)' : d.thisWeek >= 4 ? 'var(--sk-ok)' : 'var(--sk-warn)';
+      const isToday = d.lastVisit && new Date(d.lastVisit).toDateString() === now.toDateString();
+      const lastStr = d.lastVisit
+        ? new Date(d.lastVisit).toLocaleDateString('th-TH', {day:'numeric', month:'short'})
+        : '—';
+      html += `
+<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--sk-hairline);">
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--sk-ac-dim);border:1px solid rgba(255,56,92,.2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);flex-shrink:0;">${initials}</div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+    <div style="margin-top:4px;height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
+      <div style="height:100%;width:${barPct}%;background:${barColor};border-radius:2px;"></div>
+    </div>
+  </div>
+  <div style="text-align:right;flex-shrink:0;">
+    <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono',monospace;line-height:1;">${d.thisWeek}</div>
+    <div style="font-size:8px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
+  </div>
+</div>`;
+    });
+    html += `</div>`;
+    html += `<div style="padding:10px 14px 24px;text-align:center;"><span class="sk-eyebrow">เดือนนี้ · ทีมรวม ${totalMonth} visits</span></div>`;
+
+    container.innerHTML = html;
+  } catch(e) {
+    console.warn('[Skills] _renderTLVisitContent:', e.message);
+    container.innerHTML = _errMsg;
+  }
+}
+
 
 // แก้ race condition: รูปที่โหลดจาก cache เสร็จก่อน onload ผูก → เช็ค .complete
 function _markLoadedImages(scr) {
@@ -713,9 +833,14 @@ async function _doOpenDetail(skillId) {
     : `<div style="width:100%;height:100%;background:${MODULE_BG[def.module]};"></div>`;
   const teaserText = def.principle_th ? def.principle_th.split(/[.。]/)[0] : (def.skill_name_th || def.skill_name_en);
 
-  // CTA based on state
+  // CTA based on state — suppress for TL in browse mode
   let cta = '';
-  if (state === 'locked') {
+  const _isTLBrowse = _tlBrowseMode && (
+    _skillsRole === 'sales_tl' || _skillsRole === 'tl' ||
+    _skillsRole === 'admin'    || _skillsRole === 'ad_tl');
+  if (_isTLBrowse) {
+    cta = `<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:100px;background:var(--sk-surface);font-size:10px;font-weight:600;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;">READ ONLY</div>`;
+  } else if (state === 'locked') {
     cta = `<button class="sk-cta-btn sk-cta-primary" onclick="skillsStartTraining(${skillId})">เริ่มฝึก</button>`;
   } else if (state === 'training') {
     cta = `
