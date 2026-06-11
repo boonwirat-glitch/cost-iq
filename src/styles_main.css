@@ -1938,6 +1938,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
+/* Skills uses white canvas regardless of KAM/AD dark theme */
+body.kam-mode #scr-skills,body.kad-mode #scr-skills{background:#fff!important;}
 /* v498: AD mode uses same dark KAM theme */
 body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
