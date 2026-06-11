@@ -1,4 +1,4 @@
-<!-- Freshket Sense v514: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v515: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2390,6 +2390,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* ══ KAM MODE — DARK THEME ══ */
 body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
+/* Skills uses white canvas regardless of KAM/AD dark theme */
+body.kam-mode #scr-skills,body.kad-mode #scr-skills{background:#fff!important;}
 /* v498: AD mode uses same dark KAM theme */
 body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
@@ -5593,7 +5595,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v514',
+      version: 'v515',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -45456,6 +45458,14 @@ function _skUserInitials(userId) {
   return name.slice(0,2).toUpperCase();
 }
 
+// Extract nickname from "(Nick)" pattern, fallback to first word
+function _skNickname(fullName) {
+  if (!fullName) return '?';
+  const m = fullName.match(/\(([^)]+)\)/);
+  if (m) return m[1].trim();
+  return fullName.split(/\s+/)[0] || fullName;
+}
+
 // ── Nav badge (TL: pending count) ─────────────────────────
 function _updateSkillsNavBadge() {
   const badge = document.getElementById('skills-nav-badge');
@@ -45613,12 +45623,36 @@ async function _renderTLVisitContent(container) {
       if (!repMap[e].lastVisit || d > new Date(repMap[e].lastVisit)) repMap[e].lastVisit = r.visited_at;
     });
 
-    const totalThis = emails.reduce((s,e) => s + repMap[e].thisWeek, 0);
-    const avgThis   = emails.length ? (totalThis / emails.length).toFixed(1) : 0;
-    const lowCount  = emails.filter(e => repMap[e].thisWeek < 3).length;
-    const maxW      = Math.max(...emails.map(e => repMap[e].thisWeek), 1);
+    // Account count per rep from portviewBulkData — quarterly target
+    const _pvBulk = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
+    const acctPerRep = {};
+    emails.forEach(e => { acctPerRep[e] = 0; });
+    _pvBulk.forEach(r => {
+      const e = (r.kamEmail || '').toLowerCase();
+      if (acctPerRep[e] !== undefined) acctPerRep[e]++;
+    });
+
+    // Quarterly visit count per rep
+    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+    emails.forEach(e => {
+      repMap[e].thisQuarter = rows.filter(r =>
+        (r.owner_email||'').toLowerCase() === e && new Date(r.visited_at) >= qStart
+      ).length;
+    });
+
+    const totalThis  = emails.reduce((s,e) => s + repMap[e].thisWeek, 0);
+    const avgThis    = emails.length ? (totalThis / emails.length).toFixed(1) : 0;
     const totalMonth = emails.reduce((s,e) => s + repMap[e].thisMonth, 0);
-    const todayStr  = now.toLocaleDateString('th-TH', {weekday:'short', day:'numeric', month:'short'});
+    // lowCount = reps who haven't visited all their accounts this quarter
+    const lowCount   = emails.filter(e => {
+      const tgt = acctPerRep[e] || 0;
+      return tgt > 0 && repMap[e].thisQuarter < tgt;
+    }).length;
+    const todayStr   = now.toLocaleDateString('th-TH', {weekday:'short', day:'numeric', month:'short'});
+
+    // Quarter label
+    const qNum = Math.floor(now.getMonth()/3) + 1;
+    const qLabel = `Q${qNum} ${now.getFullYear()}`;
 
     let html = `
 <div style="padding:14px 14px 10px;flex-shrink:0;">
@@ -45628,7 +45662,7 @@ async function _renderTLVisitContent(container) {
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 14px;">
   <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
     <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${totalThis}</div>
-    <div class="sk-eyebrow" style="margin-top:3px;">total/week</div>
+    <div class="sk-eyebrow" style="margin-top:3px;">visits/week</div>
   </div>
   <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
     <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${avgThis}</div>
@@ -45636,7 +45670,7 @@ async function _renderTLVisitContent(container) {
   </div>
   <div style="background:${lowCount > 0 ? 'rgba(255,56,92,.07)' : 'var(--sk-surface)'};border-radius:8px;padding:10px 12px;${lowCount > 0 ? 'border:1px solid rgba(255,56,92,.18);' : ''}">
     <div style="font-size:20px;font-weight:700;color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono',monospace;">${lowCount}</div>
-    <div class="sk-eyebrow" style="margin-top:3px;color:${lowCount > 0 ? 'var(--sk-ac)' : ''};">ต่ำกว่า 3</div>
+    <div class="sk-eyebrow" style="margin-top:3px;color:${lowCount > 0 ? 'var(--sk-ac)' : ''};">ไม่ครบ ${qLabel}</div>
   </div>
 </div>`;
 
@@ -45646,32 +45680,36 @@ async function _renderTLVisitContent(container) {
       const d = repMap[email];
       const uKey = Object.keys(_skillUsers || {}).find(k => (_skillUsers[k].email || '').toLowerCase() === email);
       const uRec = uKey ? _skillUsers[uKey] : null;
-      const name = uRec ? (uRec.full_name || uRec.kam_name || email.split('@')[0]) : email.split('@')[0];
-      const initials = name.slice(0,2).toUpperCase();
-      const barPct = maxW > 0 ? Math.round((d.thisWeek / maxW) * 100) : 0;
-      const isLow  = d.thisWeek < 3;
-      const barColor = isLow ? 'var(--sk-ac)' : d.thisWeek >= 4 ? 'var(--sk-ok)' : 'var(--sk-warn)';
+      const rawName = uRec ? (uRec.kam_name || uRec.full_name || email.split('@')[0]) : email.split('@')[0];
+      const nick    = _skNickname(rawName);
+      const acctTgt = acctPerRep[email] || 0;
+      const qPct    = acctTgt > 0 ? Math.min(100, Math.round((d.thisQuarter / acctTgt) * 100)) : 0;
+      const isLow   = acctTgt > 0 && d.thisQuarter < acctTgt;
+      const barColor = qPct >= 100 ? 'var(--sk-ok)' : qPct >= 60 ? 'var(--sk-warn)' : 'var(--sk-ac)';
       const isToday = d.lastVisit && new Date(d.lastVisit).toDateString() === now.toDateString();
       const lastStr = d.lastVisit
         ? new Date(d.lastVisit).toLocaleDateString('th-TH', {day:'numeric', month:'short'})
         : '—';
       html += `
 <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--sk-hairline);">
-  <div style="width:28px;height:28px;border-radius:50%;background:var(--sk-ac-dim);border:1px solid rgba(255,56,92,.2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);flex-shrink:0;">${initials}</div>
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--sk-ac-dim);border:1px solid rgba(255,56,92,.2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--sk-ac);flex-shrink:0;letter-spacing:-.02em;">${nick}</div>
   <div style="flex:1;min-width:0;">
-    <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
-    <div style="margin-top:4px;height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
-      <div style="height:100%;width:${barPct}%;background:${barColor};border-radius:2px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px;">
+      <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rawName}</div>
+      ${acctTgt > 0 ? `<div style="font-size:9px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
+    </div>
+    <div style="height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
+      <div style="height:100%;width:${qPct}%;background:${barColor};border-radius:2px;transition:width .3s;"></div>
     </div>
   </div>
-  <div style="text-align:right;flex-shrink:0;">
+  <div style="text-align:right;flex-shrink:0;min-width:28px;">
     <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono',monospace;line-height:1;">${d.thisWeek}</div>
     <div style="font-size:8px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
   </div>
 </div>`;
     });
     html += `</div>`;
-    html += `<div style="padding:10px 14px 24px;text-align:center;"><span class="sk-eyebrow">เดือนนี้ · ทีมรวม ${totalMonth} visits</span></div>`;
+    html += `<div style="padding:10px 14px 24px;text-align:center;"><span class="sk-eyebrow">เดือนนี้ ${totalMonth} visits · ${qLabel} เป้า 100% accounts</span></div>`;
 
     container.innerHTML = html;
   } catch(e) {
