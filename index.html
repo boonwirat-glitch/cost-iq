@@ -1,4 +1,4 @@
-<!-- Freshket Sense v520: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v521: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5627,7 +5627,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v520',
+      version: 'v521',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43681,7 +43681,10 @@ function echoExpand() {
     if (prefer) headers['Prefer'] = prefer;
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || res.status); }
-    return method === 'DELETE' ? null : res.json();
+    // 204 No Content (DELETE, PATCH/POST with return=minimal) — no body to parse
+    if (res.status === 204 || method === 'DELETE') return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   }
 
   // ── Load & render list ────────────────────────────────────────────────────
