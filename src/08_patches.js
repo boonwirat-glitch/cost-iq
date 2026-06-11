@@ -200,25 +200,129 @@
     }, 150);
   };
 
-  // ── Supabase save (stub — wire to real Supabase in next session) ──────────
+  // ── Supabase save — upsert to saved_plans (per-account) ──────────────────
   function _persistPlan(){
     try{
       var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
-      var userEmail = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile.email : null;
+      var userEmail = (typeof currentUserProfile !== 'undefined' && currentUserProfile)
+        ? currentUserProfile.email : null;
+      if(!accountId || !userEmail) return;
+
       var selArr = (typeof sel !== 'undefined') ? Array.from(sel) : [];
-      var payload = {
-        account_id: accountId,
+      var planMode = (typeof currentPlanMode !== 'undefined') ? currentPlanMode : 'custom';
+
+      var row = {
         user_email: userEmail,
+        account_id: accountId,
+        plan_mode:  planMode,
         selections: selArr,
-        plan_mode: (typeof currentPlanMode !== 'undefined') ? currentPlanMode : 'custom',
-        saved_at: new Date().toISOString()
+        saved_at:   new Date().toISOString()
       };
-      // Store locally as fallback always
-      try{ localStorage.setItem('spb_plan_'+accountId, JSON.stringify(payload)); }catch(e){}
-      // TODO next session: upsert to Supabase saved_plans table
-      // if(window._supabase){ window._supabase.from('saved_plans').upsert({...payload}); }
-    }catch(e){}
+
+      // 1. Always write localStorage as instant fallback
+      try{ localStorage.setItem('spb_plan_'+accountId, JSON.stringify(row)); }catch(e){}
+
+      // 2. Upsert to Supabase (ON CONFLICT user_email,account_id → UPDATE)
+      if(typeof supa !== 'undefined' && supa){
+        supa.from('saved_plans')
+          .upsert(row, { onConflict: 'user_email,account_id' })
+          .then(function(res){
+            if(res.error) console.warn('[SavePlan] upsert error:', res.error.message);
+          })
+          .catch(function(e){ console.warn('[SavePlan] upsert exception:', e.message); });
+      }
+    }catch(e){ console.warn('[SavePlan] _persistPlan exception:', e); }
   }
+
+  // ── Restore saved plan for an account (called on account switch + login) ──
+  function _restorePlan(accountId, userEmail){
+    if(!accountId || !userEmail) return;
+
+    // Try Supabase first; fall back to localStorage
+    function _applyRestoredRow(row){
+      if(!row || !Array.isArray(row.selections) || row.selections.length === 0) return;
+      // Only restore if user hasn't already started making selections this session
+      if((typeof sel !== 'undefined') && sel.size > 0) return;
+
+      // Re-hydrate selection Set
+      if(typeof sel !== 'undefined'){
+        sel.clear();
+        row.selections.forEach(function(id){ sel.add(id); });
+      }
+      if(typeof currentPlanMode !== 'undefined') window.currentPlanMode = row.plan_mode || 'custom';
+      if(typeof footerUnlocked !== 'undefined') window.footerUnlocked = true;
+
+      // Show the badge card in saved state immediately
+      _injectBadgeCard();
+      _spcSaved = true;
+      _spcVisible = true;
+      var card = document.getElementById('save-plan-card');
+      if(card){
+        card.className = 'save-plan-card spc-saved';
+        var lbl = document.getElementById('spc-label');
+        var sub = document.getElementById('spc-sub');
+        var btn = document.getElementById('spc-btn');
+        if(lbl) lbl.textContent = 'แผนบันทึกแล้ว';
+        if(sub){
+          sub.className = 'spc-sub green';
+          // Format saved_at timestamp
+          var ts = row.saved_at ? new Date(row.saved_at) : new Date();
+          var d=ts.getDate(), m=ts.getMonth()+1, y=ts.getFullYear();
+          var hh=String(ts.getHours()).padStart(2,'0'), mm2=String(ts.getMinutes()).padStart(2,'0');
+          var MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+          sub.textContent = d+' '+MONTHS[m-1]+' '+y+' · '+row.selections.length+' รายการ · restore แล้ว';
+        }
+        if(btn){ btn.textContent = 'อัปเดต'; btn.className = 'spc-btn done'; }
+        var left = document.getElementById('spc-left');
+        if(left && !left.querySelector('.spc-dot')){
+          var dot = document.createElement('div');
+          dot.className = 'spc-dot saved';
+          left.prepend(dot);
+        }
+      }
+
+      // Re-render the plan list to reflect restored selections
+      if(typeof renderOpps === 'function') setTimeout(renderOpps, 80);
+      if(typeof updatePbFooter === 'function') setTimeout(updatePbFooter, 80);
+    }
+
+    // Try Supabase
+    if(typeof supa !== 'undefined' && supa){
+      supa.from('saved_plans')
+        .select('selections,plan_mode,saved_at')
+        .eq('user_email', userEmail)
+        .eq('account_id', accountId)
+        .maybeSingle()
+        .then(function(res){
+          if(res.error){ console.warn('[SavePlan] restore error:', res.error.message); }
+          if(res.data){
+            _applyRestoredRow(res.data);
+          } else {
+            // Fall back to localStorage
+            try{
+              var local = localStorage.getItem('spb_plan_'+accountId);
+              if(local) _applyRestoredRow(JSON.parse(local));
+            }catch(e){}
+          }
+        })
+        .catch(function(e){
+          // Network error — fall back to localStorage
+          try{
+            var local = localStorage.getItem('spb_plan_'+accountId);
+            if(local) _applyRestoredRow(JSON.parse(local));
+          }catch(e2){}
+        });
+    } else {
+      // No Supabase yet (early boot) — localStorage only
+      try{
+        var local = localStorage.getItem('spb_plan_'+accountId);
+        if(local) _applyRestoredRow(JSON.parse(local));
+      }catch(e){}
+    }
+  }
+
+  // ── Expose restore so 01_core / account-switch can call it ────────────────
+  window.savePlanBadge_restoreForAccount = _restorePlan;
 
   // ── ACTION: Share from pill button (report screen) ────────────────────────
   window.doShareFromPill = function(){
@@ -277,5 +381,27 @@
   } else {
     setTimeout(_tryInit, 500);
   }
+
+  // ── Hook: restore plan when account changes (restaurant sheet opens) ───────
+  // Poll for currentAccountId changes — lightweight, fires only when non-null
+  var _lastRestoredAccount = null;
+  setInterval(function(){
+    try{
+      var accId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+      var email = (typeof currentUserProfile !== 'undefined' && currentUserProfile)
+        ? currentUserProfile.email : null;
+      if(accId && email && accId !== _lastRestoredAccount){
+        _lastRestoredAccount = accId;
+        // Reset badge state for new account
+        _spcVisible = false;
+        _spcSaved   = false;
+        _spcInited  = false;
+        var old = document.getElementById('save-plan-card');
+        if(old) old.parentNode && old.parentNode.removeChild(old);
+        // Restore saved plan for this account
+        _restorePlan(accId, email);
+      }
+    }catch(e){}
+  }, 800);
 
 })();
