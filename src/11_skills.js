@@ -71,6 +71,7 @@ let _skillDefs    = [];        // skill_definitions rows
 let _skillProg    = {};        // { skill_id: progress_row }
 let _skillsUserId = null;      // current auth user id
 let _skillsRole   = null;      // 'sales' | 'sales_tl' | 'kam' | 'tl' | 'admin'
+let _skillsInitRole = null;    // role at last successful init — guard against double-fetch
 let _activeSkillId = null;
 let _skillUsers   = {};        // { user_id: { full_name, kam_name, email } }     // currently open skill sheet
 let _skillViewMode = 'pending';  // TL: 'pending' | 'overview' | 'visits'
@@ -149,6 +150,14 @@ async function skillsInit() {
   const role = typeof getCurrentRole === 'function' ? getCurrentRole() : null;
   _skillsRole = role;
 
+  // Idempotency guard: same role + data already loaded → just re-render, no re-fetch
+  // Prevents double network calls when user taps Skills nav repeatedly
+  if (role === _skillsInitRole && _skillDefs.length > 0) {
+    _renderSkillsScreen();
+    _updateSkillsNavBadge();
+    return;
+  }
+
   // Role guard: KAM/rep must not see skills — redirect back to portview
   // v498: rep=KAM IC, ad=Account Development, ad_tl=AD TL — all use Skills
   const _allowedRoles = ['sales','sales_tl','tl','admin','rep','ad','ad_tl'];
@@ -204,6 +213,7 @@ async function skillsInit() {
   ]);
   await _loadSkillUsers();   // โหลดชื่อ rep หลังรู้ว่ามี user_id อะไรบ้าง
 
+  _skillsInitRole = role;  // mark init complete for this role
   _renderSkillsScreen();
   _updateSkillsNavBadge();
 }
