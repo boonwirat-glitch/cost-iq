@@ -793,12 +793,12 @@ function renderPlanBuilder(opps){
     <div class="plan-sel-title">เลือกแผนของคุณ</div>
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
-        <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}</span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
-        <div class="plan-tab-sub">ประหยัดได้ · ${opps.length} รายการ</div>
+        <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:400;color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">ประมาณการเบื้องต้น — ควรตรวจสเปคก่อนเสนอลูกค้า</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
         <div class="plan-tab-row"><span class="plan-tab-title sense"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense ตรวจสเปค</span><span class="plan-tab-val sense">${!verifyDone?'เทียบสเปค →':(fmt(highSave)+'/เดือน')}</span></div>
-        <div class="plan-tab-sub">${!verifyDone?'ยังไม่ได้ตรวจ':(allHigh.length+' รายการ ✓')}</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n400)">${!verifyDone?'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง':'AI ช่วยคัดเบื้องต้น — ควรยืนยันกับร้านอีกครั้ง'}</div>
       </div>
     </div>
     <div class="plan-tab-panel">${tabPanel}</div>
