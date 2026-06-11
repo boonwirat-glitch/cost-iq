@@ -763,7 +763,9 @@ function renderPlanBuilder(opps){
   const allSave=opps.reduce((s,o)=>s+getAlt(o).save,0);
   const verifyDone=allHigh.length>0;
   // Dynamic price month label for disclaimer
-  const _priceMo=(D.history&&D.history.length)?D.history[D.history.length-1].m:'เดือนล่าสุด';
+  const _rawMo=(D.history&&D.history.length)?D.history[D.history.length-1].m:'เดือนล่าสุด';
+  // strip year (e.g. "พ.ค. 2569" → "พ.ค.") — keep only the month part
+  const _priceMo=_rawMo.replace(/\s+\d{4}$/,'').trim()||_rawMo;
   // Plan selector panel
   // ── PLAN TABS ──
   const isAll=currentPlanMode==='all';
@@ -796,11 +798,11 @@ function renderPlanBuilder(opps){
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
         <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:400;color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">ประมาณการเบื้องต้น จากราคาเดือน ${_priceMo} — ควรตรวจสเปคก่อนนำเสนอลูกค้า</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n700)">ประมาณการเบื้องต้น จากราคาเดือน ${_priceMo} — ควรตรวจสเปคก่อนนำเสนอลูกค้า</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
         <div class="plan-tab-row"><span class="plan-tab-title sense"><span class="pvc-star"><svg width="8" height="8" viewBox="0 0 10 10" fill="var(--tk-ok-bright)"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg></span> ให้ Sense ตรวจสเปค</span><span class="plan-tab-val sense">${!verifyDone?'เทียบสเปค →':(fmt(highSave)+'/เดือน')}</span></div>
-        <div class="plan-tab-sub" style="text-align:right;color:var(--n600)">AI ช่วยคัดเบื้องต้นจากเกรด แบรนด์ และสเปคที่ร้านใช้ — ควรยืนยันกับร้านอีกครั้ง</div>
+        <div class="plan-tab-sub" style="text-align:right;color:var(--n700)">AI ช่วยคัดเบื้องต้นจากเกรด แบรนด์ และสเปคที่ร้านใช้ — ควรยืนยันกับร้านอีกครั้ง</div>
       </div>
     </div>
     <div class="plan-tab-panel">${tabPanel}</div>
@@ -912,7 +914,6 @@ function smartSelect(mode,e){
   if(mode==='high'){opps.filter(o=>getAlt(o).conf==='high').forEach(o=>sel.add(o.id));}
   else{opps.forEach(o=>sel.add(o.id));}
   footerUnlocked=true; // Sprint 2: plan tapped = savings earned
-  if(typeof savePlanBadge_onDefault==='function')savePlanBadge_onDefault();
   // Unmute cards with reveal animation
   const oppList=document.getElementById('opplist');
   if(oppList&&oppList.classList.contains('opplist-muted')){
@@ -921,6 +922,8 @@ function smartSelect(mode,e){
     setTimeout(()=>oppList.classList.remove('opplist-unmuting'),500);
   }
   renderOpps();updateSim();
+  // v508: badge called AFTER renderOpps (renderPlanBuilder rewrites #opplist.innerHTML)
+  if(typeof savePlanBadge_onDefault==='function')savePlanBadge_onDefault();
 }
 
 function selectCat(cat){
@@ -1211,7 +1214,7 @@ function __legacyRenderReportFallback(){
             <td><div class="rpt2-sku-name">${o.curName}</div><div class="rpt2-sku-meta">${curMeta}</div></td>
             <td class="rpt2-arr">→</td>
             <td><div class="rpt2-sku-name">${a.altName}</div><div class="rpt2-sku-meta">${altMeta}</div></td>
-            <td class="rpt2-gmv"><div class="rpt2-gmv-val">${fmt(o.monthlyGmv||0)}</div><div class="rpt2-gmv-qty">${o.monthlyQty>0?+(+o.monthlyQty).toFixed(1)+' '+(o.qu||''):''}</div></td>
+            <td class="rpt2-gmv"><div class="rpt2-gmv-val">${fmt(o.monthlyGmv||0)}</div><div class="rpt2-gmv-qty">${o.monthlyQty>0?+(+o.monthlyQty).toFixed(1)+' '+deriveQtyUnit(o.curSpec,o.priceBasis):''}</div></td>
             <td class="rpt2-save"><div class="rpt2-save-amt">${fmt(a.save)}</div><span class="rpt2-save-pct${confHigh?' high':''}">−${a.pct}%</span></td>
           </tr>`;
         }).join('');
