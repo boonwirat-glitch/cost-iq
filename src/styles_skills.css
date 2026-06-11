@@ -1646,17 +1646,8 @@
 #scr-skills.on.sk-detail-mode {
   display: block !important;
 }
-#scr-skills.sk-detail-mode 
 
 /* ══ S3 PEEK / EXPAND SHEET ══════════════════════════════ */
-
-
-
-
-.s3-sheet-expanded 
-
-.s3-sheet-peek 
-.s3-sheet-expanded 
 
 /* ══ IMAGE LAZY FADE ═════════════════════════════════════ */
 .sk-img-lazy:not(.sk-img-loaded) {
