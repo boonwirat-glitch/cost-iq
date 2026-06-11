@@ -1,4 +1,4 @@
-<!-- Freshket Sense v539: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v540: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v539',
+      version: 'v540',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41082,6 +41082,7 @@ const CI = (() => {
   let _floatTimer  = null; // minimize timer ref
   let _audioCtx    = null; // AudioContext keep-alive — prevents iOS from suspending audio session
   let _sessionId   = null; // ci_sessions UUID after save
+  let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // 'week' | 'month' | 'all'  — inline history filter
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -41437,7 +41438,13 @@ const CI = (() => {
     _showScreen('ci-s-record');
     // Load visit counts after mount (async, non-blocking)
     setTimeout(_loadVisitBadge, 200);
-    setTimeout(_loadVisitHero, 250);
+    // Visit hero: hide entirely for TL/Admin (they manage team, not their own visits)
+    if (_canDebrief()) {
+      const hero = document.getElementById('ci-visit-hero');
+      if (hero) hero.style.display = 'none';
+    } else {
+      setTimeout(_loadVisitHero, 250);
+    }
   }
 
   function _unmount() {
@@ -41691,6 +41698,7 @@ const CI = (() => {
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
+      _isOwnRecording = true; // recording own session
       // AudioContext keep-alive — iOS audio session keep-alive
       // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
       // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
@@ -42155,7 +42163,8 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
     document.getElementById('ci-p2').innerHTML = _actionsPanel(intelData);
     document.getElementById('ci-p3').innerHTML = _transcriptPanel(transcriptSummary, toneSignals);
     const tlDiv = document.getElementById('ci-tl-actions');
-    if (tlDiv) tlDiv.style.display = _canDebrief() ? 'flex' : 'none';
+    // Show Debrief only when reviewing someone else's session, not when TL/Admin records own
+  if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
   }
 
   function _skillsPanel(d) {
@@ -43569,7 +43578,7 @@ ${summaryHtml}`;
   }
 
   function open(accountGuid) {
-    _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null;
+    _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null; _isOwnRecording = false;
     _unmount();
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
