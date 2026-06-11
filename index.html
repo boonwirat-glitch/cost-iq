@@ -1,4 +1,4 @@
-<!-- Freshket Sense v_matcher_merge: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v_rpt2: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5551,7 +5551,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v_matcher_merge',
+      version: 'v_rpt2',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6486,7 +6486,7 @@ body.sales-mode .bnav {
       var catRow = '<tr class="rpt2-cat-row"><td colspan="7">'+
         '<span class="rpt2-cat-name">'+text(g.cat)+'</span>'+
         '<span class="rpt2-cat-meta">'+g.items.length+' รายการ</span>'+
-        '<span class="rpt2-cat-save">'+catSave+' / เดือน</span>'+
+        /* rpt2-cat-save removed */
       '</td></tr>';
       var itemRows = g.items.map(function(o){
         rowNum++;
@@ -6501,7 +6501,7 @@ body.sales-mode .bnav {
           '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">'+altMeta+'</div></td>'+
           '<td class="rpt2-gmv"><div class="rpt2-gmv-val">'+c.fmt(o.monthlyGmv||0)+'</div><div class="rpt2-gmv-qty">'+(o.monthlyQty>0?(+o.monthlyQty.toFixed(1))+' '+(o.qu||''):'')+'</div></td>'+
           '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div><span class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</span></div></td>'+
-          '<td class="rpt2-conf"><span class="rpt2-dot'+(confHigh?' rpt2-dot-hi':a.conf==='medium'?' rpt2-dot-med':' rpt2-dot-lo')+'"></span></td>'+
+          /* rpt2-conf td removed */
         '</tr>';
       }).join('');
       return catRow + itemRows;
