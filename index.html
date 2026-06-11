@@ -1,4 +1,4 @@
-<!-- Freshket Sense v536: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v537: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v536',
+      version: 'v537',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41504,6 +41504,25 @@ const CI = (() => {
       <span class="chip-seg" style="${_accountSeg==='LEAD'?'color:#FF9500':''}">${_accountSeg==='LEAD'?'LEAD':ctx.seg}</span>
     </div>
   </div>
+  <!-- visit hero — weekly dots + quarterly count -->
+  <div id="ci-visit-hero" style="padding:0 24px 10px">
+    <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:14px;padding:12px 14px;transition:background .7s ease,border-color .7s ease">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div id="ci-vh-wlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">สัปดาห์นี้</div>
+          <div id="ci-vh-wnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-wsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+        </div>
+        <div id="ci-vh-div" style="width:0.5px;background:rgba(255,56,92,.12);align-self:stretch;transition:background .7s ease"></div>
+        <div style="text-align:right">
+          <div id="ci-vh-qlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">ไตรมาสนี้</div>
+          <div id="ci-vh-qnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-qsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+        </div>
+      </div>
+      <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
+    </div>
+  </div>
   <!-- idle center — orb, shown before startRecording() -->
   <div class="rec-center" id="ci-rec-center" style="${_showPicker?'display:none':''}">
     <div class="orb-wrap">
@@ -41528,33 +41547,14 @@ const CI = (() => {
     <div class="timer-val" id="ci-tval">0:00</div>
     <div class="timer-hint" id="ci-rec-hint">echo กำลังรับฟัง · ทำงานอยู่เบื้องหลัง</div>
   </div>
-  <!-- visit hero — weekly dots + quarterly count -->
-  <div id="ci-visit-hero" style="display:${_showPicker?'none':''};padding:0 24px 10px">
-    <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:14px;padding:12px 14px;transition:background .7s ease,border-color .7s ease">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-        <div>
-          <div id="ci-vh-wlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">สัปดาห์นี้</div>
-          <div id="ci-vh-wnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
-          <div id="ci-vh-wsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
-        </div>
-        <div id="ci-vh-div" style="width:0.5px;background:rgba(255,56,92,.12);align-self:stretch;transition:background .7s ease"></div>
-        <div style="text-align:right">
-          <div id="ci-vh-qlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">ไตรมาสนี้</div>
-          <div id="ci-vh-qnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
-          <div id="ci-vh-qsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
-        </div>
-      </div>
-      <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
-    </div>
-  </div>
   <!-- stop + cancel buttons — only during recording -->
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
     <div style="display:flex;align-items:center;gap:10px">
       <button id="ci-stop-btn" onclick="CI.stopRecording()"
         style="flex:1;padding:15px 0;border:none;border-radius:16px;font-size:15px;font-weight:500;cursor:pointer;
                font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.01em;
-               background:rgba(255,56,92,.12);color:#FF385C;
-               border:0.5px solid rgba(255,56,92,.25);
+               background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);
+               border:0.5px solid rgba(255,255,255,.15);
                transition:background .7s ease,color .7s ease,border-color .7s ease">
         จบ &amp; วิเคราะห์
       </button>
@@ -41631,7 +41631,8 @@ const CI = (() => {
     if (!wf) return;
     const N = 13;
     // Independent random phase offset per bar — true ripple, not synchronized movement
-    const phases = Array.from({length: N}, (_, i) => i * 0.72 + Math.random() * 0.5);
+    // Evenly distributed phases — smooth traveling wave, no blocky pattern
+    const phases = [0.0000, 0.4833, 0.9666, 1.4500, 1.9333, 2.4166, 2.8999, 3.3833, 3.8666, 4.3499, 4.8332, 5.3165, 5.7999];
     for (let i = 0; i < N; i++) {
       const b = document.createElement('div');
       b.className = 'ci-wb';
@@ -41644,7 +41645,7 @@ const CI = (() => {
       const bars = wf.querySelectorAll('.ci-wb');
       bars.forEach((b, i) => {
         // All bars same max height (32px), independent phase → every bar ripples visibly
-        const s = Math.abs(Math.sin(t + phases[i]));
+        const s = (1 + Math.sin(t + phases[i])) / 2; // 0..1, smooth single freq
         const h = 6 + s * 26; // min 6px, max 32px — every bar moves meaningfully
         const op = 0.28 + s * 0.52; // min 0.28, max 0.80
         b.style.height = h.toFixed(1) + 'px';
@@ -41719,6 +41720,10 @@ const CI = (() => {
     _durText = _fmt(_secs);
     _recorder.stop();
     _recorder.stream.getTracks().forEach(t => t.stop());
+    // Close AudioContext keep-alive
+    try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    // Restore white theme before proc/result screens
+    _applyRecordingTheme(false);
     _phase = 'processing';
     _showScreen('ci-s-proc');
     _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 14);
@@ -43751,7 +43756,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,255,255,.08)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(255,56,92,.18)'; sb.style.color='rgba(255,120,120,.9)'; sb.style.borderColor='rgba(255,56,92,.3)'; }
+      if (sb) { sb.style.background='rgba(255,255,255,.08)'; sb.style.color='rgba(255,255,255,.7)'; sb.style.borderColor='rgba(255,255,255,.15)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='rgba(255,255,255,.1)'; tabRec.style.color='rgba(255,255,255,.4)'; tabRec.style.boxShadow='none'; }
@@ -43788,7 +43793,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,56,92,.15)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(255,56,92,.12)'; sb.style.color='#FF385C'; sb.style.borderColor='rgba(255,56,92,.25)'; }
+      if (sb) { sb.style.background='rgba(0,0,0,.05)'; sb.style.color='rgba(0,0,0,.5)'; sb.style.borderColor='rgba(0,0,0,.1)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='#fff'; tabRec.style.color='#1C1C1E'; tabRec.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'; }
