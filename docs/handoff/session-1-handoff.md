@@ -1,5 +1,5 @@
 # Session 1 Handoff — Echo × Skills Upgrade
-**Built:** v225 | **Snapshot:** snapshot/pre-echo-skills-upgrade-v224d
+**Built:** v514 | **Snapshot:** snapshot/pre-echo-skills-upgrade-v224d
 
 ---
 
