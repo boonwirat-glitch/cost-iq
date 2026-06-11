@@ -1792,7 +1792,7 @@
 .s3-hero {
   position: relative;
   width: 100%;
-  height: 55%;
+  height: 50%;
   z-index: 1;
   overflow: hidden;
   flex-shrink: 0;
@@ -1855,7 +1855,7 @@
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 45%; opacity: 1; overflow: hidden; }
+.s3-sheet-peek     { height: 50%; opacity: 1; overflow: hidden; }
 .s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
@@ -1875,10 +1875,8 @@
   color: rgba(20,20,20,0.72);
   line-height: 1.45;
   margin-top: 3px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 .s3-expand-chevron {
   flex-shrink: 0;
