@@ -1243,7 +1243,7 @@
       var catRow = '<tr class="rpt2-cat-row"><td colspan="7">'+
         '<span class="rpt2-cat-name">'+text(g.cat)+'</span>'+
         '<span class="rpt2-cat-meta">'+g.items.length+' รายการ</span>'+
-        '<span class="rpt2-cat-save">'+catSave+' / เดือน</span>'+
+        /* rpt2-cat-save removed */
       '</td></tr>';
       var itemRows = g.items.map(function(o){
         rowNum++;
@@ -1258,7 +1258,7 @@
           '<td><div class="rpt2-sku-name">'+text(a.altName)+'</div><div class="rpt2-sku-meta">'+altMeta+'</div></td>'+
           '<td class="rpt2-gmv"><div class="rpt2-gmv-val">'+c.fmt(o.monthlyGmv||0)+'</div><div class="rpt2-gmv-qty">'+(o.monthlyQty>0?(+o.monthlyQty.toFixed(1))+' '+(o.qu||''):'')+'</div></td>'+
           '<td class="rpt2-save"><div class="rpt2-save-amt">'+c.fmt(a.save)+'</div><div><span class="rpt2-save-pct'+(confHigh?' high':'')+'">−'+text(a.pct)+'%</span></div></td>'+
-          '<td class="rpt2-conf"><span class="rpt2-dot'+(confHigh?' rpt2-dot-hi':a.conf==='medium'?' rpt2-dot-med':' rpt2-dot-lo')+'"></span></td>'+
+          /* rpt2-conf td removed */
         '</tr>';
       }).join('');
       return catRow + itemRows;
