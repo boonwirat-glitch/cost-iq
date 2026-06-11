@@ -2681,10 +2681,10 @@ function echoExpand() {
     if (document.getElementById('adm-modal-bg')) return;
     const div = document.createElement('div');
     div.id = 'adm-modal-bg';
-    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000;padding:20px;display:none';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9000;padding:12px;display:none;box-sizing:border-box';
     div.onclick = e => { if (e.target === div) admCloseModal(); };
     div.innerHTML = `
-      <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:22px">
+      <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;padding:18px;box-sizing:border-box">
         <div style="font-size:15px;font-weight:600;color:var(--n900,#1C1C1E);margin-bottom:2px" id="adm-m-title">เพิ่ม Skill ใหม่</div>
         <div style="font-size:11px;color:var(--n400,#AEAEB2);margin-bottom:18px" id="adm-m-sub">กรอกข้อมูลแล้วกด บันทึก</div>
 
@@ -2704,11 +2704,15 @@ function echoExpand() {
         </div>
         <div style="margin-bottom:13px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">หลักการ (Principle)</div>
-          <textarea id="adm-f-principle" rows="2" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+          <textarea id="adm-f-principle" rows="3" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+        </div>
+        <div style="margin-bottom:13px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">การฝึก (Practice) <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— คั่นด้วย |</span></div>
+          <textarea id="adm-f-practice" rows="3" placeholder="FKT Value 3 ระดับ: สิ่งที่ซัพฯ ทุกเจ้ามี | สิ่งที่ FKT ทำได้ดีกว่า | สิ่งที่ FKT เท่านั้นมี" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:13px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">เกณฑ์ผ่าน (Pass Test)</div>
-          <textarea id="adm-f-pass" rows="2" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+          <textarea id="adm-f-pass" rows="3" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:15px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono',monospace">Echo Observable Hint <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
@@ -2760,6 +2764,7 @@ function echoExpand() {
     document.getElementById('adm-f-en').value = s ? (s.skill_name_en || '') : '';
     document.getElementById('adm-f-th').value = s ? (s.skill_name_th || '') : '';
     document.getElementById('adm-f-principle').value = s ? (s.principle_th || '') : '';
+    document.getElementById('adm-f-practice').value = s ? (s.practice_th || '') : '';
     document.getElementById('adm-f-pass').value = s ? (s.pass_test_th || '') : '';
     document.getElementById('adm-f-obs').value = s ? (s.echo_observable || '') : '';
     const cb = document.getElementById('adm-f-echo');
@@ -2791,6 +2796,7 @@ function echoExpand() {
       skill_name_en:  document.getElementById('adm-f-en').value.trim(),
       skill_name_th:  document.getElementById('adm-f-th').value.trim(),
       principle_th:   document.getElementById('adm-f-principle').value.trim(),
+      practice_th:    document.getElementById('adm-f-practice').value.trim(),
       pass_test_th:   document.getElementById('adm-f-pass').value.trim(),
       echo_observable:document.getElementById('adm-f-obs').value.trim(),
       echo_enabled:   document.getElementById('adm-f-echo').checked,
