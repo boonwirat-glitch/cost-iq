@@ -2421,13 +2421,13 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
 @keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 #echo-float-pill.visible{display:flex}
 #echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2.5px;height:14px}
-#echo-float-pill .fp-bar{width:4px;border-radius:2px 2px 1px 1px;background:var(--tk-ok-bright)}
+#echo-float-pill .fp-bar{width:3px;border-radius:3px;background:rgba(255,56,92,.45);transform-origin:bottom}
 #echo-float-pill .fp-bar:nth-child(1){height:5px;animation:echo-wa .6s steps(2,end) infinite}
 #echo-float-pill .fp-bar:nth-child(2){height:9px;animation:echo-wb .75s steps(2,end) infinite .08s}
 #echo-float-pill .fp-bar:nth-child(3){height:5px;animation:echo-wc .65s steps(2,end) infinite .15s}
 #echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
 #echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
-#echo-float-pill .fp-label{font-size:11px;font-weight:600;color:var(--tk-ok-bright);letter-spacing:.04em}
+#echo-float-pill .fp-label{display:none}
 #echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
 body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
 body.kam-mode .bnav .ni.nav-disabled{opacity:.28!important;pointer-events:none!important;}
@@ -5150,4 +5150,5 @@ body.sales-mode .bnav {
   border-top: none !important;
   box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
 }
+
 
