@@ -906,19 +906,32 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
 
     _setStep('กำลังวิเคราะห์...', 'Gemini · ฟัง audio + skill rubric', 35);
 
-    const res = await fetch(`${WORKER_URL}/analyze-audio`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        audio_b64: b64audio,
-        mime_type: mimeType,
-        prompt: _buildGeminiPrompt(),
-      })
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => res.status);
-      throw new Error(`Gemini ${res.status}: ${errText}`);
+    // Retry up to 3 times on 503/429 (Gemini overload) with exponential backoff
+    let res, lastErr;
+    const _payload = JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, prompt: _buildGeminiPrompt() });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) {
+          const delay = attempt === 2 ? 3000 : 7000; // 3s then 7s
+          _setStep(`กำลังลองใหม่... (${attempt}/3)`, 'Gemini · กำลังรอสักครู่', 35);
+          await new Promise(r => setTimeout(r, delay));
+        }
+        res = await fetch(`${WORKER_URL}/analyze-audio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: _payload,
+        });
+        if (res.ok) break; // success
+        const errText = await res.text().catch(() => String(res.status));
+        lastErr = new Error(`Gemini ${res.status}: ${errText}`);
+        if (res.status !== 503 && res.status !== 429) throw lastErr; // don't retry on other errors
+        res = null; // mark as failed, will retry
+      } catch(e) {
+        if (e.message && !e.message.startsWith('Gemini 503') && !e.message.startsWith('Gemini 429')) throw e;
+        lastErr = e;
+      }
     }
+    if (!res || !res.ok) throw lastErr || new Error('Gemini unavailable after 3 attempts');
     const data = await res.json();
     const raw = data?.text || data?.content?.[0]?.text || '';
     console.log('[CI Gemini raw]', raw.substring(0, 300));
