@@ -36,7 +36,7 @@
           '<polyline points="10 9 9 9 8 9"/>' +
         '</svg>' +
       '</span>' +
-      '<span class="icon-share" aria-hidden="true" style="display:none">' +
+      '<span class="icon-share" aria-hidden="true">' +
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>' +
           '<polyline points="16 6 12 2 8 6"/>' +
