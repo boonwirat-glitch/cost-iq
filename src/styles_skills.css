@@ -1766,7 +1766,7 @@
   position: relative;
   width: 100%;
   height: 100%;  /* JS overrides with window.innerHeight inline */
-  overflow: hidden;
+  overflow: visible;
   background: #111;
   isolation: isolate;
 }
@@ -1792,9 +1792,9 @@
 .s3-hero {
   position: relative;
   width: 100%;
-  height: 50%;
+  height: 55%;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
 }
 .s3-hero-img {
@@ -1846,17 +1846,18 @@
   position: absolute;
   bottom: 0; left: 0; right: 0;
   z-index: 5;
-  background: rgba(255,255,255,0.65);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  backdrop-filter: blur(28px) saturate(1.8);
-  border-radius: 24px 24px 0 0;
+  background: rgba(255,255,255,0.92);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  backdrop-filter: blur(32px) saturate(1.6);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18), 0 -2px 8px rgba(0,0,0,.08);
   transition: height .5s cubic-bezier(.32,.72,0,1),
               opacity .25s ease;
   overflow: hidden;
 }
 .s3-sheet-hidden   { height: 0 !important; opacity: 0 !important; overflow: hidden; transition: none !important; }
-.s3-sheet-peek     { height: 50%; opacity: 1; overflow: hidden; }
-.s3-sheet-expanded { height: calc(100% - 160px); opacity: 1; overflow-y: auto; }
+.s3-sheet-peek     { height: 58%; opacity: 1; overflow: hidden; }
+.s3-sheet-expanded { height: calc(100% - 120px); opacity: 1; overflow-y: auto; }
 
 /* Sheet handle */
 .s3-sheet-handle {
@@ -1904,9 +1905,8 @@
 .s3-body-full { display: none; }
 .s3-sheet-peek .s3-body-full { display: none; }
 .s3-sheet-expanded .s3-body-full { display: block; }
-.s3-sheet-expanded .s3-peek-title { display: none; }
-.s3-sheet-expanded .s3-peek-cta   { display: none; }
-.s3-sheet-expanded .s3-peek-hint  { display: none; }
+/* Peek static section: visible in peek, hidden in expanded (full body replaces it) */
+.s3-sheet-expanded .s3-peek-static { display: none; }
 
 /* Content stagger */
 .s3-sheet .sk-detail-body > * { animation: s3-fade-up .35s ease both; }
