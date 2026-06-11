@@ -935,7 +935,7 @@ async function _doOpenDetail(skillId) {
   ${def.practice_th ? `
   <div class="sk-rubric-block">
     <div class="sk-rubric-eye">Practice — ต้องทำอะไร</div>
-    <div class="sk-rubric-text">${(def.practice_th.includes('\n') ? def.practice_th.split('\n') : def.practice_th.split('|')).map(t => t.trim()).filter(Boolean).map(t => '• ' + t).join('<br>')}</div>
+    <div class="sk-rubric-text">${(def.practice_th.includes('\n') ? def.practice_th.split('\n') : def.practice_th.split('|')).map(t => t.trim()).filter(Boolean).map(t => t.startsWith('#') ? '<span style="font-weight:600;color:var(--sk-ink);display:block;margin-top:8px;margin-bottom:2px">' + t.slice(1).trim() + '</span>' : '<span style="display:block;padding-left:10px">• ' + t + '</span>').join('')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
