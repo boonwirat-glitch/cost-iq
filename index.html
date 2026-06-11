@@ -1,4 +1,4 @@
-<!-- Freshket Sense v535: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v536: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5628,7 +5628,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v535',
+      version: 'v536',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41547,9 +41547,25 @@ const CI = (() => {
       <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
     </div>
   </div>
-  <!-- stop button — only during recording -->
+  <!-- stop + cancel buttons — only during recording -->
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
-    <button id="ci-stop-btn" onclick="CI.stopRecording()" style="width:100%;padding:14px;border:none;border-radius:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;background:rgba(0,0,0,.05);color:#AEAEB2;border:0.5px solid rgba(0,0,0,.07);transition:background .7s ease,color .7s ease,border-color .7s ease">หยุด &amp; วิเคราะห์</button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button id="ci-stop-btn" onclick="CI.stopRecording()"
+        style="flex:1;padding:15px 0;border:none;border-radius:16px;font-size:15px;font-weight:500;cursor:pointer;
+               font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.01em;
+               background:rgba(255,56,92,.12);color:#FF385C;
+               border:0.5px solid rgba(255,56,92,.25);
+               transition:background .7s ease,color .7s ease,border-color .7s ease">
+        จบ &amp; วิเคราะห์
+      </button>
+      <button onclick="CI.cancel()"
+        style="width:44px;height:44px;flex-shrink:0;border:none;border-radius:14px;cursor:pointer;
+               background:rgba(255,255,255,.06);color:rgba(255,255,255,.35);
+               font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;
+               transition:background .7s ease,color .7s ease" title="ยกเลิก session">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
   </div>
   <!-- inline history panel — shown when tab=history -->
   <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px max(32px,calc(env(safe-area-inset-bottom,0px) + 80px));-webkit-overflow-scrolling:touch">
@@ -41613,24 +41629,26 @@ const CI = (() => {
   function _initWaveform() {
     const wf = document.getElementById('ci-wf');
     if (!wf) return;
-    // Build 11 bars — slow ambient wave, same style as float pill
-    for (let i = 0; i < 11; i++) {
+    const N = 13;
+    // Independent random phase offset per bar — true ripple, not synchronized movement
+    const phases = Array.from({length: N}, (_, i) => i * 0.72 + Math.random() * 0.5);
+    for (let i = 0; i < N; i++) {
       const b = document.createElement('div');
       b.className = 'ci-wb';
-      b.style.cssText = 'width:3px;border-radius:3px;transform-origin:bottom;background:rgba(255,56,92,.35);display:inline-block;margin:0 2px;transition:background .7s ease';
+      b.style.cssText = 'width:3px;border-radius:3px;transform-origin:bottom;background:rgba(255,56,92,.4);display:inline-block;margin:0 2.5px;transition:background .7s ease';
       wf.appendChild(b);
     }
     let t = 0;
-    // Heights pattern — creates natural wave feel without randomness
-    const baseH = [6,12,20,30,36,30,20,12,6,14,22];
     _waveRef = setInterval(() => {
-      t += 0.18;
+      t += 0.14;
       const bars = wf.querySelectorAll('.ci-wb');
       bars.forEach((b, i) => {
-        // Slow sinusoidal — ambient, not frantic
-        const h = baseH[i] * (0.45 + 0.55 * Math.abs(Math.sin(t + i * 0.55)));
+        // All bars same max height (32px), independent phase → every bar ripples visibly
+        const s = Math.abs(Math.sin(t + phases[i]));
+        const h = 6 + s * 26; // min 6px, max 32px — every bar moves meaningfully
+        const op = 0.28 + s * 0.52; // min 0.28, max 0.80
         b.style.height = h.toFixed(1) + 'px';
-        b.style.opacity = (0.3 + 0.4 * Math.abs(Math.sin(t * 0.7 + i * 0.4))).toFixed(2);
+        b.style.opacity = op.toFixed(2);
       });
     }, 80);
   }
@@ -43686,6 +43704,9 @@ ${summaryHtml}`;
     if (idleCenter) idleCenter.style.display = isRec ? 'none' : '';
     if (recActive)  { recActive.style.display  = isRec ? 'flex' : 'none'; }
     if (recBottom)  { recBottom.style.display   = isRec ? 'block' : 'none'; }
+    // Hide visit hero during recording — more focus on wave + timer
+    const visitHeroEl = document.getElementById('ci-visit-hero');
+    if (visitHeroEl) visitHeroEl.style.display = isRec ? 'none' : '';
 
     // Status label
     const rlbl = document.getElementById('ci-rlbl');
@@ -43705,6 +43726,7 @@ ${summaryHtml}`;
       sheet.style.background = '#111111';
       const tb = sheet.querySelector('.topbar');
       if (tb) { tb.style.background='rgba(255,255,255,.04)'; tb.style.borderColor='rgba(255,255,255,.06)'; }
+      _themeEl('ci-tval', 'color', 'rgba(255,255,255,.82)'); // timer visible on dark bg
       _themeEl('ci-rlbl',       'color', 'rgba(255,255,255,.25)');
       _themeEl('ci-topbar-left','color', 'rgba(255,255,255,.22)');
       _themeEl('ci-tab-pill',   'background', 'rgba(255,255,255,.1)');
@@ -43729,7 +43751,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,255,255,.08)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(255,255,255,.06)'; sb.style.color='rgba(255,255,255,.28)'; sb.style.borderColor='rgba(255,255,255,.08)'; }
+      if (sb) { sb.style.background='rgba(255,56,92,.18)'; sb.style.color='rgba(255,120,120,.9)'; sb.style.borderColor='rgba(255,56,92,.3)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='rgba(255,255,255,.1)'; tabRec.style.color='rgba(255,255,255,.4)'; tabRec.style.boxShadow='none'; }
@@ -43742,6 +43764,7 @@ ${summaryHtml}`;
       sheet.style.background = '#ffffff';
       const tbL = sheet.querySelector('.topbar');
       if (tbL) { tbL.style.background=''; tbL.style.borderColor=''; }
+      _themeEl('ci-tval', 'color', ''); // restore timer color
       _themeEl('ci-rlbl',       'color', 'var(--ac,#FF385C)');
       _themeEl('ci-topbar-left','color', 'var(--tx2,#636366)');
       // chip
@@ -43765,7 +43788,7 @@ ${summaryHtml}`;
       sheet.querySelectorAll('.ci-vh-dot-empty').forEach(d => d.style.background = 'rgba(255,56,92,.15)');
       // stop btn
       const sb = document.getElementById('ci-stop-btn');
-      if (sb) { sb.style.background='rgba(0,0,0,.05)'; sb.style.color='#AEAEB2'; sb.style.borderColor='rgba(0,0,0,.07)'; }
+      if (sb) { sb.style.background='rgba(255,56,92,.12)'; sb.style.color='#FF385C'; sb.style.borderColor='rgba(255,56,92,.25)'; }
       // tab bar
       const tabRec = document.getElementById('ci-tab-rec');
       if (tabRec) { tabRec.style.background='#fff'; tabRec.style.color='#1C1C1E'; tabRec.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'; }
@@ -43775,6 +43798,26 @@ ${summaryHtml}`;
       if (tabBar) tabBar.style.background = '';
     }
   }
+
+  // ── Visibility guard — PWA resume after screen lock ────────────────────────
+  // When page becomes visible again: if we think we're recording but MediaRecorder
+  // has stopped (iOS), show a recoverable error toast. Timer auto-corrects via Date.now().
+  (function _initVisibilityGuard() {
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState !== 'visible') return;
+      if (_phase !== 'recording') return;
+      // Timer display self-corrects (Date.now() diff), just force a UI tick
+      const el = document.getElementById('ci-tval');
+      if (el) {
+        _secs = Math.floor((Date.now() - _startTime) / 1000);
+        el.textContent = _fmt(_secs);
+      }
+      // Check if MediaRecorder is still alive
+      if (_recorder && _recorder.state === 'inactive') {
+        _toast('การบันทึกหยุดชั่วคราว — กด "จบ & วิเคราะห์" เพื่อวิเคราะห์เสียงที่มีอยู่');
+      }
+    });
+  })();
 
   function _themeEl(id, prop, val) {
     const el = document.getElementById(id);
@@ -43832,12 +43875,19 @@ ${summaryHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _histFilter, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
-function echoOpen() { CI.open(null); }
+function echoOpen() {
+  // Guard: if recording in progress, expand sheet instead of killing session
+  if (typeof CI !== 'undefined' && typeof CI._phase === 'function' && CI._phase() === 'recording') {
+    echoExpand();
+    return;
+  }
+  CI.open(null);
+}
 function echoHistory(accountId) {
   // Open Echo sheet on history tab for specific account
   CI.open(accountId || null);
