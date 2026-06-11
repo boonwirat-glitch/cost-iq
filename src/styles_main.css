@@ -2691,9 +2691,8 @@ body.kam-sense-active.sense-plan-expanded #sense-plan-section{display:flex;align
 .sps-cta{background:var(--tk-ok-500);border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,opacity .15s;box-shadow:0 2px 10px rgba(0,160,80,.4);margin-right:14px;}
 /* sps-cta-col: center wrapper — aligns icon with Sense nav button (col2 of bnav 3-col grid) */
 .sps-cta-col{display:flex;align-items:center;justify-content:center;}
-body.kam-sense-active.sense-plan-expanded .sps-info{grid-column:1/3!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta-col{grid-column:2/3!important;display:flex!important;align-items:center!important;justify-content:center!important;}
-body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:0!important;}
+/* sps-cta-col sits in col2 of 2-col grid, centres the button within the 52-54px cell */
+body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:0!important;align-self:center!important;}
 .sps-cta:active{transform:scale(.92);opacity:.85;}
 .sps-cta:active{opacity:.78;}
 /* Pill nav base */
@@ -3333,7 +3332,7 @@ body.kam-sense-active.kam-mode .bnav .ni .nwrap{margin:0 auto!important;}
 body.kam-sense-active.sense-plan-expanded #sense-plan-section{
   grid-column:1 / -1!important;
   display:grid!important;
-  grid-template-columns:1fr 1fr 1fr!important;
+  grid-template-columns:minmax(0,1fr) 54px!important;
   align-items:center!important;
   gap:12px!important;
   width:100%!important;
@@ -3397,7 +3396,7 @@ body.kam-sense-active.kam-mode .bnav .ni .nwrap{margin:0 auto!important;}
 #sense-plan-section{display:none!important;}
 body.kam-sense-active.sense-plan-expanded #sense-plan-section{
   grid-column:1 / -1!important;grid-row:1!important;
-  display:grid!important;grid-template-columns:1fr 1fr 1fr!important;
+  display:grid!important;grid-template-columns:minmax(0,1fr) 52px!important;
   align-items:center!important;gap:12px!important;width:100%!important;
   min-height:0!important;max-height:74px!important;
   padding:0 14px 10px 0!important;margin:0!important;
