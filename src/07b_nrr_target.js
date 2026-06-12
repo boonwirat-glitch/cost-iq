@@ -1209,6 +1209,9 @@ setTimeout(async function _tgtInitCheck() {
   await loadTargets(_tgtCurrentQuarter());
   renderPortviewTargetBar();
   renderPortviewNRRBar();
+  // v565: tiers just arrived — re-render commission strip (was stuck on default-tier
+  // numbers or loading skeleton until next refreshAll). Value guard inside prevents dup.
+  try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
   _tgtInjectAdminBtn();
   try{
     const tv=document.getElementById('scr-teamview');

@@ -197,12 +197,19 @@
     if(src.loading && st.email && typeof _fetchUpsellBundle==='function'){
       _fetchUpsellBundle(st.email).catch(function(){});
     }
-    var finalAmt=src.loading?null:src.final;
-    var paid=!src.loading&&finalAmt>0;
+    // v565 TIERS-READY GATE: NRR payout comes from commission_rule_tiers loaded by
+    // loadTargets(). Before _tgtLoaded, _commGetDraft falls back to hardcoded default
+    // tiers → strip showed e.g. ฿7,500 (default ≥102% tier) then snapped to ฿10,000
+    // (real DB tier ≥103%) — a money-trust violation. Treat tiers-not-ready as loading;
+    // _commGatedRender's 'กำลังโหลด' peek + _tgtInitCheck both retry once tiers arrive.
+    var _tiersReady=(typeof _tgtLoaded!=='undefined')?!!_tgtLoaded:true;
+    var _stripLoading=!!src.loading||!_tiersReady;
+    var finalAmt=_stripLoading?null:src.final;
+    var paid=!_stripLoading&&finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
-    var status=src.loading?'กำลังโหลด...':(st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11'));
-    var gateNote=(!src.loading&&src.gate_active)?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
-    var mainHtml=src.loading
+    var status=_stripLoading?'กำลังโหลด...':(st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11'));
+    var gateNote=(!_stripLoading&&src.gate_active)?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
+    var mainHtml=_stripLoading
       ?'<div class="skel" style="width:90px;height:28px;border-radius:6px;display:inline-block"></div>'
       :money(finalAmt);
     return '<div class="pv-comm-strip '+cls+'" data-v210k="1" onclick="_commOpenKamSelfSheet()" style="cursor:pointer">'

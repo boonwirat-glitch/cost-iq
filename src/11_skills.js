@@ -1539,10 +1539,10 @@ function skillsTLOpenRepDetail(userId) {
     </div>
   </div>
   <div class="sk-filter-row">
-    <span class="sk-fpill sk-fpill-on" id="fp-notyet" onclick="_skRepFilter(false,'${userId}')">ยังไม่ผ่าน</span>
-    <span class="sk-fpill" id="fp-all" onclick="_skRepFilter(true,'${userId}')">ดูทั้งหมด</span>
+    <span class="sk-fpill" id="fp-notyet" onclick="_skRepFilter(false,'${userId}')">ยังไม่ผ่าน</span>
+    <span class="sk-fpill sk-fpill-on" id="fp-all" onclick="_skRepFilter(true,'${userId}')">ดูทั้งหมด</span>
   </div>
-  <div class="sk-det-skill-list" id="rep-det-list">${renderList(false)}</div>
+  <div class="sk-det-skill-list" id="rep-det-list">${renderList(true)}</div>
   ${_buildEchoSparkSection(userId)}
 </div>`;
 }
