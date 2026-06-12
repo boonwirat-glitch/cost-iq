@@ -40,6 +40,14 @@ function _skMixWhite(hex, pct) {
     return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
   } catch(e) { return hex; }
 }
+// Unlock-state variant (locked → training → unlocked/mastered) — same hue logic
+window._skStateDotColor = function(skillCode, state) {
+  const mod = ((skillCode || '')[0] || '').toUpperCase();
+  const base = (MODULE_META[mod] && MODULE_META[mod].color) || '#8E8E93';
+  if (state === 'unlocked' || state === 'mastered') return base;
+  if (state === 'training') return _skMixWhite(base, 0.55);
+  return _skMixWhite(base, 0.85); // locked
+};
 window._skDotColor = function(skillCode, score) {
   const mod = ((skillCode || '')[0] || '').toUpperCase();
   const base = (MODULE_META[mod] && MODULE_META[mod].color) || '#8E8E93';
@@ -680,7 +688,7 @@ async function _renderTLVisitContent(container) {
   <div style="flex:1;min-width:0;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px;">
       <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rawName}</div>
-      ${acctTgt > 0 ? `<div style="font-size:9px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
+      ${acctTgt > 0 ? `<div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
     </div>
     <div style="height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
       <div style="height:100%;width:${qPct}%;background:${barColor};border-radius:2px;transition:width .3s;"></div>
@@ -688,7 +696,7 @@ async function _renderTLVisitContent(container) {
   </div>
   <div style="text-align:right;flex-shrink:0;min-width:28px;">
     <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono',monospace;line-height:1;">${d.thisWeek}</div>
-    <div style="font-size:8px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
+    <div style="font-size:10px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
   </div>
 </div>`;
     });
@@ -1289,7 +1297,7 @@ function _renderTLOverviewContent() {
 <div style="padding:12px 14px 0;display:flex;align-items:flex-end;justify-content:space-between;">
   <div>
     <div style="font-size:28px;font-weight:700;color:var(--sk-ink);letter-spacing:-.03em;line-height:1;">${unlocked}<span style="font-size:13px;font-weight:500;color:var(--sk-muted);">/${total}</span></div>
-    <div style="font-size:9px;color:var(--sk-muted);margin-top:2px;">ทีม unlock แล้ว</div>
+    <div style="font-size:10.5px;color:var(--sk-muted);margin-top:2px;">ทีม unlock แล้ว</div>
   </div>
   <div style="font-size:20px;font-weight:700;color:var(--sk-ac);">${pct}%</div>
 </div>
@@ -1526,7 +1534,7 @@ function skillsTLOpenRepDetail(userId) {
   <span class="sk-det-skill-mod">${code}</span>
   <span class="sk-det-skill-name">${d.skill_name_en}</span>
   <div class="sk-det-state" style="color:var(--sk-state-${s});">
-    <div class="sk-det-dot" style="background:var(--sk-state-${s});"></div>${SKILL_STATE_LABEL_TH[s]}
+    <div class="sk-det-dot" style="background:${window._skStateDotColor ? window._skStateDotColor(d.skill_code, s) : `var(--sk-state-${s})`};"></div>${SKILL_STATE_LABEL_TH[s]}
   </div>
   <svg style="width:12px;height:12px;opacity:.5;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
 </div>`;
@@ -1554,7 +1562,7 @@ function skillsTLOpenRepDetail(userId) {
         ${ringPct>0?`<circle cx="18" cy="18" r="15" fill="none" stroke="var(--sk-ac)" stroke-width="2.5"
           stroke-dasharray="94.25" stroke-dashoffset="${ringOff.toFixed(2)}" stroke-linecap="round"/>`:''}
       </svg>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
     </div>
   </div>
   <div class="sk-filter-row">
@@ -1585,7 +1593,7 @@ function _skRepFilter(all, userId) {
   <span class="sk-det-skill-mod">${code}</span>
   <span class="sk-det-skill-name">${d.skill_name_en}</span>
   <div class="sk-det-state" style="color:var(--sk-state-${s});">
-    <div class="sk-det-dot" style="background:var(--sk-state-${s});"></div>${SKILL_STATE_LABEL_TH[s]}
+    <div class="sk-det-dot" style="background:${window._skStateDotColor ? window._skStateDotColor(d.skill_code, s) : `var(--sk-state-${s})`};"></div>${SKILL_STATE_LABEL_TH[s]}
   </div>
   <svg style="width:12px;height:12px;opacity:.5;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
 </div>`;
@@ -1701,7 +1709,7 @@ function _buildEchoSparkSection(userId) {
     const d = new Date(day);
     return d.toLocaleDateString('th-TH', { day:'numeric', month:'short' });
   }).reverse().map(l =>
-    `<span style="font-size:8px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;flex:1;text-align:center;overflow:hidden">${l}</span>`
+    `<span style="font-size:9px;color:#8E8E93;font-family:'Noto Sans Thai',sans-serif;flex:1;text-align:center;overflow:hidden">${l}</span>`
   ).join('');
 
   return `

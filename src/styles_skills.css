@@ -337,11 +337,11 @@
   border-bottom: 2.5px solid #FFD700;
   background: var(--sk-surface);
 }
-.sk-card.state-mastered,
-.s2-grid .sk-card.state-mastered {
-  animation: none !important;   /* cancel sk-card-in so foil runs clean */
-  opacity: 1 !important;
-}
+/* v570: the old `animation:none !important` here killed the sk-card-in entry
+   fade for mastered cards — the user-reported missing micro-interaction. It was
+   added out of caution, but the foil/gleam animations run on ::before/::after of
+   .sk-card-img (a different element), so they never conflicted with the card's
+   entry animation. Mastered cards now fade in like every other state. */
 
 /* Foil layer — sits on top of image, blends via overlay */
 .state-mastered .sk-card-img::before {
@@ -1254,7 +1254,7 @@
   cursor: pointer;
 }
 .sk-det-skill-mod {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
@@ -1263,13 +1263,13 @@
 }
 .sk-det-skill-name {
   flex: 1;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-det-state {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -1280,7 +1280,7 @@
   gap: 4px;
 }
 .sk-det-dot {
-  width: 5px; height: 5px;
+  width: 7px; height: 7px;
   border-radius: 50%;
 }
 
