@@ -1050,6 +1050,12 @@ const CI = (() => {
     return `คุณคือ AI coach สำหรับ Freshket sales team
 ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร (ความยาว ${_durMin}:${String(_durSec).padStart(2,'0')} นาที — วิเคราะห์ให้ครบทั้งไฟล์ key_moments ต้องครอบคลุมถึงช่วงท้าย)${acctSection}
 
+🚫 กฎเหล็กป้องกัน hallucination (v579):
+1. ทุกอย่างที่รายงานต้องมาจาก "เสียงใน audio เท่านั้น" — ห้ามนำข้อความจากคำสั่งนี้ (เช่น "AI coach", "Freshket sales team", ชื่อ skill, ตัวอย่าง JSON) ไปรายงานว่าเป็นสิ่งที่ได้ยินเด็ดขาด
+2. ถ้าไม่แน่ใจว่าได้ยินคำไหนชัด ให้ละไว้ — ห้ามเดา ห้ามเติมเอง
+3. evidence ทุกชิ้นต้องอ้างจากคำพูดจริงใน audio — ถ้าไม่มีหลักฐานเสียงชัดเจน ให้ score เป็น "not_observed"
+4. ถ้าเสียงสั้นกว่า 30 วินาที หรือไม่มีบทสนทนาสองฝ่าย (มีแค่คนเดียวพูด/ทดสอบไมค์/เสียงรบกวน) → ตอบ no_speech:true ทันที
+
 ⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
 {"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "buyer_type": null, "buyer_evidence": null, "ocpb_covered": [], "ocpb_missing": [], "pain_points": [], "upsell_signals": [], "wallet_estimate": null, "wallet_logic": null, "next_actions": []}
 
@@ -1287,10 +1293,11 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
 
     // 2. Save skill log rows (all roles — Sales uses account_name fallback when no guid)
     if (skillData?.skills?.length) {
+      // v579: account_name removed — column ไม่มีใน kam_skill_log schema (เคยทำให้ 400 ทุกครั้ง)
+      // ชื่อร้านดูได้จาก ci_sessions ผ่าน ci_session_id อยู่แล้ว
       const rows = skillData.skills.map(s => ({
         kam_email: email,
         account_id: _accountGuid || null,
-        account_name: _accountName || null,
         session_date: today, skill_code: s.code,
         score: s.score,
         evidence_summary: s.evidence || s.evidence_summary || '',
