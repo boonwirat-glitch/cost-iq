@@ -1,4 +1,4 @@
-<!-- Freshket Sense v581: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v582: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5652,7 +5652,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v581',
+      version: 'v582',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -42570,7 +42570,7 @@ const CI = (() => {
 4. ถ้าเสียงสั้นกว่า 10 วินาที หรือมีแต่เสียงรบกวน/เสียงเงียบไม่มีคนพูดเลย → ตอบ no_speech:true ทันที (ถ้ามีเสียงคนพูดแม้คนเดียว ให้วิเคราะห์ปกติ)
 
 ⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
-{"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "buyer_type": null, "buyer_evidence": null, "ocpb_covered": [], "ocpb_missing": [], "pain_points": [], "upsell_signals": [], "wallet_estimate": null, "wallet_logic": null, "next_actions": []}
+{"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "ocpb_status": {"O": "not_asked", "C": "not_asked", "P": "not_asked", "B": "not_asked"}, "ocpb_facts": [], "next_actions": []}
 
 ถ้ามีเสียงคนพูด ทำ 3 อย่างในคำตอบเดียว:
 
@@ -42586,13 +42586,19 @@ TONE & EMOTION signals ที่ต้องสังเกต:
 - customer_engagement: ลูกค้า engage มากขึ้นหรือน้อยลงตลอด session?
 - key_moments: จุดไหนที่ dynamics เปลี่ยน เช่น ลูกค้า warm ขึ้น หรือ push back
 
-OCPB framework (customer intel):
-- O: Operation — วิธีทำงาน ปัญหา ops ประจำวัน
-- C: Competitor/Service/Price — ซัพเดิมคือใคร ปัญหาอะไร เปรียบราคา
-- P: Payment/Billing — credit term, billing cycle
-- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
+OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใช่ checklist:
+- O: Operation ของร้าน — จำนวนสาขา ครัวกลาง ใครเป็นคนสั่งของ วัน/เวลาสั่งและรับของ ปริมาณ ปัญหา ops
+- C: ซัพเดิม · ราคา · สินค้าที่ร้านใช้ — ซื้ออะไรจากเจ้าไหน ราคาที่จ่าย ปัญหากับซัพเดิม สินค้า/วัตถุดิบที่ใช้ประจำ
+- P: Payment · Billing — จ่ายแบบไหน (สด/โอน/เครดิต) credit term รอบบิล
+- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยนเมนู/concept ปรับธุรกิจ
 
-Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | Action=ต้องการผลเร็ว | Nurturing=ให้ความสำคัญ trust | Knowledge=ต้องการ expertise
+กฎการเก็บ fact (เข้มงวดเท่ากฎเหล็กด้านบน):
+- 1 fact = 1 ข้อมูลที่ได้ยินจริงใน audio พร้อม quote คำพูดตรง (ห้าม paraphrase ห้ามเรียบเรียงใหม่) + เวลาโดยประมาณรูปแบบ mm:ss
+- fact ที่เป็นปัญหา/ความไม่พอใจของลูกค้า → tag "pain_high" หรือ "pain_medium" ตามความรุนแรง
+- fact ที่เป็นโอกาสขาย (เช่น อยากได้เครดิต มีแผนเปิดสาขา สินค้าที่ยังขาด) → tag "opportunity"
+- fact ทั่วไป → tag null
+- มิติไหนไม่มีใครพูดถึง = ไม่เก็บ fact มิตินั้นเลย ห้ามแต่งเติมเด็ดขาด — array ว่างคือคำตอบที่ถูกต้อง
+- ocpb_status ต่อมิติ: "answered" (ได้ข้อมูลจากลูกค้า) | "asked_no_answer" (rep ถามแต่ลูกค้าเลี่ยง/ไม่ตอบ) | "not_asked" (ไม่มีใครแตะมิตินี้)
 
 ตอบ JSON เท่านั้น ไม่มี markdown ไม่มี preamble:
 {
@@ -42617,16 +42623,10 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
   "pipc_reached": "ขั้นตอนสูงสุดที่ rep ทำถึง",
   "overall": "strong|developing|needs_work",
   "session_summary": "สรุปภาพรวม skill 2-3 ประโยค จุดเด่น จุดที่ต้องพัฒนา",
-  "buyer_type": "Blueprint|Action|Nurturing|Knowledge",
-  "buyer_evidence": "หลักฐานจาก audio",
-  "ocpb_covered": ["O","C","P","B"],
-  "ocpb_missing": ["dimension ที่ยังไม่ถาม"],
-  "pain_points": [
-    {"dimension": "Quality|Price|Delivery|Completeness|Service|Credit", "severity": "high|medium|opportunity", "summary": "สรุป pain"}
+  "ocpb_status": {"O": "answered|asked_no_answer|not_asked", "C": "answered|asked_no_answer|not_asked", "P": "answered|asked_no_answer|not_asked", "B": "answered|asked_no_answer|not_asked"},
+  "ocpb_facts": [
+    {"dim": "O|C|P|B", "summary": "สรุปสั้น 1 ประโยค", "quote": "คำพูดตรงจาก audio", "ts": "mm:ss", "tag": "pain_high|pain_medium|opportunity|null"}
   ],
-  "upsell_signals": [{"category": "หมวดสินค้า", "evidence": "หลักฐาน"}],
-  "wallet_estimate": "hot|warm|cold",
-  "wallet_logic": "เหตุผล",
   "next_actions": [
     {"action": "สิ่งที่ต้องทำ", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "reason": "ทำไม"}
   ]
@@ -42747,15 +42747,11 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
       session_summary: parsed.session_summary || null,
     };
     const intelData = {
-      buyer_type:       parsed.buyer_type || null,
-      buyer_evidence:   parsed.buyer_evidence || null,
-      ocpb_covered:     parsed.ocpb_covered || [],
-      ocpb_missing:     parsed.ocpb_missing || [],
-      pain_points:      parsed.pain_points || [],
-      upsell_signals:   parsed.upsell_signals || [],
-      wallet_estimate:  parsed.wallet_estimate || null,
-      wallet_logic:     parsed.wallet_logic || null,
-      next_actions:     parsed.next_actions || [],
+      // v582: OCPB fact capture — แทน buyer_type/wallet/ocpb_covered/pain_points/upsell_signals
+      // (ตัด Wallet/BANK ออกเพราะไม่มี rubric ที่เชื่อถือได้ — user decision 12 มิ.ย. 69)
+      ocpb_status:  parsed.ocpb_status || null,
+      ocpb_facts:   Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
+      next_actions: parsed.next_actions || [],
     };
 
     return {
@@ -42961,57 +42957,57 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
   }
 
   function _customerPanel(d) {
-    const ocpbAll = ['O','C','P','B'];
-    const covered = d?.ocpb_covered || [];
-    const ocpbBar = ocpbAll.map(dim => {
-      const done = covered.includes(dim);
-      const label = {O:'Operation',C:'Competitor',P:'Payment',B:'Business'}[dim];
-      return `<div style="flex:1;text-align:center">
-        <div style="width:32px;height:32px;border-radius:8px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;background:${done?'rgba(255,56,92,.12)':'rgba(0,0,0,.04)'};color:${done?'var(--ac,#FF385C)':'var(--tx3,#AEAEB2)'}">${dim}</div>
-        <div style="font-size:9px;color:${done?'var(--ac,#FF385C)':'var(--tx3,#AEAEB2)'};font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;text-transform:uppercase">${label}</div>
+    // v582: OCPB fact capture — render facts ต่อมิติ พร้อม quote + timestamp + tag
+    const DIMS = [
+      ['O','Operation ของร้าน'],
+      ['C','ซัพเดิม · ราคา · สินค้า'],
+      ['P','Payment · Billing'],
+      ['B','Business Plan'],
+    ];
+    const TAGS = {
+      pain_high:   ['pain · high','rgba(255,59,48,.10)','#D70015'],
+      pain_medium: ['pain · med','rgba(255,149,0,.12)','#C93400'],
+      opportunity: ['โอกาส','rgba(52,199,89,.12)','#1A8A3A'],
+    };
+    const ST = {
+      answered:        ['ได้ข้อมูล','rgba(52,199,89,.12)','#1A8A3A'],
+      asked_no_answer: ['ถามแล้ว ไม่ได้คำตอบ','rgba(255,149,0,.12)','#C93400'],
+      not_asked:       ['ยังไม่แตะ','rgba(0,0,0,.05)','#AEAEB2'],
+    };
+    const facts  = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
+    const status = d?.ocpb_status || {};
+
+    const blocks = DIMS.map(([dim, label], i) => {
+      const fs = facts.filter(f => f && f.dim === dim);
+      const stKey = status[dim] || (fs.length ? 'answered' : 'not_asked');
+      const st = ST[stKey] || ST.not_asked;
+      const rows = fs.map(f => {
+        const tg = TAGS[f.tag];
+        const tagChip = tg
+          ? `<span style="background:${tg[1]};color:${tg[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;margin-right:6px;white-space:nowrap">${tg[0]}</span>`
+          : '';
+        const quote = (f.quote && String(f.quote).trim())
+          ? `<div style="font-size:11px;color:var(--tx3,#AEAEB2);line-height:1.55;margin-top:3px">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${f.ts}</span>` : ''}</div>`
+          : '';
+        return `<div style="padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.04)">
+          <div style="font-size:13px;color:var(--tx,#1C1C1E);line-height:1.5">${tagChip}${f.summary || '-'}</div>
+          ${quote}
+        </div>`;
+      }).join('');
+      const empty = fs.length ? '' :
+        `<div style="font-size:12px;color:var(--tx3,#AEAEB2);padding:6px 0">${stKey === 'asked_no_answer' ? 'rep ถามแล้ว แต่ยังไม่ได้คำตอบจากลูกค้า' : 'ไม่มีข้อมูลจาก session นี้'}</div>`;
+      return `<div style="${i > 0 ? 'border-top:0.5px solid var(--br,#E5E5EA);padding-top:14px;' : ''}margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px">
+          <div style="font-size:12px;font-weight:500;color:var(--tx,#1C1C1E)">${dim} — ${label}</div>
+          <span style="background:${st[1]};color:${st[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0">${st[0]}</span>
+        </div>
+        ${rows}${empty}
       </div>`;
     }).join('');
 
-    const painRows = (d?.pain_points||[]).map(p => {
-      const dc = p.severity==='high'?'hi':p.severity==='medium'?'md':'op';
-      return `<div class="pain-row">
-        <div class="pain-dot ${dc}"></div>
-        <div class="pain-body">
-          <div class="pain-dim">${p.dimension} · ${p.severity}</div>
-          <div class="pain-txt">${p.summary}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    const upsells = (d?.upsell_signals||[]).length
-      ? `<div class="eyebrow" style="margin-top:20px">Upsell Signals</div>` +
-        (d.upsell_signals||[]).map(u =>
-          `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--br,#E5E5EA)">
-            <div style="font-size:12px;font-weight:500;color:var(--ac,#FF385C);min-width:80px">${u.category}</div>
-            <div style="font-size:12px;color:var(--tx2,#636366);flex:1">${u.evidence}</div>
-          </div>`).join('')
-      : '';
-
-    const walletColor = d?.wallet_estimate==='hot'?'var(--danger,#FF3B30)':d?.wallet_estimate==='warm'?'var(--warning,#FF9500)':'var(--tx3,#AEAEB2)';
-
-    return `<div class="buyer-card">
-        <div class="buyer-icon-wrap" style="background:rgba(255,56,92,.08);border-radius:12px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <div style="font-size:11px;font-weight:500;color:var(--ac,#FF385C);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em">${({'Blueprint':'BPRT','Action':'ACT','Nurturing':'NUR','Knowledge':'KNOW'})[d?.buyer_type]||'--'}</div>
-        </div>
-        <div style="flex:1">
-          <div class="buyer-lbl">Buyer Type (BANK)</div>
-          <div class="buyer-type">${({'Blueprint':'Blueprint','Action':'Action','Nurturing':'Nurturing','Knowledge':'Knowledge'})[d?.buyer_type]||d?.buyer_type||'-'}</div>
-          <div class="buyer-ev">${d?.buyer_evidence||''}</div>
-        </div>
-        <div style="text-align:right;min-width:44px;max-width:60px;flex-shrink:0">
-          <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px">Wallet</div>
-          <div style="font-size:16px;font-weight:500;color:${walletColor}">${(d?.wallet_estimate||'-').toUpperCase()}</div>
-          <div style="font-size:9px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d?.wallet_logic||''}">${(d?.wallet_logic||'').slice(0,18)}</div>
-        </div>
-      </div>
-      <div class="eyebrow" style="margin-bottom:10px">Discovery Coverage (OCPB)</div>
-      <div style="display:flex;gap:8px;margin-bottom:20px">${ocpbBar}</div>
-      <div class="eyebrow">Pain Points</div>${painRows}${upsells}`;
+    return facts.length || Object.keys(status).length
+      ? blocks
+      : `<div style="padding:24px;text-align:center;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`;
   }
 
   function _actionsPanel(d) {
@@ -44110,18 +44106,72 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     // ── Tab 3: ลูกค้า — intel + next steps
     const _ciTxt = x => (typeof x === 'string') ? x : (x && (x.point || x.signal || x.text || x.action)) || '';
     const ci = s.customer_intel || {};
-    const buyerLine = ci.buyer_type
-      ? `<div class="sd2-iline"><span class="sd2-ik">Buyer</span><div class="sd2-iv">${ci.buyer_type}${ci.buyer_evidence?` <span class="sub">· ${ci.buyer_evidence}</span>`:''}</div></div>` : '';
-    const walletLine = ci.wallet_estimate
-      ? `<div class="sd2-iline"><span class="sd2-ik">Wallet</span><div class="sd2-iv">${ci.wallet_estimate}${ci.wallet_logic?` <span class="sub">· ${ci.wallet_logic}</span>`:''}</div></div>` : '';
-    const pains = (ci.pain_points||[]).map(p => `<div class="sd2-ipoint">${_ciTxt(p)}</div>`).filter(Boolean).join('');
-    const ups   = (ci.upsell_signals||[]).map(u => `<div class="sd2-ipoint">${_ciTxt(u)}</div>`).filter(Boolean).join('');
     const nexts = (s.next_actions||[]).map((a,i) =>
       `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><span>${_ciTxt(a)||a}</span></div>`).join('');
+
+    // v582: new shape — ocpb_facts (fact capture พร้อม quote+ts+tag)
+    const _hasFacts = Array.isArray(ci.ocpb_facts) && ci.ocpb_facts.length > 0;
+    const _hasStatus = ci.ocpb_status && typeof ci.ocpb_status === 'object';
+    let intelHtml = '';
+    if (_hasFacts || _hasStatus) {
+      const _DIMS = [['O','Operation ของร้าน'],['C','ซัพเดิม · ราคา · สินค้า'],['P','Payment · Billing'],['B','Business Plan']];
+      const _TAGS = {
+        pain_high:   ['pain · high','rgba(255,59,48,.10)','#D70015'],
+        pain_medium: ['pain · med','rgba(255,149,0,.12)','#C93400'],
+        opportunity: ['โอกาส','rgba(52,199,89,.12)','#1A8A3A'],
+      };
+      const _ST = {
+        answered:        ['ได้ข้อมูล','rgba(52,199,89,.12)','#1A8A3A'],
+        asked_no_answer: ['ถามแล้ว ไม่ได้คำตอบ','rgba(255,149,0,.12)','#C93400'],
+        not_asked:       ['ยังไม่แตะ','rgba(0,0,0,.05)','#AEAEB2'],
+      };
+      const _facts = Array.isArray(ci.ocpb_facts) ? ci.ocpb_facts : [];
+      const _stat  = ci.ocpb_status || {};
+      intelHtml = `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>` + _DIMS.map(([dim,label]) => {
+        const fs = _facts.filter(f => f && f.dim === dim);
+        const stKey = _stat[dim] || (fs.length ? 'answered' : 'not_asked');
+        const st = _ST[stKey] || _ST.not_asked;
+        if (!fs.length && stKey === 'not_asked') {
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.04)">
+            <span style="font-size:12px;color:#AEAEB2">${dim} — ${label}</span>
+            <span style="background:${st[1]};color:${st[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap">${st[0]}</span>
+          </div>`;
+        }
+        const rows = fs.map(f => {
+          const tg = _TAGS[f.tag];
+          const tagChip = tg ? `<span style="background:${tg[1]};color:${tg[2]};font-size:10px;font-weight:500;padding:1px 7px;border-radius:6px;margin-right:6px;white-space:nowrap">${tg[0]}</span>` : '';
+          const quote = (f.quote && String(f.quote).trim())
+            ? `<div style="font-size:11px;color:#AEAEB2;line-height:1.55;margin-top:2px">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${f.ts}</span>` : ''}</div>`
+            : '';
+          return `<div style="padding:5px 0 5px 14px">
+            <div style="font-size:13px;color:#1C1C1E;line-height:1.5">${tagChip}${f.summary || '-'}</div>${quote}
+          </div>`;
+        }).join('');
+        const emptyNote = fs.length ? '' : `<div style="font-size:11px;color:#AEAEB2;padding:4px 0 4px 14px">rep ถามแล้ว แต่ยังไม่ได้คำตอบ</div>`;
+        return `<div style="padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.04)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span style="font-size:12px;font-weight:500;color:#1C1C1E">${dim} — ${label}</span>
+            <span style="background:${st[1]};color:${st[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0">${st[0]}</span>
+          </div>
+          ${rows}${emptyNote}
+        </div>`;
+      }).join('');
+    } else {
+      // Legacy fallback — sessions ที่บันทึกก่อน v582 (buyer_type/wallet/pain_points/upsell_signals)
+      const buyerLine = ci.buyer_type
+        ? `<div class="sd2-iline"><span class="sd2-ik">Buyer</span><div class="sd2-iv">${ci.buyer_type}${ci.buyer_evidence?` <span class="sub">· ${ci.buyer_evidence}</span>`:''}</div></div>` : '';
+      const walletLine = ci.wallet_estimate
+        ? `<div class="sd2-iline"><span class="sd2-ik">Wallet</span><div class="sd2-iv">${ci.wallet_estimate}${ci.wallet_logic?` <span class="sub">· ${ci.wallet_logic}</span>`:''}</div></div>` : '';
+      const pains = (ci.pain_points||[]).map(p => `<div class="sd2-ipoint">${_ciTxt(p)}</div>`).filter(Boolean).join('');
+      const ups   = (ci.upsell_signals||[]).map(u => `<div class="sd2-ipoint">${_ciTxt(u)}</div>`).filter(Boolean).join('');
+      intelHtml = [
+        (buyerLine || walletLine) ? `<div class="sd2-lbl">ข้อมูลลูกค้า</div>${buyerLine}${walletLine}` : '',
+        pains ? `<div class="sd2-lbl">Pain Points</div>${pains}` : '',
+        ups ? `<div class="sd2-lbl">Upsell Signals</div>${ups}` : ''
+      ].join('');
+    }
     const pane3 = [
-      (buyerLine || walletLine) ? `<div class="sd2-lbl">ข้อมูลลูกค้า</div>${buyerLine}${walletLine}` : '',
-      pains ? `<div class="sd2-lbl">Pain Points</div>${pains}` : '',
-      ups ? `<div class="sd2-lbl">Upsell Signals</div>${ups}` : '',
+      intelHtml,
       nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : ''
     ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`;
 
