@@ -379,6 +379,7 @@ const CI = (() => {
   transform:translateY(100%);
   z-index:9999;
   padding-top:env(safe-area-inset-top,44px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -387,6 +388,10 @@ const CI = (() => {
   overflow:hidden;
   color:#1C1C1E!important;
 }
+/* v588: backstop — กันแถบขาว home indicator zone ตอน is-rec (dark mode)
+   sheet เปลี่ยน bg ผ่าน JS แต่ถ้า OS ยัง render ใต้ sheet ให้ body รับ */
+body.echo-active { background:#111111; }
+body:not(.echo-active) { background:unset; }
 #ci-fullsheet .topbar{
   background:transparent;
   border-bottom:0.5px solid rgba(0,0,0,.07);

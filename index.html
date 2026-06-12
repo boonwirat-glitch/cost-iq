@@ -1,4 +1,4 @@
-<!-- Freshket Sense v587: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v588: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5652,7 +5652,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v587',
+      version: 'v588',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41892,6 +41892,7 @@ const CI = (() => {
   transform:translateY(100%);
   z-index:9999;
   padding-top:env(safe-area-inset-top,44px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -41900,6 +41901,10 @@ const CI = (() => {
   overflow:hidden;
   color:#1C1C1E!important;
 }
+/* v588: backstop — กันแถบขาว home indicator zone ตอน is-rec (dark mode)
+   sheet เปลี่ยน bg ผ่าน JS แต่ถ้า OS ยัง render ใต้ sheet ให้ body รับ */
+body.echo-active { background:#111111; }
+body:not(.echo-active) { background:unset; }
 #ci-fullsheet .topbar{
   background:transparent;
   border-bottom:0.5px solid rgba(0,0,0,.07);
