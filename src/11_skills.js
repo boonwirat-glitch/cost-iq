@@ -29,6 +29,25 @@ const MODULE_META = {
 };
 
 // Module image placeholders (gradient bg per character identity)
+// ── v569 MODULE DOT SYSTEM (app-wide, user-approved direction) ──────────────
+// Every skill dot is hue-coded by its module (MODULE_META colors):
+//   pass → full module color · developing → soft tint · not observed → faint tint
+// Replaces uniform gray/orange/green dots everywhere; no skill-name labels needed.
+function _skMixWhite(hex, pct) {
+  try {
+    const n = parseInt(hex.slice(1), 16), r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+    const m = c => Math.round(c + (255 - c) * pct);
+    return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
+  } catch(e) { return hex; }
+}
+window._skDotColor = function(skillCode, score) {
+  const mod = ((skillCode || '')[0] || '').toUpperCase();
+  const base = (MODULE_META[mod] && MODULE_META[mod].color) || '#8E8E93';
+  if (score === 'pass') return base;
+  if (score === 'developing') return _skMixWhite(base, 0.55);
+  return _skMixWhite(base, 0.85);
+};
+
 const MODULE_BG = {
   A: 'linear-gradient(160deg,#FFD6E0 0%,#FFECD2 100%)',
   B: 'linear-gradient(160deg,#D4EDDA 0%,#F0F7DA 100%)',
@@ -1663,17 +1682,17 @@ function _buildEchoSparkSection(userId) {
     const dots = sessionDays.map(day => {
       const obs = bySession[day]?.find(r => r.skill_code === code);
       const sc  = obs?.ai_score || null;
-      const col = sc ? scoreCol(sc) : '#F2F2F7';
-      const opacity = sc ? '1' : '0.4';
-      return `<span style="width:8px;height:8px;border-radius:50%;background:${col};opacity:${opacity};flex-shrink:0;display:inline-block"></span>`;
+      // v569: module-hued dots — state encoded by tint, hue by module
+      const col = sc ? (typeof window._skDotColor==='function' ? window._skDotColor(code, sc) : scoreCol(sc)) : '#F2F2F7';
+      return `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>`;
     }).join('');
 
     const def = Array.isArray(_skillDefs) ? _skillDefs.find(d => d.skill_code === code || d.skill_code.startsWith(code + '_')) : null;
     const skillLabel = def ? (def.skill_name_th || def.skill_name_en || shortCode) : shortCode;
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #F7F7F7">
-  <span style="font-size:10px;font-weight:500;color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;min-width:0;flex:0 0 auto;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillLabel}</span>
+  <span style="font-size:11px;font-weight:500;color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillLabel}</span>
   <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
-  <span style="font-size:9px;font-weight:500;color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'Pass':latestScore==='developing'?'Developing':'—'}</span>
+  <span style="font-size:10px;font-weight:500;color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'ผ่าน':latestScore==='developing'?'กำลังพัฒนา':'—'}</span>
 </div>`;
   }).join('');
 
@@ -1692,15 +1711,14 @@ function _buildEchoSparkSection(userId) {
     <span style="font-size:11px;font-weight:600;color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.01em;">Echo Skill Trend</span>
     <span style="font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;">${sessions.length} sessions ล่าสุด</span>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:34px;">
+  <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:104px;">
     ${sessionLabels}
     <span style="min-width:52px;"></span>
   </div>
   ${sparkRows}
-  <div style="display:flex;gap:12px;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--sk-hairline,#EBEBEB);">
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#34C759;display:inline-block"></span>Pass</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#FF9500;display:inline-block"></span>Developing</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A)"><span style="width:7px;height:7px;border-radius:50%;background:#E5E5EA;display:inline-block"></span>Not observed</span>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--sk-hairline,#EBEBEB);">
+    ${['A','B','C','D'].map(m => `<span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:${MODULE_META[m].color};display:inline-block"></span>${MODULE_META[m].name.replace('The ','')}</span>`).join('')}
+    <span style="font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;margin-left:auto">สีเต็ม = ผ่าน · สีจาง = ยังไม่ผ่าน</span>
   </div>
 </div>`;
 }

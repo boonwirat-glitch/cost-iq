@@ -1793,10 +1793,13 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       const dateLabel = new Date(sess.session_date).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
 
       // Skill dots — prefer tl_override if exists
+      // v569 module dot system — hue by module, tint by state, codes on hover only
       const skillDots = sess.skills.map(sk => {
         const finalScore = sk.tl_override || sk.score;
-        const dc = finalScore==='pass'?'pass':finalScore==='developing'?'dev':'no';
-        return `<span class="hist-skill-dot"><span class="hsd ${dc}"></span>${sk.skill_code}</span>`;
+        const col = (typeof window._skDotColor === 'function')
+          ? window._skDotColor(sk.skill_code, finalScore)
+          : (finalScore==='pass'?'#34C759':finalScore==='developing'?'#FF9500':'#AEAEB2');
+        return `<span class="hist-skill-dot" title="${sk.skill_code}"><span class="hsd" style="background:${col};width:8px;height:8px"></span></span>`;
       }).join('');
 
       // Coaching notes from AI
@@ -2668,10 +2671,14 @@ ${whyHtml}
       const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
       const acctLabel = s.account_name || (portviewBulkData?.find(r=>(r.id||r.account_guid)===s.account_id)?.name) || s.account_id || '—';
       const skills = s.skill_scores?.skills || [];
-      const skillDots = skills.slice(0,6).map(sk => {
+      // v569 module dot system: hue = module, tint = state — no labels (they never fit)
+      const skillDots = skills.slice(0,10).map(sk => {
+        const code = sk.code || sk.skill_code || '';
         const sc = sk.tl_override || sk.score;
-        const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
-        return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:var(--mono,'Noto Sans Thai',monospace)"><span style="width:5px;height:5px;border-radius:50%;background:${col};flex-shrink:0"></span>${sk.code||sk.skill_code||''}</span>`;
+        const col = (typeof window._skDotColor === 'function')
+          ? window._skDotColor(code, sc)
+          : (sc==='pass'?'#34C759':sc==='developing'?'#FF9500':'#E5E5EA');
+        return `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block" title="${code}"></span>`;
       }).join('');
       const actions = (s.next_actions||[]).slice(0,2).map(a=>
         `<span style="font-size:10px;color:var(--ac,#FF385C);background:rgba(255,56,92,.07);padding:3px 8px;border-radius:6px;font-weight:500">${a.action||a}</span>`
@@ -2681,23 +2688,25 @@ ${whyHtml}
       // TL coaching note — purple dot indicator + read-only note (rep sees this)
       const hasTLNote = !!(s.tl_note && s.tl_note.trim());
       const tlNoteDot = hasTLNote
-        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#534AB7;font-family:'Noto Sans Thai',sans-serif">` +
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:500;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">` +
           `<span style="width:5px;height:5px;border-radius:50%;background:#534AB7;flex-shrink:0"></span>TL note</span>` : '';
+      // v569: boxed style replaced with hairline-quote — matches Skills/Echo design
+      // language (hairline accents over filled boxes) instead of the generic look
       const tlNoteHtml = hasTLNote
-        ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(83,74,183,.06);border-radius:8px;border:0.5px solid rgba(83,74,183,.16)">` +
-          `<div style="font-size:9px;font-weight:500;letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px">TL NOTE</div>` +
-          `<div style="font-size:11px;color:#3D3680;line-height:1.6;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
+        ? `<div style="margin-top:8px;padding:2px 0 2px 10px;border-left:2px solid rgba(83,74,183,.35)">` +
+          `<div style="font-size:10px;font-weight:600;letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:2px">TL NOTE</div>` +
+          `<div style="font-size:13px;color:#48484A;line-height:1.65;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
       // Co-visit badge — shown when TL has verified proximity
       const cvDot = s.covisit_verified
         ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif">` +
           `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>` : '';
       return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${titleLeft}</span>
-          <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;font-weight:600;color:var(--tx,#1C1C1E);min-width:0;padding-right:8px">${titleLeft}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap">
             ${cvDot}
             ${tlNoteDot}
-            <span style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${titleRight}</span>
+            <span style="font-size:11px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${titleRight}</span>
           </div>
         </div>
         ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${(actions||hasTLNote)?'8px':'0'}">${skillDots}</div>` : ''}
