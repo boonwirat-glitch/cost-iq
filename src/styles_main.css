@@ -45,7 +45,12 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 #spl-ticker{transition:opacity .18s ease}
 
 /* ── TOPBAR ── */
-.topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + constant(safe-area-inset-top));padding-top:calc(11px + env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+/* v573: PWA standalone — iOS โหมด standalone ต้อง pad status bar เสมอ
+   display-mode media query จับเฉพาะตอนเปิดจาก Home Screen · 47px = status bar ต่ำสุดบน notch iPhone */
+@media all and (display-mode: standalone) {
+  .topbar{padding-top:max(calc(11px + env(safe-area-inset-top, 0px)), 47px);}
+}
 .logo{color:#fff;font-weight:700;font-size:17px;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .logo-box{width:28px;height:28px;border-radius:7px;overflow:hidden;background:transparent}
 .logo-box img{width:28px;height:28px;object-fit:cover;display:block;border-radius:7px}
@@ -3408,8 +3413,9 @@ body.kam-sense-active.sense-plan-expanded #swipe-grp-b .scr.on{
 body.kam-sense-active #scr-opportunities .sec{padding-bottom:104px!important;}
 body.kam-sense-active.sense-plan-expanded #scr-opportunities .sec{padding-bottom:174px!important;}
 body.kam-sense-active.kam-mode .bnav{
-  left:50%!important;right:auto!important;transform:translateX(-50%)!important;
-  width:calc(100% - 32px)!important;max-width:408px!important;
+  /* v573: no-transform centering — iOS fixed+transform scroll bug */
+  left:16px!important;right:16px!important;transform:none!important;
+  width:auto!important;max-width:408px!important;margin:0 auto!important;
   bottom:calc(10px + env(safe-area-inset-bottom))!important;
   display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:1fr!important;
   height:72px!important;min-height:0!important;
@@ -3933,12 +3939,12 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   .tv-payout-pill{min-width:96px!important;justify-content:center!important;padding:7px 14px!important;font-size:12px!important;border-radius:999px!important;}
   .tv-nrr-pill{padding:6px 12px!important;border-radius:999px!important;font-size:12px!important;}
   .tv-card-exclude{display:none!important;}
-  /* v571: KAM/TL only — floating pill style (dark glass, centered, lifted from bottom)
-     ไม่ apply กับ sales-mode เพราะ iOS Safari scroll bug:
-     position:fixed + transform + backdrop-filter = nav เลื่อนตาม scroll */
-  body:not(.sales-mode) .bnav{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:calc(100% - 32px)!important;max-width:392px!important;border-radius:36px!important;bottom:14px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;}
-  /* v571: Sales nav — ไม่มี transform, stick to bottom ปกติ ป้องกัน iOS Safari scroll bug */
-  body.sales-mode .bnav{left:0!important;right:0!important;transform:none!important;width:100%!important;max-width:440px!important;margin:0 auto!important;border-radius:0!important;bottom:0!important;}
+  /* v573: floating pill ทุก mode — centering ด้วย left/right + margin:auto (ไม่ใช้ transform)
+     iOS Safari/WKWebView bug: position:fixed + transform = nav เลื่อนตาม scroll
+     left:16px + right:16px + margin:0 auto + max-width ให้ผลตรงกลางเหมือน translateX(-50%) แต่ fixed ทำงานจริง */
+  body:not(.sales-mode) .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;padding-bottom:8px!important;}
+  /* v573: Sales floating pill — ขาว frosted, ลอยเหนือ bottom + safe area, ไม่มี transform */
+  body.sales-mode .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;padding-bottom:8px!important;}
 }
 @media (max-width: 370px){
   #scr-teamview #tv-action-btns{gap:5px!important;}
@@ -5076,8 +5082,7 @@ body.sales-mode.kam-mode .bnav {
   -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255,255,255,.5) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
-  border-top: none !important;
-  border-radius: 999px !important;
+  border-radius: 36px !important; /* v573: match floating pill radius */
 }
 
 /* Nav icons: inactive = dark muted, active = rausch */
@@ -5148,24 +5153,24 @@ body.sales-mode .bnav .ni[onclick*="Save"],
 body.sales-mode .bnav .ni[onclick*="save"],
 body.sales-mode .bnav #nav-save-btn { display: none !important; }
 
-/* Nav glass effect in sales-mode (frosted white, stuck to bottom)
-   v571: transform:none explicit เพื่อกัน iOS Safari scroll bug
-   (position:fixed + transform = nav เลื่อนกับ body scroll บน iOS Safari) */
+/* Sales nav — floating frosted white pill (v573)
+   ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
+   position:fixed + transform = nav เลื่อนตาม scroll) · centering ด้วย left/right+margin */
 body.sales-mode .bnav {
-  left: 0 !important;
-  right: 0 !important;
+  left: 16px !important;
+  right: 16px !important;
   transform: none !important;
-  width: 100% !important;
-  max-width: 440px !important;
+  width: auto !important;
+  max-width: 392px !important;
   margin: 0 auto !important;
-  bottom: 0 !important;
-  border-radius: 0 !important;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  border-radius: 36px !important;
+  padding-bottom: 8px !important;
   background: rgba(255,255,255,0.92) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
-  border: none !important;
-  border-top: 1px solid rgba(0,0,0,.06) !important;
-  box-shadow: 0 -1px 0 rgba(0,0,0,.06), 0 -4px 20px rgba(0,0,0,.08) !important;
+  border: 1px solid rgba(0,0,0,.07) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.8) !important;
 }
 
 
