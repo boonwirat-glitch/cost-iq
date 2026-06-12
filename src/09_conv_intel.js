@@ -2283,6 +2283,64 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
 .sd-review-btn:active { opacity:.8; }
 .sd-review-btn.done { background:#34C759; }
 .sd-review-footer { padding:12px 20px 32px;flex-shrink:0;border-top:0.5px solid #E5E5EA; }
+/* ── v568 redesign (approved mockup): readable type scale + tabs + collapsible states ── */
+.sd2-name { font-size:17px;font-weight:600;color:#1C1C1E;letter-spacing:-.02em; }
+.sd2-meta { font-size:13px;color:#48484A;margin-top:3px;line-height:1.55; }
+.sd2-chips { display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap; }
+.sd2-chip { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;letter-spacing:.01em; }
+.sd2-chip svg { flex-shrink:0; }
+.sd2-chip.bad { color:#C73E3E;background:rgba(255,59,48,.08); }
+.sd2-chip.dev { color:#B26A00;background:rgba(255,149,0,.09); }
+.sd2-chip.good { color:#1F8A43;background:rgba(52,199,89,.09); }
+.sd2-chip.cv { color:#34C759;background:rgba(52,199,89,.07); }
+.sd2-chip.rev { color:#534AB7;background:rgba(83,74,183,.07); }
+.sd2-whywrap { position:relative;margin-top:10px; }
+.sd2-why { font-size:13.5px;color:#48484A;line-height:1.7;padding:12px 38px 12px 14px;background:#F7F7F8;border-radius:12px;transition:all .2s; }
+.sd2-why.collapsed { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+.sd2-whytg { position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8E8E93;transition:transform .2s; }
+.sd2-whytg.flip { transform:rotate(180deg); }
+.sd2-tabs { display:flex;gap:4px;margin-top:16px;background:#F7F7F8;border-radius:12px;padding:4px; }
+.sd2-tab { flex:1;text-align:center;font-size:13.5px;font-weight:600;color:#8E8E93;padding:9px 0;border-radius:9px;cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent; }
+.sd2-tab.on { background:#FFF;color:#1C1C1E;box-shadow:0 1px 4px rgba(0,0,0,.07); }
+.sd2-pane { display:none;padding-top:16px; }
+.sd2-pane.on { display:block;animation:sd2fade .22s ease; }
+@keyframes sd2fade { from { opacity:0;transform:translateY(4px); } to { opacity:1;transform:none; } }
+.sd2-lbl { font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8E8E93;margin:18px 0 10px;font-family:'Noto Sans Thai',sans-serif; }
+.sd2-lbl:first-child { margin-top:0; }
+.sd2-tone { display:flex;gap:10px; }
+.sd2-tcard { flex:1;padding:13px 14px;background:#F7F7F8;border-radius:12px; }
+.sd2-tcard .k { font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8E8E93; }
+.sd2-tcard .v { font-size:15px;font-weight:600;margin-top:4px; }
+.sd2-tcard .n { font-size:12.5px;color:#48484A;margin-top:4px;line-height:1.6; }
+.sd2-sum { font-size:14px;color:#1C1C1E;line-height:1.8;padding:14px 16px;background:rgba(255,56,92,.03);border:0.5px solid rgba(255,56,92,.1);border-radius:12px; }
+.sd2-srow { display:flex;gap:12px;padding:13px 0;border-bottom:0.5px solid #ECECF0; }
+.sd2-srow:last-child { border:none; }
+.sd2-sdot { width:8px;height:8px;border-radius:50%;margin-top:7px;flex-shrink:0; }
+.sd2-scode { font-family:var(--mono,'IBM Plex Mono',monospace);font-size:10px;font-weight:500;color:#8E8E93;letter-spacing:.04em; }
+.sd2-sname { font-size:14px;font-weight:600;color:#1C1C1E;margin-top:1px; }
+.sd2-sev { font-size:13.5px;color:#48484A;line-height:1.7;margin-top:4px; }
+.sd2-snote { font-size:13px;color:#C73E3E;line-height:1.65;margin-top:5px;padding-left:10px;border-left:2px solid rgba(255,59,48,.2); }
+.sd2-sstate { margin-left:auto;flex-shrink:0;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;height:fit-content;white-space:nowrap; }
+.sd2-sstate.no { color:#8E8E93;background:#F7F7F8; }
+.sd2-sstate.dev { color:#B26A00;background:rgba(255,149,0,.08); }
+.sd2-sstate.ok { color:#1F8A43;background:rgba(52,199,89,.08); }
+.sd2-iline { display:flex;gap:12px;padding:11px 0;border-bottom:0.5px solid #ECECF0; }
+.sd2-iline:last-child { border:none; }
+.sd2-ik { flex-shrink:0;width:64px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8E8E93;padding-top:3px; }
+.sd2-iv { font-size:14px;color:#1C1C1E;line-height:1.7; }
+.sd2-iv .sub { color:#48484A;font-size:13px; }
+.sd2-ipoint { display:flex;gap:9px;padding:7px 0;font-size:14px;color:#1C1C1E;line-height:1.7; }
+.sd2-ipoint::before { content:'';width:5px;height:5px;border-radius:50%;background:var(--ac,#FF385C);margin-top:9px;flex-shrink:0; }
+.sd2-next { display:flex;gap:10px;padding:11px 13px;background:rgba(83,74,183,.03);border:0.5px solid rgba(83,74,183,.12);border-radius:11px;margin-bottom:8px;font-size:14px;color:#1C1C1E;line-height:1.65; }
+.sd2-next .num { font-family:var(--mono,'IBM Plex Mono',monospace);font-size:11px;font-weight:500;color:#534AB7;padding-top:3px;flex-shrink:0; }
+.sd2-notebar { display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent; }
+.sd2-notebar .t { flex:1;min-width:0;font-size:13.5px;font-weight:600;color:#534AB7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.sd2-notebar .t .pv { font-weight:400;color:#48484A; }
+.sd2-notebar .ch { color:#8E8E93;transition:transform .2s;flex-shrink:0; }
+.sd2-notebar.open .ch { transform:rotate(180deg); }
+.sd2-note-editor { display:none;padding:0 16px 4px; }
+.sd2-note-editor.open { display:block;animation:sd2fade .2s ease; }
+.sd2-note-ro { font-size:13.5px;color:#3D3680;line-height:1.7;padding:11px 13px;background:rgba(83,74,183,.05);border:0.5px solid rgba(83,74,183,.16);border-radius:11px;margin-bottom:4px; }
       `;
       document.head.appendChild(s);
     }
@@ -2328,6 +2386,10 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   }
 
   function _renderSessionDetailContent(s) {
+    // v568 redesign (user-approved mockup): chips verdict header + collapsible
+    // summary + segmented tabs (ภาพรวม/ทักษะ/ลูกค้า) + collapsed-by-default
+    // coaching-note footer. Readable type scale: body 14px/1.7+, ink #1C1C1E,
+    // secondary #48484A; #8E8E93 reserved for labels only; mono only for codes.
     const body   = document.getElementById('sd-body-inner');
     const footer = document.getElementById('sd-review-footer');
     if (!body) return;
@@ -2337,157 +2399,177 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
     const date      = new Date(s.visited_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
     const dur       = s.duration_secs ? _fmt(s.duration_secs) : '—';
     const reviewed  = !!s.tl_reviewed_at;
+    const reviewedDate = reviewed
+      ? new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short' })
+      : null;
 
-    // ── Tone section
+    // ── Verdict chip (replaces raw NEEDS_WORK label)
+    const overall = s.skill_scores?.overall;
+    const vMap = { needs_work:['ต้องปรับปรุง','bad'], developing:['กำลังพัฒนา','dev'], strong:['ทำได้ดี','good'] };
+    const v = vMap[overall] || null;
+    const verdictChip = v ? `<span class="sd2-chip ${v[1]}">${v[0]}</span>` : '';
+    const cvChip = s.covisit_verified
+      ? `<span class="sd2-chip cv" id="sd-cv-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>`
+      : `<span id="sd-cv-badge" style="display:none"></span>`;
+    const revChip = reviewed
+      ? `<span class="sd2-chip rev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>รีวิวแล้ว ${reviewedDate}</span>` : '';
+
+    // ── Collapsible summary (session_summary) — expanded by default, toggleable
+    const whyTxt = s.skill_scores?.session_summary || '';
+    const whyHtml = whyTxt ? `
+<div class="sd2-whywrap">
+  <div class="sd2-why" id="sd2-why">${whyTxt}</div>
+  <div class="sd2-whytg" id="sd2-whytg" onclick="CI._sdToggleWhy()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </div>
+</div>` : '';
+
+    // ── Tab 1: ภาพรวม — tone + transcript summary + key moments
+    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ' };
+    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง' };
     let toneHtml = '';
+    let momentsHtml = '';
     if (s.tone_signals) {
       const t = s.tone_signals;
       const cConf = t.rep_confidence==='high'?'#34C759':t.rep_confidence==='medium'?'#FF9500':'#FF3B30';
       const cEng  = t.customer_engagement==='increasing'?'#34C759':t.customer_engagement==='stable'?'#FF9500':'#FF3B30';
-      const moments = (t.key_moments||[]).map(m =>
-        `<div style="font-size:11px;color:#636366;padding:5px 0;border-bottom:0.5px solid #F2F2F7;line-height:1.5">${m}</div>`
-      ).join('');
       toneHtml = `
-<div class="sd-section-hd">Tone & Energy</div>
-<div class="sd-tone-row">
-  <div class="sd-tone-card">
-    <div class="sd-tone-label">Sales confidence</div>
-    <div class="sd-tone-val" style="color:${cConf}">${t.rep_confidence||'—'}</div>
-    <div class="sd-tone-note">${t.rep_confidence_note||''}</div>
-  </div>
-  <div class="sd-tone-card">
-    <div class="sd-tone-label">Customer engagement</div>
-    <div class="sd-tone-val" style="color:${cEng}">${t.customer_engagement||'—'}</div>
-    <div class="sd-tone-note">${t.customer_engagement_note||''}</div>
-  </div>
-</div>
-${moments ? `<div class="sd-section-hd">Key Moments</div>${moments}` : ''}`;
+<div class="sd2-lbl">Tone &amp; Energy</div>
+<div class="sd2-tone">
+  <div class="sd2-tcard"><div class="k">Sales Confidence</div><div class="v" style="color:${cConf}">${thaiConf[t.rep_confidence]||t.rep_confidence||'—'}</div><div class="n">${t.rep_confidence_note||''}</div></div>
+  <div class="sd2-tcard"><div class="k">Customer Engagement</div><div class="v" style="color:${cEng}">${thaiEng[t.customer_engagement]||t.customer_engagement||'—'}</div><div class="n">${t.customer_engagement_note||''}</div></div>
+</div>`;
+      const moments = (t.key_moments||[]).map(m => `<div class="sd2-ipoint">${m}</div>`).join('');
+      if (moments) momentsHtml = `<div class="sd2-lbl">Key Moments</div>${moments}`;
     }
+    const summaryHtml = s.transcript_summary
+      ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${s.transcript_summary}</div>` : '';
+    const pane1 = `${toneHtml}${summaryHtml}${momentsHtml}` ||
+      `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มีข้อมูลภาพรวม</div>`;
 
-    // ── Skills section
+    // ── Tab 2: ทักษะ
     const skills = s.skill_scores?.skills || [];
+    const stMap = { pass:['ทำได้ดี','ok','#34C759'], developing:['กำลังพัฒนา','dev','#FF9500'], not_applicable:['N/A','no','#D1D1D6'] };
     const skillRows = skills.map(sk => {
       const sc  = sk.tl_override || sk.score;
-      const col = sc==='pass'?'#34C759':sc==='developing'?'#FF9500':'#E5E5EA';
-      const bl  = sc==='pass'?'Pass':sc==='developing'?'Developing':sc==='not_applicable'?'N/A':'Not observed';
-      const ev  = sk.evidence && sk.evidence!=='-' ? `<div class="sd-skill-ev">${sk.evidence}</div>` : '';
-      const note= sk.coaching_note && sk.coaching_note!=='-' ? `<div class="sd-skill-note">${sk.coaching_note}</div>` : '';
-      return `<div class="sd-skill-row">
-  <div class="sd-skill-dot" style="background:${col}"></div>
+      const st  = stMap[sc] || ['ไม่พบ','no','#D1D1D6'];
+      const ev  = sk.evidence && sk.evidence!=='-' ? `<div class="sd2-sev">${sk.evidence}</div>` : '';
+      const note= sk.coaching_note && sk.coaching_note!=='-' ? `<div class="sd2-snote">${sk.coaching_note}</div>` : '';
+      return `<div class="sd2-srow">
+  <span class="sd2-sdot" style="background:${st[2]}"></span>
   <div style="flex:1;min-width:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <span class="sd-skill-name">${sk.code||sk.skill_code||''} · ${sk.name||''}</span>
-      <span style="font-size:9px;font-weight:500;color:${col};font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">${bl}</span>
-    </div>
+    <div class="sd2-scode">${sk.code||sk.skill_code||''}</div>
+    <div class="sd2-sname">${sk.name||''}</div>
     ${ev}${note}
   </div>
+  <span class="sd2-sstate ${st[1]}">${st[0]}</span>
 </div>`;
     }).join('');
+    const pane2 = skillRows ||
+      `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มีการประเมินทักษะใน session นี้</div>`;
 
-    // ── Transcript summary
-    const summaryHtml = s.transcript_summary
-      ? `<div class="sd-section-hd">สรุปบทสนทนา</div><div class="sd-summary">${s.transcript_summary}</div>`
-      : '';
-
-    // ── v566: Customer intel (ข้อมูลลูกค้า) — query always fetched this, it was
-    // simply never rendered. Both TL and rep see it.
-    const _ciTxt = v => (typeof v === 'string') ? v : (v && (v.point || v.signal || v.text || v.action)) || '';
-    let intelHtml = '';
-    const ci = s.customer_intel;
-    if (ci && (ci.buyer_type || (ci.pain_points||[]).length || (ci.upsell_signals||[]).length || ci.wallet_estimate)) {
-      const _ln = (k, v) => `<div style="display:flex;gap:8px;font-size:12px;line-height:1.65;font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px"><span style="flex-shrink:0;font-size:10px;font-weight:600;color:#AEAEB2;letter-spacing:.06em;text-transform:uppercase;padding-top:2px;min-width:46px">${k}</span><span style="color:#1C1C1E">${v}</span></div>`;
-      const _sub = t => `<div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:8px 0 4px">${t}</div>`;
-      const _row = t => `<div style="font-size:12px;color:#1C1C1E;line-height:1.65;font-family:'Noto Sans Thai',sans-serif">· ${t}</div>`;
-      const pains = (ci.pain_points||[]).map(p => _row(_ciTxt(p))).filter(Boolean).join('');
-      const ups   = (ci.upsell_signals||[]).map(u => _row(_ciTxt(u))).filter(Boolean).join('');
-      intelHtml = `<div class="sd-section-hd">ข้อมูลลูกค้า</div>
-<div style="padding:10px 12px;background:rgba(0,0,0,.025);border-radius:10px;margin-bottom:4px">
-  ${ci.buyer_type ? _ln('Buyer', ci.buyer_type + (ci.buyer_evidence ? ' · ' + ci.buyer_evidence : '')) : ''}
-  ${ci.wallet_estimate ? _ln('Wallet', ci.wallet_estimate + (ci.wallet_logic ? ' · ' + ci.wallet_logic : '')) : ''}
-  ${pains ? _sub('Pain Points') + pains : ''}
-  ${ups ? _sub('Upsell Signals') + ups : ''}
-</div>`;
-    }
-
-    // ── v566: Next steps
-    const nextHtml = (s.next_actions || []).length
-      ? `<div class="sd-section-hd">Next Steps</div><div style="padding:2px 0 4px">` +
-        s.next_actions.map(a => `<div style="font-size:12px;color:#1C1C1E;line-height:1.7;font-family:'Noto Sans Thai',sans-serif">→ ${_ciTxt(a) || a}</div>`).join('') +
-        `</div>`
-      : '';
-
-    // ── Overall
-    const overall = s.skill_scores?.overall;
-    const overallCol = overall==='strong'?'#34C759':overall==='developing'?'#FF9500':'#FF3B30';
-    const overallHtml = overall
-      ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:11px;font-weight:500;color:${overallCol}">${overall.toUpperCase()}</span>
-          <span style="font-size:10px;color:#AEAEB2">· ${s.skill_scores?.session_summary||''}</span>
-        </div>`
-      : '';
+    // ── Tab 3: ลูกค้า — intel + next steps
+    const _ciTxt = x => (typeof x === 'string') ? x : (x && (x.point || x.signal || x.text || x.action)) || '';
+    const ci = s.customer_intel || {};
+    const buyerLine = ci.buyer_type
+      ? `<div class="sd2-iline"><span class="sd2-ik">Buyer</span><div class="sd2-iv">${ci.buyer_type}${ci.buyer_evidence?` <span class="sub">· ${ci.buyer_evidence}</span>`:''}</div></div>` : '';
+    const walletLine = ci.wallet_estimate
+      ? `<div class="sd2-iline"><span class="sd2-ik">Wallet</span><div class="sd2-iv">${ci.wallet_estimate}${ci.wallet_logic?` <span class="sub">· ${ci.wallet_logic}</span>`:''}</div></div>` : '';
+    const pains = (ci.pain_points||[]).map(p => `<div class="sd2-ipoint">${_ciTxt(p)}</div>`).filter(Boolean).join('');
+    const ups   = (ci.upsell_signals||[]).map(u => `<div class="sd2-ipoint">${_ciTxt(u)}</div>`).filter(Boolean).join('');
+    const nexts = (s.next_actions||[]).map((a,i) =>
+      `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><span>${_ciTxt(a)||a}</span></div>`).join('');
+    const pane3 = [
+      (buyerLine || walletLine) ? `<div class="sd2-lbl">ข้อมูลลูกค้า</div>${buyerLine}${walletLine}` : '',
+      pains ? `<div class="sd2-lbl">Pain Points</div>${pains}` : '',
+      ups ? `<div class="sd2-lbl">Upsell Signals</div>${ups}` : '',
+      nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : ''
+    ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`;
 
     body.innerHTML = `
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-  <div>
-    <div style="font-size:14px;font-weight:500;color:#1C1C1E">${repName}</div>
-    <div style="font-size:11px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif">${acctLabel} · ${date} · ${dur}</div>
-  </div>
-  ${reviewed ? `<span style="font-size:10px;font-weight:500;color:#34C759;background:#34C75918;padding:3px 10px;border-radius:8px">✓ รีวิวแล้ว</span>` : ''}
+<div class="sd2-name">${repName}</div>
+<div class="sd2-meta">${acctLabel} · ${date} · ${dur}</div>
+<div class="sd2-chips">${verdictChip}${cvChip}${revChip}</div>
+${whyHtml}
+<div class="sd2-tabs">
+  <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">ภาพรวม</div>
+  <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p2')">ทักษะ</div>
+  <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p3')">ลูกค้า</div>
 </div>
-${overallHtml}
-${toneHtml}
-${skillRows ? `<div class="sd-section-hd">Skills</div>${skillRows}` : ''}
-${summaryHtml}
-${intelHtml}
-${nextHtml}`;
+<div class="sd2-pane on" id="sd2p1">${pane1}</div>
+<div class="sd2-pane" id="sd2p2">${pane2}</div>
+<div class="sd2-pane" id="sd2p3">${pane3}</div>`;
 
-    // ── Review footer — TL coaching note + save + co-visit verify
-    // v566: the coaching editor is TL-only. A rep opening this detail sees a
-    // read-only TL note (if one exists) instead of the editor.
+    // ── Footer — collapsed by default; expands on intent (approved UX state)
     const _isTLViewer = (typeof _canDebrief === 'function') ? _canDebrief() : false;
+    if (footer) footer.style.padding = '0 0 max(16px, env(safe-area-inset-bottom, 0px))';
     if (footer && !_isTLViewer) {
       const _hasNote = !!(s.tl_note && s.tl_note.trim());
       footer.style.display = _hasNote ? 'block' : 'none';
       if (_hasNote) {
-        footer.innerHTML = `<div style="padding:14px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px))">
-  <div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:6px">TL COACHING NOTE</div>
-  <div style="font-size:13px;color:#3D3680;line-height:1.7;font-family:'Noto Sans Thai',sans-serif;padding:10px 12px;background:rgba(83,74,183,.05);border:0.5px solid rgba(83,74,183,.16);border-radius:10px">${s.tl_note}</div>
+        const pv = s.tl_note.length > 42 ? s.tl_note.slice(0, 42) + '…' : s.tl_note;
+        footer.innerHTML = `
+<div class="sd2-notebar" id="sd2-notebar" onclick="CI._sdToggleNote()">
+  <span class="t">TL Note <span class="pv">· ${pv}</span></span>
+  <span class="ch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></span>
+</div>
+<div class="sd2-note-editor" id="sd2-note-editor">
+  <div class="sd2-note-ro">${s.tl_note}</div>
 </div>`;
       }
     }
     if (footer && _isTLViewer) {
       footer.style.display = 'block';
       const existingNote = s.tl_note || '';
-      const reviewedDate = reviewed
-        ? new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' })
-        : null;
-      // Co-visit badge state
-      const cvVerified = !!(s.covisit_verified);
-      const cvBadgeHtml = cvVerified
-        ? `<div id="sd-cv-badge" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif;margin-bottom:10px">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Co-visit ยืนยันแล้ว
-           </div>`
-        : `<div id="sd-cv-badge" style="display:none"></div>`;
+      const pv = existingNote ? (existingNote.length > 36 ? existingNote.slice(0, 36) + '…' : existingNote) : '';
+      const barLabel = reviewed
+        ? `รีวิวแล้ว ${reviewedDate}${pv ? ` <span class="pv">· ${pv}</span>` : ''}`
+        : 'เขียน Coaching Note + รีวิว';
       footer.innerHTML = `
-<div style="padding:14px 20px 0">
-  ${cvBadgeHtml}
-  <div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:6px">
-    TL COACHING NOTE${reviewedDate ? ' · รีวิวแล้ว ' + reviewedDate : ''}
-  </div>
-  <textarea id="sd-tl-note" placeholder="บันทึก coaching note สำหรับ session นี้ (optional)" rows="3"
-    style="width:100%;padding:10px 12px;border:0.5px solid rgba(83,74,183,.25);border-radius:10px;background:rgba(83,74,183,.05);color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;font-size:13px;line-height:1.6;resize:none;-webkit-appearance:none;outline:none"
-    onfocus="this.style.borderColor='rgba(83,74,183,.5)'" onblur="this.style.borderColor='rgba(83,74,183,.25)'"
-  >${existingNote}</textarea>
+<div class="sd2-notebar" id="sd2-notebar" onclick="CI._sdToggleNote()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#534AB7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+  <span class="t">${barLabel}</span>
+  <span class="ch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></span>
 </div>
-<div style="padding:10px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px));display:flex;gap:8px">
+<div class="sd2-note-editor" id="sd2-note-editor">
+  <textarea id="sd-tl-note" placeholder="บันทึก coaching note สำหรับ session นี้ (optional)" rows="3"
+    style="width:100%;padding:11px 13px;border:0.5px solid rgba(83,74,183,.3);border-radius:11px;background:rgba(83,74,183,.04);color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;font-size:14px;line-height:1.65;resize:none;-webkit-appearance:none;outline:none"
+    onfocus="this.style.borderColor='rgba(83,74,183,.55)'" onblur="this.style.borderColor='rgba(83,74,183,.3)'"
+  >${existingNote}</textarea>
   <button class="sd-review-btn" id="sd-save-note-btn"
-    style="flex:1;background:#534AB7;font-size:14px"
+    style="margin-top:10px;background:#534AB7;font-size:15px;font-weight:600"
     onclick="CI._saveTLSessionNote('${s.id}', ${reviewed})">
-    ${reviewed ? '✓ อัปเดต Note' : 'บันทึก + รีวิว'}
+    ${reviewed ? 'อัปเดต Note' : 'บันทึก + รีวิว'}
   </button>
 </div>`;
     }
+  }
+
+  // ── v568 detail-sheet interactions ──────────────────────────────────────────
+  function _sdTab(el, paneId) {
+    try {
+      el.parentElement.querySelectorAll('.sd2-tab').forEach(t => t.classList.remove('on'));
+      el.classList.add('on');
+      const body = document.getElementById('sd-body-inner');
+      if (body) body.querySelectorAll('.sd2-pane').forEach(p => p.classList.remove('on'));
+      const pane = document.getElementById(paneId);
+      if (pane) pane.classList.add('on');
+    } catch(e) {}
+  }
+  function _sdToggleWhy() {
+    const w = document.getElementById('sd2-why');
+    const tg = document.getElementById('sd2-whytg');
+    if (!w) return;
+    const collapsed = w.classList.toggle('collapsed');
+    if (tg) tg.classList.toggle('flip', collapsed);
+  }
+  function _sdToggleNote() {
+    const ed = document.getElementById('sd2-note-editor');
+    const bar = document.getElementById('sd2-notebar');
+    if (!ed) return;
+    const open = ed.classList.toggle('open');
+    if (bar) bar.classList.toggle('open', open);
+    if (open) { try { const ta = document.getElementById('sd-tl-note'); if (ta) ta.focus(); } catch(e) {} }
   }
 
   async function _markSessionReviewed(sessionId) {
@@ -3615,7 +3697,7 @@ ${nextHtml}`;
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
