@@ -8,7 +8,9 @@ const CI = (() => {
 
   // ── Constants ──────────────────────────────────────────────────────────────
   const WORKER_URL = 'https://freshket-sense-ai-proxy.boonwirat-t.workers.dev';
-  const MAX_SECS   = 5400; // 90min — 16kbps opus = ~14.8MB base64, under Gemini 20MB inline limit
+  const MAX_SECS   = 4800; // v587: 80min — bitrate จริงคือ 24kbps (audioBitsPerSecond:24000) = 3000B/s
+                           // 80min = 14.4MB raw → ~19.2MB base64 ใต้ Gemini 20MB inline limit
+                           // (เดิม 5400/90min คำนวณจาก 16kbps ที่ไม่ใช่ค่าจริง → 21.6MB เกิน limit → analyze fail ทั้ง session)
 
   // ── State ──────────────────────────────────────────────────────────────────
   let _recorder    = null;
@@ -46,6 +48,26 @@ const CI = (() => {
   function _toast(msg) {
     if (typeof showToast === 'function') showToast(msg, '⚠');
   }
+  // ── v587: Screen Wake Lock — กันจอดับระหว่างอัดเสียงหน้างาน 40-60 นาที ──────
+  // iOS Safari 16.4+ / Chrome รองรับ · เครื่องไม่รองรับ = ข้ามเงียบๆ (พฤติกรรมเดิม)
+  // wake lock ถูก OS ปล่อยอัตโนมัติตอน background → re-acquire ตอนกลับ foreground
+  let _wakeLock = null;
+  async function _acquireWakeLock() {
+    try {
+      if (!('wakeLock' in navigator)) return;
+      _wakeLock = await navigator.wakeLock.request('screen');
+    } catch(_) { _wakeLock = null; }
+  }
+  function _releaseWakeLock() {
+    try { if (_wakeLock) _wakeLock.release(); } catch(_) {}
+    _wakeLock = null;
+  }
+  try {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && _phase === 'recording') _acquireWakeLock();
+    });
+  } catch(_) {}
+
   // v583: key moment text — รองรับทั้ง string (sessions เก่า) และ {ts,quote,note} (v583+)
   function _kmText(m) {
     if (typeof m === 'string') return m;
@@ -842,6 +864,7 @@ const CI = (() => {
       _startTime = Date.now();
       _phase     = 'recording';
       _isOwnRecording = true; // recording own session
+      _acquireWakeLock(); // v587: กันจอดับระหว่างอัด
       // AudioContext keep-alive — iOS audio session keep-alive
       // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
       // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
@@ -876,6 +899,7 @@ const CI = (() => {
     _recorder.stream.getTracks().forEach(t => t.stop());
     // Close AudioContext keep-alive
     try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    _releaseWakeLock(); // v587
     // Restore white theme before proc/result screens
     _phase = 'processing';
     _applyRecordingTheme(false);
@@ -898,6 +922,7 @@ const CI = (() => {
     }
     // Close AudioContext keep-alive
     try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    _releaseWakeLock(); // v587
     _phase = 'idle';
     _applyRecordingTheme(false);
     _recorder = null; _chunks = [];
