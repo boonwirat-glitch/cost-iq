@@ -46,6 +46,17 @@ const CI = (() => {
   function _toast(msg) {
     if (typeof showToast === 'function') showToast(msg, '⚠');
   }
+  // v583: key moment text — รองรับทั้ง string (sessions เก่า) และ {ts,quote,note} (v583+)
+  function _kmText(m) {
+    if (typeof m === 'string') return m;
+    if (!m) return '';
+    if (m.quote) {
+      const ts = m.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--tx3,#AEAEB2)">${m.ts}</span> ` : '';
+      const note = m.note ? ` <span style="color:var(--tx3,#AEAEB2)">— ${m.note}</span>` : '';
+      return `${ts}&ldquo;${m.quote}&rdquo;${note}`;
+    }
+    return m.text || '';
+  }
   function _ctx() {
     if (typeof portviewBulkData !== 'undefined' && _accountGuid) {
       // v552: real bulk fields are id/name/accountType (not account_guid/res_name) — support both
@@ -1071,7 +1082,7 @@ ${rubricText}
 TONE & EMOTION signals ที่ต้องสังเกต:
 - rep_confidence: Sales พูดมั่นใจ ชัด หรือลังเล อ้อมค้อม?
 - customer_engagement: ลูกค้า engage มากขึ้นหรือน้อยลงตลอด session?
-- key_moments: จุดไหนที่ dynamics เปลี่ยน เช่น ลูกค้า warm ขึ้น หรือ push back
+- key_moments: ช่วงสำคัญของบทสนทนา — เก็บเป็น quote คำพูดตรงจาก audio + เวลา ห้ามย่อเป็นคำบรรยายสรุป จุดที่นับว่าสำคัญ: ลูกค้าเผยข้อมูล/ความต้องการ, dynamics เปลี่ยน (warm ขึ้น, push back), จังหวะที่ rep ทำได้ดีหรือพลาด · กระจายครอบคลุมทั้งไฟล์ตั้งแต่ต้นจนช่วงท้าย ประมาณ 1 จุดต่อทุก 2-3 นาที
 
 OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใช่ checklist:
 - O: Operation ของร้าน — จำนวนสาขา ครัวกลาง ใครเป็นคนสั่งของ วัน/เวลาสั่งและรับของ ปริมาณ ปัญหา ops
@@ -1095,7 +1106,7 @@ OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใ
     "rep_confidence_note": "เหตุผลสั้นๆ",
     "customer_engagement": "increasing|stable|decreasing",
     "customer_engagement_note": "เหตุผลสั้นๆ",
-    "key_moments": ["จุดสำคัญ 1", "จุดสำคัญ 2"]
+    "key_moments": [{"ts": "mm:ss", "quote": "คำพูดตรงจาก audio", "note": "ทำไมจุดนี้สำคัญ สั้นๆ"}]
   },
   "skills": [
     {
@@ -1522,8 +1533,8 @@ OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใ
     if (tone) {
       const confColor = tone.rep_confidence==='high'?'var(--success,#34C759)':tone.rep_confidence==='medium'?'var(--warning,#FF9500)':'var(--danger,#FF3B30)';
       const engColor  = tone.customer_engagement==='increasing'?'var(--success,#34C759)':tone.customer_engagement==='stable'?'var(--warning,#FF9500)':'var(--danger,#FF3B30)';
-      const moments   = (tone.key_moments||[]).map(m =>
-        `<div style="font-size:12px;color:var(--tx2,#636366);padding:6px 0;border-bottom:0.5px solid var(--br,#E5E5EA);line-height:1.5">${m}</div>`
+      const moments   = (tone.key_moments||[]).map(m => _kmText(m)).filter(Boolean).map(t =>
+        `<div style="font-size:12px;color:var(--tx2,#636366);padding:6px 0;border-bottom:0.5px solid var(--br,#E5E5EA);line-height:1.5">${t}</div>`
       ).join('');
       toneHtml = `
 <div class="eyebrow" style="margin-bottom:10px">Tone & Energy</div>
@@ -2561,7 +2572,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
   <div class="sd2-tcard"><div class="k">Sales Confidence</div><div class="v" style="color:${cConf}">${thaiConf[t.rep_confidence]||t.rep_confidence||'—'}</div><div class="n">${t.rep_confidence_note||''}</div></div>
   <div class="sd2-tcard"><div class="k">Customer Engagement</div><div class="v" style="color:${cEng}">${thaiEng[t.customer_engagement]||t.customer_engagement||'—'}</div><div class="n">${t.customer_engagement_note||''}</div></div>
 </div>`;
-      const moments = (t.key_moments||[]).map(m => `<div class="sd2-ipoint">${m}</div>`).join('');
+      const moments = (t.key_moments||[]).map(m => _kmText(m)).filter(Boolean).map(x => `<div class="sd2-ipoint">${x}</div>`).join('');
       if (moments) momentsHtml = `<div class="sd2-lbl">Key Moments</div>${moments}`;
     }
     const summaryHtml = s.transcript_summary
@@ -2668,8 +2679,8 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       ? `<div class="sd2-iline"><span class="sd2-ik">Confidence</span><div class="sd2-iv">${ts.rep_confidence}${ts.rep_confidence_note ? ` <span class="sub">${ts.rep_confidence_note}</span>` : ''}</div></div>` : '';
     const tsEng = ts.customer_engagement
       ? `<div class="sd2-iline"><span class="sd2-ik">Engagement</span><div class="sd2-iv">${ts.customer_engagement}${ts.customer_engagement_note ? ` <span class="sub">${ts.customer_engagement_note}</span>` : ''}</div></div>` : '';
-    const tsMoments = (ts.key_moments || []).map(m =>
-      `<div class="sd2-ipoint">${(typeof m === 'string') ? m : (m && m.text) || ''}</div>`).filter(Boolean).join('');
+    const tsMoments = (ts.key_moments || []).map(m => _kmText(m)).filter(Boolean).map(x =>
+      `<div class="sd2-ipoint">${x}</div>`).join('');
     const pane4 = [
       s.transcript_summary ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-transcript">${s.transcript_summary}</div>` : '',
       (tsConf || tsEng) ? `<div class="sd2-lbl">Tone</div>${tsConf}${tsEng}` : '',
