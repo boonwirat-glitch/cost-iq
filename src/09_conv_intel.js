@@ -918,6 +918,9 @@ const CI = (() => {
     } catch (err) {
       _phase = 'idle';
       _unmount();
+      // v571b: telemetry — ทุก analyze fail เข้า app_errors ให้ตรวจย้อนหลังได้
+      try { window.SenseSentinel?.report('ci_analyze_fail',
+        err.message.slice(0, 200) + ' | secs=' + _secs + ' | acct=' + (_accountName || '-')); } catch(_) {}
       // buffer คงไว้ — เปิด Echo ใหม่จะเจอ banner กู้คืน วิเคราะห์ซ้ำได้
       _toast('วิเคราะห์ไม่สำเร็จ: ' + err.message + ' — เปิด Echo ใหม่เพื่อลองอีกครั้ง');
     }
@@ -1064,6 +1067,33 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
 }`;
   }
 
+  // ── v571b: JSON repair — กู้ JSON ที่ถูก truncate กลางทาง ──────────────────
+  // Gemini ตอบยาวเกิน max tokens → JSON ขาดท้าย → ตัด incomplete trailing แล้วปิด braces
+  function _ciRepairJson(str) {
+    // Strategy: เดินจากท้าย ตัดทีละส่วนจน parse ได้ — เก็บ fields ที่สมบูรณ์ไว้มากที่สุด
+    // 1) ลองตัดท้าย string ที่ขาด แล้วปิด quote + braces/brackets ที่ค้าง
+    for (let cut = str.length; cut > str.length * 0.5; cut = str.lastIndexOf(',', cut - 1)) {
+      if (cut <= 0) break;
+      let candidate = str.slice(0, cut);
+      // นับ braces/brackets ที่ยังเปิดอยู่ (ข้ามที่อยู่ใน string)
+      let depth = [], inStr = false, escaped = false;
+      for (let i = 0; i < candidate.length; i++) {
+        const c = candidate[i];
+        if (escaped) { escaped = false; continue; }
+        if (c === '\\') { escaped = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (c === '{') depth.push('}');
+        else if (c === '[') depth.push(']');
+        else if (c === '}' || c === ']') depth.pop();
+      }
+      if (inStr) candidate += '"';
+      while (depth.length) candidate += depth.pop();
+      try { return JSON.parse(candidate); } catch(_) { /* ตัดต่อ */ }
+    }
+    return null;
+  }
+
   // ── Gemini audio analyze — single call ────────────────────────────────────
   async function _analyzeWithGemini(audioBlob) {
     // Convert blob to base64
@@ -1116,11 +1146,30 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
     if (!res || !res.ok) throw lastErr || new Error('Gemini unavailable after 3 attempts');
     const data = await res.json();
     const raw = data?.text || data?.content?.[0]?.text || '';
-    console.log('[CI Gemini raw]', raw.substring(0, 300));
+    // v571b: log ทั้งหัวและท้าย — เห็นว่า response จบสมบูรณ์หรือถูก truncate
+    console.log('[CI Gemini raw head]', raw.substring(0, 300));
+    console.log('[CI Gemini raw tail]', raw.length > 300 ? raw.substring(raw.length - 300) : '(same as head)', '| total len:', raw.length);
 
     const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('Gemini no JSON: ' + raw.substring(0, 120));
-    const parsed = JSON.parse(raw.slice(s, e + 1));
+    if (s === -1 || e === -1) {
+      try { window.SenseSentinel?.report('ci_gemini_nojson', 'len=' + raw.length + ' head=' + raw.substring(0, 200)); } catch(_) {}
+      throw new Error('Gemini no JSON: ' + raw.substring(0, 120));
+    }
+    // v571b: robust parse — Gemini ตอบ JSON ยาว (audio นาน → 12 skills + intel ครบ)
+    // อาจถูก truncate ที่ max output tokens → JSON ขาดท้าย → ซ่อมก่อน parse
+    let parsed;
+    const _jsonStr = raw.slice(s, e + 1);
+    try {
+      parsed = JSON.parse(_jsonStr);
+    } catch (parseErr) {
+      console.warn('[CI] JSON.parse failed, attempting repair:', parseErr.message);
+      try { window.SenseSentinel?.report('ci_gemini_badjson',
+        'len=' + raw.length + ' err=' + parseErr.message.slice(0, 100) +
+        ' tail=' + raw.substring(Math.max(0, raw.length - 200))); } catch(_) {}
+      parsed = _ciRepairJson(_jsonStr);
+      if (!parsed) throw new Error('Gemini ตอบไม่สมบูรณ์ (JSON ขาด ' + raw.length + ' ตัวอักษร) — อาจเพราะบทสนทนายาวมาก');
+      console.log('[CI] JSON repaired successfully');
+    }
 
     // Split combined response into skillData + intelData + new fields
     const skillData = {
