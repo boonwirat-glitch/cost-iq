@@ -2250,7 +2250,9 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
 
   // ── Session Detail Sheet (TL) ──────────────────────────────────────────────
   async function _openSessionDetail(sessionId) {
-    if (!_canDebrief()) return;
+    // v567: TL-only guard removed — the detail is now role-aware (v566): the
+    // coaching editor is gated to TL inside the renderer; reps get read-only.
+    // This guard was why reps could not open their own history detail.
 
     // Inject CSS once
     if (!document.getElementById('ci-sess-detail-style')) {
@@ -2464,7 +2466,7 @@ ${nextHtml}`;
       const cvBadgeHtml = cvVerified
         ? `<div id="sd-cv-badge" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif;margin-bottom:10px">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ✓ Co-visit ยืนยันแล้ว
+            Co-visit ยืนยันแล้ว
            </div>`
         : `<div id="sd-cv-badge" style="display:none"></div>`;
       footer.innerHTML = `
@@ -3547,9 +3549,21 @@ ${nextHtml}`;
       } catch(e) { console.warn('[CI] covisit_events unavailable:', e.message); }
 
       // 6. Update ci_sessions.covisit_verified
+      // v567: .select('id') exposes RLS-filtered zero-row updates (same fake-success
+      // class as the v566 review fix). Previously the sheet showed a checkmark
+      // optimistically while the DB never changed — outer list badges read DB truth
+      // and stayed empty, the exact mismatch reported in testing.
       try {
-        await supa.from('ci_sessions').update({ covisit_verified: true }).eq('id', target.session_id);
-      } catch(e) { console.warn('[CI] ci_sessions covisit_verified update:', e.message); }
+        const { data: _cvRows, error: _cvUpdErr } = await supa.from('ci_sessions')
+          .update({ covisit_verified: true }).eq('id', target.session_id).select('id');
+        if (_cvUpdErr) throw _cvUpdErr;
+        if (!_cvRows || !_cvRows.length) throw new Error('RLS filtered update (0 rows)');
+      } catch(e) {
+        console.warn('[CI] ci_sessions covisit_verified update:', e.message);
+        try { if (window.SenseSentinel && typeof window.SenseSentinel.report === 'function')
+          window.SenseSentinel.report('data_quality', 'covisit_verified update failed: ' + e.message); } catch(_e) {}
+        if (typeof showToast === 'function') showToast('บันทึก co-visit ไม่เข้าฐานข้อมูล — แจ้ง admin', '✗');
+      }
 
       // 7. Update UI
       _cvSelected = null;
@@ -3558,7 +3572,7 @@ ${nextHtml}`;
         btn.remove();
         if (badge) {
           badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
-          badge.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>✓ Co-visit ยืนยันแล้ว`;
+          badge.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit ยืนยันแล้ว`;
         }
       }
       // If in TL covisit panel — update row badge optimistically before re-fetch
@@ -3579,7 +3593,7 @@ ${nextHtml}`;
         setTimeout(_loadCovisitHero, 1100);
       }
       setTimeout(() => _loadInlineHistory(), 800);
-      if (typeof showToast === 'function') showToast('✓ Co-visit ยืนยันแล้ว', '✓');
+      if (typeof showToast === 'function') showToast('Co-visit ยืนยันแล้ว', '✓');
 
     } catch(e) {
       // Restore locked row on error
