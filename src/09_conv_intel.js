@@ -1009,7 +1009,21 @@ body:not(.echo-active) { background:unset; }
       try { window.SenseSentinel?.report('ci_analyze_fail',
         err.message.slice(0, 200) + ' | secs=' + _secs + ' | acct=' + (_accountName || '-')); } catch(_) {}
       // buffer คงไว้ — เปิด Echo ใหม่จะเจอ banner กู้คืน วิเคราะห์ซ้ำได้
-      _toast('วิเคราะห์ไม่สำเร็จ: ' + err.message + ' — เปิด Echo ใหม่เพื่อลองอีกครั้ง');
+      // v589: ภาษาคน — ห้ามโชว์ raw JSON ใส่หน้า user · telemetry ข้างบนเก็บ raw ไว้แล้ว
+      const _m = String(err.message || '');
+      let _human;
+      if (/location is not supported/i.test(_m)) {
+        _human = 'ระบบ AI ใช้ไม่ได้ชั่วคราว (เส้นทางเครือข่าย)';
+      } else if (/503|429|overload|UNAVAILABLE/i.test(_m)) {
+        _human = 'ระบบ AI คิวเต็มชั่วคราว';
+      } else if (/timeout|aborted|AbortError/i.test(_m)) {
+        _human = 'การวิเคราะห์ใช้เวลานานเกินไป';
+      } else if (/network|fetch|Failed to fetch/i.test(_m)) {
+        _human = 'การเชื่อมต่อขัดข้อง';
+      } else {
+        _human = 'วิเคราะห์ไม่สำเร็จ';
+      }
+      _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
     }
   }
 
