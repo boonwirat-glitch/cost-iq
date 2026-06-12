@@ -1054,7 +1054,7 @@ const CI = (() => {
 1. ทุกอย่างที่รายงานต้องมาจาก "เสียงใน audio เท่านั้น" — ห้ามนำข้อความจากคำสั่งนี้ (เช่น "AI coach", "Freshket sales team", ชื่อ skill, ตัวอย่าง JSON) ไปรายงานว่าเป็นสิ่งที่ได้ยินเด็ดขาด
 2. ถ้าไม่แน่ใจว่าได้ยินคำไหนชัด ให้ละไว้ — ห้ามเดา ห้ามเติมเอง
 3. evidence ทุกชิ้นต้องอ้างจากคำพูดจริงใน audio — ถ้าไม่มีหลักฐานเสียงชัดเจน ให้ score เป็น "not_observed"
-4. ถ้าเสียงสั้นกว่า 30 วินาที หรือไม่มีบทสนทนาสองฝ่าย (มีแค่คนเดียวพูด/ทดสอบไมค์/เสียงรบกวน) → ตอบ no_speech:true ทันที
+4. ถ้าเสียงสั้นกว่า 10 วินาที หรือมีแต่เสียงรบกวน/เสียงเงียบไม่มีคนพูดเลย → ตอบ no_speech:true ทันที (ถ้ามีเสียงคนพูดแม้คนเดียว ให้วิเคราะห์ปกติ)
 
 ⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
 {"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "buyer_type": null, "buyer_evidence": null, "ocpb_covered": [], "ocpb_missing": [], "pain_points": [], "upsell_signals": [], "wallet_estimate": null, "wallet_logic": null, "next_actions": []}
