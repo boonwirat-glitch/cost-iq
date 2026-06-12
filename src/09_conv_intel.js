@@ -588,10 +588,10 @@ const CI = (() => {
   </div>
   <!-- stop + cancel buttons — only during recording -->
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
-    <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px">
       <button id="ci-stop-btn" onclick="CI.stopRecording()"
-        style="padding:10px 28px;border:0.5px solid rgba(255,255,255,.16);border-radius:100px;
-               background:transparent;color:rgba(255,255,255,.35);
+        style="padding:11px 32px;border:0.5px solid rgba(255,255,255,.38);border-radius:100px;
+               background:transparent;color:rgba(255,255,255,.72);
                font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
                font-family:'Noto Sans Thai',sans-serif;cursor:pointer;
                transition:background .7s ease,color .7s ease,border-color .7s ease">
@@ -599,7 +599,7 @@ const CI = (() => {
       </button>
       <button onclick="CI.cancel()"
         style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;cursor:pointer;
-               background:rgba(255,255,255,.05);color:rgba(255,255,255,.22);
+               background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);
                display:flex;align-items:center;justify-content:center;
                transition:background .7s ease,color .7s ease" title="ยกเลิก session">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
