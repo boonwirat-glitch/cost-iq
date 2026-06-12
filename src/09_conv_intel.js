@@ -893,6 +893,22 @@ const CI = (() => {
   // v555: shared pipeline — เรียกจาก _onStop ปกติ และจาก recovery flow
   async function _processBlob(blob) {
     try {
+      // v574: audio integrity check — เทียบขนาด blob กับเวลาที่อัด
+      // 24kbps opus ≈ 3,000 bytes/วินาที — ถ้า blob เล็กกว่าที่ควร 30%+
+      // = MediaRecorder ถูก interrupt กลางทาง (lock จอ / สลับแอป / โทรเข้า)
+      // เสียงช่วงนั้นหายจริง — Gemini จะวิเคราะห์ได้เฉพาะส่วนที่มี
+      const _expectedBytes = _secs * 3000;
+      const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
+      console.log('[CI audio integrity] blob=' + blob.size + 'B expected≈' + _expectedBytes +
+        'B (' + _secs + 's) ratio=' + _ratio.toFixed(2));
+      if (_secs >= 60 && _ratio < 0.7) {
+        const _estMins = Math.round(blob.size / 3000 / 60);
+        try { window.SenseSentinel?.report('ci_audio_gap',
+          'timer=' + _secs + 's blob=' + blob.size + 'B ratio=' + _ratio.toFixed(2) +
+          ' est_audio=' + _estMins + 'min'); } catch(_) {}
+        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (สั้นกว่าเวลาที่จับ) — บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ');
+      }
+
       _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 20);
 
       // Load rubric from DB if not cached yet
@@ -1000,8 +1016,9 @@ const CI = (() => {
 เกณฑ์ผ่าน: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}${obs}`;
     }).join('\n\n');
 
+    const _durMin = Math.floor(_secs / 60), _durSec = _secs % 60;
     return `คุณคือ AI coach สำหรับ Freshket sales team
-ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร${acctSection}
+ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร (ความยาว ${_durMin}:${String(_durSec).padStart(2,'0')} นาที — วิเคราะห์ให้ครบทั้งไฟล์ key_moments ต้องครอบคลุมถึงช่วงท้าย)${acctSection}
 
 ⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
 {"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "buyer_type": null, "buyer_evidence": null, "ocpb_covered": [], "ocpb_missing": [], "pain_points": [], "upsell_signals": [], "wallet_estimate": null, "wallet_logic": null, "next_actions": []}
