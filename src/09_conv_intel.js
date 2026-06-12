@@ -1058,6 +1058,9 @@ const CI = (() => {
     }).join('\n\n');
 
     const _durMin = Math.floor(_secs / 60), _durSec = _secs % 60;
+    // v584: เพดาน key_moments คำนวณจาก duration จริง — ตัวเลขเป๊ะคุมโมเดลได้ดีกว่าอัตราคลุมเครือ
+    // ~1 จุด/2.5 นาที · ขั้นต่ำ 2 (คลิปสั้น) · เพดาน 24 (90 นาที)
+    const _kmCap = Math.max(2, Math.min(24, Math.ceil(_secs / 150)));
     return `คุณคือ AI coach สำหรับ Freshket sales team
 ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร (ความยาว ${_durMin}:${String(_durSec).padStart(2,'0')} นาที — วิเคราะห์ให้ครบทั้งไฟล์ key_moments ต้องครอบคลุมถึงช่วงท้าย)${acctSection}
 
@@ -1066,6 +1069,7 @@ const CI = (() => {
 2. ถ้าไม่แน่ใจว่าได้ยินคำไหนชัด ให้ละไว้ — ห้ามเดา ห้ามเติมเอง
 3. evidence ทุกชิ้นต้องอ้างจากคำพูดจริงใน audio — ถ้าไม่มีหลักฐานเสียงชัดเจน ให้ score เป็น "not_observed"
 4. ถ้าเสียงสั้นกว่า 10 วินาที หรือมีแต่เสียงรบกวน/เสียงเงียบไม่มีคนพูดเลย → ตอบ no_speech:true ทันที (ถ้ามีเสียงคนพูดแม้คนเดียว ให้วิเคราะห์ปกติ)
+5. ภาษา: ทุกข้อความใน response ตอบเป็นภาษาไทยเท่านั้น — ยกเว้น quote (คงคำพูดตรงตามที่ได้ยิน) และชื่อเฉพาะ/คำที่ผู้พูดพูดเป็นภาษาอังกฤษ
 
 ⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
 {"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "ocpb_status": {"O": "not_asked", "C": "not_asked", "P": "not_asked", "B": "not_asked"}, "ocpb_facts": [], "next_actions": []}
@@ -1082,7 +1086,7 @@ ${rubricText}
 TONE & EMOTION signals ที่ต้องสังเกต:
 - rep_confidence: Sales พูดมั่นใจ ชัด หรือลังเล อ้อมค้อม?
 - customer_engagement: ลูกค้า engage มากขึ้นหรือน้อยลงตลอด session?
-- key_moments: ช่วงสำคัญของบทสนทนา — เก็บเป็น quote คำพูดตรงจาก audio + เวลา ห้ามย่อเป็นคำบรรยายสรุป จุดที่นับว่าสำคัญ: ลูกค้าเผยข้อมูล/ความต้องการ, dynamics เปลี่ยน (warm ขึ้น, push back), จังหวะที่ rep ทำได้ดีหรือพลาด · กระจายครอบคลุมทั้งไฟล์ตั้งแต่ต้นจนช่วงท้าย ประมาณ 1 จุดต่อทุก 2-3 นาที
+- key_moments: ช่วงสำคัญของบทสนทนา — เก็บเป็น quote คำพูดตรงจาก audio + เวลา ห้ามย่อเป็นคำบรรยายสรุป จุดที่นับว่าสำคัญ: ลูกค้าเผยข้อมูล/ความต้องการ, dynamics เปลี่ยน (warm ขึ้น, push back), จังหวะที่ rep ทำได้ดีหรือพลาด · กระจายครอบคลุมทั้งไฟล์ตั้งแต่ต้นจนช่วงท้าย · audio นี้เก็บได้ไม่เกิน ${_kmCap} จุด — เลือกเฉพาะที่สำคัญที่สุด ถ้าจุดสำคัญจริงมีน้อยกว่านี้ ให้เก็บน้อยกว่าได้
 
 OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใช่ checklist:
 - O: Operation ของร้าน — จำนวนสาขา ครัวกลาง ใครเป็นคนสั่งของ วัน/เวลาสั่งและรับของ ปริมาณ ปัญหา ops
