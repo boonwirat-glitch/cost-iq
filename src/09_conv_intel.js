@@ -2387,6 +2387,33 @@ ${moments ? `<div class="sd-section-hd">Key Moments</div>${moments}` : ''}`;
       ? `<div class="sd-section-hd">สรุปบทสนทนา</div><div class="sd-summary">${s.transcript_summary}</div>`
       : '';
 
+    // ── v566: Customer intel (ข้อมูลลูกค้า) — query always fetched this, it was
+    // simply never rendered. Both TL and rep see it.
+    const _ciTxt = v => (typeof v === 'string') ? v : (v && (v.point || v.signal || v.text || v.action)) || '';
+    let intelHtml = '';
+    const ci = s.customer_intel;
+    if (ci && (ci.buyer_type || (ci.pain_points||[]).length || (ci.upsell_signals||[]).length || ci.wallet_estimate)) {
+      const _ln = (k, v) => `<div style="display:flex;gap:8px;font-size:12px;line-height:1.65;font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px"><span style="flex-shrink:0;font-size:10px;font-weight:600;color:#AEAEB2;letter-spacing:.06em;text-transform:uppercase;padding-top:2px;min-width:46px">${k}</span><span style="color:#1C1C1E">${v}</span></div>`;
+      const _sub = t => `<div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:8px 0 4px">${t}</div>`;
+      const _row = t => `<div style="font-size:12px;color:#1C1C1E;line-height:1.65;font-family:'Noto Sans Thai',sans-serif">· ${t}</div>`;
+      const pains = (ci.pain_points||[]).map(p => _row(_ciTxt(p))).filter(Boolean).join('');
+      const ups   = (ci.upsell_signals||[]).map(u => _row(_ciTxt(u))).filter(Boolean).join('');
+      intelHtml = `<div class="sd-section-hd">ข้อมูลลูกค้า</div>
+<div style="padding:10px 12px;background:rgba(0,0,0,.025);border-radius:10px;margin-bottom:4px">
+  ${ci.buyer_type ? _ln('Buyer', ci.buyer_type + (ci.buyer_evidence ? ' · ' + ci.buyer_evidence : '')) : ''}
+  ${ci.wallet_estimate ? _ln('Wallet', ci.wallet_estimate + (ci.wallet_logic ? ' · ' + ci.wallet_logic : '')) : ''}
+  ${pains ? _sub('Pain Points') + pains : ''}
+  ${ups ? _sub('Upsell Signals') + ups : ''}
+</div>`;
+    }
+
+    // ── v566: Next steps
+    const nextHtml = (s.next_actions || []).length
+      ? `<div class="sd-section-hd">Next Steps</div><div style="padding:2px 0 4px">` +
+        s.next_actions.map(a => `<div style="font-size:12px;color:#1C1C1E;line-height:1.7;font-family:'Noto Sans Thai',sans-serif">→ ${_ciTxt(a) || a}</div>`).join('') +
+        `</div>`
+      : '';
+
     // ── Overall
     const overall = s.skill_scores?.overall;
     const overallCol = overall==='strong'?'#34C759':overall==='developing'?'#FF9500':'#FF3B30';
@@ -2408,10 +2435,25 @@ ${moments ? `<div class="sd-section-hd">Key Moments</div>${moments}` : ''}`;
 ${overallHtml}
 ${toneHtml}
 ${skillRows ? `<div class="sd-section-hd">Skills</div>${skillRows}` : ''}
-${summaryHtml}`;
+${summaryHtml}
+${intelHtml}
+${nextHtml}`;
 
     // ── Review footer — TL coaching note + save + co-visit verify
-    if (footer) {
+    // v566: the coaching editor is TL-only. A rep opening this detail sees a
+    // read-only TL note (if one exists) instead of the editor.
+    const _isTLViewer = (typeof _canDebrief === 'function') ? _canDebrief() : false;
+    if (footer && !_isTLViewer) {
+      const _hasNote = !!(s.tl_note && s.tl_note.trim());
+      footer.style.display = _hasNote ? 'block' : 'none';
+      if (_hasNote) {
+        footer.innerHTML = `<div style="padding:14px 20px max(20px,calc(env(safe-area-inset-bottom,0px) + 12px))">
+  <div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:6px">TL COACHING NOTE</div>
+  <div style="font-size:13px;color:#3D3680;line-height:1.7;font-family:'Noto Sans Thai',sans-serif;padding:10px 12px;background:rgba(83,74,183,.05);border:0.5px solid rgba(83,74,183,.16);border-radius:10px">${s.tl_note}</div>
+</div>`;
+      }
+    }
+    if (footer && _isTLViewer) {
       footer.style.display = 'block';
       const existingNote = s.tl_note || '';
       const reviewedDate = reviewed
@@ -2468,18 +2510,26 @@ ${summaryHtml}`;
         payload.tl_reviewed_by = reviewerId;
       }
 
-      let { error } = await supa.from('ci_sessions')
+      let { data: updRows, error } = await supa.from('ci_sessions')
         .update(payload)
-        .eq('id', sessionId);
+        .eq('id', sessionId)
+        .select('id');
 
       // Graceful degrade: if tl_note column doesn't exist yet, retry without it
       if (error && error.message && error.message.includes('tl_note')) {
         const fallback = { ...payload };
         delete fallback.tl_note;
-        const res2 = await supa.from('ci_sessions').update(fallback).eq('id', sessionId);
-        error = res2.error;
+        const res2 = await supa.from('ci_sessions').update(fallback).eq('id', sessionId).select('id');
+        error = res2.error; updRows = res2.data;
       }
       if (error) throw error;
+      // v566 FAKE-SUCCESS FIX: when RLS filters the row, .update() returns success
+      // with ZERO rows and no error — button showed ✓ but the DB never changed,
+      // so the session stayed 'รอรีวิว' forever and could be re-reviewed endlessly.
+      // .select('id') above makes the row count visible; zero rows = real failure.
+      if (!updRows || !updRows.length) {
+        throw new Error('สิทธิ์ในฐานข้อมูลยังไม่เปิดให้ TL รีวิว — รัน sql/ci_sessions_tl_review.sql ใน Supabase');
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = '✓ บันทึกแล้ว';
@@ -2488,6 +2538,11 @@ ${summaryHtml}`;
           btn.textContent = alreadyReviewed ? '✓ อัปเดต Note' : '✓ บันทึก + รีวิวแล้ว';
           btn.style.background = '#534AB7';
         }, 1800);
+      }
+      // v566: first review succeeded — flip the button into 'update note' mode so a
+      // second tap updates the note instead of looking like a fresh review.
+      if (!alreadyReviewed && btn) {
+        try { btn.setAttribute('onclick', "CI._saveTLSessionNote('" + sessionId + "', true)"); } catch(_e) {}
       }
       // refresh feed + badge in background
       setTimeout(() => { _loadInlineHistory(); _loadVisitBadge(); _loadVisitHero(); }, 800);
@@ -2552,7 +2607,7 @@ ${summaryHtml}`;
       const cvDot = s.covisit_verified
         ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif">` +
           `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>` : '';
-      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+      return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E)">${titleLeft}</span>
           <div style="display:flex;align-items:center;gap:6px">
