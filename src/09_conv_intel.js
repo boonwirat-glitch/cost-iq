@@ -502,7 +502,7 @@ const CI = (() => {
       <span id="ci-topbar-left-label">ยกเลิก</span>
     </span>
     <span class="tb-lbl">Echo</span>
-    <span class="tb-rec"><span class="rec-dot" id="ci-rdot"></span><span id="ci-rlbl">พร้อมบันทึก</span></span>
+    <span class="tb-rec"><span class="rec-dot" id="ci-rdot"></span><span id="ci-rlbl"></span></span>
   </div>
   <div style="padding:8px 24px 0">
     <div class="tab-bar" id="ci-main-tabs">
@@ -3360,7 +3360,7 @@ ${whyHtml}
     // Status label
     const rlbl = document.getElementById('ci-rlbl');
     if (rlbl) {
-      rlbl.textContent = isRec ? 'รับฟังอยู่' : 'พร้อมบันทึก';
+      rlbl.textContent = isRec ? 'รับฟังอยู่' : '';
       rlbl.style.fontWeight = isRec ? '400' : '500';
     }
     // Topbar left
