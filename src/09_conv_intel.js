@@ -338,9 +338,12 @@ const CI = (() => {
 #ci-fullsheet {
   position:fixed;
   top:0;bottom:0;
-  left:50%;
+  /* v576: no translateX — iOS WKWebView fixed+transform = white flash on cold open
+     centering via left:0/right:0/margin:auto (same fix as .bnav) */
+  left:0;right:0;
   width:100%;max-width:440px;
-  transform:translateX(-50%) translateY(100%);
+  margin:0 auto;
+  transform:translateY(100%);
   z-index:9999;
   padding-top:env(safe-area-inset-top,44px);
   background:#FFFFFF;
@@ -356,7 +359,7 @@ const CI = (() => {
   border-bottom:0.5px solid rgba(0,0,0,.07);
   transition:background .7s ease,border-color .7s ease;
 }
-#ci-fullsheet.ci-open { transform:translateX(-50%) translateY(0); }
+#ci-fullsheet.ci-open { transform:translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
 #ci-fullsheet .scr.on { display:flex; }
 /* ── Picker sheet items ── */
