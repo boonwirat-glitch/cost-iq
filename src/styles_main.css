@@ -3421,6 +3421,7 @@ body.kam-sense-active.kam-mode .bnav{
   height:72px!important;min-height:0!important;
   padding:8px 12px!important;box-sizing:border-box!important;
   border-radius:30px!important;overflow:hidden!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.42),0 6px 16px rgba(0,0,0,.28)!important; /* v575: floating shadow */
 }
 body.kam-sense-active.sense-plan-expanded.kam-mode .bnav{
   height:150px!important;min-height:0!important;
@@ -3942,7 +3943,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   /* v573: floating pill ทุก mode — centering ด้วย left/right + margin:auto (ไม่ใช้ transform)
      iOS Safari/WKWebView bug: position:fixed + transform = nav เลื่อนตาม scroll
      left:16px + right:16px + margin:0 auto + max-width ให้ผลตรงกลางเหมือน translateX(-50%) แต่ fixed ทำงานจริง */
-  body:not(.sales-mode) .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;padding-bottom:8px!important;}
+  body:not(.sales-mode) .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 18px 40px rgba(0,0,0,.42),0 6px 16px rgba(0,0,0,.28),0 1px 0 rgba(255,255,255,.06) inset!important;padding-bottom:8px!important;}
   /* v573: Sales floating pill — ขาว frosted, ลอยเหนือ bottom + safe area, ไม่มี transform */
   body.sales-mode .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;padding-bottom:8px!important;}
 }
@@ -5170,7 +5171,8 @@ body.sales-mode .bnav {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(0,0,0,.07) !important;
-  box-shadow: 0 8px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.8) !important;
+  /* v575: layered shadow — ลอยชัด (ambient ใหญ่ + contact เล็ก + top highlight) */
+  box-shadow: 0 18px 40px rgba(0,0,0,.16), 0 6px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.85) !important;
 }
 
 

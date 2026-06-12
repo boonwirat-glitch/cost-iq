@@ -409,6 +409,14 @@ const CI = (() => {
     el.id = 'ci-fullsheet';
     el.innerHTML = _buildHTML();
     document.body.appendChild(el);
+    // v575: lock body scroll — กัน iOS scroll chaining ทะลุไป page ข้างหลัง
+    // (ทำให้ topbar/page เลื่อนจมใต้ status bar หลังปิด Echo)
+    try {
+      window._ciScrollLockY = window.scrollY || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = (-window._ciScrollLockY) + 'px';
+      document.body.style.width = '100%';
+    } catch(_) {}
     // v478-H4: double-rAF races with left:50% layout resolution on some iOS devices.
     // left:50% is computed relative to viewport width, but translateX(-50%) is computed
     // against the element's own width. If the browser hasn't reflowed yet, the combined
@@ -437,6 +445,14 @@ const CI = (() => {
     setTimeout(() => el.remove(), 400);
     clearInterval(_timerRef);
     clearInterval(_waveRef);
+    // v575: restore body scroll position (paired with lock in _mount)
+    try {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, window._ciScrollLockY || 0);
+      window._ciScrollLockY = 0;
+    } catch(_) {}
   }
 
   function _minimize() {
@@ -2220,8 +2236,18 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
         if (_accountGuid) q = q.eq('account_id', _accountGuid);
       }
 
-      const { data, error } = await q;
+      const { data: _rawData, error } = await q;
       if (error) throw error;
+      // v575: dedupe — double-save เดิมสร้าง row ซ้ำ (same owner+account+duration, ห่างกัน <60s)
+      // เก็บ row แรก (ใหม่สุด เพราะ order desc) ทิ้งตัวซ้ำ
+      const data = (_rawData || []).filter((s, i, arr) => {
+        return !arr.slice(0, i).some(prev =>
+          prev.owner_email === s.owner_email &&
+          (prev.account_id || prev.account_name) === (s.account_id || s.account_name) &&
+          prev.duration_secs === s.duration_secs &&
+          Math.abs(new Date(prev.visited_at) - new Date(s.visited_at)) < 60000
+        );
+      });
       if (!data || !data.length) {
         const emptyMsg = _histFilterMode === 'week' ? 'ยังไม่มี visit สัปดาห์นี้' : _histFilterMode === 'month' ? 'ยังไม่มี visit เดือนนี้' : 'ยังไม่มีประวัติ Echo';
         body.innerHTML = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">${emptyMsg}</div>`;
@@ -2343,6 +2369,7 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
 .sd-title { font-size:15px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em; }
 .sd-close { font-size:15px;color:#636366;cursor:pointer;padding:4px 0 4px 12px; }
 .sd-body { flex:1;overflow-y:auto;padding:16px 20px 24px;-webkit-overflow-scrolling:touch; }
+.sd2-transcript { font-size:12.5px;color:#48484A;line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border:0.5px solid rgba(255,56,92,.12);border-radius:11px;letter-spacing:-.005em; }
 .sd-body::-webkit-scrollbar { display:none; }
 .sd-section-hd { font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:16px 0 8px; }
 .sd-skill-row { display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid #F2F2F7; }
@@ -2564,6 +2591,20 @@ ${moments ? `<div class="eyebrow" style="margin-bottom:8px">Key Moments</div>${m
       nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : ''
     ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`;
 
+    // ── v575 Tab 4: Transcript — summary + tone + key moments (เก็บใน ci_sessions อยู่แล้ว)
+    const ts = s.tone_signals || {};
+    const tsConf = ts.rep_confidence
+      ? `<div class="sd2-iline"><span class="sd2-ik">Confidence</span><div class="sd2-iv">${ts.rep_confidence}${ts.rep_confidence_note ? ` <span class="sub">${ts.rep_confidence_note}</span>` : ''}</div></div>` : '';
+    const tsEng = ts.customer_engagement
+      ? `<div class="sd2-iline"><span class="sd2-ik">Engagement</span><div class="sd2-iv">${ts.customer_engagement}${ts.customer_engagement_note ? ` <span class="sub">${ts.customer_engagement_note}</span>` : ''}</div></div>` : '';
+    const tsMoments = (ts.key_moments || []).map(m =>
+      `<div class="sd2-ipoint">${(typeof m === 'string') ? m : (m && m.text) || ''}</div>`).filter(Boolean).join('');
+    const pane4 = [
+      s.transcript_summary ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-transcript">${s.transcript_summary}</div>` : '',
+      (tsConf || tsEng) ? `<div class="sd2-lbl">Tone</div>${tsConf}${tsEng}` : '',
+      tsMoments ? `<div class="sd2-lbl">Key Moments</div>${tsMoments}` : ''
+    ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มี transcript สำหรับ session นี้</div>`;
+
     body.innerHTML = `
 <div class="sd2-name">${repName}</div>
 <div class="sd2-meta">${acctLabel} · ${date} · ${dur}</div>
@@ -2573,10 +2614,12 @@ ${whyHtml}
   <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">ภาพรวม</div>
   <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p2')">ทักษะ</div>
   <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p3')">ลูกค้า</div>
+  <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p4')">Transcript</div>
 </div>
 <div class="sd2-pane on" id="sd2p1">${pane1}</div>
 <div class="sd2-pane" id="sd2p2">${pane2}</div>
-<div class="sd2-pane" id="sd2p3">${pane3}</div>`;
+<div class="sd2-pane" id="sd2p3">${pane3}</div>
+<div class="sd2-pane" id="sd2p4">${pane4}</div>`;
 
     // ── Footer — collapsed by default; expands on intent (approved UX state)
     const _isTLViewer = (typeof _canDebrief === 'function') ? _canDebrief() : false;
@@ -3781,7 +3824,7 @@ ${whyHtml}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { _saveToSupabase(_lastResult?.skillData, _lastResult?.intelData); cancel(); }, _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
 
 })();
 
