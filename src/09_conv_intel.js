@@ -1080,19 +1080,25 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
     _setStep('กำลังวิเคราะห์...', 'Gemini · ฟัง audio + skill rubric', 35);
 
     // Retry up to 3 times on 503/429 (Gemini overload) with exponential backoff
+    // v571: per-attempt timeout — ไม่ปล่อยให้ "กำลังวิเคราะห์..." ค้างไม่มีวันจบ
+    // ถ้าหมดเวลา → throw ชัดเจน → buffer ยังอยู่ → recovery banner ให้ลองใหม่ได้
+    const FETCH_TIMEOUT_MS = 240000; // 4 นาที ต่อ attempt (audio ยาว + Gemini ใช้เวลาคิด)
     let res, lastErr;
     const _payload = JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, prompt: _buildGeminiPrompt() });
     for (let attempt = 1; attempt <= 3; attempt++) {
+      if (attempt > 1) {
+        const delay = attempt === 2 ? 3000 : 7000; // 3s then 7s
+        _setStep(`กำลังลองใหม่... (${attempt}/3)`, 'Gemini · กำลังรอสักครู่', 35);
+        await new Promise(r => setTimeout(r, delay));
+      }
+      const _ctrl = new AbortController();
+      const _tmo  = setTimeout(() => _ctrl.abort(), FETCH_TIMEOUT_MS);
       try {
-        if (attempt > 1) {
-          const delay = attempt === 2 ? 3000 : 7000; // 3s then 7s
-          _setStep(`กำลังลองใหม่... (${attempt}/3)`, 'Gemini · กำลังรอสักครู่', 35);
-          await new Promise(r => setTimeout(r, delay));
-        }
         res = await fetch(`${WORKER_URL}/analyze-audio`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: _payload,
+          signal: _ctrl.signal,
         });
         if (res.ok) break; // success
         const errText = await res.text().catch(() => String(res.status));
@@ -1100,8 +1106,11 @@ Buyer type (BANK): Blueprint=ต้องการข้อมูลครบ | 
         if (res.status !== 503 && res.status !== 429) throw lastErr; // don't retry on other errors
         res = null; // mark as failed, will retry
       } catch(e) {
+        if (e.name === 'AbortError') throw new Error('หมดเวลารอผลวิเคราะห์ (4 นาที)');
         if (e.message && !e.message.startsWith('Gemini 503') && !e.message.startsWith('Gemini 429')) throw e;
         lastErr = e;
+      } finally {
+        clearTimeout(_tmo);
       }
     }
     if (!res || !res.ok) throw lastErr || new Error('Gemini unavailable after 3 attempts');
