@@ -413,12 +413,18 @@ const CI = (() => {
     el.innerHTML = _buildHTML();
     document.body.appendChild(el);
     // v575: lock body scroll — กัน iOS scroll chaining ทะลุไป page ข้างหลัง
-    // (ทำให้ topbar/page เลื่อนจมใต้ status bar หลังปิด Echo)
+    // v577: ตอน fixed ต้อง keep centering (left/right + margin:auto) — ไม่งั้น
+    // body กระโดดชิดซ้ายบน desktop → Echo ไม่ทับแอพ = เห็น "จอซ้ำ"
     try {
       window._ciScrollLockY = window.scrollY || 0;
       document.body.style.position = 'fixed';
       document.body.style.top = (-window._ciScrollLockY) + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
       document.body.style.width = '100%';
+      document.body.style.maxWidth = '440px';
+      document.body.style.marginLeft = 'auto';
+      document.body.style.marginRight = 'auto';
     } catch(_) {}
     // v478-H4: double-rAF races with left:50% layout resolution on some iOS devices.
     // left:50% is computed relative to viewport width, but translateX(-50%) is computed
@@ -452,7 +458,12 @@ const CI = (() => {
     try {
       document.body.style.position = '';
       document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
       document.body.style.width = '';
+      document.body.style.maxWidth = '';
+      document.body.style.marginLeft = '';
+      document.body.style.marginRight = '';
       window.scrollTo(0, window._ciScrollLockY || 0);
       window._ciScrollLockY = 0;
     } catch(_) {}

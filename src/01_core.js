@@ -147,6 +147,17 @@ function resetRuntimeSessionState(){
 
 function _showLoginOverlayClean(){
   resetRuntimeSessionState();
+  // v577: ล้างจอ user เก่า — ซ่อนทุก screen + ลบ Echo sheet ค้าง
+  // กัน "หน้า user ก่อนหน้า" โผล่ตอน login overlay fade out (privacy + UX)
+  try {
+    document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
+    const ciSheet = document.getElementById('ci-fullsheet');
+    if (ciSheet) ciSheet.remove();
+    // restore body scroll lock styles ถ้า Echo lock ค้าง
+    ['position','top','left','right','width','maxWidth','marginLeft','marginRight'].forEach(p => { document.body.style[p] = ''; });
+    // ล้าง stale account view (KAM single-account sheet)
+    document.body.classList.remove('restaurant-sheet','rest-settled','rest-closing','echo-active','kam-sense-active');
+  } catch(_) {}
   const ov = document.getElementById('login-overlay');
   passwordRecoveryMode = false;
   if (ov) {
