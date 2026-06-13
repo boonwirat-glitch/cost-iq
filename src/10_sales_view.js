@@ -250,7 +250,7 @@ function renderSalesHome(el, outlets, pipeline) {
       <div class="sv-hero-eye">Runrate ในมือ</div>
       <div><span class="sv-hero-num">฿${_sv_fmt(heroRunrate)}</span></div>
       <div class="sv-hero-sub">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
+        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
         <span style="color:#EBEBEB">·</span>
         <span>${outlets.filter(o=>o.gmvToDate>0).length} / ${outlets.length} active</span>
         ${target === 0 ? '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>' : ''}
