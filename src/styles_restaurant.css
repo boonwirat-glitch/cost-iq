@@ -23,7 +23,7 @@ body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:bl
 body.kad-mode #swipe-grp-a,body.kad-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kad-mode #swipe-grp-a .scr,body.kad-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
 body.kad-mode #swipe-grp-a .scr.on,body.kad-mode #swipe-grp-b .scr.on{display:block!important}
-body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
+body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)!important}
 
 body:not(.kam-mode) #nav-report{display:none!important}
 /* ── Restaurant swipe cue (v154) — replaces legacy white strip + dots ── */
