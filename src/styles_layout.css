@@ -470,3 +470,30 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 
 /* ── SCREENS ── */
 .main{padding-bottom:148px;min-height:calc(100vh - 48px)}
+
+/* ══ PHASE 0C: DATA-THEME — BNAV ONLY ════════════════════════
+   data-theme is set on <html> at login by 01_core.js.
+   Rules here: bnav background + nav icon colors only.
+   TOPBAR IS NOT HERE — body.kam-mode / body.sales-mode in
+   styles_main.css handle topbar. Do not add topbar rules here.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Bottom nav: theme-aware ── */
+[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
+[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
+
+/* Nav icon idle */
+[data-theme="dark"]  .bnav .ni .lb,
+[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
+[data-theme="light"] .bnav .ni .lb,
+[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
+
+/* Nav icon active */
+[data-theme="dark"]  .bnav .ni.on .lb,
+[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
+[data-theme="light"] .bnav .ni.on .lb,
+[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
+
+/* Active pill */
+[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
+[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
