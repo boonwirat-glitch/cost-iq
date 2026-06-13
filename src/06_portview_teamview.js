@@ -977,7 +977,7 @@ function __legacyRenderPortviewListFallback(){
     if(catCount>0)parts.push(`<span style="color:rgba(240,176,0,.85);font-weight:600">${catCount} cat</span>`);
     if(!parts.length)return'';
     const dot=`<span style="color:rgba(255,255,255,.15)">·</span>`;
-    return`<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
+    return`<span style="font-size:10px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
   }
 
   const _statusLabel=(cls,daysElapsed)=>{
@@ -1000,7 +1000,7 @@ function __legacyRenderPortviewListFallback(){
     const churnSegs=_buildChurnBadge(a);
     const spark=_buildSparkline(a,isNew?'new':cls);
     const handoffBadge=(a.daysWithCurrentKam!==null&&a.daysWithCurrentKam<=30)
-      ?`<span style="font-size:8px;font-weight:700;font-family:'IBM Plex Mono',monospace;background:var(--tk-accent-dim-2);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:4px;padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
+      ?`<span style="font-size:8px;font-weight:700;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;background:var(--tk-accent-dim-2);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:4px;padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
       :'';
     if(isNew){
       return`<div class="portview-acct-card new" style="${_delay}" onclick="portviewSelectAccount('${a.id}')">
@@ -1425,13 +1425,13 @@ function __legacyRenderPortviewSummaryFallback(){
     paceBarEl.style.display='block';
     paceBarEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
       <div style="display:flex;align-items:baseline;gap:6px">
-        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
+        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
           <span style="font-size:11px;color:rgba(255,255,255,.4)">Pro Rate พอร์ต</span>
           <button onclick="(function(){const d=document.getElementById('pv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.45);font-size:9px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;transition:all .15s">i</button>
         </div>
       </div>
-      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.3)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:9px;color:rgba(255,255,255,.25);text-align:right;margin-top:1px">baseline</div></div>`:''}
+      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;color:rgba(255,255,255,.3)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:9px;color:rgba(255,255,255,.25);text-align:right;margin-top:1px">baseline</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${ppCls}" style="width:${Math.min(portfolioPace,100)}%"></div></div>
     <div id="pv-formula-panel" style="display:none">
@@ -1480,7 +1480,7 @@ function __legacyRenderPortviewSummaryFallback(){
           <div class="portview-tier-lbl" style="margin:0">${lbl}</div>
           <div style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${count} ร้าน</div>
         </div>
-        ${diffVal>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${diffColor};flex-shrink:0;line-height:1">-${fmtGMV(diffVal)}</div>`:''}
+        ${diffVal>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${diffColor};flex-shrink:0;line-height:1">-${fmtGMV(diffVal)}</div>`:''}
       </div>
       <div class="portview-tier-val">${fmtGMV(runRate)}</div>
     </div>`;
@@ -1501,7 +1501,7 @@ function __legacyRenderPortviewSummaryFallback(){
         </div>
         <div class="portview-tier-val">${fmtGMV(okRunRate)}</div>
         <div style="border-top:1px solid var(--tk-ok-dim-2);margin-top:8px;padding-top:7px;display:flex;align-items:baseline;gap:5px">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-bright)">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</span>
+          <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-bright)">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</span>
           <span style="font-size:10px;color:rgba(255,255,255,.55)">เหนือ baseline</span>
         </div>
       </div>
@@ -1969,13 +1969,13 @@ function __legacyRenderTeamviewSummaryFallback(){
     const _prevPaceVal = _prevPacePct ? parseInt(_prevPacePct.textContent)||0 : 0;
     paceBarEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
       <div style="display:flex;align-items:baseline;gap:6px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${teamPaceCls}">${teamPace}%</span>
+        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${teamPaceCls}">${teamPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
           <span style="font-size:11px;color:rgba(255,255,255,.65)">Pro Rate ทีม · ${groups.length} KAM</span>
           <button onclick="(function(){const d=document.getElementById('tv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.55);font-size:9px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;transition:all .15s">i</button>
         </div>
       </div>
-      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.45)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:9px;color:rgba(255,255,255,.4);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
+      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;color:rgba(255,255,255,.45)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:9px;color:rgba(255,255,255,.4);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${teamPaceCls}" style="width:${Math.min(teamPace,100)}%"></div></div>
     <div id="tv-formula-panel" style="display:none">
@@ -2015,9 +2015,9 @@ function __legacyRenderTeamviewSummaryFallback(){
     const govCard = _tgtRenderTeamGovCard();
     sumEl.innerHTML=`${govCard}
     <div class="portview-stat"><div class="portview-stat-val" style="color:#fff;font-size:20px">${allAccts.length}</div><div class="portview-stat-lbl" style="font-size:9px">${groups.length} KAM</div></div>
-    <div class="portview-stat ok"><div class="portview-stat-val" style="color:var(--tk-ok-bright);font-size:20px">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--tk-ok-bright);margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
-    <div class="portview-stat ${warnAccts.length>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
-    <div class="portview-stat ${dangerAccts.length>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
+    <div class="portview-stat ok"><div class="portview-stat-val" style="color:var(--tk-ok-bright);font-size:20px">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:var(--tk-ok-bright);margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
+    <div class="portview-stat ${warnAccts.length>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
+    <div class="portview-stat ${dangerAccts.length>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
   }
 }
 
@@ -2169,9 +2169,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   function fullCard(g){
     const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
@@ -2201,9 +2201,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const surplus=g.pace-100;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
@@ -2235,7 +2235,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   function chipRow(g){
     const vm=getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
@@ -2263,7 +2263,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
   const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const _toggleRow=`<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 10px">
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
     <div style="display:flex;align-items:center;gap:2px">
       <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
       <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>
