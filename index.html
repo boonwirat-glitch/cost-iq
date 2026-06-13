@@ -1,4 +1,4 @@
-<!-- Freshket Sense v619: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v620: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -474,6 +474,13 @@
   --max-w:      440px;
   --nav-h:      56px;
   --topbar-h:   44px;
+
+  /* ── CHROME ZONE (Phase 0D) ──────────────────────────────── */
+  /* Single source of truth for top/bottom chrome heights.      */
+  /* Use these tokens everywhere — never hardcode 104px again.  */
+  --chrome-top:    var(--topbar-h);                                          /* 44px */
+  --chrome-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));    /* 56px + safe area */
+  --content-h:     calc(100dvh - var(--chrome-top) - var(--chrome-bottom));  /* scrollable area */
 
 }
 </style>
@@ -1059,7 +1066,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 body:not(.kam-mode) .main{height:0!important;min-height:0!important;padding:0!important;overflow:visible}
 .swipe-grp{display:none}
 .swipe-grp.on{display:flex}
-body:not(.kam-mode) .swipe-grp.on{position:fixed;top:48px;bottom:calc(104px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:100%;max-width:440px;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+body:not(.kam-mode) .swipe-grp.on{position:fixed;top:48px;bottom:var(--chrome-bottom);left:50%;transform:translateX(-50%);width:100%;max-width:440px;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 body:not(.kam-mode) .swipe-grp.on::-webkit-scrollbar{display:none}
 body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;display:block!important;scroll-snap-align:start;scroll-snap-stop:always;animation:none;box-sizing:border-box;-webkit-overflow-scrolling:touch;padding-bottom:18px}
 /* KAM mode: swipe groups become transparent block containers */
@@ -2507,8 +2514,8 @@ body.kad-mode:has(#scr-skills.on) .bnav .ni.on .nwrap{background:rgba(255,56,92,
 body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
 /* v199c: targeted navy bg — account view + overlay panel */
 body.kam-mode #scr-overview{background:var(--tk-bg-base)}
-body.kam-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
-body.kad-mode .main{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))} /* v200: was 148px — caused visible empty space at scroll-end */
+body.kam-mode .main{padding-bottom:var(--chrome-bottom)}
+body.kad-mode .main{padding-bottom:var(--chrome-bottom)} /* v200: was 148px — caused visible empty space at scroll-end */
 body.kam-mode #rest-sheet-body{background:#fff}
 body.kad-mode #rest-sheet-body{background:#fff}
 body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
@@ -2964,7 +2971,7 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
 body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
 body.kam-mode .bnav .ni.nav-disabled{opacity:.28!important;pointer-events:none!important;}
 /* drag handle — account view only */
-#kam-nav-handle{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(104px + env(safe-area-inset-bottom));width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px;z-index:101;display:none;cursor:pointer;}
+#kam-nav-handle{position:fixed;left:50%;transform:translateX(-50%);bottom:var(--chrome-bottom);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px;z-index:101;display:none;cursor:pointer;}
 body.kam-mode #kam-nav-handle{display:none;}
 /* ── v190 KAM pill nav ── */
 
@@ -3932,12 +3939,12 @@ body.kam-sense-active #swipe-grp-b{
   background:#fff!important;
 }
 body.kam-sense-active #swipe-grp-b .scr.on{
-  padding-bottom:calc(104px + env(safe-area-inset-bottom))!important;
+  padding-bottom:var(--chrome-bottom)!important;
 }
 body.kam-sense-active.sense-plan-expanded #swipe-grp-b .scr.on{
   padding-bottom:calc(174px + env(safe-area-inset-bottom))!important;
 }
-body.kam-sense-active #scr-opportunities .sec{padding-bottom:104px!important;}
+body.kam-sense-active #scr-opportunities .sec{padding-bottom:var(--chrome-bottom)!important;}
 body.kam-sense-active.sense-plan-expanded #scr-opportunities .sec{padding-bottom:174px!important;}
 body.kam-sense-active.kam-mode .bnav{
   /* v573: no-transform centering — iOS fixed+transform scroll bug */
@@ -4924,7 +4931,7 @@ html.v213-app-entry-reset,html.v213-app-entry-reset body{overscroll-behavior:non
 
 @media(max-width:430px){
   body.kam-mode #nav-restaurant .nwrap{padding:7px 12px!important;}
-  #v213-drill-coach{bottom:calc(104px + env(safe-area-inset-bottom));font-size:11.5px;}
+  #v213-drill-coach{bottom:var(--chrome-bottom);font-size:11.5px;}
 }
 
 /* ── freshket-v213a-guided-ux-cleanup-css ── */
@@ -5622,10 +5629,10 @@ body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 
 body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
 
 /* Sales portview screen — same layout as KAM portview */
-#scr-sales-portview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
-#scr-sales-pipeline { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
-#scr-sales-commission { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
-#scr-sales-teamview { padding-bottom: calc(104px + env(safe-area-inset-bottom,0px)); }
+#scr-sales-portview { padding-bottom: var(--chrome-bottom); }
+#scr-sales-pipeline { padding-bottom: var(--chrome-bottom); }
+#scr-sales-commission { padding-bottom: var(--chrome-bottom); }
+#scr-sales-teamview { padding-bottom: var(--chrome-bottom); }
 
 /* ── Sales-mode: hide KAM-specific floating/fixed elements ── */
 /* aifab: KAM AI chat FAB — dark green, must not appear on white Sales canvas */
@@ -5729,7 +5736,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v619',
+      version: 'v620',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
