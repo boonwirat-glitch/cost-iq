@@ -179,6 +179,11 @@ function __legacyShowScreenFallback(name){
   if(!isKAM&&name==='overview'){
     setTimeout(()=>{_showPill();_hidePill(2000);},350);
   }
+  // ── NavConfig: update Save enabled/disabled state ──
+  // renderNav is called separately via showScreen wrapper in 12_nav_config.js
+  // (which patches window.showScreen — but direct calls bypass it)
+  // updateSaveState is safe to call here directly since it's idempotent
+  if(typeof NavConfig!=='undefined'&&NavConfig.updateSaveState)NavConfig.updateSaveState(name);
 }
 
 // ════════════════════════════════════════
