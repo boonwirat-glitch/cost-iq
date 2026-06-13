@@ -1196,10 +1196,6 @@ function _pvSyncChips(){
 }
 
 function _pvInitCollapseObserver(){
-  // v153 surgical patch: use real scroll position instead of relying only on
-  // IntersectionObserver + sentinel. The old observer was fragile when the
-  // sticky header / scroll root changed, so Portfolio could stop collapsing
-  // even though the CSS and DOM were still present.
   if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
   const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
   const screen=document.getElementById('scr-portview');
@@ -1208,13 +1204,29 @@ function _pvInitCollapseObserver(){
   const listEl=document.getElementById('portview-list');
   if(!screen||!collapsible||!strip||!listEl)return;
 
-  let raf=0;
-  let lastCollapsed=null;
-  const COLLAPSE_AT=42;
-  const EXPAND_AT=8;
+  // v651: scroll-linked collapse (Pattern B)
+  // Instead of "scroll hits threshold → snap to collapsed", the header height
+  // is directly tied to scrollY — moves with the finger, no jarring jump.
+  //
+  // Mechanic:
+  //   expandedH  = real scrollHeight of pv-collapsible (measured once per session)
+  //   scrollY 0            → height = expandedH  (fully open)
+  //   scrollY 0..expandedH → height interpolates linearly (follows finger 1:1)
+  //   scrollY ≥ expandedH  → height = 0 (fully closed, compact strip shown)
+  //
+  // No CSS transition used — JS sets height inline every rAF frame.
+  // CSS transition removed from .pv-collapsible to prevent double-animation.
+  //
+  // Few-cards guard: if page not scrollable (_scrollable()=false),
+  // force height = expandedH and skip rAF entirely. No loop, no crash.
+
+  var expandedH = 0;       // measured on first scroll or init
+  var rafId = 0;
+  var isCollapsed = false; // current logical state for strip/search management
+  var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
 
   function _scrollTop(){
-    const se=document.scrollingElement||document.documentElement;
+    var se=document.scrollingElement||document.documentElement;
     return Math.max(
       window.pageYOffset||0,
       se?se.scrollTop||0:0,
@@ -1223,116 +1235,124 @@ function _pvInitCollapseObserver(){
       screen.scrollTop||0
     );
   }
-  function _aiVisible(){
-    const aiOut=document.getElementById('portview-ai-output');
-    return !!(aiOut&&aiOut.style.display!=='none');
+
+  function _scrollable(){
+    var docH=Math.max(
+      document.body?document.body.scrollHeight:0,
+      document.documentElement?document.documentElement.scrollHeight:0,
+      screen?screen.scrollHeight:0
+    );
+    var winH=window.innerHeight||document.documentElement.clientHeight||600;
+    return (docH-winH)>10;
   }
+
   function _canExpand(){
-    // Keep the previous guard: filter/sort renders can shrink content and fire
-    // scroll events; do not treat that as an intentional scroll-back-to-top.
-    const msSinceRender=Date.now()-(window._pvLastRenderMs||0);
-    return msSinceRender>350&&!_aiVisible();
+    var msSinceRender=Date.now()-(window._pvLastRenderMs||0);
+    var aiOut=document.getElementById('portview-ai-output');
+    return msSinceRender>350&&!(aiOut&&aiOut.style.display!=='none');
   }
-  function _apply(collapsed){
-    if(lastCollapsed===collapsed)return;
-    lastCollapsed=collapsed;
-    // v650: JS-measured max-height — animate to real content height, not hardcoded 700px.
-    // iOS PWA jank came from browser animating 0→700px where only 0→300px had content:
-    // animation "finished" at 43% of duration then jumped to end. Now it uses exact height.
-    //
-    // Order matters (v646 bug was setting className AFTER style → CSS overrode inline):
-    //   COLLAPSE: measure → set start point → reflow → set className (CSS handles 0)
-    //   EXPAND:   set className first → override with measured height → clear after done
-    if(collapsed){
-      // Collapsing: pin to real height first so transition starts from the right place
-      var _h=collapsible.scrollHeight;
-      collapsible.style.maxHeight=_h+'px';
-      collapsible.offsetHeight; // force reflow — browser must see explicit start height
-      collapsible.className='pv-collapsible collapsed'; // CSS now transitions 0
-    }else{
-      // Expanding: set class first (opacity:1, pointer-events), then override maxHeight
-      collapsible.className='pv-collapsible expanded';
-      var _h=collapsible.scrollHeight;
-      collapsible.style.maxHeight=_h+'px';
-      // After transition completes, remove inline style so content can resize freely
-      if(collapsible._expandTimer)clearTimeout(collapsible._expandTimer);
-      collapsible._expandTimer=setTimeout(function(){
-        // Only clear if still in expanded state (user didn't collapse mid-animation)
-        if(lastCollapsed===false)collapsible.style.maxHeight='';
-      },340);
-    }
+
+  function _applyStrip(collapsed){
+    // manage compact strip + search bar state changes
+    if(isCollapsed===collapsed)return;
+    isCollapsed=collapsed;
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
-    // Auto-expand search bar when compact strip appears
-    const searchExpand=document.getElementById('pv-sort-search-expand');
+    var searchExpand=document.getElementById('pv-sort-search-expand');
     if(collapsed&&searchExpand){
       searchExpand.style.display='block';
-      const si=document.getElementById('pv-search-collapsed');
-      if(si&&!si.value)setTimeout(()=>si.focus(),180);
-      const sb=document.getElementById('pv-cs-search-btn');
+      var si=document.getElementById('pv-search-collapsed');
+      if(si&&!si.value)setTimeout(function(){si.focus();},180);
+      var sb=document.getElementById('pv-cs-search-btn');
       if(sb)sb.classList.add('active');
-    } else if(!collapsed&&searchExpand){
-      const si=document.getElementById('pv-search-collapsed');
+    }else if(!collapsed&&searchExpand){
+      var si=document.getElementById('pv-search-collapsed');
       if(si&&!si.value){
         searchExpand.style.display='none';
-        const sb=document.getElementById('pv-cs-search-btn');
+        var sb=document.getElementById('pv-cs-search-btn');
         if(sb)sb.classList.remove('active');
       }
     }
   }
-  function _scrollable(){
-    // v_stab2: guard against short-list scroll thrash.
-    // When portview filter leaves only a few accounts, the list is too short to scroll.
-    // In that case, the collapsible header tries to collapse/expand but scroll never
-    // reaches COLLAPSE_AT — causing a fight between collapse logic and the render guard.
-    // If total page height < threshold, force expanded and bail out.
-    const docH = Math.max(
-      document.body ? document.body.scrollHeight : 0,
-      document.documentElement ? document.documentElement.scrollHeight : 0,
-      screen ? screen.scrollHeight : 0
-    );
-    const winH = window.innerHeight || document.documentElement.clientHeight || 600;
-    return (docH - winH) > COLLAPSE_AT;
-  }
-  function _check(){
-    raf=0;
+
+  function _frame(){
+    rafId=0;
     if(!screen.classList.contains('on'))return;
-    // v650: SCROLL GUARD — keep listeners alive, just early-return when content short.
-    // Old code detached listeners → after filter-back-to-all, listeners were gone → no collapse.
-    // Fix: _apply(false) has its own guard (lastCollapsed===false → no-op), so calling
-    // it repeatedly on short lists costs nothing. Keep listeners attached always.
+
+    // Few-cards guard — if not scrollable, stay expanded, no loop
     if(!_scrollable()){
-      _apply(false);
+      if(lastAppliedH!==expandedH){
+        lastAppliedH=expandedH;
+        collapsible.style.maxHeight=expandedH>0?expandedH+'px':'';
+        collapsible.style.opacity='1';
+        collapsible.style.pointerEvents='';
+      }
+      _applyStrip(false);
       return;
     }
-    const y=_scrollTop();
-    if(y>COLLAPSE_AT){
-      _apply(true);
-    }else if(y<=EXPAND_AT&&_canExpand()){
-      _apply(false);
+
+    // Measure expandedH once (or re-measure if it looks wrong)
+    if(expandedH<=0){
+      // Temporarily remove inline constraint to get true scrollHeight
+      var prev=collapsible.style.maxHeight;
+      collapsible.style.maxHeight='';
+      expandedH=collapsible.scrollHeight||200;
+      collapsible.style.maxHeight=prev;
+    }
+
+    var y=_scrollTop();
+    // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
+    var h=Math.max(0, Math.min(expandedH, expandedH-y));
+    var collapsed=(h===0);
+    var expanding=(h===expandedH);
+
+    // Skip DOM write if value unchanged (saves layout thrash)
+    if(lastAppliedH!==h){
+      lastAppliedH=h;
+      collapsible.style.maxHeight=h+'px';
+      // Fade out the last ~20% of collapse for a smooth vanish
+      var opacity=Math.min(1, h/(expandedH*0.3));
+      collapsible.style.opacity=String(opacity);
+      collapsible.style.pointerEvents=collapsed?'none':'';
+    }
+
+    _applyStrip(collapsed);
+
+    // If mid-animation (not fully open/closed), keep rAF running
+    if(!collapsed&&!expanding){
+      rafId=requestAnimationFrame(_frame);
     }
   }
-  function _schedule(){
-    if(raf)return;
-    raf=requestAnimationFrame(_check);
+
+  function _onScroll(){
+    if(!rafId) rafId=requestAnimationFrame(_frame);
   }
 
-  window.addEventListener('scroll',_schedule,{passive:true});
-  document.addEventListener('scroll',_schedule,true);
-  screen.addEventListener('scroll',_schedule,{passive:true});
-  window.addEventListener('resize',_schedule,{passive:true});
+  // Init: measure and set correct initial state
+  setTimeout(function(){
+    if(!screen.classList.contains('on'))return;
+    expandedH=collapsible.scrollHeight||200;
+    lastAppliedH=-1; // force first write
+    _frame();
+  },180);
 
-  // Run once after layout settles. Avoid immediate re-expand during render.
-  setTimeout(_schedule,180);
+  window.addEventListener('scroll',_onScroll,{passive:true});
+  document.addEventListener('scroll',_onScroll,{capture:true,passive:true});
+  window.addEventListener('resize',_onScroll,{passive:true});
 
-  _pvCollapseObserver={disconnect:()=>{
-    if(raf){cancelAnimationFrame(raf);raf=0;}
-    window.removeEventListener('scroll',_schedule);
-    document.removeEventListener('scroll',_schedule,true);
-    screen.removeEventListener('scroll',_schedule);
-    window.removeEventListener('resize',_schedule);
+  _pvCollapseObserver={disconnect:function(){
+    if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+    window.removeEventListener('scroll',_onScroll);
+    document.removeEventListener('scroll',_onScroll,true);
+    window.removeEventListener('resize',_onScroll);
+    // restore on disconnect
+    collapsible.style.maxHeight='';
+    collapsible.style.opacity='';
+    collapsible.style.pointerEvents='';
+    lastAppliedH=-1;
   }};
 }
+
 
 function setPvView(mode){
   pvViewMode=mode;
