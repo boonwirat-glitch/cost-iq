@@ -432,7 +432,11 @@ body:not(.echo-active) { background:unset; }
 
   // ── Mount / unmount sheet ──────────────────────────────────────────────────
   function _mount() {
-    if (document.getElementById('ci-fullsheet')) return;
+    // v604: ถ้า ci-fullsheet เก่ายังอยู่ใน DOM (อยู่ระหว่าง 400ms slide-out)
+    // ให้ remove ทันทีแทนที่จะ return — กัน blank screen จาก race ระหว่าง
+    // _unmount(400ms) กับ _mount(50ms) ใน open()
+    const _stale = document.getElementById('ci-fullsheet');
+    if (_stale) { _stale.remove(); }
     // inject font
     if (!document.getElementById('ci-font')) {
       const l = document.createElement('link');

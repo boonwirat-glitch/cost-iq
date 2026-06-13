@@ -1,4 +1,4 @@
-<!-- Freshket Sense 603: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 604: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5655,7 +5655,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '603',
+      version: '604',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -41972,7 +41972,11 @@ body:not(.echo-active) { background:unset; }
 
   // ── Mount / unmount sheet ──────────────────────────────────────────────────
   function _mount() {
-    if (document.getElementById('ci-fullsheet')) return;
+    // v604: ถ้า ci-fullsheet เก่ายังอยู่ใน DOM (อยู่ระหว่าง 400ms slide-out)
+    // ให้ remove ทันทีแทนที่จะ return — กัน blank screen จาก race ระหว่าง
+    // _unmount(400ms) กับ _mount(50ms) ใน open()
+    const _stale = document.getElementById('ci-fullsheet');
+    if (_stale) { _stale.remove(); }
     // inject font
     if (!document.getElementById('ci-font')) {
       const l = document.createElement('link');
