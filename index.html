@@ -1,4 +1,4 @@
-<!-- Freshket Sense v662: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v663: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v662',
+      version: 'v663',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7043,7 +7043,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ── Collapsible summary block ── */
 .pv-collapsible{overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1);will-change:max-height;contain:layout;padding:0 16px 12px}
-.pv-collapsible.expanded{max-height:700px;opacity:1}
+.pv-collapsible.expanded{max-height:300px;opacity:1}
 .pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
