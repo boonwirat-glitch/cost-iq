@@ -1246,7 +1246,7 @@ body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:14px!important;w
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.78),rgba(218,240,228,.9))!important;
 }
-body.sdt-light.kam-sense-active .topbar{z-index:120!important;}
+/* v667: z-index:120 override removed — .topbar is position:fixed z-index:200, always above portview-header z-index:10 */
 body.sdt-light.kam-sense-active .data-btn,
 body.sdt-light.kam-sense-active #dataBtnTop,
 body.sdt-light.kam-sense-active .topbar-right button[title="ออกจากระบบ"]{
