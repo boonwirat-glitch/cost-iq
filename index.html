@@ -1,4 +1,4 @@
-<!-- Freshket Sense v615: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v616: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5684,7 +5684,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v615',
+      version: 'v616',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -28485,8 +28485,7 @@ function _tvResolveTeamDenominator(groups, allAccts){
   return { denominator, target, baseline, mode, label, hasTarget: target > 0 };
 }
 function _tvDenomLabel(info){
-  if (!info || !info.hasTarget) return 'baseline';
-  return info.mode === 'team' ? 'target' : (info.mode === 'kam' ? 'KAM target' : 'target');
+  return '';
 }
 
 // SECTION:TEAMVIEW
