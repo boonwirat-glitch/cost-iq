@@ -1,4 +1,4 @@
-<!-- Freshket Sense v624: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v625: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4697,7 +4697,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v624',
+      version: 'v625',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9934,7 +9934,7 @@ body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:bl
 body.kad-mode #swipe-grp-a,body.kad-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kad-mode #swipe-grp-a .scr,body.kad-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
 body.kad-mode #swipe-grp-a .scr.on,body.kad-mode #swipe-grp-b .scr.on{display:block!important}
-body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
+body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)!important}
 
 body:not(.kam-mode) #nav-report{display:none!important}
 /* ── Restaurant swipe cue (v154) — replaces legacy white strip + dots ── */
