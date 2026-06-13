@@ -442,13 +442,13 @@
 .kam-opp-conf.unv{background:rgba(160,160,160,.15);color:var(--n600)}
 
 /* ── BOTTOM NAV ── */
-.bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:170;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+.bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:grid;grid-template-columns:repeat(var(--tab-count,5),1fr);z-index:170;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
 /* restaurant sheet (z-index:163→210) must sit above bnav when open */
 body.restaurant-sheet .bnav{z-index:150;}
 /* bnav uses display:flex with .ni{flex:1} for equal-width tabs
    grid-template-columns has no effect on flex containers — omitted */
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
-.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:var(--tk-font-body);transition:all .2s}
+.ni{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:var(--tk-font-body);transition:all .2s;min-width:0;overflow:hidden}
 .ni svg{width:22px;height:22px;color:var(--n400);transition:color .2s}
 .ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s;white-space:nowrap}
 .ni.on svg,.ni.on .lb{color:var(--g700)}
