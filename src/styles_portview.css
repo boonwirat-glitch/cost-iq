@@ -1,0 +1,542 @@
+/* ============================================================
+   FRESHKET SENSE — PORTVIEW STYLES
+   src/styles_portview.css · Phase 0E (verbatim copy, !important preserved)
+   Scope: #scr-portview, .portview-*, .pv-* rules
+   Note: additional portview rules scattered in v210g-v213 patches
+         remain in styles_main.css pending commission extraction
+   ============================================================ */
+
+body.kam-mode{background:var(--tk-bg-base)}body.kam-mode #scr-portview{background:var(--tk-bg-base)}
+/* Skills uses white canvas regardless of KAM/AD dark theme */
+body.kam-mode #scr-skills,body.kad-mode #scr-skills{background:#fff!important;}
+/* Ensure Skills fills full viewport height so dark body bg doesn't bleed through */
+body.kam-mode #scr-skills.on,body.kad-mode #scr-skills.on{min-height:100dvh;background:#fff!important;}
+/* Skills active: override topbar + floating nav pill to white/light theme */
+body.kam-mode:has(#scr-skills.on) .topbar,
+body.kad-mode:has(#scr-skills.on) .topbar{background:#FFFFFF!important;border-bottom:1px solid #EBEBEB!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .logo,
+body.kad-mode:has(#scr-skills.on) .topbar .logo{color:#222!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .iq-badge,
+body.kad-mode:has(#scr-skills.on) .topbar .iq-badge{color:#FF385C!important;border-color:rgba(255,56,92,.35)!important;background:rgba(255,56,92,.07)!important;}
+body.kam-mode:has(#scr-skills.on) .topbar .iq-icon,
+body.kad-mode:has(#scr-skills.on) .topbar .iq-icon{fill:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .topbar button svg,
+body.kad-mode:has(#scr-skills.on) .topbar button svg{stroke:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .topbar button,
+body.kad-mode:has(#scr-skills.on) .topbar button{background:rgba(0,0,0,.05)!important;}
+/* Floating nav pill → light style when Skills active */
+body.kam-mode:has(#scr-skills.on) .bnav,
+body.kad-mode:has(#scr-skills.on) .bnav{background:rgba(255,255,255,.92)!important;border:1px solid #EBEBEB!important;box-shadow:0 4px 20px rgba(0,0,0,.12)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni,
+body.kad-mode:has(#scr-skills.on) .bnav .ni{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni svg,
+body.kad-mode:has(#scr-skills.on) .bnav .ni svg{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni .lb,
+body.kad-mode:has(#scr-skills.on) .bnav .ni .lb{color:rgba(34,34,34,.5)!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on svg,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on svg{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on .lb,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on .lb{color:#FF385C!important;}
+body.kam-mode:has(#scr-skills.on) .bnav .ni.on .nwrap,
+body.kad-mode:has(#scr-skills.on) .bnav .ni.on .nwrap{background:rgba(255,56,92,.08)!important;border-radius:12px!important;}
+/* v498: AD mode uses same dark KAM theme */
+body.kad-mode{background:var(--tk-bg-base)}body.kad-mode #scr-portview{background:var(--tk-bg-base)}
+/* v199c: targeted navy bg — account view + overlay panel */
+body.kam-mode #scr-overview{background:var(--tk-bg-base)}
+body.kam-mode .main{padding-bottom:var(--chrome-bottom)}
+body.kad-mode .main{padding-bottom:var(--chrome-bottom)} /* v200: was 148px — caused visible empty space at scroll-end */
+/* → moved to styles_restaurant.css */
+body.kam-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
+body.kad-mode .bnav{background:var(--tk-bg-nav);border-top:1px solid rgba(255,255,255,.1)}
+body.kam-mode .bnav .ni{color:rgba(255,255,255,.55)}
+body.kam-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
+body.kam-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni svg{color:rgba(255,255,255,.55)}
+body.kad-mode .bnav .ni .lb{color:rgba(255,255,255,.55)}
+/* Active tab: white icon/label + blue pill background — override global green */
+body.kam-mode .bnav .ni.on{color:#fff}
+body.kam-mode .bnav .ni.on svg{color:#fff}
+body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700}
+body.kam-mode .bnav .ni.on .nwrap{background:var(--tk-accent-dim-3);border-radius:12px}
+body.kad-mode .bnav .ni.on{color:#fff}
+body.kad-mode .bnav .ni.on svg{color:#fff}
+body.kad-mode .bnav .ni.on .lb{color:#fff;font-weight:700}
+body.kad-mode .bnav .ni.on .nwrap{background:var(--tk-accent-dim-3);border-radius:12px}
+/* Active dot: light blue instead of green */
+
+/* Gear icon loaded state: blue tint in KAM mode (not green) */
+body.kam-mode .data-btn.loaded{background:var(--tk-accent-dim-3)}
+body.kad-mode .data-btn.loaded{background:var(--tk-accent-dim-3)}
+body.kam-mode .topbar{background:var(--tk-topbar-gradient)}
+body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
+
+/* ══ KAM SUB-TABS (สรุป / Pace & Churn) ══ */
+.kam-subtabs{display:flex;background:rgba(255,255,255,.07);border-radius:10px;padding:3px;gap:2px;margin-bottom:14px}
+.kam-stab{flex:1;padding:7px 0;border-radius:8px;border:none;background:transparent;font-family:var(--tk-font-body);font-size:12px;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer;transition:all .2s}
+.kam-stab.on{background:var(--tk-subtab-active);color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* ══ PACE CARD (เดือนนี้ tab) ══ */
+.pace-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px;margin-bottom:12px}
+.pace-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pace-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5)}
+.pace-signal-chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.2px}
+.pace-signal-chip.great{background:var(--tk-ok-dim-2);color:var(--tk-ok-bright);border:1px solid var(--tk-ok-border)}
+.pace-signal-chip.safe{background:var(--tk-ok-dim);color:var(--tk-ok-bright);border:1px solid var(--tk-ok-dim-2)}
+.pace-signal-chip.warn{background:rgba(240,176,0,.2);color:var(--amb);border:1px solid rgba(240,176,0,.35)}
+.pace-signal-chip.danger{background:rgba(229,62,62,.2);color:#ff8888;border:1px solid rgba(229,62,62,.35)}
+.pace-pct-row{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.pace-pct-val{font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:700;line-height:1}
+.pace-pct-val.great{color:var(--tk-ok-bright)}
+.pace-pct-val.safe{color:var(--tk-ok-bright);opacity:.85}
+.pace-pct-val.warn{color:var(--amb)}
+.pace-pct-val.danger{color:#ff8888}
+.pace-pct-val.star{color:#d8b4fe}
+.pace-bar-wrap{width:100%;height:6px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin-bottom:12px}
+.pace-bar-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.25,.8,.25,1)}
+.pace-bar-fill.great{background:linear-gradient(90deg,var(--tk-ok-500),var(--tk-ok-bright))}
+.pace-bar-fill.safe{background:linear-gradient(90deg,var(--tk-ok-500),var(--tk-ok-bright));opacity:.75}
+.pace-bar-fill.warn{background:linear-gradient(90deg,var(--amb),#f0d060)}
+.pace-bar-fill.danger{background:linear-gradient(90deg,#e53e3e,#ff7070)}
+.pace-bar-fill.star{background:linear-gradient(90deg,#a855f7,#c084fc)}
+.pace-meta-row{display:flex;gap:16px}
+.pace-meta-item{flex:1}
+.pace-meta-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.pace-meta-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#fff}
+.pace-info-btn{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.28);background:transparent;color:rgba(255,255,255,.5);font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;padding:0;line-height:1;transition:all .15s;flex-shrink:0;font-style:italic}
+.pace-info-btn:hover{border-color:rgba(255,255,255,.65);color:rgba(255,255,255,.9);background:rgba(255,255,255,.1)}
+.pace-meta-sub{font-size:9px;color:rgba(255,255,255,.4);margin-top:1px}
+
+/* ══ PORTVIEW (Tab 6) ══ */
+.portview-screen{padding-bottom:100px}
+.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+
+/* ── Collapsible summary block ── */
+.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.6,1),opacity 220ms cubic-bezier(0.4,0,0.6,1)}
+.pv-collapsible.expanded{max-height:700px;opacity:1}
+.pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
+
+/* ── Compact strip (shown when collapsed) ── */
+.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
+.pv-compact-strip.hidden{max-height:0;opacity:0;pointer-events:none;margin:0}
+.pv-compact-strip.visible{max-height:72px;opacity:1;margin-bottom:8px}
+.pv-cs-pace{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:0 10px 0 0;border-right:1px solid rgba(255,255,255,.1);margin-right:2px}
+.pv-cs-pace-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;line-height:1}
+.pv-cs-pace-lbl{font-size:9px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
+.pv-cs-chip{flex:1;display:flex;flex-direction:column;align-items:flex-start;padding:7px 8px;border-radius:9px;gap:1px;min-width:0;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.pv-cs-chip:active{transform:scale(.96)}
+.pv-cs-chip.ok.pf-on{border-color:var(--tk-ok-bright);background:var(--tk-ok-dim-2)}
+.pv-cs-chip.warn.pf-on{border-color:rgba(240,176,0,.8);background:rgba(240,176,0,.2)}
+.pv-cs-chip.danger.pf-on{border-color:rgba(229,62,62,.8);background:rgba(229,62,62,.2)}
+.pv-cs-chip.pf-dim{opacity:.32}
+.pv-sort-btn .sort-dir{font-size:8px;opacity:.6;margin-left:2px}
+.pv-cs-chip.ok{background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2)}
+.pv-cs-chip.warn{background:rgba(240,176,0,.06);border:1px solid rgba(240,176,0,.2)}
+.pv-cs-chip.danger{background:rgba(229,62,62,.07);border:1px solid rgba(229,62,62,.22)}
+.pv-cs-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.5)}
+.pv-cs-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#fff;line-height:1.2}
+.pv-cs-chip.ok .pv-cs-val{color:var(--tk-ok-bright)}
+.pv-cs-chip.warn .pv-cs-val{color:var(--amb)}
+.pv-cs-chip.danger .pv-cs-val{color:#ff8888}
+.pv-cs-sub{font-size:9px;color:rgba(255,255,255,.45);font-family:'IBM Plex Mono',monospace}
+.pv-cs-divider{width:1px;height:32px;background:rgba(255,255,255,.08);flex-shrink:0}
+.pv-cs-search{flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;margin-left:4px}
+.pv-cs-search:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
+.pv-cs-search.active{background:var(--tk-accent-dim-2);border-color:rgba(100,160,255,.4);color:rgba(160,200,255,.95)}
+/* Sort row — always sticky inside portview-header */
+.pv-sort-sticky{display:flex;align-items:center;justify-content:space-between;padding:4px 0 2px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px}
+.pv-sort-sticky.hidden-when-expanded{display:none}
+.pv-sort-search-expand{display:none;width:100%;margin-bottom:8px;animation:fi .18s ease}
+.pv-sort-search-expand input{width:100%;box-sizing:border-box;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;font-family:var(--tk-font-body);font-size:12px;outline:none;transition:border-color .2s}
+.pv-sort-search-expand input:focus{border-color:var(--tk-subtab-active)}
+.portview-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.portview-title{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px}
+.portview-level-badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:2px 8px;border-radius:10px;background:var(--tk-accent-dim-3);color:rgba(180,210,255,.9)}
+.portview-summary-row{display:flex;gap:10px;margin-bottom:12px}
+.portview-stat{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px;text-align:center}
+.portview-stat.danger{border-color:rgba(229,62,62,.3);background:rgba(229,62,62,.08)}
+.portview-stat.warn{border-color:rgba(240,176,0,.25);background:rgba(240,176,0,.06)}
+.portview-stat.ok{border-color:var(--tk-ok-dim-2);background:var(--tk-ok-dim)}
+.portview-stat-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;line-height:1;margin-bottom:2px}
+.portview-stat.danger .portview-stat-val{color:#ff8888}
+.portview-stat.warn .portview-stat-val{color:var(--amb)}
+.portview-stat.ok .portview-stat-val{color:var(--tk-ok-bright)}
+.portview-stat-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px}
+.portview-ai-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--tk-accent-dim-3),var(--tk-accent-dim-2));border:1px solid var(--tk-accent-dim-3);color:#fff;font-family:var(--tk-font-body);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,border-color .2s,color .2s,filter .2s;margin-bottom:14px;position:relative;overflow:hidden}
+.portview-ai-btn:hover{background:linear-gradient(135deg,var(--tk-subtab-active),var(--tk-accent-dim-3))}
+/* ── Bulk SQL copy button ── */
+.dp-bulk-sql-btn{padding:3px 8px;border-radius:6px;border:1px solid var(--tk-accent-dim-2);background:var(--tk-accent-dim);color:var(--tk-accent);font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;line-height:1.4}
+.dp-bulk-sql-btn:hover{background:var(--tk-accent-dim-2);border-color:var(--tk-accent-dim-3)}
+.dp-bulk-sql-btn.copied{background:var(--g50);border-color:var(--g500);color:var(--g700)}
+.portview-ai-btn.loading{
+  opacity:1!important;pointer-events:none;
+  border-color:var(--tk-accent-solid)!important;
+  animation:ai-glow 1.2s ease-in-out infinite;
+}
+.portview-ai-btn.done{
+  background:linear-gradient(135deg,var(--tk-subtab-active),rgba(80,140,255,.3));
+  border-color:rgba(160,210,255,.65);
+  color:#fff;
+  animation:insight-done-glow 4s ease-in-out infinite;
+}
+.portview-ai-btn.done:hover{
+  background:linear-gradient(135deg,var(--tk-accent-solid),rgba(80,140,255,.45));
+  border-color:rgba(200,230,255,.85);
+  box-shadow:0 0 16px 3px rgba(80,150,255,.35);
+}
+@keyframes ai-glow{
+  0%,100%{box-shadow:0 0 8px var(--tk-accent-dim-3),inset 0 0 8px var(--tk-accent-dim)}
+  50%    {box-shadow:0 0 20px var(--tk-accent-solid),inset 0 0 16px var(--tk-accent-dim)}
+}
+.portview-ai-star{width:14px;height:14px;animation:iq-pulse 2s ease-in-out infinite}
+.portview-filter-row{display:flex;gap:6px;margin-bottom:12px}
+.portview-fpill{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--tk-font-body);border:1.5px solid rgba(255,255,255,.15);background:transparent;cursor:pointer;color:rgba(255,255,255,.5);transition:all .15s;white-space:nowrap}
+.portview-fpill.on{border-color:var(--tk-accent-solid);background:var(--tk-accent-dim-2);color:#fff}
+.portview-acct-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-left:3px solid rgba(255,255,255,.18);border-radius:0 12px 12px 0;padding:11px 12px 11px 11px;margin-bottom:6px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;animation:card-reveal 260ms ease-out both}
+.portview-acct-card:hover{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.08)}
+.portview-acct-card.danger{border-left-color:#e53e3e}
+.portview-acct-card.warn{border-left-color:var(--amb)}
+.portview-acct-card.great,.portview-acct-card.safe{border-left-color:var(--tk-ok-bright)}
+.portview-acct-card.ok{border-left-color:rgba(255,255,255,.2)}
+.portview-acct-card.new{border-left-color:rgba(100,160,255,.7)}
+.portview-acct-pace.new{font-size:10px;font-weight:700;color:rgba(140,180,255,.85);background:var(--tk-accent-dim-2);border-radius:6px;padding:2px 8px;letter-spacing:.2px}
+.pv-card-inner{display:flex;align-items:stretch;gap:10px}
+.pv-card-left{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:5px}
+.pv-right-block{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;flex-shrink:0;min-width:58px}
+.pv-status-label{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-top:1px}
+.pv-status-label.great,.pv-status-label.safe,.pv-status-label.ok{color:var(--tk-ok-border)}
+.pv-status-label.warn{color:rgba(240,176,0,.5)}
+.pv-status-label.danger{color:rgba(229,83,62,.5)}
+.pv-status-label.early{color:rgba(140,180,255,.8);letter-spacing:.3px}
+.pv-sparkline{display:flex;align-items:flex-end;gap:2px;height:14px;margin-top:3px}
+.pv-sp-bar{border-radius:2px 2px 0 0;flex-shrink:0}
+.pv-sku-seg{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;border:1px solid}
+.pv-sku-ok{background:var(--tk-ok-dim);color:var(--tk-ok-bright);border-color:var(--tk-ok-border)}
+.pv-sku-gone{background:rgba(240,80,0,.12);color:#ff9060;border-color:rgba(240,80,0,.28)}
+.pv-sku-watch{background:rgba(240,176,0,.12);color:#f0c040;border-color:rgba(240,176,0,.26)}
+.pv-sku-total{background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.1)}
+/* Confidence badge — shown in portview list when histMonths < 3 */
+.pace-conf-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:5px;letter-spacing:.3px;flex-shrink:0;opacity:.75}
+.pace-conf-badge.low{background:rgba(240,176,0,.18);color:var(--amb)}
+.pace-conf-badge.medium{background:rgba(240,176,0,.1);color:rgba(240,176,0,.7)}
+/* Pace formula row in detail card */
+.pace-formula-row{margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.pace-formula-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.3);margin-bottom:5px}
+.pace-formula-line{font-size:11px;color:rgba(255,255,255,.7);line-height:1.6;font-family:'IBM Plex Mono',monospace}
+.pace-formula-line strong{color:rgba(255,255,255,.8);font-weight:700}
+
+.portview-acct-top{display:flex;align-items:center;gap:6px;margin-bottom:0}
+.portview-acct-name{font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portview-acct-pace{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;flex-shrink:0;line-height:1}
+.portview-acct-pace.great,.portview-acct-pace.safe{color:var(--tk-ok-bright)}
+.portview-acct-pace.warn{color:var(--amb)}
+.portview-acct-pace.danger{color:#ff8888}
+.portview-mini-bar{display:none}
+.portview-acct-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:10px}
+.portview-acct-gmv-row{font-size:10px;color:rgba(255,255,255,.45);font-family:'IBM Plex Mono',monospace}
+.portview-acct-badge-row{min-height:14px;display:flex;align-items:center}
+.portview-acct-badges{display:flex;gap:4px;align-items:center}
+.portview-churn-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(229,62,62,.12);color:#ff8888;border:1px solid rgba(229,62,62,.25);font-family:'IBM Plex Mono',monospace}
+.portview-acct-arrow{display:none}
+.portview-mini-fill{height:100%;border-radius:2px}
+.portview-mini-fill.great,.portview-mini-fill.safe{background:linear-gradient(90deg,var(--tk-ok-500),var(--tk-ok-bright))}
+.portview-mini-fill.warn{background:var(--amb)}
+.portview-mini-fill.danger{background:#e53e3e}
+.portview-acct-meta{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.portview-acct-gmv{color:rgba(255,255,255,.5);font-family:'IBM Plex Mono',monospace}
+.portview-acct-badges{display:flex;gap:4px;align-items:center}
+.portview-churn-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(229,62,62,.2);color:#ff8888;border:1px solid rgba(229,62,62,.3);animation:badge-reveal 200ms ease-out both}
+.portview-acct-arrow{font-size:14px;color:rgba(255,255,255,.25);position:absolute;right:14px;top:50%;transform:translateY(-50%)}
+
+/* ══ TL VIEW ══ */
+.portview-rep-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative}
+.portview-rep-card:hover{border-color:var(--tk-subtab-active);background:var(--tk-accent-dim)}
+.portview-rep-card.danger{border-color:rgba(229,62,62,.3);background:rgba(229,62,62,.05)}
+.portview-rep-card.warn{border-color:rgba(240,176,0,.25);background:rgba(240,176,0,.04)}
+.portview-rep-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.portview-rep-name{font-size:13px;font-weight:700;color:#fff}
+.portview-rep-meta{display:flex;gap:10px;font-size:11px}
+.portview-rep-stat{display:flex;align-items:center;gap:5px}
+.portview-rep-stat .lbl{color:rgba(255,255,255,.4)}
+/* ── Teamview variable-density cards ── */
+.tv-section-lbl{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.78);padding:0 2px;margin:14px 0 8px}
+.tv-section-lbl:first-child{margin-top:4px}
+.tv-full-card{border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;transition:all .2s;overflow:hidden}
+.tv-full-card.danger{background:rgba(229,62,62,.07);border:1px solid rgba(229,62,62,.28)}
+.tv-full-card.warn{background:rgba(240,176,0,.06);border:1px solid rgba(240,176,0,.22)}
+.tv-full-card.safe,.tv-full-card.great{background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2)}
+.tv-full-card.star{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.35)}
+.tv-full-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.tv-full-name{font-size:13px;font-weight:700;color:#fff}
+.tv-full-pace.danger{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:#ff8888}
+.tv-full-pace.warn{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--amb)}
+.tv-full-pace.great,.tv-full-pace.safe{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--tk-ok-bright)}
+.tv-full-pace.star{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:#d8b4fe}
+.tv-full-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;margin-bottom:8px}
+.tv-full-fill.danger{height:100%;border-radius:2px;background:rgba(229,62,62,.7)}
+.tv-full-fill.warn{height:100%;border-radius:2px;background:rgba(240,176,0,.7)}
+.tv-full-fill.great,.tv-full-fill.safe{height:100%;border-radius:2px;background:var(--tk-ok-bright)}
+.tv-full-fill.star{height:100%;border-radius:2px;background:linear-gradient(90deg,#a855f7,#c084fc)}
+.tv-full-meta{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.tv-shortfall{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:12px}
+.tv-shortfall.danger{color:#ff8888}
+.tv-shortfall.warn{color:var(--amb)}
+.tv-risk-chips{display:flex;gap:4px;align-items:center}
+.tv-risk-d{font-size:10px;font-weight:700;color:#ff8888}
+.tv-risk-w{font-size:10px;font-weight:700;color:var(--amb)}
+.tv-visit-row{display:flex;align-items:center;justify-content:space-between;margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.06)}
+.tv-visit-bar-wrap{flex:1;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden;margin:0 8px}
+.tv-visit-bar-fill{height:100%;border-radius:1px;background:var(--g500);transition:width .6s ease}
+.tv-visit-lbl{font-size:9px;color:var(--tk-ok-border);font-weight:700;white-space:nowrap;flex-shrink:0}
+/* chip row (ok/safe KAMs) */
+.tv-chip{display:flex;align-items:center;gap:0;border-radius:9px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);margin-bottom:6px;cursor:pointer;transition:all .15s;overflow:hidden;height:40px;padding:0 12px}
+.tv-chip:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+.tv-chip-name{flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-chip-pace{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--tk-ok-bright);margin-right:8px;flex-shrink:0}
+.tv-chip-visit{font-size:10px;color:var(--tk-ok-bright);font-weight:700;margin-right:8px;flex-shrink:0;white-space:nowrap}
+.tv-chip-arrow{font-size:13px;color:rgba(255,255,255,.2);flex-shrink:0}
+
+/* ── Portview compact chip — single-row account card ── */
+.pv-chip{display:flex;align-items:center;gap:8px;border-radius:9px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);margin-bottom:5px;cursor:pointer;transition:all .15s;overflow:hidden;height:40px;padding:0 12px;position:relative;animation:card-reveal 240ms ease-out both}
+.pv-chip:hover{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.06)}
+.pv-chip:active{transform:scale(.985);transition-duration:80ms}
+.pv-chip.danger{border-color:rgba(229,62,62,.28);background:rgba(229,62,62,.05)}
+.pv-chip.warn{border-color:rgba(240,176,0,.22);background:rgba(240,176,0,.04)}
+.pv-chip.new{border-color:rgba(100,160,255,.18);background:var(--tk-accent-dim)}
+.pv-chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pv-chip-dot.unseen{background:rgba(255,255,255,.18)}
+.pv-chip-dot.account{background:rgba(255,255,255,.4)}
+.pv-chip-dot.full{background:var(--g500);box-shadow:0 0 4px var(--tk-ok-border)}
+.pv-chip-dot.echo-recent{background:var(--tk-ok-bright);box-shadow:0 0 5px var(--tk-ok-border);width:7px;height:7px;cursor:pointer}
+.pv-chip-dot.echo-old{background:var(--tk-ok-dim-2);cursor:pointer}
+.pv-chip-name{flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,.88);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-chip-pace{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;flex-shrink:0;margin-right:4px}
+.pv-chip-pace.great,.pv-chip-pace.safe{color:var(--tk-ok-bright)}
+.pv-chip-pace.warn{color:var(--amb)}
+.pv-chip-pace.danger{color:#ff8888}
+.pv-chip-pace.new{color:rgba(140,180,255,.85);font-size:10px}
+.pv-chip-churn{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--org);background:rgba(240,80,0,.1);border-radius:4px;padding:1px 5px;margin-right:4px;flex-shrink:0;animation:badge-reveal 200ms ease-out both}
+@keyframes badge-reveal{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes card-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tgtFadeIn{from{opacity:0}to{opacity:1}}
+.pv-chip-arrow{font-size:13px;color:rgba(255,255,255,.22);flex-shrink:0}
+
+/* Portview view-toggle row */
+.pv-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:0 0 10px}
+.pv-toggle-count{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.6)}
+.pv-toggle-btns{display:flex;align-items:center;gap:2px}
+.pv-toggle-btn{width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:rgba(255,255,255,.25);transition:color .15s}
+.pv-toggle-btn.on{color:rgba(255,255,255,.9)}
+.pv-sort-divider{width:1px;height:16px;background:rgba(255,255,255,.12);margin:0 4px}
+.pv-sort-btn{height:24px;padding:0 7px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.38);font-size:9px;font-weight:700;letter-spacing:.3px;cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.pv-sort-btn.on{background:var(--tk-accent-dim-2);border-color:rgba(100,160,255,.38);color:rgba(160,200,255,.95)}
+/* star card (≥105%) */
+.tv-star-card{border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;transition:all .2s;overflow:hidden;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.4);box-shadow:0 0 18px rgba(168,85,247,.18),0 0 4px rgba(168,85,247,.1)}
+.tv-star-card:hover{box-shadow:0 0 28px rgba(168,85,247,.3),0 0 8px rgba(168,85,247,.15)}
+.tv-star-glow{animation:tv-star-pulse 2.8s ease-in-out infinite}
+@keyframes tv-star-pulse{0%,100%{box-shadow:0 0 18px rgba(168,85,247,.18),0 0 4px rgba(168,85,247,.1)}50%{box-shadow:0 0 28px rgba(168,85,247,.35),0 0 10px rgba(168,85,247,.2)}}
+.tv-star-pace{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:#d8b4fe}
+.tv-star-bar{height:4px;border-radius:2px;background:rgba(168,85,247,.2);overflow:hidden;margin-bottom:8px}
+.tv-star-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#a855f7,#c084fc)}
+.tv-star-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;color:#d8b4fe;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.35);border-radius:6px;padding:1px 6px;letter-spacing:.3px}
+.portview-rep-stat .val{font-family:'IBM Plex Mono',monospace;font-weight:700;color:#fff}
+.portview-rep-stat .val.danger{color:#ff8888}
+.portview-rep-stat .val.warn{color:var(--amb)}
+.portview-rep-stat .val.ok{color:var(--tk-ok-bright)}
+
+/* ══ PORTVIEW AI OUTPUT ══ */
+.portview-ai-output{background:var(--tk-accent-dim);border:1px solid var(--tk-accent-dim-2);border-radius:12px;padding:14px;margin-bottom:14px;font-size:12px;color:rgba(220,235,255,.9);line-height:1.75;white-space:pre-wrap;word-break:break-word;overflow:visible}
+.portview-ai-output strong{color:#fff;font-weight:700}
+.portview-back-btn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:rgba(180,210,255,.8);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:6px 12px;cursor:pointer;margin-bottom:14px;font-family:var(--tk-font-body);border:none;transition:all .15s}
+.portview-back-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* ══ NAV SPACING ══ */
+
+/* ── Sense nav tab: default state — green sparkle + pulse ── */
+#nav-opportunities svg { color: var(--g500); }
+@keyframes sense-nav-pulse { 0%,100%{opacity:.85;} 50%{opacity:1;} }
+#nav-opportunities .nwrap { animation: sense-nav-pulse 2.6s ease-in-out infinite; }
+#nav-opportunities .lb { color: var(--g500); font-weight: 700; }
+/* After senseActivated (class sense-lit): amber/gold glow */
+#nav-opportunities.sense-lit svg { color: #f6ad55; }
+#nav-opportunities.sense-lit .nwrap { animation: none; filter: drop-shadow(0 0 8px rgba(246,173,85,.55)); }
+#nav-opportunities.sense-lit .lb { color: #f6ad55; }
+.bnav{grid-template-columns:repeat(5,1fr)}
+.bnav .lb{font-size:10px}
+body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
+body.kad-mode .bnav{grid-template-columns:repeat(3,1fr)}
+/* Echo hidden from KAM — Sales only */
+body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
+body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
+body.kad-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
+
+/* ══ PORTVIEW NO DATA ══ */
+.portview-no-data{padding:40px 20px;text-align:center}
+.portview-no-data-icon{font-size:32px;margin-bottom:10px;opacity:.4}
+.portview-no-data-text{font-size:13px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:4px}
+.portview-no-data-sub{font-size:11px;color:rgba(255,255,255,.3);line-height:1.6}
+
+/* ══ CURRENT MONTH CSV SLOT ══ */
+
+
+/* Sojirat (May) — unassigned account, no Supabase user */
+
+/* ══ KAM MODE NAV SWAP ══ */
+/* In KAM mode: hide restaurant tabs, show KAM tabs */
+body.kam-mode .bnav .ni.rest-only { display: none !important; }
+body.kam-mode .bnav .ni.kam-only  { display: flex !important; }
+/* v498: AD mode mirrors KAM nav visibility */
+body.kad-mode .bnav .ni.rest-only { display: none !important; }
+body.kad-mode .bnav .ni.kam-only  { display: flex !important; }
+body.kad-mode .bnav .ni.sales-only    { display: none !important; }
+body.kad-mode .bnav .ni.sales-tl-only { display: none !important; }
+body.kad-mode .bnav .ni.tl-only       { display: none !important; }
+/* In restaurant mode: hide KAM tabs */
+body:not(.kam-mode) .bnav .ni.kam-only { display: none !important; }
+/* Default: kam-only hidden */
+.bnav .ni.kam-only { display: none !important; }
+/* TL-only: Team tab — shown only when body has both kam-mode AND tl-mode */
+.bnav .ni.tl-only { display: none !important; }
+/* v183: Team moved to portview header — hide from nav entirely */
+body.kam-mode.tl-mode .bnav .ni.tl-only { display: none !important; }
+/* ── v190 KAM pill nav ── */
+body.kam-mode .bnav #nav-opportunities{display:flex!important;}
+body.kam-mode #nav-portview{display:none!important;}
+body.kam-mode .bnav{background:rgba(14,24,45,.52);border:1px solid rgba(255,255,255,.18);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.35);}
+body.kam-mode .bnav .ni{flex:1;min-width:0;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;}
+body.kam-mode .bnav .ni .lb{display:block!important;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.2px;transition:color .18s,font-weight .18s;white-space:nowrap;}
+body.kam-mode .bnav .ni.on .lb{color:#fff;font-weight:700;}
+body.kam-mode .bnav .ni svg{width:24px;height:24px;opacity:.5;color:#fff;transition:opacity .18s,filter .18s;}
+body.kam-mode .bnav .ni.on svg{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.9)) drop-shadow(0 0 18px rgba(255,255,255,.3));}
+body.kam-mode .bnav .ni:active{transform:scale(1.1);transition:transform .07s ease!important}
+/* v492: Save icon — green pulse in regular KAM pill, white when active (.on), dark in sdt-light Save mode */
+/* Regular KAM dark pill: green star draws attention to the feature */
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities svg{color:var(--g500)!important;opacity:.9}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities .lb{color:var(--g500)!important;font-weight:700!important}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1!important}
+body.kam-mode:not(.kam-sense-active) .bnav #nav-opportunities.on .lb{color:#fff!important}
+/* kam-sense-active (Save mode) dark: inherit white from glass pill rules */
+body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities svg{color:rgba(255,255,255,.55)!important}
+body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities.on svg{color:#fff!important;opacity:1}
+/* sdt-light Save mode: dark icon idle, green when active */
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities svg{color:rgba(0,0,0,.38)!important}
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities.on svg{color:var(--g500)!important;opacity:1!important}
+/* v490-B4: hide Echo from Save mode 3-col nav (4 items → 3 columns caused overflow) */
+/* → Echo nav moved to styles_echo.css (Phase 0E) */
+body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
+body.kam-mode .bnav .ni.nav-disabled{opacity:.28!important;pointer-events:none!important;}
+/* drag handle — account view only */
+#kam-nav-handle{position:fixed;left:50%;transform:translateX(-50%);bottom:var(--chrome-bottom);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px;z-index:101;display:none;cursor:pointer;}
+body.kam-mode #kam-nav-handle{display:none;}
+/* ── v190 KAM pill nav ── */
+
+/* ── v183 Restaurant Sheet Overlay ── */
+
+/* Sheet — data-panel pattern */
+/* → rest-sheet-body/swipe/backdrop moved to styles_restaurant.css */
+
+/* ── v65 Micro-interactions ── */
+
+/* Card hover/press — risk-class aware glow */
+.portview-acct-card{transition:transform 150ms ease,box-shadow 150ms ease,border-color 200ms ease,background 200ms ease}
+/* ── Visit tracking dots ── */
+.pv-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:all .3s ease}
+.pv-dot.unseen{display:none}
+.pv-dot.account{background:rgba(255,255,255,.22);box-shadow:none}
+.pv-dot.full{background:var(--g500);box-shadow:0 0 5px var(--tk-ok-border)}
+.pv-dot.echo-recent{background:var(--tk-ok-bright);box-shadow:0 0 7px var(--tk-ok-border),0 0 2px var(--tk-ok-bright);width:7px;height:7px}
+.pv-dot.echo-old{background:var(--tk-ok-dim-2);box-shadow:none}
+.pv-dot.echo-recent,.pv-dot.echo-old{cursor:pointer}
+.portview-acct-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.portview-acct-card:active{transform:scale(0.97);transition-duration:80ms}
+.portview-acct-card.danger:hover{box-shadow:0 6px 24px rgba(229,62,62,.15)}
+.portview-acct-card.warn:hover{box-shadow:0 6px 24px rgba(240,176,0,.12)}
+.portview-acct-card.great:hover,.portview-acct-card.safe:hover{box-shadow:0 6px 24px var(--tk-ok-dim)}
+
+/* Pace bar animate on mount */
+.portview-mini-fill,.pace-bar-fill{transform-origin:left center;animation:barScale 600ms cubic-bezier(.4,0,.2,1) forwards}
+@keyframes barScale{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* Danger bar pulse after mount */
+.portview-acct-card.danger .portview-mini-fill{animation:barScale 600ms cubic-bezier(.4,0,.2,1) forwards,dangerPulse 2.5s ease-in-out 600ms infinite}
+@keyframes dangerPulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* Portfolio stats staggered pop-in */
+.portview-stat-val{animation:statPop 300ms ease both}
+@keyframes statPop{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.portview-stat:nth-child(2) .portview-stat-val{animation-delay:60ms}
+.portview-stat:nth-child(3) .portview-stat-val{animation-delay:120ms}
+.portview-stat:nth-child(4) .portview-stat-val{animation-delay:180ms}
+
+/* AI loading dots */
+.ai-thinking{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.ai-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:rgba(100,170,255,.75);animation:dotPulse 1.2s ease-in-out infinite}
+.ai-dot:nth-child(2){animation-delay:.2s}
+.ai-dot:nth-child(3){animation-delay:.4s}
+@keyframes dotPulse{0%,80%,100%{opacity:.2;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
+
+/* AI insight reveal */
+@keyframes insightReveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* IQ badge pulse on KAM mode entry */
+@keyframes iqGlow{0%{box-shadow:0 0 0 0 var(--tk-ok-bright)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.iq-pulse{animation:iqGlow 700ms ease forwards}
+
+/* Card press brightness */
+.portview-acct-card:active{transform:scale(0.97);filter:brightness(0.85);transition-duration:80ms}
+
+/* Back button press */
+#kam-back-btn{display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;flex-shrink:0;transition:transform .1s,opacity .15s;-webkit-tap-highlight-color:transparent;}
+#kam-back-btn .kam-bc-arrow{font-size:16px;line-height:1;color:rgba(180,210,255,.65);margin-top:-1px;}
+#kam-back-btn:active{transform:translateX(-2px)!important;transition-duration:60ms!important;opacity:.75!important;}
+
+/* Filter pills — smoother active with scale */
+.portview-fpill{transition:background 220ms ease,color 220ms ease,border-color 220ms ease,transform 150ms ease}
+.portview-fpill.on{transform:scale(1.03)}
+.portview-fpill:active{transform:scale(0.95)}
+
+/* Mode toggle sliding pill */
+.mode-toggle{position:relative}
+.mbtn{position:relative;z-index:1;transition:color 220ms ease}
+.mbtn.on{background:transparent;color:var(--g900)}
+.mode-slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 4px);background:var(--amb);border-radius:16px;transition:left 220ms cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:0}
+.mode-toggle.kam-active .mode-slider{left:calc(50% + 1px)}
+
+/* AI done button bounce */
+@keyframes doneBounce{0%{transform:scale(1)}40%{transform:scale(1.05)}70%{transform:scale(0.97)}100%{transform:scale(1)}}
+.portview-ai-btn.done.done-bounce{animation:doneBounce 380ms ease}
+
+/* AI loading — nth-child for dots (1-indexed after star) */
+.ai-dot:nth-child(2){animation-delay:.15s}
+.ai-dot:nth-child(3){animation-delay:.3s}
+.ai-dot:nth-child(4){animation-delay:.45s}
+
+/* ── Portfolio Tier Grid (v67) ── */
+.portview-tier-grid{display:flex;gap:8px;width:100%;align-items:stretch}
+.portview-tier-col-ok{flex-shrink:0;display:flex;flex-direction:column}
+.portview-tier-col-risk{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.portview-tier-box{border-radius:12px;padding:10px 11px;cursor:pointer;transition:opacity 200ms ease,box-shadow 200ms ease,border-color 200ms ease,background 200ms ease}
+.portview-tier-box:active{opacity:.8}
+.portview-tier-box.pf-active{}
+.portview-tier-box.pf-dim{opacity:.28;filter:saturate(.4)}
+.portview-tier-box.safe.pf-active{border-color:var(--tk-ok-bright);background:var(--tk-ok-dim);box-shadow:inset 0 0 0 1px var(--tk-ok-border)}
+.portview-tier-box.warn.pf-active{border-color:rgba(240,176,0,.75);background:rgba(240,176,0,.14);box-shadow:inset 0 0 0 1px rgba(240,176,0,.4)}
+.portview-tier-box.danger.pf-active{border-color:rgba(229,62,62,.75);background:rgba(229,62,62,.13);box-shadow:inset 0 0 0 1px rgba(229,62,62,.4)}
+.portview-tier-box.safe{background:var(--tk-ok-dim);border:1.5px solid var(--tk-ok-border);flex:1;display:flex;flex-direction:column;justify-content:center}
+.portview-tier-box.warn{background:rgba(240,176,0,.07);border:1.5px solid rgba(240,176,0,.2);flex:1}
+.portview-tier-box.danger{background:rgba(229,62,62,.07);border:1.5px solid rgba(229,62,62,.2);flex:1}
+.portview-tier-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.portview-tier-box.safe .portview-tier-lbl{color:var(--tk-ok-bright)}
+.portview-tier-box.warn .portview-tier-lbl{color:rgba(240,176,0,.75)}
+.portview-tier-box.danger .portview-tier-lbl{color:rgba(229,62,62,.7)}
+.portview-tier-val{font-family:'IBM Plex Mono',monospace;font-weight:700;line-height:1;margin-bottom:3px;animation:statPop 350ms ease both}
+.portview-tier-box.safe .portview-tier-val{color:var(--tk-ok-bright);font-size:20px}
+.portview-tier-box.warn .portview-tier-val{color:#f6ad55;font-size:15px;animation-delay:80ms}
+.portview-tier-box.danger .portview-tier-val{color:#ff8888;font-size:15px;animation-delay:160ms}
+.portview-tier-sub{font-size:10px;color:rgba(255,255,255,.6)}
+.portview-tier-box.safe .portview-tier-sub{margin-top:6px}
+
+/* Insight buttons idle glow — Portfolio + Team (mirrors kam-insight-btn) */
+.portview-ai-btn:not(.loading):not(.done){animation:insight-idle-glow 3s ease-in-out infinite}
