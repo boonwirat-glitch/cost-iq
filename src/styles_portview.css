@@ -363,14 +363,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 #nav-opportunities.sense-lit svg { color: #f6ad55; }
 #nav-opportunities.sense-lit .nwrap { animation: none; filter: drop-shadow(0 0 8px rgba(246,173,85,.55)); }
 #nav-opportunities.sense-lit .lb { color: #f6ad55; }
-.bnav{grid-template-columns:repeat(5,1fr)}
-.bnav .lb{font-size:10px}
-body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
-body.kad-mode .bnav{grid-template-columns:repeat(3,1fr)}
-/* Echo hidden from KAM — Sales only */
-body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
-body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
-body.kad-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
+/* → bnav grid rules moved to styles_layout.css (Phase 0E) */
 
 /* ══ PORTVIEW NO DATA ══ */
 .portview-no-data{padding:40px 20px;text-align:center}
