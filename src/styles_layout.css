@@ -1,13 +1,6 @@
 /* ============================================================
-   FRESHKET SENSE — LAYOUT STYLES
-   src/styles_layout.css  (Phase 0B split from styles_main.css)
-
-   Contents: topbar, bottom-nav (bnav), screens structural CSS,
-             data-panel, kambar, KAM zone 1 (pace ring, brief,
-             talkline, SKU verify), KAM data cards, account lib,
-             UX polish (button/card/checkbox/skeleton/toast).
-   Shared structural chrome visible across all roles.
-   Uses --g*/--n*/--amb tokens defined in styles_base.css :root.
+   FRESHKET SENSE — LAYOUT STYLES  src/styles_layout.css
+   Contents: topbar, bnav, screens, data-panel, KAM components.
    ============================================================ */
 
 /* ── TOPBAR ── */
@@ -475,44 +468,5 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card:hover{background:var(--tk-accent-dim);border-color:rgba(100,160,255,.35)}
 .kna-recent-card:active{transform:scale(.98)}
 
-
-/* ══ PHASE 0C: DATA-THEME SYSTEM (v2 — safe) ════════════════════════
-   These rules are ADDITIVE for new features only.
-   Existing body.kam-mode / body.sales-mode rules are NOT removed —
-   they still fire and take precedence via cascade order (main.css loads after layout.css).
-
-   data-theme is set on <html> at login. New features built after Phase 0C
-   can use [data-theme] selectors instead of body.X-mode. Old features unaffected.
-
-   SAFE RULES: only properties not already covered by existing body.X-mode rules.
-   REMOVED: [data-theme] .scr — too broad, KAM screens need body.kam-mode control.
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── Topbar: DO NOT add [data-theme] rules here ─────────────────────────
-   Topbar layout is controlled by:
-     body.kam-mode .topbar  → dark gradient  (styles_main.css)
-     body.sales-mode .topbar → white          (styles_main.css)
-   Adding [data-theme] .topbar rules here BREAKS flex layout (removes display:flex).
-   ─────────────────────────────────────────────────────────────────────── */
-
-/* ── Bottom nav: theme token ── */
-[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
-[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
-
-/* Nav icon idle */
-[data-theme="dark"]  .bnav .ni .lb,
-[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
-[data-theme="light"] .bnav .ni .lb,
-[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
-
-/* Nav icon active */
-[data-theme="dark"]  .bnav .ni.on .lb,
-[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
-[data-theme="light"] .bnav .ni.on .lb,
-[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
-
-/* Active pill */
-[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
-[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
-
-/* NOTE: .scr background is NOT set here — controlled by body.kam-mode in main.css */
+/* ── SCREENS ── */
+.main{padding-bottom:148px;min-height:calc(100vh - 48px)}
