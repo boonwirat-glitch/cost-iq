@@ -24,8 +24,9 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}html{overflow-x:clip}
-body:not(.sales-mode){font-family:var(--tk-font-body);}
-body.sales-mode{font-family:'Noto Sans Thai',sans-serif;}
+body{font-family:var(--tk-font-body);}
+/* phase-0A: KAM/AD locked to IBM Plex Sans Thai */
+body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
 body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
 .mono{font-family:'IBM Plex Mono',monospace}
