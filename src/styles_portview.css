@@ -714,3 +714,23 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 @keyframes v213-earned-sheen{0%,68%{left:-75%;opacity:0}72%{opacity:1}88%{left:125%;opacity:.95}100%{left:125%;opacity:0}}
 @keyframes v213-amount-pop{0%{transform:translateY(2px) scale(.98);opacity:.75}100%{transform:translateY(0) scale(1);opacity:1}}
 
+
+
+/* ══ Sales nav visual — injected here to override body.kam-mode .bnav .ni svg{color:#fff}
+   Cascade: portview.css injects AFTER nav.css, so this wins correctly ══ */
+body.sales-mode.kam-mode .bnav {
+  background: rgba(255,255,255,.72) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255,255,255,.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
+  border-radius: 36px !important;
+}
+body.sales-mode.kam-mode .bnav .ni svg     { color: #222222 !important; opacity: .32 !important; filter: none !important; }
+body.sales-mode.kam-mode .bnav .ni .lb     { color: #6A6A6A !important; }
+body.sales-mode.kam-mode .bnav .ni.on svg  { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
+body.sales-mode.kam-mode .bnav .ni.on .lb  { color: #FF385C !important; font-weight: 700 !important; }
+
+/* Skills + Echo disabled in KAM Sense (Save) flow */
+body.kam-sense-active.kam-mode .bnav #nav-skills   { opacity: .25 !important; pointer-events: none !important; }
+body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; pointer-events: none !important; }
