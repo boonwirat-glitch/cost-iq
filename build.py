@@ -40,6 +40,7 @@ styles_echo   = read('src/styles_echo.css')
 styles_auth   = read('src/styles_auth.css')
 styles_nav    = read('src/styles_nav.css')
 styles_pv     = read('src/styles_portview.css')
+styles_tv     = read('src/styles_teamview.css')
 styles_sales = read('src/styles_sales.css')
 styles_tokens  = read('src/styles_tokens.css')
 styles_base    = read('src/styles_base.css')
@@ -82,6 +83,8 @@ out = (shell
              f'<style id="nav-module-css">\n{styles_nav}</style>') \
              .replace('<style id="portview-module-css">\n<!-- INJECT_STYLES_PORTVIEW -->\n</style>',
              f'<style id="portview-module-css">\n{styles_pv}</style>') \
+             .replace('<style id="tv-module-css">\n<!-- INJECT_STYLES_TV -->\n</style>',
+             f'<style id="tv-module-css">\n{styles_tv}</style>') \
              .replace('<style id="skills-module-css">\n<!-- INJECT_STYLES_SKILLS -->\n</style>',
              f'<style id="skills-module-css">\n{styles_skills}</style>')
     .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
@@ -96,7 +99,7 @@ out = (shell
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS',
           'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
-          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW']:
+          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
