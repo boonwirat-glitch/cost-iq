@@ -1,4 +1,4 @@
-<!-- Freshket Sense v630: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v631: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v630',
+      version: 'v631',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9812,6 +9812,14 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
   body.sdt-light.kam-sense-active.kam-mode .bnav{background:rgba(232,250,242,.86)!important;}
 }
 
+
+
+/* ── Sales+KAM cascade fix ── */
+/* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
+   This rule must come AFTER that to win the cascade.
+   Placed in save-module-css which injects after portview-module-css. */
+body.sales-mode.kam-mode .bnav #nav-opportunities { display: none !important; }
+body.sales-mode.kam-mode .bnav #nav-portview       { display: none !important; }
 </style>
 <style id="report-module-css">
 /* FRESHKET SENSE — REPORT STYLES
@@ -23049,7 +23057,12 @@ function __legacyShowScreenFallback(name){
   }
   const _handle=document.getElementById('kam-nav-handle');
   if(_handle)_handle.style.display=(isKAM&&name==='overview')?'block':'none';
-  if(name==='teamview'){teamviewKamFilter=null;renderTeamview();}
+  if(name==='teamview'){
+    teamviewKamFilter=null;renderTeamview();
+    // Disable Save while in teamview — must select account first
+    const _sb=document.getElementById('nav-opportunities');
+    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
+  }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
