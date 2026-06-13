@@ -136,6 +136,13 @@ function __legacyShowScreenFallback(name){
     const _sb=document.getElementById('nav-opportunities');
     if(_sb&&isKAM)_sb.classList.add('nav-disabled');
   }
+  // Disable Save + Restaurant when on skills — no account context
+  if(name==='skills'&&isKAM){
+    const _sb=document.getElementById('nav-opportunities');
+    const _rb=document.getElementById('nav-restaurant');
+    if(_sb)_sb.classList.add('nav-disabled');
+    if(_rb)_rb.classList.add('nav-disabled');
+  }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
