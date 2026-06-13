@@ -10,7 +10,7 @@
 
   // ─── Tab map: key → HTML button ID ─────────────────────────────────────────
   var TABS = {
-    'portview':         'nav-portview',
+    'portview':         'nav-overview',
     'restaurant':       'nav-restaurant',
     'echo-kam':         'nav-echo-kam',
     'opportunities':    'nav-opportunities',
@@ -35,7 +35,7 @@
 
   // All HTML nav button IDs — everything NOT in active config gets hidden
   var ALL_IDS = [
-    'nav-portview', 'nav-restaurant', 'nav-echo-kam', 'nav-opportunities',
+    'nav-overview', 'nav-portview', 'nav-restaurant', 'nav-echo-kam', 'nav-opportunities',
     'nav-skills', 'nav-teamview', 'nav-overview',
     'nav-sales-portview', 'nav-sales-pipeline', 'nav-echo',
     'nav-sales-commission', 'nav-sales-teamview',
