@@ -1236,23 +1236,6 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
-    // v645: smooth-height — measure real height then animate to exact value
-    // avoids iOS PWA jank from max-height:700px animating through large empty range
-    if(!collapsed){
-      // expanding: set explicit px height first so transition animates to real size
-      var _h=collapsible.scrollHeight;
-      collapsible.style.maxHeight=_h+'px';
-      // after transition done, remove inline style so content can resize freely
-      var _t=setTimeout(function(){collapsible.style.maxHeight='';},320);
-      collapsible._heightTimer&&clearTimeout(collapsible._heightTimer);
-      collapsible._heightTimer=_t;
-    }else{
-      // collapsing: set current px height explicitly first so transition starts from real height
-      collapsible.style.maxHeight=collapsible.scrollHeight+'px';
-      // force reflow so browser sees the change
-      collapsible.offsetHeight; // eslint-disable-line no-unused-expressions
-      collapsible.style.maxHeight='0';
-    }
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
