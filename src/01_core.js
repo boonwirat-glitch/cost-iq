@@ -904,6 +904,7 @@ function hideLoginOverlay() {
     // in skip-splash path. resetRuntimeSessionState removes kam-mode on signout;
     // _autoRouteAfterLogin adds it back inside setMode, but that's after first paint.
     try { document.body.classList.add('kam-mode'); } catch(e) {}
+    try { document.documentElement.dataset.theme='dark'; } catch(e) {} // phase-0C: skip-splash path
     // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
