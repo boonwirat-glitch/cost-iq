@@ -3417,6 +3417,22 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="pv-sort-search-expand" id="pv-sort-search-expand">
 <input id="pv-search-collapsed" oninput="document.getElementById('portview-search').value=this.value;schedulePortviewListRender()" placeholder="ค้นหาชื่อร้าน..." type="text"/>
 </div>
+<!-- Sort row: inside header — inherits 16px horizontal padding + sticky bg -->
+<div class="pv-sort-sticky" id="pv-sort-sticky">
+<div style="display:flex;align-items:center;gap:5px">
+<span class="pv-toggle-count" id="pv-sort-count">— ร้าน</span>
+<div class="pv-sort-divider"></div>
+<button class="pv-sort-btn" id="psb-pace" onclick="setPvSort('pace')">PACE</button>
+<button class="pv-sort-btn" id="psb-gmv" onclick="setPvSort('gmv')">GMV</button>
+<button class="pv-sort-btn" id="psb-impact" onclick="setPvSort('impact')">IMPACT</button>
+</div>
+<div class="pv-toggle-btns">
+<button class="pv-toggle-btn" id="ptb-full" onclick="setPvView('full')" title="แบบเต็ม"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="0"></rect><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="8"></rect></svg></button>
+<button class="pv-toggle-btn" id="ptb-compact" onclick="setPvView('compact')" title="แบบ compact"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="2.5" y2="2.5"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="7" y2="7"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="11.5" y2="11.5"></line></svg></button>
+</div>
+</div>
+</div><!-- /portview-header -->
+  <!-- Collapsible section — outside sticky header, collapses in normal flow -->
 <!-- Collapsible: summary cards + AI button + search -->
 <div class="pv-collapsible expanded" id="pv-collapsible">
 <!-- Summary stats -->
@@ -3434,22 +3450,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <input id="portview-search" oninput="schedulePortviewListRender()" placeholder="ค้นหาชื่อร้าน..." style="width:100%" type="text"/>
 </div>
 </div>
-<!-- Filter pills area removed — compact strip handles filtering -->
-<!-- Sort row: inside header — inherits 16px horizontal padding + sticky bg -->
-<div class="pv-sort-sticky" id="pv-sort-sticky">
-<div style="display:flex;align-items:center;gap:5px">
-<span class="pv-toggle-count" id="pv-sort-count">— ร้าน</span>
-<div class="pv-sort-divider"></div>
-<button class="pv-sort-btn" id="psb-pace" onclick="setPvSort('pace')">PACE</button>
-<button class="pv-sort-btn" id="psb-gmv" onclick="setPvSort('gmv')">GMV</button>
-<button class="pv-sort-btn" id="psb-impact" onclick="setPvSort('impact')">IMPACT</button>
-</div>
-<div class="pv-toggle-btns">
-<button class="pv-toggle-btn" id="ptb-full" onclick="setPvView('full')" title="แบบเต็ม"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="0"></rect><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="8"></rect></svg></button>
-<button class="pv-toggle-btn" id="ptb-compact" onclick="setPvView('compact')" title="แบบ compact"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="2.5" y2="2.5"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="7" y2="7"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="11.5" y2="11.5"></line></svg></button>
-</div>
-</div>
-</div><!-- /portview-header -->
 <!-- AI output — below sort row, expands above account list -->
 <div class="portview-ai-output" id="portview-ai-output" style="display:none;margin:0 16px 14px"></div>
 <!-- Account list / TL rep list -->
