@@ -1,4 +1,4 @@
-<!-- Freshket Sense v633: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v634: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v633',
+      version: 'v634',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -49054,42 +49054,23 @@ window._skCardRipple           = _skCardRipple;
     btn.classList.toggle('nav-disabled', SAVE_DISABLED.indexOf(screen) !== -1);
   }
 
-  // ─── Patch showScreen ───────────────────────────────────────────────────────
+  // ─── Patch showScreen — render nav on every navigation ──────────────────────
+  // showScreen is always called after role is set (login flow: set classes → showScreen)
+  // This is the most reliable hook point
   var _origShow = window.showScreen;
+  var _lastRenderedRole = null;
   window.showScreen = function(name) {
     var r = _origShow ? _origShow.call(this, name) : undefined;
+    // Render nav if role changed or first time
+    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 
+               document.body.getAttribute('data-role');
+    if (role && role !== _lastRenderedRole) {
+      _lastRenderedRole = role;
+      renderNav(role);
+    }
     updateSaveState(name);
     return r;
   };
-
-  // ─── Hook: patch _senseNormalizeProfileAndBody ─────────────────────────────
-  // 07b_cds.js sets window._senseNormalizeProfileAndBody = normalizeProfileAndBody
-  // We wrap it so renderNav fires every time role is confirmed (login, re-render, etc.)
-  function _patchNormalize() {
-    var orig = window._senseNormalizeProfileAndBody;
-    if (!orig || orig._navConfigPatched) return false;
-    window._senseNormalizeProfileAndBody = function() {
-      var role = orig.apply(this, arguments);
-      if (role) renderNav(role);
-      return role;
-    };
-    window._senseNormalizeProfileAndBody._navConfigPatched = true;
-    console.log('[NavConfig] hooked _senseNormalizeProfileAndBody');
-    return true;
-  }
-
-  // Try immediately (12 loads after 07b — should be ready)
-  if (!_patchNormalize()) {
-    // Fallback: retry once after a tick (race condition safety net)
-    setTimeout(function() {
-      if (!_patchNormalize()) {
-        console.warn('[NavConfig] _senseNormalizeProfileAndBody not found — using data-role fallback');
-        // Last resort: read data-role directly
-        var role = document.body.getAttribute('data-role');
-        if (role) renderNav(role);
-      }
-    }, 200);
-  }
 
   // ─── Public API ─────────────────────────────────────────────────────────────
   window.NavConfig = {
