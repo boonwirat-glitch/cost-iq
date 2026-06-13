@@ -644,19 +644,19 @@ async function _renderTLVisitContent(container) {
     let html = `
 <div style="padding:14px 14px 10px;flex-shrink:0;">
   <div class="sk-eyebrow sk-eyebrow-ac" style="margin-bottom:3px;">VISITS · สัปดาห์นี้</div>
-  <div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;">${todayStr}</div>
+  <div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${todayStr}</div>
 </div>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 14px;">
   <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
-    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${totalThis}</div>
+    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${totalThis}</div>
     <div class="sk-eyebrow" style="margin-top:3px;">visits/week</div>
   </div>
   <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
-    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono',monospace;">${avgThis}</div>
+    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${avgThis}</div>
     <div class="sk-eyebrow" style="margin-top:3px;">avg/rep</div>
   </div>
   <div style="background:${lowCount > 0 ? 'rgba(255,56,92,.07)' : 'var(--sk-surface)'};border-radius:8px;padding:10px 12px;${lowCount > 0 ? 'border:1px solid rgba(255,56,92,.18);' : ''}">
-    <div style="font-size:20px;font-weight:700;color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono',monospace;">${lowCount}</div>
+    <div style="font-size:20px;font-weight:700;color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${lowCount}</div>
     <div class="sk-eyebrow" style="margin-top:3px;color:${lowCount > 0 ? 'var(--sk-ac)' : ''};">ไม่ครบ ${qLabel}</div>
   </div>
 </div>`;
@@ -688,14 +688,14 @@ async function _renderTLVisitContent(container) {
   <div style="flex:1;min-width:0;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px;">
       <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rawName}</div>
-      ${acctTgt > 0 ? `<div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
+      ${acctTgt > 0 ? `<div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
     </div>
     <div style="height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
       <div style="height:100%;width:${qPct}%;background:${barColor};border-radius:2px;transition:width .3s;"></div>
     </div>
   </div>
   <div style="text-align:right;flex-shrink:0;min-width:28px;">
-    <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono',monospace;line-height:1;">${d.thisWeek}</div>
+    <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono','Noto Sans Thai',monospace;line-height:1;">${d.thisWeek}</div>
     <div style="font-size:10px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
   </div>
 </div>`;
@@ -930,7 +930,7 @@ async function _doOpenDetail(skillId) {
     _skillsRole === 'sales_tl' || _skillsRole === 'tl' ||
     _skillsRole === 'admin'    || _skillsRole === 'ad_tl');
   if (_isTLBrowse) {
-    cta = `<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:100px;background:var(--sk-surface);font-size:10px;font-weight:600;color:var(--sk-muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;">READ ONLY</div>`;
+    cta = `<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:100px;background:var(--sk-surface);font-size:10px;font-weight:600;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.08em;text-transform:uppercase;">READ ONLY</div>`;
   } else if (state === 'locked') {
     cta = `<button class="sk-cta-btn sk-cta-primary" onclick="skillsStartTraining(${skillId})">เริ่มฝึก</button>`;
   } else if (state === 'training') {
@@ -1367,7 +1367,7 @@ async function skillsTLOpenEval(userId, skillId) {
     <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(124,58,237,.45);border-radius:999px;padding:3px 9px;font-family:'Noto Sans Thai',sans-serif;backdrop-filter:blur(4px);">TL</div>
   </div>
   <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 16px 18px;">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);font-family:'IBM Plex Mono',monospace;">${modCode}</div>
+    <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${modCode}</div>
     <div style="font-size:20px;font-weight:700;color:#fff;line-height:1.2;margin-top:2px;">${def.skill_name_en}</div>
     <div class="sk-state-pill pill-${state}" style="margin-top:8px;display:inline-flex;"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
   </div>
