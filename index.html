@@ -1,4 +1,4 @@
-<!-- Freshket Sense v666: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v667: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -621,7 +621,11 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
    ============================================================ */
 
 /* ── TOPBAR ── */
-.topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + constant(safe-area-inset-top));padding-top:calc(11px + env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+/* v667: --topbar-h = single source of truth for topbar height across all sticky offsets.
+   Body padding-top, portview-header top, kav-z1 top all reference this var.
+   Prevents portview-header (sticky top:0) from competing with .topbar and pushing it off screen. */
+:root{--topbar-h:calc(54px + env(safe-area-inset-top, 0px));}
+.topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + constant(safe-area-inset-top));padding-top:calc(11px + env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;margin:0 auto;max-width:440px;z-index:200;}
 /* v573: PWA standalone — iOS โหมด standalone ต้อง pad status bar เสมอ
    display-mode media query จับเฉพาะตอนเปิดจาก Home Screen · 47px = status bar ต่ำสุดบน notch iPhone */
 @media all and (display-mode: standalone) {
@@ -822,7 +826,7 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 
 /* Zone 1: sticky dark header */
 #kav-z1{
-  position:sticky;top:54px;z-index:98;
+  position:sticky;top:var(--topbar-h);z-index:98;
   background:linear-gradient(180deg,#0c1a36 0%,#091526 68%,rgba(9,21,38,0) 100%);
   padding:10px 16px 20px;
   backdrop-filter:blur(8px);
@@ -1091,7 +1095,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card:active{transform:scale(.98)}
 
 /* ── SCREENS ── */
-.main{padding-bottom:148px;min-height:calc(100vh - 48px)}
+.main{padding-top:var(--topbar-h);padding-bottom:148px;min-height:calc(100vh - 48px)}
 
 /* ══ PHASE 0C: DATA-THEME — BNAV ONLY ════════════════════════
    data-theme is set on <html> at login by 01_core.js.
@@ -1170,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v666',
+      version: 'v667',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7039,7 +7043,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
-.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
 .pv-collapsible{overflow:hidden}
@@ -9695,7 +9699,7 @@ body.kam-sense-active.sense-plan-expanded .sps-cta{margin-right:14px!important;w
 body.sdt-light.kam-sense-active.kam-mode .bnav{
   background:linear-gradient(180deg,rgba(232,250,242,.78),rgba(218,240,228,.9))!important;
 }
-body.sdt-light.kam-sense-active .topbar{z-index:120!important;}
+/* v667: z-index:120 override removed — .topbar is position:fixed z-index:200, always above portview-header z-index:10 */
 body.sdt-light.kam-sense-active .data-btn,
 body.sdt-light.kam-sense-active #dataBtnTop,
 body.sdt-light.kam-sense-active .topbar-right button[title="ออกจากระบบ"]{
