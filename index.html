@@ -1,4 +1,4 @@
-<!-- Freshket Sense v626: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v627: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -4700,7 +4700,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v626',
+      version: 'v627',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -23742,7 +23742,16 @@ function __legacyShowScreenFallback(name){
     const activeGrp=inA?grpA:grpB;
     const screens=inA?GRP_A:GRP_B;
     const idx=screens.indexOf(name);
-    if(activeGrp) activeGrp.scrollTo({left:idx*activeGrp.offsetWidth,behavior:'instant'});
+    // v626: reset scrollLeft directly first (offsetWidth may be 0 before repaint)
+    // then RAF to handle case where scroll didn't reset (container was off-screen)
+    if(activeGrp){
+      activeGrp.scrollLeft = idx === 0 ? 0 : (activeGrp.scrollLeft);
+      requestAnimationFrame(()=>{
+        const w = activeGrp.offsetWidth || window.innerWidth;
+        try{ activeGrp.scrollTo({left:idx*w,behavior:'instant'}); }
+        catch(e){ activeGrp.scrollLeft = idx*w; }
+      });
+    }
     _updateRestSwipe(inA?'a':'b',idx,{teach:inA,duration:2800});
     const footer=document.getElementById('pb-footer');
     if(footer)footer.classList.toggle('hidden',inA||name==='report');
