@@ -1,11 +1,6 @@
 /* ============================================================
-   FRESHKET SENSE — BASE STYLES
-   src/styles_base.css  (Phase 0B split from styles_main.css)
-
-   Contents: :root local color vars (--g*, --amb, --n*),
-             CSS reset, body/html, .mono, global keyframes.
-   These rules apply to EVERY role/feature — no exceptions.
-   Never add role-specific or feature-specific rules here.
+   FRESHKET SENSE — BASE STYLES  src/styles_base.css
+   Contents: :root vars, CSS reset, body, keyframes.
    ============================================================ */
 
 /* ============================================================
@@ -35,13 +30,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}html{overflow-x:clip}
 body{font-family:var(--tk-font-body);}
-/* phase-0A: KAM/AD locked to IBM Plex Sans Thai (257 components inherit, Noto would change KAM UI) */
+/* phase-0A: KAM/AD locked to IBM Plex Sans Thai */
 body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
 body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
 .mono{font-family:'IBM Plex Mono',monospace}
-/* ── FEATURE DEFAULT: new features inherit body → Noto Sans Thai automatically ─────── */
-/* ── Use var(--fk-red) for CI accent, var(--canvas) for bg, var(--ink-1) for text ──── */
 
 /* ── MICRO-INTERACTION: Dot blink for loading states ── */
 @keyframes _dotBlink{0%,100%{opacity:.2}50%{opacity:.9}}
