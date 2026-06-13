@@ -35,6 +35,7 @@ conv_intel_js = read('src/09_conv_intel.js')
 sales_js     = read('src/10_sales_view.js')
 skills_js    = read('src/11_skills.js')
 styles_skills = read('src/styles_skills.css')
+styles_rest   = read('src/styles_restaurant.css')
 styles_sales = read('src/styles_sales.css')
 styles_tokens  = read('src/styles_tokens.css')
 styles_base    = read('src/styles_base.css')
@@ -67,7 +68,9 @@ out = (shell
              f'<script id="freshket-sales">\n{sales_js}</script>\n')
     .replace('<script id="freshket-skills">\n<!-- INJECT_SKILLS -->\n</script>\n',
              f'<script id="freshket-skills">\n{skills_js}</script>\n')
-    .replace('<style id="skills-module-css">\n<!-- INJECT_STYLES_SKILLS -->\n</style>',
+    .replace('<style id="restaurant-module-css">\n<!-- INJECT_STYLES_RESTAURANT -->\n</style>',
+             f'<style id="restaurant-module-css">\n{styles_rest}</style>') \
+             .replace('<style id="skills-module-css">\n<!-- INJECT_STYLES_SKILLS -->\n</style>',
              f'<style id="skills-module-css">\n{styles_skills}</style>')
     .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
              f'<style id="sales-module-css">\n{styles_sales}</style>')
@@ -80,7 +83,8 @@ out = (shell
 
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS',
-          'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES']:
+          'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
+          'INJECT_STYLES_RESTAURANT']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
