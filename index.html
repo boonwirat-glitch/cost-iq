@@ -1,4 +1,4 @@
-<!-- Freshket Sense 605: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 606: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5655,7 +5655,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '605',
+      version: '606',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -42244,17 +42244,15 @@ body:not(.echo-active) { background:unset; }
     </div>
     <div class="tab-bar" id="ci-tabbar">
       <div class="tab-pill" id="ci-tpill"></div>
-      <button class="tab-btn on" onclick="CI._tab(0,this)">ภาพรวม</button>
+      <button class="tab-btn on" onclick="CI._tab(0,this)">บทสนทนา</button>
       <button class="tab-btn" onclick="CI._tab(1,this)">ทักษะ</button>
       <button class="tab-btn" onclick="CI._tab(2,this)">ลูกค้า</button>
-      <button class="tab-btn" onclick="CI._tab(3,this)">Transcript</button>
     </div>
   </div>
   <div class="result-body" id="ci-result-body">
     <div class="panel on" id="ci-p0"></div>
     <div class="panel" id="ci-p1"></div>
     <div class="panel" id="ci-p2"></div>
-    <div class="panel" id="ci-p3"></div>
   </div>
   <div class="result-cta">
     <button class="btn btn-ghost" onclick="CI.cancel()">ทิ้ง</button>
@@ -42985,24 +42983,20 @@ OCPB (customer intel จากเสียงเท่านั้น):
       document.getElementById('ci-p0').innerHTML = noSpeechHTML;
       document.getElementById('ci-p1').innerHTML = noSpeechHTML;
       document.getElementById('ci-p2').innerHTML = noSpeechHTML;
-      document.getElementById('ci-p3').innerHTML = noSpeechHTML;
       const tlDiv = document.getElementById('ci-tl-actions');
       if (tlDiv) tlDiv.style.display = 'none';
       return;
     }
 
-    // v586: sd2 redesign — โครงเดียวกับ session detail (v568): ภาพรวม/ทักษะ/ลูกค้า/Transcript
-    // narrative-first: เปิดมาเจอ tone + สรุป + key moments เด่น ก่อน drill ลงฟอร์ม
+    // v606: 3 tabs — บทสนทนา / ทักษะ / ลูกค้า
     document.getElementById('ci-p0').innerHTML = _overviewPanel(transcriptSummary, toneSignals);
     document.getElementById('ci-p1').innerHTML = _skillsPanel(skillData);
     document.getElementById('ci-p2').innerHTML = _customerPanel(intelData);
-    document.getElementById('ci-p3').innerHTML = _transcriptPanel(toneSignals);
     const tlDiv = document.getElementById('ci-tl-actions');
-    // Show Debrief only when reviewing someone else's session, not when TL/Admin records own
   if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
   }
 
-  // ── v586: ภาพรวม panel — sd2 design (mirror session detail pane1) ─────────
+  // ── v606: "บทสนทนา" panel — รวม overview + transcript เป็น tab เดียว ──────
   function _overviewPanel(summary, tone) {
     const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
     const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
@@ -43010,12 +43004,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
     if (tone) {
       const _conf = tone.rep_confidence;
       const _eng  = tone.customer_engagement;
-      // v599: not_applicable / missing → neutral grey ไม่ใช่ red
       const cConf = _conf==='high'?'#1F8A43':_conf==='medium'?'#B26A00':(_conf==='low'?'#C73E3E':'#8E8E93');
       const cEng  = _eng==='increasing'?'#1F8A43':_eng==='stable'?'#B26A00':(_eng==='declining'?'#C73E3E':'#8E8E93');
-      const confTxt = thaiConf[_conf] || (_conf ? '—' : '—');
-      const engTxt  = thaiEng[_eng]   || (_eng  ? '—' : '—');
-      // ซ่อน card ทั้งหมดถ้าทั้งคู่เป็น not_applicable (เช่น sales session ที่ไม่มี rep)
+      const confTxt = thaiConf[_conf] || '—';
+      const engTxt  = thaiEng[_eng]   || '—';
       const bothNA = (!_conf || _conf==='not_applicable') && (!_eng || _eng==='not_applicable');
       if (!bothNA) {
         toneHtml = `<div class="sd2-lbl">Tone &amp; Energy</div>
@@ -43027,15 +43019,14 @@ OCPB (customer intel จากเสียงเท่านั้น):
     }
     const summaryHtml = summary
       ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${summary}</div>` : '';
+    // v606: แสดง key_moments ครบทุกจุด (ไม่ตัด top 5 อีกต่อไป)
     const allM = (tone?.key_moments||[]).map(m => _kmText(m)).filter(Boolean);
-    const top  = allM.slice(0, 5);
-    const momentsHtml = top.length
-      ? `<div class="sd2-lbl">Key Moments${allM.length>5?` · เด่นสุด 5 จาก ${allM.length}`:''}</div>`
-        + top.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
-        + (allM.length>5 ? `<div style="font-size:12px;color:#8E8E93;padding-top:8px">ดูครบ ${allM.length} จุดได้ใน tab Transcript</div>` : '')
+    const momentsHtml = allM.length
+      ? `<div class="sd2-lbl">Key Moments · ${allM.length} จุด</div>`
+        + allM.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
       : '';
     return (toneHtml + summaryHtml + momentsHtml)
-      || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลภาพรวม</div>`;
+      || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลบทสนทนา</div>`;
   }
 
   function _skillsPanel(d) {
@@ -43048,19 +43039,14 @@ OCPB (customer intel จากเสียงเท่านั้น):
           </div>
         </div>`
       : '';
-    const PIPC_STAGES = ['Prepare','Identify','Probe','Close'];
-    const stageIdx = PIPC_STAGES.indexOf(d?.pipc_stage);
-    const reached = stageIdx >= 0 ? stageIdx : 0;
-    const segs = PIPC_STAGES.map((l,i) =>
-      `<div class="pipc-seg${i<=reached?' done':''}"></div>`).join('');
-    const lbls = PIPC_STAGES.map((l,i) =>
-      `<span class="pipc-lbl${i<=reached?' done':''}">${l}</span>`).join('');
+
+    // v606: ลบ PIPC progress bar ออก — A01_PIPC เป็น skill หนึ่งใน rows อยู่แล้ว
+    // ลบ session_summary ("สรุปทักษะ") ออก — อยู่ใน tab บทสนทนาแล้ว
 
     const summary = d?.session_summary
       ? `<div class="sd2-lbl">สรุปทักษะ</div><div class="sd2-sum" style="margin-bottom:6px">${d.session_summary}</div>`
       : '';
 
-    // v586: sd2 rows — module dot system (v569 app-wide) + ชื่อ skill จาก rubric DB
     const _rbName = c => { const r = (_rubricCache||[]).find(x => x.skill_code === c); return (r && r.skill_name_en) || ''; };
     const stMap = { pass:['ทำได้ดี','ok'], developing:['กำลังพัฒนา','dev'], not_applicable:['N/A','no'] };
     const rows = (d?.skills||[]).map(s => {
@@ -43082,10 +43068,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       </div>`;
     }).join('');
 
-    return shortBanner + `<div class="sd2-lbl">PIPC Progress</div>
-      <div class="pipc-track">${segs}</div>
-      <div class="pipc-labels">${lbls}</div>
-      ${summary}${rows}`;
+    return shortBanner + summary + (rows || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มีการประเมินทักษะ</div>`);
   }
 
   function _customerPanel(d) {
@@ -44159,16 +44142,6 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const revChip = reviewed
       ? `<span class="sd2-chip rev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>รีวิวแล้ว ${reviewedDate}</span>` : '';
 
-    // ── Collapsible session summary
-    const whyTxt = s.skill_scores?.session_summary || '';
-    const whyHtml = whyTxt ? `
-<div class="sd2-whywrap">
-  <div class="sd2-why" id="sd2-why">${whyTxt}</div>
-  <div class="sd2-whytg" id="sd2-whytg" onclick="CI._sdToggleWhy()">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-  </div>
-</div>` : '';
-
     // ── Map ci_sessions fields → shared panel function arguments
     // skill_scores: { skills, overall, pipc_stage, session_summary, no_speech }
     // apply tl_override per skill so shared renderer shows final score
@@ -44182,33 +44155,26 @@ OCPB (customer intel จากเสียงเท่านั้น):
       next_actions: s.next_actions || s.customer_intel?.next_actions || []
     });
     const toneSignals       = s.tone_signals || null;
-    // v599: ถ้ามี whyHtml (session_summary) อยู่ใน header แล้ว
-    // ไม่ส่ง transcriptSummary ให้ _overviewPanel เพื่อป้องกันสรุปซ้ำ
-    // transcript_summary ยังคงแสดงใน tab Transcript ผ่าน _transcriptPanel
+    // v606: ส่ง transcriptSummary ให้ _overviewPanel โดยตรง (ไม่มี whyHtml กรอง)
     const transcriptSummary = s.transcript_summary || null;
-    const overviewSummary   = whyTxt ? null : transcriptSummary;
 
-    // ── Build 4 panes using shared renderers (identical to live result)
-    const pane1 = _overviewPanel(overviewSummary, toneSignals);
+    // ── Build 3 panes (v606: รวม overview+transcript → "บทสนทนา")
+    const pane1 = _overviewPanel(transcriptSummary, toneSignals);
     const pane2 = _skillsPanel(skillData);
     const pane3 = _customerPanel(intelData);
-    const pane4 = _transcriptPanel(toneSignals, transcriptSummary);
 
     body.innerHTML = `
 <div class="sd2-name">${repName}</div>
 <div class="sd2-meta">${acctLabel} · ${date} · ${dur}</div>
 <div class="sd2-chips">${verdictChip}${cvChip}${revChip}</div>
-${whyHtml}
 <div class="sd2-tabs">
-  <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">ภาพรวม</div>
+  <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">บทสนทนา</div>
   <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p2')">ทักษะ</div>
   <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p3')">ลูกค้า</div>
-  <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p4')">Transcript</div>
 </div>
 <div class="sd2-pane on" id="sd2p1">${pane1}</div>
 <div class="sd2-pane" id="sd2p2">${pane2}</div>
-<div class="sd2-pane" id="sd2p3">${pane3}</div>
-<div class="sd2-pane" id="sd2p4">${pane4}</div>`;
+<div class="sd2-pane" id="sd2p3">${pane3}</div>`;
 
     // ── Footer — TL coaching note editor / read-only note for rep
     const _isTLViewer = (typeof _canDebrief === 'function') ? _canDebrief() : false;
