@@ -533,3 +533,199 @@ body.kam-mode #kam-nav-handle{display:none;}
 
 /* Insight buttons idle glow — Portfolio + Team (mirrors kam-insight-btn) */
 .portview-ai-btn:not(.loading):not(.done){animation:insight-idle-glow 3s ease-in-out infinite}
+
+/* ── Phase 0E appended sections ── */
+/* ── NRR Movement rows (v198) ── */
+.tgt-mv-wrap{border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding:6px 0 2px}
+.tgt-mv-header{display:flex;align-items:center;gap:6px;padding:0 0 4px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:3px}
+.tgt-mv-header .tgt-mv-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.3)}
+.tgt-mv-header .tgt-mv-count,.tgt-mv-header .tgt-mv-gmv,.tgt-mv-header .tgt-mv-nrr{font-size:9px;color:rgba(255,255,255,.25);font-weight:600}
+.tgt-mv-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;font-family:var(--tk-font-body)}
+.tgt-mv-label{flex:1;color:rgba(255,255,255,.55);font-weight:600;min-width:80px}
+.tgt-mv-count{color:rgba(255,255,255,.4);font-size:10px;min-width:44px}
+.tgt-mv-gmv{font-family:'IBM Plex Mono',monospace;font-weight:700;color:rgba(255,255,255,.8);min-width:50px;text-align:right}
+.tgt-mv-nrr{font-family:'IBM Plex Mono',monospace;font-weight:700;min-width:36px;text-align:right}
+.tgt-mv-out .tgt-mv-label{color:rgba(255,140,100,.65)}
+.tgt-mv-neg{color:rgba(255,120,100,.9)!important}
+.tgt-mv-sub{display:flex;align-items:center;gap:4px;padding:2px 0 2px 10px;font-size:10px;font-family:var(--tk-font-body);border-left:2px solid rgba(255,140,100,.2);margin-left:4px}
+.tgt-mv-sub-name{flex:1;color:rgba(255,255,255,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.tgt-mv-sub-dest{color:rgba(255,200,150,.55);white-space:nowrap;font-size:9px}
+.tgt-mv-sub-gmv{font-family:'IBM Plex Mono',monospace;font-weight:600;color:rgba(255,120,100,.7);font-size:10px;margin-left:auto;white-space:nowrap}
+.tgt-mv-sub-more{color:rgba(255,255,255,.25);font-size:9px;padding-left:10px}
+.ai-typing{display:inline-flex;align-items:center;gap:4px;padding:2px 0}
+.ai-typing span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--g500);opacity:.35;animation:ai-tdot 1.2s ease-in-out infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes ai-tdot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-4px)}}
+.aisugg{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;flex-shrink:0}
+.sgbtn{background:var(--n50);border:1px solid var(--n200);border-radius:20px;padding:6px 12px;font-size:11px;font-family:var(--tk-font-body);cursor:pointer;color:var(--n900);transition:all .15s;white-space:nowrap}
+.sgbtn:hover{background:var(--g900);color:#fff;border-color:var(--g900)}
+.aiinput-row{display:flex;gap:8px;padding:10px 16px 16px;flex-shrink:0;border-top:1px solid var(--n100)}
+.aiinput{flex:1;border:1.5px solid var(--n200);border-radius:24px;padding:10px 16px;font-size:14px;font-family:var(--tk-font-body);outline:none;background:var(--n50)}
+.aiinput:focus{border-color:var(--g500);background:var(--n0)}
+.aisend{width:42px;height:42px;border-radius:50%;background:var(--g900);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:197;opacity:0;pointer-events:none;transition:opacity .3s}
+.overlay.on{opacity:1;pointer-events:all}
+
+/* ── DETAIL SHEET ── */
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:160;opacity:0;pointer-events:none;transition:opacity .3s}
+.detail-overlay.on{opacity:1;pointer-events:all}
+.detail-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(102%);width:100%;max-width:440px;background:var(--n0);border-radius:20px 20px 0 0;box-shadow:0 -8px 40px rgba(0,0,0,.18);z-index:161;transition:transform .38s cubic-bezier(.34,1.3,.64,1);max-height:90vh;overflow-y:auto;display:flex;flex-direction:column}
+.detail-sheet.open{transform:translateX(-50%) translateY(0)}
+.detail-sheet-head{padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--n100);position:sticky;top:0;background:var(--n0);z-index:1;flex-shrink:0}
+.detail-sheet-cat{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--n400);margin-bottom:2px}
+.detail-sheet-title{font-size:14px;font-weight:700;color:var(--n900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.detail-sheet-body{padding:0 0 32px}
+/* pb-item tap hint — subtle info icon signals tappable for detail */
+.pb-item-info-hint{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--n200);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--n400);font-size:10px;font-style:italic;font-family:Georgia,serif;transition:all .15s;cursor:pointer}
+.pb-item:hover .pb-item-info-hint{border-color:var(--g500);color:var(--g700)}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--n400)}
+.empty-state .es-icon{font-size:40px;margin-bottom:12px}
+.empty-state .es-title{font-size:15px;font-weight:700;color:var(--n700);margin-bottom:6px}
+.empty-state .es-body{font-size:13px;line-height:1.6;margin-bottom:16px}
+.empty-state .es-btn{background:var(--g900);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:13px;font-weight:700;font-family:var(--tk-font-body);cursor:pointer;transition:opacity .2s}
+.empty-state .es-btn:hover{opacity:.88}
+
+.mt8{margin-top:8px}.mb12{margin-bottom:12px}
+.flex-b{display:flex;align-items:center;justify-content:space-between}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes skeleton-pulse{0%,100%{opacity:.45}50%{opacity:.9}}
+
+/* ══ KAM MODE — DARK THEME ══ */
+/* → Portview block 1 moved to styles_portview.css (Phase 0E) */
+/* Insight buttons idle glow — Portfolio + Team (mirrors kam-insight-btn) */
+.portview-ai-btn:not(.loading):not(.done){animation:insight-idle-glow 3s ease-in-out infinite}
+/* ── SENSE PREVIEW CARD (post-scan result) ── */
+.rest-ai-load{padding:10px 4px 4px}
+.rest-ai-step{font-size:12px;font-weight:500;font-family:var(--tk-font-body);min-height:22px;opacity:0;transition:opacity .35s;display:flex;align-items:center;gap:7px;margin-bottom:3px;color:rgba(190,255,220,.7)}
+.rest-ai-step.vis{opacity:1}
+.rest-ai-step-dot{width:6px;height:6px;border-radius:50%;background:var(--g500);flex-shrink:0}
+.sense-preview{border-radius:var(--r);border:1.5px solid var(--tk-ok-border);background:var(--g50);padding:16px;margin-top:10px}
+.sense-preview-eyebrow{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--g700);margin-bottom:10px;font-family:var(--tk-font-body);display:flex;align-items:center;gap:5px}
+.rap-star{color:var(--g500);font-size:13px;line-height:1}
+.rap-opps{font-size:20px;font-weight:700;color:var(--n900);font-family:var(--tk-font-body);margin-bottom:3px;line-height:1.3}
+.rap-savings-note{font-size:11px;color:var(--n500);font-weight:500;margin-bottom:14px;font-family:var(--tk-font-body)}
+.rap-cta{width:100%;padding:10px 16px;border-radius:9px;border:none;background:var(--g500);color:#003820;font-family:var(--tk-font-body);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.rap-cta:hover{background:#00b85e}
+
+/* ── freshket-v212a-pwa-freshness-css ── */
+/* v212a — PWA width guard for Teamview/KAM cards. UI only; no data/formula changes. */
+@media (max-width: 430px){
+  #scr-teamview{overflow-x:hidden;}
+  #scr-teamview .portview-head{align-items:flex-start!important;gap:10px!important;padding-left:16px!important;padding-right:16px!important;}
+  #scr-teamview #tv-title{font-size:22px!important;line-height:1.18!important;max-width:92px!important;white-space:normal!important;}
+  #scr-teamview #tv-action-btns{gap:7px!important;margin-left:0!important;flex:1!important;justify-content:flex-end!important;flex-wrap:nowrap!important;min-width:0!important;}
+  #scr-teamview #tv-target-btn,
+  #scr-teamview #tv-portfolio-btn,
+  #scr-teamview #tv-commission-btn,
+  #scr-teamview .comm-btn{height:36px!important;padding:7px 10px!important;border-radius:12px!important;font-size:12px!important;white-space:nowrap!important;flex-shrink:0!important;}
+  #scr-teamview #tv-target-btn svg,
+  #scr-teamview #tv-portfolio-btn svg,
+  #scr-teamview #tv-commission-btn svg{width:15px!important;height:15px!important;}
+  #scr-teamview .role-pill{height:28px!important;min-width:42px!important;padding:0 10px!important;}
+  #tv-pace-bar{margin-left:0!important;margin-right:0!important;}
+  #tv-pace-bar > div:first-child{align-items:flex-start!important;gap:6px!important;}
+  #tv-pace-bar > div:first-child > div:first-child{min-width:0!important;flex:1!important;}
+  #tv-pace-bar .pace-pct-val{font-size:28px!important;line-height:1!important;}
+  #tv-pace-bar .pace-bar-wrap{height:6px!important;border-radius:4px!important;}
+  #tv-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;}
+  .tv-full-card,.tv-star-card{padding:16px 16px 14px!important;border-radius:16px!important;margin-bottom:14px!important;}
+  .tv-full-top{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:8px!important;margin-bottom:10px!important;}
+  .tv-full-name{font-size:15px!important;line-height:1.3!important;min-width:0!important;white-space:normal!important;overflow:visible!important;}
+  .tv-full-name span{display:inline-block!important;margin-left:6px!important;white-space:nowrap!important;font-size:10px!important;color:rgba(255,255,255,.56)!important;}
+  .tv-full-pace,.tv-star-pace{font-size:22px!important;line-height:1!important;}
+  .tv-full-bar,.tv-star-bar{height:6px!important;border-radius:999px!important;margin-bottom:12px!important;}
+  .tv-full-fill,.tv-star-fill{border-radius:999px!important;}
+  .tv-full-meta{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"chips gmv" "payout gmv"!important;align-items:center!important;gap:8px 12px!important;font-size:11px!important;}
+  .tv-risk-chips{grid-area:chips!important;display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important;min-width:0!important;}
+  .tv-risk-chips .tv-nrr-pill{margin-left:4px!important;}
+  .tv-risk-chips .tv-payout-pill{grid-area:payout!important;}
+  .tv-full-meta > span:not(.tv-nrr-pill):not(.tv-payout-pill){grid-area:gmv!important;text-align:right!important;align-self:center!important;line-height:1.6!important;white-space:normal!important;min-width:86px!important;}
+  .tv-payout-pill{min-width:96px!important;justify-content:center!important;padding:7px 14px!important;font-size:12px!important;border-radius:999px!important;}
+  .tv-nrr-pill{padding:6px 12px!important;border-radius:999px!important;font-size:12px!important;}
+  .tv-card-exclude{display:none!important;}
+  /* v573: floating pill ทุก mode — centering ด้วย left/right + margin:auto (ไม่ใช้ transform)
+     iOS Safari/WKWebView bug: position:fixed + transform = nav เลื่อนตาม scroll
+     left:16px + right:16px + margin:0 auto + max-width ให้ผลตรงกลางเหมือน translateX(-50%) แต่ fixed ทำงานจริง */
+  body:not(.sales-mode) .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(20,32,48,.82)!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important;box-shadow:0 18px 40px rgba(0,0,0,.42),0 6px 16px rgba(0,0,0,.28),0 1px 0 rgba(255,255,255,.06) inset!important;padding-bottom:8px!important;}
+  /* v573: Sales floating pill — ขาว frosted, ลอยเหนือ bottom + safe area, ไม่มี transform */
+  body.sales-mode .bnav{left:16px!important;right:16px!important;transform:none!important;width:auto!important;max-width:392px!important;margin:0 auto!important;border-radius:36px!important;bottom:calc(14px + env(safe-area-inset-bottom,0px))!important;padding-bottom:8px!important;}
+}
+@media (max-width: 370px){
+  #scr-teamview #tv-action-btns{gap:5px!important;}
+  #scr-teamview #tv-target-btn,
+  #scr-teamview #tv-portfolio-btn,
+  #scr-teamview #tv-commission-btn,
+  #scr-teamview .comm-btn{padding:6px 8px!important;font-size:11px!important;}
+  #scr-teamview #tv-title{max-width:82px!important;font-size:20px!important;}
+  .tv-full-name{font-size:14px!important;}
+  .tv-full-pace,.tv-star-pace{font-size:20px!important;}
+}
+
+/* ── freshket-v212b-panel-target-ui-css ── */
+/* v212b — UI-only cleanup: remove duplicated overflow badge and keep info button inline. */
+.tgt-overflow-badge{display:none!important;}
+.tgt-pct-legend{align-items:center!important;gap:8px!important;}
+.tgt-info-btn{flex:0 0 auto!important;margin-left:auto!important;}
+@media(max-width:420px){
+  .tgt-pct-legend{gap:7px!important;}
+  .tgt-info-btn{width:28px!important;height:28px!important;min-width:28px!important;}
+  .tgt-month-input{font-variant-numeric:tabular-nums;letter-spacing:.2px;}
+}
+
+/* ── freshket-v212c-diagnostics-css ── */
+/* v212c — diagnostic visibility only. No layout/business formula changes. */
+#sheets-loaded-count.sense-core-ready{background:var(--tk-accent-dim)!important;color:var(--tk-accent-solid)!important;}
+#sheets-loaded-count.sense-all-ready{background:var(--tk-ok-dim-2)!important;color:var(--g700)!important;}
+#sheets-loaded-count.sense-partial{background:rgba(240,176,0,.16)!important;color:#9a6500!important;}
+
+/* ── freshket-v213-guided-intelligence-ux-css ── */
+/* v213 — Guided Intelligence UX: purposeful defaults, discoverable drill-down, premium commission reward, native-safe PWA polish. */
+:root{--v213-gold:#ffe08a;--v213-gold2:#f0b000;--v213-gold3:#8a5a00;--v213-blue:#4f8cff;}
+
+/* 1) SKU price trend starts as the intentional analytical default. */
+.sku-view-toggle.v213-price-default{box-shadow:0 0 0 1px var(--tk-ok-dim),0 4px 14px rgba(0,0,0,.06)!important;}
+.sku-view-toggle.v213-price-default #svt-price.on{position:relative;overflow:hidden;}
+.sku-view-toggle.v213-price-default #svt-price.on:after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.18) 45%,transparent 75%);transform:translateX(-120%);animation:v213-sheen-once 1.4s ease .25s 1 both;pointer-events:none;}
+@keyframes v213-sheen-once{0%{transform:translateX(-120%)}100%{transform:translateX(150%)}}
+
+/* 2) Restaurant mode is a drill-down action, not a hidden tab. */
+body.kam-mode #nav-restaurant{position:relative;}
+body.kam-mode #nav-restaurant .nwrap{position:relative;border-radius:16px;padding:8px 13px!important;background:linear-gradient(135deg,var(--tk-accent-dim-3),rgba(13,31,60,.72));box-shadow:0 0 0 1px rgba(140,200,255,.22) inset,0 0 18px rgba(80,150,255,.12);transition:transform .18s ease,box-shadow .25s ease,background .25s ease;}
+body.kam-mode #nav-restaurant .nwrap:before{content:'';position:absolute;inset:-5px;border-radius:20px;background:radial-gradient(circle,rgba(140,200,255,.20),transparent 68%);opacity:.65;pointer-events:none;animation:v213-drill-halo 3.4s ease-in-out infinite;}
+body.kam-mode #nav-restaurant .lb{font-weight:850;color:rgba(225,238,255,.88)!important;}
+/* v492: in sdt-light Save mode, nav-restaurant label must be dark (light-bg context) */
+body.sdt-light.kam-sense-active.kam-mode .bnav #nav-restaurant .lb{color:rgba(0,0,0,.52)!important;font-weight:600!important;}
+body.kam-mode #nav-restaurant.v213-coach-pulse .nwrap{animation:v213-drill-pulse 1.6s ease 1 both;}
+body.kam-mode.restaurant-sheet #nav-restaurant .nwrap{background:linear-gradient(135deg,var(--tk-ok-border),var(--tk-accent-dim-3));box-shadow:0 0 0 1px var(--tk-ok-border) inset,0 0 22px var(--tk-ok-dim-2);}
+@keyframes v213-drill-halo{0%,100%{opacity:.42;transform:scale(.98)}50%{opacity:.82;transform:scale(1.05)}}
+@keyframes v213-drill-pulse{0%,100%{transform:scale(1)}38%{transform:scale(1.08)}68%{transform:scale(.98)}}
+#v213-drill-coach{position:fixed;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(12px);z-index:10020;max-width:min(330px,calc(100vw - 38px));padding:10px 13px 10px 12px;border-radius:16px;background:rgba(12,28,54,.94);border:1px solid rgba(140,200,255,.35);box-shadow:0 12px 36px rgba(0,0,0,.28),0 0 18px rgba(80,150,255,.14);color:#fff;font-size:12px;font-weight:750;line-height:1.42;display:flex;gap:9px;align-items:flex-start;opacity:0;pointer-events:none;transition:opacity .22s ease,transform .28s cubic-bezier(.34,1.2,.64,1);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+#v213-drill-coach.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+#v213-drill-coach .v213-coach-star{color:#8fd0ff;filter:drop-shadow(0 0 8px rgba(140,200,255,.55));font-size:16px;line-height:1.2;}
+#v213-drill-coach .v213-coach-copy strong{color:#8fd0ff;}
+#v213-drill-coach button{margin-left:4px;border:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.72);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0;}
+body.kam-mode #mode-toggle-wrap{opacity:.64;transform:scale(.94);transform-origin:right center;transition:opacity .2s ease,transform .2s ease;}
+body.kam-mode #mode-toggle-wrap:hover{opacity:1;transform:scale(1);}
+body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
+
+/* 3) Commission reward loop — always visible, more special when unlocked. */
+.pv-comm-strip.v210k{position:relative;overflow:hidden;border-color:rgba(255,224,138,.42)!important;background:linear-gradient(135deg,rgba(255,224,138,.10),rgba(35,73,126,.52) 46%,rgba(15,42,76,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(255,224,138,.05),0 6px 22px rgba(0,0,0,.10)!important;}
+.pv-comm-strip.v210k:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 8% 0%,rgba(255,224,138,.18),transparent 34%),linear-gradient(110deg,transparent,rgba(255,224,138,.08),transparent);opacity:.62;pointer-events:none;}
+.pv-comm-strip.v210k .pv-comm-title{color:rgba(255,224,138,.92)!important;}
+.pv-comm-strip.v210k .pv-comm-main{color:#ffe08a!important;text-shadow:0 0 18px rgba(255,224,138,.18)!important;}
+.pv-comm-strip.v210k .pv-comm-chip{color:#ffe08a!important;border-color:rgba(255,224,138,.34)!important;background:rgba(255,224,138,.12)!important;}
+.pv-comm-strip.v210k.v213-locked .pv-comm-chip:before{content:'🔒 ';font-size:9px;}
+.pv-comm-strip.v210k.v213-near{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(255,224,138,.12),0 0 24px rgba(240,176,0,.13)!important;animation:v213-gold-breathe 3.8s ease-in-out infinite;}
+.pv-comm-strip.v210k.v213-unlocked{border-color:rgba(255,224,138,.68)!important;background:linear-gradient(135deg,rgba(255,224,138,.19),rgba(35,73,126,.54) 48%,rgba(10,31,60,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 0 0 1px rgba(255,224,138,.16),0 0 28px rgba(240,176,0,.16)!important;}
+.pv-comm-strip.v210k.v213-unlocked:after{content:'';position:absolute;top:-35%;bottom:-35%;width:55%;left:-70%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.24),rgba(255,224,138,.18),transparent);transform:skewX(-18deg);animation:v213-earned-sheen 7s ease-in-out infinite;pointer-events:none;}
+.pv-comm-strip.v210k.v213-unlocked .pv-comm-chip:before{content:'✦ ';}
+.pv-comm-strip.v210k.v213-unlocked .pv-comm-main{animation:v213-amount-pop .55s cubic-bezier(.34,1.56,.64,1) 1 both;}
+@keyframes v213-gold-breathe{0%,100%{filter:brightness(1)}50%{filter:brightness(1.08)}}
+@keyframes v213-earned-sheen{0%,68%{left:-75%;opacity:0}72%{opacity:1}88%{left:125%;opacity:.95}100%{left:125%;opacity:0}}
+@keyframes v213-amount-pop{0%{transform:translateY(2px) scale(.98);opacity:.75}100%{transform:translateY(0) scale(1);opacity:1}}
+
