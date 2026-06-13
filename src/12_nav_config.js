@@ -76,42 +76,23 @@
     btn.classList.toggle('nav-disabled', SAVE_DISABLED.indexOf(screen) !== -1);
   }
 
-  // ─── Patch showScreen ───────────────────────────────────────────────────────
+  // ─── Patch showScreen — render nav on every navigation ──────────────────────
+  // showScreen is always called after role is set (login flow: set classes → showScreen)
+  // This is the most reliable hook point
   var _origShow = window.showScreen;
+  var _lastRenderedRole = null;
   window.showScreen = function(name) {
     var r = _origShow ? _origShow.call(this, name) : undefined;
+    // Render nav if role changed or first time
+    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 
+               document.body.getAttribute('data-role');
+    if (role && role !== _lastRenderedRole) {
+      _lastRenderedRole = role;
+      renderNav(role);
+    }
     updateSaveState(name);
     return r;
   };
-
-  // ─── Hook: patch _senseNormalizeProfileAndBody ─────────────────────────────
-  // 07b_cds.js sets window._senseNormalizeProfileAndBody = normalizeProfileAndBody
-  // We wrap it so renderNav fires every time role is confirmed (login, re-render, etc.)
-  function _patchNormalize() {
-    var orig = window._senseNormalizeProfileAndBody;
-    if (!orig || orig._navConfigPatched) return false;
-    window._senseNormalizeProfileAndBody = function() {
-      var role = orig.apply(this, arguments);
-      if (role) renderNav(role);
-      return role;
-    };
-    window._senseNormalizeProfileAndBody._navConfigPatched = true;
-    console.log('[NavConfig] hooked _senseNormalizeProfileAndBody');
-    return true;
-  }
-
-  // Try immediately (12 loads after 07b — should be ready)
-  if (!_patchNormalize()) {
-    // Fallback: retry once after a tick (race condition safety net)
-    setTimeout(function() {
-      if (!_patchNormalize()) {
-        console.warn('[NavConfig] _senseNormalizeProfileAndBody not found — using data-role fallback');
-        // Last resort: read data-role directly
-        var role = document.body.getAttribute('data-role');
-        if (role) renderNav(role);
-      }
-    }, 200);
-  }
 
   // ─── Public API ─────────────────────────────────────────────────────────────
   window.NavConfig = {
