@@ -1455,17 +1455,26 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   // ── v586: ภาพรวม panel — sd2 design (mirror session detail pane1) ─────────
   function _overviewPanel(summary, tone) {
-    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ' };
-    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง' };
+    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
+    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
     let toneHtml = '';
     if (tone) {
-      const cConf = tone.rep_confidence==='high'?'#1F8A43':tone.rep_confidence==='medium'?'#B26A00':'#C73E3E';
-      const cEng  = tone.customer_engagement==='increasing'?'#1F8A43':tone.customer_engagement==='stable'?'#B26A00':'#C73E3E';
-      toneHtml = `<div class="sd2-lbl">Tone &amp; Energy</div>
+      const _conf = tone.rep_confidence;
+      const _eng  = tone.customer_engagement;
+      // v599: not_applicable / missing → neutral grey ไม่ใช่ red
+      const cConf = _conf==='high'?'#1F8A43':_conf==='medium'?'#B26A00':(_conf==='low'?'#C73E3E':'#8E8E93');
+      const cEng  = _eng==='increasing'?'#1F8A43':_eng==='stable'?'#B26A00':(_eng==='declining'?'#C73E3E':'#8E8E93');
+      const confTxt = thaiConf[_conf] || (_conf ? '—' : '—');
+      const engTxt  = thaiEng[_eng]   || (_eng  ? '—' : '—');
+      // ซ่อน card ทั้งหมดถ้าทั้งคู่เป็น not_applicable (เช่น sales session ที่ไม่มี rep)
+      const bothNA = (!_conf || _conf==='not_applicable') && (!_eng || _eng==='not_applicable');
+      if (!bothNA) {
+        toneHtml = `<div class="sd2-lbl">Tone &amp; Energy</div>
 <div class="sd2-tone">
-  <div class="sd2-tcard"><div class="k">Confidence</div><div class="v" style="color:${cConf}">${thaiConf[tone.rep_confidence]||tone.rep_confidence||'—'}</div><div class="n">${tone.rep_confidence_note||''}</div></div>
-  <div class="sd2-tcard"><div class="k">Engagement</div><div class="v" style="color:${cEng}">${thaiEng[tone.customer_engagement]||tone.customer_engagement||'—'}</div><div class="n">${tone.customer_engagement_note||''}</div></div>
+  <div class="sd2-tcard"><div class="k">Confidence</div><div class="v" style="color:${cConf}">${confTxt}</div><div class="n">${tone.rep_confidence_note||''}</div></div>
+  <div class="sd2-tcard"><div class="k">Engagement</div><div class="v" style="color:${cEng}">${engTxt}</div><div class="n">${tone.customer_engagement_note||''}</div></div>
 </div>`;
+      }
     }
     const summaryHtml = summary
       ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${summary}</div>` : '';
@@ -1601,15 +1610,19 @@ OCPB (customer intel จากเสียงเท่านั้น):
     return intelHtml + nextsHtml;
   }
 
-  function _transcriptPanel(tone) {
-    // v586: Transcript = key moments ครบทุกจุด (ภาพรวมโชว์เด่นสุด 5)
-    // และเป็นบ้านของ full transcript ในอนาคตถ้าตัดสินใจทำ
+  function _transcriptPanel(tone, transcriptSummary) {
+    // v586: Transcript = บ้านของ full transcript + key moments ครบทุกจุด
+    // v599: รับ transcriptSummary เพิ่ม — แสดงเมื่อ overview ไม่ได้โชว์ (session detail path)
+    const summaryHtml = transcriptSummary
+      ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${transcriptSummary}</div>`
+      : '';
     const allM = (tone?.key_moments||[]).map(m => _kmText(m)).filter(Boolean);
-    if (!allM.length) {
-      return `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มี key moments จาก session นี้</div>`;
-    }
-    return `<div class="sd2-lbl">Key Moments ทั้งหมด · ${allM.length} จุด</div>`
-      + allM.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('');
+    const momentsHtml = allM.length
+      ? `<div class="sd2-lbl">Key Moments ทั้งหมด · ${allM.length} จุด</div>`
+        + allM.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
+      : '';
+    return (summaryHtml + momentsHtml)
+      || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มี transcript จาก session นี้</div>`;
   }
 
 
@@ -2619,14 +2632,18 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const intelData = Object.assign({}, s.customer_intel || {}, {
       next_actions: s.next_actions || s.customer_intel?.next_actions || []
     });
-    const transcriptSummary = s.transcript_summary || null;
     const toneSignals       = s.tone_signals || null;
+    // v599: ถ้ามี whyHtml (session_summary) อยู่ใน header แล้ว
+    // ไม่ส่ง transcriptSummary ให้ _overviewPanel เพื่อป้องกันสรุปซ้ำ
+    // transcript_summary ยังคงแสดงใน tab Transcript ผ่าน _transcriptPanel
+    const transcriptSummary = s.transcript_summary || null;
+    const overviewSummary   = whyTxt ? null : transcriptSummary;
 
     // ── Build 4 panes using shared renderers (identical to live result)
-    const pane1 = _overviewPanel(transcriptSummary, toneSignals);
+    const pane1 = _overviewPanel(overviewSummary, toneSignals);
     const pane2 = _skillsPanel(skillData);
     const pane3 = _customerPanel(intelData);
-    const pane4 = _transcriptPanel(toneSignals);
+    const pane4 = _transcriptPanel(toneSignals, transcriptSummary);
 
     body.innerHTML = `
 <div class="sd2-name">${repName}</div>

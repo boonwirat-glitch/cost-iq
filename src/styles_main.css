@@ -5044,6 +5044,8 @@ body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
 body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
 /* KAM TL (tl role, kam-mode) also gets Skills nav */
 body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
+body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { display: none !important; }
 /* Echo for Sales — show + center position */
 body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
 body.sales-mode .bnav #nav-sales-portview  { order: 1; }
