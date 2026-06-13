@@ -1,4 +1,4 @@
-<!-- Freshket Sense v658: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v659: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v658',
+      version: 'v659',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -26676,6 +26676,15 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
+    // v659: scroll compensation — when header collapses, portview-list would jump up
+    // by ~collapsibleHeight px. Compensate by transitioning padding-top on the list
+    // with the same duration/easing so cards appear stationary to the user.
+    var pvList=document.getElementById('portview-list');
+    if(pvList){
+      var collH=collapsed?0:collapsible.scrollHeight;
+      pvList.style.transition='padding-top 300ms cubic-bezier(0.4,0,0.2,1)';
+      pvList.style.paddingTop=collH+'px';
+    }
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
@@ -26723,7 +26732,19 @@ function _pvInitCollapseObserver(){
   document.addEventListener('scroll',_schedule,{capture:true,passive:true});
   screen.addEventListener('scroll',_schedule,{passive:true});
   window.addEventListener('resize',_schedule,{passive:true});
-  setTimeout(_schedule,180);
+  // Set initial padding-top so list starts at correct position
+  setTimeout(function(){
+    var pvList=document.getElementById('portview-list');
+    if(pvList&&collapsible){
+      // No transition on init — just set the value immediately
+      pvList.style.transition='none';
+      pvList.style.paddingTop=(collapsible.classList.contains('expanded')?collapsible.scrollHeight:0)+'px';
+      // Re-enable transition after 1 frame
+      requestAnimationFrame(function(){
+        if(pvList)pvList.style.transition='padding-top 300ms cubic-bezier(0.4,0,0.2,1)';
+      });
+    }
+  },200);
 
   _pvCollapseObserver={disconnect:function(){
     if(raf){cancelAnimationFrame(raf);raf=0;}
