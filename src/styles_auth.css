@@ -31,7 +31,7 @@
   background:linear-gradient(135deg,var(--tk-ok-dim-2),var(--tk-ok-dim));
   border:1px solid var(--tk-ok-border);
   border-radius:6px;padding:2px 7px 2px 6px;
-  font-family:'IBM Plex Mono',monospace;
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;
   font-size:11px;font-weight:700;color:var(--tk-ok-bright);letter-spacing:.6px;
   vertical-align:2px;margin-left:6px;
   animation:iq-pulse 3.5s ease-in-out infinite;
@@ -90,13 +90,13 @@
 .lgi-foot{
   text-align:center;margin-top:24px;
   font-size:11px;color:rgba(255,255,255,.18);
-  font-family:'IBM Plex Mono',monospace;letter-spacing:.4px;
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.4px;
 }
 .lgi-divider{
   display:flex;align-items:center;gap:12px;margin:28px 0 24px;
 }
 .lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
-.lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
+.lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.6px;}
 /* ── PASSWORD RECOVERY FLOW ── */
 .pw-reset-area{display:none;}
 #login-overlay.password-recovery .lgi-form-area{display:none!important;}
@@ -104,7 +104,7 @@
 #login-overlay.password-recovery .pw-reset-area{display:block;}
 .pw-reset-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:-.2px;}
 .pw-reset-sub{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:18px;}
-.pw-reset-email{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tk-ok-bright);margin-bottom:14px;word-break:break-all;}
+.pw-reset-email{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:var(--tk-ok-bright);margin-bottom:14px;word-break:break-all;}
 .pw-reset-status{display:none;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;font-family:var(--tk-font-body);line-height:1.5;}
 .pw-reset-status.err{display:block;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#fc8181;}
 .pw-reset-status.ok{display:block;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-border);color:var(--tk-ok-bright);}
