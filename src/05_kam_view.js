@@ -325,7 +325,7 @@ function renderSkuMovementHtml(sm){
     `<div class="kam-sku-row"><span class="kam-sku-ind ${cls}">${ind}</span><span class="kam-sku-name">${name}</span><span class="kam-sku-num">${fmt(gmv)}/เดือน${pct?` · ${pct}`:''}</span></div>`;
   // Group header with subtle period pill
   const grpHead=(label,period)=>
-    `<div class="kam-sku-group-label">${label}<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:400;color:rgba(180,200,255,.45);margin-left:6px">${period}</span></div>`;
+    `<div class="kam-sku-group-label">${label}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:9px;font-weight:400;color:rgba(180,200,255,.45);margin-left:6px">${period}</span></div>`;
   let html='';
   if(sm.newSkus?.length){
     html+=`<div class="kam-sku-group">${grpHead(`เพิ่มใหม่ (${sm.newSkus.length})`,_shortMo(sm.recentMo))}`;
@@ -593,14 +593,14 @@ function __legacyRenderKamThisMonthFallback(){
       <div class="kam-dc-body">`;
     if(newThisMonth.length){
       html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">เพิ่งเริ่มสั่ง (${newThisMonth.length})</div>`;
-      html+=newThisMonth.map(s=>`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${s.item_name_th||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);margin-left:5px;font-weight:700;letter-spacing:.3px">MTD</span></div></div>`).join('');
+      html+=newThisMonth.map(s=>`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${s.item_name_th||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);margin-left:5px;font-weight:700;letter-spacing:.3px">MTD</span></div></div>`).join('');
     }
     if(growing.length){
       if(newThisMonth.length)html+=`<div style="margin-top:8px"></div>`;
       html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">สั่งเพิ่มขึ้น (${growing.length})</div>`;
       html+=growing.map(s=>{
         const projInc=Math.max(0,s.projGmv-s.lastGmv);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><span class="kam-sku-name">${s.name}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><span class="kam-sku-name">${s.name}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
       }).join('');
     }
     html+=`</div></div>`;
@@ -617,7 +617,7 @@ function __legacyRenderKamThisMonthFallback(){
       <div class="kam-dc-head"><span class="kam-dc-head-label">Outlet · ${om.recentMo}</span></div>
       <div class="kam-dc-body" style="padding-top:8px">`;
     om.newOutlets.forEach(o=>{
-      html+=`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${o.name||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:rgba(255,255,255,.9)">${fmt(o.gmv||0)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px">ใหม่</span></div></div>`;
+      html+=`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${o.name||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(255,255,255,.9)">${fmt(o.gmv||0)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px">ใหม่</span></div></div>`;
     });
     om.droppedOutlets.forEach(o=>{
       const cycle=o.orders>=1?Math.round(daysInMo/Math.max(o.orders,1)):0;
@@ -638,7 +638,7 @@ function __legacyRenderKamThisMonthFallback(){
             ${cycleLabel}
           </div>
           <div style="text-align:right;flex-shrink:0;white-space:nowrap">
-            ${o.gmv?`<div style="font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:rgba(255,255,255,.75)">${fmt(o.gmv)}</div>`:''}
+            ${o.gmv?`<div style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(255,255,255,.75)">${fmt(o.gmv)}</div>`:''}
             <div style="font-size:11px;font-weight:700;color:${statusClr}">ยังไม่สั่ง</div>
           </div>
         </div>`;
@@ -690,7 +690,7 @@ function __legacyRenderKamThisMonthFallback(){
       const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':'ยังไม่ถึงรอบ';
       const story=isSub?'':skuStoryLine(s);
       const nameOp=dimmed?'opacity:.4':'';
-      const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
+      const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
       const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
@@ -730,7 +730,7 @@ function __legacyRenderKamThisMonthFallback(){
       html+=`<div class="kam-dc" style="margin-bottom:12px;border-color:rgba(240,176,0,.2)">
         <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:var(--amb)">Category ยังไม่สั่งเดือนนี้</span><span style="font-size:10px;color:rgba(255,255,255,.3);margin-left:auto">${missingCats.length} หมวด</span></div>
         <div class="kam-dc-body" style="padding-top:8px">
-          ${missingCats.slice(0,5).map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:12px;color:rgba(255,255,255,.7)">${c.n}</span><span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--amb)">${fmt(c.s)} เดือนก่อน</span></div>`).join('')}
+          ${missingCats.slice(0,5).map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:12px;color:rgba(255,255,255,.7)">${c.n}</span><span style="font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${fmt(c.s)} เดือนก่อน</span></div>`).join('')}
         </div>
       </div>`;
     }
@@ -812,7 +812,7 @@ function __legacyRenderKamLastMonthFallback(){
     <div class="kam-dc">
       <div class="kam-dc-head"><span class="kam-dc-head-label">โอกาสลดต้นทุน</span></div>
       <div class="kam-dc-body">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:var(--amb);margin-bottom:6px">${fmt(op.totalSaveMo)}<span style="font-size:11px;font-weight:400;color:rgba(220,235,255,.6)">/เดือน</span></div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:18px;font-weight:700;color:var(--amb);margin-bottom:6px">${fmt(op.totalSaveMo)}<span style="font-size:11px;font-weight:400;color:rgba(220,235,255,.6)">/เดือน</span></div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px">${op.total} รายการ · ${op.highConf} รายการใช้แทนได้ทันที</div>
         ${top3Html}
       </div>
@@ -2571,7 +2571,7 @@ function renderSparkline(sid,moKeys,w,h){
       <polyline points="${polyPts}" fill="none" stroke="${lc}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2.5" fill="${lc}" stroke="var(--n0)" stroke-width="1.2"/>
     </svg>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:${pctC};line-height:1">${pctSign}${pct}%</span>
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:9px;font-weight:700;color:${pctC};line-height:1">${pctSign}${pct}%</span>
   </div>`;
 }
 
@@ -2710,7 +2710,7 @@ function renderSkuDetailContent(sku,priceData){
       <span style="color:var(--n400);text-decoration:line-through;font-size:11px">${sku.n}</span><br>
       <strong>→ ${getAlt(opp).altName}</strong>
     </div>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:var(--amb)">${fmt(getAlt(opp).save)}/เดือน · −${getAlt(opp).pct}%</div>
+    <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:var(--amb)">${fmt(getAlt(opp).save)}/เดือน · −${getAlt(opp).pct}%</div>
   </div>`:'';
 
   const lastPr=last.price>=100?last.price.toFixed(0):last.price.toFixed(2);
@@ -2719,10 +2719,10 @@ function renderSkuDetailContent(sku,priceData){
   return`<div style="padding:12px 16px 0">
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/${sku.display_unit||'กก.'}</span></div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/${sku.display_unit||'กก.'}</span></div>
         ${sku.pack_size?`<div style="font-size:10px;color:var(--n400);margin-top:2px">${sku.pack_size}</div>`:''}</div>
       <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${first.mo} – ${last.mo}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:700;color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
     </div>
   </div>
   <div style="padding:6px 4px 0">
@@ -2738,15 +2738,15 @@ function renderSkuDetailContent(sku,priceData){
   <div style="display:flex;margin:6px 16px 0;border:1px solid var(--n100);border-radius:10px;overflow:hidden">
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
       <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">ต่ำสุด</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">฿${mnStr}</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">฿${mnStr}</div>
     </div>
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
       <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">สูงสุด</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#9a6500">฿${mxStr}</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:#9a6500">฿${mxStr}</div>
     </div>
     <div style="flex:1;padding:8px;text-align:center">
       <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">สั่ง/เดือน</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
     </div>
   </div>
   ${oppHtml}
