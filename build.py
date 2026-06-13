@@ -36,14 +36,20 @@ sales_js     = read('src/10_sales_view.js')
 skills_js    = read('src/11_skills.js')
 styles_skills = read('src/styles_skills.css')
 styles_sales = read('src/styles_sales.css')
-styles_tokens = read('src/styles_tokens.css')
-styles_main   = read('src/styles_main.css')
+styles_tokens  = read('src/styles_tokens.css')
+styles_base    = read('src/styles_base.css')
+styles_layout  = read('src/styles_layout.css')
+styles_main    = read('src/styles_main.css')
 styles_comm   = read('src/styles_commission.css')
 
 out = (shell
     # ── CSS injections ──
     .replace('<style>\n<!-- INJECT_STYLES_TOKENS -->\n</style>',
              f'<style>\n{styles_tokens}</style>')
+    .replace('<style>\n<!-- INJECT_STYLES_BASE -->\n</style>',
+             f'<style>\n{styles_base}</style>')
+    .replace('<style>\n<!-- INJECT_STYLES_LAYOUT -->\n</style>',
+             f'<style>\n{styles_layout}</style>')
     .replace('<style>\n<!-- INJECT_STYLES_MAIN -->\n</style>',
              f'<style>\n{styles_main}</style>')
     .replace('<style id="target-module-css">\n<!-- INJECT_STYLES_COMMISSION -->\n</style>',
