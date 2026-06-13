@@ -1,0 +1,58 @@
+/* ============================================================
+   FRESHKET SENSE — BASE STYLES
+   src/styles_base.css  (Phase 0B split from styles_main.css)
+
+   Contents: :root local color vars (--g*, --amb, --n*),
+             CSS reset, body/html, .mono, global keyframes.
+   These rules apply to EVERY role/feature — no exceptions.
+   Never add role-specific or feature-specific rules here.
+   ============================================================ */
+
+/* ============================================================
+   FRESHKET SENSE — MAIN STYLES
+   src/styles_main.css
+   
+   Extracted from shell.html by build refactor.
+   Injected by build.py (CSS extract refactor).
+   
+   Sections:
+     1. Main app CSS (Block 1, lines 282–4840 of shell.html)
+     2. Login overlay CSS (Block 2, lines 6534–6642)
+     3. Sense splash CSS (Block 3, lines 6736–6762)
+   ============================================================ */
+
+/* ── SECTION 1: Main app CSS ── */
+:root {
+  --g500:var(--tk-ok-500);--g50:#e8faf2;--g70:#d0f5e8;--g700:#008060;--g800:var(--tk-bg-topbar);--g900:var(--tk-bg-topbar);
+  --amb:#f0b000;--amb50:#fff8e1;--org:#f05000;--red:#e53e3e;--red50:#fff5f5;
+  --n0:#ffffff;--n50:#fafafa;--n100:#f0f0f0;--n200:#d0d0d0;--n300:#b0b0b0;
+  --n400:#a0a0a0;--n600:#808080;--n700:#606060;--n900:#303030;
+  --bd:#e8e8e8;--sh:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);
+  --shm:0 4px 20px rgba(0,0,0,.08);--r:14px;--rs:10px;
+  --conf-hi:var(--g500);--conf-md:var(--amb);--conf-lo:#e53e3e;
+  --kam:var(--tk-accent);--kam-dark:var(--tk-accent-dark);--kam-bg:var(--tk-bg-base);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}html{overflow-x:clip}
+body{font-family:var(--tk-font-body);}
+/* phase-0A: KAM/AD locked to IBM Plex Sans Thai (257 components inherit, Noto would change KAM UI) */
+body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
+body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
+html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
+.mono{font-family:'IBM Plex Mono',monospace}
+/* ── FEATURE DEFAULT: new features inherit body → Noto Sans Thai automatically ─────── */
+/* ── Use var(--fk-red) for CI accent, var(--canvas) for bg, var(--ink-1) for text ──── */
+
+/* ── MICRO-INTERACTION: Dot blink for loading states ── */
+@keyframes _dotBlink{0%,100%{opacity:.2}50%{opacity:.9}}
+
+/* ── MICRO-INTERACTION: NRR number reveal ── */
+@keyframes _numReveal{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.tgt-num-reveal{animation:_numReveal .3s ease forwards}
+
+/* ── MICRO-INTERACTION: Portview hero fade-in ── */
+@keyframes _heroIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+#portview-pace-bar,#tgt-nrr-bar{animation:_heroIn .3s ease forwards}
+
+/* ── MICRO-INTERACTION: Splash ticker transition ── */
+#spl-ticker{transition:opacity .18s ease}
