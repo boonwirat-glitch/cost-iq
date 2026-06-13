@@ -1,4 +1,4 @@
-<!-- Freshket Sense v642: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v643: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v642',
+      version: 'v643',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7658,9 +7658,7 @@ body.sales-mode.kam-mode .bnav .ni .lb     { color: #6A6A6A !important; }
 body.sales-mode.kam-mode .bnav .ni.on svg  { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
 body.sales-mode.kam-mode .bnav .ni.on .lb  { color: #FF385C !important; font-weight: 700 !important; }
 
-/* Skills + Echo disabled in KAM Sense (Save) flow */
-body.kam-sense-active.kam-mode .bnav #nav-skills   { opacity: .25 !important; pointer-events: none !important; }
-body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; pointer-events: none !important; }
+/* → sense-active Skills/Echo disable: still CSS (opacity/pointer-events, not display) */
 </style>
 <style id="tv-module-css">
 /* ============================================================
@@ -9812,10 +9810,7 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 /* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
    This rule must come AFTER that to win the cascade.
    Placed in save-module-css which injects after portview-module-css. */
-/* ── sense-plan-expanded: hide Skills from nav (flex-wrap:wrap causes overflow) ── */
-body.kam-sense-active.sense-plan-expanded.kam-mode .bnav #nav-skills {
-  display: none !important;
-}
+/* → sense-plan-expanded Skills hide moved to NavConfig TABS.hideWhen */
 </style>
 <style id="report-module-css">
 /* FRESHKET SENSE — REPORT STYLES
@@ -49039,36 +49034,66 @@ window._skCardRipple           = _skCardRipple;
 </script>
 <script id="freshket-nav-config">
 /**
- * Freshket Sense — Nav Config System (v3)
+ * Freshket Sense — Nav Config System
  * src/12_nav_config.js
  *
- * Hook: patches _senseNormalizeProfileAndBody (set by 07b_cds.js)
- * Called every time role is confirmed — guaranteed correct timing.
+ * SINGLE SOURCE OF TRUTH for nav behavior per role.
+ *
+ * To add a new tab:
+ *   1. Add to TABS with its HTML button ID
+ *   2. Add to ALL_IDS
+ *   3. Add to relevant roles in NAV_CONFIG
+ *
+ * To add a new role:
+ *   1. Add a row to NAV_CONFIG
+ *
+ * No CSS changes needed.
  */
 (function() {
   'use strict';
 
   var TABS = {
-    'portview':         'nav-overview',
-    'restaurant':       'nav-restaurant',
-    'echo-kam':         'nav-echo-kam',
-    'opportunities':    'nav-opportunities',
-    'skills':           'nav-skills',
-    'sales-portview':   'nav-sales-portview',
-    'sales-pipeline':   'nav-sales-pipeline',
-    'sales-echo':       'nav-echo',
-    'sales-commission': 'nav-sales-commission',
-    'sales-teamview':   'nav-sales-teamview',
+    'portview':         { id: 'nav-overview' },
+    'restaurant':       { id: 'nav-restaurant' },
+    'echo-kam':         { id: 'nav-echo-kam' },
+    'opportunities':    { id: 'nav-opportunities' },
+    'skills':           { id: 'nav-skills', hideWhen: ['sense-plan-expanded'] },
+    'sales-portview':   { id: 'nav-sales-portview' },
+    'sales-pipeline':   { id: 'nav-sales-pipeline' },
+    'sales-echo':       { id: 'nav-echo' },
+    'sales-commission': { id: 'nav-sales-commission' },
+    'sales-teamview':   { id: 'nav-sales-teamview' },
   };
 
   var NAV_CONFIG = {
-    'rep':      ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-    'tl':       ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-    'admin':    ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-    'ad':       ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-    'ad_tl':    ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-    'sales':    ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills'],
-    'sales_tl': ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills', 'sales-teamview'],
+    'rep': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
+    'tl': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
+    'admin': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
+    'ad': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
+    'ad_tl': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
+    'sales': {
+      tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills'],
+      saveDisabledOn: [],
+    },
+    'sales_tl': {
+      tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills', 'sales-teamview'],
+      saveDisabledOn: [],
+    },
   };
 
   var ALL_IDS = [
@@ -49079,46 +49104,45 @@ window._skCardRipple           = _skCardRipple;
     'nav-portfolio', 'nav-report',
   ];
 
-  var SAVE_DISABLED = ['portview', 'teamview', 'skills'];
-
-  // ─── renderNav ──────────────────────────────────────────────────────────────
   function renderNav(role) {
-    var tabs = NAV_CONFIG[role];
-    if (!tabs) { console.warn('[NavConfig] unknown role:', role); return; }
+    var config = NAV_CONFIG[role];
+    if (!config) { console.warn('[NavConfig] unknown role:', role); return; }
 
-    // Hide all
+    var bodyClasses = document.body.className;
+
     ALL_IDS.forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
 
-    // Show tabs in order
-    tabs.forEach(function(key, i) {
-      var id = TABS[key];
-      if (!id) return;
-      var el = document.getElementById(id);
+    var visibleCount = 0;
+    config.tabs.forEach(function(key, i) {
+      var tab = TABS[key];
+      if (!tab) return;
+      if (tab.hideWhen && tab.hideWhen.some(function(cls) {
+        return bodyClasses.indexOf(cls) !== -1;
+      })) return;
+      var el = document.getElementById(tab.id);
       if (!el) return;
       el.style.display = 'flex';
       el.style.order = String(i + 1);
+      visibleCount++;
     });
 
-    // Set grid columns directly as inline style (more reliable than CSS variable)
     var bnav = document.querySelector('.bnav');
-    if (bnav) bnav.style.gridTemplateColumns = 'repeat(' + tabs.length + ', 1fr)';
+    if (bnav) bnav.style.gridTemplateColumns = 'repeat(' + visibleCount + ', 1fr)';
 
-    console.log('[NavConfig] rendered:', role, tabs.length, 'tabs');
+    console.log('[NavConfig] rendered:', role, visibleCount, 'tabs');
   }
 
-  // ─── updateSaveState ────────────────────────────────────────────────────────
   function updateSaveState(screen) {
+    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : null;
+    var config = role ? NAV_CONFIG[role] : null;
     var btn = document.getElementById('nav-opportunities');
-    if (!btn) return;
-    btn.classList.toggle('nav-disabled', SAVE_DISABLED.indexOf(screen) !== -1);
+    if (!btn || !config) return;
+    btn.classList.toggle('nav-disabled', config.saveDisabledOn.indexOf(screen) !== -1);
   }
 
-  // ─── Patch window.showScreen for updateSaveState ──────────────────────────
-  // renderNav is called from _autoRouteAfterLogin (01_core.js) via setTimeout(0)
-  // This patch handles Save enabled/disabled state on every navigation
   var _origShow = window.showScreen;
   window.showScreen = function(name) {
     var r = _origShow ? _origShow.call(this, name) : undefined;
@@ -49126,7 +49150,6 @@ window._skCardRipple           = _skCardRipple;
     return r;
   };
 
-  // ─── Public API ─────────────────────────────────────────────────────────────
   window.NavConfig = {
     render: renderNav,
     updateSaveState: updateSaveState,
