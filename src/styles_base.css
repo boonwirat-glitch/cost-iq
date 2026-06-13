@@ -34,7 +34,7 @@ body{font-family:var(--tk-font-body);}
 body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
 body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
-.mono{font-family:'IBM Plex Mono',monospace}
+.mono{font-family:'IBM Plex Mono','Noto Sans Thai',monospace}
 
 /* ── MICRO-INTERACTION: Dot blink for loading states ── */
 @keyframes _dotBlink{0%,100%{opacity:.2}50%{opacity:.9}}
@@ -77,7 +77,7 @@ button:active:not(:disabled){transform:scale(0.96) translateY(1px)!important;tra
 .dp-lib-row.active-acct .dp-lib-dot{background:var(--g500)}
 .dp-lib-info{flex:1;min-width:0}
 .dp-lib-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--n900)}
-.dp-lib-meta{font-size:10px;color:var(--n400);font-family:'IBM Plex Mono',monospace;margin-top:1px}
+.dp-lib-meta{font-size:10px;color:var(--n400);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;margin-top:1px}
 .dp-lib-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .dp-lib-switch{font-size:11px;color:var(--g700);font-weight:700;padding:3px 8px;border-radius:6px;background:var(--g50);border:1px solid var(--tk-ok-dim-2)}
 .dp-lib-current{font-size:10px;color:var(--g700);font-weight:600;padding:3px 8px;border-radius:6px;background:var(--g50)}
