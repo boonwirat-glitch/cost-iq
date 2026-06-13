@@ -115,3 +115,8 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 /* ── UX POLISH: LINK HOVER ── */
 .link{transition:opacity .15s,color .15s}
 .link:hover{opacity:.7}
+
+/* ── Phase 0G: SENSE-SHIMMER (updateDOM skeleton utility) ── */
+/* Used by window.shimmer() and window.shimmerHTML() in 03_rendering.js */
+.sense-shimmer{background:rgba(255,255,255,.06);border-radius:4px;position:relative;overflow:hidden}
+.sense-shimmer-inner{position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.1) 50%,transparent 100%);background-size:200% 100%;animation:shimmer 1.4s ease infinite}
