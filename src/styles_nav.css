@@ -8,46 +8,46 @@
    ══════════════════════════════════════════════════════ */
 
 /* Default: Sales-only nav hidden */
-.bnav .ni.sales-only     { display: none !important; }
-.bnav .ni.sales-tl-only  { display: none !important; }
+/* → removed (NavConfig handles): .bnav .ni.sales-only     { display: none !important; } */
+/* → removed (NavConfig handles): .bnav .ni.sales-tl-only  { display: none !important; } */
 
 /* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
-body.sales-mode .bnav .ni.sales-only     { display: flex !important; }
-body.sales-mode .bnav .ni.kam-only       { display: none !important; }
-body.sales-mode .bnav .ni.tl-only        { display: none !important; }
-body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-only     { display: flex !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.kam-only       { display: none !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.tl-only        { display: none !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-tl-only  { display: none !im */
 
 /* Sales TL mode: show Team tab in addition */
-body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
+/* → removed (NavConfig handles): body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { disp */
 
 /* Sales v6: hide non-Sales nav buttons including nav-overview */
-body.sales-mode .bnav #nav-overview     { display: none !important; }
-body.sales-mode .bnav #nav-restaurant   { display: none !important; }
-body.sales-mode .bnav #nav-portview     { display: none !important; }
-body.sales-mode .bnav #nav-teamview     { display: none !important; }
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-overview     { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-restaurant   { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-portview     { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-teamview     { display: none !imp */
 
 /* Skills + Echo tab: sales only — hidden in KAM mode */
-.bnav .ni.sales-any-btn                    { display: none !important; }
-body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
+/* → removed (NavConfig handles): .bnav .ni.sales-any-btn                    { display: none ! */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-any-btn    { display: flex ! */
 /* v498: AD also gets Skills nav */
-body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* → removed (NavConfig handles): body.kad-mode .bnav .ni.sales-any-btn      { display: flex ! */
 /* KAM TL (tl role, kam-mode) also gets Skills nav */
-body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* → removed (NavConfig handles): body.kam-mode .bnav .ni.sales-any-btn      { display: flex ! */
 /* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
-body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { display: none !important; }
+/* → removed (NavConfig handles): body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { dis */
 /* Echo for Sales — show + center position */
-body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
-body.sales-mode .bnav #nav-sales-portview  { order: 1; }
-body.sales-mode .bnav #nav-sales-pipeline  { order: 2; }
-body.sales-mode .bnav #nav-sales-commission{ order: 4; }
-body.sales-mode .bnav #nav-skills          { order: 5; }
-body.sales-mode .bnav #nav-sales-teamview  { order: 6; }
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-echo            { display: flex ! */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-portview  { order: 1; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-pipeline  { order: 2; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-commission{ order: 4; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-skills          { order: 5; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-teamview  { order: 6; } */
 
 /* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
-body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
-body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
+/* → removed (NavConfig handles): body.sales-mode .bnav { grid-template-columns: repeat(5,1fr) */
+/* → removed (NavConfig handles): body.sales-mode.sales-tl-mode .bnav { grid-template-columns: */
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
-body.sales-mode .bnav #nav-opportunities { display: none !important; }
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-opportunities { display: none !im */
 
 /* Sales uses same dark theme as KAM */
 /* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
@@ -67,22 +67,7 @@ body.sales-mode #scr-portview,
 body.sales-mode #scr-teamview,
 body.sales-mode #scr-opportunities { display: none !important; }
 
-/* Sales user gets both .sales-mode AND .kam-mode
-   Need higher specificity to override dark glass pill */
-body.sales-mode.kam-mode .bnav {
-  background: rgba(255,255,255,.72) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255,255,255,.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
-  border-radius: 36px !important; /* v573: match floating pill radius */
-}
-
-/* Nav icons: inactive = dark muted, active = rausch */
-body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
-body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
-body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
-body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
+/* → Sales nav visual rules moved to portview.css (injects after nav to win cascade) */
 
 /* Sales portview screen — same layout as KAM portview */
 #scr-sales-portview { padding-bottom: var(--chrome-bottom); }
@@ -141,10 +126,10 @@ body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
 body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
 
 /* Save tab + rest-only: hide all in sales-mode */
-body.sales-mode .bnav .ni.rest-only { display: none !important; }
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.rest-only { display: none !importa */
 body.sales-mode .bnav .ni[onclick*="Save"],
 body.sales-mode .bnav .ni[onclick*="save"],
-body.sales-mode .bnav #nav-save-btn { display: none !important; }
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-save-btn { display: none !importa */
 
 /* Sales nav — floating frosted white pill (v573)
    ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
