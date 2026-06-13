@@ -1,4 +1,4 @@
-<!-- Freshket Sense v636: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v638: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v636',
+      version: 'v638',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -3873,7 +3873,7 @@ input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; 
 body.sales-mode .sales-any-btn { display: flex !important; }
 
 /* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
-/* → nav grid-template moved to NavConfig.render() (Phase 0E+) */
+body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
@@ -6774,21 +6774,46 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
    ══════════════════════════════════════════════════════ */
 
 /* Default: Sales-only nav hidden */
+/* → removed (NavConfig handles): .bnav .ni.sales-only     { display: none !important; } */
+/* → removed (NavConfig handles): .bnav .ni.sales-tl-only  { display: none !important; } */
 
 /* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-only     { display: flex !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.kam-only       { display: none !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.tl-only        { display: none !im */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-tl-only  { display: none !im */
 
 /* Sales TL mode: show Team tab in addition */
+/* → removed (NavConfig handles): body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { disp */
 
 /* Sales v6: hide non-Sales nav buttons including nav-overview */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-overview     { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-restaurant   { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-portview     { display: none !imp */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-teamview     { display: none !imp */
 
 /* Skills + Echo tab: sales only — hidden in KAM mode */
+/* → removed (NavConfig handles): .bnav .ni.sales-any-btn                    { display: none ! */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.sales-any-btn    { display: flex ! */
 /* v498: AD also gets Skills nav */
+/* → removed (NavConfig handles): body.kad-mode .bnav .ni.sales-any-btn      { display: flex ! */
 /* KAM TL (tl role, kam-mode) also gets Skills nav */
+/* → removed (NavConfig handles): body.kam-mode .bnav .ni.sales-any-btn      { display: flex ! */
 /* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
+/* → removed (NavConfig handles): body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { dis */
 /* Echo for Sales — show + center position */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-echo            { display: flex ! */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-portview  { order: 1; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-pipeline  { order: 2; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-commission{ order: 4; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-skills          { order: 5; } */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-sales-teamview  { order: 6; } */
 
 /* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
+/* → removed (NavConfig handles): body.sales-mode .bnav { grid-template-columns: repeat(5,1fr) */
+/* → removed (NavConfig handles): body.sales-mode.sales-tl-mode .bnav { grid-template-columns: */
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-opportunities { display: none !im */
 
 /* Sales uses same dark theme as KAM */
 /* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
@@ -6808,10 +6833,7 @@ body.sales-mode #scr-portview,
 body.sales-mode #scr-teamview,
 body.sales-mode #scr-opportunities { display: none !important; }
 
-/* Sales user gets both .sales-mode AND .kam-mode
-   Need higher specificity to override dark glass pill */
-
-/* Nav icons: inactive = dark muted, active = rausch */
+/* → Sales nav visual rules moved to portview.css (injects after nav to win cascade) */
 
 /* Sales portview screen — same layout as KAM portview */
 #scr-sales-portview { padding-bottom: var(--chrome-bottom); }
@@ -6870,8 +6892,10 @@ body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
 body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
 
 /* Save tab + rest-only: hide all in sales-mode */
+/* → removed (NavConfig handles): body.sales-mode .bnav .ni.rest-only { display: none !importa */
 body.sales-mode .bnav .ni[onclick*="Save"],
 body.sales-mode .bnav .ni[onclick*="save"],
+/* → removed (NavConfig handles): body.sales-mode .bnav #nav-save-btn { display: none !importa */
 
 /* Sales nav — floating frosted white pill (v573)
    ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
@@ -7613,6 +7637,26 @@ body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 @keyframes v213-earned-sheen{0%,68%{left:-75%;opacity:0}72%{opacity:1}88%{left:125%;opacity:.95}100%{left:125%;opacity:0}}
 @keyframes v213-amount-pop{0%{transform:translateY(2px) scale(.98);opacity:.75}100%{transform:translateY(0) scale(1);opacity:1}}
 
+
+
+/* ══ Sales nav visual — injected here to override body.kam-mode .bnav .ni svg{color:#fff}
+   Cascade: portview.css injects AFTER nav.css, so this wins correctly ══ */
+body.sales-mode.kam-mode .bnav {
+  background: rgba(255,255,255,.72) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255,255,255,.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
+  border-radius: 36px !important;
+}
+body.sales-mode.kam-mode .bnav .ni svg     { color: #222222 !important; opacity: .32 !important; filter: none !important; }
+body.sales-mode.kam-mode .bnav .ni .lb     { color: #6A6A6A !important; }
+body.sales-mode.kam-mode .bnav .ni.on svg  { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
+body.sales-mode.kam-mode .bnav .ni.on .lb  { color: #FF385C !important; font-weight: 700 !important; }
+
+/* Skills + Echo disabled in KAM Sense (Save) flow */
+body.kam-sense-active.kam-mode .bnav #nav-skills   { opacity: .25 !important; pointer-events: none !important; }
+body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; pointer-events: none !important; }
 </style>
 <style id="tv-module-css">
 /* ============================================================
@@ -9759,7 +9803,11 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 }
 
 
-/* → sales+kam nav cascade fix removed — NavConfig.render() handles this (Phase 0E+) */</style>
+
+/* ── Sales+KAM cascade fix ── */
+/* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
+   This rule must come AFTER that to win the cascade.
+   Placed in save-module-css which injects after portview-module-css. */</style>
 <style id="report-module-css">
 /* FRESHKET SENSE — REPORT STYLES
    src/styles_report.css · Phase 0E (verbatim) */
