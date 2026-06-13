@@ -348,7 +348,7 @@ function _renderComponentRatesEditor() {
       return `<div>
         <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:5px">${lbl}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
+          <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
             oninput="_commSetComponentParam('${k}','${p}',${expr});_commMarkChanged()" onfocus="this.style.borderColor='rgba(188,215,255,.35)'" onblur="this.style.borderColor='rgba(188,215,255,.12)'">
           <span style="font-size:11px;color:rgba(188,215,255,.60);flex-shrink:0">${uLbl}</span>
         </div>
@@ -439,19 +439,19 @@ function _renderTlUpsellTierRows() {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
         <div>
           <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
-          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${minV ?? ''}" placeholder="0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'min_pct',this.value);_commMarkChanged()">
         </div>
         <div>
           <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
-          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${maxV ?? ''}" placeholder="∞" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'max_pct',this.value);_commMarkChanged()">
         </div>
         <div>
           <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Multiplier ×</div>
-          <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:8px;padding:8px 9px;color:#ffe08a;font-size:11px;font-family:'IBM Plex Mono',monospace;text-align:right;outline:none"
+          <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:8px;padding:8px 9px;color:#ffe08a;font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${mult}" placeholder="1.0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'multiplier',this.value);_commMarkChanged()">
         </div>
@@ -658,7 +658,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
           oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;background:rgba(0,0,0,.25);border-left:2px solid ${borderLeft}">
-        <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(188,215,255,.65)">NRR ${rangeLbl} → <span style="font-weight:800;color:${previewColor}">${payLbl}</span></span>
+        <span style="font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(188,215,255,.65)">NRR ${rangeLbl} → <span style="font-weight:800;color:${previewColor}">${payLbl}</span></span>
       </div>
       ${te.range||te.payout?`<div style="font-size:10px;color:rgba(255,120,80,.90);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
     </div>`;
@@ -673,7 +673,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
           value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule"
           oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
         ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px;vertical-align:middle">Unsaved</span>':''}
-        <div style="font-size:10px;color:rgba(188,215,255,.55);font-family:'IBM Plex Mono',monospace;margin-top:5px">${planCode} · ใช้อยู่ ${used} คน</div>
+        <div style="font-size:10px;color:rgba(188,215,255,.55);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;margin-top:5px">${planCode} · ใช้อยู่ ${used} คน</div>
       </div>
       <button onclick="archiveCommissionRule('${planCode}')" ${isStandard?'disabled title="Standard rule ลบไม่ได้"':''}
         style="font-size:10px;color:${isStandard?'rgba(188,215,255,.25)':'rgba(255,100,60,.70)'};background:none;border:1px solid ${isStandard?'rgba(188,215,255,.10)':'rgba(255,100,60,.28)'};border-radius:7px;padding:5px 10px;cursor:${isStandard?'default':'pointer'};white-space:nowrap">Archive</button>
