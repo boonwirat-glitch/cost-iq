@@ -805,7 +805,7 @@ input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; 
 body.sales-mode .sales-any-btn { display: flex !important; }
 
 /* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
-body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
+/* → grid-template-columns removed — NavConfig.render() sets inline gridTemplateColumns */
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
