@@ -1273,9 +1273,20 @@ function _pvInitCollapseObserver(){
   function _check(){
     raf=0;
     if(!screen.classList.contains('on'))return;
-    // v_stab2: if content too short to scroll, force expand and stop
+    // Phase 0G: SCROLL GUARD — if content too short to scroll, force expand
+    // AND detach listeners to prevent the micro-loop:
+    //   scroll fires → _schedule → _check → _apply(false) → layout shift
+    //   → scroll fires again → infinite loop → PWA crash on few-account lists
     if(!_scrollable()){
       _apply(false);
+      // Detach scroll listeners — will re-attach on next renderPortview()
+      // which calls _pvInitCollapseObserver() fresh
+      window.removeEventListener('scroll',_schedule);
+      document.removeEventListener('scroll',_schedule,true);
+      screen.removeEventListener('scroll',_schedule);
+      window.removeEventListener('resize',_schedule);
+      if(raf){cancelAnimationFrame(raf);raf=0;}
+      _senseDataLog('PORTVIEW','📌 scroll guard: content too short, listeners detached');
       return;
     }
     const y=_scrollTop();
