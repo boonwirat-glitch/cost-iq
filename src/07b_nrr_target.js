@@ -1200,27 +1200,32 @@ if (document.readyState === 'loading') {
 setTimeout(async function _tgtInitCheck() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   if (!role) { setTimeout(_tgtInitCheck, 600); return; }
-  // v224e render-gate: wait for portview+history data before NRR render
-  // prevents NRR bar rendering with ฿0 then re-rendering with real value
-  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
-    setTimeout(_tgtInitCheck, 400); return;
-  }
-  _injectPortviewBarEl();
+  // v648-fix: loadTargets() is a Supabase fetch, does NOT need portview/R2 data.
+  // OLD: waited for allCriticalReady() before loadTargets() → slow networks caused
+  // commission shimmer to stick the entire session (allCriticalReady blocked for >30s).
+  // FIX: loadTargets() fires immediately when role is ready → _tgtLoaded=true quickly
+  // → commission strip re-renders. NRR bar still waits for portview GMV data.
   await loadTargets(_tgtCurrentQuarter());
-  renderPortviewTargetBar();
-  renderPortviewNRRBar();
-  // v565: tiers just arrived — re-render commission strip (was stuck on default-tier
-  // numbers or loading skeleton until next refreshAll). Value guard inside prevents dup.
+  // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
-  _tgtInjectAdminBtn();
-  try{
-    const tv=document.getElementById('scr-teamview');
-    if(tv && tv.classList.contains('on')){
-      if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
-      if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+  // NRR/target bars need portview GMV — wait for allCriticalReady
+  (function _waitAndRenderBars(){
+    if(typeof allCriticalReady==='function' && !allCriticalReady()){
+      setTimeout(_waitAndRenderBars, 400); return;
     }
-  }catch(e){ console.warn('[target init] teamview refresh', e); }
-  _tgtInjectTeamviewTargetRows();
+    _injectPortviewBarEl();
+    renderPortviewTargetBar();
+    renderPortviewNRRBar();
+    _tgtInjectAdminBtn();
+    try{
+      const tv=document.getElementById('scr-teamview');
+      if(tv && tv.classList.contains('on')){
+        if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
+        if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+      }
+    }catch(e){ console.warn('[target init] teamview refresh', e); }
+    _tgtInjectTeamviewTargetRows();
+  })();
 }, 1500);
 
 // Also hook into portview renders directly
