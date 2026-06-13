@@ -34,6 +34,7 @@ patches_js    = read('src/08_patches.js')
 conv_intel_js = read('src/09_conv_intel.js')
 sales_js     = read('src/10_sales_view.js')
 skills_js    = read('src/11_skills.js')
+nav_config_js = read('src/12_nav_config.js')
 styles_skills = read('src/styles_skills.css')
 styles_rest   = read('src/styles_restaurant.css')
 styles_echo   = read('src/styles_echo.css')
@@ -77,6 +78,8 @@ out = (shell
              f'<script id="freshket-sales">\n{sales_js}</script>\n')
     .replace('<script id="freshket-skills">\n<!-- INJECT_SKILLS -->\n</script>\n',
              f'<script id="freshket-skills">\n{skills_js}</script>\n')
+    .replace('<script id="freshket-nav-config">\n<!-- INJECT_NAV_CONFIG -->\n</script>',
+             f'<script id="freshket-nav-config">\n{nav_config_js}</script>')
     .replace('<style id="restaurant-module-css">\n<!-- INJECT_STYLES_RESTAURANT -->\n</style>',
              f'<style id="restaurant-module-css">\n{styles_rest}</style>') \
              .replace('<style id="echo-module-css">\n<!-- INJECT_STYLES_ECHO -->\n</style>',
@@ -111,7 +114,8 @@ out = (shell
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS',
           'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
-          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT']:
+          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT',
+          'INJECT_NAV_CONFIG']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
