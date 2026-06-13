@@ -115,7 +115,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ── Collapsible summary block ── */
 .pv-collapsible{overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1);will-change:max-height;contain:layout;padding:0 16px 12px}
-.pv-collapsible.expanded{max-height:400px;opacity:1}
+.pv-collapsible.expanded{max-height:700px;opacity:1}
 .pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
