@@ -1,0 +1,70 @@
+/* ============================================================
+   FRESHKET SENSE — RESTAURANT / SWIPE MODE STYLES
+   src/styles_restaurant.css · Phase 0E migration
+
+   Strategy: verbatim copy — !important retained as-is
+   sp-* selectors kept flat (unique names, safe de-facto scope)
+   #swipe-pill, #swipe-grp-a/b: ID-scoped in DOM
+   body.{role} overrides: role state = allowed
+   ============================================================ */
+
+/* ── Swipe groups (restaurant mode only) ── */
+body:not(.kam-mode) .main{height:0!important;min-height:0!important;padding:0!important;overflow:visible}
+.swipe-grp{display:none}
+.swipe-grp.on{display:flex}
+body:not(.kam-mode) .swipe-grp.on{position:fixed;top:48px;bottom:var(--chrome-bottom);left:50%;transform:translateX(-50%);width:100%;max-width:440px;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+body:not(.kam-mode) .swipe-grp.on::-webkit-scrollbar{display:none}
+body:not(.kam-mode) .swipe-grp .scr{flex:0 0 100%;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;display:block!important;scroll-snap-align:start;scroll-snap-stop:always;animation:none;box-sizing:border-box;-webkit-overflow-scrolling:touch;padding-bottom:18px}
+/* KAM mode: swipe groups become transparent block containers */
+body.kam-mode #swipe-grp-a,body.kam-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
+body.kam-mode #swipe-grp-a .scr,body.kam-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
+body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:block!important}
+/* v499: kad-mode (AD) mirrors kam-mode swipe-grp layout */
+body.kad-mode #swipe-grp-a,body.kad-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
+body.kad-mode #swipe-grp-a .scr,body.kad-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
+body.kad-mode #swipe-grp-a .scr.on,body.kad-mode #swipe-grp-b .scr.on{display:block!important}
+body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
+
+body:not(.kam-mode) #nav-report{display:none!important}
+/* ── Restaurant swipe cue (v154) — replaces legacy white strip + dots ── */
+#swipe-pill{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-4px);
+  z-index:102;display:flex;align-items:center;justify-content:center;
+  border-radius:999px;border:1px solid var(--tk-ok-border);
+  background:rgba(0,86,64,.72);color:rgba(255,255,255,.88);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 8px 24px rgba(0,48,38,.22),0 0 0 1px rgba(255,255,255,.04) inset;
+  opacity:0;pointer-events:none;white-space:nowrap;
+  transition:opacity .28s ease,transform .32s cubic-bezier(.34,1.2,.64,1),background .22s,border-color .22s;
+  will-change:opacity,transform;
+  -webkit-tap-highlight-color:transparent;
+}
+#swipe-pill.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#swipe-pill.compact{padding:5px 10px}
+#swipe-pill.teach{padding:8px 16px;background:linear-gradient(135deg,rgba(0,112,80,.9),rgba(0,64,48,.86));border-color:var(--tk-ok-border);box-shadow:0 10px 28px rgba(0,48,38,.28),0 0 18px var(--tk-ok-dim-2)}
+#swipe-pill:hover{border-color:var(--tk-ok-border);background:rgba(0,96,72,.82)}
+body.kam-mode #swipe-pill{display:none}
+/* ── overlay context: white pill for contrast against green header ── */
+body.restaurant-sheet.kam-mode #swipe-pill{display:flex;z-index:170;background:rgba(255,255,255,.93);border-color:rgba(0,0,0,.07);color:#0a3020;box-shadow:0 8px 24px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.1)}
+body.restaurant-sheet.kam-mode #swipe-pill.teach{background:rgba(255,255,255,.97);border-color:rgba(0,160,80,.22)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-seg{color:rgba(0,50,30,.38)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-seg.on{color:#0a3020;background:rgba(0,200,100,.14)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-dot{background:rgba(0,0,0,.14)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-dot.on{background:var(--g500)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-mini-arrow{color:rgba(0,50,30,.35)}
+body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-shadow:none}
+.sp-compact{display:flex;align-items:center;gap:7px}
+#swipe-pill.teach .sp-compact{display:none}
+.sp-teach-text{display:none;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.1px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.18)}
+#swipe-pill.teach .sp-teach-text{display:flex}
+.sp-teach-icon{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tk-ok-border);color:#8dffc4;font-size:11px;flex-shrink:0}
+.sp-seg{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.48);padding:3px 8px;border-radius:999px;line-height:1.2;transition:all .2s}
+.sp-seg.on{color:#ffffff;background:var(--tk-ok-dim-2);box-shadow:0 0 0 1px var(--tk-ok-dim-2) inset}
+.sp-dots{display:flex;gap:4px;align-items:center;padding:0 1px}
+.sp-dot{width:5px;height:5px;border-radius:999px;background:rgba(255,255,255,.28);transition:width .26s cubic-bezier(.34,1.56,.64,1),background .2s,opacity .2s}
+.sp-dot.on{width:14px;background:var(--g500);box-shadow:0 0 8px var(--tk-ok-border)}
+.sp-mini-arrow{font-size:11px;color:rgba(255,255,255,.42);margin-left:-2px;transition:transform .2s,color .2s}
+#swipe-pill:hover .sp-mini-arrow{color:rgba(255,255,255,.78);transform:translateX(2px)}
+@media(max-width:360px){#swipe-pill{top:58px}.sp-seg{font-size:10px;padding:3px 6px}.sp-teach-text{font-size:11px}}
+@keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
