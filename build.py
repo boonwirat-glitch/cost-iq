@@ -40,7 +40,11 @@ styles_echo   = read('src/styles_echo.css')
 styles_auth   = read('src/styles_auth.css')
 styles_nav    = read('src/styles_nav.css')
 styles_pv     = read('src/styles_portview.css')
-styles_tv     = read('src/styles_teamview.css')
+styles_tv       = read('src/styles_teamview.css')
+styles_overview = read('src/styles_overview.css')
+styles_save     = read('src/styles_save.css')
+styles_report   = read('src/styles_report.css')
+styles_aichat   = read('src/styles_aichat.css')
 styles_sales = read('src/styles_sales.css')
 styles_tokens  = read('src/styles_tokens.css')
 styles_base    = read('src/styles_base.css')
@@ -85,6 +89,14 @@ out = (shell
              f'<style id="portview-module-css">\n{styles_pv}</style>') \
              .replace('<style id="tv-module-css">\n<!-- INJECT_STYLES_TV -->\n</style>',
              f'<style id="tv-module-css">\n{styles_tv}</style>') \
+             .replace('<style id="overview-module-css">\n<!-- INJECT_STYLES_OVERVIEW -->\n</style>',
+             f'<style id="overview-module-css">\n{styles_overview}</style>') \
+             .replace('<style id="save-module-css">\n<!-- INJECT_STYLES_SAVE -->\n</style>',
+             f'<style id="save-module-css">\n{styles_save}</style>') \
+             .replace('<style id="report-module-css">\n<!-- INJECT_STYLES_REPORT -->\n</style>',
+             f'<style id="report-module-css">\n{styles_report}</style>') \
+             .replace('<style id="aichat-module-css">\n<!-- INJECT_STYLES_AICHAT -->\n</style>',
+             f'<style id="aichat-module-css">\n{styles_aichat}</style>') \
              .replace('<style id="skills-module-css">\n<!-- INJECT_STYLES_SKILLS -->\n</style>',
              f'<style id="skills-module-css">\n{styles_skills}</style>')
     .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
@@ -99,7 +111,7 @@ out = (shell
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS',
           'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
-          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV']:
+          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)
 
