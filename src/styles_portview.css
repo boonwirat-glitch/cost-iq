@@ -377,23 +377,8 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 /* Sojirat (May) — unassigned account, no Supabase user */
 
 /* ══ KAM MODE NAV SWAP ══ */
-/* In KAM mode: hide restaurant tabs, show KAM tabs */
-body.kam-mode .bnav .ni.rest-only { display: none !important; }
-body.kam-mode .bnav .ni.kam-only  { display: flex !important; }
-/* v498: AD mode mirrors KAM nav visibility */
-body.kad-mode .bnav .ni.rest-only { display: none !important; }
-body.kad-mode .bnav .ni.kam-only  { display: flex !important; }
-body.kad-mode .bnav .ni.sales-only    { display: none !important; }
-body.kad-mode .bnav .ni.sales-tl-only { display: none !important; }
-body.kad-mode .bnav .ni.tl-only       { display: none !important; }
-/* In restaurant mode: hide KAM tabs */
-body:not(.kam-mode) .bnav .ni.kam-only { display: none !important; }
-/* Default: kam-only hidden */
-.bnav .ni.kam-only { display: none !important; }
-/* TL-only: Team tab — shown only when body has both kam-mode AND tl-mode */
-.bnav .ni.tl-only { display: none !important; }
-/* v183: Team moved to portview header — hide from nav entirely */
-body.kam-mode.tl-mode .bnav .ni.tl-only { display: none !important; }
+/* → All class-based display rules removed — NavConfig.render() in 12_nav_config.js
+   controls show/hide for every role. CSS here is visual-only. */
 /* ── v190 KAM pill nav ── */
 /* → nav-opportunities show rule moved to NavConfig.render() */
 /* → nav-portview hide removed — NavConfig.render() handles show/hide */
