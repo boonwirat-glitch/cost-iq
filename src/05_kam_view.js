@@ -87,7 +87,16 @@ function __legacyShowScreenFallback(name){
     const activeGrp=inA?grpA:grpB;
     const screens=inA?GRP_A:GRP_B;
     const idx=screens.indexOf(name);
-    if(activeGrp) activeGrp.scrollTo({left:idx*activeGrp.offsetWidth,behavior:'instant'});
+    // v626: reset scrollLeft directly first (offsetWidth may be 0 before repaint)
+    // then RAF to handle case where scroll didn't reset (container was off-screen)
+    if(activeGrp){
+      activeGrp.scrollLeft = idx === 0 ? 0 : (activeGrp.scrollLeft);
+      requestAnimationFrame(()=>{
+        const w = activeGrp.offsetWidth || window.innerWidth;
+        try{ activeGrp.scrollTo({left:idx*w,behavior:'instant'}); }
+        catch(e){ activeGrp.scrollLeft = idx*w; }
+      });
+    }
     _updateRestSwipe(inA?'a':'b',idx,{teach:inA,duration:2800});
     const footer=document.getElementById('pb-footer');
     if(footer)footer.classList.toggle('hidden',inA||name==='report');
