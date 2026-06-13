@@ -1336,11 +1336,19 @@ function _pvInitCollapseObserver(){
   }
 
   // Init: measure and set correct initial state
+  // v667: also set listEl paddingTop = portview-header actual height
+  // so cards never hide under the sticky header on first render (before _frame runs)
   setTimeout(function(){
     if(!screen.classList.contains('on'))return;
     expandedH=collapsible.scrollHeight||200;
     lastAppliedH=-1; // force first write
     _frame();
+    // Sync list padding-top with actual header height (measured post-render)
+    var hdr=document.querySelector('.portview-header');
+    if(hdr&&listEl){
+      var hdrH=hdr.getBoundingClientRect().height;
+      if(hdrH>0) listEl.style.paddingTop=Math.round(hdrH)+'px';
+    }
   },180);
 
   window.addEventListener('scroll',_onScroll,{passive:true});
