@@ -3506,7 +3506,7 @@ body.kam-mode #mode-toggle-wrap:hover{opacity:1;transform:scale(1);}
 body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 
 /* 3) Commission reward loop — always visible, more special when unlocked. */
-.pv-comm-strip.v210k{position:relative;overflow:hidden;border-color:rgba(255,224,138,.42)!important;background:linear-gradient(135deg,rgba(255,224,138,.10),rgba(35,73,126,.52) 46%,rgba(15,42,76,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(255,224,138,.05),0 6px 22px rgba(0,0,0,.10)!important;}
+.pv-comm-strip.v210k{position:relative;overflow:clip;border-color:rgba(255,224,138,.42)!important;background:linear-gradient(135deg,rgba(255,224,138,.10),rgba(35,73,126,.52) 46%,rgba(15,42,76,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(255,224,138,.05),0 6px 22px rgba(0,0,0,.10)!important;}
 .pv-comm-strip.v210k:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 8% 0%,rgba(255,224,138,.18),transparent 34%),linear-gradient(110deg,transparent,rgba(255,224,138,.08),transparent);opacity:.62;pointer-events:none;}
 .pv-comm-strip.v210k .pv-comm-title{color:rgba(255,224,138,.92)!important;}
 .pv-comm-strip.v210k .pv-comm-main{color:#ffe08a!important;text-shadow:0 0 18px rgba(255,224,138,.18)!important;}
