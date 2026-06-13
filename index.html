@@ -1,4 +1,4 @@
-<!-- Freshket Sense v617: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v618: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -479,6 +479,11 @@
 </style>
 <style>
 /* ============================================================
+   FRESHKET SENSE — BASE STYLES  src/styles_base.css
+   Contents: :root vars, CSS reset, body, keyframes.
+   ============================================================ */
+
+/* ============================================================
    FRESHKET SENSE — MAIN STYLES
    src/styles_main.css
    
@@ -524,6 +529,12 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 
 /* ── MICRO-INTERACTION: Splash ticker transition ── */
 #spl-ticker{transition:opacity .18s ease}
+</style>
+<style>
+/* ============================================================
+   FRESHKET SENSE — LAYOUT STYLES  src/styles_layout.css
+   Contents: topbar, bnav, screens, data-panel, KAM components.
+   ============================================================ */
 
 /* ── TOPBAR ── */
 .topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + constant(safe-area-inset-top));padding-top:calc(11px + env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
@@ -991,7 +1002,13 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card:active{transform:scale(.98)}
 
 /* ── SCREENS ── */
-.main{padding-bottom:148px;min-height:calc(100vh - 48px)}
+.main{padding-bottom:148px;min-height:calc(100vh - 48px)}</style>
+<style>
+/* ============================================================
+   FRESHKET SENSE — MAIN STYLES (Phase 0B trimmed)
+   src/styles_main.css
+   ============================================================ */
+
 /* KAM Overview dark screen */
 #kam-overview{
   background:linear-gradient(160deg,#080f1e 0%,var(--tk-bg-base) 60%,var(--tk-bg-base) 100%);
@@ -5684,7 +5701,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v617',
+      version: 'v618',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
