@@ -76,4 +76,4 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
 #echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
 #echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
 #echo-float-pill .fp-label{display:none}
-#echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
+#echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(255,255,255,.55);min-width:36px}
