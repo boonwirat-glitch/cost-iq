@@ -114,14 +114,14 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.6,1),opacity 220ms cubic-bezier(0.4,0,0.6,1)}
-.pv-collapsible.expanded{max-height:700px;opacity:1}
+.pv-collapsible{overflow:hidden;transition:max-height 320ms cubic-bezier(0.4,0,0.2,1),opacity 240ms cubic-bezier(0.4,0,0.2,1);will-change:max-height}
+.pv-collapsible.expanded{max-height:600px;opacity:1}
 .pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
-.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
-.pv-compact-strip.hidden{max-height:0;opacity:0;pointer-events:none;margin:0}
-.pv-compact-strip.visible{max-height:72px;opacity:1;margin-bottom:8px}
+.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:opacity 220ms cubic-bezier(0.0,0,0.2,1),transform 260ms cubic-bezier(0.0,0,0.2,1),max-height 300ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0;will-change:opacity,transform}
+.pv-compact-strip.hidden{opacity:0;pointer-events:none;margin:0;transform:translateY(-4px);max-height:0}
+.pv-compact-strip.visible{opacity:1;margin-bottom:8px;transform:translateY(0);max-height:72px}
 .pv-cs-pace{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:0 10px 0 0;border-right:1px solid rgba(255,255,255,.1);margin-right:2px}
 .pv-cs-pace-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;line-height:1}
 .pv-cs-pace-lbl{font-size:9px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
