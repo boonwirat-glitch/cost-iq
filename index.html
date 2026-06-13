@@ -1,4 +1,4 @@
-<!-- Freshket Sense v618: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v619: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1002,7 +1002,35 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card:active{transform:scale(.98)}
 
 /* ── SCREENS ── */
-.main{padding-bottom:148px;min-height:calc(100vh - 48px)}</style>
+.main{padding-bottom:148px;min-height:calc(100vh - 48px)}
+
+/* ══ PHASE 0C: DATA-THEME — BNAV ONLY ════════════════════════
+   data-theme is set on <html> at login by 01_core.js.
+   Rules here: bnav background + nav icon colors only.
+   TOPBAR IS NOT HERE — body.kam-mode / body.sales-mode in
+   styles_main.css handle topbar. Do not add topbar rules here.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Bottom nav: theme-aware ── */
+[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
+[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
+
+/* Nav icon idle */
+[data-theme="dark"]  .bnav .ni .lb,
+[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
+[data-theme="light"] .bnav .ni .lb,
+[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
+
+/* Nav icon active */
+[data-theme="dark"]  .bnav .ni.on .lb,
+[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
+[data-theme="light"] .bnav .ni.on .lb,
+[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
+
+/* Active pill */
+[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
+[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
+</style>
 <style>
 /* ============================================================
    FRESHKET SENSE — MAIN STYLES (Phase 0B trimmed)
@@ -5701,7 +5729,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v618',
+      version: 'v619',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
