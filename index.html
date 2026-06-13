@@ -1,4 +1,4 @@
-<!-- Freshket Sense v649: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v650: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v649',
+      version: 'v650',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7042,9 +7042,9 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.6,1),opacity 220ms cubic-bezier(0.4,0,0.6,1)}
-.pv-collapsible.expanded{max-height:700px;opacity:1}
-.pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
+.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1)}
+.pv-collapsible.expanded{opacity:1}
+.pv-collapsible.collapsed{max-height:0!important;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
 .pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
@@ -27656,7 +27656,31 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
-    collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
+    // v650: JS-measured max-height — animate to real content height, not hardcoded 700px.
+    // iOS PWA jank came from browser animating 0→700px where only 0→300px had content:
+    // animation "finished" at 43% of duration then jumped to end. Now it uses exact height.
+    //
+    // Order matters (v646 bug was setting className AFTER style → CSS overrode inline):
+    //   COLLAPSE: measure → set start point → reflow → set className (CSS handles 0)
+    //   EXPAND:   set className first → override with measured height → clear after done
+    if(collapsed){
+      // Collapsing: pin to real height first so transition starts from the right place
+      var _h=collapsible.scrollHeight;
+      collapsible.style.maxHeight=_h+'px';
+      collapsible.offsetHeight; // force reflow — browser must see explicit start height
+      collapsible.className='pv-collapsible collapsed'; // CSS now transitions 0
+    }else{
+      // Expanding: set class first (opacity:1, pointer-events), then override maxHeight
+      collapsible.className='pv-collapsible expanded';
+      var _h=collapsible.scrollHeight;
+      collapsible.style.maxHeight=_h+'px';
+      // After transition completes, remove inline style so content can resize freely
+      if(collapsible._expandTimer)clearTimeout(collapsible._expandTimer);
+      collapsible._expandTimer=setTimeout(function(){
+        // Only clear if still in expanded state (user didn't collapse mid-animation)
+        if(lastCollapsed===false)collapsible.style.maxHeight='';
+      },340);
+    }
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
     // Auto-expand search bar when compact strip appears
@@ -27693,20 +27717,12 @@ function _pvInitCollapseObserver(){
   function _check(){
     raf=0;
     if(!screen.classList.contains('on'))return;
-    // Phase 0G: SCROLL GUARD — if content too short to scroll, force expand
-    // AND detach listeners to prevent the micro-loop:
-    //   scroll fires → _schedule → _check → _apply(false) → layout shift
-    //   → scroll fires again → infinite loop → PWA crash on few-account lists
+    // v650: SCROLL GUARD — keep listeners alive, just early-return when content short.
+    // Old code detached listeners → after filter-back-to-all, listeners were gone → no collapse.
+    // Fix: _apply(false) has its own guard (lastCollapsed===false → no-op), so calling
+    // it repeatedly on short lists costs nothing. Keep listeners attached always.
     if(!_scrollable()){
       _apply(false);
-      // Detach scroll listeners — will re-attach on next renderPortview()
-      // which calls _pvInitCollapseObserver() fresh
-      window.removeEventListener('scroll',_schedule);
-      document.removeEventListener('scroll',_schedule,true);
-      screen.removeEventListener('scroll',_schedule);
-      window.removeEventListener('resize',_schedule);
-      if(raf){cancelAnimationFrame(raf);raf=0;}
-      _senseDataLog('PORTVIEW','📌 scroll guard: content too short, listeners detached');
       return;
     }
     const y=_scrollTop();
