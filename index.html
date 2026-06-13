@@ -1,4 +1,4 @@
-<!-- Freshket Sense v651: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v652: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v651',
+      version: 'v652',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7042,9 +7042,9 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden}
-.pv-collapsible.expanded{opacity:1}
-.pv-collapsible.collapsed{opacity:0;pointer-events:none}
+.pv-collapsible{overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1)}
+.pv-collapsible.expanded{max-height:400px;opacity:1}
+.pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
 .pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
@@ -26623,6 +26623,318 @@ function _applyPortviewTierVisual(){
   });
 }
 
+let _pvCollapseObserver=null;
+function _pvSyncChips(){
+  // Sync active/dim classes on compact strip chips without full rebuild
+  const strip=document.getElementById('pv-compact-strip');
+  if(!strip)return;
+  strip.querySelectorAll('.pv-cs-chip').forEach(chip=>{
+    const cls=Array.from(chip.classList).find(c=>['ok','warn','danger'].includes(c));
+    if(!cls)return;
+    const isOn=portviewFilter===cls;
+    const isDim=portviewFilter!=='all'&&!isOn;
+    chip.classList.toggle('pf-on',isOn);
+    chip.classList.toggle('pf-dim',isDim);
+  });
+}
+
+function _pvInitCollapseObserver(){
+  if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
+  var old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
+  var screen=document.getElementById('scr-portview');
+  var collapsible=document.getElementById('pv-collapsible');
+  var strip=document.getElementById('pv-compact-strip');
+  var listEl=document.getElementById('portview-list');
+  if(!screen||!collapsible||!strip||!listEl)return;
+
+  var raf=0;
+  var lastCollapsed=null;
+  var COLLAPSE_AT=42;
+  var EXPAND_AT=8;
+
+  function _scrollTop(){
+    var se=document.scrollingElement||document.documentElement;
+    return Math.max(
+      window.pageYOffset||0,
+      se?se.scrollTop||0:0,
+      document.documentElement?document.documentElement.scrollTop||0:0,
+      document.body?document.body.scrollTop||0:0,
+      screen.scrollTop||0
+    );
+  }
+  function _aiVisible(){
+    var aiOut=document.getElementById('portview-ai-output');
+    return !!(aiOut&&aiOut.style.display!=='none');
+  }
+  function _canExpand(){
+    var msSinceRender=Date.now()-(window._pvLastRenderMs||0);
+    return msSinceRender>350&&!_aiVisible();
+  }
+  function _apply(collapsed){
+    if(lastCollapsed===collapsed)return;
+    lastCollapsed=collapsed;
+    collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
+    strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
+    window._pvLastCollapseMs=collapsed?Date.now():0;
+    var searchExpand=document.getElementById('pv-sort-search-expand');
+    if(collapsed&&searchExpand){
+      searchExpand.style.display='block';
+      var si=document.getElementById('pv-search-collapsed');
+      if(si&&!si.value)setTimeout(function(){si.focus();},180);
+      var sb=document.getElementById('pv-cs-search-btn');
+      if(sb)sb.classList.add('active');
+    }else if(!collapsed&&searchExpand){
+      var si=document.getElementById('pv-search-collapsed');
+      if(si&&!si.value){
+        searchExpand.style.display='none';
+        var sb=document.getElementById('pv-cs-search-btn');
+        if(sb)sb.classList.remove('active');
+      }
+    }
+  }
+  function _scrollable(){
+    var docH=Math.max(
+      document.body?document.body.scrollHeight:0,
+      document.documentElement?document.documentElement.scrollHeight:0,
+      screen?screen.scrollHeight:0
+    );
+    var winH=window.innerHeight||document.documentElement.clientHeight||600;
+    return (docH-winH)>COLLAPSE_AT;
+  }
+  function _check(){
+    raf=0;
+    if(!screen.classList.contains('on'))return;
+    // v652: never detach listeners — just early-return when content too short.
+    // Fixes: filter few cards → filter back → listeners were gone → no collapse.
+    if(!_scrollable()){_apply(false);return;}
+    var y=_scrollTop();
+    if(y>COLLAPSE_AT){_apply(true);}
+    else if(y<=EXPAND_AT&&_canExpand()){_apply(false);}
+  }
+  function _schedule(){
+    if(raf)return;
+    raf=requestAnimationFrame(_check);
+  }
+
+  window.addEventListener('scroll',_schedule,{passive:true});
+  document.addEventListener('scroll',_schedule,{capture:true,passive:true});
+  screen.addEventListener('scroll',_schedule,{passive:true});
+  window.addEventListener('resize',_schedule,{passive:true});
+  setTimeout(_schedule,180);
+
+  _pvCollapseObserver={disconnect:function(){
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    window.removeEventListener('scroll',_schedule);
+    document.removeEventListener('scroll',_schedule,true);
+    screen.removeEventListener('scroll',_schedule);
+    window.removeEventListener('resize',_schedule);
+  }};
+}
+// SECTION:PACE_CHURN
+function computePaceSignal(cm,history){
+  if(!cm)return{cls:'',pct:0,label:'ไม่มีข้อมูล',isNew:false,histMonths:0};
+  const daysElapsed=cm.days_elapsed||1;
+  const daysInMonth=cm.days_in_month||30;
+  const hist=history&&history.length?history:[];
+  const recent3=hist.slice(-3);
+  const histMonths=recent3.length;
+
+  // ── NEW ACCOUNT: no prior months ──────────────────────────────
+  if(histMonths===0){
+    return{
+      cls:'new',pct:null,label:'ร้านใหม่',isNew:true,
+      histMonths:0,confidence:'none',
+      baselineDaily:0,baselineGmv:0,expected:0,lastGmv:0,
+      runrate:cm.runrate_gmv,daysElapsed,daysInMonth,
+      gmvToDate:cm.gmv_to_date,monthsDetail:[]
+    };
+  }
+
+  // ── NORMALIZED BASELINE ───────────────────────────────────────
+  // Compute daily rate per month (GMV ÷ actual days in that month)
+  // then average across available months (1–3)
+  const monthsDetail=recent3.map(h=>{
+    const days=getThaiMonthDays(h.m);
+    return{m:h.m,gmv:h.s,days,daily:Math.round(h.s/days)};
+  });
+  const baselineDaily=monthsDetail.reduce((s,d)=>s+d.daily,0)/histMonths;
+  const baselineGmv=Math.round(baselineDaily*daysInMonth); // Method C: × actual days in current month
+  const expected=baselineDaily*daysElapsed;
+  const pct=expected>0?Math.round(cm.gmv_to_date/expected*100):0;
+  const lastGmv=hist[hist.length-1]?.s||0;
+
+  // ── CONFIDENCE (based on months of data available) ────────────
+  const confidence=histMonths>=3?'high':histMonths===2?'medium':'low';
+
+  // ── SIGNAL CLASS ──────────────────────────────────────────────
+  let cls='',label='';
+  if(pct>=100){cls='great';label='ดีเยี่ยม';}
+  else if(pct>=95){cls='safe';label='ปลอดภัย';}
+  else if(pct>=90){cls='warn';label='MONITOR';}
+  else{cls='danger';label='AT RISK';}
+
+  return{
+    cls,pct,label,isNew:false,
+    histMonths,confidence,baselineDaily:Math.round(baselineDaily),
+    baselineGmv,expected:Math.round(expected),lastGmv,
+    runrate:cm.runrate_gmv,daysElapsed,daysInMonth,
+    gmvToDate:cm.gmv_to_date,monthsDetail
+  };
+}
+
+function getPaceClass(pct){
+  if(pct>=100)return'great';
+  if(pct>=95)return'safe';
+  if(pct>=90)return'warn';
+  return'danger';
+}
+
+// ════════════════════════════════════════
+// SKU CHURN COMPUTATION
+// ════════════════════════════════════════
+function computeChurnSignals(){
+  if(!D.current_month||!D.skus.length)return[];
+  const cm=D.current_month;
+  const daysElapsed=cm.days_elapsed||1;
+  const daysInMonth=cm.days_in_month||30;
+  const skuCurrentEmpty=!(D.sku_current||[]).length;
+  // If sku_current is empty but account has positive GMV this month → data not uploaded, can't compute
+  // If sku_current is empty AND gmv_to_date===0 → account truly has 0 orders → all last-month SKUs = gone
+  if(skuCurrentEmpty && (cm.gmv_to_date||0)>0) return [];
+  // Get last finished month SKUs with order_count
+  const months=Object.keys(D.skus_monthly||{}).sort((a,b)=>{
+    const toDate=m=>{const parts=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(parts[1]||0)*12)+mo.indexOf(parts[0]);};
+    return toDate(b)-toDate(a);
+  });
+  // v156: use last CLOSED month — Q3B now includes MTD so months[0] may be current month
+  const _cmLbl2=(D.current_month||{}).month_label||'';
+  const _lastClosed2=months.find(m=>m!==_cmLbl2)||months[0];
+  const lastMonthSkus=_lastClosed2?D.skus_monthly[_lastClosed2]:D.skus;
+  const currentMap=new Map((D.sku_current||[]).map(s=>[s.item_id,s]));
+  const signals=[];
+  for(const sku of lastMonthSkus){
+    const orderCount=sku.order_count||0;
+    if(orderCount<1)continue; // skip SKUs with no order history
+    const outletCountSku=sku.outlet_count_sku||1;
+    // Per-outlet frequency: how many times each ordering outlet buys this SKU/month
+    const perOutletFreq=orderCount/outletCountSku;
+    // Average days between orders per outlet
+    const avgInterval=daysInMonth/perOutletFreq;
+    const curr=currentMap.get(String(sku.id||sku.item_id));
+    const ordersThisMonth=curr?curr.orders_this_month:0;
+    // ── slow: has orders but pace well below last month ──
+    if(ordersThisMonth>0){
+      const lastGmv=sku.gmv||0;
+      if(daysElapsed>15&&daysElapsed>avgInterval&&lastGmv>=3000&&daysElapsed>0){
+        const projectedGmv=(curr.gmv_to_date||0)*(daysInMonth/daysElapsed);
+        const gapPct=lastGmv>0?Math.round((lastGmv-projectedGmv)/lastGmv*100):0;
+        if(gapPct>=30){
+          signals.push({
+            id:String(sku.id||sku.item_id),
+            name:sku.n||sku.name||sku.item_name_th||'—',
+            dept:sku.d||sku.dept||'—',
+            orderCount,outletCountSku,perOutletFreq,avgInterval:Math.round(avgInterval),
+            daysLate:0,daysUntil:0,
+            ordersThisMonth,type:'slow',
+            gmv:lastGmv,gapPct,
+            projectedGmv:Math.round(projectedGmv)
+          });
+        }
+      }
+      continue;
+    }
+    // zero orders → classify gone/near/not_yet as before
+    // Classify by how far past the expected reorder point we are
+    let type;
+    if(daysElapsed<avgInterval)type='not_yet';           // ยังไม่ถึงรอบ
+    else if(daysElapsed<avgInterval*1.5)type='near';     // เพิ่งเลยรอบ — เฝ้าดู
+    else type='gone';                                     // เลยรอบมากแล้ว — น่าหาย
+    const roundedInterval=Math.round(avgInterval);
+    const daysLate=Math.max(0,Math.round(daysElapsed-avgInterval));
+    const daysUntil=Math.max(0,Math.round(avgInterval-daysElapsed));
+    signals.push({
+      id:String(sku.id||sku.item_id),
+      name:sku.n||sku.name||sku.item_name_th||'—',
+      dept:sku.d||sku.dept||'—',
+      orderCount,outletCountSku,perOutletFreq,avgInterval:roundedInterval,
+      daysLate,daysUntil,
+      ordersThisMonth,type,
+      gmv:sku.gmv||0
+    });
+  }
+  const typeOrder={gone:0,slow:1,near:2,not_yet:3};
+  signals.sort((a,b)=>{
+    const td=(typeOrder[a.type]||0)-(typeOrder[b.type]||0);
+    return td!==0?td:b.gmv-a.gmv;
+  });
+  return signals;
+}
+
+// ════════════════════════════════════════
+// INTERVAL-AWARE CHURN FOR PORTVIEW (per account, uses bulk globals)
+// ════════════════════════════════════════
+function computeChurnCountsForAccount(accountId){
+  const cm=bulkCurrentMonthData[accountId];
+  const skusMonthly=bulkSkusData[accountId]||{};
+  const skuCurrentArr=bulkSkuCurrentData[accountId]||[];
+  if(!cm||!skuCurrentArr)return null;
+  const daysElapsed=cm.days_elapsed||1;
+  const daysInMonth=cm.days_in_month||30;
+  const _moSrt=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};
+  const months=Object.keys(skusMonthly).sort((a,b)=>_moSrt(b)-_moSrt(a));
+  if(!months.length)return null;
+  // v156: skip current MTD month — use last closed month as churn baseline
+  const _cmLbl2b=(cm&&cm.month_label)||'';
+  const _lastClosed2b=months.find(m=>m!==_cmLbl2b)||months[0];
+  const lastMonthSkus=(_lastClosed2b?skusMonthly[_lastClosed2b]:[])||[];
+  const currentMap=new Map(skuCurrentArr.map(s=>[String(s.item_id||s.id),s]));
+  let gone=0,near=0,ordered=0,total=0;
+  for(const sku of lastMonthSkus){
+    const orderCount=sku.order_count||0;
+    if(orderCount<1)continue;
+    total++;
+    const curr=currentMap.get(String(sku.id||sku.item_id));
+    if(curr&&(curr.orders_this_month||0)>0){ordered++;continue;} // ordered this month ✓
+    const outletCount=sku.outlet_count_sku||1;
+    const avgInterval=daysInMonth/(orderCount/outletCount);
+    if(daysElapsed<avgInterval)continue;              // not_yet — skip
+    else if(daysElapsed<avgInterval*1.5)near++;       // near — เฝ้าดู
+    else gone++;                                       // gone — หาย
+  }
+  return{gone,near,ordered,total};
+}
+
+// ════════════════════════════════════════
+// RENDER PACE & CHURN TAB
+// ════════════════════════════════════════
+// Story line: tells the "why" behind each signal type
+function skuStoryLine(s){
+  const freq=`0/${s.orderCount} ครั้ง`;
+  if(s.type==='slow') return `${s.ordersThisMonth}/${s.orderCount} ครั้ง · −${s.gapPct}%`;
+  if(s.type==='gone') return `${freq} · เลยรอบ ${s.daysLate} วันแล้ว`;
+  if(s.type==='near') return s.daysLate<=1?`${freq} · เพิ่งเลยรอบ 1 วัน`:`${freq} · เพิ่งเลยรอบ ${s.daysLate} วัน`;
+  return `${freq} · รออีก ${s.daysUntil} วัน`;
+}
+
+
+// ════════════════════════════════════════
+// PORTVIEW — ALL-ACCOUNTS PORTFOLIO
+// ════════════════════════════════════════
+function setPortviewFilter(f){
+  portviewFilter=(portviewFilter===f)?'all':f; // toggle: same card = deselect
+  window._pvLastRenderMs=Date.now(); // guard: prevent IntersectionObserver expanding on content-shrink
+  _applyPortviewTierVisual();
+  renderPortviewList();
+}
+function _applyPortviewTierVisual(){
+  document.querySelectorAll('.portview-tier-box[data-pf]').forEach(c=>{
+    c.classList.remove('pf-active','pf-dim');
+    if(portviewFilter!=='all'){
+      c.dataset.pf===portviewFilter?c.classList.add('pf-active'):c.classList.add('pf-dim');
+    }
+  });
+}
+
 // ── v183 Restaurant Sheet Overlay ────────────────────────────────────────────
 
 // ── Sense Dark Theme system (v190) ─────────────────────────────────────────
@@ -27599,180 +27911,6 @@ function _pvBuildCompactStrip(){
     }).join('')+
     `<button class="pv-cs-search" id="pv-cs-search-btn" title="ค้นหา" onclick="(function(){const ex=document.getElementById('pv-sort-search-expand');const b=document.getElementById('pv-cs-search-btn');const open=ex.style.display!=='none';ex.style.display=open?'none':'block';b.classList.toggle('active',!open);if(!open){const i=document.getElementById('pv-search-collapsed');if(i){i.focus();}}else{const i=document.getElementById('pv-search-collapsed');if(i){i.value='';document.getElementById('portview-search').value='';renderPortviewList();}}})()">${searchIconSvg}</button>`;
 }
-
-let _pvCollapseObserver=null;
-function _pvSyncChips(){
-  // Sync active/dim classes on compact strip chips without full rebuild
-  const strip=document.getElementById('pv-compact-strip');
-  if(!strip)return;
-  strip.querySelectorAll('.pv-cs-chip').forEach(chip=>{
-    const cls=Array.from(chip.classList).find(c=>['ok','warn','danger'].includes(c));
-    if(!cls)return;
-    const isOn=portviewFilter===cls;
-    const isDim=portviewFilter!=='all'&&!isOn;
-    chip.classList.toggle('pf-on',isOn);
-    chip.classList.toggle('pf-dim',isDim);
-  });
-}
-
-function _pvInitCollapseObserver(){
-  if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
-  const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
-  const screen=document.getElementById('scr-portview');
-  const collapsible=document.getElementById('pv-collapsible');
-  const strip=document.getElementById('pv-compact-strip');
-  const listEl=document.getElementById('portview-list');
-  if(!screen||!collapsible||!strip||!listEl)return;
-
-  // v651: scroll-linked collapse (Pattern B)
-  // Instead of "scroll hits threshold → snap to collapsed", the header height
-  // is directly tied to scrollY — moves with the finger, no jarring jump.
-  //
-  // Mechanic:
-  //   expandedH  = real scrollHeight of pv-collapsible (measured once per session)
-  //   scrollY 0            → height = expandedH  (fully open)
-  //   scrollY 0..expandedH → height interpolates linearly (follows finger 1:1)
-  //   scrollY ≥ expandedH  → height = 0 (fully closed, compact strip shown)
-  //
-  // No CSS transition used — JS sets height inline every rAF frame.
-  // CSS transition removed from .pv-collapsible to prevent double-animation.
-  //
-  // Few-cards guard: if page not scrollable (_scrollable()=false),
-  // force height = expandedH and skip rAF entirely. No loop, no crash.
-
-  var expandedH = 0;       // measured on first scroll or init
-  var rafId = 0;
-  var isCollapsed = false; // current logical state for strip/search management
-  var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
-
-  function _scrollTop(){
-    var se=document.scrollingElement||document.documentElement;
-    return Math.max(
-      window.pageYOffset||0,
-      se?se.scrollTop||0:0,
-      document.documentElement?document.documentElement.scrollTop||0:0,
-      document.body?document.body.scrollTop||0:0,
-      screen.scrollTop||0
-    );
-  }
-
-  function _scrollable(){
-    var docH=Math.max(
-      document.body?document.body.scrollHeight:0,
-      document.documentElement?document.documentElement.scrollHeight:0,
-      screen?screen.scrollHeight:0
-    );
-    var winH=window.innerHeight||document.documentElement.clientHeight||600;
-    return (docH-winH)>10;
-  }
-
-  function _canExpand(){
-    var msSinceRender=Date.now()-(window._pvLastRenderMs||0);
-    var aiOut=document.getElementById('portview-ai-output');
-    return msSinceRender>350&&!(aiOut&&aiOut.style.display!=='none');
-  }
-
-  function _applyStrip(collapsed){
-    // manage compact strip + search bar state changes
-    if(isCollapsed===collapsed)return;
-    isCollapsed=collapsed;
-    strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
-    window._pvLastCollapseMs=collapsed?Date.now():0;
-    var searchExpand=document.getElementById('pv-sort-search-expand');
-    if(collapsed&&searchExpand){
-      searchExpand.style.display='block';
-      var si=document.getElementById('pv-search-collapsed');
-      if(si&&!si.value)setTimeout(function(){si.focus();},180);
-      var sb=document.getElementById('pv-cs-search-btn');
-      if(sb)sb.classList.add('active');
-    }else if(!collapsed&&searchExpand){
-      var si=document.getElementById('pv-search-collapsed');
-      if(si&&!si.value){
-        searchExpand.style.display='none';
-        var sb=document.getElementById('pv-cs-search-btn');
-        if(sb)sb.classList.remove('active');
-      }
-    }
-  }
-
-  function _frame(){
-    rafId=0;
-    if(!screen.classList.contains('on'))return;
-
-    // Few-cards guard — if not scrollable, stay expanded, no loop
-    if(!_scrollable()){
-      if(lastAppliedH!==expandedH){
-        lastAppliedH=expandedH;
-        collapsible.style.maxHeight=expandedH>0?expandedH+'px':'';
-        collapsible.style.opacity='1';
-        collapsible.style.pointerEvents='';
-      }
-      _applyStrip(false);
-      return;
-    }
-
-    // Measure expandedH once (or re-measure if it looks wrong)
-    if(expandedH<=0){
-      // Temporarily remove inline constraint to get true scrollHeight
-      var prev=collapsible.style.maxHeight;
-      collapsible.style.maxHeight='';
-      expandedH=collapsible.scrollHeight||200;
-      collapsible.style.maxHeight=prev;
-    }
-
-    var y=_scrollTop();
-    // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
-    var h=Math.max(0, Math.min(expandedH, expandedH-y));
-    var collapsed=(h===0);
-    var expanding=(h===expandedH);
-
-    // Skip DOM write if value unchanged (saves layout thrash)
-    if(lastAppliedH!==h){
-      lastAppliedH=h;
-      collapsible.style.maxHeight=h+'px';
-      // Fade out the last ~20% of collapse for a smooth vanish
-      var opacity=Math.min(1, h/(expandedH*0.3));
-      collapsible.style.opacity=String(opacity);
-      collapsible.style.pointerEvents=collapsed?'none':'';
-    }
-
-    _applyStrip(collapsed);
-
-    // If mid-animation (not fully open/closed), keep rAF running
-    if(!collapsed&&!expanding){
-      rafId=requestAnimationFrame(_frame);
-    }
-  }
-
-  function _onScroll(){
-    if(!rafId) rafId=requestAnimationFrame(_frame);
-  }
-
-  // Init: measure and set correct initial state
-  setTimeout(function(){
-    if(!screen.classList.contains('on'))return;
-    expandedH=collapsible.scrollHeight||200;
-    lastAppliedH=-1; // force first write
-    _frame();
-  },180);
-
-  window.addEventListener('scroll',_onScroll,{passive:true});
-  document.addEventListener('scroll',_onScroll,{capture:true,passive:true});
-  window.addEventListener('resize',_onScroll,{passive:true});
-
-  _pvCollapseObserver={disconnect:function(){
-    if(rafId){cancelAnimationFrame(rafId);rafId=0;}
-    window.removeEventListener('scroll',_onScroll);
-    document.removeEventListener('scroll',_onScroll,true);
-    window.removeEventListener('resize',_onScroll);
-    // restore on disconnect
-    collapsible.style.maxHeight='';
-    collapsible.style.opacity='';
-    collapsible.style.pointerEvents='';
-    lastAppliedH=-1;
-  }};
-}
-
 
 function setPvView(mode){
   pvViewMode=mode;
