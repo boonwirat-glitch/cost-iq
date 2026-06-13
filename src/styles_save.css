@@ -1368,3 +1368,7 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 /* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
    This rule must come AFTER that to win the cascade.
    Placed in save-module-css which injects after portview-module-css. */
+/* ── sense-plan-expanded: hide Skills from nav (flex-wrap:wrap causes overflow) ── */
+body.kam-sense-active.sense-plan-expanded.kam-mode .bnav #nav-skills {
+  display: none !important;
+}
