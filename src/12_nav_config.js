@@ -39,7 +39,7 @@
     'nav-portfolio', 'nav-report',
   ];
 
-  var SAVE_DISABLED = ['portview', 'teamview'];
+  var SAVE_DISABLED = ['portview', 'teamview', 'skills'];
 
   // ─── renderNav ──────────────────────────────────────────────────────────────
   function renderNav(role) {
@@ -62,9 +62,9 @@
       el.style.order = String(i + 1);
     });
 
-    // Set CSS variable for grid columns
+    // Set grid columns directly as inline style (more reliable than CSS variable)
     var bnav = document.querySelector('.bnav');
-    if (bnav) bnav.style.setProperty('--tab-count', String(tabs.length));
+    if (bnav) bnav.style.gridTemplateColumns = 'repeat(' + tabs.length + ', 1fr)';
 
     console.log('[NavConfig] rendered:', role, tabs.length, 'tabs');
   }
