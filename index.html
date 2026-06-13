@@ -1,4 +1,4 @@
-<!-- Freshket Sense v664: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v665: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v664',
+      version: 'v665',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7042,7 +7042,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:calc(var(--topbar-h) + env(safe-area-inset-top, 0px));z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1);will-change:max-height;contain:layout;padding:0 16px 12px}
+.pv-collapsible{overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),opacity 220ms cubic-bezier(0.4,0,0.2,1);will-change:max-height;contain:layout}
 .pv-collapsible.expanded{max-height:400px;opacity:1}
 .pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
@@ -11443,22 +11443,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="pv-sort-search-expand" id="pv-sort-search-expand">
 <input id="pv-search-collapsed" oninput="document.getElementById('portview-search').value=this.value;schedulePortviewListRender()" placeholder="ค้นหาชื่อร้าน..." type="text"/>
 </div>
-<!-- Sort row: inside header — inherits 16px horizontal padding + sticky bg -->
-<div class="pv-sort-sticky" id="pv-sort-sticky">
-<div style="display:flex;align-items:center;gap:5px">
-<span class="pv-toggle-count" id="pv-sort-count">— ร้าน</span>
-<div class="pv-sort-divider"></div>
-<button class="pv-sort-btn" id="psb-pace" onclick="setPvSort('pace')">PACE</button>
-<button class="pv-sort-btn" id="psb-gmv" onclick="setPvSort('gmv')">GMV</button>
-<button class="pv-sort-btn" id="psb-impact" onclick="setPvSort('impact')">IMPACT</button>
-</div>
-<div class="pv-toggle-btns">
-<button class="pv-toggle-btn" id="ptb-full" onclick="setPvView('full')" title="แบบเต็ม"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="0"></rect><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="8"></rect></svg></button>
-<button class="pv-toggle-btn" id="ptb-compact" onclick="setPvView('compact')" title="แบบ compact"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="2.5" y2="2.5"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="7" y2="7"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="11.5" y2="11.5"></line></svg></button>
-</div>
-</div>
-</div><!-- /portview-header -->
-  <!-- Collapsible section — outside sticky header, collapses in normal flow -->
 <!-- Collapsible: summary cards + AI button + search -->
 <div class="pv-collapsible expanded" id="pv-collapsible">
 <!-- Summary stats -->
@@ -11476,6 +11460,22 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <input id="portview-search" oninput="schedulePortviewListRender()" placeholder="ค้นหาชื่อร้าน..." style="width:100%" type="text"/>
 </div>
 </div>
+<!-- Filter pills area removed — compact strip handles filtering -->
+<!-- Sort row: inside header — inherits 16px horizontal padding + sticky bg -->
+<div class="pv-sort-sticky" id="pv-sort-sticky">
+<div style="display:flex;align-items:center;gap:5px">
+<span class="pv-toggle-count" id="pv-sort-count">— ร้าน</span>
+<div class="pv-sort-divider"></div>
+<button class="pv-sort-btn" id="psb-pace" onclick="setPvSort('pace')">PACE</button>
+<button class="pv-sort-btn" id="psb-gmv" onclick="setPvSort('gmv')">GMV</button>
+<button class="pv-sort-btn" id="psb-impact" onclick="setPvSort('impact')">IMPACT</button>
+</div>
+<div class="pv-toggle-btns">
+<button class="pv-toggle-btn" id="ptb-full" onclick="setPvView('full')" title="แบบเต็ม"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="0"></rect><rect fill="currentColor" height="6" rx="1.5" width="14" x="0" y="8"></rect></svg></button>
+<button class="pv-toggle-btn" id="ptb-compact" onclick="setPvView('compact')" title="แบบ compact"><svg fill="none" height="14" viewbox="0 0 14 14" width="14"><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="2.5" y2="2.5"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="7" y2="7"></line><line stroke="currentColor" stroke-linecap="round" stroke-width="1.5" x1="0" x2="14" y1="11.5" y2="11.5"></line></svg></button>
+</div>
+</div>
+</div><!-- /portview-header -->
 <!-- AI output — below sort row, expands above account list -->
 <div class="portview-ai-output" id="portview-ai-output" style="display:none;margin:0 16px 14px"></div>
 <!-- Account list / TL rep list -->
