@@ -450,19 +450,12 @@ body:not(.echo-active) { background:unset; }
     el.id = 'ci-fullsheet';
     el.innerHTML = _buildHTML();
     document.body.appendChild(el);
-    // v575: lock body scroll — กัน iOS scroll chaining ทะลุไป page ข้างหลัง
-    // v577: ตอน fixed ต้อง keep centering (left/right + margin:auto) — ไม่งั้น
-    // body กระโดดชิดซ้ายบน desktop → Echo ไม่ทับแอพ = เห็น "จอซ้ำ"
+    // v601: กัน iOS scroll chaining โดยใช้ overflow:hidden แทน position:fixed
+    // position:fixed ทำให้ topbar sticky re-anchor ผิดตำแหน่งใน KAM PWA mode
+    // overflow:hidden กัน scroll ได้เหมือนกัน โดยไม่ทำลาย sticky/layout context
     try {
       window._ciScrollLockY = window.scrollY || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = (-window._ciScrollLockY) + 'px';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.maxWidth = '440px';
-      document.body.style.marginLeft = 'auto';
-      document.body.style.marginRight = 'auto';
+      document.body.style.overflow = 'hidden';
     } catch(_) {}
     // v478-H4: double-rAF races with left:50% layout resolution on some iOS devices.
     // left:50% is computed relative to viewport width, but translateX(-50%) is computed
@@ -485,10 +478,11 @@ body:not(.echo-active) { background:unset; }
     }
   }
 
-  // v598: centralised body-scroll restore — กัน position:fixed ค้างเมื่อ
-  // sheet ถูก hide โดยไม่ผ่าน _unmount (minimize → tab switch → bfcache resume)
+  // v601: centralised body-scroll restore — ใช้ overflow:hidden แทน position:fixed
   function _restoreBodyScroll() {
     try {
+      document.body.style.overflow = '';
+      // clear สิ่งที่เคย set ไว้ก่อน v601 (ป้องกัน stale state ถ้า cache SW เก่า)
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.left = '';
@@ -497,7 +491,6 @@ body:not(.echo-active) { background:unset; }
       document.body.style.maxWidth = '';
       document.body.style.marginLeft = '';
       document.body.style.marginRight = '';
-      window.scrollTo(0, window._ciScrollLockY || 0);
       window._ciScrollLockY = 0;
     } catch(_) {}
   }
@@ -538,18 +531,10 @@ body:not(.echo-active) { background:unset; }
     if (_tbIcon) _tbIcon.style.display = 'none';
   }
 
-  // v598: re-apply body scroll lock when expanding sheet back from minimized state
+  // v601: re-apply body scroll lock (overflow:hidden) when expanding sheet back from minimized
   function _reapplyBodyLock() {
     try {
-      window._ciScrollLockY = window.scrollY || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = (-window._ciScrollLockY) + 'px';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.maxWidth = '440px';
-      document.body.style.marginLeft = 'auto';
-      document.body.style.marginRight = 'auto';
+      document.body.style.overflow = 'hidden';
     } catch(_) {}
   }
 
@@ -3409,6 +3394,10 @@ ${whyHtml}
       // → DARK
       sheet.style.transition = 'transform 380ms cubic-bezier(0.16,1,0.3,1), background .7s ease';
       sheet.style.background = '#111111';
+      // v601: iOS PWA renders the area outside/behind the sheet from <html> background
+      // body.echo-active { background:#111 } catches body but not the html overscroll zone
+      // Setting documentElement directly ensures the white gap below sheet disappears
+      try { document.documentElement.style.background = '#111111'; } catch(_) {}
       const tb = sheet.querySelector('.topbar');
       if (tb) { tb.style.background='rgba(255,255,255,.04)'; tb.style.borderColor='rgba(255,255,255,.06)'; }
       _themeEl('ci-tval', 'color', 'rgba(255,255,255,.28)'); // v553: dim — working silently feel
@@ -3448,6 +3437,8 @@ ${whyHtml}
       sheet.classList.remove('is-rec');
       // → LIGHT
       sheet.style.background = '#ffffff';
+      // v601: restore html background (was set dark during recording)
+      try { document.documentElement.style.background = ''; } catch(_) {}
       const tbL = sheet.querySelector('.topbar');
       if (tbL) { tbL.style.background=''; tbL.style.borderColor=''; }
       _themeEl('ci-tval', 'color', ''); // restore timer color
@@ -3483,11 +3474,6 @@ ${whyHtml}
       const tabBar = document.getElementById('ci-main-tabs');
       if (tabBar) tabBar.style.background = '';
     }
-    // v600: sync theme-color meta → iOS PWA home indicator zone matches sheet bg
-    try {
-      const _tc = document.querySelector('meta[name="theme-color"]');
-      if (_tc) _tc.setAttribute('content', isRec ? '#111111' : '#0d3328');
-    } catch(_) {}
   }
 
   // ── Visibility guard — PWA resume after screen lock ────────────────────────
@@ -3496,12 +3482,11 @@ ${whyHtml}
   (function _initVisibilityGuard() {
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState !== 'visible') return;
-      // v598: bfcache guard — ถ้า page restore กลับมาแล้ว sheet ไม่อยู่ (minimized หรือ killed)
-      // แต่ body ยัง position:fixed ค้างอยู่ ให้ restore ทันที
-      if (document.body.style.position === 'fixed') {
+      // v601: bfcache guard — ถ้า page restore แล้ว sheet ไม่อยู่ (minimized/killed)
+      // แต่ body.overflow ยัง hidden ค้าง → restore ทันที
+      if (document.body.style.overflow === 'hidden') {
         const sheet = document.getElementById('ci-fullsheet');
         if (!sheet || sheet.style.display === 'none') {
-          // sheet ไม่ visible — body lock ต้องถูก release
           _restoreBodyScroll();
         }
       }

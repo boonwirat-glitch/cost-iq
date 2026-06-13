@@ -18,24 +18,15 @@ function showScreen(name){
 }
 
 function __legacyShowScreenFallback(name){
-  // v600: ถ้า Echo sheet minimized แล้ว user กด nav โดยตรง body อาจยัง position:fixed ค้าง
-  // restore ทันทีก่อน render ใดๆ — CI._restoreBodyScroll safe ถ้า Echo ไม่ได้ open
+  // v601: ถ้า body.overflow:hidden ค้าง (Echo lock) แต่ sheet ไม่อยู่ → restore ก่อน render
   try {
-    if (document.body.style.position === 'fixed') {
+    if (document.body.style.overflow === 'hidden') {
       const _sheet = document.getElementById('ci-fullsheet');
       if (!_sheet || _sheet.style.display === 'none') {
         if (typeof CI !== 'undefined' && typeof CI._restoreBodyScroll === 'function') {
           CI._restoreBodyScroll();
         } else {
-          // fallback ถ้า CI ยังไม่ load
-          document.body.style.position = '';
-          document.body.style.top = '';
-          document.body.style.left = '';
-          document.body.style.right = '';
-          document.body.style.width = '';
-          document.body.style.maxWidth = '';
-          document.body.style.marginLeft = '';
-          document.body.style.marginRight = '';
+          document.body.style.overflow = '';
         }
       }
     }
