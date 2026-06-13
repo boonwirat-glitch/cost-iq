@@ -90,6 +90,7 @@ function resetRuntimeSessionState(){
   // v224e: cancel pending RenderBus timers BEFORE clearing data — prevents 0-flash
   // when token auto-refresh triggers SIGNED_OUT → portviewBulkData=[] → stale render fires
   try{ if(window.RenderBus) window.RenderBus.reset(); }catch(e){}
+  try{ if(window.DataRegistry) window.DataRegistry.reset(); }catch(e){} // Phase 0G
   try { sheetsLoadStarted = false; } catch(e) {}
   try { if (typeof _cloudLoadToken !== 'undefined') _cloudLoadToken++; } catch(e) {}
   try {
