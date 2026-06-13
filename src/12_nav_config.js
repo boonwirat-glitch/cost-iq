@@ -76,20 +76,12 @@
     btn.classList.toggle('nav-disabled', SAVE_DISABLED.indexOf(screen) !== -1);
   }
 
-  // ─── Patch showScreen — render nav on every navigation ──────────────────────
-  // showScreen is always called after role is set (login flow: set classes → showScreen)
-  // This is the most reliable hook point
+  // ─── Patch window.showScreen for updateSaveState ──────────────────────────
+  // renderNav is called from _autoRouteAfterLogin (01_core.js) via setTimeout(0)
+  // This patch handles Save enabled/disabled state on every navigation
   var _origShow = window.showScreen;
-  var _lastRenderedRole = null;
   window.showScreen = function(name) {
     var r = _origShow ? _origShow.call(this, name) : undefined;
-    // Render nav if role changed or first time
-    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 
-               document.body.getAttribute('data-role');
-    if (role && role !== _lastRenderedRole) {
-      _lastRenderedRole = role;
-      renderNav(role);
-    }
     updateSaveState(name);
     return r;
   };
