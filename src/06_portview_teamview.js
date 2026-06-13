@@ -256,15 +256,6 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
-    // v659: scroll compensation — when header collapses, portview-list would jump up
-    // by ~collapsibleHeight px. Compensate by transitioning padding-top on the list
-    // with the same duration/easing so cards appear stationary to the user.
-    var pvList=document.getElementById('portview-list');
-    if(pvList){
-      var collH=collapsed?0:collapsible.scrollHeight;
-      pvList.style.transition='padding-top 300ms cubic-bezier(0.4,0,0.2,1)';
-      pvList.style.paddingTop=collH+'px';
-    }
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
@@ -312,20 +303,6 @@ function _pvInitCollapseObserver(){
   document.addEventListener('scroll',_schedule,{capture:true,passive:true});
   screen.addEventListener('scroll',_schedule,{passive:true});
   window.addEventListener('resize',_schedule,{passive:true});
-  // Set initial padding-top so list starts at correct position
-  setTimeout(function(){
-    var pvList=document.getElementById('portview-list');
-    if(pvList&&collapsible){
-      // No transition on init — just set the value immediately
-      pvList.style.transition='none';
-      pvList.style.paddingTop=(collapsible.classList.contains('expanded')?collapsible.scrollHeight:0)+'px';
-      // Re-enable transition after 1 frame
-      requestAnimationFrame(function(){
-        if(pvList)pvList.style.transition='padding-top 300ms cubic-bezier(0.4,0,0.2,1)';
-      });
-    }
-  },200);
-
   _pvCollapseObserver={disconnect:function(){
     if(raf){cancelAnimationFrame(raf);raf=0;}
     window.removeEventListener('scroll',_schedule);
