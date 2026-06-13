@@ -1,4 +1,4 @@
-<!-- Freshket Sense v611: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v612: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1028,20 +1028,12 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
    REMOVED: [data-theme] .scr — too broad, KAM screens need body.kam-mode control.
    ════════════════════════════════════════════════════════════════ */
 
-/* ── Topbar: theme token for NEW features (existing body.X-mode rules override these) ── */
-/* specificity 0,2,0 — body.kam-mode .topbar in main.css has same specificity but loads LATER = wins */
-[data-theme="dark"]  .topbar { background: var(--tk-topbar-gradient); color: #FFFFFF; }
-[data-theme="light"] .topbar { background: #FFFFFF; border-bottom: 1px solid var(--hairline); color: var(--ink-1); }
-
-/* Logo */
-[data-theme="dark"]  .topbar .logo { color: #FFFFFF; }
-[data-theme="light"] .topbar .logo { color: var(--ink-1); }
-
-/* Topbar buttons */
-[data-theme="dark"]  .topbar .data-btn { background: rgba(255,255,255,.12); }
-[data-theme="light"] .topbar .data-btn { background: rgba(0,0,0,.05); }
-[data-theme="dark"]  .topbar .data-btn svg { color: #fff; }
-[data-theme="light"] .topbar .data-btn svg { color: var(--ink-2); }
+/* ── Topbar: DO NOT add [data-theme] rules here ─────────────────────────
+   Topbar layout is controlled by:
+     body.kam-mode .topbar  → dark gradient  (styles_main.css)
+     body.sales-mode .topbar → white          (styles_main.css)
+   Adding [data-theme] .topbar rules here BREAKS flex layout (removes display:flex).
+   ─────────────────────────────────────────────────────────────────────── */
 
 /* ── Bottom nav: theme token ── */
 [data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
@@ -5770,7 +5762,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v611',
+      version: 'v612',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
