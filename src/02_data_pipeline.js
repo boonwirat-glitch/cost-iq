@@ -1384,6 +1384,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
       const ok=await ingestCSVText(spec.type,text,{timeoutMs:_specIngestTimeout(spec)});
       if(ok){
         _cloudLoadedTabs.add(tab);
+        try{ if(window.DataRegistry) window.DataRegistry.markLoaded(tab); }catch(_){} // Phase 0G
         if(tab==='skus')bulkSkusReady=true;
         if(tab==='alternatives')bulkAltsReady=true;
         if(dot){dot.style.background='var(--tk-ok-dim-2)';dot.style.color='var(--g700)';}
@@ -1800,6 +1801,7 @@ async function reloadFromCloudflareR2(){
   sheetsLoadStarted=false;
   bulkSkusReady=false;bulkAltsReady=false;
   _cloudLoadedTabs.clear();
+  try{ if(window.DataRegistry) window.DataRegistry.reset(); }catch(_){} // Phase 0G
   _clearCloudInFlight();
   _cloudInitialPromise=null;
   _cloudBackgroundPromise=null;
@@ -2026,6 +2028,7 @@ async function _preloadFromIndexedDB(){
         var ok=await ingestCSVText(spec.type,cached.text,{timeoutMs:30000});
         if(ok){
           _cloudLoadedTabs.add(tab);
+          try{ if(window.DataRegistry) window.DataRegistry.markLoaded(tab); }catch(_){} // Phase 0G
           loaded++;
           if(CRITICAL.indexOf(tab)>=0) criticalLoaded++;
           var kb=Math.round(cached.text.length/1024);
@@ -2053,26 +2056,143 @@ async function _preloadFromIndexedDB(){
 }
 
 // SECTION:REFRESH_GATE
-function allCriticalReady(){
-  try{
-    // v355: Sales users: handover CSV doesn't exist yet (404) — gate on portview+history only
-    var _salesMode=typeof getCurrentRole==='function'&&
-      (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
-    if(_salesMode){
-      return _cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history');
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 0G: DataRegistry — single source of truth สำหรับ data readiness
+//
+// TIER SYSTEM:
+//   Tier 1 (SHELL)       : portview + history + handover → list views can render
+//   Tier 2 (DETAIL)      : + categories + sku_current + outlets → account detail
+//   Tier 3 (ENHANCEMENT) : + skus + alternatives + price + upsell → Sense/opps
+//
+// HOW TO USE (feature ใหม่ทำ 2 บรรทัด):
+//   // Option A — callback เมื่อ tier พร้อม:
+//   DataRegistry.onReady(1, renderMyFeature);
+//
+//   // Option B — async/await:
+//   await DataRegistry.waitFor(1);
+//   renderMyFeature();
+//
+// HOW DATA LOADERS USE IT (เรียกทุกครั้งที่ file parse เสร็จ):
+//   DataRegistry.markLoaded('portview');   // ← เพิ่ม version + check tier gates
+//
+// VERSION GUARD (ป้องกัน render ซ้ำ):
+//   DataRegistry.version เพิ่มขึ้นทุกครั้งที่ markLoaded() — RenderBus ใช้ version
+//   นี้ตรวจว่า "data เปลี่ยนจริงไหม" ก่อน flush ถ้าไม่เปลี่ยน (ETag 304) → skip
+//
+// ─────────────────────────────────────────────────────────────────────────────
+window.DataRegistry = (function(){
+  // Tier definitions — which tabs must be loaded for each tier to be "ready"
+  var TIER_TABS = {
+    1: ['portview','history'],          // Tier 1: shell (handover added dynamically for non-sales)
+    2: ['categories','sku_current','outlets'],
+    3: ['skus','alternatives']
+  };
+
+  var _loaded = new Set();             // tabs loaded this session
+  var _tierReady = {1:false, 2:false, 3:false};
+  var _tierCallbacks = {1:[], 2:[], 3:[]};
+  var _tierPromises = {};              // cached promises per tier
+  var _tierResolvers = {};
+
+  // Public: monotonic version counter — increments every markLoaded()
+  // RenderBus reads this before flush to skip no-op renders
+  var version = 0;
+
+  function _isSales(){
+    try{
+      var r = typeof getCurrentRole==='function' ? getCurrentRole() : '';
+      return r==='sales'||r==='sales_tl';
+    }catch(e){ return false; }
+  }
+
+  function _checkTier(t){
+    if(_tierReady[t]) return true;
+    var tabs = TIER_TABS[t] ? TIER_TABS[t].slice() : [];
+    // Tier 1: non-sales users also need handover
+    if(t===1 && !_isSales()) tabs.push('handover');
+    var ready = tabs.length > 0 && tabs.every(function(k){ return _loaded.has(k); });
+    if(ready){
+      _tierReady[t] = true;
+      // fire callbacks
+      var cbs = _tierCallbacks[t].splice(0);
+      cbs.forEach(function(fn){ try{ fn(); }catch(e){} });
+      // resolve promise
+      if(_tierResolvers[t]){ _tierResolvers[t](); delete _tierResolvers[t]; }
+      _senseDataLog('REGISTRY','✅ Tier '+t+' READY ('+Array.from(_loaded).join(',')+')');
     }
-    return _cloudLoadedTabs.has('portview') &&
-           _cloudLoadedTabs.has('history') &&
-           _cloudLoadedTabs.has('handover');
-  }catch(e){return false;}
+    return ready;
+  }
+
+  // Called by every data loader when a file finishes parsing
+  function markLoaded(tab){
+    if(!tab) return;
+    _loaded.add(tab);
+    // Also sync with legacy _cloudLoadedTabs so allCriticalReady() still works
+    try{ _cloudLoadedTabs.add(tab); }catch(e){}
+    version++;
+    _senseDataLog('REGISTRY','📦 markLoaded('+tab+') version='+version);
+    _checkTier(1);
+    _checkTier(2);
+    _checkTier(3);
+  }
+
+  // isReady(tier) → boolean
+  function isReady(tier){
+    return !!_tierReady[tier];
+  }
+
+  // waitFor(tier) → Promise — resolves immediately if already ready
+  function waitFor(tier){
+    if(_tierReady[tier]) return Promise.resolve();
+    if(!_tierPromises[tier]){
+      _tierPromises[tier] = new Promise(function(resolve){
+        _tierResolvers[tier] = resolve;
+      });
+    }
+    return _tierPromises[tier];
+  }
+
+  // onReady(tier, fn) — fn called immediately if tier already ready, else queued
+  function onReady(tier, fn){
+    if(_tierReady[tier]){ try{ fn(); }catch(e){} return; }
+    if(_tierCallbacks[tier]) _tierCallbacks[tier].push(fn);
+  }
+
+  // reset() — called on logout / manual reload
+  function reset(){
+    _loaded.clear();
+    _tierReady = {1:false, 2:false, 3:false};
+    _tierCallbacks = {1:[], 2:[], 3:[]};
+    _tierPromises = {};
+    _tierResolvers = {};
+    version = 0;
+    _senseDataLog('REGISTRY','🔄 reset');
+  }
+
+  // hasTab(tab) → boolean — checks if a specific tab is loaded
+  function hasTab(tab){ return _loaded.has(tab); }
+
+  return {
+    markLoaded: markLoaded,
+    isReady: isReady,
+    waitFor: waitFor,
+    onReady: onReady,
+    reset: reset,
+    hasTab: hasTab,
+    get version(){ return version; }
+  };
+})();
+
+// allCriticalReady() — backward-compatible shim → delegates to DataRegistry
+// Existing callers (refreshAll, RenderBus, _preloadFromIndexedDB) continue to work unchanged
+function allCriticalReady(){
+  try{ return window.DataRegistry.isReady(1); }catch(e){ return false; }
 }
 
-// v221 DEBOUNCE + v221c SETTLE WINDOW
-// background file callbacks batch into ONE render per 1000ms window.
-// Prevents double-render when files arrive in two waves (e.g. resume/ETag check).
+// v221 DEBOUNCE + v221c SETTLE WINDOW (unchanged — kept for any legacy callers)
 var _scheduleRefreshAllTimer=null;
 var _scheduleRefreshAllLastFired=0;
-var _SETTLE_WINDOW=1000; // ms — renders can't fire faster than once per 1s
+var _SETTLE_WINDOW=1000;
 function _scheduleRefreshAll(delayMs){
   const now=Date.now();
   const sinceLastRender=_scheduleRefreshAllLastFired?now-_scheduleRefreshAllLastFired:Infinity;
@@ -2088,56 +2208,80 @@ function _scheduleRefreshAll(delayMs){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// v223 RENDERBUS — single owner of all data-driven screen renders.
+// Phase 0G: RenderBus V2 — version-aware, no double-render
 //
-// Architecture: data loaders call RenderBus.signal(source) when their data
-// is ready. RenderBus decides WHEN to render — never immediately, always
-// after checking: (1) splash gone? (2) critical data ready? (3) settle window.
+// WHAT CHANGED FROM V1:
+//   1. Version guard: _flush() skips if DataRegistry.version unchanged since last render
+//      → ETag 304 (data unchanged) no longer causes a re-render
+//   2. register(screenId, tier, fn): feature declares itself — RenderBus manages timing
+//      → feature ใหม่ไม่ต้องรู้ว่า splash/tier/settle ทำงานยังไง
 //
-// Result: ONE render per data-arrival burst, regardless of how many files
-// arrive concurrently. Eliminates the N-files = N-flashes pattern.
+// BACKWARD COMPATIBLE:
+//   signal(source) ยังทำงานเหมือนเดิม 100%
+//   markRender(), reset(), flushNow() ยังทำงานเหมือนเดิม
 //
-// Cases handled:
-//   cold boot    → files arrive during splash → queued → doFade fires first render
-//                  → background files batch into ONE post-splash render
-//   warm boot    → IDB loads all 6 in ~150ms → doFade fires → done (no R2 needed)
-//   resume       → validateUnifiedFreshness calls reset() → files re-arrive → one render
-//   manual reload → reloadFromCloudflareR2 calls reset() → one render when done
-//   data update  → ETag 200 → signal() → settle window → one render
+// HOW TO ADD A NEW FEATURE (2 บรรทัด):
+//   RenderBus.register('scr-pipeline', 1, renderPipeline);
+//   // Done. RenderBus จะ call renderPipeline() เมื่อ Tier 1 ready + data เปลี่ยน
 //
-// Interactive actions (account switch, button taps) bypass RenderBus and call
-// renderXxx() directly — they need immediate response.
 // ─────────────────────────────────────────────────────────────────────────────
 window.RenderBus = (function(){
   var _timer = null;
   var _lastRender = 0;
+  var _lastRenderedVersion = -1;  // Phase 0G: version guard
   var _ready = new Set();
-  var SETTLE_MS = 800; // v479-D1: 2000→800ms — 2s caused double-renders when enhancement files arrived after critical batch
+  var SETTLE_MS = 800;
+
+  // Phase 0G: registered features { screenId → { tier, fn } }
+  var _registered = {};
 
   function _flush(){
     _timer = null;
+
+    // Phase 0G: VERSION GUARD — skip if data hasn't actually changed
+    // Catches ETag 304 (file unchanged) and duplicate signals from IDB+R2 same data
+    var currentVersion = (window.DataRegistry && typeof window.DataRegistry.version !== 'undefined')
+      ? window.DataRegistry.version : -1;
+    if(currentVersion !== -1 && currentVersion === _lastRenderedVersion){
+      _senseDataLog('RENDERBUS','⏭ SKIP — version '+currentVersion+' already rendered (ETag 304 or duplicate signal)');
+      return;
+    }
+
     _lastRender = Date.now();
-    _senseDataLog('RENDERBUS','🎯 RENDER ['+Array.from(_ready).join(',')+']');
-    // v224e: clear shimmer right before render — ETag check done, real data incoming
+    _lastRenderedVersion = currentVersion;
+    _senseDataLog('RENDERBUS','🎯 RENDER v'+currentVersion+' ['+Array.from(_ready).join(',')+']');
+
+    // v224e: clear shimmer right before render
     try{
       if(window._pwaShimmerActive && typeof window._deactivatePortviewShimmer==='function'){
         window._deactivatePortviewShimmer();
       }
     }catch(e){}
-    // Primary: KAM account detail screen
+
+    // Phase 0G: call registered feature renderers first (tier-checked)
+    try{
+      Object.keys(_registered).forEach(function(screenId){
+        var reg = _registered[screenId];
+        try{
+          var scr = document.getElementById(screenId);
+          if(scr && scr.classList.contains('on') &&
+             window.DataRegistry && window.DataRegistry.isReady(reg.tier)){
+            reg.fn();
+          }
+        }catch(e){ console.warn('[RenderBus] registered render error ('+screenId+'):', e); }
+      });
+    }catch(e){}
+
+    // Legacy: existing screens (unchanged)
     if(typeof refreshAll === 'function') refreshAll();
-    // Portfolio list screen (not covered by refreshAll)
     try{
       if(document.getElementById('scr-portview')?.classList.contains('on') &&
          typeof renderPortview === 'function') renderPortview();
     }catch(e){}
-    // Team view screen
     try{
       if(document.getElementById('scr-teamview')?.classList.contains('on') &&
          typeof renderTeamview === 'function') renderTeamview();
     }catch(e){}
-    // Sales screens — render when sales-mode active
-    // Skip if user is inside account view (_salesInAccountView flag set by _salesOpenAccount)
     try{
       if(document.body.classList.contains('sales-mode') && !window._salesInAccountView){
         var _salesScr=document.getElementById('scr-sales-portview');
@@ -2150,53 +2294,63 @@ window.RenderBus = (function(){
 
   function signal(source){
     _ready.add(source);
-    // Blocked by splash
     if(window._senseSplashActive){
       window._pendingRefreshAll = true;
       _senseDataLog('RENDERBUS','⏳ '+source+' — queued (splash)');
       return;
     }
-    // Blocked until critical files ready
     if(typeof allCriticalReady === 'function' && !allCriticalReady()){
       window._pendingRefreshAll = true;
-      _senseDataLog('RENDERBUS','⏳ '+source+' — queued (waiting portview+history+handover)');
+      _senseDataLog('RENDERBUS','⏳ '+source+' — queued (waiting Tier 1)');
       return;
     }
-    // Settle window: batch concurrent arrivals
     var now = Date.now();
     var sinceLastRender = _lastRender ? now - _lastRender : Infinity;
     var wait = sinceLastRender < SETTLE_MS ? SETTLE_MS - sinceLastRender + 50 : 50;
     clearTimeout(_timer);
     _timer = setTimeout(_flush, wait);
-    _senseDataLog('RENDERBUS','📡 '+source+' — render in '+wait+'ms (settle: '+(sinceLastRender<SETTLE_MS?sinceLastRender+'ms since last':'fresh')+')');
+    _senseDataLog('RENDERBUS','📡 '+source+' — render in '+wait+'ms');
   }
 
-  // Call after doFade fires its first render — stamps settle window so
-  // subsequent signals don't fire too close to the main render.
+  // Phase 0G: register(screenId, tier, renderFn)
+  // screenId: DOM id of the screen (e.g. 'scr-pipeline')
+  // tier: 1/2/3 — minimum DataRegistry tier needed before rendering
+  // renderFn: called when (a) screen is active, (b) tier ready, (c) data version changed
+  function register(screenId, tier, renderFn){
+    _registered[screenId] = { tier: tier, fn: renderFn };
+    _senseDataLog('RENDERBUS','📋 registered: '+screenId+' (tier '+tier+')');
+    // If tier already ready and screen is active, render immediately
+    try{
+      if(window.DataRegistry && window.DataRegistry.isReady(tier)){
+        var scr = document.getElementById(screenId);
+        if(scr && scr.classList.contains('on')) renderFn();
+      }
+    }catch(e){}
+  }
+
   function markRender(){
     _lastRender = Date.now();
-    _senseDataLog('RENDERBUS','🕐 render stamped');
+    var v = (window.DataRegistry && typeof window.DataRegistry.version !== 'undefined')
+      ? window.DataRegistry.version : -1;
+    _lastRenderedVersion = v;
+    _senseDataLog('RENDERBUS','🕐 render stamped v'+v);
   }
 
-  // Call on manual reload or resume re-fetch — clears ready set and timers.
-  // Does NOT reset _lastRender (avoids render bursting right after reset).
   function reset(){
     _ready.clear();
     clearTimeout(_timer);
     _timer = null;
-    _senseDataLog('RENDERBUS','🔄 reset (reload/resume)');
+    // Phase 0G: reset version guard so next data arrival always renders
+    _lastRenderedVersion = -1;
+    _senseDataLog('RENDERBUS','🔄 reset');
   }
 
-  // v563: immediate full flush — doFade's post-splash render must go through
-  // _flush() (covers portview/teamview/SALES branches), not bare refreshAll().
-  // Bare refreshAll() never called renderSalesPortview → Sales cold login showed
-  // an empty portfolio until the user tapped the nav icon (manual re-render).
   function flushNow(){
     clearTimeout(_timer); _timer = null;
     _flush();
   }
 
-  return { signal: signal, markRender: markRender, reset: reset, flushNow: flushNow };
+  return { signal: signal, markRender: markRender, reset: reset, flushNow: flushNow, register: register };
 })();
 
 function refreshAll(){
