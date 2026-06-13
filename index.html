@@ -1,4 +1,4 @@
-<!-- Freshket Sense v645: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v646: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v645',
+      version: 'v646',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7042,14 +7042,14 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden;transition:max-height 280ms cubic-bezier(0.4,0,0.6,1),opacity 220ms cubic-bezier(0.4,0,0.6,1)}
-.pv-collapsible.expanded{max-height:700px;opacity:1}
+.pv-collapsible{overflow:hidden;transition:max-height 320ms cubic-bezier(0.4,0,0.2,1),opacity 240ms cubic-bezier(0.4,0,0.2,1);will-change:max-height}
+.pv-collapsible.expanded{max-height:600px;opacity:1}
 .pv-collapsible.collapsed{max-height:0;opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
-.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
-.pv-compact-strip.hidden{max-height:0;opacity:0;pointer-events:none;margin:0}
-.pv-compact-strip.visible{max-height:72px;opacity:1;margin-bottom:8px}
+.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:opacity 220ms cubic-bezier(0.0,0,0.2,1),transform 260ms cubic-bezier(0.0,0,0.2,1),max-height 300ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0;will-change:opacity,transform}
+.pv-compact-strip.hidden{opacity:0;pointer-events:none;margin:0;transform:translateY(-4px);max-height:0}
+.pv-compact-strip.visible{opacity:1;margin-bottom:8px;transform:translateY(0);max-height:72px}
 .pv-cs-pace{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:0 10px 0 0;border-right:1px solid rgba(255,255,255,.1);margin-right:2px}
 .pv-cs-pace-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;line-height:1}
 .pv-cs-pace-lbl{font-size:9px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
@@ -27656,6 +27656,23 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
+    // v645: smooth-height — measure real height then animate to exact value
+    // avoids iOS PWA jank from max-height:700px animating through large empty range
+    if(!collapsed){
+      // expanding: set explicit px height first so transition animates to real size
+      var _h=collapsible.scrollHeight;
+      collapsible.style.maxHeight=_h+'px';
+      // after transition done, remove inline style so content can resize freely
+      var _t=setTimeout(function(){collapsible.style.maxHeight='';},320);
+      collapsible._heightTimer&&clearTimeout(collapsible._heightTimer);
+      collapsible._heightTimer=_t;
+    }else{
+      // collapsing: set current px height explicitly first so transition starts from real height
+      collapsible.style.maxHeight=collapsible.scrollHeight+'px';
+      // force reflow so browser sees the change
+      collapsible.offsetHeight; // eslint-disable-line no-unused-expressions
+      collapsible.style.maxHeight='0';
+    }
     collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
@@ -32315,7 +32332,7 @@ html.v213-app-entry-reset,html.v213-app-entry-reset body{overscroll-behavior:non
 .pv-comm-next{font-size:10px;font-weight:750;color:rgba(188,215,255,.78);line-height:1.35;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pv-comm-strip.miss .pv-comm-next{color:#ffc96b;}
 .pv-comm-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.pv-comm-main{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:950;letter-spacing:-.4px;line-height:1;color:#bcd7ff;text-align:right;font-variant-numeric:tabular-nums;}
+.pv-comm-main{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:700;letter-spacing:-.4px;line-height:1;color:#bcd7ff;text-align:right;font-variant-numeric:tabular-nums;}
 .pv-comm-strip.hit .pv-comm-main{color:var(--tk-ok-bright);text-shadow:0 0 14px var(--tk-ok-dim);}
 .pv-comm-strip.bonus .pv-comm-main{color:#ffe08a;text-shadow:0 0 14px rgba(255,224,138,.14);}
 .pv-comm-i{width:25px;height:25px;border-radius:50%;border:1px solid rgba(188,215,255,.26);background:rgba(255,255,255,.07);color:rgba(225,238,255,.82);font-family:Georgia,serif;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .16s,border-color .16s,transform .08s;}
@@ -32338,12 +32355,12 @@ html.v213-app-entry-reset,html.v213-app-entry-reset body{overscroll-behavior:non
 .pv-comm-sheet-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
 .pv-comm-sheet-kpi{border-radius:12px;background:rgba(255,255,255,.055);border:1px solid rgba(188,215,255,.14);padding:10px 11px;}
 .pv-comm-sheet-kpi-label{font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.76);margin-bottom:4px;}
-.pv-comm-sheet-kpi-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:950;color:#bcd7ff;line-height:1;}
+.pv-comm-sheet-kpi-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:#bcd7ff;line-height:1;}
 .pv-comm-sheet-kpi.val-good .pv-comm-sheet-kpi-val{color:var(--tk-ok-bright);}.pv-comm-sheet-kpi.val-bonus .pv-comm-sheet-kpi-val{color:#ffe08a;}
 .pv-comm-tier-table{border-radius:12px;overflow:hidden;border:1px solid rgba(188,215,255,.14);margin:12px 0;background:rgba(255,255,255,.035);}
 .pv-comm-tier-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 11px;border-bottom:1px solid rgba(188,215,255,.10);font-size:12px;color:rgba(225,238,255,.78);}
 .pv-comm-tier-row:last-child{border-bottom:none;}.pv-comm-tier-row.on{background:var(--tk-ok-dim);color:#fff;}.pv-comm-tier-row.next{background:rgba(240,176,0,.10);color:#fff;}
-.pv-comm-tier-range{font-weight:750;}.pv-comm-tier-pay{font-family:'IBM Plex Mono',monospace;font-weight:950;color:#ffe08a;}
+.pv-comm-tier-range{font-weight:750;}.pv-comm-tier-pay{font-family:'IBM Plex Mono',monospace;font-weight:700;color:#ffe08a;}
 .pv-comm-action-note{border-radius:12px;background:rgba(240,176,0,.10);border:1px solid rgba(240,176,0,.22);padding:10px 12px;color:rgba(255,238,190,.94);font-size:12px;font-weight:700;line-height:1.55;}
 .pv-comm-sheet-close{width:100%;margin-top:14px;border:none;border-radius:12px;padding:12px;background:rgba(188,215,255,.10);color:#fff;font-family:var(--tk-font-body);font-weight:850;font-size:13px;cursor:pointer;}
 .pv-comm-sheet-close-row{display:flex;gap:8px;align-items:center;margin-top:14px;}
@@ -32438,9 +32455,9 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
   justify-self:end;
   font-family:'IBM Plex Mono',monospace;
   font-size:21px;
-  font-weight:950;
+  font-weight:700;
   line-height:1;
-  letter-spacing:-.4px;
+  letter-spacing:-.3px;
   color:#bcd7ff;
   font-variant-numeric:tabular-nums;
 }
@@ -32532,7 +32549,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 .pv-comm-source-row:last-child{border-bottom:none;}
 .pv-comm-source-name{font-weight:850;}
 .pv-comm-source-note{display:block;font-size:10px;font-weight:650;color:rgba(188,215,255,.68);margin-top:1px;}
-.pv-comm-source-pay{font-family:'IBM Plex Mono',monospace;font-weight:950;color:#bcd7ff;}
+.pv-comm-source-pay{font-family:'IBM Plex Mono',monospace;font-weight:700;color:#bcd7ff;}
 .pv-comm-source-row.paid .pv-comm-source-pay{color:#ffe08a;}
 
 /* ── freshket-v210l-portfolio-state-cleanup-css ── */
@@ -32604,7 +32621,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 }
 .comm-lock-state-main{font-size:11px;font-weight:850;color:rgba(225,238,255,.88);line-height:1.45;}
 .comm-lock-state-sub{font-size:9.5px;font-weight:650;color:rgba(188,215,255,.58);line-height:1.45;margin-top:2px;}
-.comm-lock-pill{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:950;letter-spacing:.06em;text-transform:uppercase;border:1px solid rgba(188,215,255,.18);color:rgba(188,215,255,.86);background:rgba(188,215,255,.08);}
+.comm-lock-pill{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid rgba(188,215,255,.18);color:rgba(188,215,255,.86);background:rgba(188,215,255,.08);}
 .comm-lock-pill.locked{border-color:rgba(255,224,138,.38);background:rgba(255,224,138,.12);color:#ffe08a;}
 .comm-lock-pill.live{border-color:var(--tk-ok-border);background:var(--tk-ok-dim);color:var(--tk-ok-bright);}
 .comm-lock-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor;}
@@ -32612,7 +32629,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 .comm-lock-actions-note{font-size:9.5px;color:rgba(188,215,255,.58);font-weight:650;margin-top:6px;line-height:1.45;}
 .comm-row-money.locked{color:#ffe08a!important;text-shadow:0 0 14px rgba(255,224,138,.12);}
 .pv-comm-strip.v210k.locked{border-color:rgba(255,224,138,.50);}
-.pv-comm-strip.v210k.locked .pv-comm-title::after{content:'LOCKED';display:inline-flex;margin-left:6px;vertical-align:1px;border-radius:999px;padding:2px 5px;font-size:7px;font-weight:950;letter-spacing:.06em;color:#ffe08a;background:rgba(255,224,138,.12);border:1px solid rgba(255,224,138,.25);}
+.pv-comm-strip.v210k.locked .pv-comm-title::after{content:'LOCKED';display:inline-flex;margin-left:6px;vertical-align:1px;border-radius:999px;padding:2px 5px;font-size:7px;font-weight:700;letter-spacing:.06em;color:#ffe08a;background:rgba(255,224,138,.12);border:1px solid rgba(255,224,138,.25);}
 
 /* ── freshket-v211b-portfolio-movement-sheet-css ── */
 /* v211b — Portfolio Movement Detail Sheet Unification */
@@ -32690,7 +32707,7 @@ body.role-admin #tv-commission-btn:not(.comm-admin-hidden){
 #ncs-sheet .ncs-transfer-card:hover{background:rgba(255,255,255,.035);}
 #ncs-sheet .ncs-transfer-name{font-size:12px;font-weight:850;color:rgba(255,255,255,.90);line-height:1.35;min-width:0;}
 #ncs-sheet .ncs-transfer-sub{font-size:10px;font-weight:650;color:rgba(198,216,245,.54);line-height:1.35;margin-top:2px;}
-#ncs-sheet .ncs-transfer-gmv{text-align:right;font-size:13px;font-weight:950;color:#ff9b45;white-space:nowrap;}
+#ncs-sheet .ncs-transfer-gmv{text-align:right;font-size:13px;font-weight:700;color:#ff9b45;white-space:nowrap;}
 #ncs-sheet .ncs-transfer-mtd{text-align:right;font-size:10px;font-weight:800;color:rgba(198,216,245,.50);margin-top:2px;white-space:nowrap;}
 #ncs-sheet .ncs-subtle-note{font-size:10px;color:rgba(198,216,245,.60);font-weight:700;margin-left:6px;}
 
