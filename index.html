@@ -1,4 +1,4 @@
-<!-- Freshket Sense v608: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v609: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1014,6 +1014,55 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;cursor:pointer;font-family:var(--tk-font-body);text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:all .15s}
 .kna-recent-card:hover{background:var(--tk-accent-dim);border-color:rgba(100,160,255,.35)}
 .kna-recent-card:active{transform:scale(.98)}
+
+
+/* ══ PHASE 0C: DATA-THEME SYSTEM ════════════════════════════════════
+   New features use [data-theme] instead of body.kam-mode / body.sales-mode.
+   Existing body class rules still work — this runs in parallel.
+   Migrate new CSS to this pattern; old CSS stays untouched.
+
+   Usage:
+     [data-theme="dark"]  → KAM, AD (dark navy)
+     [data-theme="light"] → Sales, TL, new features (white canvas)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Topbar: theme-aware (new features use this, not body.kam-mode) ── */
+[data-theme="dark"]  .topbar { background: var(--tk-topbar-gradient); }
+[data-theme="light"] .topbar { background: #FFFFFF; border-bottom: 1px solid var(--hairline); }
+
+/* Logo color */
+[data-theme="dark"]  .topbar .logo { color: #FFFFFF; }
+[data-theme="light"] .topbar .logo { color: var(--ink-1); }
+
+/* topbar buttons */
+[data-theme="dark"]  .topbar .data-btn { background: rgba(255,255,255,.12); }
+[data-theme="light"] .topbar .data-btn { background: rgba(0,0,0,.05); }
+[data-theme="dark"]  .topbar .data-btn svg { color: #fff; }
+[data-theme="light"] .topbar .data-btn svg { color: var(--ink-1); }
+
+/* ── Bottom nav: theme-aware ── */
+[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
+[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
+
+/* Nav icon idle */
+[data-theme="dark"]  .bnav .ni .lb,
+[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
+[data-theme="light"] .bnav .ni .lb,
+[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
+
+/* Nav icon active */
+[data-theme="dark"]  .bnav .ni.on .lb,
+[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
+[data-theme="light"] .bnav .ni.on .lb,
+[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
+
+/* Active pill */
+[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
+[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
+
+/* ── Screen background: theme-aware ── */
+[data-theme="light"] .scr { background: var(--canvas); }
+[data-theme="dark"]  .scr { background: var(--tk-bg-base); }
 </style>
 <style>
 /* ============================================================
@@ -5720,7 +5769,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v608',
+      version: 'v609',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12380,6 +12429,7 @@ function resetRuntimeSessionState(){
   // v491-A: remove stale role classes BEFORE setMode so kam-mode add is not immediately undone.
   // Previous order: setMode adds kam-mode, then remove() strips it → body loses dark bg on re-login.
   try { document.body.classList.remove('sales-mode','sales-tl-mode','kad-mode','ad-tl-mode','kam-mode'); } catch(e) {}
+  try { document.documentElement.removeAttribute('data-theme'); } catch(e) {} // phase-0C
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
   try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
@@ -13023,11 +13073,12 @@ function hideLoginOverlay() {
     try{
       const _pf_role = getCurrentRole();
       _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
-      if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
+      if(_pf_role==='tl'||_pf_role==='admin'){document.documentElement.dataset.theme='light';if(typeof showScreen==='function')showScreen('teamview');}
       else if(_pf_role==='sales'||_pf_role==='sales_tl'){
         // Set sales-mode body class FIRST so CSS gates work before render
         document.body.classList.add('sales-mode');
         if(_pf_role==='sales_tl') document.body.classList.add('sales-tl-mode');
+        document.documentElement.dataset.theme='light'; // phase-0C
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
@@ -13035,10 +13086,11 @@ function hideLoginOverlay() {
         // v498: AD uses KAM data stack — same portview, same dark theme
         document.body.classList.add('kad-mode');
         if(_pf_role==='ad_tl') document.body.classList.add('ad-tl-mode');
+        document.documentElement.dataset.theme='dark'; // phase-0C
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('portview');
       }
-      else{if(typeof showScreen==='function')showScreen('portview');}
+      else{document.documentElement.dataset.theme='dark';if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
 
@@ -13240,12 +13292,14 @@ function _autoRouteAfterLogin() {
   // v499: AD TL also pre-warms team bundles
   if(isTLRole(role)||isAdminRole(role)||(typeof isADTLRole==='function'&&isADTLRole(role)))_startTlBundlePrewarm();
   if (isTLRole(role) || isAdminRole(role)) {
+    document.documentElement.dataset.theme='light'; // phase-0C
     setMode('kam');
     showScreen('teamview');
   } else if (isSalesAny && isSalesAny(role)) {
     // Sales: set body classes then route to Sales portview
     document.body.classList.add('sales-mode');
     if (isSalesTLRole && isSalesTLRole(role)) document.body.classList.add('sales-tl-mode');
+    document.documentElement.dataset.theme='light'; // phase-0C
     setMode('kam');
     showScreen('sales-portview');
   } else if (isADAny && isADAny(role)) {
@@ -13265,6 +13319,7 @@ function _autoRouteAfterLogin() {
     }catch(ex){}
     document.body.classList.add('kad-mode');
     if (isADTLRole && isADTLRole(role)) document.body.classList.add('ad-tl-mode');
+    document.documentElement.dataset.theme='dark'; // phase-0C
     setMode('kam');
     // AD IC: same portview flow as KAM rep
     const _r2Settled = !(typeof sheetsLoadStarted !== 'undefined' && sheetsLoadStarted) ||
@@ -13276,6 +13331,7 @@ function _autoRouteAfterLogin() {
       showScreen('portview');
     }
   } else {
+    document.documentElement.dataset.theme='dark'; // phase-0C: KAM default
     setMode('kam');
     // v477-H5: guard IDB stale data — only auto-open single account when R2 data is settled.
     // Root cause: IDB preload runs before auth completes; portviewBulkData may contain prev-session
