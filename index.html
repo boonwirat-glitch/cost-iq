@@ -1,4 +1,4 @@
-<!-- Freshket Sense v667: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v668: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v667',
+      version: 'v668',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -11483,7 +11483,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- AI output — below sort row, expands above account list -->
 <div class="portview-ai-output" id="portview-ai-output" style="display:none;margin:0 16px 14px"></div>
 <!-- Account list / TL rep list -->
-<div id="portview-list" style="padding:44px 16px 20px"></div>
+<div id="portview-list" style="padding:0 16px 20px"></div>
 </div>
 <!-- Plan Builder Sticky Footer -->
 <div class="pb-footer hidden" id="pb-footer">
@@ -27760,11 +27760,19 @@ function _pvInitCollapseObserver(){
   }
 
   // Init: measure and set correct initial state
+  // v667: also set listEl paddingTop = portview-header actual height
+  // so cards never hide under the sticky header on first render (before _frame runs)
   setTimeout(function(){
     if(!screen.classList.contains('on'))return;
     expandedH=collapsible.scrollHeight||200;
     lastAppliedH=-1; // force first write
     _frame();
+    // Sync list padding-top with actual header height (measured post-render)
+    var hdr=document.querySelector('.portview-header');
+    if(hdr&&listEl){
+      var hdrH=hdr.getBoundingClientRect().height;
+      if(hdrH>0) listEl.style.paddingTop=Math.round(hdrH)+'px';
+    }
   },180);
 
   window.addEventListener('scroll',_onScroll,{passive:true});
