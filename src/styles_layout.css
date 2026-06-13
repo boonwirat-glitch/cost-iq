@@ -476,31 +476,34 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card:active{transform:scale(.98)}
 
 
-/* ══ PHASE 0C: DATA-THEME SYSTEM ════════════════════════════════════
-   New features use [data-theme] instead of body.kam-mode / body.sales-mode.
-   Existing body class rules still work — this runs in parallel.
-   Migrate new CSS to this pattern; old CSS stays untouched.
+/* ══ PHASE 0C: DATA-THEME SYSTEM (v2 — safe) ════════════════════════
+   These rules are ADDITIVE for new features only.
+   Existing body.kam-mode / body.sales-mode rules are NOT removed —
+   they still fire and take precedence via cascade order (main.css loads after layout.css).
 
-   Usage:
-     [data-theme="dark"]  → KAM, AD (dark navy)
-     [data-theme="light"] → Sales, TL, new features (white canvas)
+   data-theme is set on <html> at login. New features built after Phase 0C
+   can use [data-theme] selectors instead of body.X-mode. Old features unaffected.
+
+   SAFE RULES: only properties not already covered by existing body.X-mode rules.
+   REMOVED: [data-theme] .scr — too broad, KAM screens need body.kam-mode control.
    ════════════════════════════════════════════════════════════════ */
 
-/* ── Topbar: theme-aware (new features use this, not body.kam-mode) ── */
-[data-theme="dark"]  .topbar { background: var(--tk-topbar-gradient); }
-[data-theme="light"] .topbar { background: #FFFFFF; border-bottom: 1px solid var(--hairline); }
+/* ── Topbar: theme token for NEW features (existing body.X-mode rules override these) ── */
+/* specificity 0,2,0 — body.kam-mode .topbar in main.css has same specificity but loads LATER = wins */
+[data-theme="dark"]  .topbar { background: var(--tk-topbar-gradient); color: #FFFFFF; }
+[data-theme="light"] .topbar { background: #FFFFFF; border-bottom: 1px solid var(--hairline); color: var(--ink-1); }
 
-/* Logo color */
+/* Logo */
 [data-theme="dark"]  .topbar .logo { color: #FFFFFF; }
 [data-theme="light"] .topbar .logo { color: var(--ink-1); }
 
-/* topbar buttons */
+/* Topbar buttons */
 [data-theme="dark"]  .topbar .data-btn { background: rgba(255,255,255,.12); }
 [data-theme="light"] .topbar .data-btn { background: rgba(0,0,0,.05); }
 [data-theme="dark"]  .topbar .data-btn svg { color: #fff; }
-[data-theme="light"] .topbar .data-btn svg { color: var(--ink-1); }
+[data-theme="light"] .topbar .data-btn svg { color: var(--ink-2); }
 
-/* ── Bottom nav: theme-aware ── */
+/* ── Bottom nav: theme token ── */
 [data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
 [data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
 
@@ -520,6 +523,4 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 [data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
 [data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
 
-/* ── Screen background: theme-aware ── */
-[data-theme="light"] .scr { background: var(--canvas); }
-[data-theme="dark"]  .scr { background: var(--tk-bg-base); }
+/* NOTE: .scr background is NOT set here — controlled by body.kam-mode in main.css */
