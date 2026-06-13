@@ -1368,5 +1368,3 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 /* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
    This rule must come AFTER that to win the cascade.
    Placed in save-module-css which injects after portview-module-css. */
-body.sales-mode.kam-mode .bnav #nav-opportunities { display: none !important; }
-body.sales-mode.kam-mode .bnav #nav-portview       { display: none !important; }
