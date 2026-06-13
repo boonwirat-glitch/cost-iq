@@ -1045,6 +1045,14 @@ function _autoRouteAfterLogin() {
       showScreen('portview');
     }
   }
+  // NavConfig: render nav tabs for this role
+  // Called here because _autoRouteAfterLogin is the single guaranteed post-login hook
+  // NavConfig loads after this script — use setTimeout to ensure it exists
+  setTimeout(function(){
+    if(typeof NavConfig!=='undefined'&&NavConfig.render){
+      NavConfig.render(getCurrentRole());
+    }
+  }, 0);
 }
 
 // v220 PROFILE CACHE: stale-while-revalidate for currentUserProfile.
