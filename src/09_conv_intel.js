@@ -73,7 +73,7 @@ const CI = (() => {
     if (typeof m === 'string') return m;
     if (!m) return '';
     if (m.quote) {
-      const ts = m.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--tx3,#AEAEB2)">${m.ts}</span> ` : '';
+      const ts = m.ts ? `<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;color:var(--tx3,#AEAEB2)">${m.ts}</span> ` : '';
       const note = m.note ? ` <span style="color:var(--tx3,#AEAEB2)">— ${m.note}</span>` : '';
       return `${ts}&ldquo;${m.quote}&rdquo;${note}`;
     }
@@ -1563,7 +1563,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
           ? `<span style="background:${tg[1]};color:${tg[2]};font-size:11px;font-weight:500;padding:2px 9px;border-radius:999px;margin-right:7px;white-space:nowrap">${tg[0]}</span>`
           : '';
         const quote = (f.quote && String(f.quote).trim())
-          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
+          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
           : '';
         return `<div style="padding:8px 0 8px 2px">
           <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${tagChip}${f.summary || '-'}</div>
@@ -2499,7 +2499,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
 .sd2-srow { display:flex;gap:12px;padding:13px 0;border-bottom:0.5px solid #ECECF0; }
 .sd2-srow:last-child { border:none; }
 .sd2-sdot { width:8px;height:8px;border-radius:50%;margin-top:7px;flex-shrink:0; }
-.sd2-scode { font-family:var(--mono,'IBM Plex Mono',monospace);font-size:10px;font-weight:500;color:#8E8E93;letter-spacing:.04em; }
+.sd2-scode { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:10px;font-weight:500;color:#8E8E93;letter-spacing:.04em; }
 .sd2-sname { font-size:14px;font-weight:600;color:#1C1C1E;margin-top:1px; }
 .sd2-sev { font-size:13.5px;color:#48484A;line-height:1.7;margin-top:4px; }
 .sd2-snote { font-size:13px;color:#C73E3E;line-height:1.65;margin-top:5px;padding-left:10px;border-left:2px solid rgba(255,59,48,.2); }
@@ -2515,7 +2515,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
 .sd2-ipoint { display:flex;gap:9px;padding:7px 0;font-size:14px;color:#1C1C1E;line-height:1.7; }
 .sd2-ipoint::before { content:'';width:5px;height:5px;border-radius:50%;background:var(--ac,#FF385C);margin-top:9px;flex-shrink:0; }
 .sd2-next { display:flex;gap:10px;padding:11px 13px;background:rgba(83,74,183,.03);border:0.5px solid rgba(83,74,183,.12);border-radius:11px;margin-bottom:8px;font-size:14px;color:#1C1C1E;line-height:1.65; }
-.sd2-next .num { font-family:var(--mono,'IBM Plex Mono',monospace);font-size:11px;font-weight:500;color:#534AB7;padding-top:3px;flex-shrink:0; }
+.sd2-next .num { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;font-weight:500;color:#534AB7;padding-top:3px;flex-shrink:0; }
 .sd2-notebar { display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent; }
 .sd2-notebar .t { flex:1;min-width:0;font-size:13.5px;font-weight:600;color:#534AB7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .sd2-notebar .t .pv { font-weight:400;color:#48484A; }
@@ -3943,7 +3943,7 @@ function echoExpand() {
 
     el.innerHTML = _admSkills.map(s => `
       <div onclick="admOpenModal('${s.id}')" style="display:grid;grid-template-columns:80px 1fr 56px;gap:8px;align-items:center;padding:10px 12px;background:#fff;cursor:pointer;border-bottom:0.5px solid var(--n100,#E5E5EA);transition:background .12s" onmouseover="this.style.background='#F7F7F7'" onmouseout="this.style.background='#fff'">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
         <div>
           <div style="font-size:12px;font-weight:500;color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
           <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?'🎧 '+s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
@@ -3965,33 +3965,33 @@ function echoExpand() {
         <div style="font-size:11px;color:var(--n400,#AEAEB2);margin-bottom:18px" id="adm-m-sub">กรอกข้อมูลแล้วกด บันทึก</div>
 
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">Skill Code</div>
-          <input id="adm-f-code" placeholder="C06_NEW" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:'IBM Plex Mono',monospace" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Skill Code</div>
+          <input id="adm-f-code" placeholder="C06_NEW" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:'IBM Plex Mono','Noto Sans Thai',monospace" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px">
           <div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">ชื่อ EN</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ EN</div>
             <input id="adm-f-en" placeholder="Rapport Building" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">ชื่อ TH</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ TH</div>
             <input id="adm-f-th" placeholder="สร้างความไว้วางใจ" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
           </div>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">หลักการ (Principle)</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">หลักการ (Principle)</div>
           <textarea id="adm-f-principle" rows="3" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">การฝึก (Practice) <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— คั่นด้วย |</span></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">การฝึก (Practice) <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— คั่นด้วย |</span></div>
           <textarea id="adm-f-practice" rows="3" placeholder="FKT Value 3 ระดับ: สิ่งที่ซัพฯ ทุกเจ้ามี | สิ่งที่ FKT ทำได้ดีกว่า | สิ่งที่ FKT เท่านั้นมี" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">เกณฑ์ผ่าน (Pass Test)</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">เกณฑ์ผ่าน (Pass Test)</div>
           <textarea id="adm-f-pass" rows="3" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:15px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono',monospace">Echo Observable Hint <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Echo Observable Hint <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
           <textarea id="adm-f-obs" rows="3" placeholder="ฟัง: rep หยุดก่อนตอบไหม? น้ำเสียง defensive หรือ acknowledge ก่อน? ลูกค้า engage มากขึ้นหลังจาก rep ตอบไหม?" style="width:100%;padding:8px 11px;border:0.5px solid #FFB3BF;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5;background:rgba(255,56,92,.03)" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#FFB3BF'"></textarea>
         </div>
         <!-- Echo toggle -->
