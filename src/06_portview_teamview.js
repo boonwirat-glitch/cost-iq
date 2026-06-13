@@ -1116,6 +1116,8 @@ function __legacyRenderPortviewListFallback(){
   }else{
     listEl.innerHTML=_sorted.map((a,i)=>renderer(a,i)).join('');
   }
+  // v669b: sync list padding-top after each render (header height may differ)
+  setTimeout(_pvSyncListOffset, 0);
   // Sync sticky sort row in portview-header
   const _sc=document.getElementById('pv-sort-count');if(_sc)_sc.textContent=filtered.length+' ร้าน';
   const _arrow=pvSortDir===1?'↓':'↑';
@@ -1181,6 +1183,18 @@ function _pvBuildCompactStrip(){
 }
 
 let _pvCollapseObserver=null;
+
+// v669b: sync portview-list padding-top to actual portview-header height
+// portview-header is position:sticky (not in flow), so list needs explicit top offset
+// Safe to call any time — reads BCR, writes paddingTop only if changed
+function _pvSyncListOffset(){
+  var hdr=document.querySelector('.portview-header');
+  var lst=document.getElementById('portview-list');
+  if(!hdr||!lst)return;
+  var h=Math.round(hdr.getBoundingClientRect().height);
+  if(h>0&&lst.style.paddingTop!==h+'px') lst.style.paddingTop=h+'px';
+}
+
 function _pvSyncChips(){
   // Sync active/dim classes on compact strip chips without full rebuild
   const strip=document.getElementById('pv-compact-strip');
@@ -1312,13 +1326,6 @@ function _pvInitCollapseObserver(){
       collapsible.style.opacity=String(opacity);
       collapsible.style.pointerEvents=collapsed?'none':'';
 
-      // v669: sync list padding-top with actual header height every frame
-      // portview-header is sticky (not in flow) so list needs explicit offset
-      var hdr=document.querySelector('.portview-header');
-      if(hdr&&listEl){
-        var hdrH=hdr.getBoundingClientRect().height;
-        if(hdrH>0) listEl.style.paddingTop=Math.round(hdrH)+'px';
-      }
     }
 
     _applyStrip(collapsed);
@@ -1334,13 +1341,19 @@ function _pvInitCollapseObserver(){
   }
 
   // Init: measure and set correct initial state
-  // v669: _frame() now syncs listEl.paddingTop every write — no separate BCR call needed
   setTimeout(function(){
     if(!screen.classList.contains('on'))return;
     expandedH=collapsible.scrollHeight||200;
     lastAppliedH=-1; // force first write
     _frame();
+    // v669b: sync padding-top once after init (data may have loaded by now)
+    _pvSyncListOffset();
   },180);
+  // v669b: also sync after a longer delay in case data loads slow
+  setTimeout(function(){
+    if(!screen.classList.contains('on'))return;
+    _pvSyncListOffset();
+  },600);
 
   window.addEventListener('scroll',_onScroll,{passive:true});
   document.addEventListener('scroll',_onScroll,{capture:true,passive:true});
