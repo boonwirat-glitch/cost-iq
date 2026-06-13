@@ -1692,8 +1692,7 @@ function _tvResolveTeamDenominator(groups, allAccts){
   return { denominator, target, baseline, mode, label, hasTarget: target > 0 };
 }
 function _tvDenomLabel(info){
-  if (!info || !info.hasTarget) return 'baseline';
-  return info.mode === 'team' ? 'target' : (info.mode === 'kam' ? 'KAM target' : 'target');
+  return '';
 }
 
 // SECTION:TEAMVIEW
