@@ -1,4 +1,4 @@
-<!-- Freshket Sense v641: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v642: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v641',
+      version: 'v642',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -3873,7 +3873,7 @@ input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; 
 body.sales-mode .sales-any-btn { display: flex !important; }
 
 /* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
-body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
+/* → grid-template-columns removed — NavConfig.render() sets inline gridTemplateColumns */
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
