@@ -18,6 +18,28 @@ function showScreen(name){
 }
 
 function __legacyShowScreenFallback(name){
+  // v600: ถ้า Echo sheet minimized แล้ว user กด nav โดยตรง body อาจยัง position:fixed ค้าง
+  // restore ทันทีก่อน render ใดๆ — CI._restoreBodyScroll safe ถ้า Echo ไม่ได้ open
+  try {
+    if (document.body.style.position === 'fixed') {
+      const _sheet = document.getElementById('ci-fullsheet');
+      if (!_sheet || _sheet.style.display === 'none') {
+        if (typeof CI !== 'undefined' && typeof CI._restoreBodyScroll === 'function') {
+          CI._restoreBodyScroll();
+        } else {
+          // fallback ถ้า CI ยังไม่ load
+          document.body.style.position = '';
+          document.body.style.top = '';
+          document.body.style.left = '';
+          document.body.style.right = '';
+          document.body.style.width = '';
+          document.body.style.maxWidth = '';
+          document.body.style.marginLeft = '';
+          document.body.style.marginRight = '';
+        }
+      }
+    }
+  } catch(_e) {}
   // ── Role guard: only TL/admin can access teamview ──
   if(name==='teamview'){
     const _role=(currentUserProfile&&currentUserProfile.role)||'rep';

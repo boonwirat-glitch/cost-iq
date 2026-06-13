@@ -2205,6 +2205,17 @@ function refreshAll(){
     _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — splash active');
     window._pendingRefreshAll=true; return;
   }
+  // v600: Echo sheet guard — ถ้า #ci-fullsheet visible และ body position:fixed อยู่
+  // DOM render จะ clip ใต้ sheet → เห็นหน้าขาว queue ไว้ทำหลัง Echo ปิด
+  try {
+    const _echoSheet = document.getElementById('ci-fullsheet');
+    const _echoOpen  = _echoSheet && _echoSheet.style.display !== 'none'
+                       && _echoSheet.classList.contains('ci-open');
+    if (_echoOpen && document.body.style.position === 'fixed') {
+      _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — Echo sheet blocking body');
+      window._pendingRefreshAll = true; return;
+    }
+  } catch(_e) {}
   // v_stab1: pending account re-render (user tapped account while data was loading)
   // When data now available, re-render account overview and clear the flag.
   try{

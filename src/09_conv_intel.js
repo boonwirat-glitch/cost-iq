@@ -510,6 +510,15 @@ body:not(.echo-active) { background:unset; }
     clearInterval(_timerRef);
     clearInterval(_waveRef);
     _restoreBodyScroll(); // v598: use centralised restore
+    // v600: flush any refreshAll that was queued while Echo sheet was blocking body
+    setTimeout(() => {
+      try {
+        if (window._pendingRefreshAll && typeof refreshAll === 'function') {
+          window._pendingRefreshAll = false;
+          refreshAll();
+        }
+      } catch(_) {}
+    }, 450); // หลัง sheet remove (400ms) + buffer เล็กน้อย
   }
 
   function _minimize() {
@@ -3474,6 +3483,11 @@ ${whyHtml}
       const tabBar = document.getElementById('ci-main-tabs');
       if (tabBar) tabBar.style.background = '';
     }
+    // v600: sync theme-color meta → iOS PWA home indicator zone matches sheet bg
+    try {
+      const _tc = document.querySelector('meta[name="theme-color"]');
+      if (_tc) _tc.setAttribute('content', isRec ? '#111111' : '#0d3328');
+    } catch(_) {}
   }
 
   // ── Visibility guard — PWA resume after screen lock ────────────────────────
