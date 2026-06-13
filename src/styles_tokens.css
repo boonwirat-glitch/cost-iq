@@ -193,4 +193,11 @@
   --nav-h:      56px;
   --topbar-h:   44px;
 
+  /* ── CHROME ZONE (Phase 0D) ──────────────────────────────── */
+  /* Single source of truth for top/bottom chrome heights.      */
+  /* Use these tokens everywhere — never hardcode 104px again.  */
+  --chrome-top:    var(--topbar-h);                                          /* 44px */
+  --chrome-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));    /* 56px + safe area */
+  --content-h:     calc(100dvh - var(--chrome-top) - var(--chrome-bottom));  /* scrollable area */
+
 }
