@@ -1236,7 +1236,31 @@ function _pvInitCollapseObserver(){
   function _apply(collapsed){
     if(lastCollapsed===collapsed)return;
     lastCollapsed=collapsed;
-    collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
+    // v650: JS-measured max-height — animate to real content height, not hardcoded 700px.
+    // iOS PWA jank came from browser animating 0→700px where only 0→300px had content:
+    // animation "finished" at 43% of duration then jumped to end. Now it uses exact height.
+    //
+    // Order matters (v646 bug was setting className AFTER style → CSS overrode inline):
+    //   COLLAPSE: measure → set start point → reflow → set className (CSS handles 0)
+    //   EXPAND:   set className first → override with measured height → clear after done
+    if(collapsed){
+      // Collapsing: pin to real height first so transition starts from the right place
+      var _h=collapsible.scrollHeight;
+      collapsible.style.maxHeight=_h+'px';
+      collapsible.offsetHeight; // force reflow — browser must see explicit start height
+      collapsible.className='pv-collapsible collapsed'; // CSS now transitions 0
+    }else{
+      // Expanding: set class first (opacity:1, pointer-events), then override maxHeight
+      collapsible.className='pv-collapsible expanded';
+      var _h=collapsible.scrollHeight;
+      collapsible.style.maxHeight=_h+'px';
+      // After transition completes, remove inline style so content can resize freely
+      if(collapsible._expandTimer)clearTimeout(collapsible._expandTimer);
+      collapsible._expandTimer=setTimeout(function(){
+        // Only clear if still in expanded state (user didn't collapse mid-animation)
+        if(lastCollapsed===false)collapsible.style.maxHeight='';
+      },340);
+    }
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
     // Auto-expand search bar when compact strip appears
@@ -1273,20 +1297,12 @@ function _pvInitCollapseObserver(){
   function _check(){
     raf=0;
     if(!screen.classList.contains('on'))return;
-    // Phase 0G: SCROLL GUARD — if content too short to scroll, force expand
-    // AND detach listeners to prevent the micro-loop:
-    //   scroll fires → _schedule → _check → _apply(false) → layout shift
-    //   → scroll fires again → infinite loop → PWA crash on few-account lists
+    // v650: SCROLL GUARD — keep listeners alive, just early-return when content short.
+    // Old code detached listeners → after filter-back-to-all, listeners were gone → no collapse.
+    // Fix: _apply(false) has its own guard (lastCollapsed===false → no-op), so calling
+    // it repeatedly on short lists costs nothing. Keep listeners attached always.
     if(!_scrollable()){
       _apply(false);
-      // Detach scroll listeners — will re-attach on next renderPortview()
-      // which calls _pvInitCollapseObserver() fresh
-      window.removeEventListener('scroll',_schedule);
-      document.removeEventListener('scroll',_schedule,true);
-      screen.removeEventListener('scroll',_schedule);
-      window.removeEventListener('resize',_schedule);
-      if(raf){cancelAnimationFrame(raf);raf=0;}
-      _senseDataLog('PORTVIEW','📌 scroll guard: content too short, listeners detached');
       return;
     }
     const y=_scrollTop();
