@@ -1,4 +1,4 @@
-<!-- Freshket Sense v639: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v640: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v639',
+      version: 'v640',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7648,6 +7648,10 @@ body.sales-mode.kam-mode .bnav {
   border: 1px solid rgba(255,255,255,.5) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
   border-radius: 36px !important;
+  width: calc(100% - 32px) !important;
+  max-width: 440px !important;
+  padding: 8px 8px !important;
+  bottom: calc(6px + env(safe-area-inset-bottom)) !important;
 }
 body.sales-mode.kam-mode .bnav .ni svg     { color: #222222 !important; opacity: .32 !important; filter: none !important; }
 body.sales-mode.kam-mode .bnav .ni .lb     { color: #6A6A6A !important; }
@@ -23057,6 +23061,13 @@ function __legacyShowScreenFallback(name){
     // Disable Save while in teamview — must select account first
     const _sb=document.getElementById('nav-opportunities');
     if(_sb&&isKAM)_sb.classList.add('nav-disabled');
+  }
+  // Disable Save + Restaurant when on skills — no account context
+  if(name==='skills'&&isKAM){
+    const _sb=document.getElementById('nav-opportunities');
+    const _rb=document.getElementById('nav-restaurant');
+    if(_sb)_sb.classList.add('nav-disabled');
+    if(_rb)_rb.classList.add('nav-disabled');
   }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
