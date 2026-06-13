@@ -59,9 +59,13 @@
     var r=curRole();
     try{ if(p){ p.role=r; p.role_label=(r==='rep'?'KAM':r==='tl'?'TL':r==='admin'?'Admin':r); } }catch(e){}
     try{
-      document.body.classList.toggle('role-admin', r==='admin');
-      document.body.classList.toggle('role-tl', r==='tl');
-      document.body.classList.toggle('role-rep', r==='rep');
+      document.body.classList.toggle('role-admin',    r==='admin');
+      document.body.classList.toggle('role-tl',       r==='tl');
+      document.body.classList.toggle('role-rep',       r==='rep');
+      document.body.classList.toggle('role-sales',     r==='sales');
+      document.body.classList.toggle('role-sales-tl',  r==='sales_tl');
+      document.body.classList.toggle('role-ad',        r==='ad');
+      document.body.classList.toggle('role-ad-tl',     r==='ad_tl');
       document.body.setAttribute('data-role', r);
     }catch(e){}
     return r;
