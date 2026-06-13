@@ -1279,28 +1279,8 @@ function _pvInitCollapseObserver(){
     rafId=0;
     if(!screen.classList.contains('on'))return;
 
-    // Few-cards guard — if not scrollable, stay expanded, no loop
-    if(!_scrollable()){
-      // Measure if not yet done
-      if(expandedH<=0){
-        var _prev=collapsible.style.maxHeight;
-        collapsible.style.maxHeight='';
-        expandedH=collapsible.scrollHeight||200;
-        collapsible.style.maxHeight=_prev;
-      }
-      if(lastAppliedH!==expandedH){
-        lastAppliedH=expandedH;
-        collapsible.style.maxHeight=expandedH+'px';
-        collapsible.style.opacity='1';
-        collapsible.style.pointerEvents='';
-      }
-      _applyStrip(false);
-      return;
-    }
-
-    // Measure expandedH once (or re-measure if it looks wrong)
+    // v669: Measure expandedH once (or re-measure if not yet done)
     if(expandedH<=0){
-      // Temporarily remove inline constraint to get true scrollHeight
       var prev=collapsible.style.maxHeight;
       collapsible.style.maxHeight='';
       expandedH=collapsible.scrollHeight||200;
@@ -1310,6 +1290,16 @@ function _pvInitCollapseObserver(){
     var y=_scrollTop();
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
+
+    // v669: Few-cards guard — only block collapse if page would NOT be scrollable
+    // even after header is fully collapsed. This prevents scroll-jitter when
+    // card count is small but doesn't block collapse entirely.
+    // Check: simulate collapsed state → would page be scrollable?
+    if(h===0&&!_scrollable()){
+      // Page can't scroll even when collapsed → stay expanded, no jitter
+      h=expandedH;
+    }
+
     var collapsed=(h===0);
     var expanding=(h===expandedH);
 
@@ -1321,6 +1311,14 @@ function _pvInitCollapseObserver(){
       var opacity=Math.min(1, h/(expandedH*0.3));
       collapsible.style.opacity=String(opacity);
       collapsible.style.pointerEvents=collapsed?'none':'';
+
+      // v669: sync list padding-top with actual header height every frame
+      // portview-header is sticky (not in flow) so list needs explicit offset
+      var hdr=document.querySelector('.portview-header');
+      if(hdr&&listEl){
+        var hdrH=hdr.getBoundingClientRect().height;
+        if(hdrH>0) listEl.style.paddingTop=Math.round(hdrH)+'px';
+      }
     }
 
     _applyStrip(collapsed);
@@ -1336,19 +1334,12 @@ function _pvInitCollapseObserver(){
   }
 
   // Init: measure and set correct initial state
-  // v667: also set listEl paddingTop = portview-header actual height
-  // so cards never hide under the sticky header on first render (before _frame runs)
+  // v669: _frame() now syncs listEl.paddingTop every write — no separate BCR call needed
   setTimeout(function(){
     if(!screen.classList.contains('on'))return;
     expandedH=collapsible.scrollHeight||200;
     lastAppliedH=-1; // force first write
     _frame();
-    // Sync list padding-top with actual header height (measured post-render)
-    var hdr=document.querySelector('.portview-header');
-    if(hdr&&listEl){
-      var hdrH=hdr.getBoundingClientRect().height;
-      if(hdrH>0) listEl.style.paddingTop=Math.round(hdrH)+'px';
-    }
   },180);
 
   window.addEventListener('scroll',_onScroll,{passive:true});
@@ -1650,11 +1641,16 @@ function __legacyRenderPortviewFallback(){
   }
   renderPortviewSummary();
   renderPortviewList();
-  // Reset collapse state + rebuild compact strip + init observer
+  // v669: preserve collapse state across re-renders (search, sort, filter)
+  // Only full reset on fresh navigation (observer not running)
   const coll=document.getElementById('pv-collapsible');
   const strip=document.getElementById('pv-compact-strip');
-  if(coll){coll.className='pv-collapsible expanded';}
-  if(strip){strip.className='pv-compact-strip hidden';}
+  const _wasCollapsed=_pvCollapseObserver&&window._pvLastCollapseMs>0;
+  if(!_wasCollapsed){
+    // Fresh navigation — reset to expanded
+    if(coll){coll.className='pv-collapsible expanded';}
+    if(strip){strip.className='pv-compact-strip hidden';}
+  }
   // Remove old sentinel
   const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
   setTimeout(()=>{_pvBuildCompactStrip();_pvInitCollapseObserver();},120);
