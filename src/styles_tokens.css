@@ -95,7 +95,7 @@
   /* v2.0: body font changed to Noto Sans Thai (loaded in shell.html)     */
   /* KAM/AD locked to IBM Plex Sans Thai via body.kam-mode in main CSS    */
   --tk-font-body:       'Noto Sans Thai', sans-serif;
-  --tk-font-mono:       'IBM Plex Mono', monospace;
+  --tk-font-mono:       'IBM Plex Mono', 'Noto Sans Thai', monospace;
 
   /* ── IQ BADGE ────────────────────────────────────────────── */
   --tk-iq-bg:           linear-gradient(135deg,rgba(0,208,112,.18),rgba(0,208,112,.08));
