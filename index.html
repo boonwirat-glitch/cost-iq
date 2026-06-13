@@ -1,4 +1,4 @@
-<!-- Freshket Sense v625: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v626: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -985,6 +985,9 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 .bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:170;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
 /* restaurant sheet (z-index:163→210) must sit above bnav when open */
 body.restaurant-sheet .bnav{z-index:150;}
+/* bnav uses display:flex with .ni{flex:1} for equal-width tabs
+   grid-template-columns has no effect on flex containers — omitted */
+body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:var(--tk-font-body);transition:all .2s}
 .ni svg{width:22px;height:22px;color:var(--n400);transition:color .2s}
 .ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s;white-space:nowrap}
@@ -4697,7 +4700,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v625',
+      version: 'v626',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -9934,7 +9937,7 @@ body.kam-mode #swipe-grp-a .scr.on,body.kam-mode #swipe-grp-b .scr.on{display:bl
 body.kad-mode #swipe-grp-a,body.kad-mode #swipe-grp-b{display:block!important;position:static;width:auto;height:auto;transform:none;overflow:visible}
 body.kad-mode #swipe-grp-a .scr,body.kad-mode #swipe-grp-b .scr{display:none!important;height:auto;overflow:visible}
 body.kad-mode #swipe-grp-a .scr.on,body.kad-mode #swipe-grp-b .scr.on{display:block!important}
-body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)!important}
+body:not(.kam-mode) .bnav{grid-template-columns:repeat(3,1fr)}
 
 body:not(.kam-mode) #nav-report{display:none!important}
 /* ── Restaurant swipe cue (v154) — replaces legacy white strip + dots ── */
@@ -10833,14 +10836,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 #nav-opportunities.sense-lit svg { color: #f6ad55; }
 #nav-opportunities.sense-lit .nwrap { animation: none; filter: drop-shadow(0 0 8px rgba(246,173,85,.55)); }
 #nav-opportunities.sense-lit .lb { color: #f6ad55; }
-.bnav{grid-template-columns:repeat(5,1fr)}
-.bnav .lb{font-size:10px}
-body.kam-mode .bnav{grid-template-columns:repeat(3,1fr)}
-body.kad-mode .bnav{grid-template-columns:repeat(3,1fr)}
-/* Echo hidden from KAM — Sales only */
-body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
-body.kam-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
-body.kad-mode.tl-mode .bnav{grid-template-columns:repeat(3,1fr)}
+/* → bnav grid rules moved to styles_layout.css (Phase 0E) */
 
 /* ══ PORTVIEW NO DATA ══ */
 .portview-no-data{padding:40px 20px;text-align:center}
