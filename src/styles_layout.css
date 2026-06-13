@@ -474,3 +474,52 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;cursor:pointer;font-family:var(--tk-font-body);text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:all .15s}
 .kna-recent-card:hover{background:var(--tk-accent-dim);border-color:rgba(100,160,255,.35)}
 .kna-recent-card:active{transform:scale(.98)}
+
+
+/* ══ PHASE 0C: DATA-THEME SYSTEM ════════════════════════════════════
+   New features use [data-theme] instead of body.kam-mode / body.sales-mode.
+   Existing body class rules still work — this runs in parallel.
+   Migrate new CSS to this pattern; old CSS stays untouched.
+
+   Usage:
+     [data-theme="dark"]  → KAM, AD (dark navy)
+     [data-theme="light"] → Sales, TL, new features (white canvas)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Topbar: theme-aware (new features use this, not body.kam-mode) ── */
+[data-theme="dark"]  .topbar { background: var(--tk-topbar-gradient); }
+[data-theme="light"] .topbar { background: #FFFFFF; border-bottom: 1px solid var(--hairline); }
+
+/* Logo color */
+[data-theme="dark"]  .topbar .logo { color: #FFFFFF; }
+[data-theme="light"] .topbar .logo { color: var(--ink-1); }
+
+/* topbar buttons */
+[data-theme="dark"]  .topbar .data-btn { background: rgba(255,255,255,.12); }
+[data-theme="light"] .topbar .data-btn { background: rgba(0,0,0,.05); }
+[data-theme="dark"]  .topbar .data-btn svg { color: #fff; }
+[data-theme="light"] .topbar .data-btn svg { color: var(--ink-1); }
+
+/* ── Bottom nav: theme-aware ── */
+[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
+[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
+
+/* Nav icon idle */
+[data-theme="dark"]  .bnav .ni .lb,
+[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
+[data-theme="light"] .bnav .ni .lb,
+[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
+
+/* Nav icon active */
+[data-theme="dark"]  .bnav .ni.on .lb,
+[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
+[data-theme="light"] .bnav .ni.on .lb,
+[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
+
+/* Active pill */
+[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
+[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
+
+/* ── Screen background: theme-aware ── */
+[data-theme="light"] .scr { background: var(--canvas); }
+[data-theme="dark"]  .scr { background: var(--tk-bg-base); }
