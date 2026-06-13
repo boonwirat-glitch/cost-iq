@@ -1,4 +1,4 @@
-<!-- Freshket Sense v612: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v613: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -479,16 +479,6 @@
 </style>
 <style>
 /* ============================================================
-   FRESHKET SENSE — BASE STYLES
-   src/styles_base.css  (Phase 0B split from styles_main.css)
-
-   Contents: :root local color vars (--g*, --amb, --n*),
-             CSS reset, body/html, .mono, global keyframes.
-   These rules apply to EVERY role/feature — no exceptions.
-   Never add role-specific or feature-specific rules here.
-   ============================================================ */
-
-/* ============================================================
    FRESHKET SENSE — MAIN STYLES
    src/styles_main.css
    
@@ -515,13 +505,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}html{overflow-x:clip}
 body{font-family:var(--tk-font-body);}
-/* phase-0A: KAM/AD locked to IBM Plex Sans Thai (257 components inherit, Noto would change KAM UI) */
+/* phase-0A: KAM/AD locked to IBM Plex Sans Thai */
 body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
 body{background:var(--n0);color:var(--n900);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;max-width:440px;margin:0 auto;position:relative;min-height:100vh;}
 html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--n200),0 8px 40px rgba(0,0,0,.12)}}
 .mono{font-family:'IBM Plex Mono',monospace}
-/* ── FEATURE DEFAULT: new features inherit body → Noto Sans Thai automatically ─────── */
-/* ── Use var(--fk-red) for CI accent, var(--canvas) for bg, var(--ink-1) for text ──── */
 
 /* ── MICRO-INTERACTION: Dot blink for loading states ── */
 @keyframes _dotBlink{0%,100%{opacity:.2}50%{opacity:.9}}
@@ -536,19 +524,6 @@ html{background:#e8e8e8}@media(min-width:441px){body{box-shadow:0 0 0 1px var(--
 
 /* ── MICRO-INTERACTION: Splash ticker transition ── */
 #spl-ticker{transition:opacity .18s ease}
-</style>
-<style>
-/* ============================================================
-   FRESHKET SENSE — LAYOUT STYLES
-   src/styles_layout.css  (Phase 0B split from styles_main.css)
-
-   Contents: topbar, bottom-nav (bnav), screens structural CSS,
-             data-panel, kambar, KAM zone 1 (pace ring, brief,
-             talkline, SKU verify), KAM data cards, account lib,
-             UX polish (button/card/checkbox/skeleton/toast).
-   Shared structural chrome visible across all roles.
-   Uses --g*/--n*/--amb tokens defined in styles_base.css :root.
-   ============================================================ */
 
 /* ── TOPBAR ── */
 .topbar{background:var(--g900);padding:11px 16px;padding-top:calc(11px + constant(safe-area-inset-top));padding-top:calc(11px + env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
@@ -1014,59 +989,6 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
 .kna-recent-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;cursor:pointer;font-family:var(--tk-font-body);text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:all .15s}
 .kna-recent-card:hover{background:var(--tk-accent-dim);border-color:rgba(100,160,255,.35)}
 .kna-recent-card:active{transform:scale(.98)}
-
-
-/* ══ PHASE 0C: DATA-THEME SYSTEM (v2 — safe) ════════════════════════
-   These rules are ADDITIVE for new features only.
-   Existing body.kam-mode / body.sales-mode rules are NOT removed —
-   they still fire and take precedence via cascade order (main.css loads after layout.css).
-
-   data-theme is set on <html> at login. New features built after Phase 0C
-   can use [data-theme] selectors instead of body.X-mode. Old features unaffected.
-
-   SAFE RULES: only properties not already covered by existing body.X-mode rules.
-   REMOVED: [data-theme] .scr — too broad, KAM screens need body.kam-mode control.
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── Topbar: DO NOT add [data-theme] rules here ─────────────────────────
-   Topbar layout is controlled by:
-     body.kam-mode .topbar  → dark gradient  (styles_main.css)
-     body.sales-mode .topbar → white          (styles_main.css)
-   Adding [data-theme] .topbar rules here BREAKS flex layout (removes display:flex).
-   ─────────────────────────────────────────────────────────────────────── */
-
-/* ── Bottom nav: theme token ── */
-[data-theme="dark"]  .bnav { background: var(--tk-nav-bg); border-top: 1px solid rgba(255,255,255,.10); }
-[data-theme="light"] .bnav { background: #FFFFFF; border-top: 1px solid var(--hairline); }
-
-/* Nav icon idle */
-[data-theme="dark"]  .bnav .ni .lb,
-[data-theme="dark"]  .bnav .ni svg { color: rgba(255,255,255,.55); }
-[data-theme="light"] .bnav .ni .lb,
-[data-theme="light"] .bnav .ni svg { color: var(--ink-3); }
-
-/* Nav icon active */
-[data-theme="dark"]  .bnav .ni.on .lb,
-[data-theme="dark"]  .bnav .ni.on svg { color: #FFFFFF; }
-[data-theme="light"] .bnav .ni.on .lb,
-[data-theme="light"] .bnav .ni.on svg { color: var(--fk-red); }
-
-/* Active pill */
-[data-theme="dark"]  .bnav .ni.on .nwrap { background: var(--tk-accent-dim-3); }
-[data-theme="light"] .bnav .ni.on .nwrap { background: var(--fk-red-dim); }
-
-/* NOTE: .scr background is NOT set here — controlled by body.kam-mode in main.css */
-</style>
-<style>
-/* ============================================================
-   FRESHKET SENSE — MAIN STYLES (trimmed Phase 0B)
-   src/styles_main.css
-
-   Contents: screens (.main, swipe groups, overview, portfolio,
-             opportunities, report), KAM sense mode, KAM dark
-             theme, portview, teamview, commission detail sheet,
-             print CSS, login overlay, splash, sales-mode nav.
-   ============================================================ */
 
 /* ── SCREENS ── */
 .main{padding-bottom:148px;min-height:calc(100vh - 48px)}
@@ -4566,7 +4488,7 @@ body.kam-mode #mode-toggle-wrap:hover{opacity:1;transform:scale(1);}
 body.kam-mode.restaurant-sheet #mode-toggle-wrap{opacity:.45;}
 
 /* 3) Commission reward loop — always visible, more special when unlocked. */
-.pv-comm-strip.v210k{position:relative;overflow:clip;border-color:rgba(255,224,138,.42)!important;background:linear-gradient(135deg,rgba(255,224,138,.10),rgba(35,73,126,.52) 46%,rgba(15,42,76,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(255,224,138,.05),0 6px 22px rgba(0,0,0,.10)!important;}
+.pv-comm-strip.v210k{position:relative;overflow:hidden;border-color:rgba(255,224,138,.42)!important;background:linear-gradient(135deg,rgba(255,224,138,.10),rgba(35,73,126,.52) 46%,rgba(15,42,76,.50))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(255,224,138,.05),0 6px 22px rgba(0,0,0,.10)!important;}
 .pv-comm-strip.v210k:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 8% 0%,rgba(255,224,138,.18),transparent 34%),linear-gradient(110deg,transparent,rgba(255,224,138,.08),transparent);opacity:.62;pointer-events:none;}
 .pv-comm-strip.v210k .pv-comm-title{color:rgba(255,224,138,.92)!important;}
 .pv-comm-strip.v210k .pv-comm-main{color:#ffe08a!important;text-shadow:0 0 18px rgba(255,224,138,.18)!important;}
@@ -5762,7 +5684,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v612',
+      version: 'v613',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
