@@ -1,4 +1,4 @@
-<!-- Freshket Sense v622: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v623: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -2842,80 +2842,7 @@ body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities.on svg{c
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities svg{color:rgba(0,0,0,.38)!important}
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities.on svg{color:var(--g500)!important;opacity:1!important}
 /* v490-B4: hide Echo from Save mode 3-col nav (4 items → 3 columns caused overflow) */
-/* v598: cover both kam-only (#nav-echo-kam) and rest-only (#nav-echo) via .echo-nav-btn class */
-body.kam-sense-active.kam-mode .bnav .echo-nav-btn{display:none!important}
-/* v488: echo-pill shrinks correctly inside flex glass pill */
-body.kam-mode .bnav .echo-pill{flex-shrink:1!important;width:auto!important;min-width:0}
-/* ── Echo nav pill — idle + active states ── */
-/* ── Echo nav — Pattern B wave · 4px bars · uniform with other tabs ── */
-.echo-pill{
-  display:flex;align-items:flex-end;justify-content:center;gap:2.5px;
-  width:28px;height:22px;
-  padding:0 0 0;
-  flex-shrink:0;
-}
-body.kam-mode .echo-pill{
-  /* inherit */
-}
-.echo-nav-btn .nwrap{
-  padding:3px 7px!important;
-  display:flex;align-items:center;justify-content:center;
-  min-height:22px;
-  height:22px;
-}
-/* bars: Pattern B — 5·11·6·14·17 zigzag ascending, 4px wide */
-.echo-bar{
-  display:inline-block;
-  width:4px;
-  border-radius:2px 2px 1px 1px;
-  background:var(--tk-ok-bright);  /* idle = green always */
-  flex-shrink:0;
-}
-.echo-bar:nth-child(1){height:5px}
-.echo-bar:nth-child(2){height:11px}
-.echo-bar:nth-child(3){height:6px}
-.echo-bar:nth-child(4){height:14px}
-.echo-bar:nth-child(5){height:17px}
-/* Active keyframes — snappy steps like real EQ */
-@keyframes echo-wa{0%{height:5px}33%{height:15px}66%{height:3px}100%{height:5px}}
-@keyframes echo-wb{0%{height:11px}33%{height:4px}66%{height:17px}100%{height:11px}}
-@keyframes echo-wc{0%{height:6px}33%{height:17px}66%{height:5px}100%{height:6px}}
-@keyframes echo-wd{0%{height:14px}33%{height:5px}66%{height:17px}100%{height:14px}}
-@keyframes echo-we{0%{height:17px}33%{height:7px}66%{height:14px}100%{height:17px}}
-body.echo-active .echo-pill{ /* no pill bg — just glowing bars */ }
-body.echo-active .echo-bar{background:var(--tk-ok-bright);}
-body.echo-active .echo-bar:nth-child(1){animation:echo-wa .6s steps(2,end) infinite}
-body.echo-active .echo-bar:nth-child(2){animation:echo-wb .75s steps(2,end) infinite .08s}
-body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infinite .15s}
-body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
-body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
-/* label — same color/weight as other tabs, green only when active */
-.echo-nav-btn .lb{color:var(--n400);font-weight:500}
-body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weight:600!important}
-/* Floating recording pill (minimize state) */
-#echo-float-pill{
-  position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
-  left:50%;transform:translateX(-50%);
-  display:none;align-items:center;gap:8px;
-  background:rgba(14,24,45,.88);
-  border:1px solid var(--tk-ok-border);
-  border-radius:999px;padding:8px 16px;
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  box-shadow:0 4px 20px var(--tk-ok-dim-2),0 8px 32px rgba(0,0,0,.4);
-  cursor:pointer;z-index:9999;
-  animation:echo-float-in .3s cubic-bezier(.34,1.56,.64,1);
-}
-@keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
-#echo-float-pill.visible{display:flex}
-#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2.5px;height:14px}
-#echo-float-pill .fp-bar{width:3px;border-radius:3px;background:rgba(255,56,92,.45);transform-origin:bottom}
-#echo-float-pill .fp-bar:nth-child(1){height:5px;animation:echo-wa .6s steps(2,end) infinite}
-#echo-float-pill .fp-bar:nth-child(2){height:9px;animation:echo-wb .75s steps(2,end) infinite .08s}
-#echo-float-pill .fp-bar:nth-child(3){height:5px;animation:echo-wc .65s steps(2,end) infinite .15s}
-#echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
-#echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
-#echo-float-pill .fp-label{display:none}
-#echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
+/* → Echo nav moved to styles_echo.css (Phase 0E) */
 body.kam-mode .bnav .ni .nwrap{background:none!important;border:none!important;box-shadow:none!important;padding:0!important;display:flex;align-items:center;justify-content:center;}
 body.kam-mode .bnav .ni.nav-disabled{opacity:.28!important;pointer-events:none!important;}
 /* drag handle — account view only */
@@ -5273,307 +5200,10 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   font-family:var(--tk-font-body);
 }
 
-/* ── SECTION 2: Login overlay CSS ── */
-#login-overlay{
-  position:fixed;inset:0;
-  background:linear-gradient(160deg,#1a4a3a 0%,#0d3328 55%,#081e18 100%);
-  z-index:9999;display:flex;align-items:center;justify-content:center;
-  padding:32px 24px;
-}
-.lgi-box{
-  width:100%;max-width:380px;
-}
-.lgi-brand{
-  display:flex;flex-direction:column;align-items:center;text-align:center;
-  gap:10px;margin-bottom:40px;
-}
-.lgi-logo-box{
-  width:76px;height:76px;flex-shrink:0;
-}
-.lgi-wordmark{
-  font-family:var(--tk-font-body);
-  font-size:22px;font-weight:700;color:#fff;letter-spacing:-.4px;
-  display:flex;align-items:center;justify-content:center;gap:0;
-}
-.lgi-wordmark em{color:var(--amb);font-style:normal;}
-.lgi-badge{
-  display:inline-flex;align-items:center;gap:4px;
-  background:linear-gradient(135deg,var(--tk-ok-dim-2),var(--tk-ok-dim));
-  border:1px solid var(--tk-ok-border);
-  border-radius:6px;padding:2px 7px 2px 6px;
-  font-family:'IBM Plex Mono',monospace;
-  font-size:11px;font-weight:700;color:var(--tk-ok-bright);letter-spacing:.6px;
-  vertical-align:2px;margin-left:6px;
-  animation:iq-pulse 3.5s ease-in-out infinite;
-}
-.lgi-badge svg{width:8px;height:8px;flex-shrink:0;animation:iq-spin 8s linear infinite;transform-origin:center;}
-.lgi-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:3px;font-family:var(--tk-font-body);letter-spacing:.2px;}
-.lgi-field{margin-bottom:14px;}
-.lgi-label{
-  display:block;font-size:11px;font-weight:700;
-  color:rgba(255,255,255,.45);margin-bottom:7px;
-  text-transform:uppercase;letter-spacing:.9px;
-  font-family:var(--tk-font-body);
-}
-.lgi-input{
-  width:100%;padding:15px 16px;
-  background:rgba(255,255,255,.07);
-  border:1.5px solid rgba(255,255,255,.12);
-  border-radius:13px;font-size:15px;color:#fff;
-  font-family:var(--tk-font-body);
-  outline:none;transition:border-color .2s,background .2s;
-  -webkit-font-smoothing:antialiased;
-}
-.lgi-input::placeholder{color:rgba(255,255,255,.22);}
-.lgi-input:focus{border-color:var(--tk-ok-border);background:var(--tk-ok-dim);}
-.lgi-err{
-  display:none;
-  background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);
-  border-radius:10px;padding:11px 14px;
-  font-size:13px;color:#fc8181;margin-bottom:14px;
-  font-family:var(--tk-font-body);
-}
-.lgi-btn{
-  width:100%;padding:17px;
-  background:var(--g500);color:var(--g900);
-  border:none;border-radius:13px;
-  font-size:15px;font-weight:700;
-  font-family:var(--tk-font-body);
-  cursor:pointer;transition:opacity .15s,transform .1s;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  margin-top:8px;letter-spacing:.1px;
-}
-.lgi-btn:hover{opacity:.9;}
-.lgi-btn:active{transform:scale(.98);}
-.lgi-btn:disabled{opacity:.5;cursor:default;}
-.lgi-btn:hover{opacity:.9;}
-.lgi-btn:active{transform:scale(.98);}
-.lgi-btn:disabled{opacity:.5;cursor:default;}
-.lgi-checking-msg{display:none;align-items:center;gap:10px;padding:32px 0;color:rgba(255,255,255,.45);font-family:var(--tk-font-body);font-size:13px;}
-#login-overlay.lgi-checking .lgi-checking-msg{display:flex;}
-#login-overlay.lgi-checking .lgi-form-area{display:none;}
-@keyframes lgi-chk-dot{0%,80%,100%{opacity:.25;transform:scale(.75);}40%{opacity:1;transform:scale(1);}}
-.lgi-chk-dots{display:flex;gap:5px;}
-.lgi-chk-dots span{width:7px;height:7px;border-radius:50%;background:var(--g500);display:inline-block;animation:lgi-chk-dot 1.3s ease-in-out infinite;}
-.lgi-chk-dots span:nth-child(2){animation-delay:.22s;}
-.lgi-chk-dots span:nth-child(3){animation-delay:.44s;}
-.lgi-foot{
-  text-align:center;margin-top:24px;
-  font-size:11px;color:rgba(255,255,255,.18);
-  font-family:'IBM Plex Mono',monospace;letter-spacing:.4px;
-}
-.lgi-divider{
-  display:flex;align-items:center;gap:12px;margin:28px 0 24px;
-}
-.lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
-.lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
-/* ── PASSWORD RECOVERY FLOW ── */
-.pw-reset-area{display:none;}
-#login-overlay.password-recovery .lgi-form-area{display:none!important;}
-#login-overlay.password-recovery .lgi-checking-msg{display:none!important;}
-#login-overlay.password-recovery .pw-reset-area{display:block;}
-.pw-reset-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:-.2px;}
-.pw-reset-sub{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:18px;}
-.pw-reset-email{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tk-ok-bright);margin-bottom:14px;word-break:break-all;}
-.pw-reset-status{display:none;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;font-family:var(--tk-font-body);line-height:1.5;}
-.pw-reset-status.err{display:block;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#fc8181;}
-.pw-reset-status.ok{display:block;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-border);color:var(--tk-ok-bright);}
-.lgi-err.ok{display:block;background:var(--tk-ok-dim);border-color:var(--tk-ok-border);color:var(--tk-ok-bright);}
-.pw-reset-note{font-size:11px;color:rgba(255,255,255,.32);line-height:1.6;margin-top:12px;text-align:center;}
+/* → Login moved to styles_auth.css (Phase 0E) */
 
-
-/* ── SECTION 3: Sense splash CSS ── */
-#sense-splash{
-  position:fixed;inset:0;z-index:10000;
-  background:linear-gradient(160deg,#1a4a3a 0%,#0d3328 55%,#081e18 100%);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  padding:32px 24px;
-}
-/* Orb */
-.spl-orb{position:relative;width:104px;height:104px;display:flex;align-items:center;justify-content:center;margin-bottom:28px;}
-.spl-glow{position:absolute;inset:-10px;border-radius:50%;pointer-events:none;animation:spl-glow 2s ease-in-out infinite;}
-@keyframes spl-glow{0%,100%{box-shadow:0 0 20px var(--tk-ok-border);}50%{box-shadow:0 0 44px var(--tk-ok-border),0 0 80px var(--tk-ok-dim-2);}}
-#spl-star{animation:spl-star-in .55s cubic-bezier(.34,1.56,.64,1) both,spl-star-spin 9s linear infinite;transform-origin:center;filter:drop-shadow(0 0 10px var(--tk-ok-bright));}
-@keyframes spl-star-in{from{opacity:0;transform:scale(.15) rotate(-30deg);}to{opacity:1;transform:scale(1) rotate(0deg);}}
-@keyframes spl-star-spin{to{transform:rotate(360deg);}}
-/* Brand */
-.spl-brand{text-align:center;margin-bottom:24px;opacity:0;animation:spl-fadein .38s ease .38s both;}
-.spl-wordmark{font-family:var(--tk-font-body);font-size:22px;font-weight:700;color:#fff;letter-spacing:-.3px;display:flex;align-items:center;justify-content:center;}
-.spl-sub{font-size:11px;color:rgba(255,255,255,.3);margin-top:5px;font-family:var(--tk-font-body);letter-spacing:.2px;}
-/* Ticker */
-.spl-ticker-wrap{height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:40px;}
-#spl-ticker{font-size:12px;color:var(--tk-ok-bright);font-family:var(--tk-font-body);font-weight:500;transition:opacity .2s ease;opacity:0;animation:spl-fadein .3s ease .65s both;}
-/* Progress bar */
-.spl-bar-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--tk-ok-dim);}
-#spl-bar{height:100%;background:linear-gradient(90deg,var(--tk-ok-border),var(--g500));width:0;border-radius:1px;}
-/* shared */
-@keyframes spl-fadein{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:translateY(0);}}
-
-/* ══════════════════════════════════════════════════════
-   SALES MODE — CSS gating (added Phase 3 Sales build)
-   ══════════════════════════════════════════════════════ */
-
-/* Default: Sales-only nav hidden */
-.bnav .ni.sales-only     { display: none !important; }
-.bnav .ni.sales-tl-only  { display: none !important; }
-
-/* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
-body.sales-mode .bnav .ni.sales-only     { display: flex !important; }
-body.sales-mode .bnav .ni.kam-only       { display: none !important; }
-body.sales-mode .bnav .ni.tl-only        { display: none !important; }
-body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
-
-/* Sales TL mode: show Team tab in addition */
-body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
-
-/* Sales v6: hide non-Sales nav buttons including nav-overview */
-body.sales-mode .bnav #nav-overview     { display: none !important; }
-body.sales-mode .bnav #nav-restaurant   { display: none !important; }
-body.sales-mode .bnav #nav-portview     { display: none !important; }
-body.sales-mode .bnav #nav-teamview     { display: none !important; }
-
-/* Skills + Echo tab: sales only — hidden in KAM mode */
-.bnav .ni.sales-any-btn                    { display: none !important; }
-body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
-/* v498: AD also gets Skills nav */
-body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
-/* KAM TL (tl role, kam-mode) also gets Skills nav */
-body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
-/* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
-body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { display: none !important; }
-/* Echo for Sales — show + center position */
-body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
-body.sales-mode .bnav #nav-sales-portview  { order: 1; }
-body.sales-mode .bnav #nav-sales-pipeline  { order: 2; }
-body.sales-mode .bnav #nav-sales-commission{ order: 4; }
-body.sales-mode .bnav #nav-skills          { order: 5; }
-body.sales-mode .bnav #nav-sales-teamview  { order: 6; }
-
-/* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
-body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
-body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
-/* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
-body.sales-mode .bnav #nav-opportunities { display: none !important; }
-
-/* Sales uses same dark theme as KAM */
-/* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
-body.sales-mode { background: #FFFFFF; }
-body.sales-mode #scr-sales-portview,
-body.sales-mode #scr-sales-pipeline,
-body.sales-mode #scr-sales-commission,
-body.sales-mode #scr-sales-teamview { background: #FFFFFF; }
-
-/* Sales-mode: hide KAM-specific content, show Sales-specific content */
-body.sales-mode .kam-content-only  { display: none !important; }
-.sales-content-only                { display: none !important; }
-body.sales-mode .sales-content-only { display: block !important; }
-
-/* ── Sales v6: hide KAM screens + override kam-mode nav ── */
-body.sales-mode #scr-portview,
-body.sales-mode #scr-teamview,
-body.sales-mode #scr-opportunities { display: none !important; }
-
-/* Sales user gets both .sales-mode AND .kam-mode
-   Need higher specificity to override dark glass pill */
-body.sales-mode.kam-mode .bnav {
-  background: rgba(255,255,255,.72) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255,255,255,.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
-  border-radius: 36px !important; /* v573: match floating pill radius */
-}
-
-/* Nav icons: inactive = dark muted, active = rausch */
-body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
-body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
-body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
-body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
-
-/* Sales portview screen — same layout as KAM portview */
-#scr-sales-portview { padding-bottom: var(--chrome-bottom); }
-#scr-sales-pipeline { padding-bottom: var(--chrome-bottom); }
-#scr-sales-commission { padding-bottom: var(--chrome-bottom); }
-#scr-sales-teamview { padding-bottom: var(--chrome-bottom); }
-
-/* ── Sales-mode: hide KAM-specific floating/fixed elements ── */
-/* aifab: KAM AI chat FAB — dark green, must not appear on white Sales canvas */
-body.sales-mode .aifab,
-body.sales-mode #aifab { display: none !important; }
-
-/* data-load-pill: KAM data loading indicator — dark pill, wrong on Sales white bg */
-body.sales-mode #data-load-pill { display: none !important; }
-
-/* swipe-pill: restaurant/KAM mode swipe indicator */
-body.sales-mode #swipe-pill { display: none !important; }
-
-/* KAM AI panel and overlay — should not open in Sales mode */
-body.sales-mode .aipanel { display: none !important; }
-body.sales-mode .overlay { pointer-events: none; opacity: 0 !important; }
-
-/* pv-comm-sheet: KAM cohort detail sheet — wrong in Sales */
-body.sales-mode .pv-comm-sheet-overlay,
-body.sales-mode .pv-comm-sheet { display: none !important; }
-
-/* v213 drill coach tooltip — KAM only */
-body.sales-mode #v213-drill-coach { display: none !important; }
-
-/* ncs-sheet: NRR cohort sheet — KAM only */
-body.sales-mode #ncs-overlay,
-body.sales-mode #ncs-sheet { display: none !important; }
-
-/* CDS overlay — KAM only */
-body.sales-mode .cds-overlay,
-body.sales-mode .cds-sheet { display: none !important; }
-
-/* pb-footer: plan builder footer — KAM only */
-body.sales-mode .pb-footer { display: none !important; }
-
-/* Topbar: white background in sales-mode — exclude Echo fullsheet */
-body.sales-mode .topbar:not(#ci-fullsheet *) {
-  background: #FFFFFF !important;
-  border-bottom: 1px solid #EBEBEB !important;
-}
-/* v552 CSS Contract: Echo topbar dark/light = inline style + Echo's own transition
-   (ถอด !important override — มันฆ่า fade .7s ของ Echo) */
-body.sales-mode .topbar .logo { color: #222222 !important; }
-body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; animation: iq-pulse-sales 3.5s ease-in-out infinite !important; }
-body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
-@keyframes iq-pulse-sales {
-  0%,100%{box-shadow:0 0 6px rgba(255,56,92,.2),inset 0 0 4px rgba(255,56,92,.06)}
-  50%{box-shadow:0 0 14px rgba(255,56,92,.4),inset 0 0 8px rgba(255,56,92,.12)}
-}
-body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
-body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
-
-/* Save tab + rest-only: hide all in sales-mode */
-body.sales-mode .bnav .ni.rest-only { display: none !important; }
-body.sales-mode .bnav .ni[onclick*="Save"],
-body.sales-mode .bnav .ni[onclick*="save"],
-body.sales-mode .bnav #nav-save-btn { display: none !important; }
-
-/* Sales nav — floating frosted white pill (v573)
-   ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
-   position:fixed + transform = nav เลื่อนตาม scroll) · centering ด้วย left/right+margin */
-body.sales-mode .bnav {
-  left: 16px !important;
-  right: 16px !important;
-  transform: none !important;
-  width: auto !important;
-  max-width: 392px !important;
-  margin: 0 auto !important;
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
-  border-radius: 36px !important;
-  padding-bottom: 8px !important;
-  background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(0,0,0,.07) !important;
-  /* v575: layered shadow — ลอยชัด (ambient ใหญ่ + contact เล็ก + top highlight) */
-  box-shadow: 0 18px 40px rgba(0,0,0,.16), 0 6px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.85) !important;
-}
-
-
+/* → Splash moved to styles_auth.css (Phase 0E) */
+/* → Nav gating moved to styles_nav.css (Phase 0E) */
 </style>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
@@ -5598,7 +5228,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v622',
+      version: 'v623',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -10973,6 +10603,400 @@ body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
 /* ── KAM/KAD mode: white sheet background ── */
 body.kam-mode #rest-sheet-body{background:#fff}
 body.kad-mode #rest-sheet-body{background:#fff}
+</style>
+<style id="echo-module-css">
+/* ============================================================
+   FRESHKET SENSE — ECHO NAV STYLES
+   src/styles_echo.css · Phase 0E (verbatim copy, !important preserved)
+   ============================================================ */
+
+/* v598: cover both kam-only (#nav-echo-kam) and rest-only (#nav-echo) via .echo-nav-btn class */
+body.kam-sense-active.kam-mode .bnav .echo-nav-btn{display:none!important}
+/* v488: echo-pill shrinks correctly inside flex glass pill */
+body.kam-mode .bnav .echo-pill{flex-shrink:1!important;width:auto!important;min-width:0}
+/* ── Echo nav pill — idle + active states ── */
+/* ── Echo nav — Pattern B wave · 4px bars · uniform with other tabs ── */
+.echo-pill{
+  display:flex;align-items:flex-end;justify-content:center;gap:2.5px;
+  width:28px;height:22px;
+  padding:0 0 0;
+  flex-shrink:0;
+}
+body.kam-mode .echo-pill{
+  /* inherit */
+}
+.echo-nav-btn .nwrap{
+  padding:3px 7px!important;
+  display:flex;align-items:center;justify-content:center;
+  min-height:22px;
+  height:22px;
+}
+/* bars: Pattern B — 5·11·6·14·17 zigzag ascending, 4px wide */
+.echo-bar{
+  display:inline-block;
+  width:4px;
+  border-radius:2px 2px 1px 1px;
+  background:var(--tk-ok-bright);  /* idle = green always */
+  flex-shrink:0;
+}
+.echo-bar:nth-child(1){height:5px}
+.echo-bar:nth-child(2){height:11px}
+.echo-bar:nth-child(3){height:6px}
+.echo-bar:nth-child(4){height:14px}
+.echo-bar:nth-child(5){height:17px}
+/* Active keyframes — snappy steps like real EQ */
+@keyframes echo-wa{0%{height:5px}33%{height:15px}66%{height:3px}100%{height:5px}}
+@keyframes echo-wb{0%{height:11px}33%{height:4px}66%{height:17px}100%{height:11px}}
+@keyframes echo-wc{0%{height:6px}33%{height:17px}66%{height:5px}100%{height:6px}}
+@keyframes echo-wd{0%{height:14px}33%{height:5px}66%{height:17px}100%{height:14px}}
+@keyframes echo-we{0%{height:17px}33%{height:7px}66%{height:14px}100%{height:17px}}
+body.echo-active .echo-pill{ /* no pill bg — just glowing bars */ }
+body.echo-active .echo-bar{background:var(--tk-ok-bright);}
+body.echo-active .echo-bar:nth-child(1){animation:echo-wa .6s steps(2,end) infinite}
+body.echo-active .echo-bar:nth-child(2){animation:echo-wb .75s steps(2,end) infinite .08s}
+body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infinite .15s}
+body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
+body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
+/* label — same color/weight as other tabs, green only when active */
+.echo-nav-btn .lb{color:var(--n400);font-weight:500}
+body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weight:600!important}
+/* Floating recording pill (minimize state) */
+#echo-float-pill{
+  position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  display:none;align-items:center;gap:8px;
+  background:rgba(14,24,45,.88);
+  border:1px solid var(--tk-ok-border);
+  border-radius:999px;padding:8px 16px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 4px 20px var(--tk-ok-dim-2),0 8px 32px rgba(0,0,0,.4);
+  cursor:pointer;z-index:9999;
+  animation:echo-float-in .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+#echo-float-pill.visible{display:flex}
+#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2.5px;height:14px}
+#echo-float-pill .fp-bar{width:3px;border-radius:3px;background:rgba(255,56,92,.45);transform-origin:bottom}
+#echo-float-pill .fp-bar:nth-child(1){height:5px;animation:echo-wa .6s steps(2,end) infinite}
+#echo-float-pill .fp-bar:nth-child(2){height:9px;animation:echo-wb .75s steps(2,end) infinite .08s}
+#echo-float-pill .fp-bar:nth-child(3){height:5px;animation:echo-wc .65s steps(2,end) infinite .15s}
+#echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
+#echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
+#echo-float-pill .fp-label{display:none}
+#echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}</style>
+<style id="auth-module-css">
+/* ============================================================
+   FRESHKET SENSE — AUTH STYLES (Login + Splash)
+   src/styles_auth.css · Phase 0E (verbatim copy, !important preserved)
+   ============================================================ */
+
+/* ── SECTION 2: Login overlay CSS ── */
+#login-overlay{
+  position:fixed;inset:0;
+  background:linear-gradient(160deg,#1a4a3a 0%,#0d3328 55%,#081e18 100%);
+  z-index:9999;display:flex;align-items:center;justify-content:center;
+  padding:32px 24px;
+}
+.lgi-box{
+  width:100%;max-width:380px;
+}
+.lgi-brand{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  gap:10px;margin-bottom:40px;
+}
+.lgi-logo-box{
+  width:76px;height:76px;flex-shrink:0;
+}
+.lgi-wordmark{
+  font-family:var(--tk-font-body);
+  font-size:22px;font-weight:700;color:#fff;letter-spacing:-.4px;
+  display:flex;align-items:center;justify-content:center;gap:0;
+}
+.lgi-wordmark em{color:var(--amb);font-style:normal;}
+.lgi-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:linear-gradient(135deg,var(--tk-ok-dim-2),var(--tk-ok-dim));
+  border:1px solid var(--tk-ok-border);
+  border-radius:6px;padding:2px 7px 2px 6px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;font-weight:700;color:var(--tk-ok-bright);letter-spacing:.6px;
+  vertical-align:2px;margin-left:6px;
+  animation:iq-pulse 3.5s ease-in-out infinite;
+}
+.lgi-badge svg{width:8px;height:8px;flex-shrink:0;animation:iq-spin 8s linear infinite;transform-origin:center;}
+.lgi-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:3px;font-family:var(--tk-font-body);letter-spacing:.2px;}
+.lgi-field{margin-bottom:14px;}
+.lgi-label{
+  display:block;font-size:11px;font-weight:700;
+  color:rgba(255,255,255,.45);margin-bottom:7px;
+  text-transform:uppercase;letter-spacing:.9px;
+  font-family:var(--tk-font-body);
+}
+.lgi-input{
+  width:100%;padding:15px 16px;
+  background:rgba(255,255,255,.07);
+  border:1.5px solid rgba(255,255,255,.12);
+  border-radius:13px;font-size:15px;color:#fff;
+  font-family:var(--tk-font-body);
+  outline:none;transition:border-color .2s,background .2s;
+  -webkit-font-smoothing:antialiased;
+}
+.lgi-input::placeholder{color:rgba(255,255,255,.22);}
+.lgi-input:focus{border-color:var(--tk-ok-border);background:var(--tk-ok-dim);}
+.lgi-err{
+  display:none;
+  background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);
+  border-radius:10px;padding:11px 14px;
+  font-size:13px;color:#fc8181;margin-bottom:14px;
+  font-family:var(--tk-font-body);
+}
+.lgi-btn{
+  width:100%;padding:17px;
+  background:var(--g500);color:var(--g900);
+  border:none;border-radius:13px;
+  font-size:15px;font-weight:700;
+  font-family:var(--tk-font-body);
+  cursor:pointer;transition:opacity .15s,transform .1s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin-top:8px;letter-spacing:.1px;
+}
+.lgi-btn:hover{opacity:.9;}
+.lgi-btn:active{transform:scale(.98);}
+.lgi-btn:disabled{opacity:.5;cursor:default;}
+.lgi-btn:hover{opacity:.9;}
+.lgi-btn:active{transform:scale(.98);}
+.lgi-btn:disabled{opacity:.5;cursor:default;}
+.lgi-checking-msg{display:none;align-items:center;gap:10px;padding:32px 0;color:rgba(255,255,255,.45);font-family:var(--tk-font-body);font-size:13px;}
+#login-overlay.lgi-checking .lgi-checking-msg{display:flex;}
+#login-overlay.lgi-checking .lgi-form-area{display:none;}
+@keyframes lgi-chk-dot{0%,80%,100%{opacity:.25;transform:scale(.75);}40%{opacity:1;transform:scale(1);}}
+.lgi-chk-dots{display:flex;gap:5px;}
+.lgi-chk-dots span{width:7px;height:7px;border-radius:50%;background:var(--g500);display:inline-block;animation:lgi-chk-dot 1.3s ease-in-out infinite;}
+.lgi-chk-dots span:nth-child(2){animation-delay:.22s;}
+.lgi-chk-dots span:nth-child(3){animation-delay:.44s;}
+.lgi-foot{
+  text-align:center;margin-top:24px;
+  font-size:11px;color:rgba(255,255,255,.18);
+  font-family:'IBM Plex Mono',monospace;letter-spacing:.4px;
+}
+.lgi-divider{
+  display:flex;align-items:center;gap:12px;margin:28px 0 24px;
+}
+.lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
+.lgi-divider span{font-size:11px;color:rgba(255,255,255,.2);font-family:'IBM Plex Mono',monospace;letter-spacing:.6px;}
+/* ── PASSWORD RECOVERY FLOW ── */
+.pw-reset-area{display:none;}
+#login-overlay.password-recovery .lgi-form-area{display:none!important;}
+#login-overlay.password-recovery .lgi-checking-msg{display:none!important;}
+#login-overlay.password-recovery .pw-reset-area{display:block;}
+.pw-reset-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:-.2px;}
+.pw-reset-sub{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:18px;}
+.pw-reset-email{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tk-ok-bright);margin-bottom:14px;word-break:break-all;}
+.pw-reset-status{display:none;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;font-family:var(--tk-font-body);line-height:1.5;}
+.pw-reset-status.err{display:block;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#fc8181;}
+.pw-reset-status.ok{display:block;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-border);color:var(--tk-ok-bright);}
+.lgi-err.ok{display:block;background:var(--tk-ok-dim);border-color:var(--tk-ok-border);color:var(--tk-ok-bright);}
+.pw-reset-note{font-size:11px;color:rgba(255,255,255,.32);line-height:1.6;margin-top:12px;text-align:center;}
+
+
+/* ── SECTION 3: Sense splash CSS ── */
+#sense-splash{
+  position:fixed;inset:0;z-index:10000;
+  background:linear-gradient(160deg,#1a4a3a 0%,#0d3328 55%,#081e18 100%);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;
+}
+/* Orb */
+.spl-orb{position:relative;width:104px;height:104px;display:flex;align-items:center;justify-content:center;margin-bottom:28px;}
+.spl-glow{position:absolute;inset:-10px;border-radius:50%;pointer-events:none;animation:spl-glow 2s ease-in-out infinite;}
+@keyframes spl-glow{0%,100%{box-shadow:0 0 20px var(--tk-ok-border);}50%{box-shadow:0 0 44px var(--tk-ok-border),0 0 80px var(--tk-ok-dim-2);}}
+#spl-star{animation:spl-star-in .55s cubic-bezier(.34,1.56,.64,1) both,spl-star-spin 9s linear infinite;transform-origin:center;filter:drop-shadow(0 0 10px var(--tk-ok-bright));}
+@keyframes spl-star-in{from{opacity:0;transform:scale(.15) rotate(-30deg);}to{opacity:1;transform:scale(1) rotate(0deg);}}
+@keyframes spl-star-spin{to{transform:rotate(360deg);}}
+/* Brand */
+.spl-brand{text-align:center;margin-bottom:24px;opacity:0;animation:spl-fadein .38s ease .38s both;}
+.spl-wordmark{font-family:var(--tk-font-body);font-size:22px;font-weight:700;color:#fff;letter-spacing:-.3px;display:flex;align-items:center;justify-content:center;}
+.spl-sub{font-size:11px;color:rgba(255,255,255,.3);margin-top:5px;font-family:var(--tk-font-body);letter-spacing:.2px;}
+/* Ticker */
+.spl-ticker-wrap{height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:40px;}
+#spl-ticker{font-size:12px;color:var(--tk-ok-bright);font-family:var(--tk-font-body);font-weight:500;transition:opacity .2s ease;opacity:0;animation:spl-fadein .3s ease .65s both;}
+/* Progress bar */
+.spl-bar-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--tk-ok-dim);}
+#spl-bar{height:100%;background:linear-gradient(90deg,var(--tk-ok-border),var(--g500));width:0;border-radius:1px;}
+/* shared */
+@keyframes spl-fadein{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:translateY(0);}}
+</style>
+<style id="nav-module-css">
+/* ============================================================
+   FRESHKET SENSE — NAV GATING STYLES
+   src/styles_nav.css · Phase 0E (verbatim copy, !important preserved)
+   ============================================================ */
+
+/* ══════════════════════════════════════════════════════
+   SALES MODE — CSS gating (added Phase 3 Sales build)
+   ══════════════════════════════════════════════════════ */
+
+/* Default: Sales-only nav hidden */
+.bnav .ni.sales-only     { display: none !important; }
+.bnav .ni.sales-tl-only  { display: none !important; }
+
+/* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
+body.sales-mode .bnav .ni.sales-only     { display: flex !important; }
+body.sales-mode .bnav .ni.kam-only       { display: none !important; }
+body.sales-mode .bnav .ni.tl-only        { display: none !important; }
+body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
+
+/* Sales TL mode: show Team tab in addition */
+body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
+
+/* Sales v6: hide non-Sales nav buttons including nav-overview */
+body.sales-mode .bnav #nav-overview     { display: none !important; }
+body.sales-mode .bnav #nav-restaurant   { display: none !important; }
+body.sales-mode .bnav #nav-portview     { display: none !important; }
+body.sales-mode .bnav #nav-teamview     { display: none !important; }
+
+/* Skills + Echo tab: sales only — hidden in KAM mode */
+.bnav .ni.sales-any-btn                    { display: none !important; }
+body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
+/* v498: AD also gets Skills nav */
+body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* KAM TL (tl role, kam-mode) also gets Skills nav */
+body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
+/* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
+body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { display: none !important; }
+/* Echo for Sales — show + center position */
+body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
+body.sales-mode .bnav #nav-sales-portview  { order: 1; }
+body.sales-mode .bnav #nav-sales-pipeline  { order: 2; }
+body.sales-mode .bnav #nav-sales-commission{ order: 4; }
+body.sales-mode .bnav #nav-skills          { order: 5; }
+body.sales-mode .bnav #nav-sales-teamview  { order: 6; }
+
+/* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
+body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
+body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
+/* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
+body.sales-mode .bnav #nav-opportunities { display: none !important; }
+
+/* Sales uses same dark theme as KAM */
+/* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
+body.sales-mode { background: #FFFFFF; }
+body.sales-mode #scr-sales-portview,
+body.sales-mode #scr-sales-pipeline,
+body.sales-mode #scr-sales-commission,
+body.sales-mode #scr-sales-teamview { background: #FFFFFF; }
+
+/* Sales-mode: hide KAM-specific content, show Sales-specific content */
+body.sales-mode .kam-content-only  { display: none !important; }
+.sales-content-only                { display: none !important; }
+body.sales-mode .sales-content-only { display: block !important; }
+
+/* ── Sales v6: hide KAM screens + override kam-mode nav ── */
+body.sales-mode #scr-portview,
+body.sales-mode #scr-teamview,
+body.sales-mode #scr-opportunities { display: none !important; }
+
+/* Sales user gets both .sales-mode AND .kam-mode
+   Need higher specificity to override dark glass pill */
+body.sales-mode.kam-mode .bnav {
+  background: rgba(255,255,255,.72) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255,255,255,.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
+  border-radius: 36px !important; /* v573: match floating pill radius */
+}
+
+/* Nav icons: inactive = dark muted, active = rausch */
+body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
+body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
+body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
+body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
+
+/* Sales portview screen — same layout as KAM portview */
+#scr-sales-portview { padding-bottom: var(--chrome-bottom); }
+#scr-sales-pipeline { padding-bottom: var(--chrome-bottom); }
+#scr-sales-commission { padding-bottom: var(--chrome-bottom); }
+#scr-sales-teamview { padding-bottom: var(--chrome-bottom); }
+
+/* ── Sales-mode: hide KAM-specific floating/fixed elements ── */
+/* aifab: KAM AI chat FAB — dark green, must not appear on white Sales canvas */
+body.sales-mode .aifab,
+body.sales-mode #aifab { display: none !important; }
+
+/* data-load-pill: KAM data loading indicator — dark pill, wrong on Sales white bg */
+body.sales-mode #data-load-pill { display: none !important; }
+
+/* swipe-pill: restaurant/KAM mode swipe indicator */
+body.sales-mode #swipe-pill { display: none !important; }
+
+/* KAM AI panel and overlay — should not open in Sales mode */
+body.sales-mode .aipanel { display: none !important; }
+body.sales-mode .overlay { pointer-events: none; opacity: 0 !important; }
+
+/* pv-comm-sheet: KAM cohort detail sheet — wrong in Sales */
+body.sales-mode .pv-comm-sheet-overlay,
+body.sales-mode .pv-comm-sheet { display: none !important; }
+
+/* v213 drill coach tooltip — KAM only */
+body.sales-mode #v213-drill-coach { display: none !important; }
+
+/* ncs-sheet: NRR cohort sheet — KAM only */
+body.sales-mode #ncs-overlay,
+body.sales-mode #ncs-sheet { display: none !important; }
+
+/* CDS overlay — KAM only */
+body.sales-mode .cds-overlay,
+body.sales-mode .cds-sheet { display: none !important; }
+
+/* pb-footer: plan builder footer — KAM only */
+body.sales-mode .pb-footer { display: none !important; }
+
+/* Topbar: white background in sales-mode — exclude Echo fullsheet */
+body.sales-mode .topbar:not(#ci-fullsheet *) {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #EBEBEB !important;
+}
+/* v552 CSS Contract: Echo topbar dark/light = inline style + Echo's own transition
+   (ถอด !important override — มันฆ่า fade .7s ของ Echo) */
+body.sales-mode .topbar .logo { color: #222222 !important; }
+body.sales-mode .topbar .iq-badge { color: #FF385C !important; border-color: rgba(255,56,92,.35) !important; background: rgba(255,56,92,.07) !important; animation: iq-pulse-sales 3.5s ease-in-out infinite !important; }
+body.sales-mode .topbar .iq-icon { fill: #FF385C !important; }
+@keyframes iq-pulse-sales {
+  0%,100%{box-shadow:0 0 6px rgba(255,56,92,.2),inset 0 0 4px rgba(255,56,92,.06)}
+  50%{box-shadow:0 0 14px rgba(255,56,92,.4),inset 0 0 8px rgba(255,56,92,.12)}
+}
+body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
+body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
+
+/* Save tab + rest-only: hide all in sales-mode */
+body.sales-mode .bnav .ni.rest-only { display: none !important; }
+body.sales-mode .bnav .ni[onclick*="Save"],
+body.sales-mode .bnav .ni[onclick*="save"],
+body.sales-mode .bnav #nav-save-btn { display: none !important; }
+
+/* Sales nav — floating frosted white pill (v573)
+   ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
+   position:fixed + transform = nav เลื่อนตาม scroll) · centering ด้วย left/right+margin */
+body.sales-mode .bnav {
+  left: 16px !important;
+  right: 16px !important;
+  transform: none !important;
+  width: auto !important;
+  max-width: 392px !important;
+  margin: 0 auto !important;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  border-radius: 36px !important;
+  padding-bottom: 8px !important;
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0,0,0,.07) !important;
+  /* v575: layered shadow — ลอยชัด (ambient ใหญ่ + contact เล็ก + top highlight) */
+  box-shadow: 0 18px 40px rgba(0,0,0,.16), 0 6px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.85) !important;
+}
+
+
 </style>
 </head>
 <body>
