@@ -502,16 +502,20 @@ body:not(.echo-active) { background:unset; }
     setTimeout(() => el.remove(), 400);
     clearInterval(_timerRef);
     clearInterval(_waveRef);
-    _restoreBodyScroll(); // v598: use centralised restore
-    // v600: flush any refreshAll that was queued while Echo sheet was blocking body
+    _restoreBodyScroll();
+    // v603: flush queued renders after Echo closes
     setTimeout(() => {
       try {
+        // ถ้า shimmer ค้างอยู่ระหว่าง Echo เปิด → deactivate ก่อน render
+        if (window._pwaShimmerActive && typeof window._deactivatePortviewShimmer === 'function') {
+          window._deactivatePortviewShimmer();
+        }
         if (window._pendingRefreshAll && typeof refreshAll === 'function') {
           window._pendingRefreshAll = false;
           refreshAll();
         }
       } catch(_) {}
-    }, 450); // หลัง sheet remove (400ms) + buffer เล็กน้อย
+    }, 450);
   }
 
   function _minimize() {

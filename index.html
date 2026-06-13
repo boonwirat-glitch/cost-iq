@@ -1,4 +1,4 @@
-<!-- Freshket Sense 602: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 603: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -5655,7 +5655,7 @@ body.sales-mode .bnav {
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '602',
+      version: '603',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -42042,16 +42042,20 @@ body:not(.echo-active) { background:unset; }
     setTimeout(() => el.remove(), 400);
     clearInterval(_timerRef);
     clearInterval(_waveRef);
-    _restoreBodyScroll(); // v598: use centralised restore
-    // v600: flush any refreshAll that was queued while Echo sheet was blocking body
+    _restoreBodyScroll();
+    // v603: flush queued renders after Echo closes
     setTimeout(() => {
       try {
+        // ถ้า shimmer ค้างอยู่ระหว่าง Echo เปิด → deactivate ก่อน render
+        if (window._pwaShimmerActive && typeof window._deactivatePortviewShimmer === 'function') {
+          window._deactivatePortviewShimmer();
+        }
         if (window._pendingRefreshAll && typeof refreshAll === 'function') {
           window._pendingRefreshAll = false;
           refreshAll();
         }
       } catch(_) {}
-    }, 450); // หลัง sheet remove (400ms) + buffer เล็กน้อย
+    }, 450);
   }
 
   function _minimize() {
