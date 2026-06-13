@@ -485,14 +485,9 @@ body:not(.echo-active) { background:unset; }
     }
   }
 
-  function _unmount() {
-    const el = document.getElementById('ci-fullsheet');
-    if (!el) return;
-    el.classList.remove('ci-open');
-    setTimeout(() => el.remove(), 400);
-    clearInterval(_timerRef);
-    clearInterval(_waveRef);
-    // v575: restore body scroll position (paired with lock in _mount)
+  // v598: centralised body-scroll restore — กัน position:fixed ค้างเมื่อ
+  // sheet ถูก hide โดยไม่ผ่าน _unmount (minimize → tab switch → bfcache resume)
+  function _restoreBodyScroll() {
     try {
       document.body.style.position = '';
       document.body.style.top = '';
@@ -507,6 +502,16 @@ body:not(.echo-active) { background:unset; }
     } catch(_) {}
   }
 
+  function _unmount() {
+    const el = document.getElementById('ci-fullsheet');
+    if (!el) return;
+    el.classList.remove('ci-open');
+    setTimeout(() => el.remove(), 400);
+    clearInterval(_timerRef);
+    clearInterval(_waveRef);
+    _restoreBodyScroll(); // v598: use centralised restore
+  }
+
   function _minimize() {
     if (_phase !== 'recording') return;
     const sheet = document.getElementById('ci-fullsheet');
@@ -514,11 +519,29 @@ body:not(.echo-active) { background:unset; }
     const pill = document.getElementById('echo-float-pill');
     if (pill) { pill.classList.add('visible'); _startFloatTimer(); }
     document.body.classList.add('echo-active');
+    // v598: restore body scroll when minimized — sheet is hidden so app nav must work
+    // body scroll re-locked when user expands back (echoExpand → _reapplyBodyLock)
+    _restoreBodyScroll();
     // Update topbar: left button shows minimize hint
     const _tbLeft = document.getElementById('ci-topbar-left-label');
     const _tbIcon = document.getElementById('ci-topbar-left-icon');
     if (_tbLeft) _tbLeft.textContent = 'ย่อ';
     if (_tbIcon) _tbIcon.style.display = 'none';
+  }
+
+  // v598: re-apply body scroll lock when expanding sheet back from minimized state
+  function _reapplyBodyLock() {
+    try {
+      window._ciScrollLockY = window.scrollY || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = (-window._ciScrollLockY) + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.maxWidth = '440px';
+      document.body.style.marginLeft = 'auto';
+      document.body.style.marginRight = 'auto';
+    } catch(_) {}
   }
 
   function _startFloatTimer() {
@@ -660,6 +683,7 @@ body:not(.echo-active) { background:unset; }
     <p class="proc-step" id="ci-pstep">Transcribing...</p>
     <p class="proc-sub" id="ci-psub">Whisper · ภาษาไทย</p>
     <div class="proc-line"><div class="proc-fill" id="ci-pfill"></div></div>
+    <p style="font-size:11px;color:var(--tx3,#AEAEB2);margin-top:10px;font-family:'Noto Sans Thai',sans-serif" id="ci-pelapsed"></p>
   </div>
 </div>
 
@@ -936,6 +960,9 @@ body:not(.echo-active) { background:unset; }
   }
 
   // ── Processing steps ───────────────────────────────────────────────────────
+  let _procStartTime = 0;
+  let _procElapsedRef = null;
+
   function _setStep(step, sub, pct) {
     const ps = document.getElementById('ci-pstep');
     const pb = document.getElementById('ci-psub');
@@ -943,6 +970,25 @@ body:not(.echo-active) { background:unset; }
     if (ps) ps.textContent = step;
     if (pb) pb.textContent = sub;
     if (pf) pf.style.width = pct + '%';
+  }
+
+  function _startProcTimer() {
+    _procStartTime = Date.now();
+    clearInterval(_procElapsedRef);
+    _procElapsedRef = setInterval(() => {
+      const el = document.getElementById('ci-pelapsed');
+      if (!el) return;
+      const secs = Math.floor((Date.now() - _procStartTime) / 1000);
+      const m = Math.floor(secs / 60), s = secs % 60;
+      el.textContent = `กำลังประมวลผล ${m > 0 ? m + ' นาที ' : ''}${s} วินาที...`;
+    }, 1000);
+  }
+
+  function _stopProcTimer() {
+    clearInterval(_procElapsedRef);
+    _procElapsedRef = null;
+    const el = document.getElementById('ci-pelapsed');
+    if (el) el.textContent = '';
   }
 
   // ── Audio → Gemini analyze (single call) ──────────────────────────────────
@@ -963,6 +1009,7 @@ body:not(.echo-active) { background:unset; }
 
   // v555: shared pipeline — เรียกจาก _onStop ปกติ และจาก recovery flow
   async function _processBlob(blob) {
+    _startProcTimer(); // v598: start elapsed timer
     try {
       // v574: audio integrity check — เทียบขนาด blob กับเวลาที่อัด
       // 24kbps opus ≈ 3,000 bytes/วินาที — ถ้า blob เล็กกว่าที่ควร 30%+
@@ -993,6 +1040,7 @@ body:not(.echo-active) { background:unset; }
       _idbClear(); // วิเคราะห์ + บันทึกสำเร็จ — buffer ไม่จำเป็นแล้ว
 
       _setStep('เสร็จแล้ว', '', 100);
+      _stopProcTimer(); // v598
       setTimeout(() => {
         _lastResult = { skillData: result.skillData, intelData: result.intelData,
                         transcriptSummary: result.transcriptSummary, toneSignals: result.toneSignals };
@@ -1003,6 +1051,7 @@ body:not(.echo-active) { background:unset; }
       }, 400);
 
     } catch (err) {
+      _stopProcTimer(); // v598
       _phase = 'idle';
       _unmount();
       // v571b: telemetry — ทุก analyze fail เข้า app_errors ให้ตรวจย้อนหลังได้
@@ -1171,8 +1220,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (attempt > 1) {
         const delay = attempt === 2 ? 3000 : 7000; // 3s then 7s
-        _setStep(`กำลังลองใหม่... (${attempt}/3)`, 'Gemini · กำลังรอสักครู่', 35);
+        // v598: ชัดเจนว่า retry ครั้งไหน + progress bar เดินต่อ
+        _setStep(`ลองใหม่ครั้งที่ ${attempt - 1}/2...`, 'Gemini · ระบบ AI คิวเต็ม — กำลังรอสักครู่', 35 + (attempt - 1) * 10);
         await new Promise(r => setTimeout(r, delay));
+        _setStep(`กำลังวิเคราะห์... (attempt ${attempt}/3)`, 'Gemini · ฟัง audio + skill rubric', 35 + (attempt - 1) * 10);
       }
       const _ctrl = new AbortController();
       const _tmo  = setTimeout(() => _ctrl.abort(), FETCH_TIMEOUT_MS);
@@ -1183,7 +1234,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
           body: _payload,
           signal: _ctrl.signal,
         });
-        if (res.ok) break; // success
+        if (res.ok) {
+          // v598: reset step text on success — ไม่ให้ "attempt 3/3" ค้างขณะ parse
+          _setStep('กำลังประมวลผลผล...', 'Gemini · แปลงผล', 75);
+          break;
+        }
         const errText = await res.text().catch(() => String(res.status));
         lastErr = new Error(`Gemini ${res.status}: ${errText}`);
         if (res.status !== 503 && res.status !== 429) throw lastErr; // don't retry on other errors
@@ -2516,10 +2571,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   function _renderSessionDetailContent(s) {
-    // v568 redesign (user-approved mockup): chips verdict header + collapsible
-    // summary + segmented tabs (ภาพรวม/ทักษะ/ลูกค้า) + collapsed-by-default
-    // coaching-note footer. Readable type scale: body 14px/1.7+, ink #1C1C1E,
-    // secondary #48484A; #8E8E93 reserved for labels only; mono only for codes.
+    // v598: shared renderer — map ci_sessions row → same 4 panel functions as live result
+    // เพื่อให้ design เดียวกันทั้ง live result และ session detail จาก history
     const body   = document.getElementById('sd-body-inner');
     const footer = document.getElementById('sd-review-footer');
     if (!body) return;
@@ -2533,7 +2586,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       ? new Date(s.tl_reviewed_at).toLocaleDateString('th-TH', { day:'numeric', month:'short' })
       : null;
 
-    // ── Verdict chip (replaces raw NEEDS_WORK label)
+    // ── Verdict + meta chips
     const overall = s.skill_scores?.overall;
     const vMap = { needs_work:['ต้องปรับปรุง','bad'], developing:['กำลังพัฒนา','dev'], strong:['ทำได้ดี','good'] };
     const v = vMap[overall] || null;
@@ -2544,7 +2597,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const revChip = reviewed
       ? `<span class="sd2-chip rev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>รีวิวแล้ว ${reviewedDate}</span>` : '';
 
-    // ── Collapsible summary (session_summary) — expanded by default, toggleable
+    // ── Collapsible session summary
     const whyTxt = s.skill_scores?.session_summary || '';
     const whyHtml = whyTxt ? `
 <div class="sd2-whywrap">
@@ -2554,135 +2607,26 @@ OCPB (customer intel จากเสียงเท่านั้น):
   </div>
 </div>` : '';
 
-    // ── Tab 1: ภาพรวม — tone + transcript summary + key moments
-    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ' };
-    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง' };
-    let toneHtml = '';
-    let momentsHtml = '';
-    if (s.tone_signals) {
-      const t = s.tone_signals;
-      const cConf = t.rep_confidence==='high'?'#34C759':t.rep_confidence==='medium'?'#FF9500':'#FF3B30';
-      const cEng  = t.customer_engagement==='increasing'?'#34C759':t.customer_engagement==='stable'?'#FF9500':'#FF3B30';
-      toneHtml = `
-<div class="sd2-lbl">Tone &amp; Energy</div>
-<div class="sd2-tone">
-  <div class="sd2-tcard"><div class="k">Sales Confidence</div><div class="v" style="color:${cConf}">${thaiConf[t.rep_confidence]||t.rep_confidence||'—'}</div><div class="n">${t.rep_confidence_note||''}</div></div>
-  <div class="sd2-tcard"><div class="k">Customer Engagement</div><div class="v" style="color:${cEng}">${thaiEng[t.customer_engagement]||t.customer_engagement||'—'}</div><div class="n">${t.customer_engagement_note||''}</div></div>
-</div>`;
-      const moments = (t.key_moments||[]).map(m => _kmText(m)).filter(Boolean).map(x => `<div class="sd2-ipoint">${x}</div>`).join('');
-      if (moments) momentsHtml = `<div class="sd2-lbl">Key Moments</div>${moments}`;
-    }
-    const summaryHtml = s.transcript_summary
-      ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${s.transcript_summary}</div>` : '';
-    const pane1 = `${toneHtml}${summaryHtml}${momentsHtml}` ||
-      `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มีข้อมูลภาพรวม</div>`;
+    // ── Map ci_sessions fields → shared panel function arguments
+    // skill_scores: { skills, overall, pipc_stage, session_summary, no_speech }
+    // apply tl_override per skill so shared renderer shows final score
+    const skillData = Object.assign({}, s.skill_scores || {}, {
+      skills: (s.skill_scores?.skills || []).map(sk => Object.assign({}, sk, {
+        score: sk.tl_override || sk.score
+      }))
+    });
+    // customer_intel: { ocpb_facts, ocpb_status, next_actions } + legacy fields
+    const intelData = Object.assign({}, s.customer_intel || {}, {
+      next_actions: s.next_actions || s.customer_intel?.next_actions || []
+    });
+    const transcriptSummary = s.transcript_summary || null;
+    const toneSignals       = s.tone_signals || null;
 
-    // ── Tab 2: ทักษะ
-    const skills = s.skill_scores?.skills || [];
-    const stMap = { pass:['ทำได้ดี','ok','#34C759'], developing:['กำลังพัฒนา','dev','#FF9500'], not_applicable:['N/A','no','#D1D1D6'] };
-    const skillRows = skills.map(sk => {
-      const sc  = sk.tl_override || sk.score;
-      const st  = stMap[sc] || ['ไม่พบ','no','#D1D1D6'];
-      const ev  = sk.evidence && sk.evidence!=='-' ? `<div class="sd2-sev">${sk.evidence}</div>` : '';
-      const note= sk.coaching_note && sk.coaching_note!=='-' ? `<div class="sd2-snote">${sk.coaching_note}</div>` : '';
-      return `<div class="sd2-srow">
-  <span class="sd2-sdot" style="background:${st[2]}"></span>
-  <div style="flex:1;min-width:0">
-    <div class="sd2-scode">${sk.code||sk.skill_code||''}</div>
-    <div class="sd2-sname">${sk.name||''}</div>
-    ${ev}${note}
-  </div>
-  <span class="sd2-sstate ${st[1]}">${st[0]}</span>
-</div>`;
-    }).join('');
-    const pane2 = skillRows ||
-      `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มีการประเมินทักษะใน session นี้</div>`;
-
-    // ── Tab 3: ลูกค้า — intel + next steps
-    const _ciTxt = x => (typeof x === 'string') ? x : (x && (x.point || x.signal || x.text || x.action)) || '';
-    const ci = s.customer_intel || {};
-    const nexts = (s.next_actions||[]).map((a,i) =>
-      `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><span>${_ciTxt(a)||a}</span></div>`).join('');
-
-    // v582: new shape — ocpb_facts (fact capture พร้อม quote+ts+tag)
-    const _hasFacts = Array.isArray(ci.ocpb_facts) && ci.ocpb_facts.length > 0;
-    const _hasStatus = ci.ocpb_status && typeof ci.ocpb_status === 'object';
-    let intelHtml = '';
-    if (_hasFacts || _hasStatus) {
-      const _DIMS = [['O','Operation ของร้าน'],['C','ซัพเดิม · ราคา · สินค้า'],['P','Payment · Billing'],['B','Business Plan']];
-      const _TAGS = {
-        pain_high:   ['pain · high','rgba(255,59,48,.10)','#D70015'],
-        pain_medium: ['pain · med','rgba(255,149,0,.12)','#C93400'],
-        opportunity: ['โอกาส','rgba(52,199,89,.12)','#1A8A3A'],
-      };
-      const _ST = {
-        answered:        ['ได้ข้อมูล','rgba(52,199,89,.12)','#1A8A3A'],
-        asked_no_answer: ['ถามแล้ว ไม่ได้คำตอบ','rgba(255,149,0,.12)','#C93400'],
-        not_asked:       ['ยังไม่แตะ','rgba(0,0,0,.05)','#AEAEB2'],
-      };
-      const _facts = Array.isArray(ci.ocpb_facts) ? ci.ocpb_facts : [];
-      const _stat  = ci.ocpb_status || {};
-      intelHtml = `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>` + _DIMS.map(([dim,label]) => {
-        const fs = _facts.filter(f => f && f.dim === dim);
-        const stKey = _stat[dim] || (fs.length ? 'answered' : 'not_asked');
-        const st = _ST[stKey] || _ST.not_asked;
-        if (!fs.length && stKey === 'not_asked') {
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.04)">
-            <span style="font-size:12px;color:#AEAEB2">${dim} — ${label}</span>
-            <span style="background:${st[1]};color:${st[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap">${st[0]}</span>
-          </div>`;
-        }
-        const rows = fs.map(f => {
-          const tg = _TAGS[f.tag];
-          const tagChip = tg ? `<span style="background:${tg[1]};color:${tg[2]};font-size:10px;font-weight:500;padding:1px 7px;border-radius:6px;margin-right:6px;white-space:nowrap">${tg[0]}</span>` : '';
-          const quote = (f.quote && String(f.quote).trim())
-            ? `<div style="font-size:11px;color:#AEAEB2;line-height:1.55;margin-top:2px">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${f.ts}</span>` : ''}</div>`
-            : '';
-          return `<div style="padding:5px 0 5px 14px">
-            <div style="font-size:13px;color:#1C1C1E;line-height:1.5">${tagChip}${f.summary || '-'}</div>${quote}
-          </div>`;
-        }).join('');
-        const emptyNote = fs.length ? '' : `<div style="font-size:11px;color:#AEAEB2;padding:4px 0 4px 14px">rep ถามแล้ว แต่ยังไม่ได้คำตอบ</div>`;
-        return `<div style="padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.04)">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <span style="font-size:12px;font-weight:500;color:#1C1C1E">${dim} — ${label}</span>
-            <span style="background:${st[1]};color:${st[2]};font-size:10px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0">${st[0]}</span>
-          </div>
-          ${rows}${emptyNote}
-        </div>`;
-      }).join('');
-    } else {
-      // Legacy fallback — sessions ที่บันทึกก่อน v582 (buyer_type/wallet/pain_points/upsell_signals)
-      const buyerLine = ci.buyer_type
-        ? `<div class="sd2-iline"><span class="sd2-ik">Buyer</span><div class="sd2-iv">${ci.buyer_type}${ci.buyer_evidence?` <span class="sub">· ${ci.buyer_evidence}</span>`:''}</div></div>` : '';
-      const walletLine = ci.wallet_estimate
-        ? `<div class="sd2-iline"><span class="sd2-ik">Wallet</span><div class="sd2-iv">${ci.wallet_estimate}${ci.wallet_logic?` <span class="sub">· ${ci.wallet_logic}</span>`:''}</div></div>` : '';
-      const pains = (ci.pain_points||[]).map(p => `<div class="sd2-ipoint">${_ciTxt(p)}</div>`).filter(Boolean).join('');
-      const ups   = (ci.upsell_signals||[]).map(u => `<div class="sd2-ipoint">${_ciTxt(u)}</div>`).filter(Boolean).join('');
-      intelHtml = [
-        (buyerLine || walletLine) ? `<div class="sd2-lbl">ข้อมูลลูกค้า</div>${buyerLine}${walletLine}` : '',
-        pains ? `<div class="sd2-lbl">Pain Points</div>${pains}` : '',
-        ups ? `<div class="sd2-lbl">Upsell Signals</div>${ups}` : ''
-      ].join('');
-    }
-    const pane3 = [
-      intelHtml,
-      nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : ''
-    ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`;
-
-    // ── v575 Tab 4: Transcript — summary + tone + key moments (เก็บใน ci_sessions อยู่แล้ว)
-    const ts = s.tone_signals || {};
-    const tsConf = ts.rep_confidence
-      ? `<div class="sd2-iline"><span class="sd2-ik">Confidence</span><div class="sd2-iv">${ts.rep_confidence}${ts.rep_confidence_note ? ` <span class="sub">${ts.rep_confidence_note}</span>` : ''}</div></div>` : '';
-    const tsEng = ts.customer_engagement
-      ? `<div class="sd2-iline"><span class="sd2-ik">Engagement</span><div class="sd2-iv">${ts.customer_engagement}${ts.customer_engagement_note ? ` <span class="sub">${ts.customer_engagement_note}</span>` : ''}</div></div>` : '';
-    const tsMoments = (ts.key_moments || []).map(m => _kmText(m)).filter(Boolean).map(x =>
-      `<div class="sd2-ipoint">${x}</div>`).join('');
-    const pane4 = [
-      s.transcript_summary ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-transcript">${s.transcript_summary}</div>` : '',
-      (tsConf || tsEng) ? `<div class="sd2-lbl">Tone</div>${tsConf}${tsEng}` : '',
-      tsMoments ? `<div class="sd2-lbl">Key Moments</div>${tsMoments}` : ''
-    ].join('') || `<div style="text-align:center;padding:32px 0;font-size:13px;color:#8E8E93">ไม่มี transcript สำหรับ session นี้</div>`;
+    // ── Build 4 panes using shared renderers (identical to live result)
+    const pane1 = _overviewPanel(transcriptSummary, toneSignals);
+    const pane2 = _skillsPanel(skillData);
+    const pane3 = _customerPanel(intelData);
+    const pane4 = _transcriptPanel(toneSignals);
 
     body.innerHTML = `
 <div class="sd2-name">${repName}</div>
@@ -2700,17 +2644,17 @@ ${whyHtml}
 <div class="sd2-pane" id="sd2p3">${pane3}</div>
 <div class="sd2-pane" id="sd2p4">${pane4}</div>`;
 
-    // ── Footer — collapsed by default; expands on intent (approved UX state)
+    // ── Footer — TL coaching note editor / read-only note for rep
     const _isTLViewer = (typeof _canDebrief === 'function') ? _canDebrief() : false;
     if (footer) footer.style.padding = '0 0 max(16px, env(safe-area-inset-bottom, 0px))';
     if (footer && !_isTLViewer) {
       const _hasNote = !!(s.tl_note && s.tl_note.trim());
       footer.style.display = _hasNote ? 'block' : 'none';
       if (_hasNote) {
-        const pv = s.tl_note.length > 42 ? s.tl_note.slice(0, 42) + '…' : s.tl_note;
+        const pv = s.tl_note.length > 42 ? s.tl_note.slice(0, 42) + '\u2026' : s.tl_note;
         footer.innerHTML = `
 <div class="sd2-notebar" id="sd2-notebar" onclick="CI._sdToggleNote()">
-  <span class="t">TL Note <span class="pv">· ${pv}</span></span>
+  <span class="t">TL Note <span class="pv">\u00b7 ${pv}</span></span>
   <span class="ch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></span>
 </div>
 <div class="sd2-note-editor" id="sd2-note-editor">
@@ -2721,9 +2665,9 @@ ${whyHtml}
     if (footer && _isTLViewer) {
       footer.style.display = 'block';
       const existingNote = s.tl_note || '';
-      const pv = existingNote ? (existingNote.length > 36 ? existingNote.slice(0, 36) + '…' : existingNote) : '';
+      const pv = existingNote ? (existingNote.length > 36 ? existingNote.slice(0, 36) + '\u2026' : existingNote) : '';
       const barLabel = reviewed
-        ? `รีวิวแล้ว ${reviewedDate}${pv ? ` <span class="pv">· ${pv}</span>` : ''}`
+        ? `รีวิวแล้ว ${reviewedDate}${pv ? ` <span class="pv">\u00b7 ${pv}</span>` : ''}`
         : 'เขียน Coaching Note + รีวิว';
       footer.innerHTML = `
 <div class="sd2-notebar" id="sd2-notebar" onclick="CI._sdToggleNote()">
@@ -3521,6 +3465,15 @@ ${whyHtml}
   (function _initVisibilityGuard() {
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState !== 'visible') return;
+      // v598: bfcache guard — ถ้า page restore กลับมาแล้ว sheet ไม่อยู่ (minimized หรือ killed)
+      // แต่ body ยัง position:fixed ค้างอยู่ ให้ restore ทันที
+      if (document.body.style.position === 'fixed') {
+        const sheet = document.getElementById('ci-fullsheet');
+        if (!sheet || sheet.style.display === 'none') {
+          // sheet ไม่ visible — body lock ต้องถูก release
+          _restoreBodyScroll();
+        }
+      }
       if (_phase !== 'recording') return;
       // Timer display self-corrects (Date.now() diff), just force a UI tick
       const el = document.getElementById('ci-tval');
@@ -3903,7 +3856,7 @@ ${whyHtml}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; } };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll };
 
 })();
 
@@ -3926,7 +3879,14 @@ function echoExpand() {
   const pill = document.getElementById('echo-float-pill');
   if (pill) pill.classList.remove('visible');
   const sheet = document.getElementById('ci-fullsheet');
-  if (sheet) { sheet.style.display = ''; sheet.classList.add('ci-open'); }
+  if (sheet) {
+    sheet.style.display = '';
+    sheet.classList.add('ci-open');
+    // v598: re-lock body scroll now that sheet is back on screen
+    if (typeof CI !== 'undefined' && typeof CI._reapplyBodyLock === 'function') {
+      CI._reapplyBodyLock();
+    }
+  }
   else { CI.open(null); }
 }
 

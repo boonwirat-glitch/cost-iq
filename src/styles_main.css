@@ -2361,7 +2361,8 @@ body.kam-sense-active.kam-mode:not(.sdt-light) .bnav #nav-opportunities.on svg{c
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities svg{color:rgba(0,0,0,.38)!important}
 body.sdt-light.kam-sense-active.kam-mode .bnav #nav-opportunities.on svg{color:var(--g500)!important;opacity:1!important}
 /* v490-B4: hide Echo from Save mode 3-col nav (4 items → 3 columns caused overflow) */
-body.kam-sense-active.kam-mode .bnav #nav-echo-kam{display:none!important}
+/* v598: cover both kam-only (#nav-echo-kam) and rest-only (#nav-echo) via .echo-nav-btn class */
+body.kam-sense-active.kam-mode .bnav .echo-nav-btn{display:none!important}
 /* v488: echo-pill shrinks correctly inside flex glass pill */
 body.kam-mode .bnav .echo-pill{flex-shrink:1!important;width:auto!important;min-width:0}
 /* ── Echo nav pill — idle + active states ── */
