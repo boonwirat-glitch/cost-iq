@@ -205,6 +205,114 @@ function _applyPortviewTierVisual(){
 
 // ── v183 Restaurant Sheet Overlay ────────────────────────────────────────────
 
+
+let _pvCollapseObserver=null;
+function _pvSyncChips(){
+  // Sync active/dim classes on compact strip chips without full rebuild
+  const strip=document.getElementById('pv-compact-strip');
+  if(!strip)return;
+  strip.querySelectorAll('.pv-cs-chip').forEach(chip=>{
+    const cls=Array.from(chip.classList).find(c=>['ok','warn','danger'].includes(c));
+    if(!cls)return;
+    const isOn=portviewFilter===cls;
+    const isDim=portviewFilter!=='all'&&!isOn;
+    chip.classList.toggle('pf-on',isOn);
+    chip.classList.toggle('pf-dim',isDim);
+  });
+}
+
+function _pvInitCollapseObserver(){
+  if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
+  var old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
+  var screen=document.getElementById('scr-portview');
+  var collapsible=document.getElementById('pv-collapsible');
+  var strip=document.getElementById('pv-compact-strip');
+  var listEl=document.getElementById('portview-list');
+  if(!screen||!collapsible||!strip||!listEl)return;
+
+  var raf=0;
+  var lastCollapsed=null;
+  var COLLAPSE_AT=42;
+  var EXPAND_AT=8;
+
+  function _scrollTop(){
+    var se=document.scrollingElement||document.documentElement;
+    return Math.max(
+      window.pageYOffset||0,
+      se?se.scrollTop||0:0,
+      document.documentElement?document.documentElement.scrollTop||0:0,
+      document.body?document.body.scrollTop||0:0,
+      screen.scrollTop||0
+    );
+  }
+  function _aiVisible(){
+    var aiOut=document.getElementById('portview-ai-output');
+    return !!(aiOut&&aiOut.style.display!=='none');
+  }
+  function _canExpand(){
+    var msSinceRender=Date.now()-(window._pvLastRenderMs||0);
+    return msSinceRender>350&&!_aiVisible();
+  }
+  function _apply(collapsed){
+    if(lastCollapsed===collapsed)return;
+    lastCollapsed=collapsed;
+    collapsible.className='pv-collapsible '+(collapsed?'collapsed':'expanded');
+    strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
+    window._pvLastCollapseMs=collapsed?Date.now():0;
+    var searchExpand=document.getElementById('pv-sort-search-expand');
+    if(collapsed&&searchExpand){
+      searchExpand.style.display='block';
+      var si=document.getElementById('pv-search-collapsed');
+      if(si&&!si.value)setTimeout(function(){si.focus();},180);
+      var sb=document.getElementById('pv-cs-search-btn');
+      if(sb)sb.classList.add('active');
+    }else if(!collapsed&&searchExpand){
+      var si=document.getElementById('pv-search-collapsed');
+      if(si&&!si.value){
+        searchExpand.style.display='none';
+        var sb=document.getElementById('pv-cs-search-btn');
+        if(sb)sb.classList.remove('active');
+      }
+    }
+  }
+  function _scrollable(){
+    var docH=Math.max(
+      document.body?document.body.scrollHeight:0,
+      document.documentElement?document.documentElement.scrollHeight:0,
+      screen?screen.scrollHeight:0
+    );
+    var winH=window.innerHeight||document.documentElement.clientHeight||600;
+    return (docH-winH)>COLLAPSE_AT;
+  }
+  function _check(){
+    raf=0;
+    if(!screen.classList.contains('on'))return;
+    // v652: never detach listeners — just early-return when content too short.
+    // Fixes: filter few cards → filter back → listeners were gone → no collapse.
+    if(!_scrollable()){_apply(false);return;}
+    var y=_scrollTop();
+    if(y>COLLAPSE_AT){_apply(true);}
+    else if(y<=EXPAND_AT&&_canExpand()){_apply(false);}
+  }
+  function _schedule(){
+    if(raf)return;
+    raf=requestAnimationFrame(_check);
+  }
+
+  window.addEventListener('scroll',_schedule,{passive:true});
+  document.addEventListener('scroll',_schedule,{capture:true,passive:true});
+  screen.addEventListener('scroll',_schedule,{passive:true});
+  window.addEventListener('resize',_schedule,{passive:true});
+  setTimeout(_schedule,180);
+
+  _pvCollapseObserver={disconnect:function(){
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    window.removeEventListener('scroll',_schedule);
+    document.removeEventListener('scroll',_schedule,true);
+    screen.removeEventListener('scroll',_schedule);
+    window.removeEventListener('resize',_schedule);
+  }};
+}
 // ── Sense Dark Theme system (v190) ─────────────────────────────────────────
 const _SDT_KEY='sense_dark_theme';
 const _SDT_THEMES={
