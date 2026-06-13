@@ -1,44 +1,73 @@
 /* ============================================================
    FRESHKET SENSE — DESIGN TOKENS
-   src/styles_tokens.css · v1.0
+   src/styles_tokens.css · v2.0
 
    Single source of truth for all design values.
    Migrate: hardcode → var(--token)  [visual unchanged]
    Retheme: change values here only  [all components update]
 
-   CURRENT: Dark navy + Green (KAM original)
-   TARGET:  Light white + Red (post-retheme)
+   v2.0 changes (Phase 0A):
+   - --tk-font-body: IBM Plex Sans Thai → Noto Sans Thai
+     KAM/AD locked explicitly in styles_main.css
+   - Added --fk-* brand tokens (additive, no existing token touched)
+   - Added --z-* z-index system (additive)
+   - Added --canvas, --surface, --ink-* light-theme tokens (additive)
+   - --tk-accent unchanged (KAM blue — 54 KAM components depend on it)
    ============================================================ */
 
 :root {
 
+  /* ── FRESHKET BRAND (additive — Phase 0A) ───────────────── */
+  --fk-red:          #FF385C;              /* CI accent — all new features */
+  --fk-red-dim:      rgba(255,56,92,.08);  /* tint bg */
+  --fk-red-border:   rgba(255,56,92,.20);  /* border */
+  --fk-red-strong:   rgba(255,56,92,.15);  /* pill/nav active */
+
+  /* ── LIGHT THEME CANVAS (additive — Phase 0A) ───────────── */
+  --canvas:          #FFFFFF;   /* page background */
+  --surface:         #F7F7F7;   /* card / band */
+  --ink-1:           #222222;   /* primary text */
+  --ink-2:           #3F3F3F;   /* body text */
+  --ink-3:           #6A6A6A;   /* muted / label */
+  --hairline:        #EBEBEB;   /* divider */
+
+  /* ── Z-INDEX SYSTEM (additive — Phase 0A) ───────────────── */
+  --z-base:          1;
+  --z-sticky:        100;   /* topbar, bnav */
+  --z-dropdown:      200;   /* menus, tooltips */
+  --z-sheet:         300;   /* bottom sheets */
+  --z-overlay:       400;   /* dim backgrounds */
+  --z-modal:         500;   /* full modals */
+  --z-toast:         600;   /* notifications */
+  --z-splash:        9999;  /* loading screen */
+
   /* ── BACKGROUND ─────────────────────────────────────────── */
-  --tk-bg-base:         #0d1f3c;   /* main screen bg         → #FFFFFF */
-  --tk-bg-nav:          #0d2550;   /* bottom nav bg          → #FFFFFF */
-  --tk-bg-topbar:       #006050;   /* topbar bg              → #FFFFFF */
-  --tk-bg-topbar-2:     #0a1e42;   /* topbar gradient end    → #FFFFFF */
-  --tk-bg-surface:      rgba(255,255,255,.05); /* card surface  → #F7F7F7 */
-  --tk-bg-surface-2:    rgba(255,255,255,.07); /* subtab bg     → #F0F0F0 */
-  --tk-bg-panel:        #0d1f3c;   /* data panel bg          → #FFFFFF */
+  --tk-bg-base:         #0d1f3c;   /* KAM screen bg */
+  --tk-bg-nav:          #0d2550;   /* KAM bottom nav bg */
+  --tk-bg-topbar:       #006050;   /* KAM topbar bg */
+  --tk-bg-topbar-2:     #0a1e42;   /* KAM topbar gradient end */
+  --tk-bg-surface:      rgba(255,255,255,.05); /* KAM card surface */
+  --tk-bg-surface-2:    rgba(255,255,255,.07); /* KAM subtab bg */
+  --tk-bg-panel:        #0d1f3c;   /* KAM data panel bg */
 
-  /* ── ACCENT (brand interactive) ─────────────────────────── */
-  --tk-accent:          #2660c8;            /* nav active, CTA       → #FF385C */
-  --tk-accent-dark:     #1a3a6b;            /* accent pressed/bg     → rgba(255,56,92,.12) */
-  --tk-accent-dim:      rgba(38,96,200,.15); /* accent tint bg       → rgba(255,56,92,.08) */
-  --tk-accent-dim-2:    rgba(38,96,200,.22); /* accent border        → rgba(255,56,92,.20) */
-  --tk-accent-dim-3:    rgba(38,96,200,.35); /* nav pill active bg   → rgba(255,56,92,.15) */
-  --tk-accent-solid:    rgba(38,96,200,.60); /* solid-ish accent bg  → rgba(255,56,92,.60) */
+  /* ── ACCENT (KAM blue — do not change, 54 KAM components) ─ */
+  --tk-accent:          #2660c8;
+  --tk-accent-dark:     #1a3a6b;
+  --tk-accent-dim:      rgba(38,96,200,.15);
+  --tk-accent-dim-2:    rgba(38,96,200,.22);
+  --tk-accent-dim-3:    rgba(38,96,200,.35);
+  --tk-accent-solid:    rgba(38,96,200,.60);
 
-  /* ── OK / POSITIVE SIGNAL (ไม่เปลี่ยน — semantic green) ── */
-  --tk-ok:              #34C759;            /* positive result        KEEP */
-  --tk-ok-bg:           #e8faf2;            /* ok tint bg (light)     → retheme */
-  --tk-ok-text:         #008060;            /* ok text (dark green)   → retheme */
-  --tk-ok-bright:       #4ddc97;            /* bright green on dark   KEEP */
-  --tk-ok-500:          #00d070;            /* green-500 brand        KEEP */
-  --tk-ok-dim:          rgba(0,208,112,.10); /* ok tint bg            KEEP */
-  --tk-ok-dim-2:        rgba(0,208,112,.18); /* ok surface            KEEP */
-  --tk-ok-border:       rgba(0,208,112,.22); /* ok border             KEEP */
-  --tk-ok-glow:         rgba(77,220,151,.12); /* ok glow              KEEP */
+  /* ── OK / POSITIVE SIGNAL ────────────────────────────────── */
+  --tk-ok:              #34C759;
+  --tk-ok-bg:           #e8faf2;
+  --tk-ok-text:         #008060;
+  --tk-ok-bright:       #4ddc97;
+  --tk-ok-500:          #00d070;
+  --tk-ok-dim:          rgba(0,208,112,.10);
+  --tk-ok-dim-2:        rgba(0,208,112,.18);
+  --tk-ok-border:       rgba(0,208,112,.22);
+  --tk-ok-glow:         rgba(77,220,151,.12);
 
   /* ── WARNING / AMBER ─────────────────────────────────────── */
   --tk-warn:            #FF9500;
@@ -48,62 +77,61 @@
   --tk-danger:          #e53e3e;
   --tk-danger-dim:      rgba(229,62,62,.10);
 
-  /* ── TEXT ────────────────────────────────────────────────── */
-  --tk-text-primary:    #FFFFFF;            /* heading, numbers      → #222222 */
-  --tk-text-secondary:  rgba(255,255,255,.70); /* body text          → #3F3F3F */
-  --tk-text-muted:      rgba(255,255,255,.45); /* labels, meta       → #6A6A6A */
-  --tk-text-faint:      rgba(255,255,255,.25); /* placeholder        → #BDBDBD */
+  /* ── TEXT (KAM dark theme) ───────────────────────────────── */
+  --tk-text-primary:    #FFFFFF;
+  --tk-text-secondary:  rgba(255,255,255,.70);
+  --tk-text-muted:      rgba(255,255,255,.45);
+  --tk-text-faint:      rgba(255,255,255,.25);
 
-  /* ── BORDER ──────────────────────────────────────────────── */
-  --tk-border:          rgba(255,255,255,.10); /* card border        → #EBEBEB */
-  --tk-border-strong:   rgba(255,255,255,.18); /* elevated border    → #D0D0D0 */
-  --tk-hairline:        rgba(255,255,255,.06); /* subtle divider     → #F0F0F0 */
+  /* ── BORDER (KAM dark theme) ─────────────────────────────── */
+  --tk-border:          rgba(255,255,255,.10);
+  --tk-border-strong:   rgba(255,255,255,.18);
+  --tk-hairline:        rgba(255,255,255,.06);
 
-  /* ── TOPBAR GRADIENT ─────────────────────────────────────── */
+  /* ── TOPBAR GRADIENT (KAM) ───────────────────────────────── */
   --tk-topbar-gradient: linear-gradient(135deg, #0d2550, #0a1e42);
-                                            /*                       → none (flat white) */
 
   /* ── FONT ────────────────────────────────────────────────── */
-  --tk-font-body:       'IBM Plex Sans Thai', sans-serif; /* → 'Noto Sans Thai', sans-serif */
-  --tk-font-mono:       'IBM Plex Mono', monospace;       /* unchanged */
+  /* v2.0: body font changed to Noto Sans Thai (loaded in shell.html)     */
+  /* KAM/AD locked to IBM Plex Sans Thai via body.kam-mode in main CSS    */
+  --tk-font-body:       'Noto Sans Thai', sans-serif;
+  --tk-font-mono:       'IBM Plex Mono', monospace;
 
-  /* ── IQ BADGE (topbar AI indicator) ─────────────────────── */
+  /* ── IQ BADGE ────────────────────────────────────────────── */
   --tk-iq-bg:           linear-gradient(135deg,rgba(0,208,112,.18),rgba(0,208,112,.08));
   --tk-iq-border:       rgba(0,208,112,.55);
-  --tk-iq-color:        #4ddc97;            /*                       → #FF385C or neutral */
+  --tk-iq-color:        #4ddc97;
   --tk-iq-glow-lo:      rgba(0,208,112,.20);
   --tk-iq-glow-hi:      rgba(0,208,112,.40);
 
-  /* ── NAV ─────────────────────────────────────────────────── */
-  --tk-nav-bg:          #0d2550;            /* bnav background       → #FFFFFF */
-  --tk-nav-border:      rgba(255,255,255,.10); /* bnav top border    → #EBEBEB */
-  --tk-nav-icon:        rgba(255,255,255,.55); /* idle icon/label    → #6A6A6A */
-  --tk-nav-active-icon: #FFFFFF;            /* active icon/label     → #FF385C */
-  --tk-nav-active-pill: rgba(38,96,200,.35); /* active pill bg      → rgba(255,56,92,.08) */
+  /* ── NAV (KAM dark) ──────────────────────────────────────── */
+  --tk-nav-bg:          #0d2550;
+  --tk-nav-border:      rgba(255,255,255,.10);
+  --tk-nav-icon:        rgba(255,255,255,.55);
+  --tk-nav-active-icon: #FFFFFF;
+  --tk-nav-active-pill: rgba(38,96,200,.35);
 
-  /* ── SUBTAB ──────────────────────────────────────────────── */
+  /* ── SUBTAB (KAM dark) ───────────────────────────────────── */
   --tk-subtab-bg:       rgba(255,255,255,.07);
-  --tk-subtab-active:   rgba(38,96,200,.50); /*                      → rgba(255,56,92,.12) */
+  --tk-subtab-active:   rgba(38,96,200,.50);
   --tk-subtab-text:     rgba(255,255,255,.45);
-  --tk-subtab-active-text: #FFFFFF;         /*                       → #FF385C */
+  --tk-subtab-active-text: #FFFFFF;
 
   /* ── PORTVIEW HEADER ─────────────────────────────────────── */
   --tk-pv-header-bg:    linear-gradient(180deg, #0d2550 0%, #0d2550 60%, transparent 100%);
-                                            /*                       → #FFFFFF */
 
   /* ── DATA PANEL ──────────────────────────────────────────── */
-  --tk-dp-accent:       #2660c8;            /* panel headers/btns    → #FF385C */
-  --tk-dp-accent-dim:   rgba(38,96,200,.12); /* panel tint           → rgba(255,56,92,.06) */
-  --tk-dp-upload-border: rgba(0,208,112,.30); /* upload slot border  KEEP (functional) */
+  --tk-dp-accent:       #2660c8;
+  --tk-dp-accent-dim:   rgba(38,96,200,.12);
+  --tk-dp-upload-border: rgba(0,208,112,.30);
 
   /* ── TEAMVIEW SCREEN ─────────────────────────────────────── */
-  --tk-teamview-bg:     #0d1f3c;            /* scr-teamview bg       → #FFFFFF */
-
+  --tk-teamview-bg:     #0d1f3c;
 
   /* ── SPACING SCALE (4px base grid) ──────────────────────── */
   --sp-1:   4px;
-  --sp-1h:  6px;    /* 1.5 step */
-  --sp-2h:  10px;   /* 2.5 step */
+  --sp-1h:  6px;
+  --sp-2h:  10px;
   --sp-2:   8px;
   --sp-3:   12px;
   --sp-4:   16px;
@@ -114,16 +142,16 @@
   --sp-12:  48px;
 
   /* ── TYPOGRAPHY SCALE ────────────────────────────────────── */
-  --text-2xs:   9px;    /* eyebrow, meta label */
-  --text-xs:    10px;   /* badge, tag */
-  --text-sm:    11px;   /* secondary text */
-  --text-md:    12px;   /* body small */
-  --text-base:  13px;   /* body */
-  --text-lg:    14px;   /* body large */
-  --text-xl:    16px;   /* subtitle */
-  --text-2xl:   20px;   /* section heading */
-  --text-kpi:   28px;   /* KPI number */
-  --text-hero:  48px;   /* hero number */
+  --text-2xs:   9px;
+  --text-xs:    10px;
+  --text-sm:    11px;
+  --text-md:    12px;
+  --text-base:  13px;
+  --text-lg:    14px;
+  --text-xl:    16px;
+  --text-2xl:   20px;
+  --text-kpi:   28px;
+  --text-hero:  48px;
 
   /* ── FONT WEIGHT ─────────────────────────────────────────── */
   --fw-normal:  400;
@@ -138,8 +166,8 @@
   --lh-body:    1.55;
 
   /* ── LETTER SPACING ──────────────────────────────────────── */
-  --ls-eyebrow: .8px;    /* ALL CAPS eyebrow labels */
-  --ls-mono:    -.02em;  /* mono number tracking */
+  --ls-eyebrow: .8px;
+  --ls-mono:    -.02em;
 
   /* ── BORDER RADIUS ───────────────────────────────────────── */
   --r-xs:   4px;
@@ -161,8 +189,8 @@
   --sh-lg:  0 14px 28px rgba(0,0,0,.18);
 
   /* ── LAYOUT ──────────────────────────────────────────────── */
-  --max-w:      440px;   /* app max width */
-  --nav-h:      56px;    /* bottom nav height */
-  --topbar-h:   44px;    /* topbar height */
+  --max-w:      440px;
+  --nav-h:      56px;
+  --topbar-h:   44px;
 
 }
