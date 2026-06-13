@@ -1,0 +1,79 @@
+/* ============================================================
+   FRESHKET SENSE — ECHO NAV STYLES
+   src/styles_echo.css · Phase 0E (verbatim copy, !important preserved)
+   ============================================================ */
+
+/* v598: cover both kam-only (#nav-echo-kam) and rest-only (#nav-echo) via .echo-nav-btn class */
+body.kam-sense-active.kam-mode .bnav .echo-nav-btn{display:none!important}
+/* v488: echo-pill shrinks correctly inside flex glass pill */
+body.kam-mode .bnav .echo-pill{flex-shrink:1!important;width:auto!important;min-width:0}
+/* ── Echo nav pill — idle + active states ── */
+/* ── Echo nav — Pattern B wave · 4px bars · uniform with other tabs ── */
+.echo-pill{
+  display:flex;align-items:flex-end;justify-content:center;gap:2.5px;
+  width:28px;height:22px;
+  padding:0 0 0;
+  flex-shrink:0;
+}
+body.kam-mode .echo-pill{
+  /* inherit */
+}
+.echo-nav-btn .nwrap{
+  padding:3px 7px!important;
+  display:flex;align-items:center;justify-content:center;
+  min-height:22px;
+  height:22px;
+}
+/* bars: Pattern B — 5·11·6·14·17 zigzag ascending, 4px wide */
+.echo-bar{
+  display:inline-block;
+  width:4px;
+  border-radius:2px 2px 1px 1px;
+  background:var(--tk-ok-bright);  /* idle = green always */
+  flex-shrink:0;
+}
+.echo-bar:nth-child(1){height:5px}
+.echo-bar:nth-child(2){height:11px}
+.echo-bar:nth-child(3){height:6px}
+.echo-bar:nth-child(4){height:14px}
+.echo-bar:nth-child(5){height:17px}
+/* Active keyframes — snappy steps like real EQ */
+@keyframes echo-wa{0%{height:5px}33%{height:15px}66%{height:3px}100%{height:5px}}
+@keyframes echo-wb{0%{height:11px}33%{height:4px}66%{height:17px}100%{height:11px}}
+@keyframes echo-wc{0%{height:6px}33%{height:17px}66%{height:5px}100%{height:6px}}
+@keyframes echo-wd{0%{height:14px}33%{height:5px}66%{height:17px}100%{height:14px}}
+@keyframes echo-we{0%{height:17px}33%{height:7px}66%{height:14px}100%{height:17px}}
+body.echo-active .echo-pill{ /* no pill bg — just glowing bars */ }
+body.echo-active .echo-bar{background:var(--tk-ok-bright);}
+body.echo-active .echo-bar:nth-child(1){animation:echo-wa .6s steps(2,end) infinite}
+body.echo-active .echo-bar:nth-child(2){animation:echo-wb .75s steps(2,end) infinite .08s}
+body.echo-active .echo-bar:nth-child(3){animation:echo-wc .65s steps(2,end) infinite .15s}
+body.echo-active .echo-bar:nth-child(4){animation:echo-wd .7s steps(2,end) infinite .05s}
+body.echo-active .echo-bar:nth-child(5){animation:echo-we .55s steps(2,end) infinite .12s}
+/* label — same color/weight as other tabs, green only when active */
+.echo-nav-btn .lb{color:var(--n400);font-weight:500}
+body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weight:600!important}
+/* Floating recording pill (minimize state) */
+#echo-float-pill{
+  position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  display:none;align-items:center;gap:8px;
+  background:rgba(14,24,45,.88);
+  border:1px solid var(--tk-ok-border);
+  border-radius:999px;padding:8px 16px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 4px 20px var(--tk-ok-dim-2),0 8px 32px rgba(0,0,0,.4);
+  cursor:pointer;z-index:9999;
+  animation:echo-float-in .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes echo-float-in{from{opacity:0;transform:translateX(-50%) scale(.85)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+#echo-float-pill.visible{display:flex}
+#echo-float-pill .fp-bars{display:flex;align-items:flex-end;gap:2.5px;height:14px}
+#echo-float-pill .fp-bar{width:3px;border-radius:3px;background:rgba(255,56,92,.45);transform-origin:bottom}
+#echo-float-pill .fp-bar:nth-child(1){height:5px;animation:echo-wa .6s steps(2,end) infinite}
+#echo-float-pill .fp-bar:nth-child(2){height:9px;animation:echo-wb .75s steps(2,end) infinite .08s}
+#echo-float-pill .fp-bar:nth-child(3){height:5px;animation:echo-wc .65s steps(2,end) infinite .15s}
+#echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
+#echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
+#echo-float-pill .fp-label{display:none}
+#echo-float-pill .fp-time{font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.55);min-width:36px}
