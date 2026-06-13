@@ -2330,7 +2330,7 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
     .pv-comm-tl-kam-row:last-child{border-bottom:none}
     .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;grid-column:1}
     .pv-comm-tl-kam-nrr{font-size:11px;color:rgba(255,255,255,.55);text-align:right;grid-row:1;grid-column:2}
-    .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;text-align:right;grid-row:1;grid-column:3}
+    .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;text-align:right;grid-row:1;grid-column:3}
     .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:10px;color:rgba(255,255,255,.72);line-height:1.4}
   `;
   (document.head || document.body).appendChild(s);
