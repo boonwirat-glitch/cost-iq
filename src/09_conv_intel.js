@@ -1075,104 +1075,48 @@ body:not(.echo-active) { background:unset; }
 
   // ── Build Gemini prompt จาก rubric + account context ──────────────────────
   function _buildGeminiPrompt() {
-    const ctx = _ctx();
-    const fmtK = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(n);
+    // v590: ลด prompt — ตัด account context, กฎเหล็กซ้ำซาก, ตัวอย่าง JSON เต็ม,
+    // key_moments instruction ที่บีบให้โมเดลแต่งเรื่องเพื่อให้ครบ
+    // เหลือเฉพาะ rubric จาก DB + schema โครงเปล่า + no_speech guard สั้น
 
-    // Account context
-    let acctSection = '';
-    if (_accountName || _accountGuid) {
-      acctSection = `\n\nข้อมูลร้าน (ใช้ประกอบการวิเคราะห์ D1/D2):
-- ชื่อ: ${ctx.name} | Segment: ${ctx.seg} | Class: ${ctx.account_class}
-- อยู่กับ rep มา: ${ctx.days} วัน${ctx.is_new ? ' (ร้านใหม่)' : ''}`;
-      if (ctx.gmv_mtd > 0) {
-        acctSection += `\n- GMV เดือนนี้: ${fmtK(ctx.gmv_mtd)} / baseline: ${fmtK(ctx.gmv_baseline)}`;
-        if (ctx.pace_pct) acctSection += ` | Pace: ${ctx.pace_pct}%`;
-      }
-      if (ctx.churn_count > 0)  acctSection += `\n- SKU หยุดสั่ง: ${ctx.churn_count} รายการ`;
-      if (ctx.missing_cats > 0) acctSection += `\n- Category ยังไม่สั่ง: ${ctx.missing_cats} หมวด`;
-      if (_ownerType === 'sales') acctSection += `\n- ประเภท: Sales lead (ยังไม่เป็นลูกค้า Freshket)`;
-    }
+    // Skill rubric จาก DB — เฉพาะ code + name + เกณฑ์ผ่าน
+    const rubricText = (_rubricCache || []).map(s =>
+      `[${s.skill_code}] ${s.skill_name_en}: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}`
+    ).join('\n');
 
-    // Skill rubric จาก DB
-    const rubricText = (_rubricCache || []).map(s => {
-      const obs = s.echo_observable ? `\nสัญญาณในเสียง: ${s.echo_observable}` : '';
-      return `[${s.skill_code}] ${s.skill_name_en}
-หลักการ: ${s.principle_th || '-'}
-เกณฑ์ผ่าน: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}${obs}`;
-    }).join('\n\n');
+    return `ฟัง audio การสนทนาระหว่าง Sales rep กับเจ้าของร้านอาหาร แล้วตอบ JSON ตาม schema ด้านล่าง
 
-    const _durMin = Math.floor(_secs / 60), _durSec = _secs % 60;
-    return `คุณคือ AI coach สำหรับ Freshket sales team
-ฟัง audio การสนทนาต่อไปนี้ระหว่าง Sales rep กับเจ้าของร้านอาหาร (ความยาว ${_durMin}:${String(_durSec).padStart(2,'0')} นาที — วิเคราะห์ให้ครบทั้งไฟล์ key_moments ต้องครอบคลุมถึงช่วงท้าย)${acctSection}
+ถ้าไม่มีเสียงคนพูดใน audio เลย ตอบ {"no_speech": true} เท่านั้น
 
-🚫 กฎเหล็กป้องกัน hallucination (v579):
-1. ทุกอย่างที่รายงานต้องมาจาก "เสียงใน audio เท่านั้น" — ห้ามนำข้อความจากคำสั่งนี้ (เช่น "AI coach", "Freshket sales team", ชื่อ skill, ตัวอย่าง JSON) ไปรายงานว่าเป็นสิ่งที่ได้ยินเด็ดขาด
-2. ถ้าไม่แน่ใจว่าได้ยินคำไหนชัด ให้ละไว้ — ห้ามเดา ห้ามเติมเอง
-3. evidence ทุกชิ้นต้องอ้างจากคำพูดจริงใน audio — ถ้าไม่มีหลักฐานเสียงชัดเจน ให้ score เป็น "not_observed"
-4. ถ้าเสียงสั้นกว่า 10 วินาที หรือมีแต่เสียงรบกวน/เสียงเงียบไม่มีคนพูดเลย → ตอบ no_speech:true ทันที (ถ้ามีเสียงคนพูดแม้คนเดียว ให้วิเคราะห์ปกติ)
-5. ภาษา: ทุกข้อความใน response ตอบเป็นภาษาไทยเท่านั้น — ยกเว้น quote (คงคำพูดตรงตามที่ได้ยิน) และชื่อเฉพาะ/คำที่ผู้พูดพูดเป็นภาษาอังกฤษ
+ทุกอย่างในคำตอบต้องมาจากเสียงที่ได้ยินจริงเท่านั้น — ถ้าไม่มีหลักฐานในเสียง ให้ปล่อยว่างหรือ not_observed ห้ามเดาหรือเติมเอง ตอบเป็นภาษาไทย ยกเว้น quote คงคำพูดตรงตามที่ได้ยิน
 
-⚠️ สำคัญมาก: ถ้า audio ไม่มีเสียงคนพูดเลย หรือมีแค่เสียงรบกวน/เสียงเงียบ ให้ตอบ JSON นี้ทันที อย่า hallucinate:
-{"no_speech": true, "transcript_summary": "ไม่พบเสียงการสนทนาใน audio นี้", "tone_signals": {"rep_confidence": "low", "rep_confidence_note": "ไม่มีเสียง", "customer_engagement": "stable", "customer_engagement_note": "ไม่มีเสียง", "key_moments": []}, "skills": [], "pipc_stage": null, "pipc_reached": null, "overall": "needs_work", "session_summary": "ไม่พบเสียงการสนทนา", "ocpb_status": {"O": "not_asked", "C": "not_asked", "P": "not_asked", "B": "not_asked"}, "ocpb_facts": [], "next_actions": []}
-
-ถ้ามีเสียงคนพูด ทำ 3 อย่างในคำตอบเดียว:
-
-1. แยก speaker: ระบุชัดว่าส่วนไหนคือ Sales พูด ส่วนไหนคือลูกค้าพูด
-2. วิเคราะห์ skills ตาม rubric ด้านล่าง — ประเมินจากสิ่งที่ได้ยินจริง ทั้งคำพูดและน้ำเสียง
-3. วิเคราะห์ customer intelligence ตาม OCPB framework
-
-SKILL RUBRIC (ประเมินเฉพาะ skills เหล่านี้):
+SKILL RUBRIC:
 ${rubricText}
 
-TONE & EMOTION signals ที่ต้องสังเกต:
-- rep_confidence: Sales พูดมั่นใจ ชัด หรือลังเล อ้อมค้อม?
-- customer_engagement: ลูกค้า engage มากขึ้นหรือน้อยลงตลอด session?
-- key_moments: ช่วงสำคัญของบทสนทนา — เก็บเป็น quote คำพูดตรงจาก audio + เวลา ห้ามย่อเป็นคำบรรยายสรุป จุดที่นับว่าสำคัญ: ลูกค้าเผยข้อมูล/ความต้องการ, dynamics เปลี่ยน (warm ขึ้น, push back), จังหวะที่ rep ทำได้ดีหรือพลาด · จำนวนไม่กำหนดตายตัว — เก็บทุกจุดที่มีเนื้อหาจริง ข้ามเฉพาะช่วง filler/ทักทาย/คุยเรื่อยเปื่อยที่ไม่มีสาระ กระจายครอบคลุมทั้งไฟล์ตั้งแต่ต้นจนช่วงท้าย (บทสนทนายาวมากให้เลือกที่สำคัญที่สุด ไม่เกินราว 30 จุด) · ถ้าช่วงสำคัญเป็นการพูดยาวต่อเนื่อง เลือกประโยคแก่นที่สุดมาเป็น quote (คงคำพูดตรง) แล้วสรุปใจความส่วนที่เหลือของช่วงนั้นลงใน note
+OCPB (customer intel จากเสียงเท่านั้น):
+- O: Operation — การสั่งของ วัน/เวลา ปริมาณ ปัญหา ops
+- C: ซัพเดิม ราคา สินค้าที่ใช้
+- P: Payment — วิธีจ่าย credit term
+- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
 
-OCPB framework (customer intel) — เก็บเป็น "fact" ไม่ใช่ checklist:
-- O: Operation ของร้าน — จำนวนสาขา ครัวกลาง ใครเป็นคนสั่งของ วัน/เวลาสั่งและรับของ ปริมาณ ปัญหา ops
-- C: ซัพเดิม · ราคา · สินค้าที่ร้านใช้ — ซื้ออะไรจากเจ้าไหน ราคาที่จ่าย ปัญหากับซัพเดิม สินค้า/วัตถุดิบที่ใช้ประจำ
-- P: Payment · Billing — จ่ายแบบไหน (สด/โอน/เครดิต) credit term รอบบิล
-- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยนเมนู/concept ปรับธุรกิจ
-
-กฎการเก็บ fact (เข้มงวดเท่ากฎเหล็กด้านบน):
-- 1 fact = 1 ข้อมูลที่ได้ยินจริงใน audio พร้อม quote คำพูดตรง (ห้าม paraphrase ห้ามเรียบเรียงใหม่) + เวลาโดยประมาณรูปแบบ mm:ss
-- fact ที่เป็นปัญหา/ความไม่พอใจของลูกค้า → tag "pain_high" หรือ "pain_medium" ตามความรุนแรง
-- fact ที่เป็นโอกาสขาย (เช่น อยากได้เครดิต มีแผนเปิดสาขา สินค้าที่ยังขาด) → tag "opportunity"
-- fact ทั่วไป → tag null
-- มิติไหนไม่มีใครพูดถึง = ไม่เก็บ fact มิตินั้นเลย ห้ามแต่งเติมเด็ดขาด — array ว่างคือคำตอบที่ถูกต้อง
-- ocpb_status ต่อมิติ: "answered" (ได้ข้อมูลจากลูกค้า) | "asked_no_answer" (rep ถามแต่ลูกค้าเลี่ยง/ไม่ตอบ) | "not_asked" (ไม่มีใครแตะมิตินี้)
-
-ตอบ JSON เท่านั้น ไม่มี markdown ไม่มี preamble:
+ตอบ JSON เท่านั้น ไม่มี markdown:
 {
-  "transcript_summary": "สรุปบทสนทนา 3-5 ประโยค ระบุว่าใครพูดอะไร จุดสำคัญคืออะไร",
+  "transcript_summary": "",
   "tone_signals": {
     "rep_confidence": "high|medium|low",
-    "rep_confidence_note": "เหตุผลสั้นๆ",
+    "rep_confidence_note": "",
     "customer_engagement": "increasing|stable|decreasing",
-    "customer_engagement_note": "เหตุผลสั้นๆ",
-    "key_moments": [{"ts": "mm:ss", "quote": "คำพูดตรงจาก audio", "note": "ทำไมจุดนี้สำคัญ สั้นๆ"}]
+    "customer_engagement_note": "",
+    "key_moments": [{"ts": "mm:ss", "quote": "", "note": ""}]
   },
-  "skills": [
-    {
-      "code": "A01_PIPC",
-      "score": "pass|developing|not_observed|not_applicable",
-      "evidence": "คำพูดหรือพฤติกรรมจริงที่ได้ยิน",
-      "gap": "สิ่งที่ขาดจากเกณฑ์ผ่าน หรือ '-'",
-      "coaching_note": "คำแนะนำสำหรับ TL ใช้ debrief 1-2 ประโยค"
-    }
-  ],
+  "skills": [{"code": "", "score": "pass|developing|not_observed|not_applicable", "evidence": "", "gap": "", "coaching_note": ""}],
   "pipc_stage": "Prepare|Identify|Probe|Close",
-  "pipc_reached": "ขั้นตอนสูงสุดที่ rep ทำถึง",
+  "pipc_reached": "",
   "overall": "strong|developing|needs_work",
-  "session_summary": "สรุปภาพรวม skill 2-3 ประโยค จุดเด่น จุดที่ต้องพัฒนา",
+  "session_summary": "",
   "ocpb_status": {"O": "answered|asked_no_answer|not_asked", "C": "answered|asked_no_answer|not_asked", "P": "answered|asked_no_answer|not_asked", "B": "answered|asked_no_answer|not_asked"},
-  "ocpb_facts": [
-    {"dim": "O|C|P|B", "summary": "สรุปสั้น 1 ประโยค", "quote": "คำพูดตรงจาก audio", "ts": "mm:ss", "tag": "pain_high|pain_medium|opportunity|null"}
-  ],
-  "next_actions": [
-    {"action": "สิ่งที่ต้องทำ", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "reason": "ทำไม"}
-  ]
+  "ocpb_facts": [{"dim": "O|C|P|B", "summary": "", "quote": "", "ts": "mm:ss", "tag": "pain_high|pain_medium|opportunity|null"}],
+  "next_actions": [{"action": "", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "reason": ""}]
 }`;
   }
 
