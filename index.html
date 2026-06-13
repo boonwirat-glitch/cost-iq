@@ -1,4 +1,4 @@
-<!-- Freshket Sense v631: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v632: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1048,13 +1048,13 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .kam-opp-conf.unv{background:rgba(160,160,160,.15);color:var(--n600)}
 
 /* ── BOTTOM NAV ── */
-.bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:flex;z-index:170;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+.bnav{position:fixed;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:440px;background:var(--n0);border-top:1px solid var(--n100);display:grid;grid-template-columns:repeat(var(--tab-count,5),1fr);z-index:170;padding:8px 0;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
 /* restaurant sheet (z-index:163→210) must sit above bnav when open */
 body.restaurant-sheet .bnav{z-index:150;}
 /* bnav uses display:flex with .ni{flex:1} for equal-width tabs
    grid-template-columns has no effect on flex containers — omitted */
 body.kam-mode .bnav .lb{font-size:12px;font-weight:700;letter-spacing:.1px}
-.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:var(--tk-font-body);transition:all .2s}
+.ni{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 0;cursor:pointer;border:none;background:transparent;font-family:var(--tk-font-body);transition:all .2s;min-width:0;overflow:hidden}
 .ni svg{width:22px;height:22px;color:var(--n400);transition:color .2s}
 .ni .lb{font-size:10px;color:var(--n400);font-weight:500;transition:color .2s;white-space:nowrap}
 .ni.on svg,.ni.on .lb{color:var(--g700)}
@@ -1165,7 +1165,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v631',
+      version: 'v632',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -3873,7 +3873,7 @@ input[type="text"].sv-field-input { -webkit-appearance: none; appearance: none; 
 body.sales-mode .sales-any-btn { display: flex !important; }
 
 /* ── Nav: 4-column grid for Sales rep (พอร์ต/Pipeline/ทักษะ/Commission) ── */
-body.sales-mode:not(.sales-tl-mode) .bnav { grid-template-columns: repeat(4,1fr) !important; }
+/* → nav grid-template moved to NavConfig.render() (Phase 0E+) */
 
 /* ── Login transition: white bg from start, no flash ── */
 body.sales-mode { background: #FFFFFF !important; }
@@ -6774,46 +6774,21 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
    ══════════════════════════════════════════════════════ */
 
 /* Default: Sales-only nav hidden */
-.bnav .ni.sales-only     { display: none !important; }
-.bnav .ni.sales-tl-only  { display: none !important; }
 
 /* Sales mode: show Sales tabs, hide KAM/TL-only tabs */
-body.sales-mode .bnav .ni.sales-only     { display: flex !important; }
-body.sales-mode .bnav .ni.kam-only       { display: none !important; }
-body.sales-mode .bnav .ni.tl-only        { display: none !important; }
-body.sales-mode .bnav .ni.sales-tl-only  { display: none !important; }
 
 /* Sales TL mode: show Team tab in addition */
-body.sales-mode.sales-tl-mode .bnav .ni.sales-tl-only { display: flex !important; }
 
 /* Sales v6: hide non-Sales nav buttons including nav-overview */
-body.sales-mode .bnav #nav-overview     { display: none !important; }
-body.sales-mode .bnav #nav-restaurant   { display: none !important; }
-body.sales-mode .bnav #nav-portview     { display: none !important; }
-body.sales-mode .bnav #nav-teamview     { display: none !important; }
 
 /* Skills + Echo tab: sales only — hidden in KAM mode */
-.bnav .ni.sales-any-btn                    { display: none !important; }
-body.sales-mode .bnav .ni.sales-any-btn    { display: flex !important; }
 /* v498: AD also gets Skills nav */
-body.kad-mode .bnav .ni.sales-any-btn      { display: flex !important; }
 /* KAM TL (tl role, kam-mode) also gets Skills nav */
-body.kam-mode .bnav .ni.sales-any-btn      { display: flex !important; }
 /* v599: Save mode (kam-sense-active) — hide Skills nav, same as Echo */
-body.kam-sense-active.kam-mode .bnav .ni.sales-any-btn { display: none !important; }
 /* Echo for Sales — show + center position */
-body.sales-mode .bnav #nav-echo            { display: flex !important; order: 3; }
-body.sales-mode .bnav #nav-sales-portview  { order: 1; }
-body.sales-mode .bnav #nav-sales-pipeline  { order: 2; }
-body.sales-mode .bnav #nav-sales-commission{ order: 4; }
-body.sales-mode .bnav #nav-skills          { order: 5; }
-body.sales-mode .bnav #nav-sales-teamview  { order: 6; }
 
 /* Sales nav grid: 5 cols (พอร์ต | Pipeline | Echo | Commission | ทักษะ) */
-body.sales-mode .bnav { grid-template-columns: repeat(5,1fr); }
-body.sales-mode.sales-tl-mode .bnav { grid-template-columns: repeat(5,1fr); }
 /* Sales: hide Save (#nav-opportunities) — not part of Sales flow */
-body.sales-mode .bnav #nav-opportunities { display: none !important; }
 
 /* Sales uses same dark theme as KAM */
 /* Sales v6: white canvas — overrides removed, handled in styles_sales.css */
@@ -6835,20 +6810,8 @@ body.sales-mode #scr-opportunities { display: none !important; }
 
 /* Sales user gets both .sales-mode AND .kam-mode
    Need higher specificity to override dark glass pill */
-body.sales-mode.kam-mode .bnav {
-  background: rgba(255,255,255,.72) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255,255,255,.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 8px 28px rgba(0,0,0,.12) !important;
-  border-radius: 36px !important; /* v573: match floating pill radius */
-}
 
 /* Nav icons: inactive = dark muted, active = rausch */
-body.sales-mode.kam-mode .bnav .ni svg { color: #222222 !important; opacity: .32 !important; filter: none !important; }
-body.sales-mode.kam-mode .bnav .ni .lb { color: #6A6A6A !important; }
-body.sales-mode.kam-mode .bnav .ni.on svg { color: #FF385C !important; opacity: 1 !important; filter: drop-shadow(0 0 5px rgba(255,56,92,.35)) !important; }
-body.sales-mode.kam-mode .bnav .ni.on .lb { color: #FF385C !important; font-weight: 700 !important; }
 
 /* Sales portview screen — same layout as KAM portview */
 #scr-sales-portview { padding-bottom: var(--chrome-bottom); }
@@ -6907,10 +6870,8 @@ body.sales-mode .topbar button svg { stroke: rgba(34,34,34,.5) !important; }
 body.sales-mode .topbar button { background: rgba(0,0,0,.05) !important; }
 
 /* Save tab + rest-only: hide all in sales-mode */
-body.sales-mode .bnav .ni.rest-only { display: none !important; }
 body.sales-mode .bnav .ni[onclick*="Save"],
 body.sales-mode .bnav .ni[onclick*="save"],
-body.sales-mode .bnav #nav-save-btn { display: none !important; }
 
 /* Sales nav — floating frosted white pill (v573)
    ลอยเหนือ bottom + เคารพ safe-area · ไม่มี transform (iOS Safari/WKWebView:
@@ -7333,7 +7294,7 @@ body:not(.kam-mode) .bnav .ni.kam-only { display: none !important; }
 /* v183: Team moved to portview header — hide from nav entirely */
 body.kam-mode.tl-mode .bnav .ni.tl-only { display: none !important; }
 /* ── v190 KAM pill nav ── */
-body.kam-mode .bnav #nav-opportunities{display:flex!important;}
+/* → nav-opportunities show rule moved to NavConfig.render() */
 body.kam-mode #nav-portview{display:none!important;}
 body.kam-mode .bnav{background:rgba(14,24,45,.52);border:1px solid rgba(255,255,255,.18);border-top:none;border-radius:999px;width:calc(100% - 32px);max-width:408px;padding:10px 12px;gap:0;bottom:calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 28px rgba(0,0,0,.35);}
 body.kam-mode .bnav .ni{flex:1;min-width:0;width:auto;height:auto;padding:4px 0;gap:5px;border-radius:999px;transition:transform .3s cubic-bezier(.34,1.56,.64,1);justify-content:center;}
@@ -9813,14 +9774,7 @@ body.sdt-light.kam-sense-active.sense-plan-expanded .sps-cta{
 }
 
 
-
-/* ── Sales+KAM cascade fix ── */
-/* kam-mode .bnav #nav-opportunities{display:flex!important} is in portview-module-css.
-   This rule must come AFTER that to win the cascade.
-   Placed in save-module-css which injects after portview-module-css. */
-body.sales-mode.kam-mode .bnav #nav-opportunities { display: none !important; }
-body.sales-mode.kam-mode .bnav #nav-portview       { display: none !important; }
-</style>
+/* → sales+kam nav cascade fix removed — NavConfig.render() handles this (Phase 0E+) */</style>
 <style id="report-module-css">
 /* FRESHKET SENSE — REPORT STYLES
    src/styles_report.css · Phase 0E (verbatim) */
@@ -38326,9 +38280,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var r=curRole();
     try{ if(p){ p.role=r; p.role_label=(r==='rep'?'KAM':r==='tl'?'TL':r==='admin'?'Admin':r); } }catch(e){}
     try{
-      document.body.classList.toggle('role-admin', r==='admin');
-      document.body.classList.toggle('role-tl', r==='tl');
-      document.body.classList.toggle('role-rep', r==='rep');
+      document.body.classList.toggle('role-admin',    r==='admin');
+      document.body.classList.toggle('role-tl',       r==='tl');
+      document.body.classList.toggle('role-rep',       r==='rep');
+      document.body.classList.toggle('role-sales',     r==='sales');
+      document.body.classList.toggle('role-sales-tl',  r==='sales_tl');
+      document.body.classList.toggle('role-ad',        r==='ad');
+      document.body.classList.toggle('role-ad-tl',     r==='ad_tl');
       document.body.setAttribute('data-role', r);
     }catch(e){}
     return r;
@@ -49016,6 +48974,135 @@ window._renderTLContent        = _renderTLContent;
 window._s3ToggleSheet          = _s3ToggleSheet;
 window._skCardRipple           = _skCardRipple;
 
+</script>
+<script id="freshket-nav-config">
+/**
+ * Freshket Sense — Nav Config System (v2)
+ * src/12_nav_config.js
+ *
+ * Single source of truth: role → tabs
+ * Trigger: MutationObserver on body[data-role] — no setTimeout race
+ */
+(function() {
+  'use strict';
+
+  // ─── Tab map: key → HTML button ID ─────────────────────────────────────────
+  var TABS = {
+    'portview':         'nav-portview',
+    'restaurant':       'nav-restaurant',
+    'echo-kam':         'nav-echo-kam',
+    'opportunities':    'nav-opportunities',
+    'skills':           'nav-skills',
+    'sales-portview':   'nav-sales-portview',
+    'sales-pipeline':   'nav-sales-pipeline',
+    'sales-echo':       'nav-echo',
+    'sales-commission': 'nav-sales-commission',
+    'sales-teamview':   'nav-sales-teamview',
+  };
+
+  // ─── Role → ordered tabs ────────────────────────────────────────────────────
+  var NAV_CONFIG = {
+    'rep':      ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+    'tl':       ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+    'admin':    ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+    'ad':       ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+    'ad_tl':    ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+    'sales':    ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills'],
+    'sales_tl': ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills', 'sales-teamview'],
+  };
+
+  // All HTML nav button IDs — everything NOT in active config gets hidden
+  var ALL_IDS = [
+    'nav-portview', 'nav-restaurant', 'nav-echo-kam', 'nav-opportunities',
+    'nav-skills', 'nav-teamview', 'nav-overview',
+    'nav-sales-portview', 'nav-sales-pipeline', 'nav-echo',
+    'nav-sales-commission', 'nav-sales-teamview',
+    'nav-portfolio', 'nav-report',
+  ];
+
+  // Save disabled on these screens (no account selected)
+  var SAVE_DISABLED = ['portview', 'teamview'];
+
+  // ─── renderNav ──────────────────────────────────────────────────────────────
+  function renderNav(role) {
+    var tabs = NAV_CONFIG[role];
+    if (!tabs) { console.warn('[NavConfig] unknown role:', role); return; }
+
+    // 1. Hide everything
+    ALL_IDS.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    // 2. Show tabs in order
+    tabs.forEach(function(key, i) {
+      var id = TABS[key];
+      if (!id) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.display = 'flex';
+      el.style.order = String(i + 1);
+    });
+
+    // 3. Tell CSS how many tabs via CSS variable
+    var bnav = document.querySelector('.bnav');
+    if (bnav) bnav.style.setProperty('--tab-count', String(tabs.length));
+
+    console.log('[NavConfig] rendered:', role, '→', tabs.length, 'tabs');
+  }
+
+  // ─── updateSaveState ────────────────────────────────────────────────────────
+  function updateSaveState(screen) {
+    var btn = document.getElementById('nav-opportunities');
+    if (!btn) return;
+    var disable = SAVE_DISABLED.indexOf(screen) !== -1;
+    btn.classList.toggle('nav-disabled', disable);
+  }
+
+  // ─── Patch showScreen for Save state ────────────────────────────────────────
+  // Safe: runs after all other scripts load (12 is last)
+  var _orig = window.showScreen;
+  window.showScreen = function(name) {
+    var r = _orig ? _orig.call(this, name) : undefined;
+    updateSaveState(name);
+    return r;
+  };
+
+  // ─── Watch body[data-role] via MutationObserver ──────────────────────────────
+  // _autoRouteAfterLogin calls normalizeProfileAndBody which sets data-role
+  // This fires immediately when that happens — no setTimeout needed
+  var _lastRole = null;
+  var _obs = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      if (m.attributeName === 'data-role') {
+        var role = document.body.getAttribute('data-role');
+        if (role && role !== _lastRole) {
+          _lastRole = role;
+          renderNav(role);
+        }
+      }
+    });
+  });
+  _obs.observe(document.body, { attributes: true, attributeFilter: ['data-role'] });
+
+  // ─── Also run on DOMContentLoaded if data-role already set ──────────────────
+  function _tryInit() {
+    var role = document.body.getAttribute('data-role');
+    if (role) { _lastRole = role; renderNav(role); }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _tryInit);
+  } else {
+    _tryInit();
+  }
+
+  // ─── Public API ─────────────────────────────────────────────────────────────
+  window.NavConfig = {
+    render: renderNav,
+    updateSaveState: updateSaveState,
+  };
+
+})();
 </script>
 <!-- Echo floating pill — shown when recording + minimized -->
 <div id="echo-float-pill" onclick="echoExpand()" role="button" aria-label="กลับไปที่ Echo">
