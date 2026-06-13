@@ -1,4 +1,4 @@
-<!-- Freshket Sense v648: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v649: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1170,7 +1170,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v648',
+      version: 'v649',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -38388,27 +38388,32 @@ if (document.readyState === 'loading') {
 setTimeout(async function _tgtInitCheck() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   if (!role) { setTimeout(_tgtInitCheck, 600); return; }
-  // v224e render-gate: wait for portview+history data before NRR render
-  // prevents NRR bar rendering with ฿0 then re-rendering with real value
-  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
-    setTimeout(_tgtInitCheck, 400); return;
-  }
-  _injectPortviewBarEl();
+  // v648-fix: loadTargets() is a Supabase fetch, does NOT need portview/R2 data.
+  // OLD: waited for allCriticalReady() before loadTargets() → slow networks caused
+  // commission shimmer to stick the entire session (allCriticalReady blocked for >30s).
+  // FIX: loadTargets() fires immediately when role is ready → _tgtLoaded=true quickly
+  // → commission strip re-renders. NRR bar still waits for portview GMV data.
   await loadTargets(_tgtCurrentQuarter());
-  renderPortviewTargetBar();
-  renderPortviewNRRBar();
-  // v565: tiers just arrived — re-render commission strip (was stuck on default-tier
-  // numbers or loading skeleton until next refreshAll). Value guard inside prevents dup.
+  // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
-  _tgtInjectAdminBtn();
-  try{
-    const tv=document.getElementById('scr-teamview');
-    if(tv && tv.classList.contains('on')){
-      if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
-      if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+  // NRR/target bars need portview GMV — wait for allCriticalReady
+  (function _waitAndRenderBars(){
+    if(typeof allCriticalReady==='function' && !allCriticalReady()){
+      setTimeout(_waitAndRenderBars, 400); return;
     }
-  }catch(e){ console.warn('[target init] teamview refresh', e); }
-  _tgtInjectTeamviewTargetRows();
+    _injectPortviewBarEl();
+    renderPortviewTargetBar();
+    renderPortviewNRRBar();
+    _tgtInjectAdminBtn();
+    try{
+      const tv=document.getElementById('scr-teamview');
+      if(tv && tv.classList.contains('on')){
+        if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
+        if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+      }
+    }catch(e){ console.warn('[target init] teamview refresh', e); }
+    _tgtInjectTeamviewTargetRows();
+  })();
 }, 1500);
 
 // Also hook into portview renders directly
