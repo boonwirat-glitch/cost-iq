@@ -127,6 +127,7 @@ function resetRuntimeSessionState(){
   // v491-A: remove stale role classes BEFORE setMode so kam-mode add is not immediately undone.
   // Previous order: setMode adds kam-mode, then remove() strips it → body loses dark bg on re-login.
   try { document.body.classList.remove('sales-mode','sales-tl-mode','kad-mode','ad-tl-mode','kam-mode'); } catch(e) {}
+  try { document.documentElement.removeAttribute('data-theme'); } catch(e) {} // phase-0C
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
   try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
@@ -770,11 +771,12 @@ function hideLoginOverlay() {
     try{
       const _pf_role = getCurrentRole();
       _senseLog('[v206d debug] _splashPreFade role=', _pf_role);
-      if(_pf_role==='tl'||_pf_role==='admin'){if(typeof showScreen==='function')showScreen('teamview');}
+      if(_pf_role==='tl'||_pf_role==='admin'){document.documentElement.dataset.theme='light';if(typeof showScreen==='function')showScreen('teamview');}
       else if(_pf_role==='sales'||_pf_role==='sales_tl'){
         // Set sales-mode body class FIRST so CSS gates work before render
         document.body.classList.add('sales-mode');
         if(_pf_role==='sales_tl') document.body.classList.add('sales-tl-mode');
+        document.documentElement.dataset.theme='light'; // phase-0C
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
@@ -782,10 +784,11 @@ function hideLoginOverlay() {
         // v498: AD uses KAM data stack — same portview, same dark theme
         document.body.classList.add('kad-mode');
         if(_pf_role==='ad_tl') document.body.classList.add('ad-tl-mode');
+        document.documentElement.dataset.theme='dark'; // phase-0C
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('portview');
       }
-      else{if(typeof showScreen==='function')showScreen('portview');}
+      else{document.documentElement.dataset.theme='dark';if(typeof showScreen==='function')showScreen('portview');}
     }catch(e){}
   };
 
@@ -987,12 +990,14 @@ function _autoRouteAfterLogin() {
   // v499: AD TL also pre-warms team bundles
   if(isTLRole(role)||isAdminRole(role)||(typeof isADTLRole==='function'&&isADTLRole(role)))_startTlBundlePrewarm();
   if (isTLRole(role) || isAdminRole(role)) {
+    document.documentElement.dataset.theme='light'; // phase-0C
     setMode('kam');
     showScreen('teamview');
   } else if (isSalesAny && isSalesAny(role)) {
     // Sales: set body classes then route to Sales portview
     document.body.classList.add('sales-mode');
     if (isSalesTLRole && isSalesTLRole(role)) document.body.classList.add('sales-tl-mode');
+    document.documentElement.dataset.theme='light'; // phase-0C
     setMode('kam');
     showScreen('sales-portview');
   } else if (isADAny && isADAny(role)) {
@@ -1012,6 +1017,7 @@ function _autoRouteAfterLogin() {
     }catch(ex){}
     document.body.classList.add('kad-mode');
     if (isADTLRole && isADTLRole(role)) document.body.classList.add('ad-tl-mode');
+    document.documentElement.dataset.theme='dark'; // phase-0C
     setMode('kam');
     // AD IC: same portview flow as KAM rep
     const _r2Settled = !(typeof sheetsLoadStarted !== 'undefined' && sheetsLoadStarted) ||
@@ -1023,6 +1029,7 @@ function _autoRouteAfterLogin() {
       showScreen('portview');
     }
   } else {
+    document.documentElement.dataset.theme='dark'; // phase-0C: KAM default
     setMode('kam');
     // v477-H5: guard IDB stale data — only auto-open single account when R2 data is settled.
     // Root cause: IDB preload runs before auth completes; portviewBulkData may contain prev-session
