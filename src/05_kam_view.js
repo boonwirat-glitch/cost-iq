@@ -130,7 +130,12 @@ function __legacyShowScreenFallback(name){
   }
   const _handle=document.getElementById('kam-nav-handle');
   if(_handle)_handle.style.display=(isKAM&&name==='overview')?'block':'none';
-  if(name==='teamview'){teamviewKamFilter=null;renderTeamview();}
+  if(name==='teamview'){
+    teamviewKamFilter=null;renderTeamview();
+    // Disable Save while in teamview — must select account first
+    const _sb=document.getElementById('nav-opportunities');
+    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
+  }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
