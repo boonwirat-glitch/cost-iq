@@ -1,3 +1,60 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 0G: DOM UTILITIES — ใช้แทน innerHTML โดยตรง
+//
+// updateDOM(el, htmlString)
+//   ทำ event listener cleanup ก่อน inject HTML ใหม่
+//   ป้องกัน memory leak จาก inline onclick handlers ที่ไม่ถูก remove
+//   ทุก feature ใหม่ต้องใช้ updateDOM แทน el.innerHTML = html
+//
+// shimmer(el, rows, opts)
+//   แสดง skeleton loading placeholder ขณะรอ Tier ที่สูงกว่า
+//   ใช้เมื่อ feature ต้องการ Tier 2/3 แต่กำลัง render ใน Tier 1 pass
+//
+// USAGE:
+//   updateDOM(document.getElementById('my-list'), htmlString);
+//   shimmer(document.getElementById('sku-section'), 3);
+// ─────────────────────────────────────────────────────────────────────────────
+window.updateDOM = function updateDOM(el, htmlString){
+  if(!el) return;
+  try{
+    // Remove any elements with data-evt marker (explicit listener registration)
+    el.querySelectorAll('[data-evt]').forEach(function(child){
+      try{
+        var evtList = child._senseEvts;
+        if(evtList && Array.isArray(evtList)){
+          evtList.forEach(function(e){ try{ child.removeEventListener(e.type, e.fn); }catch(_){} });
+        }
+        child._senseEvts = null;
+      }catch(_){}
+    });
+  }catch(_){}
+  el.innerHTML = htmlString;
+};
+
+// shimmerHTML(rows, opts) — returns shimmer HTML string (for use inside render functions)
+// opts: { height: '12px', gap: '8px', widths: ['80%','60%','70%'] }
+window.shimmerHTML = function shimmerHTML(rows, opts){
+  opts = opts || {};
+  var h = opts.height || '12px';
+  var gap = opts.gap || '10px';
+  var ws = opts.widths || ['75%','55%','65%','50%','70%'];
+  var html = '<div style="padding:12px 0;display:flex;flex-direction:column;gap:'+gap+'">';
+  for(var i=0; i<(rows||3); i++){
+    var w = ws[i % ws.length];
+    html += '<div class="sense-shimmer" style="height:'+h+';width:'+w+';border-radius:4px;background:var(--n100,rgba(255,255,255,.06));position:relative;overflow:hidden">'
+          + '<div class="sense-shimmer-inner"></div>'
+          + '</div>';
+  }
+  html += '</div>';
+  return html;
+};
+
+// shimmer(el, rows, opts) — inject shimmer into element directly
+window.shimmer = function shimmer(el, rows, opts){
+  if(!el) return;
+  window.updateDOM(el, window.shimmerHTML(rows, opts));
+};
+
 // SECTION:OVERVIEW
 function renderOverview(){
   const renderer = window.FreshketSenseOverviewRenderer;
