@@ -8,18 +8,25 @@ let SUR_GEO = null;
 async function loadGeoJSON() {
   if (BKK_GEO && SUR_GEO) return true;  // already loaded
   try {
-    const [bkkResp, surResp] = await Promise.all([
-      fetch('/geo/bangkok_khet.geojson'),
-      fetch('/geo/surrounding_provinces.geojson'),
-    ]);
-    if (!bkkResp.ok || !surResp.ok) throw new Error('GeoJSON fetch failed');
-    [BKK_GEO, SUR_GEO] = await Promise.all([bkkResp.json(), surResp.json()]);
-    DashLog.info('map', 'GeoJSON loaded');
-    return true;
+    const bkkResp = await fetch('/geo/bangkok_khet.geojson');
+    if (!bkkResp.ok) throw new Error('bangkok_khet.geojson HTTP ' + bkkResp.status);
+    BKK_GEO = await bkkResp.json();
+    DashLog.info('map', 'BKK GeoJSON loaded');
   } catch(e) {
-    DashLog.error('map_geojson', e.message);
+    DashLog.error('map_bkk_geojson', e.message);
     return false;
   }
+  try {
+    const surResp = await fetch('/geo/surrounding_provinces.geojson');
+    if (!surResp.ok) throw new Error('surrounding_provinces.geojson HTTP ' + surResp.status);
+    SUR_GEO = await surResp.json();
+    DashLog.info('map', 'Surrounding GeoJSON loaded');
+  } catch(e) {
+    DashLog.error('map_sur_geojson', e.message);
+    // Non-fatal — surrounding provinces are background only
+    SUR_GEO = { type: 'FeatureCollection', features: [] };
+  }
+  return true;
 }
 
 
@@ -119,8 +126,8 @@ function updateMapColors() {
 
   // Read CSS vars for choropleth
   const cs = getComputedStyle(document.documentElement);
-  const c0 = cs.getPropertyValue('--choro-0').trim() || '#FFF5F7';
-  const c5 = cs.getPropertyValue('--choro-5').trim() || '#CC1A3A';
+  const c0 = cs.getPropertyValue('--choro-0').trim();
+  const c5 = cs.getPropertyValue('--choro-5').trim();
 
   const colorScale = d3.scaleSequential()
     .domain([min, max])
@@ -312,7 +319,12 @@ function openDetailForDistrict(name, props) {
     </div>`);
 }
 
-// ── Zoom controls ─────────────────────────────────────────────
+// ── Cancel pending init if nav away before timer fires ────────
+function cancelMapInitTimer() {
+  if (_mapInitTimer) { clearTimeout(_mapInitTimer); _mapInitTimer = null; }
+}
+
+// ── Zoom controls ──────────────────────────────────────────────
 function mapZoom(factor) {
   if (!mapSvg) return;
   mapSvg.transition().duration(280).call(mapZoomBehavior.scaleBy, factor);
@@ -333,11 +345,12 @@ const _origSetView = typeof setView === 'function' ? setView : null;
 
 // Watch for map view — init on first show
 let _mapInited = false;
+let _mapInitTimer = null;
 const _mapObserver = new MutationObserver(() => {
   const mapView = document.getElementById('view-map');
   if (mapView?.classList.contains('active') && !_mapInited) {
-    _mapInited = true;
-    setTimeout(initMap, 60);
+    _mapInited = true;  // flag set first to prevent double-trigger
+    setTimeout(async () => { await initMap(); }, 60);
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
