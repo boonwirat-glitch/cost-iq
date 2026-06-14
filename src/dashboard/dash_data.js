@@ -3,17 +3,18 @@
 // Data pipeline: R2 CSV + KAM group builder
 
 const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const MONTHS  = ['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+// MONTHS sourced from DASH_CONFIG
+const MONTHS = DASH_CONFIG.MONTHS;
 
 // ── State ─────────────────────────────────────────────────────
 let portviewBulkData = [];
-let currentMonth     = MONTHS[MONTHS.length - 1];  // always last available month
+let currentMonth = MONTHS.length > 0 ? MONTHS[MONTHS.length - 1] : 'Apr 26';
 let currentMetric    = 'gmv';
 let dataReady        = false;
 let dataLoadError    = null;
 
 // ── Fetch with retry ─────────────────────────────────────────
-async function fetchWithRetry(url, retries = 2, delayMs = 1200) {
+async function fetchWithRetry(url, retries = DASH_CONFIG.FETCH_RETRIES, delayMs = DASH_CONFIG.FETCH_RETRY_DELAY_MS) {
   for (let i = 0; i <= retries; i++) {
     try {
       const resp = await fetch(url);
@@ -34,7 +35,7 @@ async function loadDashData() {
   try {
     const csv = await fetchWithRetry(`${R2_BASE}/portview.csv?cb=${Date.now()}`);
     portviewBulkData = parsePortviewCSV(csv);
-    DashLog.info('data', `portview loaded: ${portviewBulkData.length} accounts`);
+    DashLog.info('data', `portview loaded: ${portviewBulkData?.length ?? 0} accounts`);
   } catch(e) {
     DashLog.error('data_load', e.message, 'portview.csv');
     dataLoadError = e.message;
@@ -85,7 +86,7 @@ function onDataReady() {
 
 // ── Getters ───────────────────────────────────────────────────
 function getMyAccounts() {
-  if (!currentProfile) return [];
+  if (!currentProfile?.email) return [];
   const email = currentProfile.email;
   const role  = currentProfile.role;
   if (role === 'admin') return portviewBulkData;
@@ -115,7 +116,7 @@ function buildKamGroups() {
     // 3-month rolling baseline
     const baseline = g.accounts.reduce((s,a) => {
       const vals = MONTHS.slice(0, MONTHS.indexOf(currentMonth))
-        .slice(-3).map(m => a.gmv[m]||0).filter(v=>v>0);
+        .slice(-DASH_CONFIG.BASELINE_MONTHS).map(m => a.gmv[m]||0).filter(v=>v>0);
       return s + (vals.length ? vals.reduce((x,y)=>x+y,0)/vals.length : 0);
     }, 0);
 
