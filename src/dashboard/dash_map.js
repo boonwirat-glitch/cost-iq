@@ -66,6 +66,7 @@ async function initMap() {
   const W = container.clientWidth  || 800;
   const H = container.clientHeight || 600;
 
+  try {
   mapProjection = d3.geoMercator()
     .center([100.52, 13.75])
     .scale(W * 5.5)
@@ -98,6 +99,9 @@ async function initMap() {
   renderMapToolbar();
   renderMapLegend();
   if (DashState?.salesOverlay) renderSalesOverlay();
+  } catch(mapErr) {
+    DashLog.error('map_init', mapErr.message);
+  }
 }
 
 // ── Colors ────────────────────────────────────────────────────
@@ -183,7 +187,7 @@ function renderMapLegend() {
 function onPolyHover(event, d) {
   const name = d.properties.name_th;
   const dist = MOCK_DISTRICT[name];
-  const entry = dist?.months[currentMonth];
+  const entry = dist?.months[currentMonth] || null;
   const prevM = MONTHS[MONTHS.indexOf(currentMonth)-1];
   const prev  = dist?.months[prevM];
 
