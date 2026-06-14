@@ -1,4 +1,4 @@
-<!-- Freshket Sense v713: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v715: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v713',
+      version: 'v715',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12554,6 +12554,39 @@ function hideLoginOverlay() {
   };
 })();
 
+// ── v715 Fix 2A: SCREEN-LEVEL SKELETON UTILITY ────────────────────────────
+// showScreenSkeleton(id) — inject shimmer into any screen container while waiting for data
+// hideScreenSkeleton(id) — remove shimmer before real render fires
+// Reuses sense-shimmer-* CSS already in the page. Safe to call multiple times.
+window._showScreenSkeleton = function(screenId){
+  try{
+    var el = document.getElementById(screenId);
+    if(!el || el.dataset.skeleton) return;
+    el.dataset.skeleton = '1';
+    var wrap = document.createElement('div');
+    wrap.id = 'skel-' + screenId;
+    wrap.style.cssText = 'padding:16px';
+    var card = function(){
+      return '<div class="sense-shimmer-card">' +
+        '<div class="sense-shimmer-line" style="width:45%;height:11px;margin-bottom:10px"></div>' +
+        '<div class="sense-shimmer-line" style="width:80%;height:20px;margin-bottom:10px"></div>' +
+        '<div class="sense-shimmer-line" style="width:40%;height:9px;margin-bottom:0"></div>' +
+      '</div>';
+    };
+    wrap.innerHTML = card() + card() + card();
+    el.insertBefore(wrap, el.firstChild);
+  }catch(e){}
+};
+window._hideScreenSkeleton = function(screenId){
+  try{
+    var el = document.getElementById(screenId);
+    if(!el) return;
+    delete el.dataset.skeleton;
+    var wrap = document.getElementById('skel-' + screenId);
+    if(wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+  }catch(e){}
+};
+
   // v224e: skip splash entirely on warm IDB boot
   // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 90min
   // → show shimmer skeleton → ETag check in background → replace with real data
@@ -15971,6 +16004,20 @@ window.RenderBus = (function(){
   function _flush(){
     _timer = null;
 
+    // v715 Fix 1B: TIER 1 GUARD in _flush() — closes gap where flushNow() bypassed
+    // the signal() guard and rendered with empty portviewBulkData → 0-values flash.
+    // Note: DataRegistry not available = script not loaded yet → proceed (safe fallback).
+    // Note: _senseSplashActive check is in signal() — _flush() can be called directly
+    //       via flushNow(), so we guard here too.
+    if(window.DataRegistry && !window.DataRegistry.isReady(1)){
+      window._pendingRefreshAll = true;
+      _senseDataLog('RENDERBUS','⏳ _flush HELD — Tier 1 not ready yet (re-queuing)');
+      // onReady fires signal() → re-schedules flush when Tier 1 is ready
+      // Use onReady not waitFor — onReady fires immediately if already ready
+      try{ window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
+      return;
+    }
+
     // Phase 0G: VERSION GUARD — skip if data hasn't actually changed
     // Catches ETag 304 (file unchanged) and duplicate signals from IDB+R2 same data
     var currentVersion = (window.DataRegistry && typeof window.DataRegistry.version !== 'undefined')
@@ -15983,6 +16030,13 @@ window.RenderBus = (function(){
     _lastRender = Date.now();
     _lastRenderedVersion = currentVersion;
     _senseDataLog('RENDERBUS','🎯 RENDER v'+currentVersion+' ['+Array.from(_ready).join(',')+']');
+
+    // v715: clear screen-level skeletons before render (Fix 2B)
+    try{
+      ['scr-portview','scr-teamview','scr-sales-portview'].forEach(function(id){
+        if(typeof window._hideScreenSkeleton==='function') window._hideScreenSkeleton(id);
+      });
+    }catch(e){}
 
     // v224e: clear shimmer right before render
     try{
@@ -46513,12 +46567,22 @@ function echoOpen() {
     echoExpand();
     return;
   }
-  // Guard: data ยังไม่พร้อม — ไม่เปิด Echo จนกว่าจะ load ครบ
-  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
-    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล กรุณารอสักครู่...', '⏳');
-    return;
-  }
+  // v715 Fix 3A: MOUNT-FIRST — CI.open() has no data dependency, always open immediately.
+  // Previous: silent return when !allCriticalReady() → user sees blank screen with no feedback.
+  // Now: open sheet → show toast if data still loading → re-render Echo state when data arrives.
   CI.open(null);
+  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
+    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล...', '⏳');
+    if (window.DataRegistry) {
+      window.DataRegistry.waitFor(1).then(function(){
+        try{
+          if (typeof CI !== 'undefined' && typeof CI._renderEchoState === 'function') {
+            CI._renderEchoState();
+          }
+        }catch(e){}
+      }).catch(function(){});
+    }
+  }
 }
 function echoHistory(accountId) {
   // Open Echo sheet on history tab for specific account
@@ -47080,6 +47144,21 @@ function renderSalesHome(el, outlets, pipeline) {
 function renderSalesPortview() {
   const el = document.getElementById('scr-sales-portview');
   if (!el) return;
+
+  // v715 Fix 2C: if Tier 1 not ready → show skeleton, re-render when data arrives
+  // Prevents 0-value flash when RenderBus fires renderSalesPortview too early
+  const _tier1Ready = window.DataRegistry ? window.DataRegistry.isReady(1) : true;
+  if (!_tier1Ready) {
+    if (typeof window._showScreenSkeleton === 'function') {
+      window._showScreenSkeleton('scr-sales-portview');
+    }
+    if (window.DataRegistry) {
+      window.DataRegistry.waitFor(1).then(function(){
+        try { renderSalesPortview(); } catch(e) {}
+      }).catch(function(){});
+    }
+    return;
+  }
 
   const outlets = getSalesPortviewData();
   const email = (currentUserProfile && currentUserProfile.email) || '';
