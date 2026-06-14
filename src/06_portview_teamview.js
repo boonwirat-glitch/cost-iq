@@ -1315,12 +1315,11 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v669: Few-cards guard — only block collapse if page would NOT be scrollable
-    // even after header is fully collapsed. This prevents scroll-jitter when
-    // card count is small but doesn't block collapse entirely.
-    // Check: simulate collapsed state → would page be scrollable?
-    if(h===0&&!_scrollable()){
-      // Page can't scroll even when collapsed → stay expanded, no jitter
+    // v671e: Few-cards guard — only block collapse on fresh load (not when user already collapsed)
+    // If user has already collapsed the header (isCollapsed=true), respect that state
+    // even when search returns few results that make page not scrollable
+    if(h===0&&!_scrollable()&&!isCollapsed){
+      // Fresh state, page can't scroll → stay expanded, no jitter
       h=expandedH;
     }
 
