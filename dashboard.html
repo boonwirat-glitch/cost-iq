@@ -1036,6 +1036,54 @@ html, body {
 .ds-seg-item:hover { color: var(--ink-2); }
 .ds-seg-item.active { background: var(--c-seg-active-bg); color: var(--c-seg-active-fg); font-weight: var(--weight-semibold); box-shadow: var(--c-seg-active-shadow); }
 .ds-seg-item.active-ac { background: var(--ac); color: white; font-weight: var(--weight-semibold); }
+
+/* ── Phase 3: Sync & Interaction (v703) ── */
+
+/* Rep-map highlight states */
+.td-poly.rep-highlight { stroke-width: 1.5 !important; }
+.td-poly.rep-dim       { transition: opacity .2s; }
+
+/* Zone filter chip */
+.td-zone-chip {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--info-dim); border: 1px solid var(--info-border);
+  border-radius: var(--r-full); padding: 4px 8px 4px 10px;
+  font-size: var(--text-2xs); color: var(--info);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+.td-zone-chip svg { flex-shrink: 0; }
+.td-zone-chip span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-zone-chip button {
+  width: 18px; height: 18px; border: none; background: var(--info-dim);
+  border-radius: var(--r-full); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: var(--info);
+  flex-shrink: 0;
+}
+.td-zone-chip button:hover { background: var(--info-border); }
+
+/* Sales overlay toggle button */
+.td-overlay-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 var(--space-3);
+  background: var(--surface); border: 1px solid var(--hair-2);
+  border-radius: var(--r-md); font-size: var(--text-2xs);
+  font-family: var(--font-mono); font-weight: var(--weight-semibold);
+  color: var(--ink-3); cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.td-overlay-btn:hover { border-color: var(--info-border); color: var(--info); }
+.td-overlay-btn.active {
+  background: var(--info-dim); border-color: var(--info-border); color: var(--info);
+}
+
+/* Sales dots */
+.td-sales-dot { pointer-events: all; }
+
+/* Rep row dim state */
+.td-rep-row.dimmed {
+  opacity: .28; pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -1206,7 +1254,7 @@ html, body {
 // Freshket TL Dashboard v702
 // Supabase: menslbnyyvpxiyvjywcm.supabase.co
 
-const DASH_VERSION = 'v702';
+const DASH_VERSION = 'v703';
 const SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
 const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
 const ALLOWED_ROLES = ['tl', 'admin', 'sales_tl', 'ad_tl',
@@ -1482,11 +1530,51 @@ function buildKamGroups() {
 <!-- Layout -->
 <script>
 // ── dash_layout.js — App init, view routing, topbar ──────────
-// Freshket TL Dashboard v702
+// Freshket TL Dashboard v703 — Phase 3: bidirectional sync
 
 let currentView = 'map';
 
-// ── App init (called after auth) ─────────────────────────────
+// ── Sync state (Phase 3) ──────────────────────────────────────
+// Single source of truth for selection state
+const DashState = {
+  selectedRepEmail:    null,   // KAM selected in sidebar
+  selectedDistrictName:null,   // district selected on map
+  zoneFilterActive:    false,  // map zone filtering rep list
+  salesOverlay:        false,  // show sales acquisition dots
+
+  // Set rep selection — triggers map highlight
+  selectRep(email) {
+    this.selectedRepEmail = this.selectedRepEmail === email ? null : email;
+    this.selectedDistrictName = null;  // clear zone selection
+    this.zoneFilterActive = false;
+    this._syncAll();
+  },
+
+  // Set district selection — triggers list filter
+  selectDistrict(name) {
+    this.selectedDistrictName = this.selectedDistrictName === name ? null : name;
+    this.selectedRepEmail = null;    // clear rep selection
+    this.zoneFilterActive = !!this.selectedDistrictName;
+    this._syncAll();
+  },
+
+  // Clear everything
+  clearAll() {
+    this.selectedRepEmail     = null;
+    this.selectedDistrictName = null;
+    this.zoneFilterActive     = false;
+    this._syncAll();
+  },
+
+  _syncAll() {
+    syncMapToRep();
+    syncRepListToZone();
+    renderZoneFilterChip();
+    renderSidebarRepHighlight();
+  }
+};
+
+// ── App init ──────────────────────────────────────────────────
 function initApp() {
   renderTopbarUser();
   renderTopbarControls();
@@ -1507,24 +1595,29 @@ function renderTopbarControls() {
   const c = document.getElementById('topbar-controls');
   c.innerHTML = `
     <div class="ds-seg-ctrl" id="metric-toggle">
-      <button class="ds-seg-item active-ac" data-m="gmv"          onclick="setMetric('gmv',this)">GMV ฿</button>
-      <button class="ds-seg-item"           data-m="accounts"     onclick="setMetric('accounts',this)">Accounts</button>
-      <button class="ds-seg-item"           data-m="outlets"      onclick="setMetric('outlets',this)">Outlets</button>
-      <button class="ds-seg-item"           data-m="new_accounts" onclick="setMetric('new_accounts',this)">New Acc</button>
+      <button class="ds-seg-item active-ac" onclick="setMetric('gmv',this)">GMV ฿</button>
+      <button class="ds-seg-item" onclick="setMetric('accounts',this)">Accounts</button>
+      <button class="ds-seg-item" onclick="setMetric('outlets',this)">Outlets</button>
+      <button class="ds-seg-item" onclick="setMetric('new_accounts',this)">New Acc</button>
     </div>
     <div class="ds-seg-ctrl" id="month-toggle">
       ${MONTHS.map(m =>
         `<button class="ds-seg-item${m===currentMonth?' active-ac':''}"
           onclick="setMonth('${m}',this)">${m}</button>`
       ).join('')}
-    </div>`;
+    </div>
+    <button class="td-overlay-btn${DashState.salesOverlay?' active':''}"
+      id="sales-overlay-btn" onclick="toggleSalesOverlay()" title="Sales acquisition overlay">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+      </svg>
+      Sales
+    </button>`;
 }
 
 function setMetric(m, btn) {
   currentMetric = m;
-  document.querySelectorAll('#metric-toggle .ds-seg-item').forEach(b => {
-    b.classList.remove('active-ac');
-  });
+  document.querySelectorAll('#metric-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
   btn.classList.add('active-ac');
   updateMapColors();
   renderCurrentView();
@@ -1532,16 +1625,21 @@ function setMetric(m, btn) {
 
 function setMonth(m, btn) {
   currentMonth = m;
-  document.querySelectorAll('#month-toggle .ds-seg-item').forEach(b => {
-    b.classList.remove('active-ac');
-  });
+  document.querySelectorAll('#month-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
   btn.classList.add('active-ac');
   updateMapColors();
   renderSidebarTeam();
   renderCurrentView();
 }
 
-// ── View routing ─────────────────────────────────────────────
+function toggleSalesOverlay() {
+  DashState.salesOverlay = !DashState.salesOverlay;
+  const btn = document.getElementById('sales-overlay-btn');
+  btn?.classList.toggle('active', DashState.salesOverlay);
+  renderSalesOverlay();
+}
+
+// ── View routing ──────────────────────────────────────────────
 function setView(v, btn) {
   currentView = v;
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -1562,7 +1660,7 @@ function renderCurrentView() {
   if (currentView === 'skills')     renderSkillsView();
 }
 
-// ── Sidebar shimmer ───────────────────────────────────────────
+// ── Shimmer ───────────────────────────────────────────────────
 function renderSidebarShimmer() {
   document.getElementById('sidebar-shimmer').style.display = 'flex';
 }
@@ -1570,30 +1668,120 @@ function hideSidebarShimmer() {
   document.getElementById('sidebar-shimmer').style.display = 'none';
 }
 
-// ── Detail panel ──────────────────────────────────────────────
-let selectedDistrict = null;
+// ── Zone filter chip ──────────────────────────────────────────
+function renderZoneFilterChip() {
+  let chip = document.getElementById('zone-filter-chip');
+  if (!DashState.zoneFilterActive || !DashState.selectedDistrictName) {
+    chip?.remove();
+    return;
+  }
+  if (!chip) {
+    chip = document.createElement('div');
+    chip.id = 'zone-filter-chip';
+    chip.className = 'td-zone-chip';
+    // Insert above rep list
+    const content = document.getElementById('sidebar-content');
+    if (content) content.prepend(chip);
+  }
+  chip.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+    <span>${DashState.selectedDistrictName}</span>
+    <button onclick="DashState.clearAll()" title="ล้าง filter">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+    </button>`;
+}
 
+// ── Sync: Map → Rep highlight ─────────────────────────────────
+function syncRepListToZone() {
+  if (!DashState.zoneFilterActive) {
+    // Show all reps at full opacity
+    document.querySelectorAll('.td-rep-row').forEach(r => {
+      r.style.opacity = '';
+      r.style.pointerEvents = '';
+    });
+    return;
+  }
+  // Find which KAMs have accounts in selected district
+  // For now using mock: hub_zone matches rep index group
+  // Phase 2: replace with real account → district mapping
+  const dist = DashState.selectedDistrictName;
+  const distData = MOCK_DISTRICT?.[dist];
+  const hubZone  = distData?.hub_zone || '';
+
+  document.querySelectorAll('.td-rep-row').forEach(r => {
+    const repEmail = r.dataset.repEmail;
+    const groups = buildKamGroups();
+    const repGroup = groups.find(g => g.email === repEmail);
+    // Simple heuristic: KAMs with accounts in this hub zone
+    // In Phase 2 replace with: repGroup.accounts.some(a => a.district === dist)
+    const isInZone = hubZone
+      ? (repGroup?.key?.charCodeAt(0) || 0) % 3 === (hubZone.charCodeAt(hubZone.length-1) || 0) % 3
+      : true;
+    r.style.opacity      = isInZone ? '' : '0.28';
+    r.style.pointerEvents = isInZone ? '' : 'none';
+  });
+}
+
+// ── Sync: Rep → Map highlight ─────────────────────────────────
+function syncMapToRep() {
+  if (typeof mapG === 'undefined' || !mapG) return;
+  const email = DashState.selectedRepEmail;
+  if (!email) {
+    // Reset all polygons
+    mapG.select('.g-bkk').selectAll('path')
+      .style('opacity', null)
+      .classed('rep-highlight', false)
+      .classed('rep-dim', false);
+    return;
+  }
+  // Find accounts owned by this rep
+  const repAccounts = getMyAccounts().filter(a => a.kamEmail === email);
+  // For now map to districts via mock hub_zone logic
+  // Phase 2: use real account.district field
+  const repIdx = buildKamGroups().findIndex(g => g.email === email);
+  const hubMatch = 'Hub ' + (repIdx + 1);
+
+  mapG.select('.g-bkk').selectAll('path')
+    .classed('rep-highlight', d => MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone === hubMatch)
+    .classed('rep-dim',       d => MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone !== hubMatch)
+    .style('opacity', d => {
+      const hz = MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone;
+      if (hz === hubMatch) return '1';
+      return '0.22';
+    });
+}
+
+// ── Sync: rep row highlight from external call ────────────────
+function renderSidebarRepHighlight() {
+  document.querySelectorAll('.td-rep-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.repEmail === DashState.selectedRepEmail);
+  });
+}
+
+// ── Detail panel ──────────────────────────────────────────────
 function openDetail(html) {
   document.getElementById('detail-content').innerHTML = html;
   document.getElementById('detail-panel').classList.add('open');
 }
 function closeDetail() {
   document.getElementById('detail-panel').classList.remove('open');
-  selectedDistrict = null;
-  // Deselect map polygon
-  document.querySelectorAll('.td-poly.selected').forEach(p => p.classList.remove('selected'));
+  DashState.clearAll();
 }
 </script>
 
 <!-- Team view -->
 <script>
 // ── dash_teamview.js — Team/Commission/Skills panels ─────────
-// Freshket TL Dashboard v702
+// Freshket TL Dashboard v703 — Phase 3: DashState sync
 
 // ── Sidebar team summary ──────────────────────────────────────
 function renderSidebarTeam() {
   const groups = buildKamGroups();
-  const total  = groups.reduce((s,g) => s + g.totalGMV, 0);
+  const total    = groups.reduce((s,g) => s + g.totalGMV, 0);
   const baseline = groups.reduce((s,g) => s + g.baseline, 0);
   const teamPace = baseline > 0 ? Math.round(total / baseline * 100) : 0;
   const cls = paceCls(teamPace);
@@ -1603,8 +1791,10 @@ function renderSidebarTeam() {
   const ok     = groups.filter(g => g.cls === 'ok').length;
   const star   = groups.filter(g => g.cls === 'star').length;
 
+  // Rep rows — data-rep-email for sync targeting
   const repsHtml = groups.map(g => `
-    <div class="td-rep-row ${g.cls}" onclick="selectRep('${g.email}',this)">
+    <div class="td-rep-row ${g.cls}" data-rep-email="${g.email}"
+      onclick="DashState.selectRep('${g.email}')">
       <div class="td-rep-body">
         <div class="td-rep-name">${g.name}</div>
         <div class="td-rep-bar-row">
@@ -1640,16 +1830,11 @@ function renderSidebarTeam() {
     </div>
     <div class="td-rep-list-hd">
       <span class="ds-eyebrow">KAM</span>
-      <button class="td-sort-btn">เสี่ยง ↓</button>
+      <button class="td-sort-btn" onclick="DashState.clearAll()">ล้าง ✕</button>
     </div>
-    ${repsHtml}`;
-}
-
-let selectedRepEmail = null;
-function selectRep(email, row) {
-  selectedRepEmail = selectedRepEmail === email ? null : email;
-  document.querySelectorAll('.td-rep-row').forEach(r => r.classList.remove('selected'));
-  if (selectedRepEmail) row.classList.add('selected');
+    <div id="rep-rows-wrap">
+      ${repsHtml}
+    </div>`;
 }
 
 // ── Main team view ────────────────────────────────────────────
@@ -1660,29 +1845,32 @@ function renderTeamView() {
   const rows = groups.map(g => {
     const prevIdx = MONTHS.indexOf(currentMonth) - 1;
     const prevGMV = prevIdx >= 0
-      ? g.accounts.reduce((s,a) => s + (a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
+      ? g.accounts.reduce((s,a) => s+(a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
     const delta = prevGMV > 0 ? fmtDelta(g.totalGMV, prevGMV) : '';
     const dcls  = prevGMV > 0 ? deltaCls(g.totalGMV, prevGMV) : '';
-    return `
-      <tr style="border-bottom:1px solid var(--hair)">
-        <td style="padding:10px 16px">
-          <div style="font-size:var(--text-sm);font-weight:700;color:var(--ink-1)">${g.name}</div>
-          <div style="font-size:var(--text-xs);color:var(--ink-4);font-family:var(--font-mono)">${g.email}</div>
-        </td>
-        <td style="padding:10px 16px;text-align:right">
-          <div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${fmtGMV(g.totalGMV)}</div>
-          ${delta ? `<span class="ds-delta ${dcls}">${delta}</span>` : ''}
-        </td>
-        <td style="padding:10px 16px;min-width:120px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="ds-bar-track" style="flex:1">
-              <div class="ds-bar-fill ${g.cls}" style="width:${Math.min(g.pace,100)}%"></div>
-            </div>
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;color:var(--${g.cls==='star'?'ac':g.cls})">${g.pace}%</span>
+    const acColor = g.cls === 'star' ? 'ac' : g.cls;
+    const isSelected = g.email === DashState.selectedRepEmail;
+
+    return `<tr style="border-bottom:1px solid var(--hair);${isSelected?'background:var(--ac-dim)':''};cursor:pointer"
+        onclick="DashState.selectRep('${g.email}')">
+      <td style="padding:10px 16px;${isSelected?'border-left:2px solid var(--ac)':''}">
+        <div style="font-size:var(--text-sm);font-weight:700;color:var(--ink-1)">${g.name}</div>
+        <div style="font-size:var(--text-micro);color:var(--ink-4);font-family:var(--font-mono)">${g.email}</div>
+      </td>
+      <td style="padding:10px 16px;text-align:right">
+        <div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${fmtGMV(g.totalGMV)}</div>
+        ${delta ? `<span class="ds-delta ${dcls}">${delta}</span>` : ''}
+      </td>
+      <td style="padding:10px 16px;min-width:140px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ds-bar-track" style="flex:1">
+            <div class="ds-bar-fill ${g.cls}" style="width:${Math.min(g.pace,100)}%"></div>
           </div>
-        </td>
-        <td style="padding:10px 16px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-3);text-align:right">${g.count}</td>
-      </tr>`;
+          <span style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;color:var(--${acColor})">${g.pace}%</span>
+        </div>
+      </td>
+      <td style="padding:10px 16px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-3);text-align:right">${g.count}</td>
+    </tr>`;
   }).join('');
 
   el.innerHTML = `
@@ -1701,35 +1889,66 @@ function renderTeamView() {
 
 // ── Commission view ───────────────────────────────────────────
 function renderCommissionView() {
-  const groups = buildKamGroups();
-  const total = groups.reduce((s,g) => s + g.totalGMV, 0);
-  const baseline = groups.reduce((s,g) => s + g.baseline, 0);
-  const pace = baseline > 0 ? Math.round(total / baseline * 100) : 0;
+  const groups   = buildKamGroups();
+  const total    = groups.reduce((s,g) => s+g.totalGMV, 0);
+  const baseline = groups.reduce((s,g) => s+g.baseline, 0);
+  const pace     = baseline > 0 ? Math.round(total/baseline*100) : 0;
 
-  // Sales TL commission table (from commission PDF)
   const brackets = [
-    { min:0,   max:84,  rate:0,    label:'< 85%'    },
-    { min:85,  max:89,  rate:.0055, label:'85–90%'  },
-    { min:90,  max:94,  rate:.007,  label:'90–95%'  },
-    { min:95,  max:99,  rate:.008,  label:'95–100%' },
-    { min:100, max:119, rate:.010,  label:'100–120%'},
-    { min:120, max:999, rate:.012,  label:'> 120%'  },
+    { min:0,   max:84,  rate:0,     label:'< 85%'     },
+    { min:85,  max:89,  rate:.0055, label:'85–90%'   },
+    { min:90,  max:94,  rate:.007,  label:'90–95%'   },
+    { min:95,  max:99,  rate:.008,  label:'95–100%'  },
+    { min:100, max:119, rate:.010,  label:'100–120%' },
+    { min:120, max:999, rate:.012,  label:'> 120%'   },
   ];
   const bracket = brackets.find(b => pace >= b.min && pace <= b.max) || brackets[0];
   const commAmt = Math.round(total * bracket.rate);
 
+  // Per-KAM commission breakdown
+  const kamRows = groups.map(g => {
+    const kamPace = g.baseline > 0 ? Math.round(g.totalGMV/g.baseline*100) : 0;
+    const b = brackets.find(br => kamPace >= br.min && kamPace <= br.max) || brackets[0];
+    const kamComm = Math.round(g.totalGMV * b.rate);
+    return `<tr style="border-bottom:1px solid var(--hair)">
+      <td style="padding:8px 16px;font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${g.name}</td>
+      <td style="padding:8px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--${paceCls(kamPace)})">${kamPace}%</td>
+      <td style="padding:8px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--ink-2)">${fmtGMV(g.totalGMV)}</td>
+      <td style="padding:8px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--ok)">${fmtGMV(kamComm)}</td>
+    </tr>`;
+  }).join('');
+
   document.getElementById('commission-content').innerHTML = `
-    <div style="max-width:560px">
-      <div style="background:var(--surface);border-radius:var(--r-md);padding:var(--space-5);margin-bottom:var(--space-5);position:relative;overflow:hidden">
+    <div style="max-width:640px">
+      <!-- Hero -->
+      <div style="background:var(--surface);border-radius:var(--r-md);padding:var(--space-5);margin-bottom:var(--space-6);position:relative;overflow:hidden">
         <div style="position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--ac)"></div>
-        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:4px">COMMISSION ESTIMATE · ${currentMonth}</div>
+        <div class="ds-eyebrow" style="margin-bottom:4px">COMMISSION ESTIMATE · ${currentMonth}</div>
         <div style="font-family:var(--font-mono);font-size:var(--text-display);font-weight:700;letter-spacing:var(--ls-tight);line-height:1;color:var(--ok)">${fmtGMV(commAmt)}</div>
         <div style="font-size:var(--text-sm);color:var(--ink-3);margin-top:6px">Team ${pace}% × ${(bracket.rate*100).toFixed(2)}% × ${fmtGMV(total)}</div>
       </div>
-      <div class="ds-stat-row"><span class="ds-stat-label">Team GMV</span><span class="ds-stat-value">${fmtGMV(total)}</span></div>
-      <div class="ds-stat-row"><span class="ds-stat-label">Pro Rate</span><span class="ds-stat-value" style="color:var(--${paceCls(pace)})">${pace}%</span></div>
-      <div class="ds-stat-row"><span class="ds-stat-label">Rate bracket</span><span class="ds-stat-value">${bracket.label} → ${(bracket.rate*100).toFixed(2)}%</span></div>
-      <div class="ds-stat-row"><span class="ds-stat-label">Commission estimate</span><span class="ds-stat-value" style="color:var(--ok)">${fmtGMV(commAmt)}</span></div>
+
+      <!-- Summary stats -->
+      <div style="margin-bottom:var(--space-6)">
+        <div class="ds-stat-row"><span class="ds-stat-label">Team GMV</span><span class="ds-stat-value">${fmtGMV(total)}</span></div>
+        <div class="ds-stat-row"><span class="ds-stat-label">Pro Rate</span><span class="ds-stat-value" style="color:var(--${paceCls(pace)})">${pace}%</span></div>
+        <div class="ds-stat-row"><span class="ds-stat-label">Rate bracket</span><span class="ds-stat-value">${bracket.label} → ${(bracket.rate*100).toFixed(2)}%</span></div>
+        <div class="ds-stat-row"><span class="ds-stat-label">Team commission</span><span class="ds-stat-value" style="color:var(--ok)">${fmtGMV(commAmt)}</span></div>
+      </div>
+
+      <!-- Per KAM breakdown -->
+      <div class="ds-eyebrow" style="margin-bottom:var(--space-3)">Per KAM Breakdown</div>
+      <table style="width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--r-md);overflow:hidden">
+        <thead>
+          <tr style="background:var(--surface-2)">
+            <th style="padding:8px 16px;text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM</th>
+            <th style="padding:8px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace</th>
+            <th style="padding:8px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV</th>
+            <th style="padding:8px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Comm.</th>
+          </tr>
+        </thead>
+        <tbody>${kamRows}</tbody>
+      </table>
     </div>`;
 }
 
@@ -1740,7 +1959,7 @@ function renderSkillsView() {
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" stroke-width="1.5" style="margin-bottom:var(--space-4)">
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
       </svg>
-      <div style="font-size:var(--text-h3);font-weight:600;color:var(--ink-2);margin-bottom:8px">Skills — coming soon</div>
+      <div style="font-size:var(--text-h3);font-weight:600;color:var(--ink-2);margin-bottom:8px">Skills — Phase 5</div>
       <div style="font-size:var(--text-body);color:var(--ink-3)">ดู Skills progress ของ rep ใน Sense บนมือถือได้แล้วตอนนี้</div>
     </div>`;
 }
@@ -1823,6 +2042,7 @@ function initMap() {
   updateMapColors();
   renderMapToolbar();
   renderMapLegend();
+  if (DashState?.salesOverlay) renderSalesOverlay();
 }
 
 // ── Colors ────────────────────────────────────────────────────
@@ -1944,12 +2164,16 @@ function onPolyLeave(event) {
 // ── Click ─────────────────────────────────────────────────────
 function onPolyClick(event, d) {
   const name = d.properties.name_th;
-  if (selectedDistrict === name) { closeDetail(); return; }
-  selectedDistrict = name;
-
+  DashState.selectDistrict(name);
+  if (!DashState.selectedDistrictName) {
+    // was deselected — close detail
+    closeDetail();
+    return;
+  }
+  // Update polygon selected state
   mapG.select('.g-bkk').selectAll('path')
-    .classed('selected', dd => dd.properties.name_th === name);
-
+    .classed('selected', dd => dd.properties.name_th === name)
+    .style('opacity', null);  // clear rep-dim when zone selected
   openDetailForDistrict(name, d.properties);
 }
 
@@ -2068,6 +2292,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+
+// ── Sales overlay (Phase 3) ───────────────────────────────────
+function renderSalesOverlay() {
+  // Remove existing overlay
+  mapG?.selectAll('.td-sales-dot').remove();
+  if (!DashState.salesOverlay || !mapG) return;
+
+  // Mock: generate acquisition dots across Bangkok
+  // Phase 2: replace with real first_dollar_date + lat/lng from R2
+  const mockDots = BKK_GEO.features.flatMap(f => {
+    const centroid = mapPath?.centroid(f);
+    if (!centroid || isNaN(centroid[0])) return [];
+    const dist = MOCK_DISTRICT?.[f.properties.name_th];
+    const count = dist?.months[currentMonth]?.new_accounts || 0;
+    return Array.from({length: Math.min(count, 6)}, (_, i) => ({
+      x: centroid[0] + (Math.random()-0.5) * 20,
+      y: centroid[1] + (Math.random()-0.5) * 20,
+      name: f.properties.name_th,
+      gmv: Math.round(Math.random() * 200000 + 50000)
+    }));
+  });
+
+  mapG.append('g').attr('class', 'td-sales-dot-group')
+    .selectAll('circle').data(mockDots).join('circle')
+    .attr('class', 'td-sales-dot')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', 5)
+    .style('fill', 'var(--info)')
+    .style('stroke', 'white')
+    .style('stroke-width', '1.5')
+    .style('opacity', '0')
+    .style('cursor', 'pointer')
+    .on('mousemove', (event, d) => {
+      const tt = document.getElementById('map-tooltip');
+      tt.innerHTML = `<div class="tt-name" style="color:var(--info)">New Account (Sales)</div>
+        <div class="tt-zone">${d.name}</div>
+        <div class="tt-row"><span>GMV</span><span class="tt-val">${fmtGMV(d.gmv)}</span></div>`;
+      const [mx,my] = d3.pointer(event, document.getElementById('map-container'));
+      tt.style.left = (mx+14) + 'px'; tt.style.top = (my+14) + 'px';
+      tt.classList.add('show');
+    })
+    .on('mouseleave', () => document.getElementById('map-tooltip').classList.remove('show'))
+    .transition().duration(300)
+    .style('opacity', '0.85');
+}
 
 // Window resize
 window.addEventListener('resize', () => {
