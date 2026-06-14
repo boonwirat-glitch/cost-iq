@@ -701,6 +701,15 @@ async function renderPortviewTargetBar() {
   // ── Accounts + run-rate ──────────────────────────────────────
   // v182: TL/admin now filter by tlEmail (was incorrectly using all accounts → inflated runRate)
   const _pvData = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : []);
+  // v673: guard pace=0% flash — if portview data not loaded yet, show nothing (self-heal retry fires below)
+  if (_pvData.length === 0) {
+    bar.style.display = 'none';
+    if (!bar._healPending) {
+      bar._healPending = true;
+      setTimeout(() => { bar._healPending = false; bar._lastRenderMs = 0; try { renderPortviewTargetBar(); } catch(e) {} }, 1500);
+    }
+    return;
+  }
   const _hasEmailCols = _pvData.some(a => a.kamEmail || a.tlEmail);
 
   // ── rep-detail: TL/admin drilling into a specific KAM's portfolio ──
