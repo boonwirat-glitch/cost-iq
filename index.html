@@ -1,4 +1,4 @@
-<!-- Freshket Sense v709: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v710: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v709',
+      version: 'v710',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43980,9 +43980,14 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   // ── Render result panels ───────────────────────────────────────────────────
   function _renderResult() {
-    const { skillData, intelData, transcriptSummary, toneSignals } = _lastResult;
+    // v709: pipeline result — segments + summaryData added
+    const { skillData, intelData, transcriptSummary, toneSignals, segments, summaryData } = _lastResult;
+    // tone comes from summaryData.tone (pipeline) or toneSignals (legacy)
+    const _tone = summaryData?.tone || toneSignals || null;
+    // summary text from summaryData or transcriptSummary
+    const _summaryText = summaryData?.transcript_summary || transcriptSummary || null;
 
-    // Guard: ถ้า Gemini บอกว่าไม่มีเสียง ให้แสดง error แทน
+    // Guard: no speech
     if (skillData?.no_speech) {
       const noSpeechHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:16px">
@@ -44004,18 +44009,20 @@ OCPB (customer intel จากเสียงเท่านั้น):
       return;
     }
 
-    // v606: 3 tabs — บทสนทนา / ทักษะ / ลูกค้า
-    document.getElementById('ci-p0').innerHTML = _overviewPanel(transcriptSummary, toneSignals);
+    // v709: Tab บทสนทนา — แสดง segments (transcript จริง) + tone + summary
+    document.getElementById('ci-p0').innerHTML = _overviewPanel(_summaryText, _tone, segments, summaryData);
     document.getElementById('ci-p1').innerHTML = _skillsPanel(skillData);
     document.getElementById('ci-p2').innerHTML = _customerPanel(intelData);
     const tlDiv = document.getElementById('ci-tl-actions');
-  if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
+    if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
   }
 
-  // ── v606: "บทสนทนา" panel — รวม overview + transcript เป็น tab เดียว ──────
-  function _overviewPanel(summary, tone) {
+  // ── v709: "บทสนทนา" panel — transcript segments + tone + summary ────────────
+  function _overviewPanel(summary, tone, segments, summaryData) {
     const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
     const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
+
+    // Tone & Energy
     let toneHtml = '';
     if (tone) {
       const _conf = tone.rep_confidence;
@@ -44033,15 +44040,35 @@ OCPB (customer intel จากเสียงเท่านั้น):
 </div>`;
       }
     }
+
+    // Summary
     const summaryHtml = summary
       ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${summary}</div>` : '';
-    // v606: แสดง key_moments ครบทุกจุด (ไม่ตัด top 5 อีกต่อไป)
-    const allM = (tone?.key_moments||[]).map(m => _kmText(m)).filter(Boolean);
-    const momentsHtml = allM.length
-      ? `<div class="sd2-lbl">Key Moments · ${allM.length} จุด</div>`
-        + allM.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
-      : '';
-    return (toneHtml + summaryHtml + momentsHtml)
+
+    // v709: Transcript segments — ground truth แทน key_moments
+    let transcriptHtml = '';
+    if (segments && segments.length) {
+      const speakerColor = (sp) => {
+        if (!sp) return '#636366';
+        const s = sp.toLowerCase();
+        if (s === 'sales') return '#FF385C';
+        if (s.startsWith('ลูกค้า')) return '#1F8A43';
+        return '#636366';
+      };
+      const rows = segments.map(seg => {
+        const color = speakerColor(seg.speaker);
+        const ts = seg.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2;margin-right:6px;flex-shrink:0">${seg.ts}</span>` : '';
+        const spk = seg.speaker ? `<span style="font-size:10px;font-weight:600;color:${color};margin-right:6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em">${seg.speaker}</span>` : '';
+        return `<div style="display:flex;align-items:baseline;gap:0;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:baseline;gap:0;flex-shrink:0;width:120px">${ts}${spk}</div>
+          <div style="font-size:13px;color:#1C1C1E;line-height:1.6;flex:1">${seg.text||''}</div>
+        </div>`;
+      }).join('');
+      transcriptHtml = `<div class="sd2-lbl">บทสนทนา · ${segments.length} segments</div>
+<div style="margin-bottom:8px">${rows}</div>`;
+    }
+
+    return (toneHtml + summaryHtml + transcriptHtml)
       || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลบทสนทนา</div>`;
   }
 
