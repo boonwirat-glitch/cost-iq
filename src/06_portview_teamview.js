@@ -191,6 +191,8 @@ function skuStoryLine(s){
 function setPortviewFilter(f){
   portviewFilter=(portviewFilter===f)?'all':f; // toggle: same card = deselect
   window._pvLastRenderMs=Date.now(); // guard: prevent IntersectionObserver expanding on content-shrink
+  // v672b: snapshot collapse state BEFORE DOM change causes browser scroll reset
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _applyPortviewTierVisual();
   renderPortviewList();
 }
@@ -683,6 +685,8 @@ function _pvAccountCacheKey(){
 function _pvClearAccountCache(){_pvAcctCacheKey='';_pvAcctCacheTs=0;_pvAcctCacheResult=null;}
 function schedulePortviewListRender(delay){
   clearTimeout(_pvRenderTimer);
+  // v672b: snapshot collapse state before render (search may cause scroll reset)
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
 function _senseHydrateVisiblePortfolio(reason,opts){
@@ -1244,8 +1248,9 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
-  // v671f: restore collapse state from global — survives reinit (search/sort/filter)
-  var isCollapsed = (window._pvLastCollapseMs||0) > 0;
+  // v672b: restore collapse state — use _pvWasCollapsed (snapshotted before scroll reset)
+  // _pvLastCollapseMs may be stale if browser reset scroll before reinit
+  var isCollapsed = !!(window._pvWasCollapsed||(window._pvLastCollapseMs||0)>0);
   var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
 
   function _scrollTop(){
