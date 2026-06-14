@@ -50,6 +50,7 @@ function initApp() {
   renderSidebarShimmer();
   loadDashData();
   loadCommissionData();  // Phase 4: load in parallel
+  loadSkillsData();         // Phase 5: load in parallel
 }
 
 function renderTopbarUser() {
