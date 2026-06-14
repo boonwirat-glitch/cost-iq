@@ -1,4 +1,4 @@
-<!-- Freshket Sense v710: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v711: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v710',
+      version: 'v711',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -44148,15 +44148,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
         </div>`;
       }
       const rows = fs.map(f => {
-        const tg = TAGS[f.tag];
-        const tagChip = tg
-          ? `<span style="background:${tg[1]};color:${tg[2]};font-size:11px;font-weight:500;padding:2px 9px;border-radius:999px;margin-right:7px;white-space:nowrap">${tg[0]}</span>`
-          : '';
         const quote = (f.quote && String(f.quote).trim())
           ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
           : '';
         return `<div style="padding:8px 0 8px 2px">
-          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${tagChip}${f.summary || '-'}</div>
+          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
           ${quote}
         </div>`;
       }).join('');
