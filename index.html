@@ -1,4 +1,4 @@
-<!-- Freshket Sense v682: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v683: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v682',
+      version: 'v683',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7683,6 +7683,15 @@ body.sales-mode.kam-mode .bnav .ni.on .lb  { color: #FF385C !important; font-wei
 /* Skills + Echo disabled in KAM Sense (Save) flow */
 body.kam-sense-active.kam-mode .bnav #nav-skills   { opacity: .25 !important; pointer-events: none !important; }
 body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; pointer-events: none !important; }
+
+/* ── v683: SKU badge shimmer — hide badge rows while KAM bundle loading ──
+   pv-shimmer-wrap exists only during shimmer active (IDB boot → ETag complete).
+   Prevents .portview-acct-badge-row flashing empty → then suddenly showing
+   สั่ง/หาย/เฝ้าดู when KAM bundle arrives ~1s later. */
+#portview-list:has(#pv-shimmer-wrap) .portview-acct-badge-row,
+#portview-list:has(#tv-shimmer-wrap) .portview-acct-badge-row {
+  visibility: hidden;
+}
 </style>
 <style id="tv-module-css">
 /* ============================================================
@@ -27589,8 +27598,10 @@ function __legacyRenderPortviewListFallback(){
   }else{
     listEl.innerHTML=_sorted.map((a,i)=>renderer(a,i)).join('');
   }
-  // v669b: sync list padding-top after each render (header height may differ)
+  // v683: sync list padding-top after each render (header height may differ)
+  // Two-pass: 0ms catches most cases, 100ms fallback catches slow layout reflow
   setTimeout(_pvSyncListOffset, 0);
+  setTimeout(_pvSyncListOffset, 100);
   // Sync sticky sort row in portview-header
   const _sc=document.getElementById('pv-sort-count');if(_sc)_sc.textContent=filtered.length+' ร้าน';
   const _arrow=pvSortDir===1?'↓':'↑';
