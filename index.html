@@ -27668,7 +27668,8 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
-  var isCollapsed = false; // current logical state for strip/search management
+  // v671f: restore collapse state from global — survives reinit (search/sort/filter)
+  var isCollapsed = (window._pvLastCollapseMs||0) > 0;
   var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
 
   function _scrollTop(){
