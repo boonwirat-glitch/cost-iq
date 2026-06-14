@@ -378,7 +378,7 @@ const CI = (() => {
   margin:0 auto;
   transform:translateY(100%);
   z-index:9999;
-  padding-top:env(safe-area-inset-top,0px);
+  padding-top:0;
   padding-bottom:env(safe-area-inset-bottom,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
