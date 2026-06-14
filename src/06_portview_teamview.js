@@ -191,7 +191,8 @@ function skuStoryLine(s){
 function setPortviewFilter(f){
   portviewFilter=(portviewFilter===f)?'all':f; // toggle: same card = deselect
   window._pvLastRenderMs=Date.now(); // guard: prevent IntersectionObserver expanding on content-shrink
-  // v684: _pvCollapseIntent is source of truth — no snapshot needed
+  // v672b: snapshot collapse state BEFORE DOM change causes browser scroll reset
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _applyPortviewTierVisual();
   renderPortviewList();
 }
@@ -684,7 +685,8 @@ function _pvAccountCacheKey(){
 function _pvClearAccountCache(){_pvAcctCacheKey='';_pvAcctCacheTs=0;_pvAcctCacheResult=null;}
 function schedulePortviewListRender(delay){
   clearTimeout(_pvRenderTimer);
-  // v684: _pvCollapseIntent is source of truth — no snapshot needed
+  // v672b: snapshot collapse state before render (search may cause scroll reset)
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
 function _senseHydrateVisiblePortfolio(reason,opts){
@@ -1191,6 +1193,21 @@ let _pvCollapseObserver=null;
 // v669b: sync portview-list padding-top to actual portview-header height
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
+function _tvSyncListOffset(){
+  // v685: sync teamview-content padding-top to actual portview-header height
+  // portview-header in scr-teamview is position:sticky, so content needs explicit top offset
+  var scr=document.getElementById('scr-teamview');
+  var lst=document.getElementById('teamview-content');
+  if(!scr||!lst)return;
+  var hdr=scr.querySelector('.portview-header');
+  if(!hdr)return;
+  var hdrRect=hdr.getBoundingClientRect();
+  var lstRect=lst.getBoundingClientRect();
+  var overlap=Math.max(0, Math.round(hdrRect.bottom - lstRect.top));
+  var pt=overlap>0?overlap+'px':'0px';
+  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
+}
+
 function _pvSyncListOffset(){
   // v671b: measure actual overlap between sticky header bottom and list top
   // padding-top = overlap only (not full header height)
@@ -1248,9 +1265,9 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
-  // v684: _pvCollapseIntent = single source of truth for user collapse intent
-  // set true when user scrolls to collapse, false only on fresh navigation
-  var isCollapsed = !!(window._pvCollapseIntent);
+  // v672b: restore collapse state — use _pvWasCollapsed (snapshotted before scroll reset)
+  // _pvLastCollapseMs may be stale if browser reset scroll before reinit
+  var isCollapsed = !!(window._pvWasCollapsed||(window._pvLastCollapseMs||0)>0);
   var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
 
   function _scrollTop(){
@@ -1286,7 +1303,6 @@ function _pvInitCollapseObserver(){
     isCollapsed=collapsed;
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
-    window._pvCollapseIntent=collapsed; // v684: keep intent in sync with actual state
     // v671d: sync padding-top when collapse state changes (header height changes significantly)
     setTimeout(_pvSyncListOffset, 0);
     var searchExpand=document.getElementById('pv-sort-search-expand');
@@ -1322,16 +1338,19 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v684: if user intended collapse (scroll or filter), restore it even at scroll=0
-    if(y===0&&(window._pvCollapseIntent||isCollapsed)){
+    // v672c: if user was collapsed before render (scroll reset to 0 by browser)
+    // restore collapsed state — don't let scroll=0 mean "expanded"
+    if(y===0&&(window._pvWasCollapsed||isCollapsed)){
       h=0;
+      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
+      // but strip class can be stale after re-render (filter/search/sort reinit)
       if(isCollapsed&&strip.className.indexOf('visible')===-1){
         strip.className='pv-compact-strip visible';
       }
     }
 
-    // Few-cards guard — only on truly fresh load (user never collapsed, no intent)
-    if(!_scrollable()&&!isCollapsed&&!window._pvCollapseIntent){
+    // Few-cards guard — only on fresh load (never collapsed before)
+    if(!_scrollable()&&!isCollapsed&&!(window._pvWasCollapsed)){
       if(lastAppliedH!==expandedH){
         lastAppliedH=expandedH;
         collapsible.style.maxHeight=expandedH+'px';
@@ -1687,10 +1706,9 @@ function __legacyRenderPortviewFallback(){
   // Only full reset on fresh navigation (observer not running)
   const coll=document.getElementById('pv-collapsible');
   const strip=document.getElementById('pv-compact-strip');
-  const _wasCollapsed=_pvCollapseObserver&&(window._pvCollapseIntent||window._pvLastCollapseMs>0);
+  const _wasCollapsed=_pvCollapseObserver&&window._pvLastCollapseMs>0;
   if(!_wasCollapsed){
-    // Fresh navigation — reset to expanded and clear intent
-    window._pvCollapseIntent=false;
+    // Fresh navigation — reset to expanded
     if(coll){coll.className='pv-collapsible expanded';}
     if(strip){strip.className='pv-compact-strip hidden';}
   }
@@ -1932,6 +1950,9 @@ function __legacyRenderTeamviewFallback(){
     if(backWrap)backWrap.style.display='none';
     renderTeamviewSummary();
     renderTeamviewKamList();
+    // v685: sync padding-top after full teamview render
+    setTimeout(_tvSyncListOffset, 0);
+    setTimeout(_tvSyncListOffset, 120);
     // v154c: Teamview must stay expanded. Do not attach the scroll-collapse behavior here.
     if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
     const tvColl=document.getElementById('tv-collapsible');
@@ -2343,6 +2364,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     </div>
   </div>`;
   el.innerHTML=_toggleRow+sorted.map(_renderCard).join('');
+  // v685: sync padding-top so first KAM card is not hidden under sticky header
+  setTimeout(_tvSyncListOffset, 0);
+  setTimeout(_tvSyncListOffset, 100);
 }
 
 function setTvView(mode){
