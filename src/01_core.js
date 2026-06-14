@@ -921,6 +921,39 @@ function hideLoginOverlay() {
   };
 })();
 
+// ── v715 Fix 2A: SCREEN-LEVEL SKELETON UTILITY ────────────────────────────
+// showScreenSkeleton(id) — inject shimmer into any screen container while waiting for data
+// hideScreenSkeleton(id) — remove shimmer before real render fires
+// Reuses sense-shimmer-* CSS already in the page. Safe to call multiple times.
+window._showScreenSkeleton = function(screenId){
+  try{
+    var el = document.getElementById(screenId);
+    if(!el || el.dataset.skeleton) return;
+    el.dataset.skeleton = '1';
+    var wrap = document.createElement('div');
+    wrap.id = 'skel-' + screenId;
+    wrap.style.cssText = 'padding:16px';
+    var card = function(){
+      return '<div class="sense-shimmer-card">' +
+        '<div class="sense-shimmer-line" style="width:45%;height:11px;margin-bottom:10px"></div>' +
+        '<div class="sense-shimmer-line" style="width:80%;height:20px;margin-bottom:10px"></div>' +
+        '<div class="sense-shimmer-line" style="width:40%;height:9px;margin-bottom:0"></div>' +
+      '</div>';
+    };
+    wrap.innerHTML = card() + card() + card();
+    el.insertBefore(wrap, el.firstChild);
+  }catch(e){}
+};
+window._hideScreenSkeleton = function(screenId){
+  try{
+    var el = document.getElementById(screenId);
+    if(!el) return;
+    delete el.dataset.skeleton;
+    var wrap = document.getElementById('skel-' + screenId);
+    if(wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+  }catch(e){}
+};
+
   // v224e: skip splash entirely on warm IDB boot
   // Conditions: IDB preloaded 3+ critical files + last_critical_ready < 90min
   // → show shimmer skeleton → ETag check in background → replace with real data
