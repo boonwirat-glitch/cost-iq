@@ -181,8 +181,13 @@ async function doLogin() {
 }
 
 async function doLogout() {
-  await supa.auth.signOut();
-  location.reload();
+  try {
+    await supa.auth.signOut();
+  } catch(e) {
+    DashLog.error('logout', e.message);
+  } finally {
+    location.reload();
+  }
 }
 
 function openSense() { window.open('/', '_blank'); }
