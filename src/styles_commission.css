@@ -1188,11 +1188,9 @@ flex-wrap:wrap;}
 #tv-collapsible.expanded{
   margin-bottom:8px !important;
 }
-/* v700: scoped — only zero padding-top when commission cockpit overlay is active,
-   NOT during normal teamview. JS _tvSyncListOffset() sets padding-top via inline style. */
-body:not(.kam-mode):not(.kad-mode) #teamview-content{
-  padding-top:0 !important;
-}
+/* v700: #teamview-content padding-top:0 rule REMOVED.
+   Commission cockpit is a position:fixed overlay — not dependent on teamview-content padding.
+   padding-top is set exclusively by JS _tvSyncListOffset() via inline style. */
 #tv-ai-btn{
   margin-bottom:0 !important;
 }
