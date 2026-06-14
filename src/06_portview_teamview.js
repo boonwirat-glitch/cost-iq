@@ -191,8 +191,7 @@ function skuStoryLine(s){
 function setPortviewFilter(f){
   portviewFilter=(portviewFilter===f)?'all':f; // toggle: same card = deselect
   window._pvLastRenderMs=Date.now(); // guard: prevent IntersectionObserver expanding on content-shrink
-  // v672b: snapshot collapse state BEFORE DOM change causes browser scroll reset
-  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
+  // v684: _pvCollapseIntent is source of truth — no snapshot needed
   _applyPortviewTierVisual();
   renderPortviewList();
 }
@@ -685,8 +684,7 @@ function _pvAccountCacheKey(){
 function _pvClearAccountCache(){_pvAcctCacheKey='';_pvAcctCacheTs=0;_pvAcctCacheResult=null;}
 function schedulePortviewListRender(delay){
   clearTimeout(_pvRenderTimer);
-  // v672b: snapshot collapse state before render (search may cause scroll reset)
-  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
+  // v684: _pvCollapseIntent is source of truth — no snapshot needed
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
 function _senseHydrateVisiblePortfolio(reason,opts){
@@ -1193,27 +1191,6 @@ let _pvCollapseObserver=null;
 // v669b: sync portview-list padding-top to actual portview-header height
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
-function _tvSyncListOffset(){
-  // v691: padding-top = portview-header rendered height (BCR.height)
-  // sticky header covers teamview-content regardless of tv-ai-output between them
-  var scr=document.getElementById('scr-teamview');
-  var lst=document.getElementById('teamview-content');
-  if(!scr||!lst)return;
-  if(!scr.classList.contains('on'))return;
-  var hdr=scr.querySelector('.portview-header');
-  if(!hdr)return;
-  // BCR.height = rendered height of sticky header (correct value)
-  // Falls back to offsetHeight if BCR not yet available (iOS timing)
-  var hdrH=Math.round(hdr.getBoundingClientRect().height)||hdr.offsetHeight||0;
-  if(hdrH===0){
-    // Layout not settled — schedule retry
-    setTimeout(_tvSyncListOffset,80);
-    return;
-  }
-  var pt=hdrH+'px';
-  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
-}
-
 function _pvSyncListOffset(){
   // v671b: measure actual overlap between sticky header bottom and list top
   // padding-top = overlap only (not full header height)
@@ -1271,9 +1248,9 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
-  // v672b: restore collapse state — use _pvWasCollapsed (snapshotted before scroll reset)
-  // _pvLastCollapseMs may be stale if browser reset scroll before reinit
-  var isCollapsed = !!(window._pvWasCollapsed||(window._pvLastCollapseMs||0)>0);
+  // v684: _pvCollapseIntent = single source of truth for user collapse intent
+  // set true when user scrolls to collapse, false only on fresh navigation
+  var isCollapsed = !!(window._pvCollapseIntent);
   var lastAppliedH = -1;   // last height written — skip DOM write if unchanged
 
   function _scrollTop(){
@@ -1309,6 +1286,7 @@ function _pvInitCollapseObserver(){
     isCollapsed=collapsed;
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
+    window._pvCollapseIntent=collapsed; // v684: keep intent in sync with actual state
     // v671d: sync padding-top when collapse state changes (header height changes significantly)
     setTimeout(_pvSyncListOffset, 0);
     var searchExpand=document.getElementById('pv-sort-search-expand');
@@ -1344,19 +1322,16 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v672c: if user was collapsed before render (scroll reset to 0 by browser)
-    // restore collapsed state — don't let scroll=0 mean "expanded"
-    if(y===0&&(window._pvWasCollapsed||isCollapsed)){
+    // v684: if user intended collapse (scroll or filter), restore it even at scroll=0
+    if(y===0&&(window._pvCollapseIntent||isCollapsed)){
       h=0;
-      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
-      // but strip class can be stale after re-render (filter/search/sort reinit)
       if(isCollapsed&&strip.className.indexOf('visible')===-1){
         strip.className='pv-compact-strip visible';
       }
     }
 
-    // Few-cards guard — only on fresh load (never collapsed before)
-    if(!_scrollable()&&!isCollapsed&&!(window._pvWasCollapsed)){
+    // Few-cards guard — only on truly fresh load (user never collapsed, no intent)
+    if(!_scrollable()&&!isCollapsed&&!window._pvCollapseIntent){
       if(lastAppliedH!==expandedH){
         lastAppliedH=expandedH;
         collapsible.style.maxHeight=expandedH+'px';
@@ -1712,9 +1687,10 @@ function __legacyRenderPortviewFallback(){
   // Only full reset on fresh navigation (observer not running)
   const coll=document.getElementById('pv-collapsible');
   const strip=document.getElementById('pv-compact-strip');
-  const _wasCollapsed=_pvCollapseObserver&&window._pvLastCollapseMs>0;
+  const _wasCollapsed=_pvCollapseObserver&&(window._pvCollapseIntent||window._pvLastCollapseMs>0);
   if(!_wasCollapsed){
-    // Fresh navigation — reset to expanded
+    // Fresh navigation — reset to expanded and clear intent
+    window._pvCollapseIntent=false;
     if(coll){coll.className='pv-collapsible expanded';}
     if(strip){strip.className='pv-compact-strip hidden';}
   }
@@ -1956,10 +1932,6 @@ function __legacyRenderTeamviewFallback(){
     if(backWrap)backWrap.style.display='none';
     renderTeamviewSummary();
     renderTeamviewKamList();
-    // v687: sync at multiple points — BCR settles after collapsible + paint
-    setTimeout(_tvSyncListOffset, 0);
-    setTimeout(_tvSyncListOffset, 120);
-    setTimeout(_tvSyncListOffset, 350);
     // v154c: Teamview must stay expanded. Do not attach the scroll-collapse behavior here.
     if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
     const tvColl=document.getElementById('tv-collapsible');
@@ -2003,7 +1975,7 @@ function _tvBuildCompactStrip(){
     `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${color}">${pace}%</div><div class="pv-cs-pace-lbl">${window._tgtFbMode==="base"?"Baseline":window._tgtFbMode==="team"?"Target":"Target"}</div></div>`+
     chips.map((c,i)=>(i>0?'<div class="pv-cs-divider"></div>':'')+`<div class="pv-cs-chip ${c.cls}"><div class="pv-cs-label">${c.lbl}</div><div class="pv-cs-val">${c.val}</div><div class="pv-cs-sub">${c.sub}</div></div>`).join('')+
     `<button class="pv-cs-search" title="ค้นหา" onclick="(function(){const ex=document.getElementById('tv-sort-search-expand');const open=ex.style.display!=='none';ex.style.display=open?'none':'block';if(!open){const i=document.getElementById('tv-search-collapsed');if(i)i.focus();}else{const i=document.getElementById('tv-search-collapsed');if(i){i.value='';const ts=document.getElementById('tv-search');if(ts){ts.value='';renderTeamviewKamList();}}}}})()">${searchIconSvg}</button>`;
-  // v690: tv-sort-sticky updated by renderTeamviewKamList
+  const sc=document.getElementById('tv-sort-count');if(sc)sc.textContent=groups.length+' KAM';
 }
 function _tvInitCollapseObserver(){
   // v154c: disabled by design. Teamview should keep the full summary visible.
@@ -2360,22 +2332,17 @@ function __legacyRenderTeamviewKamListSync(groups, el){
 
   const _renderCard=g=>tvViewMode==='compact'?chipRow(g):(g.paceCls==='star'?starCard(g):fullCard(g));
 
-  // v690: toggle row moved to #tv-sort-sticky (inside sticky portview-header)
-  // Prevents toggle being hidden under header due to padding-top offset on teamview-content
-  const _iconFull='<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>';
-  const _iconCompact='<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-  const _tvSortEl=document.getElementById('tv-sort-sticky');
-  if(_tvSortEl){
-    const _fc=tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)';
-    const _cc=tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)';
-    _tvSortEl.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:4px 0 2px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px';
-    _tvSortEl.innerHTML='<span style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:rgba(255,255,255,.35)">'+sorted.length+' KAM</span><div style="display:flex;gap:2px"><button onclick="setTvView(\'full\')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:'+_fc+';transition:color .15s">'+_iconFull+'</button><button onclick="setTvView(\'compact\')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:'+_cc+';transition:color .15s">'+_iconCompact+'</button></div>';
-  }
-  el.innerHTML=sorted.map(_renderCard).join('');
-  // v687: sync at 0/100/350ms — BCR.height needs layout to settle after pv-collapsible animation
-  setTimeout(_tvSyncListOffset, 0);
-  setTimeout(_tvSyncListOffset, 100);
-  setTimeout(_tvSyncListOffset, 350);
+  // Icon toggle row — sits above the KAM list
+  const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
+  const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  const _toggleRow=`<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 10px">
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
+    <div style="display:flex;align-items:center;gap:2px">
+      <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
+      <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>
+    </div>
+  </div>`;
+  el.innerHTML=_toggleRow+sorted.map(_renderCard).join('');
 }
 
 function setTvView(mode){
