@@ -35,6 +35,7 @@
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  padding-top: var(--topbar-h);
   padding-bottom: 84px;
 }
 #scr-skills.on { display: flex !important; flex-direction: column !important; }
