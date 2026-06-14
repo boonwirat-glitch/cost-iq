@@ -62,10 +62,20 @@ function renderSidebarTeam() {
 
 // ── Main team view ────────────────────────────────────────────
 function renderTeamView() {
+  if (!dataReady) return;
   const groups = buildKamGroups();
   const el = document.getElementById('team-content');
 
-  const rows = groups.map(g => {
+  // Sort groups
+  const sorted = [...groups].sort((a,b) => {
+    let va, vb;
+    if (_teamSortCol === 'name')     { va = a.name; vb = b.name; return _teamSortAsc ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th'); }
+    if (_teamSortCol === 'gmv')      { va = a.totalGMV; vb = b.totalGMV; }
+    else if (_teamSortCol === 'accounts') { va = a.count; vb = b.count; }
+    else                              { va = a.pace; vb = b.pace; }
+    return _teamSortAsc ? va - vb : vb - va;
+  });
+  const rows = sorted.map(g => {
     const prevIdx = MONTHS.indexOf(currentMonth) - 1;
     const prevGMV = prevIdx >= 0
       ? g.accounts.reduce((s,a) => s+(a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
@@ -100,10 +110,10 @@ function renderTeamView() {
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:var(--surface)">
-          <th style="padding:10px 16px;text-align:left;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM</th>
-          <th style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV ${currentMonth}</th>
-          <th style="padding:10px 16px;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace</th>
-          <th style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Acc</th>
+          <th onclick="setTeamSort('name')" class="td-team-th-sort" style="padding:10px 16px;text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM <span class="td-team-sort-arrow">${_teamSortCol==='name'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('gmv')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV ${currentMonth} <span class="td-team-sort-arrow">${_teamSortCol==='gmv'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('pace')" class="td-team-th-sort" style="padding:10px 16px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace <span class="td-team-sort-arrow">${_teamSortCol==='pace'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('accounts')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Acc <span class="td-team-sort-arrow">${_teamSortCol==='accounts'?(_teamSortAsc?'↑':'↓'):''}</span></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
