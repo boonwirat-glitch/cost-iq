@@ -396,6 +396,12 @@ body:not(.echo-active) { background:unset; }
   background:transparent;
   border-bottom:0.5px solid rgba(0,0,0,.07);
   transition:background .7s ease,border-color .7s ease;
+  position:relative;
+  top:auto;
+  left:auto;
+  right:auto;
+  max-width:none;
+  z-index:1;
 }
 #ci-fullsheet.ci-open { transform:translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
