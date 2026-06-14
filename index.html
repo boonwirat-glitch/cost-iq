@@ -1,4 +1,4 @@
-<!-- Freshket Sense v670: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v671: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v670',
+      version: 'v671',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -27612,10 +27612,14 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _pvSyncListOffset(){
-  var hdr=document.querySelector('.portview-header');
+  // v670b: scope to scr-portview — teamview also has .portview-header which returns h:0
+  var scr=document.getElementById('scr-portview');
   var lst=document.getElementById('portview-list');
-  if(!hdr||!lst)return;
-  var h=Math.round(hdr.getBoundingClientRect().height);
+  if(!scr||!lst)return;
+  var hdr=scr.querySelector('.portview-header');
+  if(!hdr)return;
+  // offsetHeight works on scoped element; BCR returns 0 due to sticky/layout quirk
+  var h=hdr.offsetHeight;
   if(h>0&&lst.style.paddingTop!==h+'px') lst.style.paddingTop=h+'px';
 }
 
