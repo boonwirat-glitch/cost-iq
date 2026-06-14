@@ -13,7 +13,8 @@ let skillView     = 'pending';   // 'pending' | 'matrix' | 'echo'
 // ── Load ──────────────────────────────────────────────────────
 async function loadSkillsData() {
   if (!supa || !currentProfile) return;
-  const tlEmail = currentProfile.email;
+  const tlEmail = currentProfile?.email;
+  if (!tlEmail) { DashLog.error('skills','no email'); skillDataReady=true; return; }
 
   try {
     // 1. Squad members from profiles
@@ -62,7 +63,7 @@ async function loadSkillsData() {
         .select('id, user_id, skill_code, ai_score, evidence, observed_at, session_id')
         .in('user_id', memberIds)
         .order('observed_at', { ascending: false })
-        .limit(500);
+        .limit(DASH_CONFIG.QUERY_LIMIT_SKILLS);
       skillEchoObs = {};
       (obs || []).forEach(o => {
         const key = `${o.user_id}:${o.skill_code}`;
@@ -122,6 +123,7 @@ function stateLabel(state) {
 
 // ── Render ────────────────────────────────────────────────────
 function renderSkillsView() {
+  if (!dataReady && !skillDataReady) { return; }
   const el = document.getElementById('skills-content');
   if (!el) return;
 
@@ -166,9 +168,12 @@ function pendingCount() {
 
 // ── Tab: Pending evaluations ──────────────────────────────────
 function renderSkillsPending() {
+  const _skillSortAsc = (typeof window._skillPendSort === 'undefined') ? true : window._skillPendSort;
   const pending = Object.values(skillProg)
     .filter(p => p.state === 'training')
-    .sort((a,b) => new Date(a.updated_at||0) - new Date(b.updated_at||0));
+    .sort((a,b) => _skillSortAsc
+      ? new Date(a.updated_at||0) - new Date(b.updated_at||0)
+      : new Date(b.updated_at||0) - new Date(a.updated_at||0));
 
   if (!pending.length) return `
     <div class="ds-empty" style="padding:var(--space-10) 0">
@@ -226,8 +231,11 @@ function renderSkillsPending() {
   }).join('');
 
   return `
-    <div style="margin-bottom:var(--space-2)">
-      <span class="ds-eyebrow">${pending.length} รายการ · เรียงตามรอนานสุด</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+      <span class="ds-eyebrow">${pending.length} รายการ</span>
+      <button class="td-skill-sort-btn" onclick="window._skillPendSort=!window._skillPendSort;renderSkillsView()">
+        ${(typeof window._skillPendSort==='undefined'||window._skillPendSort)?'รอนานสุด ↑':'ล่าสุด ↓'}
+      </button>
     </div>
     <div style="border-radius:var(--r-md);border:1px solid var(--hair);overflow:hidden">
       ${rows}
