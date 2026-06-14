@@ -29,6 +29,19 @@ body.sales-mode [class*="sv-"] {
   font-family: 'Noto Sans Thai', sans-serif;
 }
 
+/* ── v673: Sales screens are in swipe-grp-b (outside .main), so they don't inherit
+   .main{padding-top:var(--topbar-h)}. Without this, content renders under the fixed topbar. ── */
+body.sales-mode #scr-sales-portview,
+body.sales-mode #scr-sales-pipeline,
+body.sales-mode #scr-sales-commission,
+body.sales-mode #scr-sales-teamview,
+body.sales-mode #scr-skills {
+  padding-top: var(--topbar-h);
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  min-height: 100dvh;
+  background: #FFFFFF;
+}
+
 
 
 /* ── Page header ── */
