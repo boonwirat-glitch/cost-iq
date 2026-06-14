@@ -688,9 +688,14 @@ body:not(.echo-active) { background:unset; }
     <div class="proc-dots">
       <div class="proc-dot"></div><div class="proc-dot"></div><div class="proc-dot"></div>
     </div>
-    <p class="proc-step" id="ci-pstep">Transcribing...</p>
-    <p class="proc-sub" id="ci-psub">Whisper · ภาษาไทย</p>
+    <p class="proc-step" id="ci-pstep">กำลัง transcript...</p>
+    <p class="proc-sub" id="ci-psub">Gemini · ฟัง audio ทั้งหมด</p>
     <div class="proc-line"><div class="proc-fill" id="ci-pfill"></div></div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center" id="ci-proc-steps">
+      <div id="ci-proc-s1" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,56,92,.15);color:#FF385C;border:1px solid rgba(255,56,92,.3);font-family:'Noto Sans Thai',sans-serif">1 · Transcript</div>
+      <div id="ci-proc-s2" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">2 · สรุป</div>
+      <div id="ci-proc-s3" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">3 · ทักษะ</div>
+    </div>
     <p style="font-size:11px;color:var(--tx3,#AEAEB2);margin-top:10px;font-family:'Noto Sans Thai',sans-serif" id="ci-pelapsed"></p>
   </div>
 </div>
@@ -786,11 +791,12 @@ body:not(.echo-active) { background:unset; }
   const IDB_NAME = 'echo_buffer';
   function _idbOpen() {
     return new Promise((res, rej) => {
-      const r = indexedDB.open(IDB_NAME, 1);
-      r.onupgradeneeded = () => {
+      const r = indexedDB.open(IDB_NAME, 2);
+      r.onupgradeneeded = (ev) => {
         const db = r.result;
-        if (!db.objectStoreNames.contains('chunks')) db.createObjectStore('chunks', { autoIncrement: true });
-        if (!db.objectStoreNames.contains('meta'))   db.createObjectStore('meta');
+        if (!db.objectStoreNames.contains('chunks'))   db.createObjectStore('chunks', { autoIncrement: true });
+        if (!db.objectStoreNames.contains('meta'))     db.createObjectStore('meta');
+        if (!db.objectStoreNames.contains('pipeline')) db.createObjectStore('pipeline'); // v709: transcript + stage
       };
       r.onsuccess = () => res(r.result);
       r.onerror   = () => rej(r.error);
@@ -818,10 +824,22 @@ body:not(.echo-active) { background:unset; }
   }
   function _idbClear() {
     return _idbOpen().then(db => {
-      const tx = db.transaction(['chunks','meta'],'readwrite');
+      const tx = db.transaction(['chunks','meta','pipeline'],'readwrite');
       tx.objectStore('chunks').clear();
       tx.objectStore('meta').clear();
+      tx.objectStore('pipeline').clear();
     }).catch(()=>{});
+  }
+  // v709: pipeline state — เก็บ transcript + stage เผื่อ recovery resume จากขั้นที่ค้าง
+  function _idbSetPipeline(data) {
+    _idbOpen().then(db => { db.transaction('pipeline','readwrite').objectStore('pipeline').put(data,'current'); }).catch(()=>{});
+  }
+  function _idbGetPipeline() {
+    return _idbOpen().then(db => new Promise(res => {
+      const r = db.transaction('pipeline').objectStore('pipeline').get('current');
+      r.onsuccess = () => res(r.result || null);
+      r.onerror   = () => res(null);
+    })).catch(() => null);
   }
 
   // ── Recovery — เช็ค buffer ค้างตอนเปิด Echo (rep เท่านั้น, idle เท่านั้น) ──
@@ -855,22 +873,30 @@ body:not(.echo-active) { background:unset; }
   }
 
   async function _recoverBuffer() {
-    const meta   = await _idbGetMeta();
-    const chunks = await _idbGetChunks();
+    const meta     = await _idbGetMeta();
+    const chunks   = await _idbGetChunks();
+    const pipeline = await _idbGetPipeline(); // v709: check if transcript already done
     document.getElementById('ci-recover-banner')?.remove();
-    if (!chunks.length) { _toast('ไม่พบข้อมูลเสียง'); _idbClear(); return; }
+    if (!chunks.length && !pipeline?.segments?.length) { _toast('ไม่พบข้อมูลเสียง'); _idbClear(); return; }
     _accountGuid = meta?.account_guid || null;
     _accountName = meta?.account_name || '';
     _accountSeg  = meta?.account_seg  || '';
     _ownerType   = meta?.owner_type   || _ownerType;
     _secs = chunks.length; _durText = _fmt(_secs);
     _isOwnRecording = true;
-    const blob = new Blob(chunks, { type: meta?.mime || 'audio/webm' });
     _phase = 'processing';
     _renderEchoState();
     _showScreen('ci-s-proc');
-    _setStep('กำลังวิเคราะห์...', 'กู้คืนจากบันทึกค้าง', 14);
-    _processBlob(blob);
+    // v709: ถ้ามี transcript แล้วให้ resume จาก Step 2 ไม่ต้อง re-transcript
+    if (pipeline?.segments?.length && pipeline.stage === 'transcribed') {
+      _setStep('กำลังสรุปบทสนทนา...', 'กู้คืน — resume จาก transcript', 45);
+      const blob = chunks.length ? new Blob(chunks, { type: meta?.mime || 'audio/webm' }) : new Blob([]);
+      _processBlob(blob, pipeline.segments);
+    } else {
+      _setStep('กำลัง transcript...', 'กู้คืนจากบันทึกค้าง', 10);
+      const blob = new Blob(chunks, { type: meta?.mime || 'audio/webm' });
+      _processBlob(blob);
+    }
   }
 
   async function _discardBuffer() {
@@ -1013,14 +1039,13 @@ body:not(.echo-active) { background:unset; }
     _processBlob(blob);
   }
 
-  // v555: shared pipeline — เรียกจาก _onStop ปกติ และจาก recovery flow
-  async function _processBlob(blob) {
-    _startProcTimer(); // v598: start elapsed timer
+  // v709: pipeline — 3 calls แยก task แทน 1 call ทำทุกอย่าง
+  // transcript (ground truth) → summary → skills+OCPB
+  // แต่ละขั้น save IDB ก่อน proceed — recovery resume ได้จากขั้นที่ค้าง
+  async function _processBlob(blob, _resumeFromSegments) {
+    _startProcTimer();
     try {
-      // v574: audio integrity check — เทียบขนาด blob กับเวลาที่อัด
-      // 24kbps opus ≈ 3,000 bytes/วินาที — ถ้า blob เล็กกว่าที่ควร 30%+
-      // = MediaRecorder ถูก interrupt กลางทาง (lock จอ / สลับแอป / โทรเข้า)
-      // เสียงช่วงนั้นหายจริง — Gemini จะวิเคราะห์ได้เฉพาะส่วนที่มี
+      // ── audio integrity check (ยังคงไว้) ────────────────────────────────────
       const _expectedBytes = _secs * 3000;
       const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
       console.log('[CI audio integrity] blob=' + blob.size + 'B expected≈' + _expectedBytes +
@@ -1033,23 +1058,55 @@ body:not(.echo-active) { background:unset; }
         _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (สั้นกว่าเวลาที่จับ) — บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ');
       }
 
-      _setStep('กำลังวิเคราะห์...', 'Gemini · audio + skills', 20);
-
       // Load rubric from DB if not cached yet
       if (!_rubricCache) await _loadRubricFromDB();
 
-      const result = await _analyzeWithGemini(blob);
+      // ── Step 1: Transcript ───────────────────────────────────────────────────
+      let segments = _resumeFromSegments || null;
+      if (!segments) {
+        _setStep('กำลัง transcript...', 'Gemini · ฟัง audio ทั้งหมด', 10);
+        const transcriptResult = await _callTranscript(blob);
+        if (transcriptResult.no_speech) {
+          _phase = 'idle'; _idbClear(); _unmount();
+          _toast('ไม่พบเสียงพูดใน audio'); return;
+        }
+        segments = transcriptResult.segments || [];
+        if (!segments.length) throw new Error('Transcript ไม่ได้ผล — ไม่มี segments');
+        // Save to IDB — ถ้า crash หลังจากนี้ recovery จะ resume จาก Step 2
+        _idbSetPipeline({ segments, stage: 'transcribed' });
+        console.log('[CI pipeline] transcript done —', segments.length, 'segments');
+      } else {
+        console.log('[CI pipeline] resuming from transcript —', segments.length, 'segments');
+      }
 
+      // ── Step 2: Summary ──────────────────────────────────────────────────────
+      _setStep('กำลังสรุปบทสนทนา...', 'Gemini · อ่าน transcript', 45);
+      const summaryResult = await _callSummarize(segments);
+      _idbSetPipeline({ segments, summary: summaryResult, stage: 'summarized' });
+      console.log('[CI pipeline] summary done');
+
+      // ── Step 3: Skills + OCPB ────────────────────────────────────────────────
+      _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
+      const analysisResult = await _callAnalyze(segments, summaryResult);
+      console.log('[CI pipeline] analysis done');
+
+      // ── Save to Supabase ─────────────────────────────────────────────────────
       _setStep('กำลังบันทึก...', '', 92);
-      await _saveToSupabase(result.skillData, result.intelData, result.transcriptSummary, result.toneSignals);
+      await _saveToSupabasePipeline(segments, summaryResult, analysisResult);
 
-      _idbClear(); // วิเคราะห์ + บันทึกสำเร็จ — buffer ไม่จำเป็นแล้ว
-
+      _idbClear();
       _setStep('เสร็จแล้ว', '', 100);
-      _stopProcTimer(); // v598
+      _stopProcTimer();
+
       setTimeout(() => {
-        _lastResult = { skillData: result.skillData, intelData: result.intelData,
-                        transcriptSummary: result.transcriptSummary, toneSignals: result.toneSignals };
+        _lastResult = {
+          segments,
+          summaryData:  summaryResult,
+          skillData:    analysisResult.skillData,
+          intelData:    analysisResult.intelData,
+          transcriptSummary: summaryResult?.transcript_summary || null,
+          toneSignals:  summaryResult?.tone || null,
+        };
         _renderResult();
         document.getElementById('ci-dur-chip').textContent = _durText;
         _showScreen('ci-s-result');
@@ -1057,14 +1114,11 @@ body:not(.echo-active) { background:unset; }
       }, 400);
 
     } catch (err) {
-      _stopProcTimer(); // v598
+      _stopProcTimer();
       _phase = 'idle';
       _unmount();
-      // v571b: telemetry — ทุก analyze fail เข้า app_errors ให้ตรวจย้อนหลังได้
       try { window.SenseSentinel?.report('ci_analyze_fail',
         err.message.slice(0, 200) + ' | secs=' + _secs + ' | acct=' + (_accountName || '-')); } catch(_) {}
-      // buffer คงไว้ — เปิด Echo ใหม่จะเจอ banner กู้คืน วิเคราะห์ซ้ำได้
-      // v589: ภาษาคน — ห้ามโชว์ raw JSON ใส่หน้า user · telemetry ข้างบนเก็บ raw ไว้แล้ว
       const _m = String(err.message || '');
       let _human;
       if (/location is not supported/i.test(_m)) {
@@ -1080,6 +1134,145 @@ body:not(.echo-active) { background:unset; }
       }
       _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
     }
+  }
+
+  // ── Pipeline API calls ────────────────────────────────────────────────────────
+
+  async function _callTranscript(audioBlob) {
+    const arrayBuf = await audioBlob.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuf);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+    }
+    const b64audio = btoa(binary);
+    const mimeType = audioBlob.type || 'audio/webm';
+
+    const FETCH_TIMEOUT_MS = 360000; // 6 นาที — transcript audio ยาวใช้เวลานาน
+    let res, lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (attempt > 1) {
+        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Gemini · ระบบ AI คิวเต็ม', 10 + attempt * 5);
+        await new Promise(r => setTimeout(r, attempt === 2 ? 3000 : 7000));
+      }
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        res = await fetch(`${WORKER_URL}/transcript`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType }),
+          signal: ctrl.signal,
+        });
+        if (res.ok) { clearTimeout(tmo); break; }
+        const errText = await res.text().catch(() => String(res.status));
+        lastErr = new Error(`Transcript ${res.status}: ${errText}`);
+        if (res.status !== 503 && res.status !== 429) { clearTimeout(tmo); throw lastErr; }
+        res = null;
+      } catch(e) {
+        if (e.name === 'AbortError') throw new Error('หมดเวลา transcript (6 นาที)');
+        if (e.message && !e.message.startsWith('Transcript 503') && !e.message.startsWith('Transcript 429')) throw e;
+        lastErr = e;
+      } finally { clearTimeout(tmo); }
+    }
+    if (!res || !res.ok) throw lastErr || new Error('Transcript unavailable');
+    const data = await res.json();
+    const raw = data?.text || '';
+    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('Transcript: no JSON in response');
+    let parsed;
+    try { parsed = JSON.parse(raw.slice(s, e+1)); }
+    catch(_) { parsed = _ciRepairJson(raw.slice(s, e+1)); }
+    if (!parsed) throw new Error('Transcript: JSON parse failed');
+    return parsed;
+  }
+
+  async function _callSummarize(segments) {
+    const FETCH_TIMEOUT_MS = 120000; // 2 นาที — text input เร็วกว่า audio
+    let res, lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (attempt > 1) {
+        await new Promise(r => setTimeout(r, attempt === 2 ? 2000 : 5000));
+      }
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        res = await fetch(`${WORKER_URL}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments }),
+          signal: ctrl.signal,
+        });
+        if (res.ok) { clearTimeout(tmo); break; }
+        const errText = await res.text().catch(() => String(res.status));
+        lastErr = new Error(`Summarize ${res.status}: ${errText}`);
+        if (res.status !== 503 && res.status !== 429) { clearTimeout(tmo); throw lastErr; }
+        res = null;
+      } catch(e) {
+        if (e.name === 'AbortError') throw new Error('หมดเวลา summarize (2 นาที)');
+        lastErr = e;
+      } finally { clearTimeout(tmo); }
+    }
+    if (!res || !res.ok) throw lastErr || new Error('Summarize unavailable');
+    const data = await res.json();
+    const raw = data?.text || '';
+    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+    if (s === -1 || e === -1) return {}; // graceful — summary ไม่มีไม่ block analyze
+    try { return JSON.parse(raw.slice(s, e+1)); }
+    catch(_) { return _ciRepairJson(raw.slice(s, e+1)) || {}; }
+  }
+
+  async function _callAnalyze(segments, summary) {
+    const FETCH_TIMEOUT_MS = 180000; // 3 นาที
+    let res, lastErr;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (attempt > 1) {
+        await new Promise(r => setTimeout(r, attempt === 2 ? 2000 : 5000));
+      }
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        res = await fetch(`${WORKER_URL}/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments, summary, rubric: _rubricCache || [] }),
+          signal: ctrl.signal,
+        });
+        if (res.ok) { clearTimeout(tmo); break; }
+        const errText = await res.text().catch(() => String(res.status));
+        lastErr = new Error(`Analyze ${res.status}: ${errText}`);
+        if (res.status !== 503 && res.status !== 429) { clearTimeout(tmo); throw lastErr; }
+        res = null;
+      } catch(e) {
+        if (e.name === 'AbortError') throw new Error('หมดเวลา analyze (3 นาที)');
+        lastErr = e;
+      } finally { clearTimeout(tmo); }
+    }
+    if (!res || !res.ok) throw lastErr || new Error('Analyze unavailable');
+    const data = await res.json();
+    const raw = data?.text || '';
+    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error('Analyze: no JSON in response');
+    let parsed;
+    try { parsed = JSON.parse(raw.slice(s, e+1)); }
+    catch(_) { parsed = _ciRepairJson(raw.slice(s, e+1)); }
+    if (!parsed) throw new Error('Analyze: JSON parse failed');
+    return {
+      skillData: {
+        no_speech: false,
+        skills:          parsed.skills || [],
+        pipc_stage:      parsed.pipc_stage || null,
+        pipc_reached:    parsed.pipc_reached || null,
+        overall:         parsed.overall || null,
+        session_summary: parsed.session_summary || null,
+      },
+      intelData: {
+        ocpb_status: parsed.ocpb_status || null,
+        ocpb_facts:  Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
+        next_actions: parsed.next_actions || [],
+      },
+    };
   }
 
   // ── AI Analysis ────────────────────────────────────────────────────────────
@@ -1414,6 +1607,112 @@ OCPB (customer intel จากเสียงเท่านั้น):
         const _eKey = email + '::' + _accountGuid;
         _store[_eKey] = { ts: Date.now(), count: (_store[_eKey]?.count || 0) + 1 };
         // Prune entries older than 30 days
+        const _cutoff = Date.now() - 30*24*60*60*1000;
+        Object.keys(_store).forEach(k => { if (_store[k].ts < _cutoff) delete _store[k]; });
+        localStorage.setItem(_echoKey, JSON.stringify(_store));
+      } catch(e) { /* non-fatal */ }
+    }
+  }
+
+  // ── v709: pipeline save — saves transcript to new column ─────────────────────
+  async function _saveToSupabasePipeline(segments, summaryData, analysisResult) {
+    const skillData  = analysisResult?.skillData  || null;
+    const intelData  = analysisResult?.intelData  || null;
+    const transcriptSummary = summaryData?.transcript_summary || null;
+    const toneSignals = summaryData?.tone || null;
+
+    if (!skillData && !intelData && !segments?.length) return;
+    const email = currentUserProfile?.email;
+    if (!email) return;
+    const today = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    // 1. Save ci_sessions — เพิ่ม transcript + pipeline_stage
+    try {
+      const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
+        owner_email:        email,
+        owner_type:         _ownerType,
+        account_id:         _accountGuid || null,
+        account_name:       _accountName || null,
+        visited_at:         nowIso,
+        duration_secs:      _secs,
+        transcript:         segments?.length ? segments : null,
+        pipeline_stage:     'analyzed',
+        skill_scores:       skillData || null,
+        customer_intel:     intelData || null,
+        next_actions:       intelData?.next_actions || [],
+        transcript_summary: transcriptSummary || null,
+        tone_signals:       toneSignals || null,
+        rep_lat:            _checkinCache?.rep_lat || null,
+        rep_lng:            _checkinCache?.rep_lng || null,
+        checked_in_at:      _checkinCache?.checked_in_at || null,
+        status:             'saved'
+      }).select('id').single();
+      if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
+      else if (sessionRow) {
+        _sessionId = sessionRow.id;
+        _checkinCache = null;
+        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+      }
+    } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
+
+    // 2. skill log
+    if (skillData?.skills?.length) {
+      const rows = skillData.skills.map(s => ({
+        kam_email: email, account_id: _accountGuid || null,
+        session_date: today, skill_code: s.code,
+        score: s.score,
+        evidence_summary: s.evidence || s.evidence_summary || '',
+        ci_session_id: _sessionId || null
+      }));
+      const { error } = await supa.from('kam_skill_log').insert(rows);
+      if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
+    }
+
+    // 3. echo_skill_observations
+    if (skillData?.skills?.length) {
+      try {
+        let _userId = null;
+        try {
+          const _sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+          if (_sk) { const _ss = JSON.parse(localStorage.getItem(_sk)); _userId = _ss?.user?.id || null; }
+        } catch(_) {}
+        if (_userId) {
+          const obsRows = skillData.skills.map(s => ({
+            session_id:    _sessionId || null,
+            user_id:       _userId,
+            skill_code:    ECHO_TO_SKILL_CODE[s.code] || s.code,
+            echo_code:     s.code,
+            ai_score:      s.score,
+            evidence:      s.evidence || s.evidence_summary || null,
+            coaching_note: s.coaching_note || null,
+            gap:           s.gap || null,
+            observed_at:   nowIso,
+          }));
+          const { error: obsErr } = await supa.from('echo_skill_observations').insert(obsRows);
+          if (obsErr) console.warn('[CI] echo_skill_observations insert:', obsErr.message);
+        }
+      } catch(e) { console.warn('[CI] echo_skill_observations unavailable:', e.message); }
+    }
+
+    // 4. kam_visits snapshot
+    if (_accountGuid) {
+      const { error: visitError } = await supa.from('kam_visits').upsert({
+        kam_email: email, account_id: _accountGuid,
+        ci_skill_scores: skillData, ci_customer_signals: intelData,
+        ci_next_actions: intelData?.next_actions || [], ci_mode: 'echo',
+        ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
+      }, { onConflict: 'kam_email,account_id' });
+      if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
+    }
+
+    // 5. localStorage echo visits dot
+    if (_accountGuid) {
+      try {
+        const _echoKey = 'ciq_echo_visits';
+        const _store = JSON.parse(localStorage.getItem(_echoKey) || '{}');
+        const _eKey = email + '::' + _accountGuid;
+        _store[_eKey] = { ts: Date.now(), count: (_store[_eKey]?.count || 0) + 1 };
         const _cutoff = Date.now() - 30*24*60*60*1000;
         Object.keys(_store).forEach(k => { if (_store[k].ts < _cutoff) delete _store[k]; });
         localStorage.setItem(_echoKey, JSON.stringify(_store));
