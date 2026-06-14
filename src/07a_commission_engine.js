@@ -1533,10 +1533,7 @@ function _tgtRenderTeamGovCard() {
         <div class="tv-signal-value ${pending ? 'warn' : 'ok'}">${pending}</div>
         <div class="tv-signal-meta">${policyPublished ? 'Published' : 'Draft policy'}</div>
       </div>
-      ${(!ready && isAdmin) ? `<div class="tv-action-strip ${actionCls}">
-        <div class="tv-action-text"><strong>${actionTitle}</strong><br>${actionMsg}</div>
-        <button class="tv-action-btn commission-open" onclick="event.stopPropagation();openCommissionCockpit('exceptions')">Review now</button>
-      </div>` : ''}
+      <!-- v686: action strip hidden — Commission header button is the access point -->
     </div>
   </div>`;
 }
