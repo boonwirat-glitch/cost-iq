@@ -27753,7 +27753,8 @@ function _pvInitCollapseObserver(){
       var opacity=Math.min(1, h/(expandedH*0.3));
       collapsible.style.opacity=String(opacity);
       collapsible.style.pointerEvents=collapsed?'none':'';
-
+      // v671a: sync list padding-top every time header height changes
+      _pvSyncListOffset();
     }
 
     _applyStrip(collapsed);
