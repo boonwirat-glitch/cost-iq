@@ -283,7 +283,7 @@ html, body {
 /* Map polygons (via D3) */
 .td-poly { stroke: white; stroke-width: .8; cursor: pointer; transition: opacity .1s; }
 .td-poly:hover { opacity: .75; stroke-width: 1.2; }
-.td-poly.selected { stroke: var(--ink-1); stroke-width: 2; opacity: 1 !important; }
+.td-poly.selected { stroke: var(--ink-1); stroke-width: 2; opacity: 1; }
 .td-poly-bg { fill: var(--surface-2); stroke: white; stroke-width: .5; pointer-events: none; }
 
 /* ── Detail panel ── */
@@ -433,7 +433,7 @@ html, body {
 /* ── Phase 3: Sync & Interaction (v703) ── */
 
 /* Rep-map highlight states */
-.td-poly.rep-highlight { stroke-width: 1.5 !important; }
+.td-poly.rep-highlight { stroke-width: 1.5; }
 .td-poly.rep-dim       { transition: opacity .2s; }
 
 /* Zone filter chip */
@@ -653,3 +653,31 @@ html, body {
 .td-echo-note-input:focus {
   border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-dim);
 }
+
+/* ── Commission last-updated badge ── */
+.td-comm-updated {
+  font-family: var(--font-mono); font-size: var(--text-micro);
+  color: var(--ink-4); margin-top: var(--space-2);
+}
+
+/* ── Skills pending sort toggle ── */
+.td-skill-sort-btn {
+  font-size: var(--text-micro); font-family: var(--font-mono);
+  color: var(--ink-4); background: none; border: none;
+  cursor: pointer; padding: 0;
+}
+.td-skill-sort-btn:hover { color: var(--ac); }
+
+/* ── Team table — sortable header ── */
+.td-team-th-sort {
+  cursor: pointer; user-select: none;
+}
+.td-team-th-sort:hover { color: var(--ink-2); }
+.td-team-sort-arrow { margin-left: 4px; color: var(--ink-4); }
+
+/* ── Forgot password link ── */
+.auth-forgot {
+  font-size: var(--text-xs); color: var(--ink-4); text-align: right;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.auth-forgot:hover { color: var(--ac); }
