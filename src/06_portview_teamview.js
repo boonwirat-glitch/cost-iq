@@ -1325,6 +1325,11 @@ function _pvInitCollapseObserver(){
     // restore collapsed state — don't let scroll=0 mean "expanded"
     if(y===0&&(window._pvWasCollapsed||isCollapsed)){
       h=0;
+      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
+      // but strip class can be stale after re-render (filter/search/sort reinit)
+      if(isCollapsed&&strip.className.indexOf('visible')===-1){
+        strip.className='pv-compact-strip visible';
+      }
     }
 
     // Few-cards guard — only on fresh load (never collapsed before)
