@@ -275,8 +275,8 @@
 <html lang="th">
 <head>
 <script>
-if (window.location.pathname === '/dashboard' ||
-    window.location.pathname.startsWith('/dashboard/')) {
+var _p = window.location.pathname;
+if (_p === '/dashboard') {
   window.location.replace('/dashboard.html');
 }
 </script>
