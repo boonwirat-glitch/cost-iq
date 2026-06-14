@@ -34,7 +34,7 @@ async function loadCommissionData() {
       .in('period_month', periods);
     commSnapshotData = snaps || [];
   } catch(e) {
-    console.warn('[Comm snapshots]', e.message);
+    DashLog.error('commission_snapshots', e.message);
     commSnapshotData = [];
   }
 
@@ -80,7 +80,7 @@ async function loadCommissionData() {
       }
     }
   } catch(e) {
-    console.warn('[Comm plans]', e.message);
+    DashLog.error('commission_plans', e.message);
   }
 
   commDataReady = true;
@@ -141,6 +141,7 @@ function estimateTLCommission(groups) {
 function renderCommissionView() {
   const el = document.getElementById('commission-content');
   if (!el) return;
+  if (!commDataReady) { el.innerHTML = skeletonBlock(4); return; }
 
   const groups = buildKamGroups();
   const isoNow = MONTH_ISO[currentMonth] || '2026-04';
