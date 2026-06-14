@@ -742,6 +742,15 @@ function handleFileUpload(type,input){
           if(window.RenderBus) window.RenderBus.signal('history_portview');
         }
       }
+      // v688: TL/Admin landing on teamview — portview signal above only fires when
+      // currentAccountId is set (KAM account selected). TL/Admin never select an account
+      // → signal never fires → teamview stays empty until _startTlBundlePrewarm (~4500ms).
+      // Fix: signal RenderBus unconditionally when scr-teamview is on.
+      try{
+        var _isTvOn=document.getElementById('scr-teamview')&&
+                    document.getElementById('scr-teamview').classList.contains('on');
+        if(_isTvOn&&window.RenderBus)window.RenderBus.signal('portview-for-teamview');
+      }catch(_){}
       _done();
     };reader.readAsText(file);return;
   }
