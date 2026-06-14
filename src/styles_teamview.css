@@ -45,12 +45,14 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 @media (max-width: 430px){
   /* Screen rhythm */
   #scr-teamview{overflow-x:hidden!important;background:var(--tk-bg-base)!important;}
-  /* v698: split shorthand → separate properties so JS CSS-variable can set padding-top */
+  /* v700: padding-left/right/bottom only — NO padding-top here.
+     padding-top is set exclusively by JS _tvSyncListOffset() via inline style
+     (same pattern as _pvSyncListOffset / portview-list which has no !important padding-top).
+     Adding padding-top:anything!important here would override JS inline style. */
   #teamview-content{
     padding-left:16px!important;
     padding-right:16px!important;
     padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;
-    padding-top:var(--tv-content-offset,0px)!important;
   }
 
   /* Header: undo v212a title squeeze and keep desktop hierarchy */
