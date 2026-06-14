@@ -1,4 +1,4 @@
-<!-- Freshket Sense 698: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 699: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '698',
+      version: '699',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -27722,19 +27722,21 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v698: use CSS variable instead of inline style — CSS !important shorthand
-  // in styles_teamview.css L48 (media ≤430px) overrides lst.style.paddingTop always.
-  // CSS variable set on :root wins over !important regular rule but yields to JS setProperty.
+  // v699: use OVERLAP method (same as _pvSyncListOffset) instead of full header height.
+  // hdr.BCR.height includes bottom padding/margin BELOW visible content → over-estimates.
+  // Overlap = hdrRect.bottom - lstRect.top = exact pixels header covers the list top.
+  // CSS variable on :root → picked up by padding-top:var(--tv-content-offset,0px)!important
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
   if(!scr.classList.contains('on'))return; // not visible — BCR unreliable
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
-  if(hdrH===0)return; // layout not settled yet — caller will retry
-  var pt=hdrH+'px';
-  // Set CSS variable on :root — picked up by padding-top:var(--tv-content-offset,0px)!important
+  var hdrRect=hdr.getBoundingClientRect();
+  var lstRect=lst.getBoundingClientRect();
+  if(hdrRect.height===0)return; // layout not settled — caller will retry
+  var overlap=Math.max(0, Math.round(hdrRect.bottom - lstRect.top));
+  var pt=overlap>0?overlap+'px':'0px';
   document.documentElement.style.setProperty('--tv-content-offset', pt);
 }
 
