@@ -477,3 +477,115 @@ html, body {
 .td-rep-row.dimmed {
   opacity: .28; pointer-events: none;
 }
+
+/* ── Phase 5: Skills (v705) ── */
+
+/* Sub-nav tabs */
+.td-skills-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--hair);
+  margin-bottom: var(--space-5);
+}
+.td-skills-tab {
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--ink-3); background: none; border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.td-skills-tab:hover { color: var(--ink-2); }
+.td-skills-tab.active { color: var(--ac); border-bottom-color: var(--ac); font-weight: var(--weight-semibold); }
+
+/* Pending row */
+.td-skill-pend-row {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--hair); cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.td-skill-pend-row:hover { background: var(--surface); }
+.td-skill-pend-row:last-child { border-bottom: none; }
+.td-skill-pend-body { flex: 1; min-width: 0; }
+.td-skill-pend-name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); }
+.td-skill-pend-skill { font-size: var(--text-xs); color: var(--ink-3); margin-top: 2px; display: flex; align-items: center; gap: var(--space-2); }
+.td-skill-pend-date { font-size: var(--text-micro); color: var(--ink-4); margin-top: 2px; font-family: var(--font-mono); }
+
+/* Gate badge */
+.td-skill-gate {
+  font-family: var(--font-mono); font-size: 9px; font-weight: var(--weight-semibold);
+  padding: 1px 5px; border-radius: var(--r-xs);
+  background: var(--info-dim); color: var(--info); border: 1px solid var(--info-border);
+}
+
+/* Echo strip in pending */
+.td-skill-echo-strip {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface); border-radius: var(--r-xs);
+  font-size: var(--text-micro);
+}
+.td-skill-echo-score { font-weight: var(--weight-semibold); }
+.td-skill-echo-date  { color: var(--ink-4); font-family: var(--font-mono); }
+.td-skill-echo-ev    { color: var(--ink-3); width: 100%; line-height: 1.4; }
+
+/* Matrix */
+.td-skill-matrix-wrap { display: flex; flex-direction: column; gap: 0; }
+.td-skill-matrix-header {
+  display: flex; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hair);
+}
+.td-skill-matrix-row {
+  display: flex; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hair);
+  gap: var(--space-4);
+}
+.td-skill-matrix-row:last-child { border-bottom: none; }
+.td-skill-matrix-rep {
+  min-width: 200px; flex-shrink: 0;
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.td-skill-matrix-dots {
+  flex: 1; display: flex; gap: var(--space-2); flex-wrap: wrap;
+  align-items: center;
+}
+.td-skill-matrix-dots-hd {
+  flex: 1; display: flex; gap: var(--space-2); flex-wrap: wrap;
+  align-items: center;
+}
+.td-skill-matrix-hd {
+  width: 28px; text-align: center;
+  font-family: var(--font-mono); font-size: 9px; color: var(--ink-4);
+  letter-spacing: .04em;
+}
+.td-skill-matrix-bar {
+  width: 120px; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+.td-skill-matrix-cell {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.td-skill-matrix-dot {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.td-skill-matrix-dot.pass  { background: var(--ok-dim);     border: 1.5px solid var(--ok); }
+.td-skill-matrix-dot.train { background: var(--warn-dim);   border: 1.5px solid var(--warn); }
+.td-skill-matrix-dot.lock  { background: var(--surface-2);  border: 1.5px solid var(--hair-2); }
+
+/* Echo dot overlay on matrix dot */
+.td-skill-echo-dot {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid var(--bg);
+}
+.td-skill-echo-dot.ok      { background: var(--ok); }
+.td-skill-echo-dot.warn    { background: var(--warn); }
+.td-skill-echo-dot.danger  { background: var(--danger); }
