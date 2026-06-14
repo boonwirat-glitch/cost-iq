@@ -617,7 +617,8 @@ body.kam-mode #kam-nav-handle{display:none;}
   #tv-pace-bar .pace-pct-val{font-size:28px!important;line-height:1!important;}
   #tv-pace-bar .pace-bar-wrap{height:6px!important;border-radius:4px!important;}
   #tv-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}
-  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;}
+  /* v698: add --tv-content-offset to neutralize padding-top conflict with styles_teamview.css */
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;padding-top:var(--tv-content-offset,0px)!important;}
   .tv-full-card,.tv-star-card{padding:16px 16px 14px!important;border-radius:16px!important;margin-bottom:14px!important;}
   .tv-full-top{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:8px!important;margin-bottom:10px!important;}
   .tv-full-name{font-size:15px!important;line-height:1.3!important;min-width:0!important;white-space:normal!important;overflow:visible!important;}
