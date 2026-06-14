@@ -43,6 +43,16 @@ const DashState = {
   }
 };
 
+// ── Render debounce — prevents double-render on fast clicks ─────
+let _renderDebounceTimer = null;
+function scheduleRender() {
+  if (_renderDebounceTimer) clearTimeout(_renderDebounceTimer);
+  _renderDebounceTimer = setTimeout(() => {
+    _renderDebounceTimer = null;
+    renderCurrentView();
+  }, 40);  // 40ms — one frame
+}
+
 // ── App init ──────────────────────────────────────────────────
 function initApp() {
   renderTopbarUser();
@@ -55,7 +65,7 @@ function initApp() {
 }
 
 function renderTopbarUser() {
-  if (!currentProfile) return;
+  if (!currentProfile?.email) return;
   const initials = (currentProfile.name || currentProfile.email || '?')
     .trim().charAt(0).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
@@ -91,8 +101,8 @@ function setMetric(m, btn) {
   currentMetric = m;
   document.querySelectorAll('#metric-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
   btn.classList.add('active-ac');
-  updateMapColors();
-  renderCurrentView();
+  if (typeof _mapInited !== 'undefined' && _mapInited) updateMapColors();
+  scheduleRender();
 }
 
 function setMonth(m, btn) {
@@ -114,6 +124,7 @@ function toggleSalesOverlay() {
 // ── View routing ──────────────────────────────────────────────
 function setView(v, btn) {
   currentView = v;
+  if (v !== 'map' && typeof cancelMapInitTimer === 'function') cancelMapInitTimer();
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v)?.classList.add('active');
   document.querySelectorAll('.snav-btn').forEach(b => b.classList.remove('active'));
@@ -235,7 +246,20 @@ function renderSidebarRepHighlight() {
   });
 }
 
-// ── Detail panel ──────────────────────────────────────────────
+// ── Click-outside to close detail panel ────────────────────────
+document.addEventListener('click', e => {
+  const panel  = document.getElementById('detail-panel');
+  const isOpen = panel?.classList.contains('open');
+  if (!isOpen) return;
+  if (!panel.contains(e.target) &&
+      !e.target.closest('.td-echo-card') &&
+      !e.target.closest('.td-poly') &&
+      !e.target.closest('.td-rep-row')) {
+    closeDetail();
+  }
+});
+
+// ── Detail panel ───────────────────────────────────────────────
 function openDetail(html) {
   document.getElementById('detail-content').innerHTML = html;
   document.getElementById('detail-panel').classList.add('open');
