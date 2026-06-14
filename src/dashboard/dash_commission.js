@@ -60,10 +60,10 @@ async function loadCommissionData() {
 
   try {
     // 1. Snapshots (pre-computed by Sense)
-    const { data: snaps } = await supa
+    const { data: snaps } = await supaFetch(supa
       .from('commission_payout_snapshots')
       .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at')
-      .in('period_month', periods);
+      .in('period_month', periods));
     commSnapshotData = snaps || [];
   } catch(e) {
     DashLog.error('commission_snapshots', e.message);
@@ -72,11 +72,11 @@ async function loadCommissionData() {
 
   try {
     // 2. Plans + tiers (for bracket display)
-    const { data: plans } = await supa
+    const { data: plans } = await supaFetch(supa
       .from('commission_plans')
       .select('id,plan_code,plan_name,beneficiary_role,status')
       .in('beneficiary_role', ['tl','kam'])
-      .neq('status','inactive');
+      .neq('status','inactive'));
 
     const planMap = {};
     const planIds = [];
@@ -128,10 +128,10 @@ function getCommSnaps(periodMonth, role) {
 }
 
 function getMyCommSnaps(role) {
-  if (!currentProfile?.email) return [];
+  if (!currentProfile?.email) return [];  // guard
   return commSnapshotData.filter(s =>
-    (s.beneficiary_email === currentProfile.email ||
-     s.team_lead_email   === currentProfile.email) &&
+    (s.beneficiary_email === (currentProfile?.email||'__none__') ||
+     s.team_lead_email   === (currentProfile?.email||'__none__')) &&
     (!role || s.beneficiary_role === role)
   );
 }
@@ -144,10 +144,10 @@ function getTLPayoutForMonth(isoMonth) {
 
 // All KAM payouts under this TL for a month
 function getKAMPayoutsForMonth(isoMonth) {
-  if (!currentProfile?.email) return [];
+  if (!currentProfile?.email) return [];  // guard
   return commSnapshotData.filter(s =>
     s.period_month === isoMonth &&
-    s.team_lead_email === currentProfile.email &&
+    s.team_lead_email === (currentProfile?.email||'__none__') &&
     s.beneficiary_role === 'kam'
   );
 }
@@ -164,6 +164,7 @@ function estimateTLCommission(groups) {
 
 // ── Render: Commission view (Phase 4) ─────────────────────────
 function renderCommissionView() {
+  if (!dataReady) return;
   const el = document.getElementById('commission-content');
   if (!el) return;
   if (!commDataReady) { el.innerHTML = skeletonBlock(4); return; }
@@ -242,6 +243,9 @@ function renderCommissionView() {
             KAM team ${fmtGMV(kamTotal)} · status: ${tlSnap?.snapshot_status || '—'}
            </div>`
       }
+      ${tlSnap?.updated_at
+        ? `<div class="td-comm-updated">Updated ${new Date(tlSnap.updated_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>`
+        : ''}
     </div>
 
     <!-- 6-month trend -->
