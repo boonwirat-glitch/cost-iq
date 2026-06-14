@@ -977,9 +977,13 @@ function hideLoginOverlay() {
     window._pendingRefreshAll=false;
     // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
     _autoRouteAfterLogin();
-    // v685: resume saved screen — only portview/teamview allowed, respects role routing above
-    var _targetScreen=(_rs&&_rs.screen)||'portview';
-    if(typeof showScreen==='function'){
+    // v700: resume saved screen — role routing takes priority for TL/Admin
+    // TL/Admin always land on teamview (already set L955) — never override with saved portview
+    // Other roles: restore saved screen if safe
+    var _skipRoleForResume = getCurrentRole();
+    var _isTlAdmin = _skipRoleForResume==='tl'||_skipRoleForResume==='admin';
+    if(!_isTlAdmin && typeof showScreen==='function'){
+      var _targetScreen=(_rs&&_rs.screen)||'portview';
       setTimeout(function(){
         try{
           var safeScreens=['portview','teamview'];
