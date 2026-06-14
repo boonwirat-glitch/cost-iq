@@ -73,7 +73,7 @@ async function loadSkillsData() {
 
     skillDataReady = true;
   } catch(e) {
-    console.warn('[Skills]', e.message);
+    DashLog.error('skills_load', e.message);
     skillDataReady = true;
   }
 
