@@ -8,6 +8,26 @@ const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
 const ALLOWED_ROLES = ['tl','admin','sales_tl','ad_tl',
   'team_lead','team lead','ka team lead','sales team lead'];
 
+
+// ── DASH_CONFIG — all tunable constants in one place ─────────
+// Change here only — never hardcode these values elsewhere
+const DASH_CONFIG = {
+  PACE_STAR:            105,
+  PACE_OK:               95,
+  PACE_WARN:             90,
+  BASELINE_MONTHS:        3,
+  QUERY_LIMIT_ECHO:     120,
+  QUERY_LIMIT_SKILLS:   500,
+  FETCH_RETRIES:          2,
+  FETCH_RETRY_DELAY_MS: 1200,
+  SUPABASE_TIMEOUT_MS:  8000,
+  TOAST_DURATION_MS:    2800,
+  ECHO_WEEK_DAYS:          7,
+  ECHO_DEDUPE_SEC:        60,
+  MONTHS: ["Nov 25","Dec 25","Jan 26","Feb 26","Mar 26","Apr 26"],
+};
+Object.freeze(DASH_CONFIG);
+
 let supa, currentProfile = null;
 
 // ── Logger ────────────────────────────────────────────────────
@@ -70,6 +90,16 @@ const DashLog = (() => {
 
 // Expose for console debugging
 window.DashLog = DashLog;
+
+
+// ── supaFetch — Supabase query with timeout ───────────────────
+async function supaFetch(queryBuilder) {
+  const timeout = new Promise((_,reject) =>
+    setTimeout(() => reject(new Error('Supabase timeout')),
+               DASH_CONFIG.SUPABASE_TIMEOUT_MS)
+  );
+  return Promise.race([queryBuilder, timeout]);
+}
 
 // ── Global error boundary ─────────────────────────────────────
 window.addEventListener('unhandledrejection', e => {
@@ -192,6 +222,32 @@ async function doLogout() {
 
 function openSense() { window.open('/', '_blank'); }
 
+async function doForgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) {
+    showAuthError('กรุณากรอกอีเมลก่อน แล้วกด "ลืมรหัสผ่าน"');
+    return;
+  }
+  try {
+    const { error } = await supa.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/dashboard'
+    });
+    if (error) throw error;
+    showAuthError('');
+    const el = document.getElementById('auth-error');
+    el.textContent = 'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ' + email + ' แล้ว';
+    el.style.display = 'block';
+    el.style.background = 'var(--ok-dim)';
+    el.style.color = 'var(--ok-text)';
+    el.style.borderColor = 'var(--ok-border)';
+  } catch(e) {
+    DashLog.error('forgot_password', e.message);
+    showAuthError(e.message || 'ไม่สามารถส่งอีเมลได้');
+  }
+}
+
+
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.activeElement?.id === 'auth-pass') doLogin();
 });
@@ -257,8 +313,8 @@ function fmtPct(v)         { return v != null ? v + '%' : '—'; }
 function fmtDelta(c, p)    { if (!p) return ''; const d = Math.round((c-p)/p*100); return (d>=0?'+':'')+d+'%'; }
 function deltaCls(c, p)    { return c >= p ? 'up' : 'down'; }
 function paceCls(pct) {
-  if (pct >= 105) return 'star';
-  if (pct >= 95)  return 'ok';
-  if (pct >= 90)  return 'warn';
+  if (pct >= DASH_CONFIG.PACE_STAR) return 'star';
+  if (pct >= DASH_CONFIG.PACE_OK)   return 'ok';
+  if (pct >= DASH_CONFIG.PACE_WARN) return 'warn';
   return 'danger';
 }
