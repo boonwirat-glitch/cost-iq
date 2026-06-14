@@ -27740,21 +27740,20 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v671g: Few-cards guard — if page not scrollable, stop rAF but keep current header state
-    // Do NOT force expand — let header stay wherever it is (expanded or collapsed)
-    // This prevents jitter on few cards AND prevents forced expand on search/filter results
-    if(!_scrollable()){
-      // Ensure header is either fully expanded or fully collapsed (no mid-state)
-      if(h>0) h=expandedH; // snap to expanded if not already collapsed
-      if(lastAppliedH!==h){
-        lastAppliedH=h;
-        collapsible.style.maxHeight=h+'px';
+    // v672a: Few-cards guard — only prevent jitter on fresh load (not scrolled yet)
+    // If user already collapsed (isCollapsed=true), skip guard entirely
+    // so search/filter with few cards does NOT force expand
+    if(!_scrollable()&&!isCollapsed){
+      // Not scrolled yet + few cards → stay expanded, stop rAF
+      if(lastAppliedH!==expandedH){
+        lastAppliedH=expandedH;
+        collapsible.style.maxHeight=expandedH+'px';
         collapsible.style.opacity='1';
         collapsible.style.pointerEvents='';
         _pvSyncListOffset();
       }
-      _applyStrip(h===0);
-      return; // stop rAF — no scroll possible anyway
+      _applyStrip(false);
+      return;
     }
 
     var collapsed=(h===0);
