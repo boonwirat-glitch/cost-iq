@@ -1,4 +1,4 @@
-<!-- Freshket Sense 695: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 696: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '695',
+      version: '696',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7741,7 +7741,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 @media (max-width: 430px){
   /* Screen rhythm */
   #scr-teamview{overflow-x:hidden!important;background:var(--tk-bg-base)!important;}
-  #teamview-content{padding:0 16px calc(150px + env(safe-area-inset-bottom))!important;}
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;padding-top:0;}
 
   /* Header: undo v212a title squeeze and keep desktop hierarchy */
   #scr-teamview .portview-head{
