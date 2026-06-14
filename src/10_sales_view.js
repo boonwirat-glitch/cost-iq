@@ -294,6 +294,21 @@ function renderSalesPortview() {
   const el = document.getElementById('scr-sales-portview');
   if (!el) return;
 
+  // v715 Fix 2C: if Tier 1 not ready → show skeleton, re-render when data arrives
+  // Prevents 0-value flash when RenderBus fires renderSalesPortview too early
+  const _tier1Ready = window.DataRegistry ? window.DataRegistry.isReady(1) : true;
+  if (!_tier1Ready) {
+    if (typeof window._showScreenSkeleton === 'function') {
+      window._showScreenSkeleton('scr-sales-portview');
+    }
+    if (window.DataRegistry) {
+      window.DataRegistry.waitFor(1).then(function(){
+        try { renderSalesPortview(); } catch(e) {}
+      }).catch(function(){});
+    }
+    return;
+  }
+
   const outlets = getSalesPortviewData();
   const email = (currentUserProfile && currentUserProfile.email) || '';
 
