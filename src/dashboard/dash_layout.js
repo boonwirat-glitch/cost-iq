@@ -51,6 +51,7 @@ function initApp() {
   loadDashData();
   loadCommissionData();  // Phase 4: load in parallel
   loadSkillsData();         // Phase 5: load in parallel
+  loadEchoData();           // Phase 6: load in parallel
 }
 
 function renderTopbarUser() {
@@ -119,7 +120,7 @@ function setView(v, btn) {
   btn?.classList.add('active');
   document.getElementById('topbar-section').textContent = {
     map: 'Territory Map', team: 'ภาพรวมทีม',
-    commission: 'Commission', skills: 'Skills'
+    commission: 'Commission', skills: 'Skills', echo: 'Echo Sessions'
   }[v] || v;
   renderCurrentView();
 }
@@ -129,6 +130,7 @@ function renderCurrentView() {
   if (currentView === 'team')       renderTeamView();
   if (currentView === 'commission') renderCommissionView();
   if (currentView === 'skills')     renderSkillsView();
+  if (currentView === 'echo')       renderEchoView();
 }
 
 // ── Shimmer ───────────────────────────────────────────────────
