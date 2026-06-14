@@ -1890,15 +1890,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
         </div>`;
       }
       const rows = fs.map(f => {
-        const tg = TAGS[f.tag];
-        const tagChip = tg
-          ? `<span style="background:${tg[1]};color:${tg[2]};font-size:11px;font-weight:500;padding:2px 9px;border-radius:999px;margin-right:7px;white-space:nowrap">${tg[0]}</span>`
-          : '';
         const quote = (f.quote && String(f.quote).trim())
           ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
           : '';
         return `<div style="padding:8px 0 8px 2px">
-          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${tagChip}${f.summary || '-'}</div>
+          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
           ${quote}
         </div>`;
       }).join('');
