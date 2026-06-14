@@ -73,6 +73,7 @@ function initMap() {
   updateMapColors();
   renderMapToolbar();
   renderMapLegend();
+  if (DashState?.salesOverlay) renderSalesOverlay();
 }
 
 // ── Colors ────────────────────────────────────────────────────
@@ -194,12 +195,16 @@ function onPolyLeave(event) {
 // ── Click ─────────────────────────────────────────────────────
 function onPolyClick(event, d) {
   const name = d.properties.name_th;
-  if (selectedDistrict === name) { closeDetail(); return; }
-  selectedDistrict = name;
-
+  DashState.selectDistrict(name);
+  if (!DashState.selectedDistrictName) {
+    // was deselected — close detail
+    closeDetail();
+    return;
+  }
+  // Update polygon selected state
   mapG.select('.g-bkk').selectAll('path')
-    .classed('selected', dd => dd.properties.name_th === name);
-
+    .classed('selected', dd => dd.properties.name_th === name)
+    .style('opacity', null);  // clear rep-dim when zone selected
   openDetailForDistrict(name, d.properties);
 }
 
@@ -318,6 +323,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+
+// ── Sales overlay (Phase 3) ───────────────────────────────────
+function renderSalesOverlay() {
+  // Remove existing overlay
+  mapG?.selectAll('.td-sales-dot').remove();
+  if (!DashState.salesOverlay || !mapG) return;
+
+  // Mock: generate acquisition dots across Bangkok
+  // Phase 2: replace with real first_dollar_date + lat/lng from R2
+  const mockDots = BKK_GEO.features.flatMap(f => {
+    const centroid = mapPath?.centroid(f);
+    if (!centroid || isNaN(centroid[0])) return [];
+    const dist = MOCK_DISTRICT?.[f.properties.name_th];
+    const count = dist?.months[currentMonth]?.new_accounts || 0;
+    return Array.from({length: Math.min(count, 6)}, (_, i) => ({
+      x: centroid[0] + (Math.random()-0.5) * 20,
+      y: centroid[1] + (Math.random()-0.5) * 20,
+      name: f.properties.name_th,
+      gmv: Math.round(Math.random() * 200000 + 50000)
+    }));
+  });
+
+  mapG.append('g').attr('class', 'td-sales-dot-group')
+    .selectAll('circle').data(mockDots).join('circle')
+    .attr('class', 'td-sales-dot')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', 5)
+    .style('fill', 'var(--info)')
+    .style('stroke', 'white')
+    .style('stroke-width', '1.5')
+    .style('opacity', '0')
+    .style('cursor', 'pointer')
+    .on('mousemove', (event, d) => {
+      const tt = document.getElementById('map-tooltip');
+      tt.innerHTML = `<div class="tt-name" style="color:var(--info)">New Account (Sales)</div>
+        <div class="tt-zone">${d.name}</div>
+        <div class="tt-row"><span>GMV</span><span class="tt-val">${fmtGMV(d.gmv)}</span></div>`;
+      const [mx,my] = d3.pointer(event, document.getElementById('map-container'));
+      tt.style.left = (mx+14) + 'px'; tt.style.top = (my+14) + 'px';
+      tt.classList.add('show');
+    })
+    .on('mouseleave', () => document.getElementById('map-tooltip').classList.remove('show'))
+    .transition().duration(300)
+    .style('opacity', '0.85');
+}
 
 // Window resize
 window.addEventListener('resize', () => {
