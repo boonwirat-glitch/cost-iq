@@ -1,4 +1,4 @@
-<!-- Freshket Sense 699: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 700: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '699',
+      version: '700',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7562,8 +7562,8 @@ body.kam-mode #kam-nav-handle{display:none;}
   #tv-pace-bar .pace-pct-val{font-size:28px!important;line-height:1!important;}
   #tv-pace-bar .pace-bar-wrap{height:6px!important;border-radius:4px!important;}
   #tv-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}
-  /* v698: add --tv-content-offset to neutralize padding-top conflict with styles_teamview.css */
-  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;padding-top:var(--tv-content-offset,0px)!important;}
+  /* v700: no padding-top here — JS _tvSyncListOffset() sets it via inline style */
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:128px!important;}
   .tv-full-card,.tv-star-card{padding:16px 16px 14px!important;border-radius:16px!important;margin-bottom:14px!important;}
   .tv-full-top{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:8px!important;margin-bottom:10px!important;}
   .tv-full-name{font-size:15px!important;line-height:1.3!important;min-width:0!important;white-space:normal!important;overflow:visible!important;}
@@ -7742,12 +7742,14 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 @media (max-width: 430px){
   /* Screen rhythm */
   #scr-teamview{overflow-x:hidden!important;background:var(--tk-bg-base)!important;}
-  /* v698: split shorthand → separate properties so JS CSS-variable can set padding-top */
+  /* v700: padding-left/right/bottom only — NO padding-top here.
+     padding-top is set exclusively by JS _tvSyncListOffset() via inline style
+     (same pattern as _pvSyncListOffset / portview-list which has no !important padding-top).
+     Adding padding-top:anything!important here would override JS inline style. */
   #teamview-content{
     padding-left:16px!important;
     padding-right:16px!important;
     padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;
-    padding-top:var(--tv-content-offset,0px)!important;
   }
 
   /* Header: undo v212a title squeeze and keep desktop hierarchy */
@@ -27722,10 +27724,10 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v699: use OVERLAP method (same as _pvSyncListOffset) instead of full header height.
-  // hdr.BCR.height includes bottom padding/margin BELOW visible content → over-estimates.
-  // Overlap = hdrRect.bottom - lstRect.top = exact pixels header covers the list top.
-  // CSS variable on :root → picked up by padding-top:var(--tv-content-offset,0px)!important
+  // v700: overlap method + inline style (same pattern as _pvSyncListOffset for portview-list).
+  // portview-list has no !important padding-top CSS → inline style wins.
+  // teamview-content also has no !important padding-top CSS (removed v700) → inline style wins.
+  // DO NOT add padding-top:anything!important in any CSS rule for #teamview-content.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
@@ -27737,7 +27739,7 @@ function _tvSyncListOffset(){
   if(hdrRect.height===0)return; // layout not settled — caller will retry
   var overlap=Math.max(0, Math.round(hdrRect.bottom - lstRect.top));
   var pt=overlap>0?overlap+'px':'0px';
-  document.documentElement.style.setProperty('--tv-content-offset', pt);
+  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
 
 function _pvSyncListOffset(){
@@ -31833,9 +31835,9 @@ flex-wrap:wrap;}
 #tv-collapsible.expanded{
   margin-bottom:8px !important;
 }
-#teamview-content{
-  padding-top:0 !important;
-}
+/* v700: #teamview-content padding-top:0 rule REMOVED.
+   Commission cockpit is a position:fixed overlay — not dependent on teamview-content padding.
+   padding-top is set exclusively by JS _tvSyncListOffset() via inline style. */
 #tv-ai-btn{
   margin-bottom:0 !important;
 }
