@@ -589,3 +589,67 @@ html, body {
 .td-skill-echo-dot.ok      { background: var(--ok); }
 .td-skill-echo-dot.warn    { background: var(--warn); }
 .td-skill-echo-dot.danger  { background: var(--danger); }
+
+/* ── Phase 6: Echo (v706) ── */
+
+/* Echo feed */
+.td-echo-feed { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.td-echo-card {
+  background: var(--bg); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+}
+.td-echo-card:hover { background: var(--surface); border-color: var(--hair-2); }
+.td-echo-card.selected { background: var(--ac-dim); border-color: var(--ac-border); }
+
+.td-echo-card-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.td-echo-card-left {
+  display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0;
+}
+.td-echo-card-right { flex-shrink: 0; }
+.td-echo-rep   { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); }
+.td-echo-acct  { font-size: var(--text-xs); color: var(--ink-3); }
+.td-echo-meta  { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-4); }
+
+.td-echo-badges {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin-bottom: var(--space-1);
+}
+.td-echo-dots { display: flex; gap: 3px; align-items: center; flex: 1; }
+.td-echo-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.td-echo-dot.ok      { background: var(--ok); }
+.td-echo-dot.warn    { background: var(--warn); }
+.td-echo-dot.danger  { background: var(--danger); }
+.td-echo-dot.neutral { background: var(--hair-3); }
+
+.td-echo-note {
+  font-size: var(--text-xs); color: var(--info); font-style: italic;
+  line-height: 1.5; margin-top: var(--space-2); padding-top: var(--space-2);
+  border-top: 1px solid var(--hair);
+}
+.td-echo-summary {
+  font-size: var(--text-xs); color: var(--ink-3);
+  line-height: 1.5; margin-top: var(--space-2); padding-top: var(--space-2);
+  border-top: 1px solid var(--hair);
+}
+
+/* TL note textarea */
+.td-echo-note-input {
+  width: 100%; min-height: 80px;
+  background: var(--surface); border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm); padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body); font-size: var(--text-sm);
+  color: var(--ink-1); resize: vertical; outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out);
+  line-height: var(--lh-relaxed);
+}
+.td-echo-note-input:focus {
+  border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-dim);
+}
