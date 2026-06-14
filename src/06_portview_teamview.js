@@ -1194,17 +1194,16 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v685: sync teamview-content padding-top to actual portview-header height
-  // portview-header in scr-teamview is position:sticky, so content needs explicit top offset
+  // v686: teamview-content has tv-ai-output between it and portview-header,
+  // so overlap measurement is always 0. Instead measure header scrollHeight directly.
+  // padding-top = header height, keeps first KAM card below the sticky header.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrRect=hdr.getBoundingClientRect();
-  var lstRect=lst.getBoundingClientRect();
-  var overlap=Math.max(0, Math.round(hdrRect.bottom - lstRect.top));
-  var pt=overlap>0?overlap+'px':'0px';
+  var hdrH=hdr.scrollHeight||0;
+  var pt=hdrH>0?hdrH+'px':'0px';
   if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
 
