@@ -9,9 +9,9 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
-| `docs/handoff-2026-06-14-v708.md` | **Latest Sense handoff** — v708, สถานะ pending tasks |
+| `docs/handoff-2026-06-14-v708.md` | **Latest Sense handoff** — v708 |
 | `docs/handoff-2026-06-14-v701.md` | Sense v701 — teamview card fix, full architecture notes |
-| `docs/handoff/HANDOFF_v606_20260613.md` | Dashboard v709 architecture — Phase 1–8 complete |
+| `docs/handoff/HANDOFF_v606_20260613.md` | Dashboard Phase 1–8 architecture |
 
 ---
 
@@ -101,13 +101,7 @@
 
 ---
 
-## 🗺 Pending (รอดำเนินการ)
-
-### Sense
-- SQL2 `PARTITION BY ko.account_id` fix → re-export KAM CSVs ไป R2
-- SmartSelect 52→41 regression
-- Qty unit display "3 kg" → "3 ถัง"
-- Co-visit GPS verify (`covisit_events` table)
+## 🗺 Pending
 
 ### Dashboard
 - **Phase 0:** BigQuery query result → replace `MOCK_DISTRICT` ใน `dash_map.js`
