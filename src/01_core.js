@@ -128,6 +128,19 @@ function resetRuntimeSessionState(){
   // v491-A: remove stale role classes BEFORE setMode so kam-mode add is not immediately undone.
   // Previous order: setMode adds kam-mode, then remove() strips it → body loses dark bg on re-login.
   try { document.body.classList.remove('sales-mode','sales-tl-mode','kad-mode','ad-tl-mode','kam-mode'); } catch(e) {}
+  // v682: reset nav inline styles so NavConfig.render() starts from a clean slate
+  // prevents stale display:flex / order values from previous session persisting
+  try {
+    var _navIds=['nav-overview','nav-portview','nav-restaurant','nav-echo-kam','nav-opportunities',
+      'nav-skills','nav-teamview','nav-sales-portview','nav-sales-pipeline','nav-echo',
+      'nav-sales-commission','nav-sales-teamview','nav-portfolio','nav-report'];
+    _navIds.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){el.style.display='none';el.style.order='';}
+    });
+    var bnav=document.querySelector('.bnav');
+    if(bnav) bnav.style.gridTemplateColumns='';
+  } catch(e) {}
   try { document.documentElement.removeAttribute('data-theme'); } catch(e) {} // phase-0C
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
   try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
@@ -797,6 +810,8 @@ function hideLoginOverlay() {
         if(typeof showScreen==='function') showScreen('portview');
       }
       else{document.documentElement.dataset.theme='dark';if(typeof showScreen==='function')showScreen('portview');}
+      // v682: render nav BEFORE splash becomes transparent — prevents 14-button flash
+      try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(getCurrentRole());}catch(e){}
     }catch(e){}
   };
 
@@ -853,6 +868,13 @@ function hideLoginOverlay() {
         listEl.innerHTML='';
         listEl.appendChild(lw);
       }
+      // v682: also clear NRR/commission/pace elements — they flash stale IDB values
+      // before Supabase targets and R2 fresh data arrive
+      ['tgt-portview-bar','tgt-nrr-bar','pv-commission-strip','portview-pace-bar',
+       'pv-compact-strip'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el) el.innerHTML='';
+      });
       window._pwaShimmerActive=true;
     }catch(e){}
   };
@@ -913,6 +935,9 @@ function hideLoginOverlay() {
     // _autoRouteAfterLogin adds it back inside setMode, but that's after first paint.
     try { document.body.classList.add('kam-mode'); } catch(e) {}
     try { document.documentElement.dataset.theme='dark'; } catch(e) {} // phase-0C: skip-splash path
+    // v682: render nav NOW — role known from profile cache, body classes already set above
+    // Must fire before splash.display='none' so nav is correct when it becomes visible
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(getCurrentRole());}catch(e){}
     // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
