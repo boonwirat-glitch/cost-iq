@@ -882,13 +882,17 @@ function hideLoginOverlay() {
   window._activateTeamviewShimmer = function(){
     try{
       _injectCSS();
-      var sumEl=document.getElementById('teamview-summary');
-      if(sumEl){
-        sumEl.innerHTML='<div style="padding:12px">'+_makeBar('40%',11,10)+_makeBar('100%',6,0)+'</div>';
-      }
-      var listEl=document.getElementById('teamview-list');
-      if(listEl){
-        listEl.innerHTML='<div style="padding:4px 0">'+_makeCard()+_makeCard()+_makeCard()+'</div>';
+      // v685: shimmer targets teamview-content (KAM list) only.
+      // tv-summary-row (govCard + commission) is NOT cleared — commission data comes from
+      // Supabase and is only available after the first real render; clearing it causes the
+      // "commission flash then disappear" bug.
+      var listEl=document.getElementById('teamview-content');
+      if(listEl && !document.getElementById('tv-shimmer-wrap')){
+        var lw=document.createElement('div');
+        lw.id='tv-shimmer-wrap';
+        lw.innerHTML='<div style="padding:4px 0">'+_makeCard()+_makeCard()+_makeCard()+'</div>';
+        listEl.innerHTML='';
+        listEl.appendChild(lw);
       }
       window._pwaShimmerActive=true;
     }catch(e){}
@@ -897,7 +901,8 @@ function hideLoginOverlay() {
   window._deactivatePortviewShimmer = function(){
     try{
       window._pwaShimmerActive=false;
-      _SHIMMER_IDS.forEach(function(id){
+      // v685: also remove tv-shimmer-wrap from teamview-content
+      _SHIMMER_IDS.concat(['tv-shimmer-wrap']).forEach(function(id){
         var el=document.getElementById(id);
         if(el && el.parentNode) el.parentNode.removeChild(el);
       });
@@ -930,14 +935,30 @@ function hideLoginOverlay() {
     }else{
       _senseDataLog('RESUME','⚡ skip splash — warm IDB boot (no saved state)');
     }
-    // v491-B: ensure kam-mode on body BEFORE anything shows, preventing white body flash
-    // in skip-splash path. resetRuntimeSessionState removes kam-mode on signout;
-    // _autoRouteAfterLogin adds it back inside setMode, but that's after first paint.
-    try { document.body.classList.add('kam-mode'); } catch(e) {}
-    try { document.documentElement.dataset.theme='dark'; } catch(e) {} // phase-0C: skip-splash path
-    // v682: render nav NOW — role known from profile cache, body classes already set above
-    // Must fire before splash.display='none' so nav is correct when it becomes visible
-    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(getCurrentRole());}catch(e){}
+    // v685: set correct role theme + screen BEFORE splash hides — prevents wrong screen flash
+    // Admin/TL must see teamview light theme; KAM/AD must see portview dark theme
+    var _skipRole = getCurrentRole();
+    if(_skipRole==='tl'||_skipRole==='admin'){
+      document.documentElement.dataset.theme='light';
+      try { document.body.classList.remove('kam-mode'); } catch(e) {}
+      if(typeof showScreen==='function') try{ showScreen('teamview'); }catch(e){}
+    } else if(_skipRole==='sales'||_skipRole==='sales_tl'){
+      document.body.classList.add('sales-mode');
+      if(_skipRole==='sales_tl') document.body.classList.add('sales-tl-mode');
+      document.documentElement.dataset.theme='light';
+      if(typeof showScreen==='function') try{ showScreen('sales-portview'); }catch(e){}
+    } else if(_skipRole==='ad'||_skipRole==='ad_tl'){
+      document.body.classList.add('kad-mode');
+      document.documentElement.dataset.theme='dark';
+      try { document.body.classList.add('kam-mode'); } catch(e) {}
+      if(typeof showScreen==='function') try{ showScreen('portview'); }catch(e){}
+    } else {
+      try { document.body.classList.add('kam-mode'); } catch(e) {}
+      document.documentElement.dataset.theme='dark';
+      if(typeof showScreen==='function') try{ showScreen('portview'); }catch(e){}
+    }
+    // v682: render nav NOW with correct role — must fire before splash hides
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(_skipRole);}catch(e){}
     // Hide splash + login overlay immediately
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
@@ -945,9 +966,8 @@ function hideLoginOverlay() {
     window._pendingRefreshAll=false;
     // Fire _autoRouteAfterLogin → loads R2 bundles, starts background ETag
     _autoRouteAfterLogin();
-    // Restore saved screen (after route which defaults to portview/teamview)
-    var _targetScreen='portview';
-    if(_rs&&_rs.screen){_targetScreen=_rs.screen;}
+    // v685: resume saved screen — only portview/teamview allowed, respects role routing above
+    var _targetScreen=(_rs&&_rs.screen)||'portview';
     if(typeof showScreen==='function'){
       setTimeout(function(){
         try{
@@ -957,7 +977,7 @@ function hideLoginOverlay() {
       },0);
     }
     // v224e: show shimmer skeleton instead of stale data.
-    // RenderBus will clear shimmer and render once ETag check completes (~200-400ms).
+    // Read active screen AFTER role routing above — shimmer goes to correct screen
     setTimeout(function(){
       try{
         var onPv = document.getElementById('scr-portview') &&
