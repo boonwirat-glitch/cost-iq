@@ -159,6 +159,13 @@ function _showLoginOverlayClean(){
     ['position','top','left','right','width','maxWidth','marginLeft','marginRight'].forEach(p => { document.body.style[p] = ''; });
     // ล้าง stale account view (KAM single-account sheet)
     document.body.classList.remove('restaurant-sheet','rest-settled','rest-closing','echo-active','kam-sense-active');
+    // v673: clear stale portview/commission UI from previous session so IDB-served data
+    // doesn't flash old design (NRR 7500, pace 0%, old layout) before fresh R2 data arrives.
+    ['portview-list','portview-summary-row','tgt-portview-bar','tgt-nrr-bar',
+     'pv-commission-strip','pv-compact-strip','portview-pace-bar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '';
+    });
   } catch(_) {}
   const ov = document.getElementById('login-overlay');
   passwordRecoveryMode = false;
