@@ -132,7 +132,7 @@ ${segmentLines}
     if (attempt > 1) await new Promise(r => setTimeout(r, attempt === 2 ? 2000 : 4000));
     try {
       geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash}:generateContent?key=${env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_lite}:generateContent?key=${env.GEMINI_API_KEY}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: geminiBody }
       );
     } catch(e) {
@@ -167,20 +167,25 @@ async function handleSummarize(request, env) {
 
   const transcriptText = segments.map(s => `[${s.ts}] ${s.speaker}: ${s.text}`).join('\n');
 
-  const prompt = `อ่าน transcript บทสนทนานี้แล้วสรุป
+  const prompt = `อ่าน transcript บทสนทนานี้แล้วสรุปเป็น structured notes
 
 TRANSCRIPT:
 ${transcriptText}
 
 กฎ:
-1. อ้างอิงจาก transcript เท่านั้น ห้ามเติมหรือคาดเดาสิ่งที่ไม่มีใน transcript
-2. ทุก fact ต้องมี quote และ timestamp จาก transcript จริง
+1. อ้างอิงจาก transcript เท่านั้น ห้ามเติมหรือคาดเดา
+2. ทุก quote ต้องมาจาก transcript จริง พร้อม timestamp
 3. ตอบภาษาไทย
 
 ตอบ JSON เท่านั้น ไม่มี markdown:
 {
-  "transcript_summary": "สรุปภาพรวมบทสนทนา",
-  "what_was_discussed": ["สิ่งที่คุยได้ข้อ 1", "ข้อ 2"],
+  "transcript_summary": "สรุปภาพรวม 2-3 ประโยค",
+  "notes": [
+    {
+      "heading": "หัวข้อ เช่น สินค้าที่สนใจ / ปัญหาที่เจอ / ข้อตกลง",
+      "bullets": ["bullet point สั้นๆ จาก transcript", "..."]
+    }
+  ],
   "customer_said": [
     {"point": "สิ่งที่ลูกค้าบอก", "quote": "คำพูดตรงๆ", "ts": "mm:ss"}
   ],
@@ -209,7 +214,7 @@ ${transcriptText}
     if (attempt > 1) await new Promise(r => setTimeout(r, attempt === 2 ? 2000 : 4000));
     try {
       geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash}:generateContent?key=${env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_lite}:generateContent?key=${env.GEMINI_API_KEY}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: geminiBody }
       );
     } catch(e) {
