@@ -1,0 +1,583 @@
+/* ============================================================
+   FRESHKET COMMERCIAL OS — DESIGN SYSTEM TOKENS
+   design/tokens.css · v1.0
+
+   Architecture:
+   Layer 1 PRIMITIVE  — raw values, never reference directly in components
+   Layer 2 SEMANTIC   — meaning-based aliases, what components use
+   Layer 3 COMPONENT  — usage-specific tokens per component family
+
+   Themes:
+   Default             → Light (white canvas, Rausch red)
+   [data-theme="dark"] → Dark (Sense dark, teal accent)
+
+   Prefix convention:
+   --p-*   primitive  (never use in component CSS)
+   --*     semantic   (use in component CSS)
+   --c-*   component  (use only within that component)
+
+   Fonts:
+   Display/data  → IBM Plex Mono (numbers, labels, mono)
+   Body/UI       → Noto Sans Thai (all prose, buttons, nav)
+   ============================================================ */
+
+
+/* ============================================================
+   LAYER 1 · PRIMITIVES
+   ============================================================ */
+:root {
+
+  /* Red family — Rausch #FF385C (brand accent) */
+  --p-red-900: #4A0011;
+  --p-red-800: #7A001E;
+  --p-red-700: #AA0029;
+  --p-red-600: #CC1A3A;
+  --p-red-500: #FF385C;   /* Rausch — primary accent */
+  --p-red-400: #FF6B85;
+  --p-red-300: #FF9AAD;
+  --p-red-200: #FFC8D2;
+  --p-red-100: #FFE8EC;
+  --p-red-50:  #FFF5F7;
+
+  /* Neutral family — warm not cool */
+  --p-neutral-950: #0A0A0A;
+  --p-neutral-900: #111111;
+  --p-neutral-800: #222222;
+  --p-neutral-700: #3D3D3D;
+  --p-neutral-600: #5A5A5A;
+  --p-neutral-500: #6A6A6A;
+  --p-neutral-400: #9A9A9A;
+  --p-neutral-300: #AEAEB2;
+  --p-neutral-200: #C8C8C8;
+  --p-neutral-150: #DCDCDC;
+  --p-neutral-100: #EBEBEB;
+  --p-neutral-75:  #F2F2F2;
+  --p-neutral-50:  #F7F7F7;
+  --p-neutral-25:  #FAFAFA;
+  --p-neutral-0:   #FFFFFF;
+
+  /* Green family — positive signal */
+  --p-green-700: #005E39;
+  --p-green-600: #007A4A;
+  --p-green-500: #00A651;   /* ok default */
+  --p-green-400: #34C759;   /* ok bright (iOS-style) */
+  --p-green-300: #5EDB7E;
+  --p-green-200: #A3EDB9;
+  --p-green-100: #D4F7DF;
+  --p-green-50:  #F0FDF4;
+
+  /* Amber family — warning */
+  --p-amber-700: #704D00;
+  --p-amber-600: #996800;
+  --p-amber-500: #C28400;
+  --p-amber-400: #FF9500;   /* warn default (iOS-style) */
+  --p-amber-300: #FFBB33;
+  --p-amber-100: #FFF3CD;
+  --p-amber-50:  #FFFBF0;
+
+  /* Blue family — neutral/info */
+  --p-blue-700: #003D99;
+  --p-blue-600: #0055CC;
+  --p-blue-500: #007AFF;    /* iOS blue */
+  --p-blue-400: #409CFF;
+  --p-blue-100: #D6EAFF;
+  --p-blue-50:  #F0F7FF;
+
+  /* Teal family — Sense dark theme accent */
+  --p-teal-600: #1D4849;
+  --p-teal-500: #008065;
+  --p-teal-400: #00A882;
+  --p-teal-300: #00C98A;
+  --p-teal-200: #7FE8C7;
+  --p-teal-100: #C7FFE7;
+
+  /* Segment identity colors */
+  --p-sa-500:  #1D57D8;   /* SA — blue */
+  --p-mc-500:  #047A57;   /* MC — green */
+  --p-ch-500:  #C97000;   /* Chain — amber */
+  --p-eu-500:  #6D30D4;   /* End User — purple */
+
+  /* Choropleth — 6-stop red scale for map density */
+  --p-choro-0: #FFF5F7;
+  --p-choro-1: #FFD5DC;
+  --p-choro-2: #FFAAB8;
+  --p-choro-3: #FF7090;
+  --p-choro-4: #FF385C;
+  --p-choro-5: #CC1A3A;
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — LIGHT THEME (DEFAULT)
+   ============================================================ */
+:root,
+[data-theme="light"] {
+
+  /* Canvas */
+  --bg:         var(--p-neutral-0);      /* page background */
+  --surface:    var(--p-neutral-50);     /* card, band, input bg */
+  --surface-2:  var(--p-neutral-75);     /* secondary surface, hover bg */
+  --surface-3:  var(--p-neutral-100);    /* tertiary, pressed */
+  --overlay:    var(--p-neutral-25);     /* overlay panels */
+
+  /* Ink */
+  --ink-1:      var(--p-neutral-900);    /* primary text, headings */
+  --ink-2:      var(--p-neutral-700);    /* body text */
+  --ink-3:      var(--p-neutral-500);    /* labels, muted */
+  --ink-4:      var(--p-neutral-400);    /* placeholders, disabled */
+
+  /* Border */
+  --hair:       var(--p-neutral-100);    /* dividers, row separators */
+  --hair-2:     var(--p-neutral-150);    /* borders on interactive */
+  --hair-3:     var(--p-neutral-200);    /* strong border */
+
+  /* Accent — Rausch red */
+  --ac:         var(--p-red-500);
+  --ac-hover:   var(--p-red-600);
+  --ac-dim:     rgba(255, 56, 92, .07);
+  --ac-mid:     rgba(255, 56, 92, .14);
+  --ac-border:  rgba(255, 56, 92, .22);
+  --ac-strong:  rgba(255, 56, 92, .35);
+
+  /* Status — OK */
+  --ok:         var(--p-green-500);
+  --ok-bright:  var(--p-green-400);
+  --ok-dim:     rgba(0, 166, 81, .07);
+  --ok-border:  rgba(0, 166, 81, .20);
+  --ok-text:    var(--p-green-600);
+
+  /* Status — Warn */
+  --warn:       var(--p-amber-400);
+  --warn-dim:   rgba(255, 149, 0, .07);
+  --warn-border:rgba(255, 149, 0, .22);
+  --warn-text:  var(--p-amber-600);
+
+  /* Status — Danger */
+  --danger:     #FF3B30;
+  --danger-dim: rgba(255, 59, 48, .07);
+  --danger-border: rgba(255, 59, 48, .22);
+  --danger-text: #C0392B;
+
+  /* Status — Neutral/Info */
+  --info:       var(--p-blue-500);
+  --info-dim:   rgba(0, 122, 255, .07);
+  --info-border:rgba(0, 122, 255, .20);
+
+  /* Segment */
+  --sa:         var(--p-sa-500);
+  --mc:         var(--p-mc-500);
+  --ch:         var(--p-ch-500);
+  --eu:         var(--p-eu-500);
+
+  /* Scrim */
+  --scrim:      rgba(0, 0, 0, .40);
+
+  /* Choropleth */
+  --choro-0:    var(--p-choro-0);
+  --choro-1:    var(--p-choro-1);
+  --choro-2:    var(--p-choro-2);
+  --choro-3:    var(--p-choro-3);
+  --choro-4:    var(--p-choro-4);
+  --choro-5:    var(--p-choro-5);
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — DARK THEME
+   (Sense: KAM, TL teamview, Echo)
+   ============================================================ */
+[data-theme="dark"] {
+
+  --bg:         #0D0F0E;
+  --surface:    #141816;
+  --surface-2:  #1C2120;
+  --surface-3:  #242B29;
+  --overlay:    #1A1F1E;
+
+  --ink-1:      #EEF5F2;
+  --ink-2:      #A8C4BD;
+  --ink-3:      #6A9490;
+  --ink-4:      #3D6660;
+
+  --hair:       rgba(0, 201, 138, .09);
+  --hair-2:     rgba(0, 201, 138, .14);
+  --hair-3:     rgba(0, 201, 138, .22);
+
+  --ac:         var(--p-teal-300);    /* teal in dark */
+  --ac-hover:   var(--p-teal-200);
+  --ac-dim:     rgba(0, 201, 138, .10);
+  --ac-mid:     rgba(0, 201, 138, .18);
+  --ac-border:  rgba(0, 201, 138, .28);
+  --ac-strong:  rgba(0, 201, 138, .42);
+
+  --ok:         var(--p-green-400);
+  --ok-bright:  var(--p-green-300);
+  --ok-dim:     rgba(0, 208, 112, .10);
+  --ok-border:  rgba(0, 208, 112, .22);
+  --ok-text:    var(--p-green-300);
+
+  --warn:       var(--p-amber-400);
+  --warn-dim:   rgba(240, 165, 0, .10);
+  --warn-border:rgba(240, 165, 0, .22);
+  --warn-text:  var(--p-amber-300);
+
+  --danger:     #FF6B3D;
+  --danger-dim: rgba(255, 107, 61, .10);
+  --danger-border: rgba(255, 107, 61, .22);
+  --danger-text: #FF9A7A;
+
+  --info:       #5B9CF6;
+  --info-dim:   rgba(91, 156, 246, .10);
+  --info-border:rgba(91, 156, 246, .20);
+
+  --sa:         #5B9CF6;
+  --mc:         #4CD4A0;
+  --ch:         #FBBF24;
+  --eu:         #C4A3FC;
+
+  --scrim:      rgba(0, 0, 0, .70);
+
+  --choro-0:    rgba(255, 56, 92, .05);
+  --choro-1:    rgba(255, 56, 92, .18);
+  --choro-2:    rgba(255, 56, 92, .35);
+  --choro-3:    rgba(255, 56, 92, .55);
+  --choro-4:    rgba(255, 56, 92, .75);
+  --choro-5:    var(--p-red-500);
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — TYPOGRAPHY
+   ============================================================ */
+:root {
+
+  --font-body:  'Noto Sans Thai', -apple-system, sans-serif;
+  --font-mono:  'IBM Plex Mono', 'Menlo', monospace;
+
+  /* Type scale */
+  --text-display:  48px;   /* hero numbers only */
+  --text-hero:     36px;   /* large KPI */
+  --text-h1:       28px;   /* page title */
+  --text-h2:       22px;   /* section title */
+  --text-h3:       18px;   /* card title */
+  --text-lg:       16px;   /* prominent body */
+  --text-body:     14px;   /* default body */
+  --text-sm:       13px;   /* secondary */
+  --text-xs:       12px;   /* table, meta */
+  --text-2xs:      11px;   /* labels, caps */
+  --text-3xs:      10px;   /* mono labels */
+  --text-micro:     9px;   /* smallest readable */
+
+  /* Weight */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-extrabold:800;
+
+  /* Line height */
+  --lh-tight:   1.15;    /* display numbers */
+  --lh-snug:    1.30;    /* headings */
+  --lh-normal:  1.50;    /* body Thai (needs more than Latin) */
+  --lh-relaxed: 1.65;    /* long-form Thai text */
+
+  /* Letter spacing */
+  --ls-tight:   -.03em;  /* display numbers */
+  --ls-normal:  -.01em;  /* headings */
+  --ls-wide:    .06em;   /* eyebrows */
+  --ls-wider:   .10em;   /* all-caps labels */
+  --ls-widest:  .16em;   /* mono micro labels */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — SPACING (4px base grid)
+   ============================================================ */
+:root {
+
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Named spacing roles */
+  --gap-row:       var(--space-1);   /* between tight list items */
+  --gap-section:   var(--space-6);   /* between page sections */
+  --pad-card:      var(--space-4);   /* card inner padding */
+  --pad-page-x:    var(--space-5);   /* page horizontal margin mobile */
+  --pad-page-x-md: var(--space-8);   /* page horizontal margin desktop */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — SHAPE
+   ============================================================ */
+:root {
+
+  /* Radius */
+  --r-none:  0;
+  --r-xs:    3px;    /* tags, micro chips */
+  --r-sm:    6px;    /* buttons, inputs, small cards */
+  --r-md:   10px;    /* cards, panels */
+  --r-lg:   14px;    /* large cards, sheets */
+  --r-xl:   20px;    /* hero cards, modals */
+  --r-full: 999px;   /* pills, avatar */
+
+  /* Radius rule: size determines radius
+     Height < 28px  → --r-xs or --r-sm
+     Height 28–44px → --r-sm or --r-md
+     Height > 44px  → --r-md to --r-xl
+     Always round, never sharp for interactive elements */
+
+  /* Shadow — use border + shadow-sm as default, shadow-md only for elevation */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:  0 12px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+  --shadow-xl:  0 24px 64px rgba(0,0,0,.16), 0 8px 16px rgba(0,0,0,.08);
+
+  /* Shadow rule: prefer border over shadow for components
+     shadow-sm: tooltips, floating buttons
+     shadow-md: drawers, dropdowns
+     shadow-lg: modals
+     shadow-xl: splash, critical overlays */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — MOTION
+   ============================================================ */
+:root {
+
+  /* Duration */
+  --dur-instant:  80ms;    /* micro: hover color, toggle */
+  --dur-fast:    150ms;    /* normal interactive feedback */
+  --dur-normal:  250ms;    /* panels, drawers, expand */
+  --dur-slow:    400ms;    /* page transitions, charts */
+  --dur-crawl:   600ms;    /* onboarding, first-load emphasis */
+
+  /* Easing */
+  --ease-out:    cubic-bezier(.16, 1, .3, 1);     /* enter: spring-like */
+  --ease-in:     cubic-bezier(.4, 0, 1, 1);        /* exit: quick */
+  --ease-inout:  cubic-bezier(.4, 0, .2, 1);       /* repositioning */
+  --ease-linear: linear;                            /* progress bars, loading */
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);  /* playful spring */
+
+  /* Motion rule:
+     Enter  → --dur-normal + --ease-out (feels responsive)
+     Exit   → --dur-fast + --ease-in (feels snappy, never lingers)
+     Data   → --dur-slow + --ease-inout (charts, bar fills)
+     Micro  → --dur-instant + --ease-out (hover, active)
+     @media prefers-reduced-motion: set all durations to 0 */
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  0ms;
+    --dur-slow:    0ms;
+    --dur-crawl:   0ms;
+  }
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — LAYOUT
+   ============================================================ */
+:root {
+
+  /* Breakpoints (use in JS, reference here as docs) */
+  /* --bp-sm: 640px   mobile → tablet */
+  /* --bp-md: 1024px  tablet → desktop */
+  /* --bp-lg: 1440px  desktop → wide */
+
+  /* Desktop layout */
+  --sidebar-width:     280px;
+  --detail-width:      340px;
+  --topbar-height:      52px;
+  --topbar-height-mob:  48px;
+  --bnav-height:        72px;    /* mobile bottom nav */
+  --content-max:      1440px;
+
+  /* Z-index stack */
+  --z-base:        1;
+  --z-sticky:    100;    /* topbar, sticky headers */
+  --z-dropdown:  200;    /* menus, tooltips, popovers */
+  --z-sheet:     300;    /* bottom sheets, drawers */
+  --z-overlay:   400;    /* dim backgrounds */
+  --z-modal:     500;    /* dialogs */
+  --z-toast:     600;    /* notifications */
+  --z-splash:   9999;    /* loading screen */
+
+}
+
+
+/* ============================================================
+   LAYER 3 · COMPONENT TOKENS
+   ============================================================ */
+
+/* Button */
+:root {
+  --c-btn-h:           40px;
+  --c-btn-h-sm:        32px;
+  --c-btn-h-lg:        48px;
+  --c-btn-px:          var(--space-4);
+  --c-btn-px-sm:       var(--space-3);
+  --c-btn-r:           var(--r-sm);
+  --c-btn-font:        var(--font-body);
+  --c-btn-size:        var(--text-sm);
+  --c-btn-weight:      var(--weight-semibold);
+  /* primary */
+  --c-btn-primary-bg:  var(--ac);
+  --c-btn-primary-fg:  #FFFFFF;
+  --c-btn-primary-hover: var(--ac-hover);
+  /* secondary */
+  --c-btn-sec-bg:      transparent;
+  --c-btn-sec-fg:      var(--ink-1);
+  --c-btn-sec-border:  var(--hair-2);
+  --c-btn-sec-hover:   var(--surface-2);
+  /* ghost */
+  --c-btn-ghost-bg:    transparent;
+  --c-btn-ghost-fg:    var(--ac);
+  --c-btn-ghost-hover: var(--ac-dim);
+  /* destructive */
+  --c-btn-dest-bg:     var(--danger);
+  --c-btn-dest-fg:     #FFFFFF;
+}
+
+/* Input */
+:root {
+  --c-input-h:       40px;
+  --c-input-px:      var(--space-3);
+  --c-input-r:       var(--r-sm);
+  --c-input-bg:      var(--surface);
+  --c-input-border:  var(--hair-2);
+  --c-input-focus:   var(--ac);
+  --c-input-font:    var(--font-body);
+  --c-input-size:    var(--text-body);
+  --c-input-fg:      var(--ink-1);
+  --c-input-ph:      var(--ink-4);
+}
+
+/* Card */
+:root {
+  --c-card-bg:       var(--surface);
+  --c-card-border:   1px solid var(--hair);
+  --c-card-r:        var(--r-md);
+  --c-card-pad:      var(--pad-card);
+  --c-card-hover-bg: var(--surface-2);
+  --c-card-hover-border: 1px solid var(--hair-2);
+  --c-card-selected-bg:     var(--ac-dim);
+  --c-card-selected-border: 1px solid var(--ac-border);
+}
+
+/* Badge / Chip */
+:root {
+  --c-badge-h:       20px;
+  --c-badge-px:      6px;
+  --c-badge-r:       var(--r-xs);
+  --c-badge-size:    var(--text-micro);
+  --c-badge-weight:  var(--weight-semibold);
+  /* pill variant */
+  --c-pill-h:        22px;
+  --c-pill-px:       8px;
+  --c-pill-r:        var(--r-full);
+}
+
+/* Table row */
+:root {
+  --c-row-h:         44px;
+  --c-row-h-sm:      36px;
+  --c-row-h-lg:      52px;
+  --c-row-pad-x:     var(--space-4);
+  --c-row-border:    1px solid var(--hair);
+  --c-row-hover:     var(--surface);
+  --c-row-selected:  var(--ac-dim);
+}
+
+/* Progress / Bar */
+:root {
+  --c-bar-h:        3px;
+  --c-bar-h-md:     4px;
+  --c-bar-h-lg:     6px;
+  --c-bar-track:    var(--hair);
+  --c-bar-r:        var(--r-full);
+}
+
+/* Tooltip */
+:root {
+  --c-tooltip-bg:     var(--bg);
+  --c-tooltip-border: 1px solid var(--hair);
+  --c-tooltip-r:      var(--r-md);
+  --c-tooltip-pad:    var(--space-3) var(--space-4);
+  --c-tooltip-shadow: var(--shadow-md);
+}
+
+/* Avatar */
+:root {
+  --c-avatar-sm:  24px;
+  --c-avatar-md:  32px;
+  --c-avatar-lg:  40px;
+  --c-avatar-xl:  48px;
+  --c-avatar-r:   var(--r-full);
+  --c-avatar-bg:  var(--ac);
+  --c-avatar-fg:  #FFFFFF;
+}
+
+/* Icon */
+:root {
+  --c-icon-sm:   14px;
+  --c-icon-md:   18px;    /* default */
+  --c-icon-lg:   22px;
+  --c-icon-xl:   28px;
+  /* Icons: SVG only, stroke-based, stroke-width 1.5
+     Never use emoji as icons.
+     Color via currentColor — inherits from parent. */
+}
+
+/* Segmented control */
+:root {
+  --c-seg-bg:      var(--surface);
+  --c-seg-border:  1px solid var(--hair);
+  --c-seg-r:       var(--r-md);
+  --c-seg-item-h:  32px;
+  --c-seg-item-px: var(--space-3);
+  --c-seg-active-bg:     var(--bg);
+  --c-seg-active-shadow: var(--shadow-sm);
+  --c-seg-active-fg:     var(--ink-1);
+  --c-seg-inactive-fg:   var(--ink-3);
+}
+
+/* Toast */
+:root {
+  --c-toast-bg:    var(--p-neutral-900);
+  --c-toast-fg:    #FFFFFF;
+  --c-toast-r:     var(--r-lg);
+  --c-toast-pad:   var(--space-3) var(--space-5);
+  --c-toast-shadow: var(--shadow-lg);
+}
+
+/* Map polygon */
+:root {
+  --c-poly-stroke:          #FFFFFF;
+  --c-poly-stroke-w:        1px;
+  --c-poly-stroke-hover:    1.5px;
+  --c-poly-stroke-selected: var(--p-neutral-900);
+  --c-poly-stroke-selected-w: 2px;
+  --c-poly-muted-fill:      var(--p-neutral-75);
+  --c-poly-muted-opacity:   .4;
+}
+
