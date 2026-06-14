@@ -27,25 +27,85 @@ function json(data, status = 200, env = {}) {
   });
 }
 
-// ── /transcript — audio → segments[] ─────────────────────────────────────────
+// ── /transcript — audio → segments[] via Groq Whisper + Gemini diarization ───
+// v712: 2-step pipeline
+//   Step 1: Groq Whisper → raw text (เร็ว, Thai accurate, มี timestamps)
+//   Step 2: Gemini Flash → แปลง text → segments[] + speaker diarization
+// ดีกว่า Gemini ฟัง audio ตรง เพราะ Whisper Thai accuracy สูงกว่ามาก
 async function handleTranscript(request, env) {
+  if (!env.GROQ_API_KEY) return json({ error: 'GROQ_API_KEY not set' }, 503, env);
   if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY not set' }, 503, env);
   let body;
-  try { body = await request.json(); } 
+  try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400, env); }
 
   const { audio_b64, mime_type } = body;
   if (!audio_b64) return json({ error: 'audio_b64 required' }, 400, env);
 
-  const prompt = `ฟัง audio การสนทนานี้แล้ว transcript ทุกคำที่ได้ยินจริง
+  // ── Step 1: Groq Whisper — audio → raw text with word timestamps ─────────────
+  // แปลง base64 กลับเป็น binary blob
+  const binaryStr = atob(audio_b64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+  const audioBlob = new Blob([bytes], { type: mime_type || 'audio/webm' });
+
+  const groqForm = new FormData();
+  groqForm.append('file', audioBlob, 'recording.webm');
+  groqForm.append('model', 'whisper-large-v3');
+  groqForm.append('language', 'th');
+  groqForm.append('prompt', 'การสนทนาระหว่าง sales rep กับเจ้าของร้านอาหาร เรื่องวัตถุดิบและการสั่งซื้อสินค้า Freshket');
+  groqForm.append('response_format', 'verbose_json'); // ได้ segments + timestamps
+  groqForm.append('timestamp_granularities[]', 'segment');
+
+  let groqRes;
+  try {
+    groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
+      body: groqForm
+    });
+  } catch(e) {
+    return json({ error: 'Groq network error: ' + (e?.message || 'fetch failed') }, 502, env);
+  }
+
+  if (!groqRes.ok) {
+    const errText = await groqRes.text().catch(() => String(groqRes.status));
+    return json({ error: 'Groq error: ' + errText }, groqRes.status, env);
+  }
+
+  const groqData = await groqRes.json();
+  // verbose_json คืน { text, segments: [{id, start, end, text}] }
+  const groqSegments = groqData.segments || [];
+  const fullText = groqData.text || '';
+
+  if (!fullText.trim()) {
+    return json({ text: JSON.stringify({ no_speech: true, segments: [], speakers_detected: [], duration_mins: 0 }) }, 200, env);
+  }
+
+  // ── Step 2: Gemini Flash — text → speaker diarization ────────────────────────
+  // Groq ให้ text + timestamps แต่ไม่รู้ว่าใครพูด
+  // Gemini อ่าน text ล้วน (เร็วกว่าฟัง audio มาก) แล้วแยก speaker
+  const segmentLines = groqSegments.length
+    ? groqSegments.map(s => {
+        const mm = Math.floor(s.start / 60).toString().padStart(2,'0');
+        const ss = Math.floor(s.start % 60).toString().padStart(2,'0');
+        return `[${mm}:${ss}] ${s.text.trim()}`;
+      }).join('\n')
+    : fullText;
+
+  const diarizePrompt = `อ่าน transcript บทสนทนานี้แล้วแยก speaker
+
+TRANSCRIPT:
+${segmentLines}
+
+บริบท: เป็นการสนทนาระหว่าง Sales rep ของ Freshket (บริษัทจำหน่ายวัตถุดิบ) กับเจ้าของร้านอาหาร
 
 กฎ:
-1. จด ทุกคำที่พูด ห้ามตัดทอนหรือสรุป
-2. แยก speaker: "Sales" สำหรับ sales rep, "ลูกค้า" ถ้ามีคนเดียว, "ลูกค้า_1"/"ลูกค้า_2" ถ้ามีหลายคน
-3. ถ้า speaker พูดชื่อตัวเองในบทสนทนา ให้ใช้ชื่อนั้นแทน label — แต่ถ้าไม่แน่ใจให้ใช้ label ปกติ
-4. timestamp ทุก segment รูปแบบ "mm:ss"
-5. ตอบภาษาไทยเป็น default — ถ้า speaker พูดภาษาอื่นให้ transcript ตามที่พูดจริง
-6. ถ้าไม่มีเสียงพูดใน audio ตอบ {"no_speech": true}
+1. แยก speaker เป็น "Sales" กับ "ลูกค้า" — ถ้ามีลูกค้าหลายคนให้ใช้ "ลูกค้า_1" / "ลูกค้า_2"
+2. Sales มักพูดเรื่องสินค้า ราคา บริการ Freshket — ลูกค้ามักถามหรือตอบเรื่องร้าน
+3. ถ้า speaker พูดชื่อตัวเองให้ใช้ชื่อนั้น
+4. คง timestamp และ text ตรงตามที่ให้มา ห้ามเปลี่ยน
+5. ถ้าไม่แน่ใจ speaker ให้ใช้ "ไม่ทราบ"
 
 ตอบ JSON เท่านั้น ไม่มี markdown:
 {
@@ -59,23 +119,17 @@ async function handleTranscript(request, env) {
 }`;
 
   const geminiBody = JSON.stringify({
-    contents: [{
-      parts: [
-        { inline_data: { mime_type: mime_type || 'audio/webm', data: audio_b64 } },
-        { text: prompt }
-      ]
-    }],
+    contents: [{ parts: [{ text: diarizePrompt }] }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 65536,
+      maxOutputTokens: 32768,
       responseMimeType: 'application/json'
     }
   });
 
-  // Retry 3 ครั้ง — transcript อาจใช้เวลานานสำหรับ audio ยาว
   let geminiRes = null, lastErrText = '';
   for (let attempt = 1; attempt <= 3; attempt++) {
-    if (attempt > 1) await new Promise(r => setTimeout(r, attempt === 2 ? 3000 : 6000));
+    if (attempt > 1) await new Promise(r => setTimeout(r, attempt === 2 ? 2000 : 4000));
     try {
       geminiRes = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash}:generateContent?key=${env.GEMINI_API_KEY}`,
@@ -96,8 +150,8 @@ async function handleTranscript(request, env) {
     return json({ error: err }, geminiRes.status, env);
   }
 
-  const data = await geminiRes.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const geminiData = await geminiRes.json();
+  const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return json({ text }, 200, env);
 }
 
