@@ -1,0 +1,3775 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Freshket Dashboard</title>
+<meta name="description" content="Freshket TL Dashboard — Territory & Team Intelligence">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- D3 (map only) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<!-- Design tokens -->
+<style>
+/* ============================================================
+   FRESHKET COMMERCIAL OS — DESIGN SYSTEM TOKENS
+   design/tokens.css · v1.0
+
+   Architecture:
+   Layer 1 PRIMITIVE  — raw values, never reference directly in components
+   Layer 2 SEMANTIC   — meaning-based aliases, what components use
+   Layer 3 COMPONENT  — usage-specific tokens per component family
+
+   Themes:
+   Default             → Light (white canvas, Rausch red)
+   [data-theme="dark"] → Dark (Sense dark, teal accent)
+
+   Prefix convention:
+   --p-*   primitive  (never use in component CSS)
+   --*     semantic   (use in component CSS)
+   --c-*   component  (use only within that component)
+
+   Fonts:
+   Display/data  → IBM Plex Mono (numbers, labels, mono)
+   Body/UI       → Noto Sans Thai (all prose, buttons, nav)
+   ============================================================ */
+
+
+/* ============================================================
+   LAYER 1 · PRIMITIVES
+   ============================================================ */
+:root {
+
+  /* Red family — Rausch #FF385C (brand accent) */
+  --p-red-900: #4A0011;
+  --p-red-800: #7A001E;
+  --p-red-700: #AA0029;
+  --p-red-600: #CC1A3A;
+  --p-red-500: #FF385C;   /* Rausch — primary accent */
+  --p-red-400: #FF6B85;
+  --p-red-300: #FF9AAD;
+  --p-red-200: #FFC8D2;
+  --p-red-100: #FFE8EC;
+  --p-red-50:  #FFF5F7;
+
+  /* Neutral family — warm not cool */
+  --p-neutral-950: #0A0A0A;
+  --p-neutral-900: #111111;
+  --p-neutral-800: #222222;
+  --p-neutral-700: #3D3D3D;
+  --p-neutral-600: #5A5A5A;
+  --p-neutral-500: #6A6A6A;
+  --p-neutral-400: #9A9A9A;
+  --p-neutral-300: #AEAEB2;
+  --p-neutral-200: #C8C8C8;
+  --p-neutral-150: #DCDCDC;
+  --p-neutral-100: #EBEBEB;
+  --p-neutral-75:  #F2F2F2;
+  --p-neutral-50:  #F7F7F7;
+  --p-neutral-25:  #FAFAFA;
+  --p-neutral-0:   #FFFFFF;
+
+  /* Green family — positive signal */
+  --p-green-700: #005E39;
+  --p-green-600: #007A4A;
+  --p-green-500: #00A651;   /* ok default */
+  --p-green-400: #34C759;   /* ok bright (iOS-style) */
+  --p-green-300: #5EDB7E;
+  --p-green-200: #A3EDB9;
+  --p-green-100: #D4F7DF;
+  --p-green-50:  #F0FDF4;
+
+  /* Amber family — warning */
+  --p-amber-700: #704D00;
+  --p-amber-600: #996800;
+  --p-amber-500: #C28400;
+  --p-amber-400: #FF9500;   /* warn default (iOS-style) */
+  --p-amber-300: #FFBB33;
+  --p-amber-100: #FFF3CD;
+  --p-amber-50:  #FFFBF0;
+
+  /* Blue family — neutral/info */
+  --p-blue-700: #003D99;
+  --p-blue-600: #0055CC;
+  --p-blue-500: #007AFF;    /* iOS blue */
+  --p-blue-400: #409CFF;
+  --p-blue-100: #D6EAFF;
+  --p-blue-50:  #F0F7FF;
+
+  /* Teal family — Sense dark theme accent */
+  --p-teal-600: #1D4849;
+  --p-teal-500: #008065;
+  --p-teal-400: #00A882;
+  --p-teal-300: #00C98A;
+  --p-teal-200: #7FE8C7;
+  --p-teal-100: #C7FFE7;
+
+  /* Segment identity colors */
+  --p-sa-500:  #1D57D8;   /* SA — blue */
+  --p-mc-500:  #047A57;   /* MC — green */
+  --p-ch-500:  #C97000;   /* Chain — amber */
+  --p-eu-500:  #6D30D4;   /* End User — purple */
+
+  /* Choropleth — 6-stop red scale for map density */
+  --p-choro-0: #FFF5F7;
+  --p-choro-1: #FFD5DC;
+  --p-choro-2: #FFAAB8;
+  --p-choro-3: #FF7090;
+  --p-choro-4: #FF385C;
+  --p-choro-5: #CC1A3A;
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — LIGHT THEME (DEFAULT)
+   ============================================================ */
+:root,
+[data-theme="light"] {
+
+  /* Canvas */
+  --bg:         var(--p-neutral-0);      /* page background */
+  --surface:    var(--p-neutral-50);     /* card, band, input bg */
+  --surface-2:  var(--p-neutral-75);     /* secondary surface, hover bg */
+  --surface-3:  var(--p-neutral-100);    /* tertiary, pressed */
+  --overlay:    var(--p-neutral-25);     /* overlay panels */
+
+  /* Ink */
+  --ink-1:      var(--p-neutral-900);    /* primary text, headings */
+  --ink-2:      var(--p-neutral-700);    /* body text */
+  --ink-3:      var(--p-neutral-500);    /* labels, muted */
+  --ink-4:      var(--p-neutral-400);    /* placeholders, disabled */
+
+  /* Border */
+  --hair:       var(--p-neutral-100);    /* dividers, row separators */
+  --hair-2:     var(--p-neutral-150);    /* borders on interactive */
+  --hair-3:     var(--p-neutral-200);    /* strong border */
+
+  /* Accent — Rausch red */
+  --ac:         var(--p-red-500);
+  --ac-hover:   var(--p-red-600);
+  --ac-dim:     rgba(255, 56, 92, .07);
+  --ac-mid:     rgba(255, 56, 92, .14);
+  --ac-border:  rgba(255, 56, 92, .22);
+  --ac-strong:  rgba(255, 56, 92, .35);
+
+  /* Status — OK */
+  --ok:         var(--p-green-500);
+  --ok-bright:  var(--p-green-400);
+  --ok-dim:     rgba(0, 166, 81, .07);
+  --ok-border:  rgba(0, 166, 81, .20);
+  --ok-text:    var(--p-green-600);
+
+  /* Status — Warn */
+  --warn:       var(--p-amber-400);
+  --warn-dim:   rgba(255, 149, 0, .07);
+  --warn-border:rgba(255, 149, 0, .22);
+  --warn-text:  var(--p-amber-600);
+
+  /* Status — Danger */
+  --danger:     #FF3B30;
+  --danger-dim: rgba(255, 59, 48, .07);
+  --danger-border: rgba(255, 59, 48, .22);
+  --danger-text: #C0392B;
+
+  /* Status — Neutral/Info */
+  --info:       var(--p-blue-500);
+  --info-dim:   rgba(0, 122, 255, .07);
+  --info-border:rgba(0, 122, 255, .20);
+
+  /* Segment */
+  --sa:         var(--p-sa-500);
+  --mc:         var(--p-mc-500);
+  --ch:         var(--p-ch-500);
+  --eu:         var(--p-eu-500);
+
+  /* Scrim */
+  --scrim:      rgba(0, 0, 0, .40);
+
+  /* Choropleth */
+  --choro-0:    var(--p-choro-0);
+  --choro-1:    var(--p-choro-1);
+  --choro-2:    var(--p-choro-2);
+  --choro-3:    var(--p-choro-3);
+  --choro-4:    var(--p-choro-4);
+  --choro-5:    var(--p-choro-5);
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — DARK THEME
+   (Sense: KAM, TL teamview, Echo)
+   ============================================================ */
+[data-theme="dark"] {
+
+  --bg:         #0D0F0E;
+  --surface:    #141816;
+  --surface-2:  #1C2120;
+  --surface-3:  #242B29;
+  --overlay:    #1A1F1E;
+
+  --ink-1:      #EEF5F2;
+  --ink-2:      #A8C4BD;
+  --ink-3:      #6A9490;
+  --ink-4:      #3D6660;
+
+  --hair:       rgba(0, 201, 138, .09);
+  --hair-2:     rgba(0, 201, 138, .14);
+  --hair-3:     rgba(0, 201, 138, .22);
+
+  --ac:         var(--p-teal-300);    /* teal in dark */
+  --ac-hover:   var(--p-teal-200);
+  --ac-dim:     rgba(0, 201, 138, .10);
+  --ac-mid:     rgba(0, 201, 138, .18);
+  --ac-border:  rgba(0, 201, 138, .28);
+  --ac-strong:  rgba(0, 201, 138, .42);
+
+  --ok:         var(--p-green-400);
+  --ok-bright:  var(--p-green-300);
+  --ok-dim:     rgba(0, 208, 112, .10);
+  --ok-border:  rgba(0, 208, 112, .22);
+  --ok-text:    var(--p-green-300);
+
+  --warn:       var(--p-amber-400);
+  --warn-dim:   rgba(240, 165, 0, .10);
+  --warn-border:rgba(240, 165, 0, .22);
+  --warn-text:  var(--p-amber-300);
+
+  --danger:     #FF6B3D;
+  --danger-dim: rgba(255, 107, 61, .10);
+  --danger-border: rgba(255, 107, 61, .22);
+  --danger-text: #FF9A7A;
+
+  --info:       #5B9CF6;
+  --info-dim:   rgba(91, 156, 246, .10);
+  --info-border:rgba(91, 156, 246, .20);
+
+  --sa:         #5B9CF6;
+  --mc:         #4CD4A0;
+  --ch:         #FBBF24;
+  --eu:         #C4A3FC;
+
+  --scrim:      rgba(0, 0, 0, .70);
+
+  --choro-0:    rgba(255, 56, 92, .05);
+  --choro-1:    rgba(255, 56, 92, .18);
+  --choro-2:    rgba(255, 56, 92, .35);
+  --choro-3:    rgba(255, 56, 92, .55);
+  --choro-4:    rgba(255, 56, 92, .75);
+  --choro-5:    var(--p-red-500);
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — TYPOGRAPHY
+   ============================================================ */
+:root {
+
+  --font-body:  'Noto Sans Thai', -apple-system, sans-serif;
+  --font-mono:  'IBM Plex Mono', 'Menlo', monospace;
+
+  /* Type scale */
+  --text-display:  48px;   /* hero numbers only */
+  --text-hero:     36px;   /* large KPI */
+  --text-h1:       28px;   /* page title */
+  --text-h2:       22px;   /* section title */
+  --text-h3:       18px;   /* card title */
+  --text-lg:       16px;   /* prominent body */
+  --text-body:     14px;   /* default body */
+  --text-sm:       13px;   /* secondary */
+  --text-xs:       12px;   /* table, meta */
+  --text-2xs:      11px;   /* labels, caps */
+  --text-3xs:      10px;   /* mono labels */
+  --text-micro:     9px;   /* smallest readable */
+
+  /* Weight */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-extrabold:800;
+
+  /* Line height */
+  --lh-tight:   1.15;    /* display numbers */
+  --lh-snug:    1.30;    /* headings */
+  --lh-normal:  1.50;    /* body Thai (needs more than Latin) */
+  --lh-relaxed: 1.65;    /* long-form Thai text */
+
+  /* Letter spacing */
+  --ls-tight:   -.03em;  /* display numbers */
+  --ls-normal:  -.01em;  /* headings */
+  --ls-wide:    .06em;   /* eyebrows */
+  --ls-wider:   .10em;   /* all-caps labels */
+  --ls-widest:  .16em;   /* mono micro labels */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — SPACING (4px base grid)
+   ============================================================ */
+:root {
+
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Named spacing roles */
+  --gap-row:       var(--space-1);   /* between tight list items */
+  --gap-section:   var(--space-6);   /* between page sections */
+  --pad-card:      var(--space-4);   /* card inner padding */
+  --pad-page-x:    var(--space-5);   /* page horizontal margin mobile */
+  --pad-page-x-md: var(--space-8);   /* page horizontal margin desktop */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — SHAPE
+   ============================================================ */
+:root {
+
+  /* Radius */
+  --r-none:  0;
+  --r-xs:    3px;    /* tags, micro chips */
+  --r-sm:    6px;    /* buttons, inputs, small cards */
+  --r-md:   10px;    /* cards, panels */
+  --r-lg:   14px;    /* large cards, sheets */
+  --r-xl:   20px;    /* hero cards, modals */
+  --r-full: 999px;   /* pills, avatar */
+
+  /* Radius rule: size determines radius
+     Height < 28px  → --r-xs or --r-sm
+     Height 28–44px → --r-sm or --r-md
+     Height > 44px  → --r-md to --r-xl
+     Always round, never sharp for interactive elements */
+
+  /* Shadow — use border + shadow-sm as default, shadow-md only for elevation */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:  0 12px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+  --shadow-xl:  0 24px 64px rgba(0,0,0,.16), 0 8px 16px rgba(0,0,0,.08);
+
+  /* Shadow rule: prefer border over shadow for components
+     shadow-sm: tooltips, floating buttons
+     shadow-md: drawers, dropdowns
+     shadow-lg: modals
+     shadow-xl: splash, critical overlays */
+
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — MOTION
+   ============================================================ */
+:root {
+
+  /* Duration */
+  --dur-instant:  80ms;    /* micro: hover color, toggle */
+  --dur-fast:    150ms;    /* normal interactive feedback */
+  --dur-normal:  250ms;    /* panels, drawers, expand */
+  --dur-slow:    400ms;    /* page transitions, charts */
+  --dur-crawl:   600ms;    /* onboarding, first-load emphasis */
+
+  /* Easing */
+  --ease-out:    cubic-bezier(.16, 1, .3, 1);     /* enter: spring-like */
+  --ease-in:     cubic-bezier(.4, 0, 1, 1);        /* exit: quick */
+  --ease-inout:  cubic-bezier(.4, 0, .2, 1);       /* repositioning */
+  --ease-linear: linear;                            /* progress bars, loading */
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);  /* playful spring */
+
+  /* Motion rule:
+     Enter  → --dur-normal + --ease-out (feels responsive)
+     Exit   → --dur-fast + --ease-in (feels snappy, never lingers)
+     Data   → --dur-slow + --ease-inout (charts, bar fills)
+     Micro  → --dur-instant + --ease-out (hover, active)
+     @media prefers-reduced-motion: set all durations to 0 */
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  0ms;
+    --dur-slow:    0ms;
+    --dur-crawl:   0ms;
+  }
+}
+
+
+/* ============================================================
+   LAYER 2 · SEMANTIC — LAYOUT
+   ============================================================ */
+:root {
+
+  /* Breakpoints (use in JS, reference here as docs) */
+  /* --bp-sm: 640px   mobile → tablet */
+  /* --bp-md: 1024px  tablet → desktop */
+  /* --bp-lg: 1440px  desktop → wide */
+
+  /* Desktop layout */
+  --sidebar-width:     280px;
+  --detail-width:      340px;
+  --topbar-height:      52px;
+  --topbar-height-mob:  48px;
+  --bnav-height:        72px;    /* mobile bottom nav */
+  --content-max:      1440px;
+
+  /* Z-index stack */
+  --z-base:        1;
+  --z-sticky:    100;    /* topbar, sticky headers */
+  --z-dropdown:  200;    /* menus, tooltips, popovers */
+  --z-sheet:     300;    /* bottom sheets, drawers */
+  --z-overlay:   400;    /* dim backgrounds */
+  --z-modal:     500;    /* dialogs */
+  --z-toast:     600;    /* notifications */
+  --z-splash:   9999;    /* loading screen */
+
+}
+
+
+/* ============================================================
+   LAYER 3 · COMPONENT TOKENS
+   ============================================================ */
+
+/* Button */
+:root {
+  --c-btn-h:           40px;
+  --c-btn-h-sm:        32px;
+  --c-btn-h-lg:        48px;
+  --c-btn-px:          var(--space-4);
+  --c-btn-px-sm:       var(--space-3);
+  --c-btn-r:           var(--r-sm);
+  --c-btn-font:        var(--font-body);
+  --c-btn-size:        var(--text-sm);
+  --c-btn-weight:      var(--weight-semibold);
+  /* primary */
+  --c-btn-primary-bg:  var(--ac);
+  --c-btn-primary-fg:  #FFFFFF;
+  --c-btn-primary-hover: var(--ac-hover);
+  /* secondary */
+  --c-btn-sec-bg:      transparent;
+  --c-btn-sec-fg:      var(--ink-1);
+  --c-btn-sec-border:  var(--hair-2);
+  --c-btn-sec-hover:   var(--surface-2);
+  /* ghost */
+  --c-btn-ghost-bg:    transparent;
+  --c-btn-ghost-fg:    var(--ac);
+  --c-btn-ghost-hover: var(--ac-dim);
+  /* destructive */
+  --c-btn-dest-bg:     var(--danger);
+  --c-btn-dest-fg:     #FFFFFF;
+}
+
+/* Input */
+:root {
+  --c-input-h:       40px;
+  --c-input-px:      var(--space-3);
+  --c-input-r:       var(--r-sm);
+  --c-input-bg:      var(--surface);
+  --c-input-border:  var(--hair-2);
+  --c-input-focus:   var(--ac);
+  --c-input-font:    var(--font-body);
+  --c-input-size:    var(--text-body);
+  --c-input-fg:      var(--ink-1);
+  --c-input-ph:      var(--ink-4);
+}
+
+/* Card */
+:root {
+  --c-card-bg:       var(--surface);
+  --c-card-border:   1px solid var(--hair);
+  --c-card-r:        var(--r-md);
+  --c-card-pad:      var(--pad-card);
+  --c-card-hover-bg: var(--surface-2);
+  --c-card-hover-border: 1px solid var(--hair-2);
+  --c-card-selected-bg:     var(--ac-dim);
+  --c-card-selected-border: 1px solid var(--ac-border);
+}
+
+/* Badge / Chip */
+:root {
+  --c-badge-h:       20px;
+  --c-badge-px:      6px;
+  --c-badge-r:       var(--r-xs);
+  --c-badge-size:    var(--text-micro);
+  --c-badge-weight:  var(--weight-semibold);
+  /* pill variant */
+  --c-pill-h:        22px;
+  --c-pill-px:       8px;
+  --c-pill-r:        var(--r-full);
+}
+
+/* Table row */
+:root {
+  --c-row-h:         44px;
+  --c-row-h-sm:      36px;
+  --c-row-h-lg:      52px;
+  --c-row-pad-x:     var(--space-4);
+  --c-row-border:    1px solid var(--hair);
+  --c-row-hover:     var(--surface);
+  --c-row-selected:  var(--ac-dim);
+}
+
+/* Progress / Bar */
+:root {
+  --c-bar-h:        3px;
+  --c-bar-h-md:     4px;
+  --c-bar-h-lg:     6px;
+  --c-bar-track:    var(--hair);
+  --c-bar-r:        var(--r-full);
+}
+
+/* Tooltip */
+:root {
+  --c-tooltip-bg:     var(--bg);
+  --c-tooltip-border: 1px solid var(--hair);
+  --c-tooltip-r:      var(--r-md);
+  --c-tooltip-pad:    var(--space-3) var(--space-4);
+  --c-tooltip-shadow: var(--shadow-md);
+}
+
+/* Avatar */
+:root {
+  --c-avatar-sm:  24px;
+  --c-avatar-md:  32px;
+  --c-avatar-lg:  40px;
+  --c-avatar-xl:  48px;
+  --c-avatar-r:   var(--r-full);
+  --c-avatar-bg:  var(--ac);
+  --c-avatar-fg:  #FFFFFF;
+}
+
+/* Icon */
+:root {
+  --c-icon-sm:   14px;
+  --c-icon-md:   18px;    /* default */
+  --c-icon-lg:   22px;
+  --c-icon-xl:   28px;
+  /* Icons: SVG only, stroke-based, stroke-width 1.5
+     Never use emoji as icons.
+     Color via currentColor — inherits from parent. */
+}
+
+/* Segmented control */
+:root {
+  --c-seg-bg:      var(--surface);
+  --c-seg-border:  1px solid var(--hair);
+  --c-seg-r:       var(--r-md);
+  --c-seg-item-h:  32px;
+  --c-seg-item-px: var(--space-3);
+  --c-seg-active-bg:     var(--bg);
+  --c-seg-active-shadow: var(--shadow-sm);
+  --c-seg-active-fg:     var(--ink-1);
+  --c-seg-inactive-fg:   var(--ink-3);
+}
+
+/* Toast */
+:root {
+  --c-toast-bg:    var(--p-neutral-900);
+  --c-toast-fg:    #FFFFFF;
+  --c-toast-r:     var(--r-lg);
+  --c-toast-pad:   var(--space-3) var(--space-5);
+  --c-toast-shadow: var(--shadow-lg);
+}
+
+/* Map polygon */
+:root {
+  --c-poly-stroke:          #FFFFFF;
+  --c-poly-stroke-w:        1px;
+  --c-poly-stroke-hover:    1.5px;
+  --c-poly-stroke-selected: var(--p-neutral-900);
+  --c-poly-stroke-selected-w: 2px;
+  --c-poly-muted-fill:      var(--p-neutral-75);
+  --c-poly-muted-opacity:   .4;
+}
+
+</style>
+
+<!-- Dashboard styles -->
+<style>
+/* ============================================================
+   FRESHKET TL DASHBOARD — Component Styles
+   src/dashboard/styles_dashboard.css · v702
+   
+   Uses design/tokens.css as foundation.
+   Class prefix: td- (TL Dashboard)
+   All values via var(--token) — no hardcoded colors.
+   ============================================================ */
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink-1);
+  font-size: 14px;
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Auth Overlay ── */
+.auth-overlay {
+  position: fixed; inset: 0;
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--z-splash);
+}
+.auth-card {
+  background: var(--bg);
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-xl);
+  padding: 36px 32px;
+  width: 360px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.auth-logo {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.auth-logo-name { font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--ink-1); }
+.auth-title { font-size: var(--text-h2); font-weight: var(--weight-extrabold); color: var(--ink-1); letter-spacing: var(--ls-normal); }
+.auth-sub { font-size: var(--text-sm); color: var(--ink-3); }
+.auth-error {
+  background: var(--danger-dim); border: 1px solid var(--danger-border);
+  border-radius: var(--r-sm); padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm); color: var(--danger-text);
+}
+
+/* ── App Shell ── */
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Topbar ── */
+.topbar {
+  height: var(--topbar-height);
+  background: var(--bg);
+  border-bottom: 1px solid var(--hair);
+  display: flex; align-items: center;
+  padding: 0 var(--space-5);
+  gap: var(--space-4);
+  flex-shrink: 0;
+  z-index: var(--z-sticky);
+  position: relative;
+}
+.topbar-left  { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
+.topbar-center { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--space-3); }
+.topbar-right { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; position: relative; }
+.topbar-logo  { display: flex; align-items: center; gap: var(--space-2); }
+.topbar-product { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); }
+.topbar-sep   { width: 1px; height: 18px; background: var(--hair-2); }
+.topbar-section { font-size: var(--text-sm); color: var(--ink-3); font-weight: var(--weight-medium); }
+.topbar-user  {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  border-radius: var(--r-md); cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.topbar-user:hover { background: var(--surface); }
+.topbar-user-name { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--ink-2); }
+
+/* User menu */
+.user-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--bg); border: 1px solid var(--hair-2);
+  border-radius: var(--r-md); padding: var(--space-1) 0;
+  min-width: 180px; box-shadow: var(--shadow-md);
+  z-index: var(--z-dropdown);
+}
+.user-menu-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm); color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.user-menu-item:hover { background: var(--surface); }
+.user-menu-item.danger { color: var(--danger); }
+.user-menu-divider { height: 1px; background: var(--hair); margin: var(--space-1) 0; }
+
+/* ── Main body ── */
+.main-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--hair);
+  display: flex; flex-direction: column;
+  overflow: hidden; background: var(--bg);
+}
+.sidebar-nav {
+  display: flex; flex-direction: column;
+  padding: var(--space-3);
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--hair);
+  flex-shrink: 0;
+}
+.snav-btn {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm); border: none; background: none;
+  font-family: var(--font-body); font-size: var(--text-sm);
+  font-weight: var(--weight-medium); color: var(--ink-3);
+  cursor: pointer; text-align: left;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.snav-btn:hover { background: var(--surface); color: var(--ink-2); }
+.snav-btn.active { background: var(--ac-dim); color: var(--ac); font-weight: var(--weight-semibold); }
+.snav-btn svg { flex-shrink: 0; }
+
+.sidebar-content {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: var(--space-4) var(--space-4) var(--space-8);
+}
+.sidebar-content::-webkit-scrollbar { width: 3px; }
+.sidebar-content::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 2px; }
+
+.sidebar-shimmer { display: flex; flex-direction: column; gap: 0; }
+
+/* Team summary in sidebar */
+.td-team-hero {
+  background: var(--surface); border-radius: var(--r-md);
+  padding: var(--space-4); margin-bottom: var(--space-4);
+  position: relative; overflow: hidden;
+}
+.td-team-hero::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2.5px; background: var(--ac);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+}
+.td-team-pace-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: var(--space-2); }
+.td-team-pace-num {
+  font-family: var(--font-mono); font-size: var(--text-hero);
+  font-weight: var(--weight-bold); letter-spacing: var(--ls-tight); line-height: 1;
+}
+.td-team-pace-num.ok     { color: var(--ok); }
+.td-team-pace-num.warn   { color: var(--warn); }
+.td-team-pace-num.danger { color: var(--danger); }
+.td-team-pace-num.star   { color: var(--ac); }
+.td-team-pace-meta { text-align: right; line-height: 1.3; }
+.td-team-pace-gmv  { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--ink-1); }
+.td-team-pace-sub  { font-size: var(--text-micro); color: var(--ink-4); }
+.td-signal-row { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--space-2); margin-top: var(--space-3); }
+.td-signal { text-align: center; }
+.td-signal-val { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--weight-semibold); line-height: 1; }
+.td-signal-val.danger { color: var(--danger); }
+.td-signal-val.warn   { color: var(--warn); }
+.td-signal-val.ok     { color: var(--ok); }
+.td-signal-val.star   { color: var(--ac); }
+.td-signal-lbl { font-size: var(--text-micro); color: var(--ink-4); margin-top: var(--space-1); letter-spacing: .04em; }
+
+/* Rep list */
+.td-rep-list-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.td-rep-list-hd .ds-eyebrow { color: var(--ink-4); }
+.td-sort-btn { font-size: var(--text-micro); font-family: var(--font-mono); color: var(--ink-4); background: none; border: none; cursor: pointer; }
+.td-sort-btn:hover { color: var(--ac); }
+
+.td-rep-row {
+  display: flex; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hair);
+  cursor: pointer; gap: var(--space-2);
+  transition: background var(--dur-instant) var(--ease-out);
+  position: relative; margin: 0 calc(-1 * var(--space-4)); padding-left: var(--space-4); padding-right: var(--space-4);
+}
+.td-rep-row:hover { background: var(--surface); }
+.td-rep-row.selected { background: var(--ac-dim); }
+.td-rep-row.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--ac); }
+.td-rep-row:last-child { border-bottom: none; }
+
+.td-rep-body { flex: 1; min-width: 0; }
+.td-rep-name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.td-rep-bar-row { display: flex; align-items: center; gap: var(--space-2); }
+.td-rep-bar-wrap { flex: 1; }
+.td-rep-pace { font-family: var(--font-mono); font-size: var(--text-xs); font-weight: var(--weight-semibold); flex-shrink: 0; }
+.td-rep-row.danger .td-rep-pace { color: var(--danger); }
+.td-rep-row.warn   .td-rep-pace { color: var(--warn); }
+.td-rep-row.ok     .td-rep-pace { color: var(--ok); }
+.td-rep-row.star   .td-rep-pace { color: var(--ac); }
+.td-rep-row.danger .ds-bar-fill { background: var(--danger); }
+.td-rep-row.warn   .ds-bar-fill { background: var(--warn); }
+.td-rep-row.ok     .ds-bar-fill { background: var(--ok); }
+.td-rep-row.star   .ds-bar-fill { background: var(--ac); }
+.td-rep-chip {
+  font-size: 9px; font-family: var(--font-mono); font-weight: var(--weight-semibold);
+  padding: 1px 5px; border-radius: var(--r-xs);
+}
+.td-rep-row.danger .td-rep-chip { background: var(--danger-dim); color: var(--danger); }
+.td-rep-row.warn   .td-rep-chip { background: var(--warn-dim);   color: var(--warn); }
+.td-rep-row.ok     .td-rep-chip { background: var(--ok-dim);     color: var(--ok); }
+.td-rep-row.star   .td-rep-chip { background: var(--ac-dim);     color: var(--ac); }
+
+/* ── Center panel ── */
+.center-panel { flex: 1; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+
+.view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.view.active { display: flex; }
+
+.view-header { padding: var(--space-5) var(--space-8) var(--space-4); border-bottom: 1px solid var(--hair); flex-shrink: 0; }
+.view-eyebrow { font-family: var(--font-mono); font-size: var(--text-3xs); letter-spacing: var(--ls-wider); text-transform: uppercase; color: var(--ink-4); margin-bottom: var(--space-1); }
+.view-title { font-size: var(--text-h2); font-weight: var(--weight-bold); color: var(--ink-1); letter-spacing: var(--ls-normal); }
+.view-content { flex: 1; overflow-y: auto; padding: var(--space-6) var(--space-8); }
+.view-content::-webkit-scrollbar { width: 4px; }
+.view-content::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 2px; }
+
+/* ── Map ── */
+#view-map { background: var(--surface-2); }
+.map-toolbar {
+  position: absolute; top: var(--space-4); left: var(--space-4); right: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-3); z-index: var(--z-sticky);
+  pointer-events: none;
+}
+.map-toolbar > * { pointer-events: auto; }
+.map-container { position: relative; width: 100%; height: 100%; }
+
+/* Map controls */
+.map-zoom-ctrl {
+  position: absolute; top: var(--space-4); right: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-1);
+  z-index: var(--z-dropdown);
+}
+.zoom-btn {
+  width: 32px; height: 32px;
+  background: var(--bg); border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: var(--weight-bold); color: var(--ink-2);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.zoom-btn:hover { background: var(--surface); border-color: var(--hair-3); }
+
+/* Map legend */
+.map-legend {
+  position: absolute; bottom: var(--space-5); left: var(--space-5);
+  background: var(--bg); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm); min-width: 160px;
+}
+.map-legend-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: var(--ls-wider); text-transform: uppercase; color: var(--ink-4); margin-bottom: var(--space-2); }
+.map-legend-gradient { height: 8px; border-radius: var(--r-full); background: linear-gradient(to right, var(--choro-0), var(--choro-3), var(--choro-5)); margin-bottom: var(--space-1); }
+.map-legend-labels { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 9px; color: var(--ink-4); }
+
+/* Map tooltip */
+.map-tooltip {
+  position: absolute; background: var(--bg); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-md); pointer-events: none;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-out);
+  min-width: 160px; z-index: var(--z-dropdown);
+}
+.map-tooltip.show { opacity: 1; }
+.tt-name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); margin-bottom: var(--space-1); }
+.tt-zone { font-family: var(--font-mono); font-size: 9px; color: var(--ink-4); margin-bottom: var(--space-2); }
+.tt-row { display: flex; justify-content: space-between; gap: var(--space-4); font-size: var(--text-xs); color: var(--ink-3); margin-bottom: 2px; }
+.tt-val { font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--ink-2); }
+
+/* Map polygons (via D3) */
+.td-poly { stroke: white; stroke-width: .8; cursor: pointer; transition: opacity .1s; }
+.td-poly:hover { opacity: .75; stroke-width: 1.2; }
+.td-poly.selected { stroke: var(--ink-1); stroke-width: 2; opacity: 1; }
+.td-poly-bg { fill: var(--surface-2); stroke: white; stroke-width: .5; pointer-events: none; }
+
+/* ── Detail panel ── */
+.detail-panel {
+  width: var(--detail-width); flex-shrink: 0;
+  border-left: 1px solid var(--hair); background: var(--bg);
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: translateX(100%);
+  transition: transform var(--dur-normal) var(--ease-out);
+  position: absolute; right: 0;
+  top: 0; bottom: 0;
+}
+.detail-panel.open { transform: translateX(0); }
+.detail-close {
+  position: absolute; top: var(--space-3); right: var(--space-4);
+  width: 26px; height: 26px; border: 1px solid var(--hair-2);
+  background: var(--surface); border-radius: var(--r-full);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-3);
+  transition: all var(--dur-fast) var(--ease-out); z-index: 1;
+}
+.detail-close:hover { background: var(--surface-2); color: var(--ink-1); }
+
+/* Detail content */
+.td-detail-hd {
+  padding: var(--space-4) calc(var(--space-4) + 30px) var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--hair); flex-shrink: 0;
+}
+.td-detail-hd .ds-eyebrow { color: var(--ink-4); margin-bottom: var(--space-1); }
+.td-detail-title { font-size: var(--text-h3); font-weight: var(--weight-extrabold); color: var(--ink-1); letter-spacing: var(--ls-normal); margin-bottom: 2px; }
+.td-detail-sub { font-size: var(--text-xs); color: var(--ink-3); }
+.td-detail-body { flex: 1; overflow-y: auto; }
+.td-detail-body::-webkit-scrollbar { width: 3px; }
+.td-detail-body::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 2px; }
+
+.td-detail-section { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--hair); }
+.td-detail-section:last-child { border-bottom: none; }
+
+/* Sparkline */
+.td-spark-wrap { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--hair); }
+.td-spark { display: flex; align-items: flex-end; gap: 4px; height: 44px; }
+.td-spark-bar { flex: 1; min-height: 3px; border-radius: 2px 2px 0 0; background: var(--ac); opacity: .55; cursor: pointer; transition: opacity var(--dur-instant) var(--ease-out); }
+.td-spark-bar:hover { opacity: 1; }
+.td-spark-bar.cur { opacity: 1; outline: 1.5px solid var(--ink-2); outline-offset: 1px; }
+.td-spark-labels { display: flex; gap: 4px; margin-top: 3px; }
+.td-spark-labels span { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 8px; color: var(--ink-4); }
+
+/* Account list in detail */
+.td-acc-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--hair);
+  cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.td-acc-row:hover { background: var(--surface); }
+.td-acc-row:last-child { border-bottom: none; }
+.td-acc-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.td-acc-dot.active   { background: var(--ok); }
+.td-acc-dot.atrisk   { background: var(--warn); }
+.td-acc-dot.inactive { background: var(--hair-3); }
+.td-acc-name { flex: 1; font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-acc-gmv { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+
+/* ── Toast ── */
+.toast-container {
+  position: fixed; bottom: var(--space-5); left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  z-index: var(--z-toast); pointer-events: none;
+}
+.td-toast {
+  background: var(--p-neutral-900); color: white;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--r-lg); font-size: var(--text-sm);
+  box-shadow: var(--shadow-lg); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+  pointer-events: auto; white-space: nowrap;
+}
+.td-toast.show { opacity: 1; }
+.td-toast.ok { background: var(--ok); }
+.td-toast.error { background: var(--danger); }
+
+/* ── DS Base components (shared) ── */
+.ds-input {
+  display: block; width: 100%;
+  height: var(--c-input-h); padding: 0 var(--c-input-px);
+  background: var(--c-input-bg); border: 1px solid var(--c-input-border);
+  border-radius: var(--c-input-r);
+  font-family: var(--c-input-font); font-size: var(--c-input-size);
+  color: var(--c-input-fg); outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.ds-input::placeholder { color: var(--c-input-ph); }
+.ds-input:focus { border-color: var(--c-input-focus); box-shadow: 0 0 0 3px var(--ac-dim); }
+
+.ds-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-2); height: var(--c-btn-h); padding: 0 var(--c-btn-px);
+  border-radius: var(--c-btn-r); font-family: var(--c-btn-font);
+  font-size: var(--c-btn-size); font-weight: var(--c-btn-weight);
+  border: none; cursor: pointer; text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out);
+  white-space: nowrap; user-select: none;
+}
+.ds-btn-primary { background: var(--c-btn-primary-bg); color: var(--c-btn-primary-fg); }
+.ds-btn-primary:hover { background: var(--c-btn-primary-hover); }
+
+.ds-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--c-avatar-r);
+  background: var(--c-avatar-bg); color: var(--c-avatar-fg);
+  font-family: var(--font-mono); font-weight: var(--weight-bold); flex-shrink: 0;
+}
+.ds-avatar.sm { width: var(--c-avatar-sm); height: var(--c-avatar-sm); font-size: 9px; }
+.ds-avatar.md { width: var(--c-avatar-md); height: var(--c-avatar-md); font-size: 11px; }
+
+.ds-eyebrow {
+  font-family: var(--font-mono); font-size: var(--text-3xs);
+  font-weight: var(--weight-semibold); letter-spacing: var(--ls-wider);
+  text-transform: uppercase; color: var(--ink-4);
+}
+.ds-eyebrow.ac { color: var(--ac); }
+
+.ds-bar-track { height: var(--c-bar-h); background: var(--c-bar-track); border-radius: var(--c-bar-r); overflow: hidden; }
+.ds-bar-track.md { height: var(--c-bar-h-md); }
+.ds-bar-fill { height: 100%; border-radius: var(--c-bar-r); transition: width var(--dur-slow) var(--ease-inout); }
+
+.ds-skel { background: linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%); background-size: 200% 100%; border-radius: var(--r-sm); animation: skel-shimmer 1.4s infinite; }
+@keyframes skel-shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
+
+.ds-stat-row { display: flex; align-items: baseline; justify-content: space-between; padding: var(--space-2) 0; border-bottom: 1px solid var(--hair); gap: var(--space-4); }
+.ds-stat-row:last-child { border-bottom: none; }
+.ds-stat-label { font-size: var(--text-sm); color: var(--ink-3); }
+.ds-stat-value { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--ink-1); display: flex; align-items: center; gap: var(--space-2); }
+
+.ds-delta { font-family: var(--font-mono); font-size: var(--text-micro); font-weight: var(--weight-semibold); padding: 1px 5px; border-radius: var(--r-xs); }
+.ds-delta.up   { background: var(--ok-dim);     color: var(--ok-text); }
+.ds-delta.down { background: var(--danger-dim);  color: var(--danger-text); }
+
+.ds-seg-ctrl { display: inline-flex; background: var(--c-seg-bg); border: var(--c-seg-border); border-radius: var(--c-seg-r); padding: 3px; gap: 2px; }
+.ds-seg-item { display: flex; align-items: center; height: var(--c-seg-item-h); padding: 0 var(--c-seg-item-px); border-radius: calc(var(--c-seg-r) - 2px); font-size: var(--text-2xs); font-family: var(--font-mono); font-weight: var(--weight-medium); color: var(--c-seg-inactive-fg); cursor: pointer; border: none; background: none; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap; }
+.ds-seg-item:hover { color: var(--ink-2); }
+.ds-seg-item.active { background: var(--c-seg-active-bg); color: var(--c-seg-active-fg); font-weight: var(--weight-semibold); box-shadow: var(--c-seg-active-shadow); }
+.ds-seg-item.active-ac { background: var(--ac); color: white; font-weight: var(--weight-semibold); }
+
+/* ── Phase 3: Sync & Interaction (v703) ── */
+
+/* Rep-map highlight states */
+.td-poly.rep-highlight { stroke-width: 1.5; }
+.td-poly.rep-dim       { transition: opacity .2s; }
+
+/* Zone filter chip */
+.td-zone-chip {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--info-dim); border: 1px solid var(--info-border);
+  border-radius: var(--r-full); padding: 4px 8px 4px 10px;
+  font-size: var(--text-2xs); color: var(--info);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+.td-zone-chip svg { flex-shrink: 0; }
+.td-zone-chip span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-zone-chip button {
+  width: 18px; height: 18px; border: none; background: var(--info-dim);
+  border-radius: var(--r-full); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: var(--info);
+  flex-shrink: 0;
+}
+.td-zone-chip button:hover { background: var(--info-border); }
+
+/* Sales overlay toggle button */
+.td-overlay-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 var(--space-3);
+  background: var(--surface); border: 1px solid var(--hair-2);
+  border-radius: var(--r-md); font-size: var(--text-2xs);
+  font-family: var(--font-mono); font-weight: var(--weight-semibold);
+  color: var(--ink-3); cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.td-overlay-btn:hover { border-color: var(--info-border); color: var(--info); }
+.td-overlay-btn.active {
+  background: var(--info-dim); border-color: var(--info-border); color: var(--info);
+}
+
+/* Sales dots */
+.td-sales-dot { pointer-events: all; }
+
+/* Rep row dim state */
+.td-rep-row.dimmed {
+  opacity: .28; pointer-events: none;
+}
+
+/* ── Phase 5: Skills (v705) ── */
+
+/* Sub-nav tabs */
+.td-skills-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--hair);
+  margin-bottom: var(--space-5);
+}
+.td-skills-tab {
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--ink-3); background: none; border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.td-skills-tab:hover { color: var(--ink-2); }
+.td-skills-tab.active { color: var(--ac); border-bottom-color: var(--ac); font-weight: var(--weight-semibold); }
+
+/* Pending row */
+.td-skill-pend-row {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--hair); cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out);
+}
+.td-skill-pend-row:hover { background: var(--surface); }
+.td-skill-pend-row:last-child { border-bottom: none; }
+.td-skill-pend-body { flex: 1; min-width: 0; }
+.td-skill-pend-name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); }
+.td-skill-pend-skill { font-size: var(--text-xs); color: var(--ink-3); margin-top: 2px; display: flex; align-items: center; gap: var(--space-2); }
+.td-skill-pend-date { font-size: var(--text-micro); color: var(--ink-4); margin-top: 2px; font-family: var(--font-mono); }
+
+/* Gate badge */
+.td-skill-gate {
+  font-family: var(--font-mono); font-size: 9px; font-weight: var(--weight-semibold);
+  padding: 1px 5px; border-radius: var(--r-xs);
+  background: var(--info-dim); color: var(--info); border: 1px solid var(--info-border);
+}
+
+/* Echo strip in pending */
+.td-skill-echo-strip {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface); border-radius: var(--r-xs);
+  font-size: var(--text-micro);
+}
+.td-skill-echo-score { font-weight: var(--weight-semibold); }
+.td-skill-echo-date  { color: var(--ink-4); font-family: var(--font-mono); }
+.td-skill-echo-ev    { color: var(--ink-3); width: 100%; line-height: 1.4; }
+
+/* Matrix */
+.td-skill-matrix-wrap { display: flex; flex-direction: column; gap: 0; }
+.td-skill-matrix-header {
+  display: flex; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hair);
+}
+.td-skill-matrix-row {
+  display: flex; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hair);
+  gap: var(--space-4);
+}
+.td-skill-matrix-row:last-child { border-bottom: none; }
+.td-skill-matrix-rep {
+  min-width: 200px; flex-shrink: 0;
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.td-skill-matrix-dots {
+  flex: 1; display: flex; gap: var(--space-2); flex-wrap: wrap;
+  align-items: center;
+}
+.td-skill-matrix-dots-hd {
+  flex: 1; display: flex; gap: var(--space-2); flex-wrap: wrap;
+  align-items: center;
+}
+.td-skill-matrix-hd {
+  width: 28px; text-align: center;
+  font-family: var(--font-mono); font-size: 9px; color: var(--ink-4);
+  letter-spacing: .04em;
+}
+.td-skill-matrix-bar {
+  width: 120px; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+.td-skill-matrix-cell {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.td-skill-matrix-dot {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.td-skill-matrix-dot.pass  { background: var(--ok-dim);     border: 1.5px solid var(--ok); }
+.td-skill-matrix-dot.train { background: var(--warn-dim);   border: 1.5px solid var(--warn); }
+.td-skill-matrix-dot.lock  { background: var(--surface-2);  border: 1.5px solid var(--hair-2); }
+
+/* Echo dot overlay on matrix dot */
+.td-skill-echo-dot {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid var(--bg);
+}
+.td-skill-echo-dot.ok      { background: var(--ok); }
+.td-skill-echo-dot.warn    { background: var(--warn); }
+.td-skill-echo-dot.danger  { background: var(--danger); }
+
+/* ── Phase 6: Echo (v706) ── */
+
+/* Echo feed */
+.td-echo-feed { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.td-echo-card {
+  background: var(--bg); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+}
+.td-echo-card:hover { background: var(--surface); border-color: var(--hair-2); }
+.td-echo-card.selected { background: var(--ac-dim); border-color: var(--ac-border); }
+
+.td-echo-card-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.td-echo-card-left {
+  display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0;
+}
+.td-echo-card-right { flex-shrink: 0; }
+.td-echo-rep   { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--ink-1); }
+.td-echo-acct  { font-size: var(--text-xs); color: var(--ink-3); }
+.td-echo-meta  { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--ink-4); }
+
+.td-echo-badges {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin-bottom: var(--space-1);
+}
+.td-echo-dots { display: flex; gap: 3px; align-items: center; flex: 1; }
+.td-echo-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.td-echo-dot.ok      { background: var(--ok); }
+.td-echo-dot.warn    { background: var(--warn); }
+.td-echo-dot.danger  { background: var(--danger); }
+.td-echo-dot.neutral { background: var(--hair-3); }
+
+.td-echo-note {
+  font-size: var(--text-xs); color: var(--info); font-style: italic;
+  line-height: 1.5; margin-top: var(--space-2); padding-top: var(--space-2);
+  border-top: 1px solid var(--hair);
+}
+.td-echo-summary {
+  font-size: var(--text-xs); color: var(--ink-3);
+  line-height: 1.5; margin-top: var(--space-2); padding-top: var(--space-2);
+  border-top: 1px solid var(--hair);
+}
+
+/* TL note textarea */
+.td-echo-note-input {
+  width: 100%; min-height: 80px;
+  background: var(--surface); border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm); padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body); font-size: var(--text-sm);
+  color: var(--ink-1); resize: vertical; outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out);
+  line-height: var(--lh-relaxed);
+}
+.td-echo-note-input:focus {
+  border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-dim);
+}
+
+/* ── Commission last-updated badge ── */
+.td-comm-updated {
+  font-family: var(--font-mono); font-size: var(--text-micro);
+  color: var(--ink-4); margin-top: var(--space-2);
+}
+
+/* ── Skills pending sort toggle ── */
+.td-skill-sort-btn {
+  font-size: var(--text-micro); font-family: var(--font-mono);
+  color: var(--ink-4); background: none; border: none;
+  cursor: pointer; padding: 0;
+}
+.td-skill-sort-btn:hover { color: var(--ac); }
+
+/* ── Team table — sortable header ── */
+.td-team-th-sort {
+  cursor: pointer; user-select: none;
+}
+.td-team-th-sort:hover { color: var(--ink-2); }
+.td-team-sort-arrow { margin-left: 4px; color: var(--ink-4); }
+
+/* ── Forgot password link ── */
+.auth-forgot {
+  font-size: var(--text-xs); color: var(--ink-4); text-align: right;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.auth-forgot:hover { color: var(--ac); }
+</style>
+</head>
+<body>
+
+<!-- ── AUTH OVERLAY ─────────────────────────────────────── -->
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="7" fill="#FF385C"/>
+        <path d="M8 14.5h12M14 8.5v12" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <span class="auth-logo-name">Freshket</span>
+    </div>
+    <div class="auth-title">TL Dashboard</div>
+    <div class="auth-sub">เข้าสู่ระบบเพื่อดู territory & team intelligence</div>
+    <div id="auth-error" class="auth-error" style="display:none"></div>
+    <input id="auth-email" class="ds-input" type="email" placeholder="อีเมล" autocomplete="email">
+    <input id="auth-pass"  class="ds-input" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+    <button id="auth-btn" class="ds-btn ds-btn-primary" style="width:100%" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="auth-forgot" onclick="doForgotPassword()">ลืมรหัสผ่าน?</div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ─────────────────────────────────────────── -->
+<div id="app" class="app" style="display:none">
+
+  <!-- TOPBAR -->
+  <header class="topbar" id="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">
+        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#FF385C"/>
+          <path d="M8 14.5h12M14 8.5v12" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span class="topbar-product">Freshket</span>
+      </div>
+      <div class="topbar-sep"></div>
+      <span class="topbar-section" id="topbar-section">Dashboard</span>
+    </div>
+    <div class="topbar-center" id="topbar-controls">
+      <!-- injected by JS -->
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-user" id="topbar-user" onclick="toggleUserMenu()">
+        <div class="ds-avatar sm" id="user-avatar">?</div>
+        <span class="topbar-user-name" id="user-name">...</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div class="user-menu" id="user-menu" style="display:none">
+        <div class="user-menu-item" onclick="openSense()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+          เปิด Sense (mobile)
+        </div>
+        <div class="user-menu-divider"></div>
+        <div class="user-menu-item danger" onclick="doLogout()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          ออกจากระบบ
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN BODY -->
+  <div class="main-body">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <button class="snav-btn active" data-view="map" aria-label="Territory Map" onclick="setView('map',this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/></svg>
+          <span>Map</span>
+        </button>
+        <button class="snav-btn" data-view="team" aria-label="ภาพรวมทีม" onclick="setView('team',this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>ทีม</span>
+        </button>
+        <button class="snav-btn" data-view="commission" aria-label="Commission" onclick="setView('commission',this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+          <span>Comm.</span>
+        </button>
+        <button class="snav-btn" data-view="skills" aria-label="Skills" onclick="setView('skills',this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+          <span>Skills</span>
+        </button>
+        <button class="snav-btn" data-view="echo" aria-label="Echo Sessions" onclick="setView('echo',this)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>
+          <span>Echo</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar content (view-dependent) -->
+      <div class="sidebar-content" id="sidebar-content">
+        <div class="sidebar-shimmer" id="sidebar-shimmer">
+          <div class="ds-skel" style="height:52px;border-radius:var(--r-md);margin-bottom:8px"></div>
+          <div class="ds-skel" style="height:3px;border-radius:2px;margin-bottom:16px"></div>
+          <div class="ds-skel" style="height:14px;width:60%;border-radius:3px;margin-bottom:20px"></div>
+          <div class="ds-skel" style="height:44px;border-radius:var(--r-md);margin-bottom:4px"></div>
+          <div class="ds-skel" style="height:44px;border-radius:var(--r-md);margin-bottom:4px"></div>
+          <div class="ds-skel" style="height:44px;border-radius:var(--r-md);margin-bottom:4px"></div>
+          <div class="ds-skel" style="height:44px;border-radius:var(--r-md);margin-bottom:4px"></div>
+          <div class="ds-skel" style="height:44px;border-radius:var(--r-md)"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER (Map or content) -->
+    <main class="center-panel" id="center-panel">
+      <!-- Map view -->
+      <div id="view-map" class="view active">
+        <div class="map-toolbar" id="map-toolbar">
+          <!-- injected by dash_map.js -->
+        </div>
+        <div class="map-container" id="map-container">
+          <svg id="map-svg" width="100%" height="100%"></svg>
+          <div class="map-legend" id="map-legend"></div>
+          <div class="map-zoom-ctrl">
+            <button class="zoom-btn" onclick="mapZoom(1.35)">+</button>
+            <button class="zoom-btn" onclick="mapZoom(0.74)">−</button>
+            <button class="zoom-btn" onclick="mapReset()" title="Reset view">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+          </div>
+          <div class="map-tooltip" id="map-tooltip"></div>
+        </div>
+      </div>
+
+      <!-- Team view -->
+      <div id="view-team" class="view">
+        <div class="view-header">
+          <div class="view-eyebrow">TEAM VIEW</div>
+          <div class="view-title" id="team-view-title">ภาพรวมทีม</div>
+        </div>
+        <div id="team-content" class="view-content"></div>
+      </div>
+
+      <!-- Commission view -->
+      <div id="view-commission" class="view">
+        <div class="view-header">
+          <div class="view-eyebrow">COMMISSION</div>
+          <div class="view-title">Commission Estimate</div>
+        </div>
+        <div id="commission-content" class="view-content"></div>
+      </div>
+
+      <!-- Skills view -->
+      <div id="view-skills" class="view">
+        <div class="view-header">
+          <div class="view-eyebrow">SKILLS</div>
+          <div class="view-title">Skills Progress</div>
+        </div>
+        <div id="skills-content" class="view-content"></div>
+      </div>
+
+      <!-- Echo view -->
+      <div id="view-echo" class="view">
+        <div class="view-header">
+          <div class="view-eyebrow">ECHO</div>
+          <div class="view-title">Conversation Intelligence</div>
+        </div>
+        <div id="echo-content" class="view-content"></div>
+      </div>
+    </main>
+
+    <!-- RIGHT DETAIL PANEL -->
+    <aside class="detail-panel" id="detail-panel">
+      <button class="detail-close" onclick="closeDetail()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div id="detail-content"></div>
+    </aside>
+
+  </div><!-- main-body -->
+</div><!-- app -->
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Core -->
+<script>
+// ── dash_core.js ─────────────────────────────────────────────
+// Freshket TL Dashboard v707
+// Single responsibility: auth, logging, error handling, shared utils
+
+const DASH_VERSION = 'v710';
+const SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
+const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
+const ALLOWED_ROLES = ['tl','admin','sales_tl','ad_tl',
+  'team_lead','team lead','ka team lead','sales team lead'];
+
+
+// ── DASH_CONFIG — all tunable constants in one place ─────────
+// Change here only — never hardcode these values elsewhere
+const DASH_CONFIG = {
+  PACE_STAR:            105,
+  PACE_OK:               95,
+  PACE_WARN:             90,
+  BASELINE_MONTHS:        3,
+  QUERY_LIMIT_ECHO:     120,
+  QUERY_LIMIT_SKILLS:   500,
+  FETCH_RETRIES:          2,
+  FETCH_RETRY_DELAY_MS: 1200,
+  SUPABASE_TIMEOUT_MS:  8000,
+  TOAST_DURATION_MS:    2800,
+  ECHO_WEEK_DAYS:          7,
+  ECHO_DEDUPE_SEC:        60,
+  MONTHS: ["Nov 25","Dec 25","Jan 26","Feb 26","Mar 26","Apr 26"],
+};
+Object.freeze(DASH_CONFIG);
+
+let supa, currentProfile = null;
+
+// ── Logger ────────────────────────────────────────────────────
+// Centralised error log — queryable for debugging
+const DashLog = (() => {
+  const LOG_KEY   = 'dash_error_log_v1';
+  const MAX_ITEMS = 120;
+
+  function _read() {
+    try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
+  }
+  function _write(arr) {
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(arr.slice(-MAX_ITEMS))); } catch {}
+  }
+
+  return {
+    error(module, message, detail = null) {
+      const entry = {
+        ts: new Date().toISOString(),
+        v: DASH_VERSION,
+        level: 'error',
+        module,
+        message: String(message).slice(0, 400),
+        detail: detail ? String(detail).slice(0, 400) : undefined,
+        user: currentProfile?.email || null,
+        view: typeof currentView !== 'undefined' ? currentView : null,
+      };
+      const log = _read();
+      log.push(entry);
+      _write(log);
+      console.error(`[${module}]`, message, detail || '');
+    },
+
+    warn(module, message) {
+      console.warn(`[${module}]`, message);
+    },
+
+    info(module, message) {
+      if (localStorage.getItem('dash_debug') === '1')
+        console.log(`[${module}]`, message);
+    },
+
+    // Export full log (for debugging)
+    dump() { return _read(); },
+
+    // Clear log
+    clear() { localStorage.removeItem(LOG_KEY); },
+
+    // Render readable summary (called from dev console)
+    print() {
+      const log = _read();
+      if (!log.length) { console.log('No errors logged.'); return; }
+      console.table(log.map(e => ({
+        time: e.ts.slice(11,19), module: e.module,
+        message: e.message.slice(0,60), user: e.user
+      })));
+    }
+  };
+})();
+
+// Expose for console debugging
+window.DashLog = DashLog;
+
+
+// ── supaFetch — Supabase query with timeout ───────────────────
+async function supaFetch(queryBuilder) {
+  const timeout = new Promise((_,reject) =>
+    setTimeout(() => reject(new Error('Supabase timeout')),
+               DASH_CONFIG.SUPABASE_TIMEOUT_MS)
+  );
+  return Promise.race([queryBuilder, timeout]);
+}
+
+// ── Global error boundary ─────────────────────────────────────
+window.addEventListener('unhandledrejection', e => {
+  DashLog.error('unhandled_promise', e.reason?.message || String(e.reason));
+});
+window.addEventListener('error', e => {
+  DashLog.error('runtime', e.message, `${e.filename}:${e.lineno}`);
+});
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+  try {
+    const { data: { session } } = await supa.auth.getSession();
+    if (session) await onSessionReady(session);
+  } catch(e) {
+    DashLog.error('auth_init', e.message);
+    showAuthError('เชื่อมต่อระบบไม่ได้ — กรุณาลองใหม่');
+  }
+
+  supa.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      await onSessionReady(session);
+    } else if (event === 'SIGNED_OUT') {
+      showAuth();
+    } else if (event === 'TOKEN_REFRESHED') {
+      DashLog.info('auth', 'token refreshed');
+    }
+  });
+});
+
+async function onSessionReady(session) {
+  try {
+    const { data: profile, error } = await supa
+      .from('profiles').select('*')
+      .eq('id', session.user.id).single();
+
+    if (error) DashLog.warn('profile_load', error.message);
+
+    const role = normalizeRole(
+      profile?.role || session.user.user_metadata?.role || ''
+    );
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      await supa.auth.signOut();
+      showAuthError('บัญชีนี้ไม่มีสิทธิ์เข้าใช้ Dashboard — กรุณาใช้ Sense บนมือถือ');
+      DashLog.error('auth_role', `role '${role}' not allowed`, session.user.email);
+      return;
+    }
+
+    currentProfile = { ...profile, role, email: session.user.email };
+    DashLog.info('auth', `signed in: ${session.user.email} (${role})`);
+    showApp();
+    initApp();
+  } catch(e) {
+    DashLog.error('on_session_ready', e.message);
+    showAuthError('เกิดข้อผิดพลาด — กรุณา refresh หน้า');
+  }
+}
+
+function normalizeRole(r) {
+  const s = String(r || '').trim().toLowerCase();
+  if (['kam','ka','key_account','key account','rep'].includes(s)) return 'rep';
+  if (['team_lead','team lead','tl'].includes(s)) return 'tl';
+  if (['sales_tl','sales_lead','sales team lead'].includes(s)) return 'sales_tl';
+  if (['ad_tl','ad_lead','ad team lead'].includes(s)) return 'ad_tl';
+  return s || 'rep';
+}
+
+// ── Auth UI ───────────────────────────────────────────────────
+function showAuth() {
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+function showApp() {
+  document.getElementById('auth-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function doLogin() {
+  const btn   = document.getElementById('auth-btn');
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  document.getElementById('auth-error').style.display = 'none';
+
+  if (!email || !pass) { showAuthError('กรุณากรอกอีเมลและรหัสผ่าน'); return; }
+
+  btn.textContent = 'กำลังเข้าสู่ระบบ...';
+  btn.disabled = true;
+
+  try {
+    const { error } = await supa.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      DashLog.error('login', error.message, email);
+      showAuthError(error.message || 'เข้าสู่ระบบไม่สำเร็จ');
+    }
+  } catch(e) {
+    DashLog.error('login', e.message);
+    showAuthError('เชื่อมต่อไม่ได้ — กรุณาตรวจสอบอินเทอร์เน็ต');
+  } finally {
+    btn.textContent = 'เข้าสู่ระบบ';
+    btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  try {
+    await supa.auth.signOut();
+  } catch(e) {
+    DashLog.error('logout', e.message);
+  } finally {
+    location.reload();
+  }
+}
+
+function openSense() { window.open('/', '_blank'); }
+
+async function doForgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) {
+    showAuthError('กรุณากรอกอีเมลก่อน แล้วกด "ลืมรหัสผ่าน"');
+    return;
+  }
+  try {
+    const { error } = await supa.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/dashboard'
+    });
+    if (error) throw error;
+    showAuthError('');
+    const el = document.getElementById('auth-error');
+    el.textContent = 'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ' + email + ' แล้ว';
+    el.style.display = 'block';
+    el.style.background = 'var(--ok-dim)';
+    el.style.color = 'var(--ok-text)';
+    el.style.borderColor = 'var(--ok-border)';
+  } catch(e) {
+    DashLog.error('forgot_password', e.message);
+    showAuthError(e.message || 'ไม่สามารถส่งอีเมลได้');
+  }
+}
+
+
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement?.id === 'auth-pass') doLogin();
+});
+
+// ── User menu ─────────────────────────────────────────────────
+function toggleUserMenu() {
+  const m = document.getElementById('user-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#topbar-user')) {
+    const m = document.getElementById('user-menu');
+    if (m) m.style.display = 'none';
+  }
+});
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `td-toast${type ? ' ' + type : ''}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2800);
+}
+
+// ── Error panel (inline, replaces blank states) ───────────────
+function errorPanel(module, message, retryFn = null) {
+  DashLog.error(module, message);
+  const retryBtn = retryFn
+    ? `<button class="ds-btn ds-btn-secondary" style="height:32px;font-size:var(--text-xs)"
+        onclick="(${retryFn.toString()})()">ลองอีกครั้ง</button>` : '';
+  return `
+    <div style="display:flex;flex-direction:column;align-items:center;padding:var(--space-10) 0;gap:var(--space-3);text-align:center">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+      </svg>
+      <div style="font-size:var(--text-sm);font-weight:600;color:var(--ink-2)">${message}</div>
+      <div style="font-size:var(--text-xs);color:var(--ink-4);font-family:var(--font-mono)">${module}</div>
+      ${retryBtn}
+    </div>`;
+}
+
+// Loading skeleton block
+function skeletonBlock(rows = 5, height = 44) {
+  return `<div style="display:flex;flex-direction:column;gap:var(--space-2)">
+    ${Array(rows).fill('').map(() =>
+      `<div class="ds-skel" style="height:${height}px;border-radius:var(--r-md)"></div>`
+    ).join('')}
+  </div>`;
+}
+
+// ── Format helpers ────────────────────────────────────────────
+function fmtGMV(v) {
+  if (!v && v !== 0) return '—';
+  if (v >= 1e6) return '฿' + (v/1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '฿' + Math.round(v/1e3) + 'K';
+  return '฿' + Math.round(v).toLocaleString();
+}
+function fmtNum(v)         { return v != null ? Number(v).toLocaleString() : '—'; }
+function fmtPct(v)         { return v != null ? v + '%' : '—'; }
+function fmtDelta(c, p)    { if (!p) return ''; const d = Math.round((c-p)/p*100); return (d>=0?'+':'')+d+'%'; }
+function deltaCls(c, p)    { return c >= p ? 'up' : 'down'; }
+function paceCls(pct) {
+  if (pct >= DASH_CONFIG.PACE_STAR) return 'star';
+  if (pct >= DASH_CONFIG.PACE_OK)   return 'ok';
+  if (pct >= DASH_CONFIG.PACE_WARN) return 'warn';
+  return 'danger';
+}
+</script>
+
+<!-- Data pipeline -->
+<script>
+// ── dash_data.js ──────────────────────────────────────────────
+// Freshket TL Dashboard v707
+// Data pipeline: R2 CSV + KAM group builder
+
+const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+// MONTHS sourced from DASH_CONFIG
+const MONTHS = DASH_CONFIG.MONTHS;
+
+// ── State ─────────────────────────────────────────────────────
+let portviewBulkData = [];
+let currentMonth = MONTHS.length > 0 ? MONTHS[MONTHS.length - 1] : 'Apr 26';
+let currentMetric    = 'gmv';
+let dataReady        = false;
+let dataLoadError    = null;
+
+// ── Fetch with retry ─────────────────────────────────────────
+async function fetchWithRetry(url, retries = DASH_CONFIG.FETCH_RETRIES, delayMs = DASH_CONFIG.FETCH_RETRY_DELAY_MS) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    } catch(e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+}
+
+// ── Load pipeline ─────────────────────────────────────────────
+async function loadDashData() {
+  const el = document.getElementById('sidebar-content');
+  if (el) el.innerHTML = skeletonBlock(6);
+
+  try {
+    const csv = await fetchWithRetry(`${R2_BASE}/portview.csv?cb=${Date.now()}`);
+    portviewBulkData = parsePortviewCSV(csv);
+    DashLog.info('data', `portview loaded: ${portviewBulkData?.length ?? 0} accounts`);
+  } catch(e) {
+    DashLog.error('data_load', e.message, 'portview.csv');
+    dataLoadError = e.message;
+    // Render degraded state — don't block the rest of the app
+  }
+
+  dataReady = true;
+  onDataReady();
+}
+
+function parsePortviewCSV(csv) {
+  const lines = csv.trim().split('\n').slice(1).filter(l => l.trim());
+  return lines.map(line => {
+    const cols = line.split(',');
+    return {
+      id:       cols[0]?.trim(),
+      name:     cols[1]?.trim(),
+      kamEmail: cols[2]?.trim(),
+      tlEmail:  cols[3]?.trim(),
+      kamName:  cols[4]?.trim(),
+      type:     cols[5]?.trim(),
+      cls:      cols[6]?.trim(),
+      gmv:      parseGMVCols(cols, 7),
+    };
+  });
+}
+
+function parseGMVCols(cols, startIdx) {
+  const result = {};
+  MONTHS.forEach((m, i) => {
+    const v = parseFloat(cols[startIdx + i]);
+    if (!isNaN(v)) result[m] = v;
+  });
+  return result;
+}
+
+function onDataReady() {
+  hideSidebarShimmer();
+
+  if (dataLoadError) {
+    // Show degraded notice but still render with empty data
+    showToast('โหลดข้อมูลไม่ครบ — บางส่วนอาจไม่แสดง', 'warn');
+  }
+
+  renderSidebarTeam();
+  renderCurrentView();
+}
+
+// ── Getters ───────────────────────────────────────────────────
+function getMyAccounts() {
+  if (!currentProfile?.email) return [];
+  const email = currentProfile.email;
+  const role  = currentProfile.role;
+  if (role === 'admin') return portviewBulkData;
+  if (['tl','ad_tl','sales_tl'].includes(role)) {
+    const f = portviewBulkData.filter(r => r.tlEmail === email);
+    return f.length ? f : portviewBulkData;
+  }
+  return portviewBulkData.filter(r => r.kamEmail === email);
+}
+
+function buildKamGroups() {
+  const accounts = getMyAccounts();
+  const groups   = {};
+
+  accounts.forEach(a => {
+    const key = a.kamEmail || a.kamName || 'ไม่มี KAM';
+    if (!groups[key]) groups[key] = { key, name: a.kamName||key, email: a.kamEmail||'', accounts: [] };
+    groups[key].accounts.push(a);
+  });
+
+  return Object.values(groups).map(g => {
+    const totalGMV = g.accounts.reduce((s,a) => s+(a.gmv[currentMonth]||0), 0);
+    const prevIdx  = MONTHS.indexOf(currentMonth) - 1;
+    const prevGMV  = prevIdx >= 0
+      ? g.accounts.reduce((s,a) => s+(a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
+
+    // 3-month rolling baseline
+    const baseline = g.accounts.reduce((s,a) => {
+      const vals = MONTHS.slice(0, MONTHS.indexOf(currentMonth))
+        .slice(-DASH_CONFIG.BASELINE_MONTHS).map(m => a.gmv[m]||0).filter(v=>v>0);
+      return s + (vals.length ? vals.reduce((x,y)=>x+y,0)/vals.length : 0);
+    }, 0);
+
+    const pace = baseline > 0 ? Math.round(totalGMV/baseline*100) : 0;
+    const cls  = paceCls(pace);
+
+    return {
+      ...g,
+      totalGMV, prevGMV, baseline,
+      pace, cls,
+      count: g.accounts.length,
+    };
+  }).sort((a,b) => {
+    const o = { danger:0, warn:1, ok:2, star:3 };
+    return (o[a.cls]??2)-(o[b.cls]??2);
+  });
+}
+</script>
+
+<!-- Layout -->
+<script>
+// ── dash_layout.js — App init, view routing, topbar ──────────
+// Freshket TL Dashboard v703 — Phase 3: bidirectional sync
+
+let currentView = 'map';
+
+// ── Sync state (Phase 3) ──────────────────────────────────────
+// Single source of truth for selection state
+const DashState = {
+  selectedRepEmail:    null,   // KAM selected in sidebar
+  selectedDistrictName:null,   // district selected on map
+  zoneFilterActive:    false,  // map zone filtering rep list
+  salesOverlay:        false,  // show sales acquisition dots
+
+  // Set rep selection — triggers map highlight
+  selectRep(email) {
+    this.selectedRepEmail = this.selectedRepEmail === email ? null : email;
+    this.selectedDistrictName = null;  // clear zone selection
+    this.zoneFilterActive = false;
+    this._syncAll();
+  },
+
+  // Set district selection — triggers list filter
+  selectDistrict(name) {
+    this.selectedDistrictName = this.selectedDistrictName === name ? null : name;
+    this.selectedRepEmail = null;    // clear rep selection
+    this.zoneFilterActive = !!this.selectedDistrictName;
+    this._syncAll();
+  },
+
+  // Clear everything
+  clearAll() {
+    this.selectedRepEmail     = null;
+    this.selectedDistrictName = null;
+    this.zoneFilterActive     = false;
+    this._syncAll();
+  },
+
+  _syncAll() {
+    syncMapToRep();
+    syncRepListToZone();
+    renderZoneFilterChip();
+    renderSidebarRepHighlight();
+  }
+};
+
+// ── Render debounce — prevents double-render on fast clicks ─────
+let _renderDebounceTimer = null;
+function scheduleRender() {
+  if (_renderDebounceTimer) clearTimeout(_renderDebounceTimer);
+  _renderDebounceTimer = setTimeout(() => {
+    _renderDebounceTimer = null;
+    renderCurrentView();
+  }, 40);  // 40ms — one frame
+}
+
+// ── App init ──────────────────────────────────────────────────
+function initApp() {
+  renderTopbarUser();
+  renderTopbarControls();
+  renderSidebarShimmer();
+  loadDashData();
+  loadCommissionData();  // Phase 4: load in parallel
+  loadSkillsData();         // Phase 5: load in parallel
+  loadEchoData();           // Phase 6: load in parallel
+}
+
+function renderTopbarUser() {
+  if (!currentProfile?.email) return;
+  const initials = (currentProfile.name || currentProfile.email || '?')
+    .trim().charAt(0).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name').textContent =
+    currentProfile.name || currentProfile.email?.split('@')[0] || '—';
+}
+
+function renderTopbarControls() {
+  const c = document.getElementById('topbar-controls');
+  c.innerHTML = `
+    <div class="ds-seg-ctrl" id="metric-toggle">
+      <button class="ds-seg-item active-ac" onclick="setMetric('gmv',this)">GMV ฿</button>
+      <button class="ds-seg-item" onclick="setMetric('accounts',this)">Accounts</button>
+      <button class="ds-seg-item" onclick="setMetric('outlets',this)">Outlets</button>
+      <button class="ds-seg-item" onclick="setMetric('new_accounts',this)">New Acc</button>
+    </div>
+    <div class="ds-seg-ctrl" id="month-toggle">
+      ${MONTHS.map(m =>
+        `<button class="ds-seg-item${m===currentMonth?' active-ac':''}"
+          onclick="setMonth('${m}',this)">${m}</button>`
+      ).join('')}
+    </div>
+    <button class="td-overlay-btn${DashState.salesOverlay?' active':''}"
+      id="sales-overlay-btn" onclick="toggleSalesOverlay()" title="Sales acquisition overlay">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+      </svg>
+      Sales
+    </button>`;
+}
+
+function setMetric(m, btn) {
+  currentMetric = m;
+  document.querySelectorAll('#metric-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
+  btn.classList.add('active-ac');
+  if (typeof _mapInited !== 'undefined' && _mapInited) updateMapColors();
+  scheduleRender();
+}
+
+function setMonth(m, btn) {
+  currentMonth = m;
+  document.querySelectorAll('#month-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
+  btn.classList.add('active-ac');
+  updateMapColors();
+  renderSidebarTeam();
+  renderCurrentView();
+}
+
+function toggleSalesOverlay() {
+  DashState.salesOverlay = !DashState.salesOverlay;
+  const btn = document.getElementById('sales-overlay-btn');
+  btn?.classList.toggle('active', DashState.salesOverlay);
+  renderSalesOverlay();
+}
+
+// ── View routing ──────────────────────────────────────────────
+function setView(v, btn) {
+  currentView = v;
+  if (v !== 'map' && typeof cancelMapInitTimer === 'function') cancelMapInitTimer();
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v)?.classList.add('active');
+  document.querySelectorAll('.snav-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+  document.getElementById('topbar-section').textContent = {
+    map: 'Territory Map', team: 'ภาพรวมทีม',
+    commission: 'Commission', skills: 'Skills', echo: 'Echo Sessions'
+  }[v] || v;
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (!dataReady) return;
+  if (currentView === 'team')       renderTeamView();
+  if (currentView === 'commission') renderCommissionView();
+  if (currentView === 'skills')     renderSkillsView();
+  if (currentView === 'echo')       renderEchoView();
+}
+
+// ── Shimmer ───────────────────────────────────────────────────
+function renderSidebarShimmer() {
+  document.getElementById('sidebar-shimmer').style.display = 'flex';
+}
+function hideSidebarShimmer() {
+  document.getElementById('sidebar-shimmer').style.display = 'none';
+}
+
+// ── Zone filter chip ──────────────────────────────────────────
+function renderZoneFilterChip() {
+  let chip = document.getElementById('zone-filter-chip');
+  if (!DashState.zoneFilterActive || !DashState.selectedDistrictName) {
+    chip?.remove();
+    return;
+  }
+  if (!chip) {
+    chip = document.createElement('div');
+    chip.id = 'zone-filter-chip';
+    chip.className = 'td-zone-chip';
+    // Insert above rep list
+    const content = document.getElementById('sidebar-content');
+    if (content) content.prepend(chip);
+  }
+  chip.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+    <span>${DashState.selectedDistrictName}</span>
+    <button onclick="DashState.clearAll()" title="ล้าง filter">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+    </button>`;
+}
+
+// ── Sync: Map → Rep highlight ─────────────────────────────────
+function syncRepListToZone() {
+  if (!DashState.zoneFilterActive) {
+    // Show all reps at full opacity
+    document.querySelectorAll('.td-rep-row').forEach(r => {
+      r.style.opacity = '';
+      r.style.pointerEvents = '';
+    });
+    return;
+  }
+  // Find which KAMs have accounts in selected district
+  // For now using mock: hub_zone matches rep index group
+  // Phase 2: replace with real account → district mapping
+  const dist = DashState.selectedDistrictName;
+  const distData = MOCK_DISTRICT?.[dist];
+  const hubZone  = distData?.hub_zone || '';
+
+  document.querySelectorAll('.td-rep-row').forEach(r => {
+    const repEmail = r.dataset.repEmail;
+    const groups = buildKamGroups();
+    const repGroup = groups.find(g => g.email === repEmail);
+    // Simple heuristic: KAMs with accounts in this hub zone
+    // In Phase 2 replace with: repGroup.accounts.some(a => a.district === dist)
+    const isInZone = hubZone
+      ? (repGroup?.key?.charCodeAt(0) || 0) % 3 === (hubZone.charCodeAt(hubZone.length-1) || 0) % 3
+      : true;
+    r.style.opacity      = isInZone ? '' : '0.28';
+    r.style.pointerEvents = isInZone ? '' : 'none';
+  });
+}
+
+// ── Sync: Rep → Map highlight ─────────────────────────────────
+function syncMapToRep() {
+  if (typeof mapG === 'undefined' || !mapG) return;
+  const email = DashState.selectedRepEmail;
+  if (!email) {
+    // Reset all polygons
+    mapG.select('.g-bkk').selectAll('path')
+      .style('opacity', null)
+      .classed('rep-highlight', false)
+      .classed('rep-dim', false);
+    return;
+  }
+  // Find accounts owned by this rep
+  const repAccounts = getMyAccounts().filter(a => a.kamEmail === email);
+  // For now map to districts via mock hub_zone logic
+  // Phase 2: use real account.district field
+  const repIdx = buildKamGroups().findIndex(g => g.email === email);
+  const hubMatch = 'Hub ' + (repIdx + 1);
+
+  mapG.select('.g-bkk').selectAll('path')
+    .classed('rep-highlight', d => MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone === hubMatch)
+    .classed('rep-dim',       d => MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone !== hubMatch)
+    .style('opacity', d => {
+      const hz = MOCK_DISTRICT?.[d.properties.name_th]?.hub_zone;
+      if (hz === hubMatch) return '1';
+      return '0.22';
+    });
+}
+
+// ── Sync: rep row highlight from external call ────────────────
+function renderSidebarRepHighlight() {
+  document.querySelectorAll('.td-rep-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.repEmail === DashState.selectedRepEmail);
+  });
+}
+
+// ── Click-outside to close detail panel ────────────────────────
+document.addEventListener('click', e => {
+  const panel  = document.getElementById('detail-panel');
+  const isOpen = panel?.classList.contains('open');
+  if (!isOpen) return;
+  if (!panel.contains(e.target) &&
+      !e.target.closest('.td-echo-card') &&
+      !e.target.closest('.td-poly') &&
+      !e.target.closest('.td-rep-row')) {
+    closeDetail();
+  }
+});
+
+// ── Detail panel ───────────────────────────────────────────────
+function openDetail(html) {
+  document.getElementById('detail-content').innerHTML = html;
+  document.getElementById('detail-panel').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  DashState.clearAll();
+}
+</script>
+
+<!-- Team view -->
+<script>
+// ── dash_teamview.js — Team/Commission/Skills panels ─────────
+// Freshket TL Dashboard v703 — Phase 3: DashState sync
+
+// ── Sidebar team summary ──────────────────────────────────────
+function renderSidebarTeam() {
+  const groups = buildKamGroups();
+  const total    = groups.reduce((s,g) => s + g.totalGMV, 0);
+  const baseline = groups.reduce((s,g) => s + g.baseline, 0);
+  const teamPace = baseline > 0 ? Math.round(total / baseline * 100) : 0;
+  const cls = paceCls(teamPace);
+
+  const danger = groups.filter(g => g.cls === 'danger').length;
+  const warn   = groups.filter(g => g.cls === 'warn').length;
+  const ok     = groups.filter(g => g.cls === 'ok').length;
+  const star   = groups.filter(g => g.cls === 'star').length;
+
+  // Rep rows — data-rep-email for sync targeting
+  const repsHtml = groups.map(g => `
+    <div class="td-rep-row ${g.cls}" data-rep-email="${g.email}"
+      onclick="DashState.selectRep('${g.email}')">
+      <div class="td-rep-body">
+        <div class="td-rep-name">${g.name}</div>
+        <div class="td-rep-bar-row">
+          <div class="td-rep-bar-wrap">
+            <div class="ds-bar-track">
+              <div class="ds-bar-fill" style="width:${Math.min(g.pace,100)}%"></div>
+            </div>
+          </div>
+          <span class="td-rep-pace">${g.pace}%</span>
+        </div>
+      </div>
+      <span class="td-rep-chip">${g.count} acc</span>
+    </div>`).join('');
+
+  document.getElementById('sidebar-content').innerHTML = `
+    <div class="td-team-hero">
+      <div class="td-team-pace-row">
+        <div class="td-team-pace-num ${cls}">${teamPace}%</div>
+        <div class="td-team-pace-meta">
+          <div class="td-team-pace-gmv">${fmtGMV(total)}</div>
+          <div class="td-team-pace-sub">Pro Rate · ${groups.length} KAM</div>
+        </div>
+      </div>
+      <div class="ds-bar-track md">
+        <div class="ds-bar-fill ${cls}" style="width:${Math.min(teamPace,100)}%"></div>
+      </div>
+      <div class="td-signal-row" style="margin-top:var(--space-3)">
+        <div class="td-signal"><div class="td-signal-val danger">${danger}</div><div class="td-signal-lbl">DANGER</div></div>
+        <div class="td-signal"><div class="td-signal-val warn">${warn}</div><div class="td-signal-lbl">WARN</div></div>
+        <div class="td-signal"><div class="td-signal-val ok">${ok}</div><div class="td-signal-lbl">OK</div></div>
+        <div class="td-signal"><div class="td-signal-val star">${star}</div><div class="td-signal-lbl">STAR</div></div>
+      </div>
+    </div>
+    <div class="td-rep-list-hd">
+      <span class="ds-eyebrow">KAM</span>
+      <button class="td-sort-btn" onclick="DashState.clearAll()">ล้าง ✕</button>
+    </div>
+    <div id="rep-rows-wrap">
+      ${repsHtml}
+    </div>`;
+}
+
+// ── Main team view ────────────────────────────────────────────
+function renderTeamView() {
+  if (!dataReady) return;
+  const groups = buildKamGroups();
+  const el = document.getElementById('team-content');
+
+  // Sort groups
+  const sorted = [...groups].sort((a,b) => {
+    let va, vb;
+    if (_teamSortCol === 'name')     { va = a.name; vb = b.name; return _teamSortAsc ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th'); }
+    if (_teamSortCol === 'gmv')      { va = a.totalGMV; vb = b.totalGMV; }
+    else if (_teamSortCol === 'accounts') { va = a.count; vb = b.count; }
+    else                              { va = a.pace; vb = b.pace; }
+    return _teamSortAsc ? va - vb : vb - va;
+  });
+  const rows = sorted.map(g => {
+    const prevIdx = MONTHS.indexOf(currentMonth) - 1;
+    const prevGMV = prevIdx >= 0
+      ? g.accounts.reduce((s,a) => s+(a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
+    const delta = prevGMV > 0 ? fmtDelta(g.totalGMV, prevGMV) : '';
+    const dcls  = prevGMV > 0 ? deltaCls(g.totalGMV, prevGMV) : '';
+    const acColor = g.cls === 'star' ? 'ac' : g.cls;
+    const isSelected = g.email === DashState.selectedRepEmail;
+
+    return `<tr style="border-bottom:1px solid var(--hair);${isSelected?'background:var(--ac-dim)':''};cursor:pointer"
+        onclick="DashState.selectRep('${g.email}')">
+      <td style="padding:10px 16px;${isSelected?'border-left:2px solid var(--ac)':''}">
+        <div style="font-size:var(--text-sm);font-weight:700;color:var(--ink-1)">${g.name}</div>
+        <div style="font-size:var(--text-micro);color:var(--ink-4);font-family:var(--font-mono)">${g.email}</div>
+      </td>
+      <td style="padding:10px 16px;text-align:right">
+        <div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${fmtGMV(g.totalGMV)}</div>
+        ${delta ? `<span class="ds-delta ${dcls}">${delta}</span>` : ''}
+      </td>
+      <td style="padding:10px 16px;min-width:140px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ds-bar-track" style="flex:1">
+            <div class="ds-bar-fill ${g.cls}" style="width:${Math.min(g.pace,100)}%"></div>
+          </div>
+          <span style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;color:var(--${acColor})">${g.pace}%</span>
+        </div>
+      </td>
+      <td style="padding:10px 16px;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-3);text-align:right">${g.count}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--surface)">
+          <th onclick="setTeamSort('name')" class="td-team-th-sort" style="padding:10px 16px;text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM <span class="td-team-sort-arrow">${_teamSortCol==='name'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('gmv')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV ${currentMonth} <span class="td-team-sort-arrow">${_teamSortCol==='gmv'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('pace')" class="td-team-th-sort" style="padding:10px 16px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace <span class="td-team-sort-arrow">${_teamSortCol==='pace'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('accounts')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Acc <span class="td-team-sort-arrow">${_teamSortCol==='accounts'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Skills view ───────────────────────────────────────────────
+function renderSkillsView() {
+  document.getElementById('skills-content').innerHTML = `
+    <div style="max-width:480px;padding:var(--space-10) 0;text-align:center">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" stroke-width="1.5" style="margin-bottom:var(--space-4)">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+      </svg>
+      <div style="font-size:var(--text-h3);font-weight:600;color:var(--ink-2);margin-bottom:8px">Skills — Phase 5</div>
+      <div style="font-size:var(--text-body);color:var(--ink-3)">ดู Skills progress ของ rep ใน Sense บนมือถือได้แล้วตอนนี้</div>
+    </div>`;
+}
+</script>
+
+<!-- Commission -->
+<script>
+// ── dash_commission.js — Commission engine (Phase 4) ─────────
+// Freshket TL Dashboard v704
+//
+// Architecture: query Supabase commission_payout_snapshots directly
+// (pre-computed by Sense) — no need to re-implement computation logic.
+// Falls back to local pace-based estimate when snapshots unavailable.
+
+
+// ── Bracket resolver — Supabase tiers first, hardcoded fallback ──
+function _getSalesTLBrackets() {
+  // Attempt to read from loaded commTierData (commission_rule_tiers)
+  try {
+    const tlPlan = Object.values(commPlanData || {}).find(p => p.beneficiary_role === 'tl');
+    if (tlPlan) {
+      const rule = Object.values(commTierData || {}).flat()
+        .filter(t => {
+          // find rule that belongs to TL plan
+          return true; // tier rows don't have plan_id directly — use fallback
+        });
+    }
+  } catch(e) { /* fallback */ }
+  // Hardcoded fallback (Sales TL Commission PDF Apr 2026)
+  return [
+    { min:0,   max:84,  rate:0,     label:'< 85%'    },
+    { min:85,  max:89,  rate:.0055, label:'85–90%'  },
+    { min:90,  max:94,  rate:.007,  label:'90–95%'  },
+    { min:95,  max:99,  rate:.008,  label:'95–100%' },
+    { min:100, max:119, rate:.010,  label:'100–120%'},
+    { min:120, max:999, rate:.012,  label:'≥ 120%'  },
+  ];
+}
+
+// ── State ─────────────────────────────────────────────────────
+let commSnapshotData  = [];   // commission_payout_snapshots rows
+let commPlanData      = {};   // planCode → plan
+let commTierData      = {};   // ruleId → tiers[]
+let commAssignments   = [];   // plan assignments per period
+let commDataReady     = false;
+
+// Month label ↔ ISO — derived from MONTHS array in dash_data.js (no hardcode)
+// MONTHS = ['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26']
+function _buildMonthISO() {
+  const map = {};
+  (typeof MONTHS !== 'undefined' ? MONTHS : []).forEach(m => {
+    const [mon, yr] = m.split(' ');
+    const moNum = {'Nov':'11','Dec':'12','Jan':'01','Feb':'02','Mar':'03',
+                   'Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10'}[mon];
+    const year  = parseInt(yr) < 50 ? '20' + yr : '19' + yr;
+    if (moNum) map[m] = `${year}-${moNum}`;
+  });
+  return map;
+}
+const MONTH_ISO     = _buildMonthISO();
+const MONTH_DISPLAY = Object.fromEntries(Object.entries(MONTH_ISO).map(([d,iso]) => [iso,d]));
+
+// ── Load from Supabase ────────────────────────────────────────
+async function loadCommissionData() {
+  if (!supa) return;
+  const periods = Object.values(MONTH_ISO);  // last 6 months
+
+  try {
+    // 1. Snapshots (pre-computed by Sense)
+    const { data: snaps } = await supaFetch(supa
+      .from('commission_payout_snapshots')
+      .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at')
+      .in('period_month', periods));
+    commSnapshotData = snaps || [];
+  } catch(e) {
+    DashLog.error('commission_snapshots', e.message);
+    commSnapshotData = [];
+  }
+
+  try {
+    // 2. Plans + tiers (for bracket display)
+    const { data: plans } = await supaFetch(supa
+      .from('commission_plans')
+      .select('id,plan_code,plan_name,beneficiary_role,status')
+      .in('beneficiary_role', ['tl','kam'])
+      .neq('status','inactive'));
+
+    const planMap = {};
+    const planIds = [];
+    (plans || []).forEach(p => {
+      if (!p?.plan_code) return;
+      planMap[p.plan_code] = p;
+      planIds.push(p.id);
+    });
+    // Fallback standard plans
+    if (!planMap.TL_NRR_STD)  planMap.TL_NRR_STD  = { plan_code:'TL_NRR_STD',  plan_name:'TL NRR Standard',  beneficiary_role:'tl' };
+    if (!planMap.KAM_NRR_STD) planMap.KAM_NRR_STD = { plan_code:'KAM_NRR_STD', plan_name:'KAM NRR Standard', beneficiary_role:'kam' };
+    commPlanData = planMap;
+
+    if (planIds.length) {
+      const { data: rules } = await supa
+        .from('commission_rules')
+        .select('id,plan_id,metric_code,payout_type')
+        .in('plan_id', planIds);
+
+      const ruleIds = (rules || []).map(r => r.id);
+      if (ruleIds.length) {
+        const { data: tiers } = await supa
+          .from('commission_rule_tiers')
+          .select('id,rule_id,tier_order,min_value,max_value,payout_value,payout_label')
+          .in('rule_id', ruleIds)
+          .order('tier_order', { ascending: true });
+        const tm = {};
+        (tiers || []).forEach(t => {
+          if (!tm[t.rule_id]) tm[t.rule_id] = [];
+          tm[t.rule_id].push(t);
+        });
+        commTierData = tm;
+      }
+    }
+  } catch(e) {
+    DashLog.error('commission_plans', e.message);
+  }
+
+  commDataReady = true;
+  if (currentView === 'commission') renderCommissionView();
+}
+
+// ── Getters ───────────────────────────────────────────────────
+function getCommSnaps(periodMonth, role) {
+  return commSnapshotData.filter(s =>
+    s.period_month === periodMonth &&
+    (!role || s.beneficiary_role === role)
+  );
+}
+
+function getMyCommSnaps(role) {
+  if (!currentProfile?.email) return [];  // guard
+  return commSnapshotData.filter(s =>
+    (s.beneficiary_email === (currentProfile?.email||'__none__') ||
+     s.team_lead_email   === (currentProfile?.email||'__none__')) &&
+    (!role || s.beneficiary_role === role)
+  );
+}
+
+// TL payout for a given month (from snapshots)
+function getTLPayoutForMonth(isoMonth) {
+  const snap = getMyCommSnaps('tl').find(s => s.period_month === isoMonth);
+  return snap ? (Number(snap.payout_amount) || 0) : null;
+}
+
+// All KAM payouts under this TL for a month
+function getKAMPayoutsForMonth(isoMonth) {
+  if (!currentProfile?.email) return [];  // guard
+  return commSnapshotData.filter(s =>
+    s.period_month === isoMonth &&
+    s.team_lead_email === (currentProfile?.email||'__none__') &&
+    s.beneficiary_role === 'kam'
+  );
+}
+
+// ── Pace-based estimate (fallback when no snapshot) ───────────
+function estimateTLCommission(groups) {
+  const total    = groups.reduce((s,g) => s+g.totalGMV, 0);
+  const baseline = groups.reduce((s,g) => s+g.baseline, 0);
+  const pace     = baseline > 0 ? Math.round(total/baseline*100) : 0;
+  const _eb  = _getSalesTLBrackets();
+  const bracket = _eb.find(b => pace >= b.min && pace <= b.max) || _eb[0];
+  return { pace, total, baseline, bracket, est: Math.round(total * bracket.rate) };
+}
+
+// ── Render: Commission view (Phase 4) ─────────────────────────
+function renderCommissionView() {
+  if (!dataReady) return;
+  const el = document.getElementById('commission-content');
+  if (!el) return;
+  if (!commDataReady) { el.innerHTML = skeletonBlock(4); return; }
+
+  const groups = buildKamGroups();
+  const isoNow = MONTH_ISO[currentMonth] || Object.values(MONTH_ISO)[Object.values(MONTH_ISO).length-1];
+
+  // TL own payout this month
+  const tlSnap    = getMyCommSnaps('tl').find(s => s.period_month === isoNow);
+  const tlPayout  = tlSnap ? Number(tlSnap.payout_amount||0) : null;
+  const kamSnaps  = getKAMPayoutsForMonth(isoNow);
+  const kamTotal  = kamSnaps.reduce((s,r) => s+Number(r.payout_amount||0), 0);
+
+  // Fallback estimate
+  const est = estimateTLCommission(groups);
+  const showEst = tlPayout === null;
+
+  // 6-month trend from snapshots
+  const trend6 = Object.entries(MONTH_ISO).map(([disp, iso]) => {
+    const snap = getMyCommSnaps('tl').find(s => s.period_month === iso);
+    const v = snap ? Number(snap.payout_amount||0) : null;
+    return { disp, iso, v };
+  });
+  const maxTrend = Math.max(1, ...trend6.map(t => t.v || 0));
+
+  // Spark bars
+  const sparks = trend6.map(t => {
+    const h = t.v != null ? Math.max(4, Math.round((t.v/maxTrend)*44)) : 4;
+    const isCur = t.disp === currentMonth;
+    const opacity = t.v != null ? '' : 'opacity:.25';
+    return `<div class="td-spark-bar${isCur?' cur':''}" style="height:${h}px;${opacity}"
+      title="${t.disp}: ${t.v != null ? fmtGMV(t.v) : 'รอ snapshot'}"></div>`;
+  }).join('');
+  const sparkLabels = trend6.map(t =>
+    `<span style="${t.disp===currentMonth?'color:var(--ac)':''}">${t.disp.split(' ')[0]}</span>`
+  ).join('');
+
+  // KAM breakdown rows
+  const kamRows = kamSnaps.length
+    ? kamSnaps.sort((a,b) => Number(b.payout_amount||0)-Number(a.payout_amount||0)).map(r => {
+        const nrr = r.governed_nrr_pct ?? r.raw_nrr_pct;
+        const nrrCls = nrr >= 100 ? 'ok' : nrr >= 95 ? 'warn' : 'danger';
+        return `<tr style="border-bottom:1px solid var(--hair)">
+          <td style="padding:9px 16px;font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${r.beneficiary_email?.split('@')[0] || '—'}</td>
+          <td style="padding:9px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--${nrrCls})">${nrr != null ? nrr+'%' : '—'}</td>
+          <td style="padding:9px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--ok)">${fmtGMV(Number(r.payout_amount||0))}</td>
+          <td style="padding:9px 16px;font-size:10px;color:var(--ink-4)">${r.snapshot_status || '—'}</td>
+        </tr>`;
+      }).join('')
+    : groups.map(g => {
+        // Fallback: pace-based per KAM
+        const kamEst = estimateTLCommission([g]);
+        const nrrCls = paceCls(kamEst.pace);
+        return `<tr style="border-bottom:1px solid var(--hair)">
+          <td style="padding:9px 16px;font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${g.name}</td>
+          <td style="padding:9px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--${nrrCls})">${kamEst.pace}% <span style="color:var(--ink-4);font-size:9px">est.</span></td>
+          <td style="padding:9px 16px;font-family:var(--font-mono);font-size:var(--text-xs);text-align:right;color:var(--ok)">${fmtGMV(kamEst.est)}</td>
+          <td style="padding:9px 16px;font-size:10px;color:var(--ink-4)">estimate</td>
+        </tr>`;
+      }).join('');
+
+  el.innerHTML = `<div style="max-width:680px">
+
+    <!-- Hero: TL payout -->
+    <div style="background:var(--surface);border-radius:var(--r-md);padding:var(--space-5);margin-bottom:var(--space-5);position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--ac)"></div>
+      <div class="ds-eyebrow" style="margin-bottom:4px">TL COMMISSION ${currentMonth}${showEst?' · ESTIMATE':''}</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-display);font-weight:700;letter-spacing:var(--ls-tight);line-height:1;color:var(--ok)">
+        ${showEst ? fmtGMV(est.est) : fmtGMV(tlPayout)}
+      </div>
+      ${showEst
+        ? `<div style="font-size:var(--text-sm);color:var(--ink-3);margin-top:6px">
+            Team ${est.pace}% × ${(est.bracket.rate*100).toFixed(2)}% × ${fmtGMV(est.total)}
+           </div>`
+        : `<div style="font-size:var(--text-sm);color:var(--ink-3);margin-top:6px">
+            KAM team ${fmtGMV(kamTotal)} · status: ${tlSnap?.snapshot_status || '—'}
+           </div>`
+      }
+      ${tlSnap?.updated_at
+        ? `<div class="td-comm-updated">Updated ${new Date(tlSnap.updated_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>`
+        : ''}
+    </div>
+
+    <!-- 6-month trend -->
+    <div style="background:var(--surface);border-radius:var(--r-md);padding:var(--space-4);margin-bottom:var(--space-5)">
+      <div class="ds-eyebrow" style="margin-bottom:var(--space-3)">Commission 6 เดือน</div>
+      <div class="td-spark">${sparks}</div>
+      <div class="td-spark-labels" style="margin-top:3px">${sparkLabels}</div>
+      ${showEst ? `<div style="font-size:10px;color:var(--ink-4);margin-top:8px;font-family:var(--font-mono)">
+        * ยังไม่มี snapshot — แสดงค่าประมาณจาก pace</div>` : ''}
+    </div>
+
+    <!-- Team summary stat row -->
+    <div style="margin-bottom:var(--space-5)">
+      <div class="ds-stat-row">
+        <span class="ds-stat-label">Team GMV ${currentMonth}</span>
+        <span class="ds-stat-value">${fmtGMV(est.total)}</span>
+      </div>
+      <div class="ds-stat-row">
+        <span class="ds-stat-label">Pro Rate</span>
+        <span class="ds-stat-value" style="color:var(--${paceCls(est.pace)})">${est.pace}%</span>
+      </div>
+      <div class="ds-stat-row">
+        <span class="ds-stat-label">Rate bracket</span>
+        <span class="ds-stat-value">${est.bracket.label} → ${(est.bracket.rate*100).toFixed(2)}%</span>
+      </div>
+      ${kamTotal > 0 ? `<div class="ds-stat-row">
+        <span class="ds-stat-label">KAM team commission</span>
+        <span class="ds-stat-value" style="color:var(--ok)">${fmtGMV(kamTotal)}</span>
+      </div>` : ''}
+    </div>
+
+    <!-- Per-KAM breakdown -->
+    <div class="ds-eyebrow" style="margin-bottom:var(--space-3)">Per KAM · ${currentMonth}</div>
+    <div style="border-radius:var(--r-md);overflow:hidden;border:1px solid var(--hair)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--surface-2)">
+            <th style="padding:9px 16px;text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM</th>
+            <th style="padding:9px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">NRR / Pace</th>
+            <th style="padding:9px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Commission</th>
+            <th style="padding:9px 16px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Status</th>
+          </tr>
+        </thead>
+        <tbody>${kamRows}</tbody>
+      </table>
+    </div>
+
+  </div>`;
+}
+</script>
+
+<!-- Skills -->
+<script>
+// ── dash_skills.js — Skills dashboard (Phase 5) ──────────────
+// Freshket TL Dashboard v705
+// Tables: skill_definitions, user_skill_progress, echo_skill_observations, profiles
+
+// ── State ─────────────────────────────────────────────────────
+let skillDefs     = [];   // skill_definitions rows
+let skillProg     = {};   // 'userId:skillId' → progress row
+let skillEchoObs  = {};   // 'userId:skill_code' → obs[]
+let skillMembers  = [];   // { id, email, full_name, role } squad members
+let skillDataReady = false;
+let skillView     = 'pending';   // 'pending' | 'matrix' | 'echo'
+
+// ── Load ──────────────────────────────────────────────────────
+async function loadSkillsData() {
+  if (!supa || !currentProfile) return;
+  const tlEmail = currentProfile?.email;
+  if (!tlEmail) { DashLog.error('skills','no email'); skillDataReady=true; return; }
+
+  try {
+    // 1. Squad members from profiles
+    const { data: tlRow } = await supa
+      .from('profiles')
+      .select('squad, sale_team')
+      .eq('email', tlEmail)
+      .single();
+
+    const squadName = tlRow?.squad || tlRow?.sale_team || null;
+    if (squadName) {
+      const { data: members } = await supa
+        .from('profiles')
+        .select('id, email, full_name, role')
+        .eq('squad', squadName)
+        .in('role', ['sales','rep','tl','sales_tl','ad','ad_tl']);
+      skillMembers = (members || []).filter(m => m.email !== tlEmail);
+    }
+
+    // 2. Skill definitions
+    const { data: defs } = await supa
+      .from('skill_definitions')
+      .select('id, skill_code, skill_name_en, skill_name_th, sort_order, gate_level')
+      .order('sort_order', { ascending: true });
+    skillDefs = defs || [];
+
+    // 3. Progress for all squad members
+    const memberEmails = skillMembers.map(m => m.email);
+    if (memberEmails.length) {
+      const { data: prog } = await supa
+        .from('user_skill_progress')
+        .select('id, user_id, skill_id, state, owner_email, tl_note, updated_at')
+        .in('owner_email', memberEmails);
+      skillProg = {};
+      (prog || []).forEach(p => {
+        const key = `${p.user_id}:${p.skill_id}`;
+        skillProg[key] = p;
+      });
+    }
+
+    // 4. Echo observations for squad
+    const memberIds = skillMembers.map(m => m.id).filter(Boolean);
+    if (memberIds.length) {
+      const { data: obs } = await supa
+        .from('echo_skill_observations')
+        .select('id, user_id, skill_code, ai_score, evidence, observed_at, session_id')
+        .in('user_id', memberIds)
+        .order('observed_at', { ascending: false })
+        .limit(DASH_CONFIG.QUERY_LIMIT_SKILLS);
+      skillEchoObs = {};
+      (obs || []).forEach(o => {
+        const key = `${o.user_id}:${o.skill_code}`;
+        if (!skillEchoObs[key]) skillEchoObs[key] = [];
+        skillEchoObs[key].push(o);
+      });
+    }
+
+    skillDataReady = true;
+  } catch(e) {
+    DashLog.error('skills_load', e.message);
+    skillDataReady = true;
+  }
+
+  if (currentView === 'skills') renderSkillsView();
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function getMemberName(member) {
+  return member.full_name || member.email?.split('@')[0] || '—';
+}
+function getMemberInitials(member) {
+  const name = getMemberName(member);
+  return name.charAt(0).toUpperCase();
+}
+function getMemberProgress(memberId) {
+  return Object.values(skillProg).filter(p => p.user_id === memberId);
+}
+function getSkillState(memberId, skillId) {
+  return skillProg[`${memberId}:${skillId}`]?.state || 'locked';
+}
+function getLatestEcho(memberId, skillCode) {
+  return (skillEchoObs[`${memberId}:${skillCode}`] || [])[0] || null;
+}
+function scoreCls(score) {
+  if (score === 'pass')       return 'ok';
+  if (score === 'developing') return 'warn';
+  if (score === 'miss')       return 'danger';
+  return 'neutral';
+}
+function scoreLabel(score) {
+  if (score === 'pass')       return 'Pass';
+  if (score === 'developing') return 'Developing';
+  if (score === 'miss')       return 'Miss';
+  return score || '—';
+}
+function stateCls(state) {
+  if (state === 'unlocked' || state === 'mastered') return 'ok';
+  if (state === 'training') return 'warn';
+  return 'neutral';
+}
+function stateLabel(state) {
+  if (state === 'unlocked' || state === 'mastered') return 'Pass';
+  if (state === 'training') return 'Training';
+  return 'Locked';
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderSkillsView() {
+  if (!dataReady && !skillDataReady) { return; }
+  const el = document.getElementById('skills-content');
+  if (!el) return;
+
+  if (!skillDataReady) {
+    el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;max-width:400px">
+      ${[80,60,70,55,65].map(w =>
+        `<div class="ds-skel" style="height:44px;border-radius:var(--r-md)"></div>`
+      ).join('')}
+    </div>`;
+    return;
+  }
+
+  // Sub-nav tabs
+  const tabs = [
+    { key:'pending', label:`รอประเมิน${pendingCount()>0?` (${pendingCount()})`:''}`},
+    { key:'matrix',  label:'ภาพรวมทีม' },
+    { key:'echo',    label:'Echo สัปดาห์นี้' },
+  ];
+  const tabsHtml = `<div class="td-skills-tabs">
+    ${tabs.map(t =>
+      `<button class="td-skills-tab${skillView===t.key?' active':''}"
+        onclick="setSkillView('${t.key}')">${t.label}</button>`
+    ).join('')}
+  </div>`;
+
+  let body = '';
+  if (skillView === 'pending')  body = renderSkillsPending();
+  if (skillView === 'matrix')   body = renderSkillsMatrix();
+  if (skillView === 'echo')     body = renderSkillsEcho();
+
+  el.innerHTML = `<div style="max-width:780px">${tabsHtml}${body}</div>`;
+}
+
+function setSkillView(v) {
+  skillView = v;
+  renderSkillsView();
+}
+
+function pendingCount() {
+  return Object.values(skillProg).filter(p => p.state === 'training').length;
+}
+
+// ── Tab: Pending evaluations ──────────────────────────────────
+function renderSkillsPending() {
+  const _skillSortAsc = (typeof window._skillPendSort === 'undefined') ? true : window._skillPendSort;
+  const pending = Object.values(skillProg)
+    .filter(p => p.state === 'training')
+    .sort((a,b) => _skillSortAsc
+      ? new Date(a.updated_at||0) - new Date(b.updated_at||0)
+      : new Date(b.updated_at||0) - new Date(a.updated_at||0));
+
+  if (!pending.length) return `
+    <div class="ds-empty" style="padding:var(--space-10) 0">
+      <svg class="ds-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+      </svg>
+      <div class="ds-empty-title">ไม่มีรายการรอประเมิน</div>
+      <div class="ds-empty-desc">ทุก rep อยู่ใน state ปัจจุบันแล้ว</div>
+    </div>`;
+
+  const rows = pending.map(p => {
+    const def    = skillDefs.find(d => d.id === p.skill_id);
+    if (!def) return '';
+    const member = skillMembers.find(m => m.id === p.user_id);
+    if (!member) return '';
+
+    const daysAgo = p.updated_at
+      ? Math.floor((Date.now() - new Date(p.updated_at)) / 86400000) : null;
+    const dateLabel = daysAgo === null ? '' : daysAgo === 0 ? 'วันนี้' : `${daysAgo} วันที่แล้ว`;
+
+    // Latest echo evidence
+    const echo = getLatestEcho(p.user_id, def.skill_code);
+    const echoHtml = echo ? `
+      <div class="td-skill-echo-strip">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--${scoreCls(echo.ai_score)})" stroke-width="2">
+          <rect x="9" y="2" width="6" height="11" rx="3"/>
+          <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/>
+        </svg>
+        <span class="td-skill-echo-score" style="color:var(--${scoreCls(echo.ai_score)})">${scoreLabel(echo.ai_score)}</span>
+        <span class="td-skill-echo-date">${new Date(echo.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})}</span>
+        ${echo.evidence ? `<span class="td-skill-echo-ev">${echo.evidence.slice(0,72)}${echo.evidence.length>72?'…':''}</span>` : ''}
+      </div>` : '';
+
+    const gateLabel = def.gate_level ? `Gate ${def.gate_level}` : '';
+
+    return `
+      <div class="td-skill-pend-row">
+        <div class="ds-avatar md">${getMemberInitials(member)}</div>
+        <div class="td-skill-pend-body">
+          <div class="td-skill-pend-name">${getMemberName(member)}</div>
+          <div class="td-skill-pend-skill">
+            ${def.skill_name_en}
+            ${gateLabel ? `<span class="td-skill-gate">${gateLabel}</span>` : ''}
+          </div>
+          <div class="td-skill-pend-date">self-marked · ${dateLabel}</div>
+          ${echoHtml}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <span class="ds-pill ds-pill-warn">Training</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-4)" stroke-width="1.5">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+      <span class="ds-eyebrow">${pending.length} รายการ</span>
+      <button class="td-skill-sort-btn" onclick="window._skillPendSort=!window._skillPendSort;renderSkillsView()">
+        ${(typeof window._skillPendSort==='undefined'||window._skillPendSort)?'รอนานสุด ↑':'ล่าสุด ↓'}
+      </button>
+    </div>
+    <div style="border-radius:var(--r-md);border:1px solid var(--hair);overflow:hidden">
+      ${rows}
+    </div>`;
+}
+
+// ── Tab: Team matrix ──────────────────────────────────────────
+function renderSkillsMatrix() {
+  if (!skillMembers.length || !skillDefs.length) {
+    return `<div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูล</div></div>`;
+  }
+
+  // Rep rows
+  const memberRows = skillMembers.map(member => {
+    const prog = getMemberProgress(member.id);
+    const total    = skillDefs.length;
+    const unlocked = prog.filter(p => p.state==='unlocked'||p.state==='mastered').length;
+    const training = prog.filter(p => p.state==='training').length;
+    const pct = total > 0 ? Math.round(unlocked/total*100) : 0;
+
+    // Skill dots
+    const dots = skillDefs.map(def => {
+      const state = getSkillState(member.id, def.id);
+      const echo  = getLatestEcho(member.id, def.skill_code);
+      const dotCls = state==='unlocked'||state==='mastered' ? 'pass'
+                   : state==='training' ? 'train' : 'lock';
+      const echoDot = echo ? `<div class="td-skill-echo-dot ${scoreCls(echo.ai_score)}"></div>` : '';
+      return `<div class="td-skill-matrix-cell" title="${def.skill_name_en} · ${stateLabel(state)}">
+        <div class="td-skill-matrix-dot ${dotCls}">${echoDot}</div>
+      </div>`;
+    }).join('');
+
+    const barPct = pct;
+    return `
+      <div class="td-skill-matrix-row">
+        <div class="td-skill-matrix-rep">
+          <div class="ds-avatar sm">${getMemberInitials(member)}</div>
+          <div>
+            <div style="font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${getMemberName(member)}</div>
+            <div style="font-size:var(--text-micro);color:var(--ink-4);font-family:var(--font-mono)">${unlocked}/${total} · ${training > 0 ? training+' pending':''}  </div>
+          </div>
+        </div>
+        <div class="td-skill-matrix-dots">${dots}</div>
+        <div class="td-skill-matrix-bar">
+          <div class="ds-bar-track" style="width:80px">
+            <div class="ds-bar-fill ${pct>=80?'ok':pct>=50?'warn':'danger'}" style="width:${barPct}%"></div>
+          </div>
+          <span style="font-family:var(--font-mono);font-size:var(--text-micro);color:var(--ink-3);margin-left:6px">${pct}%</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Skill headers
+  const headers = skillDefs.map(def =>
+    `<div class="td-skill-matrix-hd" title="${def.skill_name_en}">
+      ${def.skill_code.split('_')[0]}
+    </div>`
+  ).join('');
+
+  return `
+    <div class="td-skill-matrix-wrap">
+      <div class="td-skill-matrix-header">
+        <div style="min-width:200px;flex-shrink:0"></div>
+        <div class="td-skill-matrix-dots-hd">${headers}</div>
+        <div style="width:120px;flex-shrink:0"></div>
+      </div>
+      ${memberRows}
+    </div>
+    <div style="margin-top:var(--space-4);display:flex;gap:var(--space-4);font-size:var(--text-xs);color:var(--ink-3)">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--ok);margin-right:4px;vertical-align:middle"></span>Pass</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--warn);margin-right:4px;vertical-align:middle"></span>Training</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--hair-3);margin-right:4px;vertical-align:middle"></span>Locked</span>
+    </div>`;
+}
+
+// ── Tab: Echo this week ───────────────────────────────────────
+function renderSkillsEcho() {
+  const weekAgo = Date.now() - 7 * 86400000;
+  const recentObs = Object.entries(skillEchoObs)
+    .flatMap(([key, obs]) => obs.map(o => ({ ...o, _key: key })))
+    .filter(o => new Date(o.observed_at) >= weekAgo)
+    .sort((a,b) => new Date(b.observed_at) - new Date(a.observed_at))
+    .slice(0, 30);
+
+  if (!recentObs.length) return `
+    <div class="ds-empty" style="padding:var(--space-10) 0">
+      <svg class="ds-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/>
+      </svg>
+      <div class="ds-empty-title">ไม่มี Echo session สัปดาห์นี้</div>
+      <div class="ds-empty-desc">Echo observations จะปรากฏที่นี่ภายใน 7 วัน</div>
+    </div>`;
+
+  const rows = recentObs.map(o => {
+    const member = skillMembers.find(m => m.id === o.user_id);
+    const def    = skillDefs.find(d => d.skill_code === o.skill_code);
+    const cls    = scoreCls(o.ai_score);
+    const dt     = new Date(o.observed_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+
+    return `
+      <div style="display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--hair)">
+        <div class="ds-avatar sm" style="margin-top:2px">${member ? getMemberInitials(member) : '?'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:2px">
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--ink-1)">${member ? getMemberName(member) : o.user_id}</span>
+            <span class="ds-badge ds-badge-${cls === 'ok'?'ok':cls==='warn'?'warn':cls==='danger'?'danger':'neutral'}">${scoreLabel(o.ai_score)}</span>
+          </div>
+          <div style="font-size:var(--text-xs);color:var(--ink-3)">${def?.skill_name_en || o.skill_code} · ${dt}</div>
+          ${o.evidence ? `<div style="font-size:var(--text-xs);color:var(--ink-2);margin-top:3px;line-height:1.5">${o.evidence.slice(0,120)}${o.evidence.length>120?'…':''}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:var(--space-2)">
+      <span class="ds-eyebrow">${recentObs.length} observations · 7 วันล่าสุด</span>
+    </div>
+    ${rows}`;
+}
+</script>
+
+<!-- Echo -->
+<script>
+// ── dash_echo.js — Echo session feed (Phase 6) ───────────────
+// Freshket TL Dashboard v706
+// Table: ci_sessions, covisit_events
+
+// ── State ─────────────────────────────────────────────────────
+let echoSessions     = [];
+let echoDataReady    = false;
+let echoFilter       = 'pending_review';  // 'pending_review' | 'all' | 'covisit'
+let echoSelectedId   = null;
+let echoDetailData   = null;
+
+// ── Load ──────────────────────────────────────────────────────
+async function loadEchoData() {
+  if (!supa || !currentProfile) return;
+  try {
+    // Get team emails — reuse skillMembers if loaded, else derive from portview
+    const teamEmails = getTeamEmails();
+
+    let q = supa.from('ci_sessions')
+      .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,tone_signals,transcript_summary,tl_reviewed_at,tl_note,covisit_verified,status')
+      .order('visited_at', { ascending: false })
+      .limit(DASH_CONFIG.QUERY_LIMIT_ECHO);
+
+    if (teamEmails.length) q = q.in('owner_email', teamEmails);
+
+    const { data, error } = await q;
+    if (error) throw error;
+
+    // Dedupe (same logic as Sense)
+    echoSessions = (data || []).filter((s, i, arr) =>
+      !arr.slice(0,i).some(prev =>
+        prev.owner_email === s.owner_email &&
+        (prev.account_id||prev.account_name) === (s.account_id||s.account_name) &&
+        prev.duration_secs === s.duration_secs &&
+        Math.abs(new Date(prev.visited_at)-new Date(s.visited_at)) < DASH_CONFIG.ECHO_DEDUPE_SEC * 1000
+      )
+    );
+    echoDataReady = true;
+  } catch(e) {
+    DashLog.error('echo_load', e.message);
+    echoDataReady = true;
+  }
+  if (currentView === 'echo') renderEchoView();
+}
+
+function getTeamEmails() {
+  // 1. Use skillMembers if available (Phase 5 data)
+  if (skillMembers?.length) return skillMembers.map(m => m.email).filter(Boolean);
+  // 2. Derive from portviewBulkData (same as Sense _getTeamEmails)
+  const tlEmail = (currentProfile?.email||'').toLowerCase();
+  const emails = new Set();
+  (portviewBulkData||[]).forEach(r => {
+    if (r.tlEmail?.toLowerCase()===tlEmail && r.kamEmail)
+      emails.add(r.kamEmail.toLowerCase());
+  });
+  return [...emails];
+}
+
+// ── Format helpers ────────────────────────────────────────────
+function fmtDuration(secs) {
+  if (!secs) return '';
+  const m = Math.floor(secs/60), s = secs%60;
+  return m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`;
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+}
+function fmtDateTime(iso) {
+  return new Date(iso).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+
+// ── Filters ───────────────────────────────────────────────────
+function getFilteredSessions() {
+  switch (echoFilter) {
+    case 'pending_review': return echoSessions.filter(s => !s.tl_reviewed_at);
+    case 'covisit':        return echoSessions.filter(s => s.covisit_verified);
+    default:               return echoSessions;
+  }
+}
+
+// ── Render view ───────────────────────────────────────────────
+function renderEchoView() {
+  const el = document.getElementById('echo-content');
+  if (!el) return;
+
+  if (!echoDataReady) {
+    el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;max-width:560px">
+      ${[1,2,3,4,5].map(()=>`<div class="ds-skel" style="height:80px;border-radius:var(--r-md)"></div>`).join('')}
+    </div>`;
+    return;
+  }
+
+  const all      = echoSessions.length;
+  const pending  = echoSessions.filter(s => !s.tl_reviewed_at).length;
+  const covisits = echoSessions.filter(s => s.covisit_verified).length;
+
+  const tabs = [
+    { key:'pending_review', label:`รอรีวิว (${pending})` },
+    { key:'all',            label:`ทั้งหมด (${all})` },
+    { key:'covisit',        label:`Co-visit (${covisits})` },
+  ];
+
+  const tabsHtml = `<div class="td-skills-tabs">
+    ${tabs.map(t =>
+      `<button class="td-skills-tab${echoFilter===t.key?' active':''}"
+        onclick="setEchoFilter('${t.key}')">${t.label}</button>`
+    ).join('')}
+  </div>`;
+
+  const sessions = getFilteredSessions();
+
+  const feedHtml = sessions.length
+    ? `<div class="td-echo-feed">${sessions.map(renderEchoCard).join('')}</div>`
+    : `<div class="ds-empty" style="padding:var(--space-10) 0">
+        <svg class="ds-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="9" y="2" width="6" height="11" rx="3"/>
+          <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/>
+        </svg>
+        <div class="ds-empty-title">ไม่มี session ที่ตรงกับ filter</div>
+      </div>`;
+
+  el.innerHTML = `<div style="max-width:680px">${tabsHtml}${feedHtml}</div>`;
+}
+
+function setEchoFilter(f) {
+  echoFilter = f;
+  renderEchoView();
+}
+
+// ── Session card ──────────────────────────────────────────────
+function renderEchoCard(s) {
+  const repName   = s.owner_email ? s.owner_email.split('@')[0] : '—';
+  const initials  = repName.slice(0,2).toUpperCase();
+  const date      = fmtDate(s.visited_at);
+  const dur       = fmtDuration(s.duration_secs);
+  const reviewed  = !!s.tl_reviewed_at;
+  const isSelected = s.id === echoSelectedId;
+
+  // Skill dots
+  const skills = s.skill_scores?.skills || [];
+  const dots = skills.slice(0,8).map(sk => {
+    const sc = sk.tl_override || sk.score;
+    const cls = sc==='pass'?'ok':sc==='developing'?'warn':'neutral';
+    return `<span class="td-echo-dot ${cls}"></span>`;
+  }).join('');
+
+  // Tone badge
+  let toneBadge = '';
+  if (s.tone_signals?.rep_confidence) {
+    const c = s.tone_signals.rep_confidence;
+    const cls = c==='high'?'ok':c==='medium'?'warn':'danger';
+    const lbl = c==='high'?'Confident':c==='medium'?'Steady':'Hesitant';
+    toneBadge = `<span class="ds-badge ds-badge-${cls}">${lbl}</span>`;
+  }
+
+  // Status badge
+  const statusBadge = reviewed
+    ? `<span class="ds-badge ds-badge-ok">รีวิวแล้ว</span>`
+    : `<span class="ds-badge ds-badge-warn">รอรีวิว</span>`;
+
+  // Co-visit badge
+  const cvBadge = s.covisit_verified
+    ? `<span class="ds-badge ds-badge-ok">Co-visit ✓</span>` : '';
+
+  // TL note preview
+  const noteHtml = s.tl_note
+    ? `<div class="td-echo-note">${s.tl_note.length>80?s.tl_note.slice(0,80)+'…':s.tl_note}</div>` : '';
+
+  // Transcript summary preview
+  const summaryHtml = (!s.tl_note && s.transcript_summary)
+    ? `<div class="td-echo-summary">${s.transcript_summary.slice(0,100)}${s.transcript_summary.length>100?'…':''}</div>` : '';
+
+  return `
+    <div class="td-echo-card${isSelected?' selected':''}" onclick="openEchoDetail('${s.id}')">
+      <div class="td-echo-card-top">
+        <div class="td-echo-card-left">
+          <div class="ds-avatar sm">${initials}</div>
+          <div>
+            <div class="td-echo-rep">${repName}</div>
+            <div class="td-echo-acct">${s.account_name || '—'}</div>
+          </div>
+        </div>
+        <div class="td-echo-card-right">
+          <div class="td-echo-meta">${date}${dur?' · '+dur:''}</div>
+        </div>
+      </div>
+      <div class="td-echo-badges">
+        <div class="td-echo-dots">${dots}</div>
+        ${toneBadge}${cvBadge}${statusBadge}
+      </div>
+      ${noteHtml}${summaryHtml}
+    </div>`;
+}
+
+// ── Session detail (right panel) ─────────────────────────────
+let _echoDetailLoading = false;
+async function openEchoDetail(sessionId) {
+  if (_echoDetailLoading) return;  // ignore rapid clicks
+  if (echoSelectedId === sessionId) {
+    echoSelectedId = null;
+    closeDetail();
+    renderEchoView();
+    return;
+  }
+  echoSelectedId = sessionId;
+  renderEchoView();  // re-render to show selected state
+
+  // Fetch full session
+  _echoDetailLoading = true;
+  try {
+    const { data, error } = await supa.from('ci_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+    if (error) throw error;
+    echoDetailData = data;
+    openDetail(renderEchoDetailPanel(data));
+    _echoDetailLoading = false;
+  } catch(e) {
+    DashLog.error('echo_detail', e.message);
+  }
+}
+
+function renderEchoDetailPanel(s) {
+  const repName = s.owner_email ? s.owner_email.split('@')[0] : '—';
+  const dur     = fmtDuration(s.duration_secs);
+  const dt      = fmtDateTime(s.visited_at);
+  const reviewed = !!s.tl_reviewed_at;
+
+  // Skill scores table
+  const skills = s.skill_scores?.skills || [];
+  const skillRows = skills.map(sk => {
+    const score = sk.tl_override || sk.score;
+    const cls   = score==='pass'?'ok':score==='developing'?'warn':score==='miss'?'danger':'neutral';
+    return `<div class="ds-stat-row" style="align-items:center">
+      <span class="ds-stat-label" style="flex:1">${sk.skill_name||sk.skill_code||'—'}</span>
+      <span class="ds-badge ds-badge-${cls}">${score||'—'}</span>
+    </div>`;
+  }).join('') || `<div style="font-size:var(--text-xs);color:var(--ink-4);padding:var(--space-2) 0">ยังไม่มีข้อมูล skill</div>`;
+
+  // Tone signals
+  const tone = s.tone_signals || {};
+  const toneRows = Object.entries({
+    'Confidence': tone.rep_confidence,
+    'Clarity':    tone.rep_clarity,
+    'Energy':     tone.rep_energy,
+  }).filter(([,v])=>v).map(([k,v]) => {
+    const cls = v==='high'?'ok':v==='medium'?'warn':'danger';
+    return `<div class="ds-stat-row">
+      <span class="ds-stat-label">${k}</span>
+      <span class="ds-badge ds-badge-${cls}">${v}</span>
+    </div>`;
+  }).join('');
+
+  // Next actions
+  const actions = (s.next_actions||[]).slice(0,3).map(a =>
+    `<div style="font-size:var(--text-xs);color:var(--ink-2);padding:var(--space-1) 0;border-bottom:1px solid var(--hair);line-height:1.5">
+      <span style="color:var(--ac);margin-right:4px">→</span>${a}
+    </div>`
+  ).join('');
+
+  // TL note section
+  const noteSection = `
+    <div class="td-detail-section">
+      <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">TL Note</div>
+      <textarea id="echo-note-input" class="td-echo-note-input"
+        placeholder="เพิ่ม coaching note...">${s.tl_note||''}</textarea>
+      <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
+        <button class="ds-btn ds-btn-primary" style="height:32px;font-size:var(--text-xs)"
+          onclick="saveEchoNote('${s.id}')">บันทึก Note</button>
+        ${!reviewed
+          ? `<button class="ds-btn ds-btn-secondary" style="height:32px;font-size:var(--text-xs)"
+              onclick="markEchoReviewed('${s.id}')">Mark รีวิวแล้ว</button>`
+          : `<span style="font-size:var(--text-micro);color:var(--ink-4);padding:var(--space-2) 0;display:flex;align-items:center">
+              รีวิวแล้ว ${fmtDateTime(s.tl_reviewed_at)}</span>`
+        }
+      </div>
+    </div>`;
+
+  return `
+    <div class="td-detail-hd">
+      <div class="ds-eyebrow">ECHO SESSION</div>
+      <div class="td-detail-title">${repName}</div>
+      <div class="td-detail-sub">${s.account_name||'—'} · ${dt}${dur?' · '+dur:''}</div>
+    </div>
+    <div class="td-detail-body">
+
+      ${s.transcript_summary ? `
+        <div class="td-detail-section">
+          <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">Summary</div>
+          <div style="font-size:var(--text-sm);color:var(--ink-2);line-height:1.6">${s.transcript_summary}</div>
+        </div>` : ''}
+
+      ${skills.length ? `
+        <div class="td-detail-section">
+          <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">Skill Scores</div>
+          ${skillRows}
+        </div>` : ''}
+
+      ${toneRows ? `
+        <div class="td-detail-section">
+          <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">Tone</div>
+          ${toneRows}
+        </div>` : ''}
+
+      ${actions ? `
+        <div class="td-detail-section">
+          <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">Next Actions</div>
+          ${actions}
+        </div>` : ''}
+
+      ${noteSection}
+    </div>`;
+}
+
+// ── TL actions ────────────────────────────────────────────────
+async function saveEchoNote(sessionId) {
+  const note = document.getElementById('echo-note-input')?.value || '';
+  try {
+    const { error } = await supa.from('ci_sessions')
+      .update({ tl_note: note || null })
+      .eq('id', sessionId);
+    if (error) throw error;
+    // Update local cache
+    const s = echoSessions.find(s => s.id === sessionId);
+    if (s) s.tl_note = note || null;
+    if (echoDetailData?.id === sessionId) echoDetailData.tl_note = note || null;
+    showToast('บันทึก note แล้ว', 'ok');
+    renderEchoView();
+  } catch(e) {
+    showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+async function markEchoReviewed(sessionId) {
+  const now = new Date().toISOString();
+  try {
+    const { error } = await supa.from('ci_sessions')
+      .update({ tl_reviewed_at: now, tl_reviewed_by: currentProfile?.email || null })
+      .eq('id', sessionId);
+    if (error) throw error;
+    const s = echoSessions.find(s => s.id === sessionId);
+    if (s) { s.tl_reviewed_at = now; }
+    showToast('Mark รีวิวแล้ว', 'ok');
+    // Re-fetch detail and re-render
+    if (echoDetailData?.id === sessionId) {
+      echoDetailData.tl_reviewed_at = now;
+      openDetail(renderEchoDetailPanel(echoDetailData));
+    }
+    renderEchoView();
+  } catch(e) {
+    showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+</script>
+
+<!-- Map -->
+<script>
+// ── dash_map.js — D3 choropleth map ─────────────────────────
+// Freshket TL Dashboard v707
+// GeoJSON: fetched lazily from geo/ folder
+
+let BKK_GEO = null;
+let SUR_GEO = null;
+
+async function loadGeoJSON() {
+  if (BKK_GEO && SUR_GEO) return true;  // already loaded
+  try {
+    const bkkResp = await fetch('/geo/bangkok_khet.geojson');
+    if (!bkkResp.ok) throw new Error('bangkok_khet.geojson HTTP ' + bkkResp.status);
+    BKK_GEO = await bkkResp.json();
+    DashLog.info('map', 'BKK GeoJSON loaded');
+  } catch(e) {
+    DashLog.error('map_bkk_geojson', e.message);
+    return false;
+  }
+  try {
+    const surResp = await fetch('/geo/surrounding_provinces.geojson');
+    if (!surResp.ok) throw new Error('surrounding_provinces.geojson HTTP ' + surResp.status);
+    SUR_GEO = await surResp.json();
+    DashLog.info('map', 'Surrounding GeoJSON loaded');
+  } catch(e) {
+    DashLog.error('map_sur_geojson', e.message);
+    // Non-fatal — surrounding provinces are background only
+    SUR_GEO = { type: 'FeatureCollection', features: [] };
+  }
+  return true;
+}
+
+
+// Mock district data until real CSV arrives (Phase 3)
+const REAL_DISTRICT = {"บางบอน": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 3682273, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Dec 25": {"gmv": 3685058, "accounts": 21, "outlets": 42, "new_accounts": 0}, "Jan 26": {"gmv": 3508305, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Feb 26": {"gmv": 3327885, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Mar 26": {"gmv": 3530215, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Apr 26": {"gmv": 3432991, "accounts": 21, "outlets": 42, "new_accounts": 1}}}, "บางกะป": {"hub_zone": "Kaset-Nawamin", "hub_code": "Q", "months": {"Nov 25": {"gmv": 957661, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 947067, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 1009103, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 1034982, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 1059546, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 1006267, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "บางแค": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 4910735, "accounts": 26, "outlets": 52, "new_accounts": 1}, "Dec 25": {"gmv": 4999473, "accounts": 26, "outlets": 52, "new_accounts": 2}, "Jan 26": {"gmv": 5122164, "accounts": 26, "outlets": 52, "new_accounts": 0}, "Feb 26": {"gmv": 5439097, "accounts": 26, "outlets": 52, "new_accounts": 0}, "Mar 26": {"gmv": 5543056, "accounts": 26, "outlets": 52, "new_accounts": 0}, "Apr 26": {"gmv": 5512797, "accounts": 26, "outlets": 52, "new_accounts": 1}}}, "บางเขน": {"hub_zone": "Kaset-Nawamin", "hub_code": "Q", "months": {"Nov 25": {"gmv": 4221835, "accounts": 24, "outlets": 48, "new_accounts": 1}, "Dec 25": {"gmv": 4105348, "accounts": 24, "outlets": 48, "new_accounts": 0}, "Jan 26": {"gmv": 4144503, "accounts": 24, "outlets": 48, "new_accounts": 2}, "Feb 26": {"gmv": 4332600, "accounts": 24, "outlets": 48, "new_accounts": 1}, "Mar 26": {"gmv": 4148764, "accounts": 24, "outlets": 48, "new_accounts": 1}, "Apr 26": {"gmv": 4084668, "accounts": 24, "outlets": 48, "new_accounts": 1}}}, "บางคอแหลม": {"hub_zone": "Rama 3", "hub_code": "H", "months": {"Nov 25": {"gmv": 4434899, "accounts": 26, "outlets": 52, "new_accounts": 1}, "Dec 25": {"gmv": 4704580, "accounts": 26, "outlets": 52, "new_accounts": 2}, "Jan 26": {"gmv": 4727868, "accounts": 26, "outlets": 52, "new_accounts": 2}, "Feb 26": {"gmv": 4641011, "accounts": 26, "outlets": 52, "new_accounts": 2}, "Mar 26": {"gmv": 4508566, "accounts": 26, "outlets": 52, "new_accounts": 2}, "Apr 26": {"gmv": 4511190, "accounts": 26, "outlets": 52, "new_accounts": 1}}}, "บางนา": {"hub_zone": "Bang Na", "hub_code": "E", "months": {"Nov 25": {"gmv": 958187, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 994419, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 1009918, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 1065122, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 1127509, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 1197630, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "บางพลัด": {"hub_zone": "Taling Chan", "hub_code": "T", "months": {"Nov 25": {"gmv": 924431, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 878219, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 835114, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 875972, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 853526, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 895812, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "บางรัก": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 16895127, "accounts": 96, "outlets": 192, "new_accounts": 1}, "Dec 25": {"gmv": 17787878, "accounts": 96, "outlets": 192, "new_accounts": 6}, "Jan 26": {"gmv": 16853051, "accounts": 96, "outlets": 192, "new_accounts": 7}, "Feb 26": {"gmv": 17700638, "accounts": 96, "outlets": 192, "new_accounts": 3}, "Mar 26": {"gmv": 17944500, "accounts": 96, "outlets": 192, "new_accounts": 2}, "Apr 26": {"gmv": 18581396, "accounts": 96, "outlets": 192, "new_accounts": 5}}}, "บางซื่อ": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 1573776, "accounts": 9, "outlets": 18, "new_accounts": 0}, "Dec 25": {"gmv": 1592503, "accounts": 9, "outlets": 18, "new_accounts": 0}, "Jan 26": {"gmv": 1652136, "accounts": 9, "outlets": 18, "new_accounts": 0}, "Feb 26": {"gmv": 1644870, "accounts": 9, "outlets": 18, "new_accounts": 0}, "Mar 26": {"gmv": 1699279, "accounts": 9, "outlets": 18, "new_accounts": 0}, "Apr 26": {"gmv": 1762573, "accounts": 9, "outlets": 18, "new_accounts": 1}}}, "บางขุนเทียน": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 2285343, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Dec 25": {"gmv": 2366043, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Jan 26": {"gmv": 2348954, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Feb 26": {"gmv": 2274199, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Mar 26": {"gmv": 2183730, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Apr 26": {"gmv": 2089531, "accounts": 12, "outlets": 24, "new_accounts": 0}}}, "บางกอกน้อย": {"hub_zone": "Taling Chan", "hub_code": "T", "months": {"Nov 25": {"gmv": 184454, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Dec 25": {"gmv": 184872, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Jan 26": {"gmv": 188882, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Feb 26": {"gmv": 196445, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Mar 26": {"gmv": 200885, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Apr 26": {"gmv": 198874, "accounts": 1, "outlets": 2, "new_accounts": 0}}}, "บางกอกใหญ่": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 556468, "accounts": 3, "outlets": 6, "new_accounts": 0}, "Dec 25": {"gmv": 549096, "accounts": 3, "outlets": 6, "new_accounts": 0}, "Jan 26": {"gmv": 539357, "accounts": 3, "outlets": 6, "new_accounts": 0}, "Feb 26": {"gmv": 562289, "accounts": 3, "outlets": 6, "new_accounts": 0}, "Mar 26": {"gmv": 583471, "accounts": 3, "outlets": 6, "new_accounts": 0}, "Apr 26": {"gmv": 621427, "accounts": 3, "outlets": 6, "new_accounts": 0}}}, "บึงกุ่ม": {"hub_zone": "Kaset-Nawamin", "hub_code": "Q", "months": {"Nov 25": {"gmv": 2544985, "accounts": 14, "outlets": 28, "new_accounts": 0}, "Dec 25": {"gmv": 2441476, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Jan 26": {"gmv": 2480819, "accounts": 14, "outlets": 28, "new_accounts": 0}, "Feb 26": {"gmv": 2540396, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Mar 26": {"gmv": 2584927, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Apr 26": {"gmv": 2652711, "accounts": 14, "outlets": 28, "new_accounts": 1}}}, "จตุจักร": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 10310636, "accounts": 60, "outlets": 120, "new_accounts": 1}, "Dec 25": {"gmv": 10910729, "accounts": 60, "outlets": 120, "new_accounts": 4}, "Jan 26": {"gmv": 10564022, "accounts": 60, "outlets": 120, "new_accounts": 0}, "Feb 26": {"gmv": 10557784, "accounts": 60, "outlets": 120, "new_accounts": 4}, "Mar 26": {"gmv": 10477224, "accounts": 60, "outlets": 120, "new_accounts": 4}, "Apr 26": {"gmv": 10884245, "accounts": 60, "outlets": 120, "new_accounts": 1}}}, "จอมทอง": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 948930, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 1011001, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 972959, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 972382, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 945307, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 923798, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "ดินแดง": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 3296143, "accounts": 18, "outlets": 36, "new_accounts": 0}, "Dec 25": {"gmv": 3275874, "accounts": 18, "outlets": 36, "new_accounts": 1}, "Jan 26": {"gmv": 3441933, "accounts": 18, "outlets": 36, "new_accounts": 1}, "Feb 26": {"gmv": 3494759, "accounts": 18, "outlets": 36, "new_accounts": 0}, "Mar 26": {"gmv": 3363930, "accounts": 18, "outlets": 36, "new_accounts": 1}, "Apr 26": {"gmv": 3190985, "accounts": 18, "outlets": 36, "new_accounts": 1}}}, "ดอนเมือง": {"hub_zone": "Don Mueang", "hub_code": "C", "months": {"Nov 25": {"gmv": 1062174, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Dec 25": {"gmv": 1114742, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Jan 26": {"gmv": 1086082, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Feb 26": {"gmv": 1081631, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Mar 26": {"gmv": 1128639, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Apr 26": {"gmv": 1185723, "accounts": 6, "outlets": 12, "new_accounts": 0}}}, "ดุสิต": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 171416, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Dec 25": {"gmv": 174936, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Jan 26": {"gmv": 170858, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Feb 26": {"gmv": 167791, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Mar 26": {"gmv": 171022, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Apr 26": {"gmv": 180990, "accounts": 1, "outlets": 2, "new_accounts": 0}}}, "ห้วยขวาง": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 2366159, "accounts": 13, "outlets": 26, "new_accounts": 0}, "Dec 25": {"gmv": 2419395, "accounts": 13, "outlets": 26, "new_accounts": 1}, "Jan 26": {"gmv": 2326617, "accounts": 13, "outlets": 26, "new_accounts": 1}, "Feb 26": {"gmv": 2269564, "accounts": 13, "outlets": 26, "new_accounts": 0}, "Mar 26": {"gmv": 2384724, "accounts": 13, "outlets": 26, "new_accounts": 0}, "Apr 26": {"gmv": 2409960, "accounts": 13, "outlets": 26, "new_accounts": 0}}}, "คันนายาว": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 2591262, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Dec 25": {"gmv": 2724680, "accounts": 14, "outlets": 28, "new_accounts": 0}, "Jan 26": {"gmv": 2744998, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Feb 26": {"gmv": 2718533, "accounts": 14, "outlets": 28, "new_accounts": 1}, "Mar 26": {"gmv": 2663255, "accounts": 14, "outlets": 28, "new_accounts": 0}, "Apr 26": {"gmv": 2552586, "accounts": 14, "outlets": 28, "new_accounts": 0}}}, "คลองสามวา": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 724735, "accounts": 4, "outlets": 8, "new_accounts": 0}, "Dec 25": {"gmv": 750650, "accounts": 4, "outlets": 8, "new_accounts": 0}, "Jan 26": {"gmv": 725024, "accounts": 4, "outlets": 8, "new_accounts": 0}, "Feb 26": {"gmv": 687909, "accounts": 4, "outlets": 8, "new_accounts": 0}, "Mar 26": {"gmv": 651847, "accounts": 4, "outlets": 8, "new_accounts": 0}, "Apr 26": {"gmv": 654986, "accounts": 4, "outlets": 8, "new_accounts": 0}}}, "คลองสาน": {"hub_zone": "Iconsiam", "hub_code": "Z", "months": {"Nov 25": {"gmv": 1124540, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Dec 25": {"gmv": 1071340, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Jan 26": {"gmv": 1134556, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Feb 26": {"gmv": 1207907, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Mar 26": {"gmv": 1288877, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Apr 26": {"gmv": 1324822, "accounts": 6, "outlets": 12, "new_accounts": 0}}}, "คลองเตย": {"hub_zone": "Ekkamai", "hub_code": "A", "months": {"Nov 25": {"gmv": 6996723, "accounts": 39, "outlets": 78, "new_accounts": 0}, "Dec 25": {"gmv": 7410915, "accounts": 39, "outlets": 78, "new_accounts": 0}, "Jan 26": {"gmv": 7899300, "accounts": 39, "outlets": 78, "new_accounts": 3}, "Feb 26": {"gmv": 8318557, "accounts": 39, "outlets": 78, "new_accounts": 0}, "Mar 26": {"gmv": 8293623, "accounts": 39, "outlets": 78, "new_accounts": 1}, "Apr 26": {"gmv": 8335406, "accounts": 39, "outlets": 78, "new_accounts": 0}}}, "หลักส": {"hub_zone": "Don Mueang", "hub_code": "C", "months": {"Nov 25": {"gmv": 931915, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 973304, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 933475, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 894056, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 889661, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 948969, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "ลาดกระบัง": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 1486984, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Dec 25": {"gmv": 1541263, "accounts": 8, "outlets": 16, "new_accounts": 1}, "Jan 26": {"gmv": 1471131, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Feb 26": {"gmv": 1459988, "accounts": 8, "outlets": 16, "new_accounts": 1}, "Mar 26": {"gmv": 1513370, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Apr 26": {"gmv": 1439284, "accounts": 8, "outlets": 16, "new_accounts": 0}}}, "ลาดพร้าว": {"hub_zone": "Kaset-Nawamin", "hub_code": "Q", "months": {"Nov 25": {"gmv": 5332790, "accounts": 31, "outlets": 62, "new_accounts": 2}, "Dec 25": {"gmv": 5456387, "accounts": 31, "outlets": 62, "new_accounts": 0}, "Jan 26": {"gmv": 5442421, "accounts": 31, "outlets": 62, "new_accounts": 0}, "Feb 26": {"gmv": 5274641, "accounts": 31, "outlets": 62, "new_accounts": 1}, "Mar 26": {"gmv": 5250404, "accounts": 31, "outlets": 62, "new_accounts": 1}, "Apr 26": {"gmv": 5261628, "accounts": 31, "outlets": 62, "new_accounts": 2}}}, "มีนบุรี": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 1282048, "accounts": 7, "outlets": 14, "new_accounts": 0}, "Dec 25": {"gmv": 1336552, "accounts": 7, "outlets": 14, "new_accounts": 0}, "Jan 26": {"gmv": 1278848, "accounts": 7, "outlets": 14, "new_accounts": 1}, "Feb 26": {"gmv": 1219926, "accounts": 7, "outlets": 14, "new_accounts": 0}, "Mar 26": {"gmv": 1250793, "accounts": 7, "outlets": 14, "new_accounts": 0}, "Apr 26": {"gmv": 1309250, "accounts": 7, "outlets": 14, "new_accounts": 0}}}, "หนองจอก": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 186075, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Dec 25": {"gmv": 189163, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Jan 26": {"gmv": 200509, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Feb 26": {"gmv": 194371, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Mar 26": {"gmv": 185473, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Apr 26": {"gmv": 185129, "accounts": 1, "outlets": 2, "new_accounts": 0}}}, "หนองแขม": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 188820, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Dec 25": {"gmv": 197244, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Jan 26": {"gmv": 210136, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Feb 26": {"gmv": 208924, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Mar 26": {"gmv": 214990, "accounts": 1, "outlets": 2, "new_accounts": 0}, "Apr 26": {"gmv": 217725, "accounts": 1, "outlets": 2, "new_accounts": 0}}}, "ปทุมวัน": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 32575230, "accounts": 182, "outlets": 364, "new_accounts": 1}, "Dec 25": {"gmv": 33834115, "accounts": 182, "outlets": 364, "new_accounts": 13}, "Jan 26": {"gmv": 34165882, "accounts": 182, "outlets": 364, "new_accounts": 7}, "Feb 26": {"gmv": 32871400, "accounts": 182, "outlets": 364, "new_accounts": 11}, "Mar 26": {"gmv": 32768844, "accounts": 182, "outlets": 364, "new_accounts": 2}, "Apr 26": {"gmv": 32845495, "accounts": 182, "outlets": 364, "new_accounts": 7}}}, "ภาษีเจริญ": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 355135, "accounts": 2, "outlets": 4, "new_accounts": 0}, "Dec 25": {"gmv": 363542, "accounts": 2, "outlets": 4, "new_accounts": 0}, "Jan 26": {"gmv": 377188, "accounts": 2, "outlets": 4, "new_accounts": 0}, "Feb 26": {"gmv": 392791, "accounts": 2, "outlets": 4, "new_accounts": 0}, "Mar 26": {"gmv": 398309, "accounts": 2, "outlets": 4, "new_accounts": 0}, "Apr 26": {"gmv": 411244, "accounts": 2, "outlets": 4, "new_accounts": 0}}}, "พญาไท": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 5149004, "accounts": 29, "outlets": 58, "new_accounts": 2}, "Dec 25": {"gmv": 5130737, "accounts": 29, "outlets": 58, "new_accounts": 1}, "Jan 26": {"gmv": 5090557, "accounts": 29, "outlets": 58, "new_accounts": 1}, "Feb 26": {"gmv": 5079506, "accounts": 29, "outlets": 58, "new_accounts": 2}, "Mar 26": {"gmv": 4964599, "accounts": 29, "outlets": 58, "new_accounts": 2}, "Apr 26": {"gmv": 5092821, "accounts": 29, "outlets": 58, "new_accounts": 2}}}, "พระนคร": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 2049531, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Dec 25": {"gmv": 2153605, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Jan 26": {"gmv": 2109668, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Feb 26": {"gmv": 2040882, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Mar 26": {"gmv": 1964580, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Apr 26": {"gmv": 1996943, "accounts": 12, "outlets": 24, "new_accounts": 0}}}, "ป้อมปราบศัตรูพ่าย": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 1420640, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Dec 25": {"gmv": 1424142, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Jan 26": {"gmv": 1470147, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Feb 26": {"gmv": 1462608, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Mar 26": {"gmv": 1548923, "accounts": 8, "outlets": 16, "new_accounts": 0}, "Apr 26": {"gmv": 1508817, "accounts": 8, "outlets": 16, "new_accounts": 1}}}, "พระโขนง": {"hub_zone": "Ekkamai", "hub_code": "A", "months": {"Nov 25": {"gmv": 3867887, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Dec 25": {"gmv": 3804500, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Jan 26": {"gmv": 3985423, "accounts": 21, "outlets": 42, "new_accounts": 2}, "Feb 26": {"gmv": 4032304, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Mar 26": {"gmv": 4088515, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Apr 26": {"gmv": 4025275, "accounts": 21, "outlets": 42, "new_accounts": 0}}}, "ประเวศ": {"hub_zone": "Bang Na", "hub_code": "E", "months": {"Nov 25": {"gmv": 4104872, "accounts": 23, "outlets": 46, "new_accounts": 2}, "Dec 25": {"gmv": 4286960, "accounts": 23, "outlets": 46, "new_accounts": 1}, "Jan 26": {"gmv": 4133345, "accounts": 23, "outlets": 46, "new_accounts": 1}, "Feb 26": {"gmv": 4005564, "accounts": 23, "outlets": 46, "new_accounts": 2}, "Mar 26": {"gmv": 4212696, "accounts": 23, "outlets": 46, "new_accounts": 0}, "Apr 26": {"gmv": 4040694, "accounts": 23, "outlets": 46, "new_accounts": 2}}}, "ราษฎร์บูรณะ": {"hub_zone": "Rama 3", "hub_code": "H", "months": {"Nov 25": {"gmv": 2209331, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Dec 25": {"gmv": 2098136, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Jan 26": {"gmv": 2107561, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Feb 26": {"gmv": 2221747, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Mar 26": {"gmv": 2227282, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Apr 26": {"gmv": 2202099, "accounts": 12, "outlets": 24, "new_accounts": 0}}}, "ราชเทวี": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 872649, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 894988, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 879380, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 866255, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 878522, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 887412, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "สายไหม": {"hub_zone": "Don Mueang", "hub_code": "C", "months": {"Nov 25": {"gmv": 2015354, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Dec 25": {"gmv": 1981785, "accounts": 11, "outlets": 22, "new_accounts": 1}, "Jan 26": {"gmv": 1966132, "accounts": 11, "outlets": 22, "new_accounts": 1}, "Feb 26": {"gmv": 2017257, "accounts": 11, "outlets": 22, "new_accounts": 1}, "Mar 26": {"gmv": 2077048, "accounts": 11, "outlets": 22, "new_accounts": 1}, "Apr 26": {"gmv": 2177875, "accounts": 11, "outlets": 22, "new_accounts": 0}}}, "สัมพันธวงศ์": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 2052823, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Dec 25": {"gmv": 2024636, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Jan 26": {"gmv": 2116850, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Feb 26": {"gmv": 2180665, "accounts": 12, "outlets": 24, "new_accounts": 0}, "Mar 26": {"gmv": 2099684, "accounts": 12, "outlets": 24, "new_accounts": 1}, "Apr 26": {"gmv": 2171958, "accounts": 12, "outlets": 24, "new_accounts": 0}}}, "สะพานสูง": {"hub_zone": "Khan Na Yao", "hub_code": "I", "months": {"Nov 25": {"gmv": 1917635, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Dec 25": {"gmv": 1997575, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Jan 26": {"gmv": 1904886, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Feb 26": {"gmv": 1815596, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Mar 26": {"gmv": 1736414, "accounts": 11, "outlets": 22, "new_accounts": 0}, "Apr 26": {"gmv": 1761038, "accounts": 11, "outlets": 22, "new_accounts": 0}}}, "สาทร": {"hub_zone": "Rama 3", "hub_code": "H", "months": {"Nov 25": {"gmv": 9831845, "accounts": 53, "outlets": 106, "new_accounts": 0}, "Dec 25": {"gmv": 9399755, "accounts": 53, "outlets": 106, "new_accounts": 2}, "Jan 26": {"gmv": 9749598, "accounts": 53, "outlets": 106, "new_accounts": 1}, "Feb 26": {"gmv": 10312560, "accounts": 53, "outlets": 106, "new_accounts": 0}, "Mar 26": {"gmv": 10478376, "accounts": 53, "outlets": 106, "new_accounts": 4}, "Apr 26": {"gmv": 10736373, "accounts": 53, "outlets": 106, "new_accounts": 4}}}, "สวนหลวง": {"hub_zone": "Bang Na", "hub_code": "E", "months": {"Nov 25": {"gmv": 3682423, "accounts": 21, "outlets": 42, "new_accounts": 2}, "Dec 25": {"gmv": 3603439, "accounts": 21, "outlets": 42, "new_accounts": 0}, "Jan 26": {"gmv": 3663584, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Feb 26": {"gmv": 3576199, "accounts": 21, "outlets": 42, "new_accounts": 0}, "Mar 26": {"gmv": 3703671, "accounts": 21, "outlets": 42, "new_accounts": 1}, "Apr 26": {"gmv": 3561963, "accounts": 21, "outlets": 42, "new_accounts": 1}}}, "ตลิ่งชัน": {"hub_zone": "Taling Chan", "hub_code": "T", "months": {"Nov 25": {"gmv": 1131660, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Dec 25": {"gmv": 1191390, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Jan 26": {"gmv": 1267309, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Feb 26": {"gmv": 1306035, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Mar 26": {"gmv": 1299862, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Apr 26": {"gmv": 1269140, "accounts": 6, "outlets": 12, "new_accounts": 0}}}, "ทวีวัฒนา)": {"hub_zone": "Taling Chan", "hub_code": "T", "months": {"Nov 25": {"gmv": 936730, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 935234, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 908371, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 929156, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 989023, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 1008427, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "ธนบุร": {"hub_zone": "Sathon", "hub_code": "B", "months": {"Nov 25": {"gmv": 872981, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Dec 25": {"gmv": 841220, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Jan 26": {"gmv": 819565, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Feb 26": {"gmv": 816175, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Mar 26": {"gmv": 816537, "accounts": 5, "outlets": 10, "new_accounts": 0}, "Apr 26": {"gmv": 821939, "accounts": 5, "outlets": 10, "new_accounts": 0}}}, "ทุ่งครุ": {"hub_zone": "Bang Khae", "hub_code": "G", "months": {"Nov 25": {"gmv": 1050215, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Dec 25": {"gmv": 1120697, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Jan 26": {"gmv": 1176416, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Feb 26": {"gmv": 1227903, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Mar 26": {"gmv": 1301393, "accounts": 6, "outlets": 12, "new_accounts": 0}, "Apr 26": {"gmv": 1341633, "accounts": 6, "outlets": 12, "new_accounts": 0}}}, "วังทองหลาง": {"hub_zone": "Lat Phrao", "hub_code": "D", "months": {"Nov 25": {"gmv": 1767382, "accounts": 10, "outlets": 20, "new_accounts": 0}, "Dec 25": {"gmv": 1744928, "accounts": 10, "outlets": 20, "new_accounts": 1}, "Jan 26": {"gmv": 1699152, "accounts": 10, "outlets": 20, "new_accounts": 1}, "Feb 26": {"gmv": 1650441, "accounts": 10, "outlets": 20, "new_accounts": 1}, "Mar 26": {"gmv": 1599971, "accounts": 10, "outlets": 20, "new_accounts": 1}, "Apr 26": {"gmv": 1643415, "accounts": 10, "outlets": 20, "new_accounts": 0}}}, "วัฒนา": {"hub_zone": "Ekkamai", "hub_code": "A", "months": {"Nov 25": {"gmv": 58861771, "accounts": 312, "outlets": 624, "new_accounts": 17}, "Dec 25": {"gmv": 60511572, "accounts": 312, "outlets": 624, "new_accounts": 15}, "Jan 26": {"gmv": 63976401, "accounts": 312, "outlets": 624, "new_accounts": 16}, "Feb 26": {"gmv": 67662946, "accounts": 312, "outlets": 624, "new_accounts": 7}, "Mar 26": {"gmv": 67228466, "accounts": 312, "outlets": 624, "new_accounts": 13}, "Apr 26": {"gmv": 63846549, "accounts": 312, "outlets": 624, "new_accounts": 13}}}, "ยานนาวา": {"hub_zone": "Rama 3", "hub_code": "H", "months": {"Nov 25": {"gmv": 7197428, "accounts": 39, "outlets": 78, "new_accounts": 0}, "Dec 25": {"gmv": 7428198, "accounts": 39, "outlets": 78, "new_accounts": 1}, "Jan 26": {"gmv": 7056985, "accounts": 39, "outlets": 78, "new_accounts": 3}, "Feb 26": {"gmv": 7095874, "accounts": 39, "outlets": 78, "new_accounts": 2}, "Mar 26": {"gmv": 7455346, "accounts": 39, "outlets": 78, "new_accounts": 2}, "Apr 26": {"gmv": 7186551, "accounts": 39, "outlets": 78, "new_accounts": 2}}}};
+
+
+// ── Map state ─────────────────────────────────────────────────
+let mapSvg, mapProjection, mapPath, mapZoomBehavior, mapG;
+let mapScope = 'bkk';
+
+const METRIC_LABELS = {
+  gmv: 'GMV ฿', accounts: 'Accounts', outlets: 'Outlets', new_accounts: 'New Acc'
+};
+
+// ── Init ──────────────────────────────────────────────────────
+async function initMap() {
+  const ok = await loadGeoJSON();
+  if (!ok) {
+    const container = document.getElementById('map-container');
+    if (container) container.innerHTML = errorPanel('map', 'โหลดแผนที่ไม่ได้ — กรุณา refresh');
+    return;
+  }
+  const container = document.getElementById('map-container');
+  const W = container.clientWidth  || 800;
+  const H = container.clientHeight || 600;
+
+  try {
+  mapProjection = d3.geoMercator()
+    .center([100.52, 13.75])
+    .scale(W * 5.5)
+    .translate([W/2, H/2]);
+
+  mapPath = d3.geoPath().projection(mapProjection);
+
+  mapZoomBehavior = d3.zoom()
+    .scaleExtent([0.4, 14])
+    .on('zoom', e => { mapG.attr('transform', e.transform); });
+
+  mapSvg = d3.select('#map-svg').call(mapZoomBehavior);
+  mapG   = mapSvg.append('g');
+
+  // Surrounding (background)
+  mapG.append('g').attr('class', 'g-sur')
+    .selectAll('path').data(SUR_GEO.features).join('path')
+    .attr('class','td-poly-bg').attr('d', mapPath);
+
+  // Bangkok districts
+  mapG.append('g').attr('class', 'g-bkk')
+    .selectAll('path').data(BKK_GEO.features).join('path')
+    .attr('class','td-poly')
+    .attr('d', mapPath)
+    .on('mousemove', onPolyHover)
+    .on('mouseleave', onPolyLeave)
+    .on('click', onPolyClick);
+
+  updateMapColors();
+  renderMapToolbar();
+  renderMapLegend();
+  if (DashState?.salesOverlay) renderSalesOverlay();
+  } catch(mapErr) {
+    DashLog.error('map_init', mapErr.message);
+  }
+}
+
+// ── Colors ────────────────────────────────────────────────────
+function getDistrictValue(nameTh) {
+  const d = REAL_DISTRICT[nameTh];
+  if (!d) return 0;
+  return d.months[currentMonth]?.[currentMetric] || 0;
+}
+
+function updateMapColors() {
+  if (!mapG) return;
+  const values = BKK_GEO.features.map(f => getDistrictValue(f.properties.name_th));
+  const max = d3.max(values) || 1;
+  const min = d3.min(values.filter(v => v > 0)) || 0;
+
+  // Read CSS vars for choropleth
+  const cs = getComputedStyle(document.documentElement);
+  const c0 = cs.getPropertyValue('--choro-0').trim();
+  const c5 = cs.getPropertyValue('--choro-5').trim();
+
+  const colorScale = d3.scaleSequential()
+    .domain([min, max])
+    .interpolator(d3.interpolateRgb(c0, c5));
+
+  mapG.select('.g-bkk').selectAll('path')
+    .transition().duration(300)
+    .attr('fill', d => {
+      const v = getDistrictValue(d.properties.name_th);
+      return v > 0 ? colorScale(v) : '#F5F5F5';
+    });
+
+  // Update legend labels
+  const fmtVal = currentMetric === 'gmv'
+    ? v => fmtGMV(v)
+    : v => fmtNum(Math.round(v));
+  const legMin = document.getElementById('map-leg-min');
+  const legMax = document.getElementById('map-leg-max');
+  if (legMin) legMin.textContent = fmtVal(0);
+  if (legMax) legMax.textContent = fmtVal(max);
+}
+
+// ── Toolbar ───────────────────────────────────────────────────
+function renderMapToolbar() {
+  const tb = document.getElementById('map-toolbar');
+  if (!tb) return;
+  tb.innerHTML = `
+    <div class="ds-seg-ctrl">
+      <button class="ds-seg-item active" onclick="setMapScope('bkk',this)">กรุงเทพฯ</button>
+      <button class="ds-seg-item" onclick="setMapScope('metro',this)">กทม.+ปริมณฑล</button>
+    </div>`;
+}
+
+function setMapScope(scope, btn) {
+  mapScope = scope;
+  document.querySelectorAll('#map-toolbar .ds-seg-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const container = document.getElementById('map-container');
+  const W = container.clientWidth, H = container.clientHeight;
+  if (scope === 'bkk') {
+    mapProjection.center([100.52,13.75]).scale(W*5.5);
+  } else {
+    mapProjection.center([100.40,13.80]).scale(W*3.0);
+  }
+  mapPath = d3.geoPath().projection(mapProjection);
+  mapSvg.call(mapZoomBehavior.transform, d3.zoomIdentity);
+  mapG.selectAll('path').transition().duration(400).attr('d', mapPath);
+}
+
+// ── Legend ────────────────────────────────────────────────────
+function renderMapLegend() {
+  const leg = document.getElementById('map-legend');
+  if (!leg) return;
+  leg.innerHTML = `
+    <div class="map-legend-title" id="map-leg-title">${METRIC_LABELS[currentMetric] || currentMetric}</div>
+    <div class="map-legend-gradient"></div>
+    <div class="map-legend-labels">
+      <span id="map-leg-min">0</span>
+      <span id="map-leg-max">—</span>
+    </div>`;
+}
+
+// ── Hover ─────────────────────────────────────────────────────
+function onPolyHover(event, d) {
+  const name = d.properties.name_th;
+  const dist = REAL_DISTRICT[name];
+  const entry = dist?.months[currentMonth] || null;
+  const prevM = MONTHS[MONTHS.indexOf(currentMonth)-1];
+  const prev  = dist?.months[prevM];
+
+  const tt = document.getElementById('map-tooltip');
+  if (!entry) return;
+
+  const delta = prev ? fmtDelta(entry[currentMetric], prev[currentMetric]) : '';
+  const dcls  = prev ? deltaCls(entry[currentMetric], prev[currentMetric]) : '';
+
+  tt.innerHTML = `
+    <div class="tt-name">${name}</div>
+    <div class="tt-zone">${dist.hub_zone || '—'}</div>
+    <div class="tt-row"><span>GMV</span><span class="tt-val">${fmtGMV(entry.gmv)} ${delta ? `<span class="ds-delta ${dcls}">${delta}</span>` : ''}</span></div>
+    <div class="tt-row"><span>Accounts</span><span class="tt-val">${fmtNum(entry.accounts)}</span></div>
+    <div class="tt-row"><span>Outlets</span><span class="tt-val">${fmtNum(entry.outlets)}</span></div>`;
+
+  const [mx,my] = d3.pointer(event, document.getElementById('map-container'));
+  const aw = document.getElementById('map-container').clientWidth;
+  const ah = document.getElementById('map-container').clientHeight;
+  tt.style.left = (mx+14+170 > aw ? mx-174 : mx+14) + 'px';
+  tt.style.top  = (my+14+110 > ah ? my-114 : my+14) + 'px';
+  tt.classList.add('show');
+
+  d3.select(event.target).style('opacity', '0.7');
+}
+
+function onPolyLeave(event) {
+  document.getElementById('map-tooltip').classList.remove('show');
+  if (!d3.select(event.target).classed('selected'))
+    d3.select(event.target).style('opacity', null);
+}
+
+// ── Click ─────────────────────────────────────────────────────
+function onPolyClick(event, d) {
+  const name = d.properties.name_th;
+  DashState.selectDistrict(name);
+  if (!DashState.selectedDistrictName) {
+    // was deselected — close detail
+    closeDetail();
+    return;
+  }
+  // Update polygon selected state
+  mapG.select('.g-bkk').selectAll('path')
+    .classed('selected', dd => dd.properties.name_th === name)
+    .style('opacity', null);  // clear rep-dim when zone selected
+  openDetailForDistrict(name, d.properties);
+}
+
+function openDetailForDistrict(name, props) {
+  const dist  = REAL_DISTRICT[name];
+  const entry = dist?.months[currentMonth] || {};
+  const prevM = MONTHS[MONTHS.indexOf(currentMonth)-1];
+  const prev  = dist?.months[prevM] || {};
+
+  const delta = prev.gmv ? fmtDelta(entry.gmv, prev.gmv) : '';
+  const dcls  = prev.gmv ? deltaCls(entry.gmv, prev.gmv) : '';
+
+  // Sparkline
+  const maxGMV = Math.max(...Object.values(dist?.months||{}).map(m=>m.gmv||0)) || 1;
+  const sparks = MONTHS.map(m => {
+    const v = dist?.months[m]?.gmv || 0;
+    const h = Math.max(4, Math.round((v/maxGMV)*44));
+    const cur = m === currentMonth;
+    return `<div class="td-spark-bar${cur?' cur':''}" style="height:${h}px" title="${m}: ${fmtGMV(v)}"></div>`;
+  }).join('');
+  const sparkLabels = MONTHS.map(m =>
+    `<span style="${m===currentMonth?'color:var(--ac)':''}">${m.split(' ')[0]}</span>`
+  ).join('');
+
+  // Mock accounts
+  const mockAccounts = [
+    { name:'ร้านอาหารสุขุมวิท', seg:'SA', status:'active', gmv:280000 },
+    { name:'The Coffee Club', seg:'Chain', status:'active', gmv:420000 },
+    { name:'Local Bistro', seg:'MC', status:'atrisk', gmv:95000 },
+    { name:'Hotel Kitchen', seg:'Chain', status:'active', gmv:780000 },
+    { name:'Mini Mart', seg:'SA', status:'inactive', gmv:12000 },
+  ].slice(0, Math.max(2, Math.floor(Math.random()*5)+2));
+
+  const accRows = mockAccounts.map(a => `
+    <div class="td-acc-row">
+      <div class="td-acc-dot ${a.status}"></div>
+      <div class="td-acc-name">${a.name}</div>
+      <span class="ds-seg-sa" style="flex-shrink:0">${a.seg}</span>
+      <div class="td-acc-gmv">${fmtGMV(a.gmv)}</div>
+    </div>`).join('');
+
+  openDetail(`
+    <div class="td-detail-hd">
+      <div class="ds-eyebrow">${dist?.hub_zone || 'DISTRICT'}</div>
+      <div class="td-detail-title">${name}</div>
+      <div class="td-detail-sub">${props.name_en || ''} · กรุงเทพมหานคร</div>
+    </div>
+    <div class="td-detail-body">
+      <div class="td-spark-wrap">
+        <div class="ds-eyebrow" style="margin-bottom:var(--space-2)">GMV 6 เดือน</div>
+        <div class="td-spark">${sparks}</div>
+        <div class="td-spark-labels" style="margin-top:3px">${sparkLabels}</div>
+      </div>
+      <div class="td-detail-section">
+        <div class="ds-eyebrow" style="margin-bottom:var(--space-3)">Metrics · ${currentMonth}</div>
+        <div class="ds-stat-row">
+          <span class="ds-stat-label">GMV</span>
+          <span class="ds-stat-value">${fmtGMV(entry.gmv)} ${delta ? `<span class="ds-delta ${dcls}">${delta}</span>` : ''}</span>
+        </div>
+        <div class="ds-stat-row">
+          <span class="ds-stat-label">Active Accounts</span>
+          <span class="ds-stat-value">${fmtNum(entry.accounts)}</span>
+        </div>
+        <div class="ds-stat-row">
+          <span class="ds-stat-label">Outlets</span>
+          <span class="ds-stat-value">${fmtNum(entry.outlets)}</span>
+        </div>
+        <div class="ds-stat-row">
+          <span class="ds-stat-label">New Accounts (Sales)</span>
+          <span class="ds-stat-value">${fmtNum(entry.new_accounts)}</span>
+        </div>
+      </div>
+      <div class="td-detail-section">
+        <div class="ds-eyebrow" style="margin-bottom:0">Accounts ใน District</div>
+      </div>
+      ${accRows}
+    </div>`);
+}
+
+// ── Cancel pending init if nav away before timer fires ────────
+function cancelMapInitTimer() {
+  if (_mapInitTimer) { clearTimeout(_mapInitTimer); _mapInitTimer = null; }
+}
+
+// ── Zoom controls ──────────────────────────────────────────────
+function mapZoom(factor) {
+  if (!mapSvg) return;
+  mapSvg.transition().duration(280).call(mapZoomBehavior.scaleBy, factor);
+}
+function mapReset() {
+  if (!mapSvg) return;
+  mapSvg.transition().duration(380).call(mapZoomBehavior.transform, d3.zoomIdentity);
+}
+
+// ── Boot: init map when map view becomes active ───────────────
+function checkInitMap() {
+  if (!mapG && document.getElementById('view-map')?.classList.contains('active')) {
+    setTimeout(initMap, 0);
+  }
+}
+// Called from setView override
+const _origSetView = typeof setView === 'function' ? setView : null;
+
+// Watch for map view — init on first show
+let _mapInited = false;
+let _mapInitTimer = null;
+const _mapObserver = new MutationObserver(() => {
+  const mapView = document.getElementById('view-map');
+  if (mapView?.classList.contains('active') && !_mapInited) {
+    _mapInited = true;  // flag set first to prevent double-trigger
+    setTimeout(async () => { await initMap(); }, 60);
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const mapView = document.getElementById('view-map');
+  if (mapView) {
+    _mapObserver.observe(mapView, { attributes: true, attributeFilter: ['class'] });
+    // If already active on load
+    if (mapView.classList.contains('active')) {
+      _mapInited = true;
+      setTimeout(initMap, 80);
+    }
+  }
+});
+
+
+// ── Sales overlay (Phase 3) ───────────────────────────────────
+function renderSalesOverlay() {
+  // Remove existing overlay
+  mapG?.selectAll('.td-sales-dot').remove();
+  if (!DashState.salesOverlay || !mapG) return;
+
+  // Mock: generate acquisition dots across Bangkok
+  // Phase 2: replace with real first_dollar_date + lat/lng from R2
+  const mockDots = BKK_GEO.features.flatMap(f => {
+    const centroid = mapPath?.centroid(f);
+    if (!centroid || isNaN(centroid[0])) return [];
+    const dist = REAL_DISTRICT?.[f.properties.name_th];
+    const count = dist?.months[currentMonth]?.new_accounts || 0;
+    return Array.from({length: Math.min(count, 6)}, (_, i) => ({
+      x: centroid[0] + (Math.random()-0.5) * 20,
+      y: centroid[1] + (Math.random()-0.5) * 20,
+      name: f.properties.name_th,
+      gmv: Math.round(Math.random() * 200000 + 50000)
+    }));
+  });
+
+  mapG.append('g').attr('class', 'td-sales-dot-group')
+    .selectAll('circle').data(mockDots).join('circle')
+    .attr('class', 'td-sales-dot')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', 5)
+    .style('fill', 'var(--info)')
+    .style('stroke', 'white')
+    .style('stroke-width', '1.5')
+    .style('opacity', '0')
+    .style('cursor', 'pointer')
+    .on('mousemove', (event, d) => {
+      const tt = document.getElementById('map-tooltip');
+      tt.innerHTML = `<div class="tt-name" style="color:var(--info)">New Account (Sales)</div>
+        <div class="tt-zone">${d.name}</div>
+        <div class="tt-row"><span>GMV</span><span class="tt-val">${fmtGMV(d.gmv)}</span></div>`;
+      const [mx,my] = d3.pointer(event, document.getElementById('map-container'));
+      tt.style.left = (mx+14) + 'px'; tt.style.top = (my+14) + 'px';
+      tt.classList.add('show');
+    })
+    .on('mouseleave', () => document.getElementById('map-tooltip').classList.remove('show'))
+    .transition().duration(300)
+    .style('opacity', '0.85');
+}
+
+// Window resize
+window.addEventListener('resize', () => {
+  if (!_mapInited || !mapSvg) return;
+  const container = document.getElementById('map-container');
+  if (!container) return;
+  const W = container.clientWidth, H = container.clientHeight;
+  mapProjection.translate([W/2, H/2]);
+  mapPath = d3.geoPath().projection(mapProjection);
+  mapG.selectAll('path').attr('d', mapPath);
+});
+</script>
+
+</body>
+</html>
