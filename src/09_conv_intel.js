@@ -4255,12 +4255,22 @@ function echoOpen() {
     echoExpand();
     return;
   }
-  // Guard: data ยังไม่พร้อม — ไม่เปิด Echo จนกว่าจะ load ครบ
-  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
-    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล กรุณารอสักครู่...', '⏳');
-    return;
-  }
+  // v715 Fix 3A: MOUNT-FIRST — CI.open() has no data dependency, always open immediately.
+  // Previous: silent return when !allCriticalReady() → user sees blank screen with no feedback.
+  // Now: open sheet → show toast if data still loading → re-render Echo state when data arrives.
   CI.open(null);
+  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
+    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล...', '⏳');
+    if (window.DataRegistry) {
+      window.DataRegistry.waitFor(1).then(function(){
+        try{
+          if (typeof CI !== 'undefined' && typeof CI._renderEchoState === 'function') {
+            CI._renderEchoState();
+          }
+        }catch(e){}
+      }).catch(function(){});
+    }
+  }
 }
 function echoHistory(accountId) {
   // Open Echo sheet on history tab for specific account
