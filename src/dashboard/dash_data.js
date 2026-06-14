@@ -7,7 +7,7 @@ const MONTHS  = ['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
 
 // ── State ─────────────────────────────────────────────────────
 let portviewBulkData = [];
-let currentMonth     = 'Apr 26';
+let currentMonth     = MONTHS[MONTHS.length - 1];  // always last available month
 let currentMetric    = 'gmv';
 let dataReady        = false;
 let dataLoadError    = null;
