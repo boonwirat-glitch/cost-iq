@@ -49,6 +49,7 @@ function initApp() {
   renderTopbarControls();
   renderSidebarShimmer();
   loadDashData();
+  loadCommissionData();  // Phase 4: load in parallel
 }
 
 function renderTopbarUser() {
