@@ -1,4 +1,4 @@
-<!-- Freshket Sense v673: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v674: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v673',
+      version: 'v674',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -11774,6 +11774,13 @@ function _showLoginOverlayClean(){
     ['position','top','left','right','width','maxWidth','marginLeft','marginRight'].forEach(p => { document.body.style[p] = ''; });
     // ล้าง stale account view (KAM single-account sheet)
     document.body.classList.remove('restaurant-sheet','rest-settled','rest-closing','echo-active','kam-sense-active');
+    // v673: clear stale portview/commission UI from previous session so IDB-served data
+    // doesn't flash old design (NRR 7500, pace 0%, old layout) before fresh R2 data arrives.
+    ['portview-list','portview-summary-row','tgt-portview-bar','tgt-nrr-bar',
+     'pv-commission-strip','pv-compact-strip','portview-pace-bar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '';
+    });
   } catch(_) {}
   const ov = document.getElementById('login-overlay');
   passwordRecoveryMode = false;
@@ -27762,6 +27769,11 @@ function _pvInitCollapseObserver(){
     // restore collapsed state — don't let scroll=0 mean "expanded"
     if(y===0&&(window._pvWasCollapsed||isCollapsed)){
       h=0;
+      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
+      // but strip class can be stale after re-render (filter/search/sort reinit)
+      if(isCollapsed&&strip.className.indexOf('visible')===-1){
+        strip.className='pv-compact-strip visible';
+      }
     }
 
     // Few-cards guard — only on fresh load (never collapsed before)
