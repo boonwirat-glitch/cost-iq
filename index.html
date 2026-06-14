@@ -1,4 +1,4 @@
-<!-- Freshket Sense v674: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v675: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v674',
+      version: 'v675',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -42280,7 +42280,7 @@ const CI = (() => {
 #ci-fullsheet .scr.on{display:flex;}
 
 /* ── TOPBAR ── */
-#ci-fullsheet .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px 10px;background:transparent;}
+#ci-fullsheet .topbar{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top,0px)) 24px 10px;background:transparent;}
 .tb-act{font-size:15px;font-weight:400;color:var(--tx2);cursor:pointer;padding:6px 0;}
 .tb-act:hover{color:var(--tx);}
 .tb-lbl{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;}
@@ -42538,6 +42538,7 @@ body:not(.echo-active) { background:unset; }
   background:transparent;
   border-bottom:0.5px solid rgba(0,0,0,.07);
   transition:background .7s ease,border-color .7s ease;
+  padding-top:calc(16px + env(safe-area-inset-top,0px));
 }
 #ci-fullsheet.ci-open { transform:translateY(0); }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
@@ -44585,7 +44586,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       s.textContent = `
 #ci-sess-detail { position:fixed;top:0;bottom:0;left:50%;width:100%;max-width:440px;transform:translateX(-50%) translateY(100%);z-index:10001;padding-top:env(safe-area-inset-top,0px);background:#FFFFFF;font-family:'Noto Sans Thai',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:transform 380ms cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
 #ci-sess-detail.open { transform:translateX(-50%) translateY(0); }
-.sd-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:0.5px solid #E5E5EA;flex-shrink:0; }
+.sd-header { display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top,0px)) 20px 12px;border-bottom:0.5px solid #E5E5EA;flex-shrink:0; }
 .sd-title { font-size:15px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em; }
 .sd-close { font-size:15px;color:#636366;cursor:pointer;padding:4px 0 4px 12px; }
 .sd-body { flex:1;overflow-y:auto;padding:16px 20px 24px;-webkit-overflow-scrolling:touch; }
