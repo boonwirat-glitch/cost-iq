@@ -1120,8 +1120,10 @@ function __legacyRenderPortviewListFallback(){
   }else{
     listEl.innerHTML=_sorted.map((a,i)=>renderer(a,i)).join('');
   }
-  // v669b: sync list padding-top after each render (header height may differ)
+  // v683: sync list padding-top after each render (header height may differ)
+  // Two-pass: 0ms catches most cases, 100ms fallback catches slow layout reflow
   setTimeout(_pvSyncListOffset, 0);
+  setTimeout(_pvSyncListOffset, 100);
   // Sync sticky sort row in portview-header
   const _sc=document.getElementById('pv-sort-count');if(_sc)_sc.textContent=filtered.length+' ร้าน';
   const _arrow=pvSortDir===1?'↓':'↑';
