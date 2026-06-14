@@ -1,4 +1,4 @@
-<!-- Freshket Sense 689: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 690: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '689',
+      version: '690',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -27715,17 +27715,27 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v687: use getBoundingClientRect().height — scrollHeight includes hidden overflow
-  // and gives wrong value; BCR.height = actual rendered height of sticky header.
-  // Guard: if scr-teamview is not on-screen BCR.height=0; skip silently.
+  // v690: measure offset of teamview-content top relative to scr-teamview top.
+  // This gives the exact amount of space the sticky header occupies regardless of
+  // BCR timing, iOS safe-area, or scroll container differences.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
-  if(!scr.classList.contains('on'))return; // not visible — BCR unreliable
+  if(!scr.classList.contains('on'))return;
+  var scrTop=scr.getBoundingClientRect().top;
+  var lstTop=lst.getBoundingClientRect().top;
+  // offset = distance from screen top to content top, minus topbar
+  // The sticky header sits at top:var(--topbar-h) so content starts below it
+  // Compute how much the header is actually covering content
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
+  var hdrBottom=hdr.getBoundingClientRect().bottom;
+  // If content top is already below header bottom — no overlap, no padding needed
+  var overlap=Math.max(0, Math.round(hdrBottom - lstTop));
+  if(overlap===0&&lstTop>scrTop)return; // already clear
+  // Set padding-top = overlap so first card starts below header
   var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
-  if(hdrH===0)return; // layout not settled yet — caller will retry
+  if(hdrH===0)return;
   var pt=hdrH+'px';
   if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
@@ -28519,7 +28529,7 @@ function _tvBuildCompactStrip(){
     `<div class="pv-cs-pace"><div class="pv-cs-pace-val" style="color:${color}">${pace}%</div><div class="pv-cs-pace-lbl">${window._tgtFbMode==="base"?"Baseline":window._tgtFbMode==="team"?"Target":"Target"}</div></div>`+
     chips.map((c,i)=>(i>0?'<div class="pv-cs-divider"></div>':'')+`<div class="pv-cs-chip ${c.cls}"><div class="pv-cs-label">${c.lbl}</div><div class="pv-cs-val">${c.val}</div><div class="pv-cs-sub">${c.sub}</div></div>`).join('')+
     `<button class="pv-cs-search" title="ค้นหา" onclick="(function(){const ex=document.getElementById('tv-sort-search-expand');const open=ex.style.display!=='none';ex.style.display=open?'none':'block';if(!open){const i=document.getElementById('tv-search-collapsed');if(i)i.focus();}else{const i=document.getElementById('tv-search-collapsed');if(i){i.value='';const ts=document.getElementById('tv-search');if(ts){ts.value='';renderTeamviewKamList();}}}}})()">${searchIconSvg}</button>`;
-  const sc=document.getElementById('tv-sort-count');if(sc)sc.textContent=groups.length+' KAM';
+  // v690: tv-sort-sticky updated by renderTeamviewKamList
 }
 function _tvInitCollapseObserver(){
   // v154c: disabled by design. Teamview should keep the full summary visible.
@@ -28876,17 +28886,18 @@ function __legacyRenderTeamviewKamListSync(groups, el){
 
   const _renderCard=g=>tvViewMode==='compact'?chipRow(g):(g.paceCls==='star'?starCard(g):fullCard(g));
 
-  // Icon toggle row — sits above the KAM list
-  const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
-  const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-  const _toggleRow=`<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 10px">
-    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
-    <div style="display:flex;align-items:center;gap:2px">
-      <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
-      <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>
-    </div>
-  </div>`;
-  el.innerHTML=_toggleRow+sorted.map(_renderCard).join('');
+  // v690: toggle row moved to #tv-sort-sticky (inside sticky portview-header)
+  // Prevents toggle being hidden under header due to padding-top offset on teamview-content
+  const _iconFull='<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>';
+  const _iconCompact='<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const _tvSortEl=document.getElementById('tv-sort-sticky');
+  if(_tvSortEl){
+    const _fc=tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)';
+    const _cc=tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)';
+    _tvSortEl.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:4px 0 2px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px';
+    _tvSortEl.innerHTML='<span style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:rgba(255,255,255,.35)">'+sorted.length+' KAM</span><div style="display:flex;gap:2px"><button onclick="setTvView(\'full\')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:'+_fc+';transition:color .15s">'+_iconFull+'</button><button onclick="setTvView(\'compact\')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:'+_cc+';transition:color .15s">'+_iconCompact+'</button></div>';
+  }
+  el.innerHTML=sorted.map(_renderCard).join('');
   // v687: sync at 0/100/350ms — BCR.height needs layout to settle after pv-collapsible animation
   setTimeout(_tvSyncListOffset, 0);
   setTimeout(_tvSyncListOffset, 100);
