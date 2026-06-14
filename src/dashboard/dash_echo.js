@@ -19,7 +19,7 @@ async function loadEchoData() {
     let q = supa.from('ci_sessions')
       .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,tone_signals,transcript_summary,tl_reviewed_at,tl_note,covisit_verified,status')
       .order('visited_at', { ascending: false })
-      .limit(120);
+      .limit(DASH_CONFIG.QUERY_LIMIT_ECHO);
 
     if (teamEmails.length) q = q.in('owner_email', teamEmails);
 
@@ -32,7 +32,7 @@ async function loadEchoData() {
         prev.owner_email === s.owner_email &&
         (prev.account_id||prev.account_name) === (s.account_id||s.account_name) &&
         prev.duration_secs === s.duration_secs &&
-        Math.abs(new Date(prev.visited_at)-new Date(s.visited_at)) < 60000
+        Math.abs(new Date(prev.visited_at)-new Date(s.visited_at)) < DASH_CONFIG.ECHO_DEDUPE_SEC * 1000
       )
     );
     echoDataReady = true;
@@ -193,7 +193,9 @@ function renderEchoCard(s) {
 }
 
 // ── Session detail (right panel) ─────────────────────────────
+let _echoDetailLoading = false;
 async function openEchoDetail(sessionId) {
+  if (_echoDetailLoading) return;  // ignore rapid clicks
   if (echoSelectedId === sessionId) {
     echoSelectedId = null;
     closeDetail();
@@ -204,6 +206,7 @@ async function openEchoDetail(sessionId) {
   renderEchoView();  // re-render to show selected state
 
   // Fetch full session
+  _echoDetailLoading = true;
   try {
     const { data, error } = await supa.from('ci_sessions')
       .select('*')
@@ -212,6 +215,7 @@ async function openEchoDetail(sessionId) {
     if (error) throw error;
     echoDetailData = data;
     openDetail(renderEchoDetailPanel(data));
+    _echoDetailLoading = false;
   } catch(e) {
     DashLog.error('echo_detail', e.message);
   }
