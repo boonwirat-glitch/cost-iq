@@ -1194,27 +1194,22 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v690: measure offset of teamview-content top relative to scr-teamview top.
-  // This gives the exact amount of space the sticky header occupies regardless of
-  // BCR timing, iOS safe-area, or scroll container differences.
+  // v691: padding-top = portview-header rendered height (BCR.height)
+  // sticky header covers teamview-content regardless of tv-ai-output between them
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
   if(!scr.classList.contains('on'))return;
-  var scrTop=scr.getBoundingClientRect().top;
-  var lstTop=lst.getBoundingClientRect().top;
-  // offset = distance from screen top to content top, minus topbar
-  // The sticky header sits at top:var(--topbar-h) so content starts below it
-  // Compute how much the header is actually covering content
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrBottom=hdr.getBoundingClientRect().bottom;
-  // If content top is already below header bottom — no overlap, no padding needed
-  var overlap=Math.max(0, Math.round(hdrBottom - lstTop));
-  if(overlap===0&&lstTop>scrTop)return; // already clear
-  // Set padding-top = overlap so first card starts below header
-  var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
-  if(hdrH===0)return;
+  // BCR.height = rendered height of sticky header (correct value)
+  // Falls back to offsetHeight if BCR not yet available (iOS timing)
+  var hdrH=Math.round(hdr.getBoundingClientRect().height)||hdr.offsetHeight||0;
+  if(hdrH===0){
+    // Layout not settled — schedule retry
+    setTimeout(_tvSyncListOffset,80);
+    return;
+  }
   var pt=hdrH+'px';
   if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
