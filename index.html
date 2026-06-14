@@ -1,4 +1,4 @@
-<!-- Freshket Sense v711: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v712: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v711',
+      version: 'v712',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43322,7 +43322,7 @@ body:not(.echo-active) { background:unset; }
       // ── Step 1: Transcript ───────────────────────────────────────────────────
       let segments = _resumeFromSegments || null;
       if (!segments) {
-        _setStep('กำลัง transcript...', 'Gemini · ฟัง audio ทั้งหมด', 10);
+        _setStep('กำลัง transcript...', 'Groq Whisper · ฟัง audio ทั้งหมด', 10);
         const transcriptResult = await _callTranscript(blob);
         if (transcriptResult.no_speech) {
           _phase = 'idle'; _idbClear(); _unmount();
@@ -43330,46 +43330,51 @@ body:not(.echo-active) { background:unset; }
         }
         segments = transcriptResult.segments || [];
         if (!segments.length) throw new Error('Transcript ไม่ได้ผล — ไม่มี segments');
-        // Save to IDB — ถ้า crash หลังจากนี้ recovery จะ resume จาก Step 2
         _idbSetPipeline({ segments, stage: 'transcribed' });
         console.log('[CI pipeline] transcript done —', segments.length, 'segments');
       } else {
         console.log('[CI pipeline] resuming from transcript —', segments.length, 'segments');
       }
 
+      // ── Progressive: เข้าหน้า result ทันทีหลัง transcript เสร็จ ────────────
+      // Tab 1 แสดง "กำลังสรุป..." ระหว่างรอ Step 2-3
+      _lastResult = { segments, summaryData: null, skillData: null, intelData: null,
+                      transcriptSummary: null, toneSignals: null };
+      _renderResult();
+      document.getElementById('ci-dur-chip').textContent = _durText;
+      _showScreen('ci-s-result');
+      setTimeout(_initPill, 80);
+
       // ── Step 2: Summary ──────────────────────────────────────────────────────
       _setStep('กำลังสรุปบทสนทนา...', 'Gemini · อ่าน transcript', 45);
       const summaryResult = await _callSummarize(segments);
       _idbSetPipeline({ segments, summary: summaryResult, stage: 'summarized' });
       console.log('[CI pipeline] summary done');
+      // Update Tab 1 ทันทีที่ summary เสร็จ
+      _lastResult.summaryData = summaryResult;
+      _lastResult.transcriptSummary = summaryResult?.transcript_summary || null;
+      _lastResult.toneSignals = summaryResult?.tone || null;
+      _updatePanel(0);
 
       // ── Step 3: Skills + OCPB ────────────────────────────────────────────────
       _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
       const analysisResult = await _callAnalyze(segments, summaryResult);
       console.log('[CI pipeline] analysis done');
+      // Update Tab 2 + 3 ทันทีที่ analysis เสร็จ
+      _lastResult.skillData  = analysisResult.skillData;
+      _lastResult.intelData  = analysisResult.intelData;
+      _updatePanel(1);
+      _updatePanel(2);
 
       // ── Save to Supabase ─────────────────────────────────────────────────────
       _setStep('กำลังบันทึก...', '', 92);
       await _saveToSupabasePipeline(segments, summaryResult, analysisResult);
-
       _idbClear();
-      _setStep('เสร็จแล้ว', '', 100);
+      _setStep('', '', 100);
       _stopProcTimer();
-
-      setTimeout(() => {
-        _lastResult = {
-          segments,
-          summaryData:  summaryResult,
-          skillData:    analysisResult.skillData,
-          intelData:    analysisResult.intelData,
-          transcriptSummary: summaryResult?.transcript_summary || null,
-          toneSignals:  summaryResult?.tone || null,
-        };
-        _renderResult();
-        document.getElementById('ci-dur-chip').textContent = _durText;
-        _showScreen('ci-s-result');
-        setTimeout(_initPill, 80);
-      }, 400);
+      // ซ่อน processing banner หลัง save เสร็จ
+      const procBanner = document.getElementById('ci-proc-banner');
+      if (procBanner) procBanner.style.display = 'none';
 
     } catch (err) {
       _stopProcTimer();
@@ -43979,6 +43984,29 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   // ── Render result panels ───────────────────────────────────────────────────
+  // v712: update single panel without full re-render
+  function _updatePanel(idx) {
+    if (!_lastResult) return;
+    const { skillData, intelData, segments, summaryData } = _lastResult;
+    const _tone = summaryData?.tone || null;
+    const _summaryText = summaryData?.transcript_summary || null;
+    if (idx === 0) {
+      const el = document.getElementById('ci-p0');
+      if (el) el.innerHTML = _overviewPanel(_summaryText, _tone, segments, summaryData);
+    } else if (idx === 1) {
+      const el = document.getElementById('ci-p1');
+      if (el) el.innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังวิเคราะห์ทักษะ...');
+    } else if (idx === 2) {
+      const el = document.getElementById('ci-p2');
+      if (el) el.innerHTML = intelData ? _customerPanel(intelData) : _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
+    }
+  }
+
+  function _loadingPanel(msg) {
+    return '<div style="padding:32px 24px;text-align:center;font-size:13px;color:#AEAEB2">'
+      + '<div style="margin-bottom:8px">⏳</div>' + (msg||'กำลังโหลด...') + '</div>';
+  }
+
   function _renderResult() {
     // v709: pipeline result — segments + summaryData added
     const { skillData, intelData, transcriptSummary, toneSignals, segments, summaryData } = _lastResult;
@@ -44009,10 +44037,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
       return;
     }
 
-    // v709: Tab บทสนทนา — แสดง segments (transcript จริง) + tone + summary
+    // v712: progressive — handle null states while pipeline continues
     document.getElementById('ci-p0').innerHTML = _overviewPanel(_summaryText, _tone, segments, summaryData);
-    document.getElementById('ci-p1').innerHTML = _skillsPanel(skillData);
-    document.getElementById('ci-p2').innerHTML = _customerPanel(intelData);
+    document.getElementById('ci-p1').innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังวิเคราะห์ทักษะ...');
+    document.getElementById('ci-p2').innerHTML = intelData ? _customerPanel(intelData) : _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
     const tlDiv = document.getElementById('ci-tl-actions');
     if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
   }
@@ -44068,8 +44096,42 @@ OCPB (customer intel จากเสียงเท่านั้น):
 <div style="margin-bottom:8px">${rows}</div>`;
     }
 
-    return (toneHtml + summaryHtml + transcriptHtml)
-      || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลบทสนทนา</div>`;
+    // v712: notes format (Google Meet style) — แสดงแทน transcript ยาวๆ
+    let notesHtml = '';
+    const notes = summaryData?.notes || [];
+    if (notes.length) {
+      notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
+      notesHtml += notes.map(n => {
+        const bullets = (n.bullets||[]).map(b =>
+          '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;color:#1C1C1E;line-height:1.6">'
+          + '<span style="color:#AEAEB2;flex-shrink:0">•</span><span>' + b + '</span></div>'
+        ).join('');
+        return '<div style="margin-bottom:14px">'
+          + (n.heading ? '<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
+          + bullets + '</div>';
+      }).join('');
+    } else if (!summaryData && segments && segments.length) {
+      // ยังไม่มี summary — แสดง loading
+      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
+    }
+
+    // customer_said — สิ่งที่ลูกค้าบอก
+    let customerSaidHtml = '';
+    const customerSaid = summaryData?.customer_said || [];
+    if (customerSaid.length) {
+      customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
+      customerSaidHtml += customerSaid.map(c =>
+        '<div style="padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">'
+        + '<div style="font-size:13px;color:#1C1C1E;line-height:1.6;margin-bottom:2px">' + (c.point||'') + '</div>'
+        + (c.quote ? '<div class="sd2-sev">&ldquo;' + c.quote + '&rdquo;'
+          + (c.ts ? ' <span style="font-family:var(--mono);font-size:11px;color:#8E8E93">' + c.ts + '</span>' : '')
+          + '</div>' : '')
+        + '</div>'
+      ).join('');
+    }
+
+    return (toneHtml + summaryHtml + notesHtml + customerSaidHtml)
+      || _loadingPanel('กำลังสรุปบทสนทนา...');
   }
 
   function _skillsPanel(d) {
