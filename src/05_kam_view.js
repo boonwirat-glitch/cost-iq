@@ -132,9 +132,6 @@ function __legacyShowScreenFallback(name){
   if(_handle)_handle.style.display=(isKAM&&name==='overview')?'block':'none';
   if(name==='teamview'){
     teamviewKamFilter=null;renderTeamview();
-    // v687: sync first-card offset after teamview is visible and layout settles
-    setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},300);
-    setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},600);
     // Disable Save while in teamview — must select account first
     const _sb=document.getElementById('nav-opportunities');
     if(_sb&&isKAM)_sb.classList.add('nav-disabled');
