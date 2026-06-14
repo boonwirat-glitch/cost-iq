@@ -1,4 +1,4 @@
-<!-- Freshket Sense 693: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 694: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '693',
+      version: '694',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -27715,19 +27715,23 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v687: use getBoundingClientRect().height — scrollHeight includes hidden overflow
-  // and gives wrong value; BCR.height = actual rendered height of sticky header.
-  // Guard: if scr-teamview is not on-screen BCR.height=0; skip silently.
+  // v694: padding-top = hdr.BCR.bottom - scr.BCR.top
+  // scr-teamview starts at y=0 in DOM flow (no topbar offset).
+  // Header is position:sticky top:var(--topbar-h), so header.bottom = topbar_h + header_height.
+  // Content must be offset by (header.bottom - scr.top) to clear the sticky header.
+  // Previous bug: used hdr.height alone (370px) but needed hdr.height + topbar_h (~424px).
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
-  if(!scr.classList.contains('on'))return; // not visible — BCR unreliable
+  if(!scr.classList.contains('on'))return;
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
-  if(hdrH===0)return; // layout not settled yet — caller will retry
-  var pt=hdrH+'px';
-  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
+  var hdrBottom=hdr.getBoundingClientRect().bottom;
+  var scrTop=scr.getBoundingClientRect().top;
+  var pt=Math.round(hdrBottom-scrTop);
+  if(pt<=0)return; // layout not settled
+  var ptPx=pt+'px';
+  if(lst.style.paddingTop!==ptPx) lst.style.paddingTop=ptPx;
 }
 
 function _pvSyncListOffset(){
