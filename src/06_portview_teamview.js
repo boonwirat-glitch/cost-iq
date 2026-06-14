@@ -1188,10 +1188,14 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _pvSyncListOffset(){
-  var hdr=document.querySelector('.portview-header');
+  // v670b: scope to scr-portview — teamview also has .portview-header which returns h:0
+  var scr=document.getElementById('scr-portview');
   var lst=document.getElementById('portview-list');
-  if(!hdr||!lst)return;
-  var h=Math.round(hdr.getBoundingClientRect().height);
+  if(!scr||!lst)return;
+  var hdr=scr.querySelector('.portview-header');
+  if(!hdr)return;
+  // offsetHeight works on scoped element; BCR returns 0 due to sticky/layout quirk
+  var h=hdr.offsetHeight;
   if(h>0&&lst.style.paddingTop!==h+'px') lst.style.paddingTop=h+'px';
 }
 
