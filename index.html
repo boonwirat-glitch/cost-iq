@@ -27745,11 +27745,14 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v672a: Few-cards guard — only prevent jitter on fresh load (not scrolled yet)
-    // If user already collapsed (isCollapsed=true), skip guard entirely
-    // so search/filter with few cards does NOT force expand
-    if(!_scrollable()&&!isCollapsed){
-      // Not scrolled yet + few cards → stay expanded, stop rAF
+    // v672c: if user was collapsed before render (scroll reset to 0 by browser)
+    // restore collapsed state — don't let scroll=0 mean "expanded"
+    if(y===0&&(window._pvWasCollapsed||isCollapsed)){
+      h=0;
+    }
+
+    // Few-cards guard — only on fresh load (never collapsed before)
+    if(!_scrollable()&&!isCollapsed&&!(window._pvWasCollapsed)){
       if(lastAppliedH!==expandedH){
         lastAppliedH=expandedH;
         collapsible.style.maxHeight=expandedH+'px';
