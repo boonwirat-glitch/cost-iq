@@ -27797,10 +27797,9 @@ function _pvInitCollapseObserver(){
     window.removeEventListener('scroll',_onScroll);
     document.removeEventListener('scroll',_onScroll,true);
     window.removeEventListener('resize',_onScroll);
-    // restore on disconnect
-    collapsible.style.maxHeight='';
-    collapsible.style.opacity='';
-    collapsible.style.pointerEvents='';
+    // v671c: preserve collapse state on disconnect — don't reset maxHeight
+    // so reinit (search/sort/filter) keeps header collapsed if user scrolled it
+    // Only reset lastAppliedH so _frame() re-writes on next init
     lastAppliedH=-1;
   }};
 }
