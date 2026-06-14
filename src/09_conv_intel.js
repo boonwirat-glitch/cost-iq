@@ -378,7 +378,7 @@ const CI = (() => {
   margin:0 auto;
   transform:translateY(100%);
   z-index:9999;
-  padding-top:env(safe-area-inset-top,44px);
+  padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
@@ -1631,7 +1631,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  padding-top:env(safe-area-inset-top,44px);
+  padding-top:env(safe-area-inset-top,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -1874,7 +1874,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  padding-top:env(safe-area-inset-top,44px);
+  padding-top:env(safe-area-inset-top,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -2033,7 +2033,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
   width:100%;max-width:440px;
   transform:translateX(-50%) translateY(100%);
   z-index:10000;
-  padding-top:env(safe-area-inset-top,44px);
+  padding-top:env(safe-area-inset-top,0px);
   background:#FFFFFF;
   font-family:'Noto Sans Thai',sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -2441,7 +2441,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       const s = document.createElement('style');
       s.id = 'ci-sess-detail-style';
       s.textContent = `
-#ci-sess-detail { position:fixed;top:0;bottom:0;left:50%;width:100%;max-width:440px;transform:translateX(-50%) translateY(100%);z-index:10001;padding-top:env(safe-area-inset-top,44px);background:#FFFFFF;font-family:'Noto Sans Thai',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:transform 380ms cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
+#ci-sess-detail { position:fixed;top:0;bottom:0;left:50%;width:100%;max-width:440px;transform:translateX(-50%) translateY(100%);z-index:10001;padding-top:env(safe-area-inset-top,0px);background:#FFFFFF;font-family:'Noto Sans Thai',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:transform 380ms cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
 #ci-sess-detail.open { transform:translateX(-50%) translateY(0); }
 .sd-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:0.5px solid #E5E5EA;flex-shrink:0; }
 .sd-title { font-size:15px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em; }
