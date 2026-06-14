@@ -37,7 +37,7 @@ async function loadEchoData() {
     );
     echoDataReady = true;
   } catch(e) {
-    console.warn('[Echo]', e.message);
+    DashLog.error('echo_load', e.message);
     echoDataReady = true;
   }
   if (currentView === 'echo') renderEchoView();
@@ -213,7 +213,7 @@ async function openEchoDetail(sessionId) {
     echoDetailData = data;
     openDetail(renderEchoDetailPanel(data));
   } catch(e) {
-    console.warn('[Echo detail]', e.message);
+    DashLog.error('echo_detail', e.message);
   }
 }
 
