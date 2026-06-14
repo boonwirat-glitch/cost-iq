@@ -738,3 +738,12 @@ body.sales-mode.kam-mode .bnav .ni.on .lb  { color: #FF385C !important; font-wei
 /* Skills + Echo disabled in KAM Sense (Save) flow */
 body.kam-sense-active.kam-mode .bnav #nav-skills   { opacity: .25 !important; pointer-events: none !important; }
 body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; pointer-events: none !important; }
+
+/* ── v683: SKU badge shimmer — hide badge rows while KAM bundle loading ──
+   pv-shimmer-wrap exists only during shimmer active (IDB boot → ETag complete).
+   Prevents .portview-acct-badge-row flashing empty → then suddenly showing
+   สั่ง/หาย/เฝ้าดู when KAM bundle arrives ~1s later. */
+#portview-list:has(#pv-shimmer-wrap) .portview-acct-badge-row,
+#portview-list:has(#tv-shimmer-wrap) .portview-acct-badge-row {
+  visibility: hidden;
+}
