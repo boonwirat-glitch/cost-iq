@@ -1280,6 +1280,8 @@ function _pvInitCollapseObserver(){
     isCollapsed=collapsed;
     strip.className='pv-compact-strip '+(collapsed?'visible':'hidden');
     window._pvLastCollapseMs=collapsed?Date.now():0;
+    // v671d: sync padding-top when collapse state changes (header height changes significantly)
+    setTimeout(_pvSyncListOffset, 0);
     var searchExpand=document.getElementById('pv-sort-search-expand');
     if(collapsed&&searchExpand){
       searchExpand.style.display='block';
