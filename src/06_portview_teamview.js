@@ -1194,9 +1194,9 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v687: use getBoundingClientRect().height — scrollHeight includes hidden overflow
-  // and gives wrong value; BCR.height = actual rendered height of sticky header.
-  // Guard: if scr-teamview is not on-screen BCR.height=0; skip silently.
+  // v698: use CSS variable instead of inline style — CSS !important shorthand
+  // in styles_teamview.css L48 (media ≤430px) overrides lst.style.paddingTop always.
+  // CSS variable set on :root wins over !important regular rule but yields to JS setProperty.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
@@ -1206,7 +1206,8 @@ function _tvSyncListOffset(){
   var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
   if(hdrH===0)return; // layout not settled yet — caller will retry
   var pt=hdrH+'px';
-  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
+  // Set CSS variable on :root — picked up by padding-top:var(--tv-content-offset,0px)!important
+  document.documentElement.style.setProperty('--tv-content-offset', pt);
 }
 
 function _pvSyncListOffset(){
