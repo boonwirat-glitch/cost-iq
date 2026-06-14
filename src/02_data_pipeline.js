@@ -2247,6 +2247,20 @@ window.RenderBus = (function(){
   function _flush(){
     _timer = null;
 
+    // v715 Fix 1B: TIER 1 GUARD in _flush() — closes gap where flushNow() bypassed
+    // the signal() guard and rendered with empty portviewBulkData → 0-values flash.
+    // Note: DataRegistry not available = script not loaded yet → proceed (safe fallback).
+    // Note: _senseSplashActive check is in signal() — _flush() can be called directly
+    //       via flushNow(), so we guard here too.
+    if(window.DataRegistry && !window.DataRegistry.isReady(1)){
+      window._pendingRefreshAll = true;
+      _senseDataLog('RENDERBUS','⏳ _flush HELD — Tier 1 not ready yet (re-queuing)');
+      // onReady fires signal() → re-schedules flush when Tier 1 is ready
+      // Use onReady not waitFor — onReady fires immediately if already ready
+      try{ window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
+      return;
+    }
+
     // Phase 0G: VERSION GUARD — skip if data hasn't actually changed
     // Catches ETag 304 (file unchanged) and duplicate signals from IDB+R2 same data
     var currentVersion = (window.DataRegistry && typeof window.DataRegistry.version !== 'undefined')
@@ -2259,6 +2273,13 @@ window.RenderBus = (function(){
     _lastRender = Date.now();
     _lastRenderedVersion = currentVersion;
     _senseDataLog('RENDERBUS','🎯 RENDER v'+currentVersion+' ['+Array.from(_ready).join(',')+']');
+
+    // v715: clear screen-level skeletons before render (Fix 2B)
+    try{
+      ['scr-portview','scr-teamview','scr-sales-portview'].forEach(function(id){
+        if(typeof window._hideScreenSkeleton==='function') window._hideScreenSkeleton(id);
+      });
+    }catch(e){}
 
     // v224e: clear shimmer right before render
     try{
