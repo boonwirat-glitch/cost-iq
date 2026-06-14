@@ -1194,23 +1194,19 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v694: padding-top = hdr.BCR.bottom - scr.BCR.top
-  // scr-teamview starts at y=0 in DOM flow (no topbar offset).
-  // Header is position:sticky top:var(--topbar-h), so header.bottom = topbar_h + header_height.
-  // Content must be offset by (header.bottom - scr.top) to clear the sticky header.
-  // Previous bug: used hdr.height alone (370px) but needed hdr.height + topbar_h (~424px).
+  // v687: use getBoundingClientRect().height — scrollHeight includes hidden overflow
+  // and gives wrong value; BCR.height = actual rendered height of sticky header.
+  // Guard: if scr-teamview is not on-screen BCR.height=0; skip silently.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
-  if(!scr.classList.contains('on'))return;
+  if(!scr.classList.contains('on'))return; // not visible — BCR unreliable
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrBottom=hdr.getBoundingClientRect().bottom;
-  var scrTop=scr.getBoundingClientRect().top;
-  var pt=Math.round(hdrBottom-scrTop);
-  if(pt<=0)return; // layout not settled
-  var ptPx=pt+'px';
-  if(lst.style.paddingTop!==ptPx) lst.style.paddingTop=ptPx;
+  var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
+  if(hdrH===0)return; // layout not settled yet — caller will retry
+  var pt=hdrH+'px';
+  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
 
 function _pvSyncListOffset(){
