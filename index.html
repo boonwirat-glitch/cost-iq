@@ -1,4 +1,4 @@
-<!-- Freshket Sense 688: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 689: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '688',
+      version: '689',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12328,6 +12328,17 @@ function showSenseSplash(onDone){
             try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
           }
         }
+        // v689: MAX_SHOW timeout case — allCriticalReady()=false so block above skips.
+        // But scr-teamview may already be .on (Admin/TL) with portviewBulkData available.
+        // RenderBus signals were queued (splash active) and lost — render teamview directly.
+        try{
+          var _tvEl=document.getElementById('scr-teamview');
+          var _pvLen=(typeof portviewBulkData!=='undefined'&&portviewBulkData)?portviewBulkData.length:0;
+          if(_tvEl&&_tvEl.classList.contains('on')&&_pvLen>0&&typeof renderTeamview==='function'){
+            _senseDataLog('SPLASH','🔄 post-fade teamview render (MAX_SHOW path)');
+            renderTeamview();
+          }
+        }catch(_){}
         // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
         // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.
         if(!dataReady && !window._coldRetryFired){
