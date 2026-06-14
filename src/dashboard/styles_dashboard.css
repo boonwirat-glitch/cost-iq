@@ -429,3 +429,51 @@ html, body {
 .ds-seg-item:hover { color: var(--ink-2); }
 .ds-seg-item.active { background: var(--c-seg-active-bg); color: var(--c-seg-active-fg); font-weight: var(--weight-semibold); box-shadow: var(--c-seg-active-shadow); }
 .ds-seg-item.active-ac { background: var(--ac); color: white; font-weight: var(--weight-semibold); }
+
+/* ── Phase 3: Sync & Interaction (v703) ── */
+
+/* Rep-map highlight states */
+.td-poly.rep-highlight { stroke-width: 1.5 !important; }
+.td-poly.rep-dim       { transition: opacity .2s; }
+
+/* Zone filter chip */
+.td-zone-chip {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--info-dim); border: 1px solid var(--info-border);
+  border-radius: var(--r-full); padding: 4px 8px 4px 10px;
+  font-size: var(--text-2xs); color: var(--info);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+.td-zone-chip svg { flex-shrink: 0; }
+.td-zone-chip span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-zone-chip button {
+  width: 18px; height: 18px; border: none; background: var(--info-dim);
+  border-radius: var(--r-full); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: var(--info);
+  flex-shrink: 0;
+}
+.td-zone-chip button:hover { background: var(--info-border); }
+
+/* Sales overlay toggle button */
+.td-overlay-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 var(--space-3);
+  background: var(--surface); border: 1px solid var(--hair-2);
+  border-radius: var(--r-md); font-size: var(--text-2xs);
+  font-family: var(--font-mono); font-weight: var(--weight-semibold);
+  color: var(--ink-3); cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.td-overlay-btn:hover { border-color: var(--info-border); color: var(--info); }
+.td-overlay-btn.active {
+  background: var(--info-dim); border-color: var(--info-border); color: var(--info);
+}
+
+/* Sales dots */
+.td-sales-dot { pointer-events: all; }
+
+/* Rep row dim state */
+.td-rep-row.dimmed {
+  opacity: .28; pointer-events: none;
+}
