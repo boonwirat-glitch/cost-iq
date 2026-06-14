@@ -1194,10 +1194,10 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v699: use OVERLAP method (same as _pvSyncListOffset) instead of full header height.
-  // hdr.BCR.height includes bottom padding/margin BELOW visible content → over-estimates.
-  // Overlap = hdrRect.bottom - lstRect.top = exact pixels header covers the list top.
-  // CSS variable on :root → picked up by padding-top:var(--tv-content-offset,0px)!important
+  // v700: overlap method + inline style (same pattern as _pvSyncListOffset for portview-list).
+  // portview-list has no !important padding-top CSS → inline style wins.
+  // teamview-content also has no !important padding-top CSS (removed v700) → inline style wins.
+  // DO NOT add padding-top:anything!important in any CSS rule for #teamview-content.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
@@ -1209,7 +1209,7 @@ function _tvSyncListOffset(){
   if(hdrRect.height===0)return; // layout not settled — caller will retry
   var overlap=Math.max(0, Math.round(hdrRect.bottom - lstRect.top));
   var pt=overlap>0?overlap+'px':'0px';
-  document.documentElement.style.setProperty('--tv-content-offset', pt);
+  if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
 
 function _pvSyncListOffset(){
