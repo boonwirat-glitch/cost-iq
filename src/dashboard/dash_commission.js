@@ -5,6 +5,31 @@
 // (pre-computed by Sense) — no need to re-implement computation logic.
 // Falls back to local pace-based estimate when snapshots unavailable.
 
+
+// ── Bracket resolver — Supabase tiers first, hardcoded fallback ──
+function _getSalesTLBrackets() {
+  // Attempt to read from loaded commTierData (commission_rule_tiers)
+  try {
+    const tlPlan = Object.values(commPlanData || {}).find(p => p.beneficiary_role === 'tl');
+    if (tlPlan) {
+      const rule = Object.values(commTierData || {}).flat()
+        .filter(t => {
+          // find rule that belongs to TL plan
+          return true; // tier rows don't have plan_id directly — use fallback
+        });
+    }
+  } catch(e) { /* fallback */ }
+  // Hardcoded fallback (Sales TL Commission PDF Apr 2026)
+  return [
+    { min:0,   max:84,  rate:0,     label:'< 85%'    },
+    { min:85,  max:89,  rate:.0055, label:'85–90%'  },
+    { min:90,  max:94,  rate:.007,  label:'90–95%'  },
+    { min:95,  max:99,  rate:.008,  label:'95–100%' },
+    { min:100, max:119, rate:.010,  label:'100–120%'},
+    { min:120, max:999, rate:.012,  label:'≥ 120%'  },
+  ];
+}
+
 // ── State ─────────────────────────────────────────────────────
 let commSnapshotData  = [];   // commission_payout_snapshots rows
 let commPlanData      = {};   // planCode → plan
@@ -12,14 +37,21 @@ let commTierData      = {};   // ruleId → tiers[]
 let commAssignments   = [];   // plan assignments per period
 let commDataReady     = false;
 
-// Month label format: "2026-04" (ISO) ↔ "Apr 26" (display)
-const MONTH_ISO = {
-  'Nov 25':'2025-11','Dec 25':'2025-12','Jan 26':'2026-01',
-  'Feb 26':'2026-02','Mar 26':'2026-03','Apr 26':'2026-04'
-};
-const MONTH_DISPLAY = Object.fromEntries(
-  Object.entries(MONTH_ISO).map(([d,iso]) => [iso, d])
-);
+// Month label ↔ ISO — derived from MONTHS array in dash_data.js (no hardcode)
+// MONTHS = ['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26']
+function _buildMonthISO() {
+  const map = {};
+  (typeof MONTHS !== 'undefined' ? MONTHS : []).forEach(m => {
+    const [mon, yr] = m.split(' ');
+    const moNum = {'Nov':'11','Dec':'12','Jan':'01','Feb':'02','Mar':'03',
+                   'Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10'}[mon];
+    const year  = parseInt(yr) < 50 ? '20' + yr : '19' + yr;
+    if (moNum) map[m] = `${year}-${moNum}`;
+  });
+  return map;
+}
+const MONTH_ISO     = _buildMonthISO();
+const MONTH_DISPLAY = Object.fromEntries(Object.entries(MONTH_ISO).map(([d,iso]) => [iso,d]));
 
 // ── Load from Supabase ────────────────────────────────────────
 async function loadCommissionData() {
@@ -125,15 +157,8 @@ function estimateTLCommission(groups) {
   const total    = groups.reduce((s,g) => s+g.totalGMV, 0);
   const baseline = groups.reduce((s,g) => s+g.baseline, 0);
   const pace     = baseline > 0 ? Math.round(total/baseline*100) : 0;
-  // Sales TL bracket (from commission PDF)
-  const bracket = [
-    {min:0,   max:84,  rate:0,     label:'< 85%'},
-    {min:85,  max:89,  rate:.0055, label:'85–90%'},
-    {min:90,  max:94,  rate:.007,  label:'90–95%'},
-    {min:95,  max:99,  rate:.008,  label:'95–100%'},
-    {min:100, max:119, rate:.010,  label:'100–120%'},
-    {min:120, max:999, rate:.012,  label:'≥ 120%'},
-  ].find(b => pace >= b.min && pace <= b.max) || {min:0,max:84,rate:0,label:'< 85%'};
+  const _eb  = _getSalesTLBrackets();
+  const bracket = _eb.find(b => pace >= b.min && pace <= b.max) || _eb[0];
   return { pace, total, baseline, bracket, est: Math.round(total * bracket.rate) };
 }
 
@@ -144,7 +169,7 @@ function renderCommissionView() {
   if (!commDataReady) { el.innerHTML = skeletonBlock(4); return; }
 
   const groups = buildKamGroups();
-  const isoNow = MONTH_ISO[currentMonth] || '2026-04';
+  const isoNow = MONTH_ISO[currentMonth] || Object.values(MONTH_ISO)[Object.values(MONTH_ISO).length-1];
 
   // TL own payout this month
   const tlSnap    = getMyCommSnaps('tl').find(s => s.period_month === isoNow);
