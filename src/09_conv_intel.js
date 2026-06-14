@@ -141,7 +141,7 @@ const CI = (() => {
 #ci-fullsheet .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px 10px;background:transparent;}
 .tb-act{font-size:15px;font-weight:400;color:var(--tx2);cursor:pointer;padding:6px 0;}
 .tb-act:hover{color:var(--tx);}
-.tb-lbl{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;}
+.tb-lbl{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;}
 .tb-rec{font-size:12px;font-weight:500;color:var(--ac);display:flex;align-items:center;gap:5px;font-family:'Noto Sans Thai',sans-serif;}
 .rec-dot{width:5px;height:5px;border-radius:50%;background:var(--danger);opacity:0;transition:opacity .3s;}
 .rec-dot.on{opacity:1;animation:blink 1.3s ease-in-out infinite;}
@@ -3412,11 +3412,19 @@ OCPB (customer intel จากเสียงเท่านั้น):
       const tabHist = document.getElementById('ci-tab-hist');
       if (tabHist) tabHist.style.color = 'rgba(255,255,255,.2)';
       const tabBar = document.getElementById('ci-main-tabs');
-      if (tabBar) tabBar.style.background = 'rgba(255,255,255,.06)';
+      if (tabBar) { tabBar.style.background = 'rgba(255,255,255,.06)'; if (tabBar.parentElement) tabBar.parentElement.style.display = 'none'; }
     } else {
       sheet.classList.remove('is-rec');
       // → LIGHT
       sheet.style.background = '#ffffff';
+      const tabBarR = document.getElementById('ci-main-tabs');
+      if (tabBarR && tabBarR.parentElement) tabBarR.parentElement.style.display = '';
+      if (tabBarR) tabBarR.style.background = '';
+      const tabRecR = document.getElementById('ci-tab-rec');
+      if (tabRecR) { tabRecR.style.background = ''; tabRecR.style.color = ''; tabRecR.style.boxShadow = ''; }
+      const tabHistR = document.getElementById('ci-tab-hist');
+      if (tabHistR) tabHistR.style.color = '';
+
       // v601: restore html background (was set dark during recording)
       try { document.documentElement.style.background = ''; } catch(_) {}
       const tbL = sheet.querySelector('.topbar');
