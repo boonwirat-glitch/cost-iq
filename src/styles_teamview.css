@@ -45,7 +45,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 @media (max-width: 430px){
   /* Screen rhythm */
   #scr-teamview{overflow-x:hidden!important;background:var(--tk-bg-base)!important;}
-  #teamview-content{padding:0 16px calc(150px + env(safe-area-inset-bottom))!important;}
+  #teamview-content{padding-left:16px!important;padding-right:16px!important;padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;padding-top:0;}
 
   /* Header: undo v212a title squeeze and keep desktop hierarchy */
   #scr-teamview .portview-head{
