@@ -4255,6 +4255,11 @@ function echoOpen() {
     echoExpand();
     return;
   }
+  // Guard: data ยังไม่พร้อม — ไม่เปิด Echo จนกว่าจะ load ครบ
+  if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
+    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล กรุณารอสักครู่...', '⏳');
+    return;
+  }
   CI.open(null);
 }
 function echoHistory(accountId) {
