@@ -890,7 +890,7 @@ html, body {
 /* Map polygons (via D3) */
 .td-poly { stroke: white; stroke-width: .8; cursor: pointer; transition: opacity .1s; }
 .td-poly:hover { opacity: .75; stroke-width: 1.2; }
-.td-poly.selected { stroke: var(--ink-1); stroke-width: 2; opacity: 1 !important; }
+.td-poly.selected { stroke: var(--ink-1); stroke-width: 2; opacity: 1; }
 .td-poly-bg { fill: var(--surface-2); stroke: white; stroke-width: .5; pointer-events: none; }
 
 /* ── Detail panel ── */
@@ -1040,7 +1040,7 @@ html, body {
 /* ── Phase 3: Sync & Interaction (v703) ── */
 
 /* Rep-map highlight states */
-.td-poly.rep-highlight { stroke-width: 1.5 !important; }
+.td-poly.rep-highlight { stroke-width: 1.5; }
 .td-poly.rep-dim       { transition: opacity .2s; }
 
 /* Zone filter chip */
@@ -1260,6 +1260,34 @@ html, body {
 .td-echo-note-input:focus {
   border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-dim);
 }
+
+/* ── Commission last-updated badge ── */
+.td-comm-updated {
+  font-family: var(--font-mono); font-size: var(--text-micro);
+  color: var(--ink-4); margin-top: var(--space-2);
+}
+
+/* ── Skills pending sort toggle ── */
+.td-skill-sort-btn {
+  font-size: var(--text-micro); font-family: var(--font-mono);
+  color: var(--ink-4); background: none; border: none;
+  cursor: pointer; padding: 0;
+}
+.td-skill-sort-btn:hover { color: var(--ac); }
+
+/* ── Team table — sortable header ── */
+.td-team-th-sort {
+  cursor: pointer; user-select: none;
+}
+.td-team-th-sort:hover { color: var(--ink-2); }
+.td-team-sort-arrow { margin-left: 4px; color: var(--ink-4); }
+
+/* ── Forgot password link ── */
+.auth-forgot {
+  font-size: var(--text-xs); color: var(--ink-4); text-align: right;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.auth-forgot:hover { color: var(--ac); }
 </style>
 </head>
 <body>
@@ -1280,6 +1308,7 @@ html, body {
     <input id="auth-email" class="ds-input" type="email" placeholder="อีเมล" autocomplete="email">
     <input id="auth-pass"  class="ds-input" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
     <button id="auth-btn" class="ds-btn ds-btn-primary" style="width:100%" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="auth-forgot" onclick="doForgotPassword()">ลืมรหัสผ่าน?</div>
   </div>
 </div>
 
@@ -1328,23 +1357,23 @@ html, body {
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <nav class="sidebar-nav" id="sidebar-nav">
-        <button class="snav-btn active" data-view="map" onclick="setView('map',this)">
+        <button class="snav-btn active" data-view="map" aria-label="Territory Map" onclick="setView('map',this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/></svg>
           <span>Map</span>
         </button>
-        <button class="snav-btn" data-view="team" onclick="setView('team',this)">
+        <button class="snav-btn" data-view="team" aria-label="ภาพรวมทีม" onclick="setView('team',this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>ทีม</span>
         </button>
-        <button class="snav-btn" data-view="commission" onclick="setView('commission',this)">
+        <button class="snav-btn" data-view="commission" aria-label="Commission" onclick="setView('commission',this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
           <span>Comm.</span>
         </button>
-        <button class="snav-btn" data-view="skills" onclick="setView('skills',this)">
+        <button class="snav-btn" data-view="skills" aria-label="Skills" onclick="setView('skills',this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
           <span>Skills</span>
         </button>
-        <button class="snav-btn" data-view="echo" onclick="setView('echo',this)">
+        <button class="snav-btn" data-view="echo" aria-label="Echo Sessions" onclick="setView('echo',this)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>
           <span>Echo</span>
         </button>
@@ -1443,11 +1472,31 @@ html, body {
 // Freshket TL Dashboard v707
 // Single responsibility: auth, logging, error handling, shared utils
 
-const DASH_VERSION = 'v708';
+const DASH_VERSION = 'v709';
 const SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
 const SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
 const ALLOWED_ROLES = ['tl','admin','sales_tl','ad_tl',
   'team_lead','team lead','ka team lead','sales team lead'];
+
+
+// ── DASH_CONFIG — all tunable constants in one place ─────────
+// Change here only — never hardcode these values elsewhere
+const DASH_CONFIG = {
+  PACE_STAR:            105,
+  PACE_OK:               95,
+  PACE_WARN:             90,
+  BASELINE_MONTHS:        3,
+  QUERY_LIMIT_ECHO:     120,
+  QUERY_LIMIT_SKILLS:   500,
+  FETCH_RETRIES:          2,
+  FETCH_RETRY_DELAY_MS: 1200,
+  SUPABASE_TIMEOUT_MS:  8000,
+  TOAST_DURATION_MS:    2800,
+  ECHO_WEEK_DAYS:          7,
+  ECHO_DEDUPE_SEC:        60,
+  MONTHS: ["Nov 25","Dec 25","Jan 26","Feb 26","Mar 26","Apr 26"],
+};
+Object.freeze(DASH_CONFIG);
 
 let supa, currentProfile = null;
 
@@ -1511,6 +1560,16 @@ const DashLog = (() => {
 
 // Expose for console debugging
 window.DashLog = DashLog;
+
+
+// ── supaFetch — Supabase query with timeout ───────────────────
+async function supaFetch(queryBuilder) {
+  const timeout = new Promise((_,reject) =>
+    setTimeout(() => reject(new Error('Supabase timeout')),
+               DASH_CONFIG.SUPABASE_TIMEOUT_MS)
+  );
+  return Promise.race([queryBuilder, timeout]);
+}
 
 // ── Global error boundary ─────────────────────────────────────
 window.addEventListener('unhandledrejection', e => {
@@ -1633,6 +1692,32 @@ async function doLogout() {
 
 function openSense() { window.open('/', '_blank'); }
 
+async function doForgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) {
+    showAuthError('กรุณากรอกอีเมลก่อน แล้วกด "ลืมรหัสผ่าน"');
+    return;
+  }
+  try {
+    const { error } = await supa.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/dashboard'
+    });
+    if (error) throw error;
+    showAuthError('');
+    const el = document.getElementById('auth-error');
+    el.textContent = 'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ ' + email + ' แล้ว';
+    el.style.display = 'block';
+    el.style.background = 'var(--ok-dim)';
+    el.style.color = 'var(--ok-text)';
+    el.style.borderColor = 'var(--ok-border)';
+  } catch(e) {
+    DashLog.error('forgot_password', e.message);
+    showAuthError(e.message || 'ไม่สามารถส่งอีเมลได้');
+  }
+}
+
+
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.activeElement?.id === 'auth-pass') doLogin();
 });
@@ -1698,9 +1783,9 @@ function fmtPct(v)         { return v != null ? v + '%' : '—'; }
 function fmtDelta(c, p)    { if (!p) return ''; const d = Math.round((c-p)/p*100); return (d>=0?'+':'')+d+'%'; }
 function deltaCls(c, p)    { return c >= p ? 'up' : 'down'; }
 function paceCls(pct) {
-  if (pct >= 105) return 'star';
-  if (pct >= 95)  return 'ok';
-  if (pct >= 90)  return 'warn';
+  if (pct >= DASH_CONFIG.PACE_STAR) return 'star';
+  if (pct >= DASH_CONFIG.PACE_OK)   return 'ok';
+  if (pct >= DASH_CONFIG.PACE_WARN) return 'warn';
   return 'danger';
 }
 </script>
@@ -1712,17 +1797,18 @@ function paceCls(pct) {
 // Data pipeline: R2 CSV + KAM group builder
 
 const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const MONTHS  = ['Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+// MONTHS sourced from DASH_CONFIG
+const MONTHS = DASH_CONFIG.MONTHS;
 
 // ── State ─────────────────────────────────────────────────────
 let portviewBulkData = [];
-let currentMonth     = MONTHS[MONTHS.length - 1];  // always last available month
+let currentMonth = MONTHS.length > 0 ? MONTHS[MONTHS.length - 1] : 'Apr 26';
 let currentMetric    = 'gmv';
 let dataReady        = false;
 let dataLoadError    = null;
 
 // ── Fetch with retry ─────────────────────────────────────────
-async function fetchWithRetry(url, retries = 2, delayMs = 1200) {
+async function fetchWithRetry(url, retries = DASH_CONFIG.FETCH_RETRIES, delayMs = DASH_CONFIG.FETCH_RETRY_DELAY_MS) {
   for (let i = 0; i <= retries; i++) {
     try {
       const resp = await fetch(url);
@@ -1743,7 +1829,7 @@ async function loadDashData() {
   try {
     const csv = await fetchWithRetry(`${R2_BASE}/portview.csv?cb=${Date.now()}`);
     portviewBulkData = parsePortviewCSV(csv);
-    DashLog.info('data', `portview loaded: ${portviewBulkData.length} accounts`);
+    DashLog.info('data', `portview loaded: ${portviewBulkData?.length ?? 0} accounts`);
   } catch(e) {
     DashLog.error('data_load', e.message, 'portview.csv');
     dataLoadError = e.message;
@@ -1794,7 +1880,7 @@ function onDataReady() {
 
 // ── Getters ───────────────────────────────────────────────────
 function getMyAccounts() {
-  if (!currentProfile) return [];
+  if (!currentProfile?.email) return [];
   const email = currentProfile.email;
   const role  = currentProfile.role;
   if (role === 'admin') return portviewBulkData;
@@ -1824,7 +1910,7 @@ function buildKamGroups() {
     // 3-month rolling baseline
     const baseline = g.accounts.reduce((s,a) => {
       const vals = MONTHS.slice(0, MONTHS.indexOf(currentMonth))
-        .slice(-3).map(m => a.gmv[m]||0).filter(v=>v>0);
+        .slice(-DASH_CONFIG.BASELINE_MONTHS).map(m => a.gmv[m]||0).filter(v=>v>0);
       return s + (vals.length ? vals.reduce((x,y)=>x+y,0)/vals.length : 0);
     }, 0);
 
@@ -1891,6 +1977,16 @@ const DashState = {
   }
 };
 
+// ── Render debounce — prevents double-render on fast clicks ─────
+let _renderDebounceTimer = null;
+function scheduleRender() {
+  if (_renderDebounceTimer) clearTimeout(_renderDebounceTimer);
+  _renderDebounceTimer = setTimeout(() => {
+    _renderDebounceTimer = null;
+    renderCurrentView();
+  }, 40);  // 40ms — one frame
+}
+
 // ── App init ──────────────────────────────────────────────────
 function initApp() {
   renderTopbarUser();
@@ -1903,7 +1999,7 @@ function initApp() {
 }
 
 function renderTopbarUser() {
-  if (!currentProfile) return;
+  if (!currentProfile?.email) return;
   const initials = (currentProfile.name || currentProfile.email || '?')
     .trim().charAt(0).toUpperCase();
   document.getElementById('user-avatar').textContent = initials;
@@ -1939,8 +2035,8 @@ function setMetric(m, btn) {
   currentMetric = m;
   document.querySelectorAll('#metric-toggle .ds-seg-item').forEach(b => b.classList.remove('active-ac'));
   btn.classList.add('active-ac');
-  updateMapColors();
-  renderCurrentView();
+  if (typeof _mapInited !== 'undefined' && _mapInited) updateMapColors();
+  scheduleRender();
 }
 
 function setMonth(m, btn) {
@@ -1962,6 +2058,7 @@ function toggleSalesOverlay() {
 // ── View routing ──────────────────────────────────────────────
 function setView(v, btn) {
   currentView = v;
+  if (v !== 'map' && typeof cancelMapInitTimer === 'function') cancelMapInitTimer();
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v)?.classList.add('active');
   document.querySelectorAll('.snav-btn').forEach(b => b.classList.remove('active'));
@@ -2083,7 +2180,20 @@ function renderSidebarRepHighlight() {
   });
 }
 
-// ── Detail panel ──────────────────────────────────────────────
+// ── Click-outside to close detail panel ────────────────────────
+document.addEventListener('click', e => {
+  const panel  = document.getElementById('detail-panel');
+  const isOpen = panel?.classList.contains('open');
+  if (!isOpen) return;
+  if (!panel.contains(e.target) &&
+      !e.target.closest('.td-echo-card') &&
+      !e.target.closest('.td-poly') &&
+      !e.target.closest('.td-rep-row')) {
+    closeDetail();
+  }
+});
+
+// ── Detail panel ───────────────────────────────────────────────
 function openDetail(html) {
   document.getElementById('detail-content').innerHTML = html;
   document.getElementById('detail-panel').classList.add('open');
@@ -2160,10 +2270,20 @@ function renderSidebarTeam() {
 
 // ── Main team view ────────────────────────────────────────────
 function renderTeamView() {
+  if (!dataReady) return;
   const groups = buildKamGroups();
   const el = document.getElementById('team-content');
 
-  const rows = groups.map(g => {
+  // Sort groups
+  const sorted = [...groups].sort((a,b) => {
+    let va, vb;
+    if (_teamSortCol === 'name')     { va = a.name; vb = b.name; return _teamSortAsc ? va.localeCompare(vb,'th') : vb.localeCompare(va,'th'); }
+    if (_teamSortCol === 'gmv')      { va = a.totalGMV; vb = b.totalGMV; }
+    else if (_teamSortCol === 'accounts') { va = a.count; vb = b.count; }
+    else                              { va = a.pace; vb = b.pace; }
+    return _teamSortAsc ? va - vb : vb - va;
+  });
+  const rows = sorted.map(g => {
     const prevIdx = MONTHS.indexOf(currentMonth) - 1;
     const prevGMV = prevIdx >= 0
       ? g.accounts.reduce((s,a) => s+(a.gmv[MONTHS[prevIdx]]||0), 0) : 0;
@@ -2198,10 +2318,10 @@ function renderTeamView() {
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:var(--surface)">
-          <th style="padding:10px 16px;text-align:left;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM</th>
-          <th style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV ${currentMonth}</th>
-          <th style="padding:10px 16px;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace</th>
-          <th style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Acc</th>
+          <th onclick="setTeamSort('name')" class="td-team-th-sort" style="padding:10px 16px;text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">KAM <span class="td-team-sort-arrow">${_teamSortCol==='name'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('gmv')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">GMV ${currentMonth} <span class="td-team-sort-arrow">${_teamSortCol==='gmv'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('pace')" class="td-team-th-sort" style="padding:10px 16px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Pace <span class="td-team-sort-arrow">${_teamSortCol==='pace'?(_teamSortAsc?'↑':'↓'):''}</span></th>
+          <th onclick="setTeamSort('accounts')" class="td-team-th-sort" style="padding:10px 16px;text-align:right;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;border-bottom:1px solid var(--hair)">Acc <span class="td-team-sort-arrow">${_teamSortCol==='accounts'?(_teamSortAsc?'↑':'↓'):''}</span></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -2285,10 +2405,10 @@ async function loadCommissionData() {
 
   try {
     // 1. Snapshots (pre-computed by Sense)
-    const { data: snaps } = await supa
+    const { data: snaps } = await supaFetch(supa
       .from('commission_payout_snapshots')
       .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at')
-      .in('period_month', periods);
+      .in('period_month', periods));
     commSnapshotData = snaps || [];
   } catch(e) {
     DashLog.error('commission_snapshots', e.message);
@@ -2297,11 +2417,11 @@ async function loadCommissionData() {
 
   try {
     // 2. Plans + tiers (for bracket display)
-    const { data: plans } = await supa
+    const { data: plans } = await supaFetch(supa
       .from('commission_plans')
       .select('id,plan_code,plan_name,beneficiary_role,status')
       .in('beneficiary_role', ['tl','kam'])
-      .neq('status','inactive');
+      .neq('status','inactive'));
 
     const planMap = {};
     const planIds = [];
@@ -2353,10 +2473,10 @@ function getCommSnaps(periodMonth, role) {
 }
 
 function getMyCommSnaps(role) {
-  if (!currentProfile?.email) return [];
+  if (!currentProfile?.email) return [];  // guard
   return commSnapshotData.filter(s =>
-    (s.beneficiary_email === currentProfile.email ||
-     s.team_lead_email   === currentProfile.email) &&
+    (s.beneficiary_email === (currentProfile?.email||'__none__') ||
+     s.team_lead_email   === (currentProfile?.email||'__none__')) &&
     (!role || s.beneficiary_role === role)
   );
 }
@@ -2369,10 +2489,10 @@ function getTLPayoutForMonth(isoMonth) {
 
 // All KAM payouts under this TL for a month
 function getKAMPayoutsForMonth(isoMonth) {
-  if (!currentProfile?.email) return [];
+  if (!currentProfile?.email) return [];  // guard
   return commSnapshotData.filter(s =>
     s.period_month === isoMonth &&
-    s.team_lead_email === currentProfile.email &&
+    s.team_lead_email === (currentProfile?.email||'__none__') &&
     s.beneficiary_role === 'kam'
   );
 }
@@ -2389,6 +2509,7 @@ function estimateTLCommission(groups) {
 
 // ── Render: Commission view (Phase 4) ─────────────────────────
 function renderCommissionView() {
+  if (!dataReady) return;
   const el = document.getElementById('commission-content');
   if (!el) return;
   if (!commDataReady) { el.innerHTML = skeletonBlock(4); return; }
@@ -2467,6 +2588,9 @@ function renderCommissionView() {
             KAM team ${fmtGMV(kamTotal)} · status: ${tlSnap?.snapshot_status || '—'}
            </div>`
       }
+      ${tlSnap?.updated_at
+        ? `<div class="td-comm-updated">Updated ${new Date(tlSnap.updated_at).toLocaleDateString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>`
+        : ''}
     </div>
 
     <!-- 6-month trend -->
@@ -2535,7 +2659,8 @@ let skillView     = 'pending';   // 'pending' | 'matrix' | 'echo'
 // ── Load ──────────────────────────────────────────────────────
 async function loadSkillsData() {
   if (!supa || !currentProfile) return;
-  const tlEmail = currentProfile.email;
+  const tlEmail = currentProfile?.email;
+  if (!tlEmail) { DashLog.error('skills','no email'); skillDataReady=true; return; }
 
   try {
     // 1. Squad members from profiles
@@ -2584,7 +2709,7 @@ async function loadSkillsData() {
         .select('id, user_id, skill_code, ai_score, evidence, observed_at, session_id')
         .in('user_id', memberIds)
         .order('observed_at', { ascending: false })
-        .limit(500);
+        .limit(DASH_CONFIG.QUERY_LIMIT_SKILLS);
       skillEchoObs = {};
       (obs || []).forEach(o => {
         const key = `${o.user_id}:${o.skill_code}`;
@@ -2644,6 +2769,7 @@ function stateLabel(state) {
 
 // ── Render ────────────────────────────────────────────────────
 function renderSkillsView() {
+  if (!dataReady && !skillDataReady) { return; }
   const el = document.getElementById('skills-content');
   if (!el) return;
 
@@ -2688,9 +2814,12 @@ function pendingCount() {
 
 // ── Tab: Pending evaluations ──────────────────────────────────
 function renderSkillsPending() {
+  const _skillSortAsc = (typeof window._skillPendSort === 'undefined') ? true : window._skillPendSort;
   const pending = Object.values(skillProg)
     .filter(p => p.state === 'training')
-    .sort((a,b) => new Date(a.updated_at||0) - new Date(b.updated_at||0));
+    .sort((a,b) => _skillSortAsc
+      ? new Date(a.updated_at||0) - new Date(b.updated_at||0)
+      : new Date(b.updated_at||0) - new Date(a.updated_at||0));
 
   if (!pending.length) return `
     <div class="ds-empty" style="padding:var(--space-10) 0">
@@ -2748,8 +2877,11 @@ function renderSkillsPending() {
   }).join('');
 
   return `
-    <div style="margin-bottom:var(--space-2)">
-      <span class="ds-eyebrow">${pending.length} รายการ · เรียงตามรอนานสุด</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+      <span class="ds-eyebrow">${pending.length} รายการ</span>
+      <button class="td-skill-sort-btn" onclick="window._skillPendSort=!window._skillPendSort;renderSkillsView()">
+        ${(typeof window._skillPendSort==='undefined'||window._skillPendSort)?'รอนานสุด ↑':'ล่าสุด ↓'}
+      </button>
     </div>
     <div style="border-radius:var(--r-md);border:1px solid var(--hair);overflow:hidden">
       ${rows}
@@ -2895,7 +3027,7 @@ async function loadEchoData() {
     let q = supa.from('ci_sessions')
       .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,tone_signals,transcript_summary,tl_reviewed_at,tl_note,covisit_verified,status')
       .order('visited_at', { ascending: false })
-      .limit(120);
+      .limit(DASH_CONFIG.QUERY_LIMIT_ECHO);
 
     if (teamEmails.length) q = q.in('owner_email', teamEmails);
 
@@ -2908,7 +3040,7 @@ async function loadEchoData() {
         prev.owner_email === s.owner_email &&
         (prev.account_id||prev.account_name) === (s.account_id||s.account_name) &&
         prev.duration_secs === s.duration_secs &&
-        Math.abs(new Date(prev.visited_at)-new Date(s.visited_at)) < 60000
+        Math.abs(new Date(prev.visited_at)-new Date(s.visited_at)) < DASH_CONFIG.ECHO_DEDUPE_SEC * 1000
       )
     );
     echoDataReady = true;
@@ -3069,7 +3201,9 @@ function renderEchoCard(s) {
 }
 
 // ── Session detail (right panel) ─────────────────────────────
+let _echoDetailLoading = false;
 async function openEchoDetail(sessionId) {
+  if (_echoDetailLoading) return;  // ignore rapid clicks
   if (echoSelectedId === sessionId) {
     echoSelectedId = null;
     closeDetail();
@@ -3080,6 +3214,7 @@ async function openEchoDetail(sessionId) {
   renderEchoView();  // re-render to show selected state
 
   // Fetch full session
+  _echoDetailLoading = true;
   try {
     const { data, error } = await supa.from('ci_sessions')
       .select('*')
@@ -3088,6 +3223,7 @@ async function openEchoDetail(sessionId) {
     if (error) throw error;
     echoDetailData = data;
     openDetail(renderEchoDetailPanel(data));
+    _echoDetailLoading = false;
   } catch(e) {
     DashLog.error('echo_detail', e.message);
   }
@@ -3238,18 +3374,25 @@ let SUR_GEO = null;
 async function loadGeoJSON() {
   if (BKK_GEO && SUR_GEO) return true;  // already loaded
   try {
-    const [bkkResp, surResp] = await Promise.all([
-      fetch('/geo/bangkok_khet.geojson'),
-      fetch('/geo/surrounding_provinces.geojson'),
-    ]);
-    if (!bkkResp.ok || !surResp.ok) throw new Error('GeoJSON fetch failed');
-    [BKK_GEO, SUR_GEO] = await Promise.all([bkkResp.json(), surResp.json()]);
-    DashLog.info('map', 'GeoJSON loaded');
-    return true;
+    const bkkResp = await fetch('/geo/bangkok_khet.geojson');
+    if (!bkkResp.ok) throw new Error('bangkok_khet.geojson HTTP ' + bkkResp.status);
+    BKK_GEO = await bkkResp.json();
+    DashLog.info('map', 'BKK GeoJSON loaded');
   } catch(e) {
-    DashLog.error('map_geojson', e.message);
+    DashLog.error('map_bkk_geojson', e.message);
     return false;
   }
+  try {
+    const surResp = await fetch('/geo/surrounding_provinces.geojson');
+    if (!surResp.ok) throw new Error('surrounding_provinces.geojson HTTP ' + surResp.status);
+    SUR_GEO = await surResp.json();
+    DashLog.info('map', 'Surrounding GeoJSON loaded');
+  } catch(e) {
+    DashLog.error('map_sur_geojson', e.message);
+    // Non-fatal — surrounding provinces are background only
+    SUR_GEO = { type: 'FeatureCollection', features: [] };
+  }
+  return true;
 }
 
 
@@ -3349,8 +3492,8 @@ function updateMapColors() {
 
   // Read CSS vars for choropleth
   const cs = getComputedStyle(document.documentElement);
-  const c0 = cs.getPropertyValue('--choro-0').trim() || '#FFF5F7';
-  const c5 = cs.getPropertyValue('--choro-5').trim() || '#CC1A3A';
+  const c0 = cs.getPropertyValue('--choro-0').trim();
+  const c5 = cs.getPropertyValue('--choro-5').trim();
 
   const colorScale = d3.scaleSequential()
     .domain([min, max])
@@ -3542,7 +3685,12 @@ function openDetailForDistrict(name, props) {
     </div>`);
 }
 
-// ── Zoom controls ─────────────────────────────────────────────
+// ── Cancel pending init if nav away before timer fires ────────
+function cancelMapInitTimer() {
+  if (_mapInitTimer) { clearTimeout(_mapInitTimer); _mapInitTimer = null; }
+}
+
+// ── Zoom controls ──────────────────────────────────────────────
 function mapZoom(factor) {
   if (!mapSvg) return;
   mapSvg.transition().duration(280).call(mapZoomBehavior.scaleBy, factor);
@@ -3563,11 +3711,12 @@ const _origSetView = typeof setView === 'function' ? setView : null;
 
 // Watch for map view — init on first show
 let _mapInited = false;
+let _mapInitTimer = null;
 const _mapObserver = new MutationObserver(() => {
   const mapView = document.getElementById('view-map');
   if (mapView?.classList.contains('active') && !_mapInited) {
-    _mapInited = true;
-    setTimeout(initMap, 60);
+    _mapInited = true;  // flag set first to prevent double-trigger
+    setTimeout(async () => { await initMap(); }, 60);
   }
 });
 document.addEventListener('DOMContentLoaded', () => {
