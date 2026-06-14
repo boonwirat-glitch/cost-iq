@@ -1194,16 +1194,18 @@ let _pvCollapseObserver=null;
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
 // Safe to call any time — reads BCR, writes paddingTop only if changed
 function _tvSyncListOffset(){
-  // v686: teamview-content has tv-ai-output between it and portview-header,
-  // so overlap measurement is always 0. Instead measure header scrollHeight directly.
-  // padding-top = header height, keeps first KAM card below the sticky header.
+  // v687: use getBoundingClientRect().height — scrollHeight includes hidden overflow
+  // and gives wrong value; BCR.height = actual rendered height of sticky header.
+  // Guard: if scr-teamview is not on-screen BCR.height=0; skip silently.
   var scr=document.getElementById('scr-teamview');
   var lst=document.getElementById('teamview-content');
   if(!scr||!lst)return;
+  if(!scr.classList.contains('on'))return; // not visible — BCR unreliable
   var hdr=scr.querySelector('.portview-header');
   if(!hdr)return;
-  var hdrH=hdr.scrollHeight||0;
-  var pt=hdrH>0?hdrH+'px':'0px';
+  var hdrH=Math.round(hdr.getBoundingClientRect().height)||0;
+  if(hdrH===0)return; // layout not settled yet — caller will retry
+  var pt=hdrH+'px';
   if(lst.style.paddingTop!==pt) lst.style.paddingTop=pt;
 }
 
@@ -1949,9 +1951,10 @@ function __legacyRenderTeamviewFallback(){
     if(backWrap)backWrap.style.display='none';
     renderTeamviewSummary();
     renderTeamviewKamList();
-    // v685: sync padding-top after full teamview render
+    // v687: sync at multiple points — BCR settles after collapsible + paint
     setTimeout(_tvSyncListOffset, 0);
     setTimeout(_tvSyncListOffset, 120);
+    setTimeout(_tvSyncListOffset, 350);
     // v154c: Teamview must stay expanded. Do not attach the scroll-collapse behavior here.
     if(_tvCollapseObserver){_tvCollapseObserver.disconnect();_tvCollapseObserver=null;}
     const tvColl=document.getElementById('tv-collapsible');
@@ -2363,9 +2366,10 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     </div>
   </div>`;
   el.innerHTML=_toggleRow+sorted.map(_renderCard).join('');
-  // v685: sync padding-top so first KAM card is not hidden under sticky header
+  // v687: sync at 0/100/350ms — BCR.height needs layout to settle after pv-collapsible animation
   setTimeout(_tvSyncListOffset, 0);
   setTimeout(_tvSyncListOffset, 100);
+  setTimeout(_tvSyncListOffset, 350);
 }
 
 function setTvView(mode){
