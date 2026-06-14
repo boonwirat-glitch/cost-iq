@@ -704,6 +704,17 @@ function showSenseSplash(onDone){
             try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
           }
         }
+        // v689: MAX_SHOW timeout case — allCriticalReady()=false so block above skips.
+        // But scr-teamview may already be .on (Admin/TL) with portviewBulkData available.
+        // RenderBus signals were queued (splash active) and lost — render teamview directly.
+        try{
+          var _tvEl=document.getElementById('scr-teamview');
+          var _pvLen=(typeof portviewBulkData!=='undefined'&&portviewBulkData)?portviewBulkData.length:0;
+          if(_tvEl&&_tvEl.classList.contains('on')&&_pvLen>0&&typeof renderTeamview==='function'){
+            _senseDataLog('SPLASH','🔄 post-fade teamview render (MAX_SHOW path)');
+            renderTeamview();
+          }
+        }catch(_){}
         // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
         // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.
         if(!dataReady && !window._coldRetryFired){
