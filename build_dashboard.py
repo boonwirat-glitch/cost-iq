@@ -65,6 +65,11 @@ if unresolved:
 
 os.makedirs('dist', exist_ok=True)
 path = f'dist/dashboard_{VERSION}.html'
+
+# Also copy to dashboard-app/index.html for Cloudflare Pages
+import shutil, os
+os.makedirs('dashboard-app', exist_ok=True)
+shutil.copy(path, 'dashboard-app/index.html')
 with open(path, 'w', encoding='utf-8') as f:
     f.write(out)
 
