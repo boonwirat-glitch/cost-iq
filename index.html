@@ -1,4 +1,4 @@
-<!-- Freshket Sense 730: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 731: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '730',
+      version: '731',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43451,6 +43451,7 @@ body:not(.echo-active) { background:unset; }
       _setStep('กำลังบันทึก...', '', 92);
       console.log('[CI pipeline] reaching save step, _sessionId=' + _sessionId);
       await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
+      _sessionId = null; // v731: pipeline owns _sessionId — release after save completes
       _idbClear();
       _setStep('', '', 100);
       _stopProcTimer();
@@ -45889,11 +45890,13 @@ OCPB (customer intel จากเสียงเท่านั้น):
   function open(accountGuid) {
     // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
     // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
-    // v729: capture pipeline state BEFORE any resets
-    // _keepSessionId must be evaluated before _phase is reset to 'idle'
-    const _pipelineWasActive = (_phase === 'processing') && !!_sessionId;
+    // v731: _sessionId belongs to the pipeline — preserve it if pipeline saved a transcript
+    // _phase may already be 'idle' (user pressed cancel) but pipeline still runs in background
+    // Only null _sessionId if there is genuinely no active session
+    const _hadActiveSession = !!_sessionId;
     _phase = 'idle'; _lastResult = null; _secs = 0;
-    if (!_pipelineWasActive) _sessionId = null;
+    if (!_hadActiveSession) _sessionId = null;
+    // Note: if _hadActiveSession=true, pipeline will null _sessionId itself after _saveAnalysis completes
     _isOwnRecording = false;
     _mainTab = 'record';
     _unmount();
