@@ -1132,6 +1132,7 @@ body:not(.echo-active) { background:unset; }
       _setStep('กำลังบันทึก...', '', 92);
       console.log('[CI pipeline] reaching save step, _sessionId=' + _sessionId);
       await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
+      _sessionId = null; // v731: pipeline owns _sessionId — release after save completes
       _idbClear();
       _setStep('', '', 100);
       _stopProcTimer();
@@ -3570,11 +3571,13 @@ OCPB (customer intel จากเสียงเท่านั้น):
   function open(accountGuid) {
     // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
     // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
-    // v729: capture pipeline state BEFORE any resets
-    // _keepSessionId must be evaluated before _phase is reset to 'idle'
-    const _pipelineWasActive = (_phase === 'processing') && !!_sessionId;
+    // v731: _sessionId belongs to the pipeline — preserve it if pipeline saved a transcript
+    // _phase may already be 'idle' (user pressed cancel) but pipeline still runs in background
+    // Only null _sessionId if there is genuinely no active session
+    const _hadActiveSession = !!_sessionId;
     _phase = 'idle'; _lastResult = null; _secs = 0;
-    if (!_pipelineWasActive) _sessionId = null;
+    if (!_hadActiveSession) _sessionId = null;
+    // Note: if _hadActiveSession=true, pipeline will null _sessionId itself after _saveAnalysis completes
     _isOwnRecording = false;
     _mainTab = 'record';
     _unmount();
