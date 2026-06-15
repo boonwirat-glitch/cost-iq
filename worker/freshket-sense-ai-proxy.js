@@ -97,33 +97,8 @@ async function handleTranscript(request, env) {
   const groqSegments = groqData.segments || [];
   const fullText     = groqData.text || '';
 
-  // ── Keyword correction map — Whisper mishears for Freshket context ───────
-  // Applied to both fullText and groqSegments.text before diarization
-  const KEYWORD_MAP = [
-    // Brand name
-    [/FredGate|FredeGate|FreshGate|Freshgate|FREDGET|FEDGET|fredgate|freshgate/gi, 'Freshket'],
-    [/เฟดเก็ต|เฟรดเก็ต|เฟรชเกต|เฟรชเก็ต/gi, 'Freshket'],
-    // Competitor
-    [/m8\.co|M8\.co|m8co/gi, 'Makro'],
-    [/แม็คโค|แม็คโคร|Macro(?!n)/gi, 'Makro'],
-    // Common mishears
-    [/เฟสเก็ต/gi, 'Freshket'],
-  ];
-  function applyKeywords(text) {
-    if (!text) return text;
-    let t = text;
-    for (const [pattern, replacement] of KEYWORD_MAP) {
-      t = t.replace(pattern, replacement);
-    }
-    return t;
-  }
-  const fullTextCorrected = applyKeywords(fullText);
-  const groqSegmentsCorrected = groqSegments.map(s => ({
-    ...s, text: applyKeywords(s.text)
-  }));
-
   // no speech detected
-  if (!fullTextCorrected.trim()) {
+  if (!fullText.trim()) {
     return json({
       text: JSON.stringify({
         no_speech: true,
@@ -137,7 +112,7 @@ async function handleTranscript(request, env) {
   }
 
   // Build segment lines with index for segment_id tracking
-  const segmentLines = groqSegmentsCorrected.length
+  const segmentLines = groqSegments.length
     ? groqSegments.map((s, i) => {
         const mm = String(Math.floor(s.start / 60)).padStart(2,'0');
         const ss = String(Math.floor(s.start % 60)).padStart(2,'0');
@@ -222,7 +197,7 @@ ${segmentLines}
   // Spec principle: transcript is never thrown away
   if (!diarizeResult) {
     const fallbackSegments = groqSegments.length
-      ? groqSegmentsCorrected.map((s, i) => ({
+      ? groqSegments.map((s, i) => ({
           segment_id:             i,
           ts:                     String(Math.floor(s.start/60)).padStart(2,'0') + ':' + String(Math.floor(s.start%60)).padStart(2,'0'),
           start_sec:              s.start,
@@ -265,9 +240,8 @@ async function handleSummarize(request, env) {
   const { segments } = body;
   if (!segments || !segments.length) return json({ error: 'segments required' }, 400, env);
 
-  // Strip [seg:N] prefix from display text — keep only ts + speaker + text for readability
   const transcriptText = segments.map(s =>
-    `[${s.ts}] ${s.speaker}: ${s.text}`
+    `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
   ).join('\n');
 
   const prompt = `อ่าน transcript นี้แล้วสรุปเป็น structured notes
