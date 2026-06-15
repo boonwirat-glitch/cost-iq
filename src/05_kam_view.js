@@ -49,6 +49,8 @@ function __legacyShowScreenFallback(name){
     document.body.classList.remove('kam-sense-active');
     window._kamSenseReturn=false;
     const _ksb=document.getElementById('kam-sense-back-btn');if(_ksb)_ksb.remove();
+    // v753a: re-render nav so Skills tab shows again after leaving Save screen
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
   }
   if((name==='opportunities'||name==='report')&&!senseActivated&&(!isKAM||_kamWithAcct)){
     openSenseGate();return;
@@ -56,6 +58,8 @@ function __legacyShowScreenFallback(name){
   // ── KAM Sense Mode: full-screen opportunities routing ──
   if(isKAM&&window._kamSenseReturn&&(name==='opportunities'||name==='report')){
     document.body.classList.add('kam-sense-active');
+    // v753a: re-render nav so Skills tab hides when entering Save screen
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
     document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));

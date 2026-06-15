@@ -22,7 +22,7 @@
     'restaurant':       { id: 'nav-restaurant' },
     'echo-kam':         { id: 'nav-echo-kam' },
     'opportunities':    { id: 'nav-opportunities' },
-    'skills':           { id: 'nav-skills', hideWhen: ['sense-plan-expanded'] },
+    'skills':           { id: 'nav-skills', hideWhen: ['sense-plan-expanded', 'kam-sense-active'] },
     'sales-portview':   { id: 'nav-sales-portview' },
     'sales-pipeline':   { id: 'nav-sales-pipeline' },
     'sales-echo':       { id: 'nav-echo' },
