@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echo v2 — Eval Tool</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'IBM Plex Mono', monospace; background: #0d1117; color: #e6edf3; font-size: 13px; padding: 24px; }
+h1 { font-size: 16px; font-weight: 600; color: #f0f6fc; margin-bottom: 4px; }
+.sub { color: #8b949e; font-size: 12px; margin-bottom: 24px; }
+
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #8b949e; margin-bottom: 12px; }
+
+label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; margin-top: 10px; }
+input, textarea, select {
+  width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  color: #e6edf3; font-family: inherit; font-size: 12px; padding: 8px 10px;
+  outline: none;
+}
+input:focus, textarea:focus { border-color: #388bfd; }
+textarea { resize: vertical; min-height: 80px; }
+
+button {
+  padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+}
+.btn-primary { background: #238636; color: #fff; }
+.btn-primary:hover { background: #2ea043; }
+.btn-primary:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+.btn-ghost { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+.btn-ghost:hover { background: #30363d; }
+
+.row { display: flex; gap: 10px; margin-top: 14px; }
+
+/* Results */
+#results { display: none; }
+.criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.crit-card {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px;
+}
+.crit-card.pass { border-color: #238636; }
+.crit-card.fail { border-color: #da3633; }
+.crit-card.unknown { border-color: #9e6a03; }
+.crit-label { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: .06em; }
+.crit-status { font-size: 18px; margin: 4px 0 2px; }
+.crit-value { font-size: 20px; font-weight: 700; }
+.crit-card.pass .crit-value { color: #3fb950; }
+.crit-card.fail .crit-value { color: #f85149; }
+.crit-card.unknown .crit-value { color: #d29922; }
+.crit-target { font-size: 10px; color: #8b949e; margin-top: 2px; }
+.crit-note { font-size: 10px; color: #8b949e; margin-top: 4px; border-top: 1px solid #21262d; padding-top: 4px; }
+
+.overall-banner {
+  padding: 14px 16px; border-radius: 8px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.overall-banner.pass { background: rgba(35,134,54,.15); border: 1px solid #238636; }
+.overall-banner.fail { background: rgba(218,54,51,.12); border: 1px solid #da3633; }
+.overall-icon { font-size: 24px; }
+.overall-text { font-size: 14px; font-weight: 600; }
+.overall-sub { font-size: 11px; color: #8b949e; margin-top: 2px; }
+
+.segments-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.segments-table th { color: #8b949e; text-align: left; padding: 4px 8px; border-bottom: 1px solid #21262d; font-weight: 500; }
+.segments-table td { padding: 5px 8px; border-bottom: 1px solid #161b22; vertical-align: top; }
+.segments-table tr:hover td { background: #161b22; }
+.conf-bar { display: inline-block; height: 4px; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
+.spk-sales { color: #f85149; font-weight: 600; }
+.spk-customer { color: #3fb950; font-weight: 600; }
+.spk-unknown { color: #d29922; font-weight: 600; }
+
+.log { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px; font-size: 11px; color: #8b949e; max-height: 200px; overflow-y: auto; }
+.log-line { margin-bottom: 2px; }
+.log-line.ok { color: #3fb950; }
+.log-line.err { color: #f85149; }
+.log-line.info { color: #58a6ff; }
+
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.badge { display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+.badge-pass { background: rgba(35,134,54,.2); color: #3fb950; }
+.badge-fail { background: rgba(218,54,51,.15); color: #f85149; }
+.badge-skip { background: rgba(139,148,158,.15); color: #8b949e; }
+</style>
+</head>
+<body>
+
+<h1>Echo v2 — Eval Tool</h1>
+<p class="sub">วัด criteria ตาม spec: Thai accuracy · speaker attribution · hallucination · evidence coverage</p>
+
+<!-- Config -->
+<div class="card">
+  <div class="card-title">Config</div>
+  <label>Worker URL</label>
+  <input type="text" id="workerUrl" value="https://freshket-sense-ai-proxy.boonwirat-t.workers.dev">
+  <label>Supabase URL</label>
+  <input type="text" id="supaUrl" value="https://menslbnyyvpxiyvjywcm.supabase.co">
+  <label>Supabase Anon Key</label>
+  <input type="text" id="supaKey" value="sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG">
+</div>
+
+<!-- Mode selector -->
+<div class="card">
+  <div class="card-title">วิธีโหลด Session</div>
+  <label>Mode</label>
+  <select id="mode" onchange="toggleMode()">
+    <option value="session_id">จาก Session ID (Supabase)</option>
+    <option value="manual">ใส่ segments JSON โดยตรง</option>
+  </select>
+
+  <div id="mode-session">
+    <label>Session ID (UUID จาก ci_sessions)</label>
+    <input type="text" id="sessionId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="row">
+      <button class="btn-ghost" onclick="loadLatestSession()">โหลด Session ล่าสุด</button>
+      <button class="btn-ghost" onclick="loadSession()">โหลดจาก ID</button>
+    </div>
+  </div>
+
+  <div id="mode-manual" style="display:none">
+    <label>Segments JSON (array)</label>
+    <textarea id="manualSegments" rows="6" placeholder='[{"segment_id":0,"ts":"00:00","speaker":"Sales","text":"สวัสดีครับ","speaker_confidence":0.9,"transcript_confidence":0.95}]'></textarea>
+    <label>Analysis Result JSON (optional — วัด evidence coverage)</label>
+    <textarea id="manualAnalysis" rows="4" placeholder='{"skills":[...],"ocpb_facts":[...]}'></textarea>
+  </div>
+</div>
+
+<!-- Ground truth (optional) -->
+<div class="card">
+  <div class="card-title">Ground Truth (optional — วัด hallucination)</div>
+  <label>พิมพ์หรือวางสิ่งที่พูดจริงๆ ใน session นี้ (ถ้าไม่มีจะข้าม hallucination check)</label>
+  <textarea id="groundTruth" rows="4" placeholder="Sales: สวัสดีครับ วันนี้มาคุยเรื่องวัตถุดิบ...&#10;ลูกค้า: ครับ ตอนนี้ใช้อยู่ที่..."></textarea>
+</div>
+
+<!-- Session preview -->
+<div class="card" id="session-preview" style="display:none">
+  <div class="card-title">Session ที่โหลด</div>
+  <div id="session-meta" style="color:#8b949e;font-size:12px;margin-bottom:10px"></div>
+  <div style="overflow-x:auto">
+    <table class="segments-table" id="segments-table">
+      <thead><tr>
+        <th>#</th><th>ts</th><th>speaker</th><th>text</th>
+        <th>spk conf</th><th>tx conf</th>
+      </tr></thead>
+      <tbody id="segments-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Run button -->
+<div class="row" style="margin-bottom:16px">
+  <button class="btn-primary" id="run-btn" onclick="runEval()" disabled>
+    <span class="spinner" id="spinner" style="display:none"></span>
+    วัด criteria
+  </button>
+  <button class="btn-ghost" onclick="clearResults()">ล้าง</button>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <div class="card-title">Log</div>
+  <div class="log" id="log"><div class="log-line info">พร้อม — โหลด session แล้วกด "วัด criteria"</div></div>
+</div>
+
+<!-- Results -->
+<div id="results">
+  <div class="card" style="margin-top:16px">
+    <div id="overall-banner"></div>
+    <div class="card-title">Criteria Results</div>
+    <div class="criteria-grid" id="criteria-grid"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px" id="hallucination-detail" style="display:none">
+    <div class="card-title">Hallucination Detail</div>
+    <div id="hallucination-content"></div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL = () => document.getElementById('supaUrl').value.trim();
+const SUPA_KEY = () => document.getElementById('supaKey').value.trim();
+const WORKER   = () => document.getElementById('workerUrl').value.trim();
+
+let _segments = null;
+let _analysis = null;
+
+function log(msg, type='') {
+  const el = document.getElementById('log');
+  const div = document.createElement('div');
+  div.className = 'log-line' + (type ? ' '+type : '');
+  div.textContent = '[' + new Date().toLocaleTimeString('th') + '] ' + msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function toggleMode() {
+  const mode = document.getElementById('mode').value;
+  document.getElementById('mode-session').style.display = mode === 'session_id' ? '' : 'none';
+  document.getElementById('mode-manual').style.display  = mode === 'manual'     ? '' : 'none';
+  if (mode === 'manual') {
+    _segments = null;
+    document.getElementById('run-btn').disabled = false;
+  }
+}
+
+async function loadLatestSession() {
+  log('โหลด session ล่าสุด...');
+  try {
+    const email = prompt('Email ของ user (เช่น phongsakorn.j@freshket.co):');
+    if (!email) return;
+    const res = await fetch(`${SUPA_URL()}/rest/v1/ci_sessions?owner_email=eq.${encodeURIComponent(email)}&order=visited_at.desc&limit=1&select=*`, {
+      headers: { 'apikey': SUPA_KEY(), 'Authorization': 'Bearer ' + SUPA_KEY() }
+    });
+    const rows = await res.json();
+    if (!rows.length) { log('ไม่พบ session', 'err'); return; }
+    const row = rows[0];
+    document.getElementById('sessionId').value = row.id;
+    populateSession(row);
+    log(`โหลดแล้ว: ${row.id.slice(0,8)}... (${row.pipeline_stage})`, 'ok');
+  } catch(e) { log('Error: ' + e.message, 'err'); }
+}
+
+async function loadSession() {
+  const id = document.getElementById('sessionId').value.trim();
+  if (!id) { log('ใส่ Session ID ก่อน', 'err'); return; }
+  log('โหลด session ' + id.slice(0,8) + '...');
+  try {
+    const res = await fetch(`${SUPA_URL()}/rest/v1/ci_sessions?id=eq.${id}&select=*`, {
+      headers: { 'apikey': SUPA_KEY(), 'Authorization': 'Bearer ' + SUPA_KEY() }
+    });
+    const rows = await res.json();
+    if (!rows.length) { log('ไม่พบ session', 'err'); return; }
+    populateSession(rows[0]);
+    log(`โหลดแล้ว: ${rows[0].pipeline_stage} · ${rows[0].transcript_source || 'unknown source'}`, 'ok');
+  } catch(e) { log('Error: ' + e.message, 'err'); }
+}
+
+function populateSession(row) {
+  _segments = row.transcript || [];
+  _analysis = row.skill_scores || null;
+
+  // Meta
+  const dur = row.duration_secs ? Math.floor(row.duration_secs/60) + ':' + String(row.duration_secs%60).padStart(2,'0') : '?';
+  document.getElementById('session-meta').innerHTML =
+    `<strong>${row.account_name || '(no account)'}</strong> · ${row.owner_email} · ${dur} · ` +
+    `<span class="badge ${row.pipeline_stage === 'analyzed' ? 'badge-pass' : 'badge-skip'}">${row.pipeline_stage}</span> · ` +
+    `source: ${row.transcript_source || 'unknown'}`;
+
+  // Table
+  const tbody = document.getElementById('segments-tbody');
+  tbody.innerHTML = '';
+  _segments.forEach((s, i) => {
+    const spkClass = s.speaker === 'Sales' ? 'spk-sales' : s.speaker === 'ไม่ทราบ' ? 'spk-unknown' : 'spk-customer';
+    const sc = (s.speaker_confidence || 0);
+    const tc = (s.transcript_confidence || 0);
+    const scBar = `<span class="conf-bar" style="width:${Math.round(sc*40)}px;background:${sc>=0.9?'#3fb950':sc>=0.7?'#d29922':'#f85149'}"></span>`;
+    const tcBar = `<span class="conf-bar" style="width:${Math.round(tc*40)}px;background:${tc>=0.9?'#3fb950':tc>=0.7?'#d29922':'#f85149'}"></span>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:#8b949e">${i}</td>` +
+      `<td style="color:#8b949e;white-space:nowrap">${s.ts||''}</td>` +
+      `<td class="${spkClass}">${s.speaker||'?'}</td>` +
+      `<td style="max-width:300px">${(s.text||'').slice(0,120)}</td>` +
+      `<td style="white-space:nowrap">${(sc*100).toFixed(0)}%${scBar}</td>` +
+      `<td style="white-space:nowrap">${(tc*100).toFixed(0)}%${tcBar}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('session-preview').style.display = '';
+  document.getElementById('run-btn').disabled = _segments.length === 0;
+}
+
+async function runEval() {
+  const mode = document.getElementById('mode').value;
+  let segments = _segments;
+  let analysis = _analysis;
+
+  if (mode === 'manual') {
+    try {
+      segments = JSON.parse(document.getElementById('manualSegments').value || '[]');
+      const analysisTxt = document.getElementById('manualAnalysis').value.trim();
+      if (analysisTxt) analysis = JSON.parse(analysisTxt);
+    } catch(e) { log('JSON parse error: ' + e.message, 'err'); return; }
+  }
+
+  if (!segments || !segments.length) { log('ไม่มี segments — โหลด session ก่อน', 'err'); return; }
+
+  const groundTruth = document.getElementById('groundTruth').value.trim();
+
+  const btn = document.getElementById('run-btn');
+  const spinner = document.getElementById('spinner');
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+
+  log('เรียก /eval ...');
+
+  try {
+    const body = { segments };
+    if (groundTruth) body.ground_truth_text = groundTruth;
+    if (analysis)    body.analysis_result   = analysis;
+
+    const res = await fetch(`${WORKER()}/eval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      log('Worker error ' + res.status + ': ' + err, 'err');
+      return;
+    }
+
+    const data = await res.json();
+    log('ได้ผลแล้ว — ' + data.pass_count + '/' + data.total_criteria + ' criteria ผ่าน', data.overall_pass ? 'ok' : 'err');
+    renderResults(data);
+
+  } catch(e) {
+    log('Fetch error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function renderResults(data) {
+  document.getElementById('results').style.display = '';
+
+  // Overall banner
+  const banner = document.getElementById('overall-banner');
+  banner.className = 'overall-banner ' + (data.overall_pass ? 'pass' : 'fail');
+  banner.innerHTML =
+    `<div class="overall-icon">${data.overall_pass ? '✅' : '❌'}</div>` +
+    `<div><div class="overall-text">${data.overall_pass ? 'ผ่านทุก criteria' : 'ยังไม่ผ่าน'}</div>` +
+    `<div class="overall-sub">${data.pass_count}/${data.total_criteria} criteria ผ่าน · ` +
+    `${data.meta?.total_segments || 0} segments · ` +
+    `source: ${data.meta?.source || 'unknown'}</div></div>`;
+
+  // Criteria grid
+  const grid = document.getElementById('criteria-grid');
+  grid.innerHTML = '';
+
+  const LABELS = {
+    thai_accuracy:          'Thai Accuracy',
+    speaker_attribution:    'Speaker Attribution',
+    avg_speaker_confidence: 'Speaker Confidence',
+    hallucination_rate:     'Hallucination Rate',
+    evidence_coverage:      'Evidence Coverage',
+  };
+
+  const TARGETS = {
+    thai_accuracy:          '>= 90%',
+    speaker_attribution:    '>= 90%',
+    avg_speaker_confidence: '>= 85%',
+    hallucination_rate:     '<= 5%',
+    evidence_coverage:      '= 100%',
+  };
+
+  Object.entries(data.criteria || {}).forEach(([key, crit]) => {
+    const isSkipped = crit.pass === null;
+    const statusClass = isSkipped ? 'unknown' : crit.pass ? 'pass' : 'fail';
+    const pct = crit.value !== null ? (crit.value * 100).toFixed(1) + '%' : 'N/A';
+    const icon = isSkipped ? '—' : crit.pass ? '✓' : '✗';
+
+    const card = document.createElement('div');
+    card.className = 'crit-card ' + statusClass;
+    card.innerHTML =
+      `<div class="crit-label">${LABELS[key] || key}</div>` +
+      `<div class="crit-value">${pct}</div>` +
+      `<div class="crit-target">target: ${TARGETS[key] || '?'} <span class="badge ${isSkipped?'badge-skip':crit.pass?'badge-pass':'badge-fail'}">${icon}</span></div>` +
+      `<div class="crit-note">${crit.note || ''}</div>`;
+    grid.appendChild(card);
+  });
+
+  // Hallucination detail
+  // (rendered inside criteria card already — show raw if available)
+  log('Rendered results ✓', 'ok');
+}
+
+function clearResults() {
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('criteria-grid').innerHTML = '';
+  document.getElementById('log').innerHTML = '<div class="log-line info">ล้างแล้ว</div>';
+}
+
+// Save eval result to echo_eval_log
+async function saveEvalResult(sessionId, evalData) {
+  if (!sessionId) return;
+  try {
+    const c = evalData.criteria;
+    const row = {
+      session_id:                sessionId,
+      total_segments:            evalData.meta?.total_segments,
+      avg_speaker_confidence:    c.avg_speaker_confidence?.value,
+      avg_transcript_confidence: c.thai_accuracy?.value,
+      speaker_accuracy:          c.speaker_attribution?.value,
+      hallucination_rate:        c.hallucination_rate?.value,
+      evidence_coverage:         c.evidence_coverage?.value,
+      overall_pass:              evalData.overall_pass,
+      criteria_detail:           evalData.criteria,
+      source:                    evalData.meta?.source,
+    };
+    const res = await fetch(`${SUPA_URL()}/rest/v1/echo_eval_log`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY(),
+        'Authorization': 'Bearer ' + SUPA_KEY(),
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+    if (res.ok) log('Eval saved to echo_eval_log ✓', 'ok');
+    else log('Save eval failed: ' + res.status, 'err');
+  } catch(e) { log('Save eval error: ' + e.message, 'err'); }
+}
+
+// Override runEval to also save
+const _origRunEval = runEval;
+async function runEval() {
+  const sessionId = document.getElementById('sessionId').value.trim();
+  const mode = document.getElementById('mode').value;
+  let segments = _segments;
+  let analysis = _analysis;
+
+  if (mode === 'manual') {
+    try {
+      segments = JSON.parse(document.getElementById('manualSegments').value || '[]');
+      const analysisTxt = document.getElementById('manualAnalysis').value.trim();
+      if (analysisTxt) analysis = JSON.parse(analysisTxt);
+    } catch(e) { log('JSON parse error: ' + e.message, 'err'); return; }
+  }
+
+  if (!segments || !segments.length) { log('ไม่มี segments — โหลด session ก่อน', 'err'); return; }
+
+  const groundTruth = document.getElementById('groundTruth').value.trim();
+  const btn = document.getElementById('run-btn');
+  const spinner = document.getElementById('spinner');
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  log('เรียก /eval ...');
+
+  try {
+    const body = { segments };
+    if (groundTruth) body.ground_truth_text = groundTruth;
+    if (analysis)    body.analysis_result   = analysis;
+
+    const res = await fetch(`${WORKER()}/eval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      log('Worker error ' + res.status + ': ' + await res.text(), 'err');
+      return;
+    }
+
+    const data = await res.json();
+    log('ได้ผลแล้ว — ' + data.pass_count + '/' + data.total_criteria + ' criteria ผ่าน',
+        data.overall_pass ? 'ok' : 'err');
+    renderResults(data);
+
+    // Auto-save to DB
+    if (sessionId && mode === 'session_id') {
+      await saveEvalResult(sessionId, data);
+    }
+
+  } catch(e) {
+    log('Fetch error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
