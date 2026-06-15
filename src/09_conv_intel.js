@@ -1126,6 +1126,7 @@ body:not(.echo-active) { background:unset; }
       // ── Save full analysis to Supabase ───────────────────────────────────────
       // Transcript was already saved in step 1 — this updates the same row
       _setStep('กำลังบันทึก...', '', 92);
+      console.log('[CI pipeline] reaching save step, _sessionId=' + _sessionId);
       await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
       _idbClear();
       _setStep('', '', 100);
@@ -1136,6 +1137,7 @@ body:not(.echo-active) { background:unset; }
     } catch (err) {
       _stopProcTimer();
       _phase = 'idle';
+      console.error('[CI pipeline] FAILED:', err.message, err.stack?.split('\n').slice(0,2).join(' | '));
       _unmount();
       try { window.SenseSentinel?.report('ci_analyze_fail',
         err.message.slice(0, 200) + ' | secs=' + _secs + ' | acct=' + (_accountName || '-')); } catch(_) {}
