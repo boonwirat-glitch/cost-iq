@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v751
+// Freshket Sense — Service Worker v752
 // Strategy: Cache-first, background revalidate (stale-while-revalidate)
 //
 // v225 rewrite: fixed all redirect-related ERR_FAILED bugs.
