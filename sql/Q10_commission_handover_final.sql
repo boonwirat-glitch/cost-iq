@@ -55,7 +55,8 @@ kam_name_list AS (
     'Puttipong (Tape) Wanithaweewat',
     'Rinlaphat (Mild) Setthasiriwuti',
     'Siriprapa (Pop) Piapeng',
-    'Warissara (Ply) Chanaboon'
+    'Warissara (Ply) Chanaboon',
+    'Treerak (May) Sangjua'
   ]) AS kam_name
 ),
 
