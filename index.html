@@ -23478,7 +23478,7 @@ function __legacyShowScreenFallback(name){
     document.body.classList.add('kam-sense-active');
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
-    document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+    document.querySelectorAll('.scr:not(#ci-fullsheet .scr)').forEach(s=>s.classList.remove('on')); // v751
     document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
     const _scrEl=document.getElementById('scr-'+name);
     if(_scrEl){_scrEl.classList.add('on');_scrEl.style.display='';}
@@ -23525,7 +23525,7 @@ function __legacyShowScreenFallback(name){
     if(name==='report'&&typeof renderReport==='function')renderReport();
     return;
   }
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.scr:not(#ci-fullsheet .scr)').forEach(s=>s.classList.remove('on')); // v751
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   const scrEl=document.getElementById('scr-'+name);
   const navEl=document.getElementById('nav-'+name);
