@@ -3570,9 +3570,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
   function open(accountGuid) {
     // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
     // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
-    const _keepSessionId = (_phase === 'processing' || _phase === 'result') && _sessionId;
+    // v729: capture pipeline state BEFORE any resets
+    // _keepSessionId must be evaluated before _phase is reset to 'idle'
+    const _pipelineWasActive = (_phase === 'processing') && !!_sessionId;
     _phase = 'idle'; _lastResult = null; _secs = 0;
-    if (!_keepSessionId) _sessionId = null;
+    if (!_pipelineWasActive) _sessionId = null;
     _isOwnRecording = false;
     _mainTab = 'record';
     _unmount();
