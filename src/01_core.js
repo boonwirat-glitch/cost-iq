@@ -690,7 +690,10 @@ function showSenseSplash(onDone){
       if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
         window._pendingRefreshAll=false;
         window._suppressAnimN=true;
-        if(window.RenderBus) window.RenderBus.markRender();
+        // v742: do NOT markRender() here — refreshAll() hits splash guard (still active)
+        // and gets queued without rendering. markRender() would stamp version prematurely,
+        // causing VERSION GUARD to block the actual render after splash clears.
+        // Let _flush() stamp version itself when it truly renders.
         try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         // Re-enable animations after splash has fully disappeared
         setTimeout(()=>{ window._suppressAnimN=false; },400);
