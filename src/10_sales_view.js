@@ -315,8 +315,13 @@ function renderSalesPortview() {
   // Reset account-view guard so RenderBus can render portview normally again
   window._salesInAccountView = false;
 
+  // Clear skeleton before any render — skeleton may be present from early Tier-1-not-ready pass
+  if (typeof window._hideScreenSkeleton === 'function') window._hideScreenSkeleton('scr-sales-portview');
+
   // Load pipeline async then render home summary + outlet list
   _loadSalesPipeline().then(pipeline => {
+    // Clear skeleton again inside async callback (race: skeleton may re-inject between now and then)
+    if (typeof window._hideScreenSkeleton === 'function') window._hideScreenSkeleton('scr-sales-portview');
     el.innerHTML = '';
     el.onclick = null;
     window.scrollTo(0, 0);
