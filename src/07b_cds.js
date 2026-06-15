@@ -1548,7 +1548,15 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   outlets.forEach(function(o, oi) {
     var rowId   = 'p1r' + oi;
     var oName   = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
-    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    // v753d: chip row — GMV shown only when collapsed (hidden via CSS when .open)
+    var _p1OnClick = '_cdsToggleRow(\'' + rowId + '\')';
+    html += '<div class="cds-chip-row'+(oi < 3?' open':'') +'" id="'+rowId+'" onclick="'+_p1OnClick+'"><span class="cds-chip-chev">&#8250;</span>'
+      + '<div style="flex:1;min-width:0"><div class="cds-chip-name">'+h.esc(oName)+'</div>'
+      + '<div class="cds-chip-meta">'+o.items.length+' กลุ่มสินค้า</div></div>'
+      + '<span class="cds-chip-gmv cds-chip-val v-muted">'+fmt(o.totalGmv)+'</span>'
+      + '<span class="cds-chip-val v-amber">'+fmt(o.totalComm)+'</span>'
+      + '</div>'
+      + '<div class="cds-sub-rows'+(oi < 3?' open':'') +'" id="'+rowId+'-sub">';
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
       html += h.subRow([
@@ -1576,7 +1584,15 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmtFull(totalComm), 'v-amber');
+  // v753d: P1 total — GMV + commission (p1-cols: minmax(0,1fr) 62px 56px)
+  if (totalEl) {
+    var _p1Gmv = outlets.reduce(function(s,o){return s+o.totalGmv;},0);
+    totalEl.innerHTML = '<div class="cds-total p1-cols">'
+      + '<span class="cds-total-label">รวม สินค้าใหม่</span>'
+      + '<span class="cds-total-val v-muted">'+fmtFull(_p1Gmv)+'</span>'
+      + '<span class="cds-total-val v-amber">'+fmtFull(totalComm)+'</span>'
+      + '</div>';
+  }
 };
 
 
@@ -1639,7 +1655,15 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   outlets.forEach(function(o, oi) {
     var rowId = 'p3r' + oi;
     var oName = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
-    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    // v753d: chip row — GMV shown only when collapsed
+    var _p3OnClick = '_cdsToggleRow(\'' + rowId + '\')';
+    html += '<div class="cds-chip-row'+(oi < 3?' open':'') +'" id="'+rowId+'" onclick="'+_p3OnClick+'"><span class="cds-chip-chev">&#8250;</span>'
+      + '<div style="flex:1;min-width:0"><div class="cds-chip-name">'+h.esc(oName)+'</div>'
+      + '<div class="cds-chip-meta">'+o.items.length+' กลุ่มสินค้า</div></div>'
+      + '<span class="cds-chip-gmv cds-chip-val v-muted">'+fmt(o.totalIncr)+'</span>'
+      + '<span class="cds-chip-val v-amber">'+fmt(o.totalComm)+'</span>'
+      + '</div>'
+      + '<div class="cds-sub-rows'+(oi < 3?' open':'') +'" id="'+rowId+'-sub">';
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
       var growthPct = g.max_baseline > 0 ? Math.round(g.existing_curr / g.max_baseline * 100) : 0;
@@ -1672,7 +1696,17 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmtFull(totalComm), 'v-amber');
+  // v753d: P3 total — incremental GMV + commission (p3-cols: minmax(0,1fr) 52px 62px 56px)
+  if (totalEl) {
+    var _p3Incr = outlets.reduce(function(s,o){return s+o.totalIncr;},0);
+    var _p3Base = groups.reduce(function(s,g){return s+(g.max_baseline||0);},0);
+    totalEl.innerHTML = '<div class="cds-total p3-cols">'
+      + '<span class="cds-total-label">รวม ยอดเติบโต</span>'
+      + '<span class="cds-total-val v-dim">'+fmtFull(_p3Base)+'</span>'
+      + '<span class="cds-total-val v-green">'+fmtFull(_p3Incr)+'</span>'
+      + '<span class="cds-total-val v-amber">'+fmtFull(totalComm)+'</span>'
+      + '</div>';
+  }
 };
 
 
@@ -2002,18 +2036,20 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  // v753c: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  // v753d: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  // Use short fmt (฿X.XM) to fit in narrow 54-60px columns
   if (totalEl) {
     var _nrrBase = nr.baselinePrevGmv || 0;
     var _nrrMtd  = nr.cohortGmv || 0;
     var _nrrDays = nr.daysElapsed || 1;
     var _nrrDim  = nr.daysInMonth || 30;
     var _nrrRr   = Math.round(_nrrMtd / _nrrDays * _nrrDim);
+    var _nrrFmt  = function(n){ n=Math.round(n||0); return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+n; };
     totalEl.innerHTML = '<div class="cds-total nrr-cols">'
       + '<span class="cds-total-label">รวม NRR GMV</span>'
-      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + fmtFull(_nrrBase) + '</span>'
-      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + fmtFull(_nrrRr) + '</span>'
-      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + fmtFull(_nrrMtd) + '</span>'
+      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + _nrrFmt(_nrrBase) + '</span>'
+      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + _nrrFmt(_nrrRr) + '</span>'
+      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + _nrrFmt(_nrrMtd) + '</span>'
       + '</div>';
   }
 };
