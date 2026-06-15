@@ -1045,41 +1045,47 @@ body:not(.echo-active) { background:unset; }
   async function _processBlob(blob, _resumeFromSegments) {
     _startProcTimer();
     try {
-      // ── audio integrity check (ยังคงไว้) ────────────────────────────────────
+      // ── audio integrity check ──────────────────────────────────────────────
       const _expectedBytes = _secs * 3000;
       const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
-      console.log('[CI audio integrity] blob=' + blob.size + 'B expected≈' + _expectedBytes +
-        'B (' + _secs + 's) ratio=' + _ratio.toFixed(2));
+      console.log('[CI audio] blob=' + blob.size + 'B expected≈' + _expectedBytes + 'B ratio=' + _ratio.toFixed(2));
       if (_secs >= 60 && _ratio < 0.7) {
         const _estMins = Math.round(blob.size / 3000 / 60);
-        try { window.SenseSentinel?.report('ci_audio_gap',
-          'timer=' + _secs + 's blob=' + blob.size + 'B ratio=' + _ratio.toFixed(2) +
-          ' est_audio=' + _estMins + 'min'); } catch(_) {}
-        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (สั้นกว่าเวลาที่จับ) — บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ');
+        try { window.SenseSentinel?.report('ci_audio_gap', 'ratio=' + _ratio.toFixed(2)); } catch(_) {}
+        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ)');
       }
 
       // Load rubric from DB if not cached yet
       if (!_rubricCache) await _loadRubricFromDB();
 
-      // ── Step 1: Transcript ───────────────────────────────────────────────────
+      // ── Step 1: Transcript (ground truth) ───────────────────────────────────
+      // Echo v2: save transcript to Supabase immediately after this step
+      // Analysis layers are disposable — transcript is permanent
       let segments = _resumeFromSegments || null;
       if (!segments) {
         _setStep('กำลัง transcript...', 'Groq Whisper · ฟัง audio ทั้งหมด', 10);
-        const transcriptResult = await _callTranscript(blob);
+        // Dynamic timeout: at least 6 min, scale with recording length
+        const transcriptTimeout = Math.max(360000, _secs * 1000 * 1.5);
+        const transcriptResult = await _callTranscript(blob, transcriptTimeout);
         if (transcriptResult.no_speech) {
           _phase = 'idle'; _idbClear(); _unmount();
           _toast('ไม่พบเสียงพูดใน audio'); return;
         }
         segments = transcriptResult.segments || [];
+        // Fallback: diarize failed but Whisper text exists (source = 'whisper_fallback')
         if (!segments.length) throw new Error('Transcript ไม่ได้ผล — ไม่มี segments');
         _idbSetPipeline({ segments, stage: 'transcribed' });
-        console.log('[CI pipeline] transcript done —', segments.length, 'segments');
+        console.log('[CI pipeline] transcript done —', segments.length, 'segments, source=' + (transcriptResult.source || 'unknown'));
+
+        // ── Echo v2: Save transcript to Supabase immediately (permanent ground truth) ──
+        _setStep('กำลังบันทึก transcript...', '', 20);
+        await _saveTranscriptOnly(segments, transcriptResult.source || 'unknown');
+
       } else {
         console.log('[CI pipeline] resuming from transcript —', segments.length, 'segments');
       }
 
-      // ── Progressive: เข้าหน้า result ทันทีหลัง transcript เสร็จ ────────────
-      // Tab 1 แสดง "กำลังสรุป..." ระหว่างรอ Step 2-3
+      // ── Progressive: เข้าหน้า result ทันทีหลัง transcript เสร็จ ───────────
       _lastResult = { segments, summaryData: null, skillData: null, intelData: null,
                       transcriptSummary: null, toneSignals: null };
       _renderResult();
@@ -1089,10 +1095,18 @@ body:not(.echo-active) { background:unset; }
 
       // ── Step 2: Summary ──────────────────────────────────────────────────────
       _setStep('กำลังสรุปบทสนทนา...', 'Gemini · อ่าน transcript', 45);
-      const summaryResult = await _callSummarize(segments);
+      let summaryResult = null;
+      try {
+        summaryResult = await _callSummarize(segments);
+      } catch(summaryErr) {
+        // Summary failure is non-fatal — analysis proceeds with null summary
+        console.warn('[CI pipeline] summary failed (non-fatal):', summaryErr.message);
+        summaryResult = null;
+      }
       _idbSetPipeline({ segments, summary: summaryResult, stage: 'summarized' });
-      console.log('[CI pipeline] summary done');
-      // Update Tab 1 ทันทีที่ summary เสร็จ
+      console.log('[CI pipeline] summary done, result=' + (summaryResult ? 'ok' : 'null'));
+
+      // Update Tab 1 immediately after summary
       _lastResult.summaryData = summaryResult;
       _lastResult.transcriptSummary = summaryResult?.transcript_summary || null;
       _lastResult.toneSignals = summaryResult?.tone || null;
@@ -1102,19 +1116,20 @@ body:not(.echo-active) { background:unset; }
       _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
       const analysisResult = await _callAnalyze(segments, summaryResult);
       console.log('[CI pipeline] analysis done');
-      // Update Tab 2 + 3 ทันทีที่ analysis เสร็จ
+
+      // Update Tab 2 + 3
       _lastResult.skillData  = analysisResult.skillData;
       _lastResult.intelData  = analysisResult.intelData;
       _updatePanel(1);
       _updatePanel(2);
 
-      // ── Save to Supabase ─────────────────────────────────────────────────────
+      // ── Save full analysis to Supabase ───────────────────────────────────────
+      // Transcript was already saved in step 1 — this updates the same row
       _setStep('กำลังบันทึก...', '', 92);
-      await _saveToSupabasePipeline(segments, summaryResult, analysisResult);
+      await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
       _idbClear();
       _setStep('', '', 100);
       _stopProcTimer();
-      // ซ่อน processing banner หลัง save เสร็จ
       const procBanner = document.getElementById('ci-proc-banner');
       if (procBanner) procBanner.style.display = 'none';
 
@@ -1137,13 +1152,18 @@ body:not(.echo-active) { background:unset; }
       } else {
         _human = 'วิเคราะห์ไม่สำเร็จ';
       }
-      _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
+      // If transcript was already saved, user can retry analysis from history
+      if (_sessionId) {
+        _toast(_human + ' — transcript บันทึกแล้ว กด "วิเคราะห์ใหม่" ใน history ได้เลย');
+      } else {
+        _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
+      }
     }
   }
 
   // ── Pipeline API calls ────────────────────────────────────────────────────────
 
-  async function _callTranscript(audioBlob) {
+  async function _callTranscript(audioBlob, timeoutMs) {
     const arrayBuf = await audioBlob.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuf);
     let binary = '';
@@ -1153,12 +1173,12 @@ body:not(.echo-active) { background:unset; }
     }
     const b64audio = btoa(binary);
     const mimeType = audioBlob.type || 'audio/webm';
+    const FETCH_TIMEOUT_MS = timeoutMs || Math.max(360000, _secs * 1000 * 1.5); // dynamic
 
-    const FETCH_TIMEOUT_MS = 360000; // 6 นาที — transcript audio ยาวใช้เวลานาน
     let res, lastErr;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (attempt > 1) {
-        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Gemini · ระบบ AI คิวเต็ม', 10 + attempt * 5);
+        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Groq Whisper · ระบบคิวเต็ม', 10 + attempt * 5);
         await new Promise(r => setTimeout(r, attempt === 2 ? 3000 : 7000));
       }
       const ctrl = new AbortController();
@@ -1167,7 +1187,7 @@ body:not(.echo-active) { background:unset; }
         res = await fetch(`${WORKER_URL}/transcript`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType }),
+          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs }),
           signal: ctrl.signal,
         });
         if (res.ok) { clearTimeout(tmo); break; }
@@ -1176,7 +1196,7 @@ body:not(.echo-active) { background:unset; }
         if (res.status !== 503 && res.status !== 429) { clearTimeout(tmo); throw lastErr; }
         res = null;
       } catch(e) {
-        if (e.name === 'AbortError') throw new Error('หมดเวลา transcript (6 นาที)');
+        if (e.name === 'AbortError') throw new Error('หมดเวลา transcript (' + Math.round(FETCH_TIMEOUT_MS/60000) + ' นาที)');
         if (e.message && !e.message.startsWith('Transcript 503') && !e.message.startsWith('Transcript 429')) throw e;
         lastErr = e;
       } finally { clearTimeout(tmo); }
@@ -1620,48 +1640,98 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   // ── v709: pipeline save — saves transcript to new column ─────────────────────
-  async function _saveToSupabasePipeline(segments, summaryData, analysisResult) {
+// ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
+  async function _saveTranscriptOnly(segments, source) {
+    const email = currentUserProfile?.email;
+    if (!email) return;
+    const nowIso = new Date().toISOString();
+    try {
+      const { data: sessionRow, error } = await supa.from('ci_sessions').insert({
+        owner_email:    email,
+        owner_type:     _ownerType,
+        account_id:     _accountGuid || null,
+        account_name:   _accountName || null,
+        visited_at:     nowIso,
+        duration_secs:  _secs,
+        transcript:     segments,
+        pipeline_stage: 'transcribed',
+        transcript_source: source || 'unknown',
+        rep_lat:        _checkinCache?.rep_lat || null,
+        rep_lng:        _checkinCache?.rep_lng || null,
+        checked_in_at:  _checkinCache?.checked_in_at || null,
+        status:         'draft'
+      }).select('id').single();
+      if (error) {
+        console.warn('[CI] _saveTranscriptOnly insert:', error.message);
+      } else if (sessionRow) {
+        _sessionId = sessionRow.id;
+        console.log('[CI] transcript saved, session_id=' + _sessionId);
+      }
+    } catch(e) {
+      console.warn('[CI] _saveTranscriptOnly unavailable:', e.message);
+    }
+  }
+
+  // ── Echo v2: Update existing session row with analysis ───────────────────
+  async function _saveAnalysisToExistingSession(segments, summaryData, analysisResult) {
     const skillData  = analysisResult?.skillData  || null;
     const intelData  = analysisResult?.intelData  || null;
     const transcriptSummary = summaryData?.transcript_summary || null;
     const toneSignals = summaryData?.tone || null;
-
-    if (!skillData && !intelData && !segments?.length) return;
     const email = currentUserProfile?.email;
     if (!email) return;
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
 
-    // 1. Save ci_sessions — เพิ่ม transcript + pipeline_stage
-    try {
-      const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
-        owner_email:        email,
-        owner_type:         _ownerType,
-        account_id:         _accountGuid || null,
-        account_name:       _accountName || null,
-        visited_at:         nowIso,
-        duration_secs:      _secs,
-        transcript:         segments?.length ? segments : null,
-        pipeline_stage:     'analyzed',
-        skill_scores:       skillData || null,
-        customer_intel:     intelData || null,
-        next_actions:       intelData?.next_actions || [],
-        transcript_summary: transcriptSummary || null,
-        tone_signals:       toneSignals || null,
-        rep_lat:            _checkinCache?.rep_lat || null,
-        rep_lng:            _checkinCache?.rep_lng || null,
-        checked_in_at:      _checkinCache?.checked_in_at || null,
-        status:             'saved'
-      }).select('id').single();
-      if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
-      else if (sessionRow) {
-        _sessionId = sessionRow.id;
-        _checkinCache = null;
-        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
-      }
-    } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
+    // Update existing session if we have _sessionId from transcript save
+    if (_sessionId) {
+      try {
+        const { error } = await supa.from('ci_sessions').update({
+          pipeline_stage:     'analyzed',
+          skill_scores:       skillData || null,
+          customer_intel:     intelData || null,
+          next_actions:       intelData?.next_actions || [],
+          transcript_summary: transcriptSummary || null,
+          tone_signals:       toneSignals || null,
+          status:             'saved'
+        }).eq('id', _sessionId);
+        if (error) console.warn('[CI] session update:', error.message);
+        else console.log('[CI] analysis saved to session_id=' + _sessionId);
+      } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
+    } else {
+      // Fallback: insert everything together (transcript save failed earlier)
+      try {
+        const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
+          owner_email:        email,
+          owner_type:         _ownerType,
+          account_id:         _accountGuid || null,
+          account_name:       _accountName || null,
+          visited_at:         nowIso,
+          duration_secs:      _secs,
+          transcript:         segments?.length ? segments : null,
+          pipeline_stage:     'analyzed',
+          transcript_source:  'unknown',
+          skill_scores:       skillData || null,
+          customer_intel:     intelData || null,
+          next_actions:       intelData?.next_actions || [],
+          transcript_summary: transcriptSummary || null,
+          tone_signals:       toneSignals || null,
+          rep_lat:            _checkinCache?.rep_lat || null,
+          rep_lng:            _checkinCache?.rep_lng || null,
+          checked_in_at:      _checkinCache?.checked_in_at || null,
+          status:             'saved'
+        }).select('id').single();
+        if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
+        else if (sessionRow) _sessionId = sessionRow.id;
+      } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
+    }
 
-    // 2. skill log
+    if (_sessionId) {
+      _checkinCache = null;
+      try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+    }
+
+    // skill log
     if (skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
         kam_email: email, account_id: _accountGuid || null,
@@ -1674,7 +1744,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
 
-    // 3. echo_skill_observations
+    // echo_skill_observations
     if (skillData?.skills?.length) {
       try {
         let _userId = null;
@@ -1700,7 +1770,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       } catch(e) { console.warn('[CI] echo_skill_observations unavailable:', e.message); }
     }
 
-    // 4. kam_visits snapshot
+    // kam_visits snapshot
     if (_accountGuid) {
       const { error: visitError } = await supa.from('kam_visits').upsert({
         kam_email: email, account_id: _accountGuid,
@@ -1711,7 +1781,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
     }
 
-    // 5. localStorage echo visits dot
+    // localStorage echo visits dot
     if (_accountGuid) {
       try {
         const _echoKey = 'ciq_echo_visits';
