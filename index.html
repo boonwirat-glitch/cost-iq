@@ -1,4 +1,4 @@
-<!-- Freshket Sense 721: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 722: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '721',
+      version: '722',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43997,6 +43997,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const nowIso = new Date().toISOString();
 
     // Update existing session if we have _sessionId from transcript save
+    console.log('[CI save] _sessionId=' + _sessionId + ' skillData=' + !!skillData + ' intelData=' + !!intelData);
     if (_sessionId) {
       try {
         const { error } = await supa.from('ci_sessions').update({
@@ -44009,11 +44010,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
           summary_data:       summaryData || null,
           status:             'saved'
         }).eq('id', _sessionId);
-        if (error) console.warn('[CI] session update:', error.message);
+        if (error) console.warn('[CI] session update error:', error.message, error.code);
         else console.log('[CI] analysis saved to session_id=' + _sessionId);
       } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
     } else {
       // Fallback: insert everything together (transcript save failed earlier)
+      console.warn('[CI save] no _sessionId — using fallback insert');
       try {
         const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
           owner_email:        email,
