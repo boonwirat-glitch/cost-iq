@@ -73,7 +73,7 @@ async function handleTranscript(request, env) {
   groqForm.append('file', audioBlob, 'recording.webm');
   groqForm.append('model', 'whisper-large-v3');
   groqForm.append('language', 'th');
-  groqForm.append('prompt', 'การสนทนาระหว่าง sales rep กับเจ้าของร้านอาหาร เรื่องวัตถุดิบและการสั่งซื้อสินค้า Freshket procurement supplier');
+  groqForm.append('prompt', 'บทสนทนาภาษาไทย ระหว่างพนักงานขายกับเจ้าของร้านอาหาร');
   groqForm.append('response_format', 'verbose_json');
   groqForm.append('timestamp_granularities[]', 'segment');
 
