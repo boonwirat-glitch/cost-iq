@@ -844,7 +844,7 @@ body:not(.echo-active) { background:unset; }
 
   // ── Recovery — เช็ค buffer ค้างตอนเปิด Echo (rep เท่านั้น, idle เท่านั้น) ──
   async function _checkRecoverBuffer() {
-    if (_phase !== 'idle' || _canDebrief()) return;
+    if (_phase !== 'idle' || _sessionId || _canDebrief()) return; // v728: ไม่ recover ถ้ามี session active อยู่
     const meta = await _idbGetMeta();
     if (!meta) return;
     const chunks = await _idbGetChunks();
@@ -3610,8 +3610,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       _showPicker = true;
       setTimeout(_mount, 50);
     }
-    // Echo v2: check for crashed/incomplete session in IDB after mount
-    setTimeout(_checkRecoverBuffer, 300);
+    // v728: _checkRecoverBuffer is called from _mount() — no duplicate needed here
   }
 
   function _mountPicker() {
