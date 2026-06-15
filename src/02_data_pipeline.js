@@ -2108,6 +2108,12 @@ window.DataRegistry = (function(){
   var version = 0;
 
   function _isSales(){
+    // v720 fix: check body.sales-mode class FIRST — set synchronously before any data fetch
+    // getCurrentRole() may not be ready when markLoaded fires on first portview/history arrival
+    try{
+      if(document.body.classList.contains('sales-mode')||
+         document.body.classList.contains('sales-tl-mode')) return true;
+    }catch(e){}
     try{
       var r = typeof getCurrentRole==='function' ? getCurrentRole() : '';
       return r==='sales'||r==='sales_tl';
