@@ -1106,22 +1106,26 @@ body:not(.echo-active) { background:unset; }
       _idbSetPipeline({ segments, summary: summaryResult, stage: 'summarized' });
       console.log('[CI pipeline] summary done, result=' + (summaryResult ? 'ok' : 'null'));
 
-      // Update Tab 1 immediately after summary
-      _lastResult.summaryData = summaryResult;
-      _lastResult.transcriptSummary = summaryResult?.transcript_summary || null;
-      _lastResult.toneSignals = summaryResult?.tone || null;
-      _updatePanel(0);
+      // Update Tab 1 immediately after summary (guard: user may have cancelled)
+      if (_lastResult) {
+        _lastResult.summaryData = summaryResult;
+        _lastResult.transcriptSummary = summaryResult?.transcript_summary || null;
+        _lastResult.toneSignals = summaryResult?.tone || null;
+        _updatePanel(0);
+      }
 
       // ── Step 3: Skills + OCPB ────────────────────────────────────────────────
       _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
       const analysisResult = await _callAnalyze(segments, summaryResult);
       console.log('[CI pipeline] analysis done');
 
-      // Update Tab 2 + 3
-      _lastResult.skillData  = analysisResult.skillData;
-      _lastResult.intelData  = analysisResult.intelData;
-      _updatePanel(1);
-      _updatePanel(2);
+      // Update Tab 2 + 3 (guard: user may have cancelled/unmounted)
+      if (_lastResult) {
+        _lastResult.skillData  = analysisResult.skillData;
+        _lastResult.intelData  = analysisResult.intelData;
+        _updatePanel(1);
+        _updatePanel(2);
+      }
 
       // ── Save full analysis to Supabase ───────────────────────────────────────
       // Transcript was already saved in step 1 — this updates the same row
