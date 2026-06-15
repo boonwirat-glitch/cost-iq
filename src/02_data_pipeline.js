@@ -1403,9 +1403,13 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         // categories/sku_current/outlets are background files — their arrival doesn't need to
         // block the portfolio render or hold the splash.
         try{
-          if(_cloudLoadedTabs.has('portview') &&
-             _cloudLoadedTabs.has('history') &&
-             _cloudLoadedTabs.has('handover')){
+          // v732: Sales has no handover file — gate on portview+history only for Sales
+          var _isSales=(typeof getCurrentRole==='function')&&
+                       (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+          var _gateOk=_isSales
+            ? (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history'))
+            : (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history') && _cloudLoadedTabs.has('handover'));
+          if(_gateOk){
             // Signal splash to start fading (critical data ready)
             if(typeof window._splashDataReady==='function') window._splashDataReady();
             _senseDataLog('🚪 GATE ✅','portview+history+handover ready → splash fade');
