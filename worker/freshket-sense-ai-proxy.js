@@ -104,12 +104,10 @@ async function handleTranscript(request, env) {
     [/FredGate|FredeGate|FreshGate|Freshgate|FREDGET|FEDGET|fredgate|freshgate/gi, 'Freshket'],
     [/เฟดเก็ต|เฟรดเก็ต|เฟรชเกต|เฟรชเก็ต/gi, 'Freshket'],
     // Competitor
-    [/m8\.co|M8\.co|เอ็มแปด|เอ็ม 8|m8co/gi, 'Makro'],
+    [/m8\.co|M8\.co|m8co/gi, 'Makro'],
     [/แม็คโค|แม็คโคร|Macro(?!n)/gi, 'Makro'],
     // Common mishears
-    [/ตังวัด/gi, 'ตัวเมือง'],
     [/เฟสเก็ต/gi, 'Freshket'],
-    [/ราแพ็ค|ราแพ็ก/gi, 'แพ็คอย่างดี'],
   ];
   function applyKeywords(text) {
     if (!text) return text;
