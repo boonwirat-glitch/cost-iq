@@ -1,4 +1,4 @@
-<!-- Freshket Sense 733: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 734: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '733',
+      version: '734',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -16186,13 +16186,18 @@ function refreshAll(){
     }
   }catch(_e){}
   // v218 DATA GATE: block render until portview+history+handover all loaded.
+  // v733: Sales doesn't use handover — allCriticalReady() already handles this via DataRegistry
   if(!allCriticalReady()){
+    var _isSalesGate=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
     var _pending=[];
     try{ if(!_cloudLoadedTabs.has('portview'))_pending.push('portview');
          if(!_cloudLoadedTabs.has('history')) _pending.push('history');
-         if(!_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
-    _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
-    window._pendingRefreshAll=true; return;
+         if(!_isSalesGate && !_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
+    if(_pending.length===0){ /* all critical loaded — proceed */ }
+    else{
+      _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
+      window._pendingRefreshAll=true; return;
+    }
   }
   _senseDataLog('RENDER','refreshAll() ✅ FIRED');
   renderOverview();renderPortfolio();renderOpps();renderReport();
