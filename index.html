@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753c: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753d: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753c',
+      version: 'v753d',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -32470,12 +32470,19 @@ flex-wrap:wrap;}
 
 /* ── Zone D: Total + Footer ─────────────────────────────────────────────── */
 .cds-total{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,.25);border-top:1px solid rgba(255,255,255,.12);flex-shrink:0;}
-/* v753c: column-aligned total bars — match grid of each tab's column header */
+/* v753c/d: column-aligned total bars — match grid of each tab's column header */
 .cds-total.nrr-cols{display:grid;grid-template-columns:minmax(0,1fr) 54px 60px 54px;gap:0;padding:10px 18px;align-items:center;}
 .cds-total.exp-cols{display:grid;grid-template-columns:minmax(0,1fr) 44px 62px 56px;gap:0;padding:10px 18px;align-items:center;}
 .cds-total.ho-cols{display:grid;grid-template-columns:minmax(0,1fr) 58px 58px 48px;gap:0;padding:10px 18px;align-items:center;}
-.cds-total.nrr-cols .cds-total-label,.cds-total.exp-cols .cds-total-label,.cds-total.ho-cols .cds-total-label{font-size:9px;white-space:nowrap;}
-.cds-total.nrr-cols .cds-total-val,.cds-total.exp-cols .cds-total-val,.cds-total.ho-cols .cds-total-val{font-size:11px;text-align:right;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;}
+.cds-total.p1-cols{display:grid;grid-template-columns:minmax(0,1fr) 62px 56px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.p3-cols{display:grid;grid-template-columns:minmax(0,1fr) 52px 62px 56px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.nrr-cols .cds-total-label,.cds-total.exp-cols .cds-total-label,.cds-total.ho-cols .cds-total-label,
+.cds-total.p1-cols .cds-total-label,.cds-total.p3-cols .cds-total-label{font-size:9px;white-space:nowrap;}
+.cds-total.nrr-cols .cds-total-val,.cds-total.exp-cols .cds-total-val,.cds-total.ho-cols .cds-total-val,
+.cds-total.p1-cols .cds-total-val,.cds-total.p3-cols .cds-total-val{font-size:11px;text-align:right;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;}
+/* v753d: chip-row GMV summary — visible when collapsed, hidden when expanded */
+.cds-chip-gmv{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:600;flex-shrink:0;margin-right:6px;color:rgba(225,238,255,.45);transition:opacity .15s;}
+.cds-chip-row.open .cds-chip-gmv{opacity:0;pointer-events:none;}
 .cds-total-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.65);}
 .cds-total-val{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:16px;font-weight:900;}
 .cds-footer{display:flex;gap:7px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));}
@@ -40509,7 +40516,15 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   outlets.forEach(function(o, oi) {
     var rowId   = 'p1r' + oi;
     var oName   = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
-    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    // v753d: chip row — GMV shown only when collapsed (hidden via CSS when .open)
+    var _p1OnClick = '_cdsToggleRow(\'' + rowId + '\')';
+    html += '<div class="cds-chip-row'+(oi < 3?' open':'') +'" id="'+rowId+'" onclick="'+_p1OnClick+'"><span class="cds-chip-chev">&#8250;</span>'
+      + '<div style="flex:1;min-width:0"><div class="cds-chip-name">'+h.esc(oName)+'</div>'
+      + '<div class="cds-chip-meta">'+o.items.length+' กลุ่มสินค้า</div></div>'
+      + '<span class="cds-chip-gmv cds-chip-val v-muted">'+fmt(o.totalGmv)+'</span>'
+      + '<span class="cds-chip-val v-amber">'+fmt(o.totalComm)+'</span>'
+      + '</div>'
+      + '<div class="cds-sub-rows'+(oi < 3?' open':'') +'" id="'+rowId+'-sub">';
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
       html += h.subRow([
@@ -40537,7 +40552,15 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม สินค้าใหม่', fmtFull(totalComm), 'v-amber');
+  // v753d: P1 total — GMV + commission (p1-cols: minmax(0,1fr) 62px 56px)
+  if (totalEl) {
+    var _p1Gmv = outlets.reduce(function(s,o){return s+o.totalGmv;},0);
+    totalEl.innerHTML = '<div class="cds-total p1-cols">'
+      + '<span class="cds-total-label">รวม สินค้าใหม่</span>'
+      + '<span class="cds-total-val v-muted">'+fmtFull(_p1Gmv)+'</span>'
+      + '<span class="cds-total-val v-amber">'+fmtFull(totalComm)+'</span>'
+      + '</div>';
+  }
 };
 
 
@@ -40600,7 +40623,15 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   outlets.forEach(function(o, oi) {
     var rowId = 'p3r' + oi;
     var oName = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
-    html += h.chipRow(rowId, oName, o.items.length + ' กลุ่มสินค้า', fmt(o.totalComm), 'v-amber', oi < 3);
+    // v753d: chip row — GMV shown only when collapsed
+    var _p3OnClick = '_cdsToggleRow(\'' + rowId + '\')';
+    html += '<div class="cds-chip-row'+(oi < 3?' open':'') +'" id="'+rowId+'" onclick="'+_p3OnClick+'"><span class="cds-chip-chev">&#8250;</span>'
+      + '<div style="flex:1;min-width:0"><div class="cds-chip-name">'+h.esc(oName)+'</div>'
+      + '<div class="cds-chip-meta">'+o.items.length+' กลุ่มสินค้า</div></div>'
+      + '<span class="cds-chip-gmv cds-chip-val v-muted">'+fmt(o.totalIncr)+'</span>'
+      + '<span class="cds-chip-val v-amber">'+fmt(o.totalComm)+'</span>'
+      + '</div>'
+      + '<div class="cds-sub-rows'+(oi < 3?' open':'') +'" id="'+rowId+'-sub">';
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
       var growthPct = g.max_baseline > 0 ? Math.round(g.existing_curr / g.max_baseline * 100) : 0;
@@ -40633,7 +40664,17 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
     });
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม ยอดเติบโต', fmtFull(totalComm), 'v-amber');
+  // v753d: P3 total — incremental GMV + commission (p3-cols: minmax(0,1fr) 52px 62px 56px)
+  if (totalEl) {
+    var _p3Incr = outlets.reduce(function(s,o){return s+o.totalIncr;},0);
+    var _p3Base = groups.reduce(function(s,g){return s+(g.max_baseline||0);},0);
+    totalEl.innerHTML = '<div class="cds-total p3-cols">'
+      + '<span class="cds-total-label">รวม ยอดเติบโต</span>'
+      + '<span class="cds-total-val v-dim">'+fmtFull(_p3Base)+'</span>'
+      + '<span class="cds-total-val v-green">'+fmtFull(_p3Incr)+'</span>'
+      + '<span class="cds-total-val v-amber">'+fmtFull(totalComm)+'</span>'
+      + '</div>';
+  }
 };
 
 
@@ -40963,18 +41004,20 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  // v753c: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  // v753d: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  // Use short fmt (฿X.XM) to fit in narrow 54-60px columns
   if (totalEl) {
     var _nrrBase = nr.baselinePrevGmv || 0;
     var _nrrMtd  = nr.cohortGmv || 0;
     var _nrrDays = nr.daysElapsed || 1;
     var _nrrDim  = nr.daysInMonth || 30;
     var _nrrRr   = Math.round(_nrrMtd / _nrrDays * _nrrDim);
+    var _nrrFmt  = function(n){ n=Math.round(n||0); return n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+Math.round(n/1000)+'K':'฿'+n; };
     totalEl.innerHTML = '<div class="cds-total nrr-cols">'
       + '<span class="cds-total-label">รวม NRR GMV</span>'
-      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + fmtFull(_nrrBase) + '</span>'
-      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + fmtFull(_nrrRr) + '</span>'
-      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + fmtFull(_nrrMtd) + '</span>'
+      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + _nrrFmt(_nrrBase) + '</span>'
+      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + _nrrFmt(_nrrRr) + '</span>'
+      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + _nrrFmt(_nrrMtd) + '</span>'
       + '</div>';
   }
 };
