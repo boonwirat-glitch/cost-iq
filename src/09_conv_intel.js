@@ -4343,10 +4343,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
 function echoOpen() {
-  // Guard: if recording in progress, expand sheet instead of killing session
-  if (typeof CI !== 'undefined' && typeof CI._phase === 'function' && CI._phase() === 'recording') {
-    echoExpand();
-    return;
+  // Guard: if recording OR processing in progress, expand sheet instead of killing session
+  if (typeof CI !== 'undefined' && typeof CI._phase === 'function') {
+    const _p = CI._phase();
+    if (_p === 'recording') { echoExpand(); return; }
+    if (_p === 'processing') { echoExpand(); return; } // v730: ไม่ kill pipeline ระหว่าง analyze
   }
   // v715 Fix 3A: MOUNT-FIRST — CI.open() has no data dependency, always open immediately.
   // Previous: silent return when !allCriticalReady() → user sees blank screen with no feedback.
