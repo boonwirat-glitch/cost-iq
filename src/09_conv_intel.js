@@ -1684,6 +1684,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const nowIso = new Date().toISOString();
 
     // Update existing session if we have _sessionId from transcript save
+    console.log('[CI save] _sessionId=' + _sessionId + ' skillData=' + !!skillData + ' intelData=' + !!intelData);
     if (_sessionId) {
       try {
         const { error } = await supa.from('ci_sessions').update({
@@ -1696,11 +1697,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
           summary_data:       summaryData || null,
           status:             'saved'
         }).eq('id', _sessionId);
-        if (error) console.warn('[CI] session update:', error.message);
+        if (error) console.warn('[CI] session update error:', error.message, error.code);
         else console.log('[CI] analysis saved to session_id=' + _sessionId);
       } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
     } else {
       // Fallback: insert everything together (transcript save failed earlier)
+      console.warn('[CI save] no _sessionId — using fallback insert');
       try {
         const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
           owner_email:        email,
