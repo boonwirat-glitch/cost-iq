@@ -1209,6 +1209,9 @@ function _patchR2FilesForSales(){
       R2_FILES['sku_current']= 'sales_sku_current.csv';
       R2_FILES['outlets']    = 'sales_outlets.csv';
       R2_FILES['handover']   = ''; // not needed — newUserExpDate in portview covers it
+      // v735: pre-mark handover as loaded — Sales never fetches it but all gates check for it
+      try{ _cloudLoadedTabs.add('handover'); }catch(_){}
+      try{ if(window.DataRegistry) window.DataRegistry.markLoaded('handover'); }catch(_){}
       console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:R2_FILES['portview']});
       // Fix B: clear ALL Sales-relevant IDB keys so KAM cached data never serves Sales
       // history/sku_current/categories/outlets are cached per-tab — must evict before Sales fetch
