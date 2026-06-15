@@ -2230,7 +2230,27 @@ window.DataRegistry = (function(){
 // allCriticalReady() — backward-compatible shim → delegates to DataRegistry
 // Existing callers (refreshAll, RenderBus, _preloadFromIndexedDB) continue to work unchanged
 function allCriticalReady(){
-  try{ return window.DataRegistry.isReady(1); }catch(e){ return false; }
+  try{
+    // v741: restored to v643 pattern — check _cloudLoadedTabs directly (no DataRegistry indirection).
+    // DataRegistry.isReady(1) was broken for Sales because _isSales() inside DataRegistry
+    // checked body.sales-mode which is not set yet at splash time, causing handover to be
+    // included in Tier 1 requirements even for Sales → gate never opened → white screen.
+    var _isSalesNow=(typeof getCurrentRole==='function')&&
+      (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+    if(!_isSalesNow){
+      // Also check body class as fallback (set later in boot sequence)
+      _isSalesNow=document.body.classList.contains('sales-mode')||
+                  document.body.classList.contains('sales-tl-mode');
+    }
+    // Sales: only portview + history needed (handover CSV not used)
+    if(_isSalesNow){
+      return _cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history');
+    }
+    // Non-Sales: portview + history + handover
+    return _cloudLoadedTabs.has('portview') &&
+           _cloudLoadedTabs.has('history') &&
+           _cloudLoadedTabs.has('handover');
+  }catch(e){return false;}
 }
 
 // v221 DEBOUNCE + v221c SETTLE WINDOW (unchanged — kept for any legacy callers)
@@ -2287,12 +2307,17 @@ window.RenderBus = (function(){
     // Note: DataRegistry not available = script not loaded yet → proceed (safe fallback).
     // Note: _senseSplashActive check is in signal() — _flush() can be called directly
     //       via flushNow(), so we guard here too.
-    if(window.DataRegistry && !window.DataRegistry.isReady(1)){
+    // v741: use allCriticalReady() — consistent Sales-aware check (portview+history only for Sales)
+    // DataRegistry.isReady(1) was broken for Sales: body.sales-mode not set yet → wrong Tier 1 tabs
+    if(typeof allCriticalReady==='function' && !allCriticalReady()){
       window._pendingRefreshAll = true;
       _senseDataLog('RENDERBUS','⏳ _flush HELD — Tier 1 not ready yet (re-queuing)');
-      // onReady fires signal() → re-schedules flush when Tier 1 is ready
-      // Use onReady not waitFor — onReady fires immediately if already ready
-      try{ window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
+      // Retry when any new data arrives (will re-check allCriticalReady each time)
+      try{ if(window.DataRegistry) window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
+      // Also schedule direct retry for Sales path (DataRegistry.onReady may not fire if Tier1 never set)
+      setTimeout(function(){
+        if(typeof allCriticalReady==='function'&&allCriticalReady()) signal('tier1-direct-retry');
+      }, 500);
       return;
     }
 
