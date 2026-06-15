@@ -2428,13 +2428,18 @@ function refreshAll(){
     }
   }catch(_e){}
   // v218 DATA GATE: block render until portview+history+handover all loaded.
+  // v733: Sales doesn't use handover — allCriticalReady() already handles this via DataRegistry
   if(!allCriticalReady()){
+    var _isSalesGate=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
     var _pending=[];
     try{ if(!_cloudLoadedTabs.has('portview'))_pending.push('portview');
          if(!_cloudLoadedTabs.has('history')) _pending.push('history');
-         if(!_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
-    _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
-    window._pendingRefreshAll=true; return;
+         if(!_isSalesGate && !_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
+    if(_pending.length===0){ /* all critical loaded — proceed */ }
+    else{
+      _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
+      window._pendingRefreshAll=true; return;
+    }
   }
   _senseDataLog('RENDER','refreshAll() ✅ FIRED');
   renderOverview();renderPortfolio();renderOpps();renderReport();
