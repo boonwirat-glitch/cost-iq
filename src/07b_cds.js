@@ -1778,7 +1778,15 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   body.innerHTML = html;
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmtFull(totalComm), 'v-amber');
+  // v753c: Expansion total — show GMV + commission aligned with exp-cols
+  if (totalEl) {
+    totalEl.innerHTML = '<div class="cds-total exp-cols">'
+      + '<span class="cds-total-label">รวม Expansion</span>'
+      + '<span class="cds-total-val v-dim">' + totalOutlets + ' outlet</span>'
+      + '<span class="cds-total-val v-teal">' + fmtFull(totalGmv) + '</span>'
+      + '<span class="cds-total-val v-amber">' + fmtFull(totalComm) + '</span>'
+      + '</div>';
+  }
 };
 
 
@@ -1864,7 +1872,17 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
     if (el) el.classList.toggle('open');
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmtFull(payout), payout > 0 ? 'v-blue' : 'v-dim');
+  // v753c: Handover total — show baseline + MTD + payout aligned with ho-cols
+  if (totalEl) {
+    var _hoBase = detail.reduce(function(s,a){return s+(a.baseline||0);},0);
+    var _hoMtd  = detail.reduce(function(s,a){return s+(a.current||0);},0);
+    totalEl.innerHTML = '<div class="cds-total ho-cols">'
+      + '<span class="cds-total-label">รวม Handover</span>'
+      + '<span class="cds-total-val v-dim">' + fmtFull(_hoBase) + '</span>'
+      + '<span class="cds-total-val v-blue">' + fmtFull(_hoMtd) + '</span>'
+      + '<span class="cds-total-val ' + (payout > 0 ? 'v-amber' : 'v-dim') + '">' + fmtFull(payout) + '</span>'
+      + '</div>';
+  }
 };
 
 
@@ -1984,7 +2002,20 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmtFull(nr.cohortGmv || 0), 'v-green');
+  // v753c: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  if (totalEl) {
+    var _nrrBase = nr.baselinePrevGmv || 0;
+    var _nrrMtd  = nr.cohortGmv || 0;
+    var _nrrDays = nr.daysElapsed || 1;
+    var _nrrDim  = nr.daysInMonth || 30;
+    var _nrrRr   = Math.round(_nrrMtd / _nrrDays * _nrrDim);
+    totalEl.innerHTML = '<div class="cds-total nrr-cols">'
+      + '<span class="cds-total-label">รวม NRR GMV</span>'
+      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + fmtFull(_nrrBase) + '</span>'
+      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + fmtFull(_nrrRr) + '</span>'
+      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + fmtFull(_nrrMtd) + '</span>'
+      + '</div>';
+  }
 };
 
 

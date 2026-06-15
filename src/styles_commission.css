@@ -1619,6 +1619,12 @@ flex-wrap:wrap;}
 
 /* ── Zone D: Total + Footer ─────────────────────────────────────────────── */
 .cds-total{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,.25);border-top:1px solid rgba(255,255,255,.12);flex-shrink:0;}
+/* v753c: column-aligned total bars — match grid of each tab's column header */
+.cds-total.nrr-cols{display:grid;grid-template-columns:minmax(0,1fr) 54px 60px 54px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.exp-cols{display:grid;grid-template-columns:minmax(0,1fr) 44px 62px 56px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.ho-cols{display:grid;grid-template-columns:minmax(0,1fr) 58px 58px 48px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.nrr-cols .cds-total-label,.cds-total.exp-cols .cds-total-label,.cds-total.ho-cols .cds-total-label{font-size:9px;white-space:nowrap;}
+.cds-total.nrr-cols .cds-total-val,.cds-total.exp-cols .cds-total-val,.cds-total.ho-cols .cds-total-val{font-size:11px;text-align:right;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;}
 .cds-total-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.65);}
 .cds-total-val{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:16px;font-weight:900;}
 .cds-footer{display:flex;gap:7px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));}

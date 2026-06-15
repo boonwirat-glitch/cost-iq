@@ -280,7 +280,9 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       comebackCount:comebackIds.length,
       expansionGmv:expansionIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
       expansionCount:expansionIds.length,
-      cohortDetail, comebackDetail, expansionDetail
+      cohortDetail, comebackDetail, expansionDetail,
+      // v753c: expose time fields for run rate calculation in total bar
+      daysElapsed, daysInMonth:prevDays, prevMonth:prevMonth
     };
   }
 
