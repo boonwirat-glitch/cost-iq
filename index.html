@@ -1,4 +1,4 @@
-<!-- Freshket Sense v745r: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v747: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v745r',
+      version: 'v747',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15932,7 +15932,7 @@ async function _preloadFromIndexedDB(){
 window.DataRegistry = (function(){
   // Tier definitions — which tabs must be loaded for each tier to be "ready"
   var TIER_TABS = {
-    1: ['portview','history'],          // Tier 1: shell (handover added dynamically for non-sales)
+    1: ['portview','history'],          // Tier 1: shell — gate checked via allCriticalReady() (Sales-aware)
     2: ['categories','sku_current','outlets'],
     3: ['skus','alternatives']
   };
@@ -15946,19 +15946,6 @@ window.DataRegistry = (function(){
   // Public: monotonic version counter — increments every markLoaded()
   // RenderBus reads this before flush to skip no-op renders
   var version = 0;
-
-  function _isSales(){
-    // v720 fix: check body.sales-mode class FIRST — set synchronously before any data fetch
-    // getCurrentRole() may not be ready when markLoaded fires on first portview/history arrival
-    try{
-      if(document.body.classList.contains('sales-mode')||
-         document.body.classList.contains('sales-tl-mode')) return true;
-    }catch(e){}
-    try{
-      var r = typeof getCurrentRole==='function' ? getCurrentRole() : '';
-      return r==='sales'||r==='sales_tl';
-    }catch(e){ return false; }
-  }
 
   function _checkTier(t){
     if(_tierReady[t]) return true;
@@ -16132,10 +16119,7 @@ window.RenderBus = (function(){
       _senseDataLog('RENDERBUS','⏳ _flush HELD — Tier 1 not ready yet (re-queuing)');
       // Retry when any new data arrives (will re-check allCriticalReady each time)
       try{ if(window.DataRegistry) window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
-      // Also schedule direct retry for Sales path (DataRegistry.onReady may not fire if Tier1 never set)
-      setTimeout(function(){
-        if(typeof allCriticalReady==='function'&&allCriticalReady()) signal('tier1-direct-retry');
-      }, 500);
+
       return;
     }
 
