@@ -447,7 +447,12 @@ supa.auth.onAuthStateChange((event, session) => {
           window._bgEtagTimer=setTimeout(async function(){
             try{
               _senseDataLog('BACKGROUND','ETag check for portview+history+handover...');
-              for(var _bt of ['portview','history','handover']){
+              // v743: Sales never has handover file — skip to avoid 404 blocking gate
+              var _bgEtagFiles=['portview','history','handover'];
+              var _bgIsSales=(typeof getCurrentRole==='function')&&
+                (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+              if(_bgIsSales) _bgEtagFiles=_bgEtagFiles.filter(function(k){return k!=='handover';});
+              for(var _bt of _bgEtagFiles){
                 try{ var _bs=R2_SPECS[_bt]; if(_bs) await _fetchCloudflareFile(_bs,{force:true}); }catch(e){}
               }
               window._idbPreloaded=false; // reset after first real ETag cycle
