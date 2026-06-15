@@ -1,4 +1,4 @@
-<!-- Freshket Sense 726: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 727: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '726',
+      version: '727',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -45881,7 +45881,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   function open(accountGuid) {
-    _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null; _isOwnRecording = false;
+    // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
+    // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
+    const _keepSessionId = (_phase === 'processing' || _phase === 'result') && _sessionId;
+    _phase = 'idle'; _lastResult = null; _secs = 0;
+    if (!_keepSessionId) _sessionId = null;
+    _isOwnRecording = false;
     _mainTab = 'record';
     _unmount();
     // v552: TL/Admin — covisit panel only, picker ห้ามเปิดเด็ดขาด (spec Table 3)
