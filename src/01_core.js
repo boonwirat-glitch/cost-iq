@@ -64,6 +64,18 @@ function normalizeCurrentUserProfileRole(){
   }catch(e){}
   return getCurrentRole();
 }
+
+// v744: Single entry point — called immediately after every profile set.
+// Ensures _patchR2FilesForSales() runs synchronously before any fetch path
+// evaluates _isSalesMode, eliminating the race between role detection and R2 fetch.
+function _detectAndMarkSalesSession(){
+  try{
+    var _role=getCurrentRole();
+    if(_role==='sales'||_role==='sales_tl'){
+      if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales();
+    }
+  }catch(e){}
+}
 try{
   window.normalizeRole = normalizeRole;
   window.normalizeSenseRole = normalizeRole;
@@ -474,7 +486,7 @@ supa.auth.onAuthStateChange((event, session) => {
       // but that's correct (IDB not ready = not a warm boot).
       var _cp=_profileCacheGet(currentUser.id);
       if(_cp){
-        currentUserProfile=_cp; normalizeCurrentUserProfileRole();
+        currentUserProfile=_cp; normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
         _senseDataLog('PROFILE','⚡ cache hit → waiting for IDB preload before hideLoginOverlay (max 500ms)');
         Promise.race([
           window._idbPreloadPromise,
@@ -1230,17 +1242,17 @@ async function loadUserProfile() {
     const { data, error } = await supa.from('profiles').select('*').eq('id', currentUser.id).single();
     if (!error && data) {
       currentUserProfile = data;
-      normalizeCurrentUserProfileRole();
+      normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
       _profileCacheSet(currentUserProfile); // v220: persist for next cold boot
     } else {
       // Fallback: build minimal profile from auth session so role/email still work
       currentUserProfile = { id: currentUser.id, email: currentUser.email, role: 'rep', full_name: '' };
-      normalizeCurrentUserProfileRole();
+      normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
       if (error) console.warn('[loadUserProfile] profiles fetch error:', error.message);
     }
   } catch(e) {
     currentUserProfile = { id: currentUser.id, email: currentUser.email, role: 'rep', full_name: '' };
-    normalizeCurrentUserProfileRole();
+    normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
     console.warn('[loadUserProfile] exception:', e.message);
   }
   // v497: invalidate portview account cache after profile loads so email filter uses correct email
@@ -1344,7 +1356,7 @@ async function checkSession() {
       // v220 PROFILE CACHE: same cache-first pattern as onAuthStateChange path.
       var _cpcs=_profileCacheGet(session.user.id);
       if(_cpcs){
-        currentUserProfile=_cpcs; normalizeCurrentUserProfileRole();
+        currentUserProfile=_cpcs; normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
         _senseDataLog('PROFILE','⚡ cache hit (checkSession) → hideLoginOverlay immediately');
         // v348: patch R2 for Sales before fetch
         try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
