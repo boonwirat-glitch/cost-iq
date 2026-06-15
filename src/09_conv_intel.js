@@ -3568,7 +3568,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   function open(accountGuid) {
-    _phase = 'idle'; _lastResult = null; _secs = 0; _sessionId = null; _isOwnRecording = false;
+    // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
+    // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
+    const _keepSessionId = (_phase === 'processing' || _phase === 'result') && _sessionId;
+    _phase = 'idle'; _lastResult = null; _secs = 0;
+    if (!_keepSessionId) _sessionId = null;
+    _isOwnRecording = false;
     _mainTab = 'record';
     _unmount();
     // v552: TL/Admin — covisit panel only, picker ห้ามเปิดเด็ดขาด (spec Table 3)
