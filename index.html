@@ -1,4 +1,4 @@
-<!-- Freshket Sense v739: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v740: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v739',
+      version: 'v740',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15521,6 +15521,17 @@ async function loadFromCloudflareR2(){
   if(sheetsLoadStarted)return;
   sheetsLoadStarted=true;
   const token=++_cloudLoadToken;
+
+  // v739: auto-patch Sales routing if _salesR2Override was cleared (e.g. by reloadFromCloudflareR2)
+  // but role is still Sales. Prevents handover ending up in FOREGROUND after a reload.
+  try{
+    if(Object.keys(_salesR2Override).length===0){
+      var _autoRole=(typeof getCurrentRole==='function')?getCurrentRole():'';
+      if(_autoRole==='sales'||_autoRole==='sales_tl'){
+        if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales();
+      }
+    }
+  }catch(_){}
 
   // v201c loading strategy:
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
