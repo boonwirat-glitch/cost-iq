@@ -146,6 +146,7 @@ const CI = (() => {
 .rec-dot{width:5px;height:5px;border-radius:50%;background:var(--danger);opacity:0;transition:opacity .3s;}
 .rec-dot.on{opacity:1;animation:blink 1.3s ease-in-out infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes ci-dot-pulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 
 /* ── CHIP ── */
 #ci-fullsheet .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;background:rgba(0,0,0,.04);}
@@ -1820,16 +1821,26 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (el) el.innerHTML = _overviewPanel(_summaryText, _tone, segments, summaryData);
     } else if (idx === 1) {
       const el = document.getElementById('ci-p1');
-      if (el) el.innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังวิเคราะห์ทักษะ...');
+      if (el) el.innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังประเมินทักษะ...');
     } else if (idx === 2) {
       const el = document.getElementById('ci-p2');
       if (el) el.innerHTML = intelData ? _customerPanel(intelData) : _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
     }
   }
 
-  function _loadingPanel(msg) {
-    return '<div style="padding:32px 24px;text-align:center;font-size:13px;color:#AEAEB2">'
-      + '<div style="margin-bottom:8px">⏳</div>' + (msg||'กำลังโหลด...') + '</div>';
+  function _loadingPanel(msg, isDone) {
+    // isDone=true → แสดง "ไม่มีข้อมูล" แทน spinner
+    if (isDone) {
+      return '<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลในส่วนนี้</div>';
+    }
+    return '<div style="padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:12px">'
+      + '<div style="display:flex;gap:5px;align-items:center">'
+      + '<span style="width:5px;height:5px;border-radius:50%;background:#AEAEB2;animation:ci-dot-pulse 1.2s ease-in-out infinite"></span>'
+      + '<span style="width:5px;height:5px;border-radius:50%;background:#AEAEB2;animation:ci-dot-pulse 1.2s ease-in-out .2s infinite"></span>'
+      + '<span style="width:5px;height:5px;border-radius:50%;background:#AEAEB2;animation:ci-dot-pulse 1.2s ease-in-out .4s infinite"></span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:#AEAEB2;letter-spacing:.04em">' + (msg||'กำลังประมวลผล...') + '</div>'
+      + '</div>';
   }
 
   function _renderResult() {
@@ -1864,7 +1875,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
     // v712: progressive — handle null states while pipeline continues
     document.getElementById('ci-p0').innerHTML = _overviewPanel(_summaryText, _tone, segments, summaryData);
-    document.getElementById('ci-p1').innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังวิเคราะห์ทักษะ...');
+    document.getElementById('ci-p1').innerHTML = skillData ? _skillsPanel(skillData) : _loadingPanel('กำลังประเมินทักษะ...');
     document.getElementById('ci-p2').innerHTML = intelData ? _customerPanel(intelData) : _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
     const tlDiv = document.getElementById('ci-tl-actions');
     if (tlDiv) tlDiv.style.display = (_canDebrief() && !_isOwnRecording) ? 'flex' : 'none';
@@ -1941,8 +1952,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
       notesHtml = transcriptHtml;
       transcriptHtml = ''; // ป้องกัน duplicate
     } else if (!summaryData) {
-      // ไม่มีทั้ง notes, segments, summaryData — แสดง loading
-      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
+      // ไม่มีทั้ง notes, segments, summaryData — session ยังไม่ได้ analyze หรือ fail
+      notesHtml = _loadingPanel('ยังไม่มีข้อมูล', true);
     }
 
     // customer_said — สิ่งที่ลูกค้าบอก
@@ -1961,7 +1972,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     }
 
     return (toneHtml + summaryHtml + notesHtml + customerSaidHtml)
-      || _loadingPanel('กำลังสรุปบทสนทนา...');
+      || _loadingPanel('ยังไม่มีข้อมูล', true);
   }
 
   function _skillsPanel(d) {
@@ -4362,7 +4373,7 @@ function echoOpen() {
   // Now: open sheet → show toast if data still loading → re-render Echo state when data arrives.
   CI.open(null);
   if (typeof allCriticalReady === 'function' && !allCriticalReady()) {
-    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล...', '⏳');
+    if (typeof showToast === 'function') showToast('กำลังโหลดข้อมูล...');
     if (window.DataRegistry) {
       window.DataRegistry.waitFor(1).then(function(){
         try{
