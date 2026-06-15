@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753c: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753b',
+      version: 'v753c',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -32470,6 +32470,12 @@ flex-wrap:wrap;}
 
 /* ── Zone D: Total + Footer ─────────────────────────────────────────────── */
 .cds-total{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,.25);border-top:1px solid rgba(255,255,255,.12);flex-shrink:0;}
+/* v753c: column-aligned total bars — match grid of each tab's column header */
+.cds-total.nrr-cols{display:grid;grid-template-columns:minmax(0,1fr) 54px 60px 54px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.exp-cols{display:grid;grid-template-columns:minmax(0,1fr) 44px 62px 56px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.ho-cols{display:grid;grid-template-columns:minmax(0,1fr) 58px 58px 48px;gap:0;padding:10px 18px;align-items:center;}
+.cds-total.nrr-cols .cds-total-label,.cds-total.exp-cols .cds-total-label,.cds-total.ho-cols .cds-total-label{font-size:9px;white-space:nowrap;}
+.cds-total.nrr-cols .cds-total-val,.cds-total.exp-cols .cds-total-val,.cds-total.ho-cols .cds-total-val{font-size:11px;text-align:right;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;}
 .cds-total-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(188,215,255,.65);}
 .cds-total-val{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:16px;font-weight:900;}
 .cds-footer{display:flex;gap:7px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.2);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));}
@@ -37899,7 +37905,9 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
       comebackCount:comebackIds.length,
       expansionGmv:expansionIds.reduce((s,id)=>s+(currGmvByOutlet[id]||0),0),
       expansionCount:expansionIds.length,
-      cohortDetail, comebackDetail, expansionDetail
+      cohortDetail, comebackDetail, expansionDetail,
+      // v753c: expose time fields for run rate calculation in total bar
+      daysElapsed, daysInMonth:prevDays, prevMonth:prevMonth
     };
   }
 
@@ -40731,7 +40739,15 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   body.innerHTML = html;
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', fmtFull(totalComm), 'v-amber');
+  // v753c: Expansion total — show GMV + commission aligned with exp-cols
+  if (totalEl) {
+    totalEl.innerHTML = '<div class="cds-total exp-cols">'
+      + '<span class="cds-total-label">รวม Expansion</span>'
+      + '<span class="cds-total-val v-dim">' + totalOutlets + ' outlet</span>'
+      + '<span class="cds-total-val v-teal">' + fmtFull(totalGmv) + '</span>'
+      + '<span class="cds-total-val v-amber">' + fmtFull(totalComm) + '</span>'
+      + '</div>';
+  }
 };
 
 
@@ -40817,7 +40833,17 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
     if (el) el.classList.toggle('open');
   });
 
-  if (totalEl) totalEl.innerHTML = h.total('รวม Handover', fmtFull(payout), payout > 0 ? 'v-blue' : 'v-dim');
+  // v753c: Handover total — show baseline + MTD + payout aligned with ho-cols
+  if (totalEl) {
+    var _hoBase = detail.reduce(function(s,a){return s+(a.baseline||0);},0);
+    var _hoMtd  = detail.reduce(function(s,a){return s+(a.current||0);},0);
+    totalEl.innerHTML = '<div class="cds-total ho-cols">'
+      + '<span class="cds-total-label">รวม Handover</span>'
+      + '<span class="cds-total-val v-dim">' + fmtFull(_hoBase) + '</span>'
+      + '<span class="cds-total-val v-blue">' + fmtFull(_hoMtd) + '</span>'
+      + '<span class="cds-total-val ' + (payout > 0 ? 'v-amber' : 'v-dim') + '">' + fmtFull(payout) + '</span>'
+      + '</div>';
+  }
 };
 
 
@@ -40937,7 +40963,20 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 
   // ── Total bar ─────────────────────────────────────────────────────────
-  if (totalEl) totalEl.innerHTML = h.total('รวม NRR GMV', fmtFull(nr.cohortGmv || 0), 'v-green');
+  // v753c: NRR total bar — 3 columns aligned with header (base / run rate / MTD)
+  if (totalEl) {
+    var _nrrBase = nr.baselinePrevGmv || 0;
+    var _nrrMtd  = nr.cohortGmv || 0;
+    var _nrrDays = nr.daysElapsed || 1;
+    var _nrrDim  = nr.daysInMonth || 30;
+    var _nrrRr   = Math.round(_nrrMtd / _nrrDays * _nrrDim);
+    totalEl.innerHTML = '<div class="cds-total nrr-cols">'
+      + '<span class="cds-total-label">รวม NRR GMV</span>'
+      + '<span class="cds-total-val v-dim" title="Base (เดือนก่อน)">' + fmtFull(_nrrBase) + '</span>'
+      + '<span class="cds-total-val v-green" title="Run Rate (normalize)">' + fmtFull(_nrrRr) + '</span>'
+      + '<span class="cds-total-val" style="color:rgba(26,232,123,.55)" title="MTD">' + fmtFull(_nrrMtd) + '</span>'
+      + '</div>';
+  }
 };
 
 
