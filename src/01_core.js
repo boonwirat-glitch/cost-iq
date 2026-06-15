@@ -614,19 +614,8 @@ function showSenseSplash(onDone){
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
-  // v737: Sales never fetches handover — pre-mark BEFORE gate checks so allCriticalReady() works.
-  // v736 bug: body.sales-mode class is NOT set yet at splash time (set later in _splashPreFade/doFade).
-  // Fix: check getCurrentRole() as fallback — profile guaranteed loaded before showSenseSplash fires.
-  try{
-    var _splashRole=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
-    if(!_splashRole&&typeof getCurrentRole==='function'){
-      var _sr=getCurrentRole(); _splashRole=(_sr==='sales'||_sr==='sales_tl');
-    }
-    if(_splashRole){
-      try{if(typeof _cloudLoadedTabs!=='undefined')_cloudLoadedTabs.add('handover');}catch(_){}
-      try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){}
-    }
-  }catch(_){}
+  // Sales handover pre-mark handled by _patchR2FilesForSales() via _detectAndMarkSalesSession()
+  // which runs synchronously after every profile set — no need to repeat here.
   // v219: if IndexedDB preloaded, allCriticalReady()=true → dataReady=true immediately
   // (gate already fired before showSenseSplash was called → no need to wait for _splashDataReady signal)
   let dataReady=_cacheWarm || (_idbPreloaded && allCriticalReady());
@@ -748,26 +737,7 @@ function showSenseSplash(onDone){
             renderTeamview();
           }
         }catch(_){}
-        // v737: Sales MAX_SHOW timeout safety render.
-        // allCriticalReady() may still be false if handover was not yet marked (race with loadFromCloudflareR2).
-        // If portviewBulkData has data and role is sales, force mark handover + flush.
-        try{
-          var _spLen=(typeof portviewBulkData!=='undefined'&&portviewBulkData)?portviewBulkData.length:0;
-          var _isSalesNow=(document.body.classList.contains('sales-mode')||
-            (typeof getCurrentRole==='function'&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl')));
-          if(_spLen>0&&_isSalesNow){
-            try{if(typeof _cloudLoadedTabs!=='undefined')_cloudLoadedTabs.add('handover');}catch(_){}
-            try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){}
-            _senseDataLog('SPLASH','🔄 Sales post-fade render (MAX_SHOW path)');
-            if(window.RenderBus&&typeof window.RenderBus.flushNow==='function'){
-              try{window.RenderBus.flushNow();}catch(e){}
-            }else if(typeof renderSalesPortview==='function'){
-              try{renderSalesPortview();}catch(e){}
-            }else if(typeof refreshAll==='function'){
-              try{refreshAll();}catch(e){}
-            }
-          }
-        }catch(_){}
+
         // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
         // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.
         if(!dataReady && !window._coldRetryFired){
