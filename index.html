@@ -1,4 +1,4 @@
-<!-- Freshket Sense v737: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v738: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v737',
+      version: 'v738',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -14985,27 +14985,29 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
 const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',current_movements:'portview_current_movements.csv'};
+// v738: R2_FILES comes from FRESHKET_APP_CONFIG which is Object.freeze()'d — direct mutation is
+// a silent no-op. _salesR2Override is a mutable local map; _getR2File() checks it first.
+var _salesR2Override = {}; // populated by _patchR2FilesForSales for Sales role
+function _getR2File(tab){ return (_salesR2Override[tab] !== undefined ? _salesR2Override[tab] : R2_FILES[tab]) || (tab+'.csv'); }
 // Sales CSV routing — called after loadUserProfile() resolves
-// Patches R2_FILES keys so Sales users load their own portview CSV
 function _patchR2FilesForSales(){
   try{
     const role=typeof getCurrentRole==='function'?getCurrentRole():'';
     if(role==='sales'||role==='sales_tl'){
       const email=(typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email)||'';
       if(!email) return;
-      // Bulk routing: shared Sales CSVs (filter by kamEmail in client for portview)
-      R2_FILES['portview']   = 'sales_portview.csv';
-      R2_FILES['history']    = 'sales_history.csv';
-      R2_FILES['categories'] = 'sales_categories.csv';
-      R2_FILES['sku_current']= 'sales_sku_current.csv';
-      R2_FILES['outlets']    = 'sales_outlets.csv';
-      R2_FILES['handover']   = ''; // not needed — newUserExpDate in portview covers it
-      // v735: pre-mark handover as loaded — Sales never fetches it but all gates check for it
+      // v738: populate _salesR2Override (mutable) instead of frozen R2_FILES
+      _salesR2Override['portview']    = 'sales_portview.csv';
+      _salesR2Override['history']     = 'sales_history.csv';
+      _salesR2Override['categories']  = 'sales_categories.csv';
+      _salesR2Override['sku_current'] = 'sales_sku_current.csv';
+      _salesR2Override['outlets']     = 'sales_outlets.csv';
+      _salesR2Override['handover']    = ''; // not fetched — mark loaded below
+      // Pre-mark handover: Sales never fetches it but gates check for it
       try{ _cloudLoadedTabs.add('handover'); }catch(_){}
       try{ if(window.DataRegistry) window.DataRegistry.markLoaded('handover'); }catch(_){}
-      console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:R2_FILES['portview']});
-      // Fix B: clear ALL Sales-relevant IDB keys so KAM cached data never serves Sales
-      // history/sku_current/categories/outlets are cached per-tab — must evict before Sales fetch
+      console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:_salesR2Override['portview']});
+      // Clear Sales-relevant IDB keys so KAM cached data never serves Sales
       try{
         const _SALES_IDB_KEYS=['portview','history','sku_current','categories','outlets'];
         const _db_req=indexedDB.open('ciq-csv-v1',1);
@@ -15129,7 +15131,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
           // v205c: Conditional GET (ETag-based) — replaces HEAD+GET double-trip
           // R2 returns 304 Not Modified if file unchanged → use cache; 200 → fresh data
           try{
-            const _url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
+            const _url=`${R2_BASE}/${_getR2File(tab)}`;
             const _res=await window.FreshketSenseRuntime.data.fetchWithEtag(_url,cached.etag||null,_specFetchTimeout(spec));
             if(_res.notModified){
               _src='IDB→ETag304'; // v218b: cache hit, unchanged
@@ -15171,7 +15173,7 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         }
       }
       if(!text){
-        const url=`${R2_BASE}/${R2_FILES[tab]||tab+'.csv'}`;
+        const url=`${R2_BASE}/${_getR2File(tab)}`;
         const _fr=await window.FreshketSenseRuntime.data.fetchWithEtag(url,null,_specFetchTimeout(spec)).catch(async()=>{
           // fetchWithEtag failed → fallback to plain fetch (handles edge cases)
           const t=await _fetchTextWithTimeout(url,_specFetchTimeout(spec));
@@ -15198,8 +15200,9 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         // block the portfolio render or hold the splash.
         try{
           // v732: Sales has no handover file — gate on portview+history only for Sales
-          var _isSales=(typeof getCurrentRole==='function')&&
-                       (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+          // v738: use _salesR2Override as authoritative Sales signal
+          var _isSales=(Object.keys(_salesR2Override).length>0)||
+            ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
           var _gateOk=_isSales
             ? (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history'))
             : (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history') && _cloudLoadedTabs.has('handover'));
@@ -15524,9 +15527,12 @@ async function loadFromCloudflareR2(){
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
   // Tier 3 (DEFERRED): price → sparkline baseline upgrade (silent, after tier 2)
   // v359: Sales users skip handover fetch (no sales_handover_{key}.csv exists — not needed for render)
-  const _isSalesMode=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+  // v738: check _salesR2Override (set by _patchR2FilesForSales) as authoritative Sales signal
+  // getCurrentRole() alone can be empty if profile not yet settled at this point
+  const _isSalesMode=(Object.keys(_salesR2Override).length>0)||
+    ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
-  // v733: Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
+  // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
   if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
@@ -15610,6 +15616,7 @@ async function reloadFromCloudflareR2(){
   sheetsLoadStarted=false;
   bulkSkusReady=false;bulkAltsReady=false;
   _cloudLoadedTabs.clear();
+  _salesR2Override = {}; // v738: reset Sales routing on full reload
   try{ if(window.DataRegistry) window.DataRegistry.reset(); }catch(_){} // Phase 0G
   _clearCloudInFlight();
   _cloudInitialPromise=null;
@@ -15819,7 +15826,9 @@ async function _preloadFromIndexedDB(){
   // IDB has KAM portview (640 accounts) — wrong data for Sales
   // IDB clear in _patchR2FilesForSales() handles eviction, but race condition
   // on warm boot means IDB may still be populated. Skip here to be safe.
-  var _isSalesPreload=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+  // v738: use _salesR2Override as authoritative Sales signal (set before IDB preload in most paths)
+  var _isSalesPreload=(Object.keys(_salesR2Override).length>0)||
+    ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   var CRITICAL=['portview','history','handover'];
   var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
   var TABS=_isSalesPreload
@@ -16224,7 +16233,7 @@ function refreshAll(){
   // v218 DATA GATE: block render until portview+history+handover all loaded.
   // v733: Sales doesn't use handover — allCriticalReady() already handles this via DataRegistry
   if(!allCriticalReady()){
-    var _isSalesGate=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
+    var _isSalesGate=(Object.keys(_salesR2Override).length>0)||(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
     var _pending=[];
     try{ if(!_cloudLoadedTabs.has('portview'))_pending.push('portview');
          if(!_cloudLoadedTabs.has('history')) _pending.push('history');
