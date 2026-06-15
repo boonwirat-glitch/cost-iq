@@ -1935,8 +1935,13 @@ OCPB (customer intel จากเสียงเท่านั้น):
           + (n.heading ? '<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
           + bullets + '</div>';
       }).join('');
-    } else if (!summaryData && segments && segments.length) {
-      // ยังไม่มี summary — แสดง loading
+    } else if (segments && segments.length) {
+      // notes ว่าง (session เก่า / summarize fail) — fallback แสดง transcript segments แทน
+      // ไม่ต้องเช็ค !summaryData เพราะ session เก่ามี summaryData แต่ไม่มี notes field
+      notesHtml = transcriptHtml;
+      transcriptHtml = ''; // ป้องกัน duplicate
+    } else if (!summaryData) {
+      // ไม่มีทั้ง notes, segments, summaryData — แสดง loading
       notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
     }
 
