@@ -1861,130 +1861,126 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   // ── v709: "บทสนทนา" panel — transcript segments + tone + summary ────────────
   function _overviewPanel(summary, tone, segments, summaryData) {
+    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
+    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
 
-    // ── Tone & Energy (sd2-tcard) ──────────────────────────────────────────
+    // Tone & Energy
     let toneHtml = '';
     if (tone) {
-      const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
-      const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
       const _conf = tone.rep_confidence;
       const _eng  = tone.customer_engagement;
       const cConf = _conf==='high'?'#1F8A43':_conf==='medium'?'#B26A00':(_conf==='low'?'#C73E3E':'#8E8E93');
       const cEng  = _eng==='increasing'?'#1F8A43':_eng==='stable'?'#B26A00':(_eng==='declining'?'#C73E3E':'#8E8E93');
-      const bothNA = (!_conf||_conf==='not_applicable')&&(!_eng||_eng==='not_applicable');
+      const confTxt = thaiConf[_conf] || '—';
+      const engTxt  = thaiEng[_eng]   || '—';
+      const bothNA = (!_conf || _conf==='not_applicable') && (!_eng || _eng==='not_applicable');
       if (!bothNA) {
         toneHtml = `<div class="sd2-lbl">Tone &amp; Energy</div>
 <div class="sd2-tone">
-  <div class="sd2-tcard">
-    <div class="k">Confidence</div>
-    <div class="v" style="color:${cConf}">${thaiConf[_conf]||'—'}</div>
-    <div class="n">${tone.rep_confidence_note||''}</div>
-  </div>
-  <div class="sd2-tcard">
-    <div class="k">Engagement</div>
-    <div class="v" style="color:${cEng}">${thaiEng[_eng]||'—'}</div>
-    <div class="n">${tone.customer_engagement_note||''}</div>
-  </div>
+  <div class="sd2-tcard"><div class="k">Confidence</div><div class="v" style="color:${cConf}">${confTxt}</div><div class="n">${tone.rep_confidence_note||''}</div></div>
+  <div class="sd2-tcard"><div class="k">Engagement</div><div class="v" style="color:${cEng}">${engTxt}</div><div class="n">${tone.customer_engagement_note||''}</div></div>
 </div>`;
       }
     }
 
-    // ── Summary (sd2-sum) ──────────────────────────────────────────────────
+    // Summary
     const summaryHtml = summary
       ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${summary}</div>` : '';
 
-    // ── Notes — Google Meet style (sd2 bullets) ────────────────────────────
-    let notesHtml = '';
-    const notes = summaryData?.notes || [];
-    if (notes.length) {
-      notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
-      notesHtml += notes.map(n => {
-        const bullets = (n.bullets||[]).map(b =>
-          `<div class="sd2-ipoint">${b}</div>`
-        ).join('');
-        return `<div style="margin-bottom:14px">
-          ${n.heading ? `<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${n.heading}</div>` : ''}
-          ${bullets}
-        </div>`;
-      }).join('');
-    } else if (!summaryData && segments && segments.length) {
-      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
-    }
-
-    // ── ลูกค้าบอกว่า (sd2-iline) ──────────────────────────────────────────
-    let customerSaidHtml = '';
-    const customerSaid = summaryData?.customer_said || [];
-    if (customerSaid.length) {
-      customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
-      customerSaidHtml += customerSaid.map(c =>
-        `<div class="sd2-iline">
-          <div class="sd2-ik">${c.ts||''}</div>
-          <div class="sd2-iv">
-            ${c.point||''}
-            ${c.quote ? `<div class="sd2-sev">&ldquo;${c.quote}&rdquo;</div>` : ''}
-          </div>
-        </div>`
-      ).join('');
-    }
-
-    // ── Transcript segments (sd2-srow style) ──────────────────────────────
+    // v709: Transcript segments — ground truth แทน key_moments
     let transcriptHtml = '';
     if (segments && segments.length) {
-      const spkColor = sp => {
-        if (!sp) return '#8E8E93';
+      const speakerColor = (sp) => {
+        if (!sp) return '#636366';
         const s = sp.toLowerCase();
         if (s === 'sales') return '#FF385C';
         if (s.startsWith('ลูกค้า')) return '#1F8A43';
-        return '#8E8E93';
+        return '#636366';
       };
       const rows = segments.map(seg => {
-        const color = spkColor(seg.speaker);
-        return `<div style="display:flex;align-items:baseline;gap:8px;padding:8px 0;border-bottom:0.5px solid #F2F2F7">
-          <div style="flex-shrink:0;min-width:80px">
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2">${seg.ts||''}</span>
-          </div>
-          <div style="flex-shrink:0;min-width:52px">
-            <span style="font-size:10px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:.04em">${seg.speaker||''}</span>
-          </div>
-          <div style="font-size:13.5px;color:#1C1C1E;line-height:1.65;flex:1">${seg.text||''}</div>
+        const color = speakerColor(seg.speaker);
+        const ts = seg.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2;margin-right:6px;flex-shrink:0">${seg.ts}</span>` : '';
+        const spk = seg.speaker ? `<span style="font-size:10px;font-weight:600;color:${color};margin-right:6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em">${seg.speaker}</span>` : '';
+        return `<div style="display:flex;align-items:baseline;gap:0;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:baseline;gap:0;flex-shrink:0;width:120px">${ts}${spk}</div>
+          <div style="font-size:13px;color:#1C1C1E;line-height:1.6;flex:1">${seg.text||''}</div>
         </div>`;
       }).join('');
       transcriptHtml = `<div class="sd2-lbl">บทสนทนา · ${segments.length} segments</div>
 <div style="margin-bottom:8px">${rows}</div>`;
     }
 
-    return (toneHtml + summaryHtml + notesHtml + customerSaidHtml + transcriptHtml)
+    // v712: notes format (Google Meet style) — แสดงแทน transcript ยาวๆ
+    let notesHtml = '';
+    const notes = summaryData?.notes || [];
+    if (notes.length) {
+      notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
+      notesHtml += notes.map(n => {
+        const bullets = (n.bullets||[]).map(b =>
+          '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;color:#1C1C1E;line-height:1.6">'
+          + '<span style="color:#AEAEB2;flex-shrink:0">•</span><span>' + b + '</span></div>'
+        ).join('');
+        return '<div style="margin-bottom:14px">'
+          + (n.heading ? '<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
+          + bullets + '</div>';
+      }).join('');
+    } else if (!summaryData && segments && segments.length) {
+      // ยังไม่มี summary — แสดง loading
+      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
+    }
+
+    // customer_said — สิ่งที่ลูกค้าบอก
+    let customerSaidHtml = '';
+    const customerSaid = summaryData?.customer_said || [];
+    if (customerSaid.length) {
+      customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
+      customerSaidHtml += customerSaid.map(c =>
+        '<div style="padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">'
+        + '<div style="font-size:13px;color:#1C1C1E;line-height:1.6;margin-bottom:2px">' + (c.point||'') + '</div>'
+        + (c.quote ? '<div class="sd2-sev">&ldquo;' + c.quote + '&rdquo;'
+          + (c.ts ? ' <span style="font-family:var(--mono);font-size:11px;color:#8E8E93">' + c.ts + '</span>' : '')
+          + '</div>' : '')
+        + '</div>'
+      ).join('');
+    }
+
+    return (toneHtml + summaryHtml + notesHtml + customerSaidHtml)
       || _loadingPanel('กำลังสรุปบทสนทนา...');
   }
 
   function _skillsPanel(d) {
-    if (!d) return _loadingPanel('กำลังวิเคราะห์ทักษะ...');
-
     const shortBanner = (d?._short_transcript)
       ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:12px;margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
-          <div style="flex-shrink:0;padding-top:2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+          <div style="flex-shrink:0;display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning,#FF9500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
           <div>
-            <div style="font-size:12px;font-weight:600;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
-            <div style="font-size:12px;color:#636366;line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
+            <div style="font-size:12px;font-weight:500;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
+            <div style="font-size:11px;color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
           </div>
-        </div>` : '';
+        </div>`
+      : '';
+
+    // v606: ลบ PIPC progress bar ออก — A01_PIPC เป็น skill หนึ่งใน rows อยู่แล้ว
+    // ลบ session_summary ("สรุปทักษะ") ออก — อยู่ใน tab บทสนทนาแล้ว
 
     const summary = d?.session_summary
-      ? `<div class="sd2-lbl">สรุปทักษะ</div><div class="sd2-sum" style="margin-bottom:6px">${d.session_summary}</div>` : '';
+      ? `<div class="sd2-lbl">สรุปทักษะ</div><div class="sd2-sum" style="margin-bottom:6px">${d.session_summary}</div>`
+      : '';
 
-    const _rbName = c => { const r = (_rubricCache||[]).find(x=>x.skill_code===c); return (r&&r.skill_name_en)||''; };
-    const stMap = { pass:['ทำได้ดี','ok'], developing:['กำลังพัฒนา','dev'], not_applicable:['N/A','no'], not_observed:['ไม่พบ','no'] };
+    const _rbName = c => { const r = (_rubricCache||[]).find(x => x.skill_code === c); return (r && r.skill_name_en) || ''; };
+    const stMap = { pass:['ทำได้ดี','ok'], developing:['กำลังพัฒนา','dev'], not_applicable:['N/A','no'] };
     const rows = (d?.skills||[]).map(s => {
-      const dotColor = s.score==='pass'?'#34C759':s.score==='developing'?'#FF9500':'#D1D1D6';
-      const st = stMap[s.score]||['ไม่พบ','no'];
-      const ev   = (s.evidence||s.evidence_summary)&&s.evidence!=='-' ? `<div class="sd2-sev">${s.evidence||s.evidence_summary}</div>` : '';
-      const gap  = s.gap&&s.gap!=='-' ? `<div style="font-size:12.5px;color:#8E8E93;line-height:1.6;margin-top:3px">ขาด: ${s.gap}</div>` : '';
-      const note = s.coaching_note&&s.coaching_note!=='-' ? `<div class="sd2-snote">${s.coaching_note}</div>` : '';
+      const dotColor = (typeof window._skDotColor === 'function')
+        ? window._skDotColor(s.code, s.score)
+        : (s.score==='pass'?'#34C759':s.score==='developing'?'#FF9500':'#D1D1D6');
+      const st = stMap[s.score] || ['ไม่พบ','no'];
+      const ev   = (s.evidence||s.evidence_summary) && s.evidence!=='-' ? `<div class="sd2-sev">${s.evidence||s.evidence_summary}</div>` : '';
+      const gap  = s.gap && s.gap !== '-' ? `<div style="font-size:12.5px;color:#8E8E93;line-height:1.6;margin-top:3px">ขาด: ${s.gap}</div>` : '';
+      const note = s.coaching_note && s.coaching_note !== '-' ? `<div class="sd2-snote">${s.coaching_note}</div>` : '';
       return `<div class="sd2-srow">
         <span class="sd2-sdot" style="background:${dotColor}"></span>
         <div style="flex:1;min-width:0">
           <div class="sd2-scode">${s.code||''}</div>
-          <div class="sd2-sname">${s.name||_rbName(s.code)}</div>
+          <div class="sd2-sname">${s.name || _rbName(s.code)}</div>
           ${ev}${gap}${note}
         </div>
         <span class="sd2-sstate ${st[1]}">${st[0]}</span>
@@ -1995,8 +1991,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   function _customerPanel(d) {
-    if (!d) return _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
-
+    // v582 fact capture · v586 sd2 polish — type scale 14px, state pills แบบ sd2-sstate,
+    // มิติที่ยังไม่แตะยุบเหลือบรรทัดเดียว, Next Steps ต่อท้าย pane (โครงเดียวกับ session detail)
     const DIMS = [
       ['O','Operation ของร้าน'],
       ['C','ซัพเดิม · ราคา · สินค้า'],
@@ -2008,58 +2004,57 @@ OCPB (customer intel จากเสียงเท่านั้น):
       pain_medium: ['pain · med','rgba(255,149,0,.08)','#B26A00'],
       opportunity: ['โอกาส','rgba(52,199,89,.08)','#1F8A43'],
     };
+    const ST = {
+      answered:        ['ได้ข้อมูล','ok'],
+      asked_no_answer: ['ถามแล้ว ไม่ได้คำตอบ','dev'],
+      not_asked:       ['ยังไม่แตะ','no'],
+    };
+    const facts  = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
+    const status = d?.ocpb_status || {};
 
-    const ocpbStatus = d?.ocpb_status || {};
-    const facts = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
-
-    const statusLabel = v => v==='answered'?'ถามและได้คำตอบ':v==='asked_no_answer'?'ถามแต่ไม่ได้คำตอบ':'ยังไม่แตะ';
-    const statusColor = v => v==='answered'?'#1F8A43':v==='asked_no_answer'?'#B26A00':'#AEAEB2';
-
-    let ocpbHtml = '<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>';
-    DIMS.forEach(([dim, label]) => {
-      const status = ocpbStatus[dim] || 'not_asked';
-      const dimFacts = facts.filter(f => f.dim === dim);
-      const tagData = dimFacts[0]?.tag ? TAGS[dimFacts[0].tag] : null;
-
-      ocpbHtml += `<div style="padding:12px 0;border-bottom:0.5px solid #F2F2F7">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${dimFacts.length?'8px':'0'}">
-          <div style="font-size:14px;font-weight:600;color:#1C1C1E">${dim} — ${label}</div>
-          <div style="font-size:11px;font-weight:500;color:${statusColor(status)};white-space:nowrap;padding-left:8px">${statusLabel(status)}</div>
-        </div>
-        ${dimFacts.map(f => `<div style="display:flex;align-items:flex-start;gap:8px;margin-top:6px">
-          ${tagData ? `<span style="flex-shrink:0;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:${tagData[1]};color:${tagData[2]};margin-top:2px">${tagData[0]}</span>` : '<span style="width:8px;flex-shrink:0;margin-top:8px;height:5px;width:5px;border-radius:50%;background:#D1D1D6;display:inline-block"></span>'}
-          <div>
-            <div style="font-size:13.5px;color:#1C1C1E;line-height:1.7">${f.summary||''}</div>
-            ${f.quote ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo; <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2">${f.ts||''}</span></div>` : ''}
-          </div>
-        </div>`).join('')}
-      </div>`;
-    });
-
-    // Next actions
-    const nextActions = d?.next_actions || [];
-    let nextHtml = '';
-    if (nextActions.length) {
-      nextHtml = '<div class="sd2-lbl" style="margin-top:20px">Next Steps</div>';
-      nextHtml += nextActions.map((a,i) => {
-        const action = typeof a === 'string' ? a : (a.action||'');
-        const owner  = typeof a === 'object' ? a.owner : '';
-        const urg    = typeof a === 'object' ? a.urgency : '';
-        const urgColor = urg==='3_days'?'#C73E3E':urg==='this_week'?'#B26A00':'#534AB7';
-        return `<div class="sd2-next">
-          <div class="num">${i+1}</div>
-          <div style="flex:1">
-            ${action}
-            ${owner||urg ? `<div style="margin-top:4px;display:flex;gap:8px">
-              ${owner ? `<span style="font-size:11px;font-weight:600;color:#8E8E93">${owner}</span>` : ''}
-              ${urg ? `<span style="font-size:11px;font-weight:600;color:${urgColor}">${urg.replace('_',' ')}</span>` : ''}
-            </div>` : ''}
-          </div>
+    const blocks = DIMS.map(([dim, label]) => {
+      const fs = facts.filter(f => f && f.dim === dim);
+      const stKey = status[dim] || (fs.length ? 'answered' : 'not_asked');
+      const st = ST[stKey] || ST.not_asked;
+      // มิติที่ไม่มีใครแตะ — ยุบเหลือบรรทัดเดียว ไม่กินสายตา (ช่องว่างคือคำตอบ ไม่ใช่ความผิด)
+      if (!fs.length && stKey === 'not_asked') {
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 0;border-bottom:0.5px solid #ECECF0">
+          <span style="font-size:13px;color:#AEAEB2">${dim} — ${label}</span>
+          <span class="sd2-sstate no">${st[0]}</span>
+        </div>`;
+      }
+      const rows = fs.map(f => {
+        const quote = (f.quote && String(f.quote).trim())
+          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
+          : '';
+        return `<div style="padding:8px 0 8px 2px">
+          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
+          ${quote}
         </div>`;
       }).join('');
-    }
+      const empty = fs.length ? '' :
+        `<div style="font-size:12.5px;color:#8E8E93;padding:6px 0 6px 2px">rep ถามแล้ว แต่ยังไม่ได้คำตอบจากลูกค้า</div>`;
+      return `<div style="padding:11px 0;border-bottom:0.5px solid #ECECF0">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:600;color:#1C1C1E">${dim} — ${label}</span>
+          <span class="sd2-sstate ${st[1]}">${st[0]}</span>
+        </div>
+        ${rows}${empty}
+      </div>`;
+    }).join('');
 
-    return ocpbHtml + nextHtml;
+    // Next Steps — ต่อท้าย pane ลูกค้า (mirror session detail)
+    const nexts = (d?.next_actions||[]).map((a,i) => {
+      const ul = a.urgency==='3_days'?'ภายใน 3 วัน':a.urgency==='this_week'?'สัปดาห์นี้':'visit ถัดไป';
+      return `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><div><div>${a.action||''}</div><div style="font-size:12px;color:#8E8E93;margin-top:3px">${a.owner||''} · ${ul}${a.reason?` — ${a.reason}`:''}</div></div></div>`;
+    }).join('');
+    const nextsHtml = nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : '';
+
+    const hasIntel = facts.length || Object.keys(status).length;
+    const intelHtml = hasIntel
+      ? `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>${blocks}`
+      : (nextsHtml ? '' : `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
+    return intelHtml + nextsHtml;
   }
 
   function _transcriptPanel(tone, transcriptSummary) {
