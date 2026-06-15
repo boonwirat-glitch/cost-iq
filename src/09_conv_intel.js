@@ -1668,10 +1668,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
         status:         'draft'
       }).select('id').single();
       if (error) {
-        console.warn('[CI] _saveTranscriptOnly insert:', error.message);
+        console.error('[CI] _saveTranscriptOnly insert FAILED:', error.message, error.code, error.details, error.hint);
       } else if (sessionRow) {
         _sessionId = sessionRow.id;
         console.log('[CI] transcript saved, session_id=' + _sessionId);
+      } else {
+        console.error('[CI] _saveTranscriptOnly: no error but no row returned');
       }
     } catch(e) {
       console.warn('[CI] _saveTranscriptOnly unavailable:', e.message);
