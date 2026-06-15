@@ -1,4 +1,4 @@
-<!-- Freshket Sense 725: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 726: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '725',
+      version: '726',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43981,10 +43981,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
         status:         'draft'
       }).select('id').single();
       if (error) {
-        console.warn('[CI] _saveTranscriptOnly insert:', error.message);
+        console.error('[CI] _saveTranscriptOnly insert FAILED:', error.message, error.code, error.details, error.hint);
       } else if (sessionRow) {
         _sessionId = sessionRow.id;
         console.log('[CI] transcript saved, session_id=' + _sessionId);
+      } else {
+        console.error('[CI] _saveTranscriptOnly: no error but no row returned');
       }
     } catch(e) {
       console.warn('[CI] _saveTranscriptOnly unavailable:', e.message);
