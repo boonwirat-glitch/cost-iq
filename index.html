@@ -1,4 +1,4 @@
-<!-- Freshket Sense v744: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v745: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v744',
+      version: 'v745',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15962,10 +15962,17 @@ window.DataRegistry = (function(){
 
   function _checkTier(t){
     if(_tierReady[t]) return true;
-    var tabs = TIER_TABS[t] ? TIER_TABS[t].slice() : [];
-    // Tier 1: non-sales users also need handover
-    if(t===1 && !_isSales()) tabs.push('handover');
-    var ready = tabs.length > 0 && tabs.every(function(k){ return _loaded.has(k); });
+    var ready;
+    if(t===1){
+      // v745: delegate Tier 1 check to allCriticalReady() — it is Sales-aware
+      // (portview+history for Sales, portview+history+handover for others)
+      // DataRegistry._isSales() checked body.sales-mode which may not be set yet at boot,
+      // causing handover to be included in Tier 1 for Sales → _tierReady[1] never set.
+      ready = (typeof allCriticalReady==='function') ? allCriticalReady() : false;
+    } else {
+      var tabs = TIER_TABS[t] ? TIER_TABS[t].slice() : [];
+      ready = tabs.length > 0 && tabs.every(function(k){ return _loaded.has(k); });
+    }
     if(ready){
       _tierReady[t] = true;
       // fire callbacks
