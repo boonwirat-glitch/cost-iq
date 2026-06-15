@@ -1,4 +1,4 @@
-<!-- Freshket Sense v742: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v743: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v742',
+      version: 'v743',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12081,7 +12081,12 @@ supa.auth.onAuthStateChange((event, session) => {
           window._bgEtagTimer=setTimeout(async function(){
             try{
               _senseDataLog('BACKGROUND','ETag check for portview+history+handover...');
-              for(var _bt of ['portview','history','handover']){
+              // v743: Sales never has handover file — skip to avoid 404 blocking gate
+              var _bgEtagFiles=['portview','history','handover'];
+              var _bgIsSales=(typeof getCurrentRole==='function')&&
+                (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+              if(_bgIsSales) _bgEtagFiles=_bgEtagFiles.filter(function(k){return k!=='handover';});
+              for(var _bt of _bgEtagFiles){
                 try{ var _bs=R2_SPECS[_bt]; if(_bs) await _fetchCloudflareFile(_bs,{force:true}); }catch(e){}
               }
               window._idbPreloaded=false; // reset after first real ETag cycle
