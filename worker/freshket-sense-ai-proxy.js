@@ -12,7 +12,7 @@ const MODEL_MAP = {
   claude: { haiku: 'claude-haiku-4-5-20251001', sonnet: 'claude-sonnet-4-6' },
   gemini: {
     flash:      'gemini-2.5-flash',
-    flash_lite: 'gemini-2.0-flash-lite',
+    flash_lite: 'gemini-2.5-flash-lite', // updated: 2.0-flash-lite shutdown 2026-06-01
   }
 };
 
