@@ -1693,6 +1693,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
           next_actions:       intelData?.next_actions || [],
           transcript_summary: transcriptSummary || null,
           tone_signals:       toneSignals || null,
+          summary_data:       summaryData || null,
           status:             'saved'
         }).eq('id', _sessionId);
         if (error) console.warn('[CI] session update:', error.message);
@@ -1716,6 +1717,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
           next_actions:       intelData?.next_actions || [],
           transcript_summary: transcriptSummary || null,
           tone_signals:       toneSignals || null,
+          summary_data:       summaryData || null,
           rep_lat:            _checkinCache?.rep_lat || null,
           rep_lng:            _checkinCache?.rep_lng || null,
           checked_in_at:      _checkinCache?.checked_in_at || null,
@@ -3070,9 +3072,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const toneSignals       = s.tone_signals || null;
     // v606: ส่ง transcriptSummary ให้ _overviewPanel โดยตรง (ไม่มี whyHtml กรอง)
     const transcriptSummary = s.transcript_summary || null;
+    // Echo v2: pass segments + summaryData so history matches live result
+    const segments   = Array.isArray(s.transcript) ? s.transcript : [];
+    const summaryData = s.summary_data || null;
 
     // ── Build 3 panes (v606: รวม overview+transcript → "บทสนทนา")
-    const pane1 = _overviewPanel(transcriptSummary, toneSignals);
+    const pane1 = _overviewPanel(transcriptSummary, toneSignals, segments, summaryData);
     const pane2 = _skillsPanel(skillData);
     const pane3 = _customerPanel(intelData);
 
@@ -4429,7 +4434,7 @@ function echoExpand() {
         <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
         <div>
           <div style="font-size:12px;font-weight:500;color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
-          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?'🎧 '+s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
+          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
         </div>
         <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
       </div>`).join('');
