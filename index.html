@@ -1,4 +1,4 @@
-<!-- Freshket Sense 731: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 732: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '731',
+      version: '732',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15161,9 +15161,13 @@ async function _fetchCloudflareFile(spec,{force=false,cacheOverride}={}){
         // categories/sku_current/outlets are background files — their arrival doesn't need to
         // block the portfolio render or hold the splash.
         try{
-          if(_cloudLoadedTabs.has('portview') &&
-             _cloudLoadedTabs.has('history') &&
-             _cloudLoadedTabs.has('handover')){
+          // v732: Sales has no handover file — gate on portview+history only for Sales
+          var _isSales=(typeof getCurrentRole==='function')&&
+                       (getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
+          var _gateOk=_isSales
+            ? (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history'))
+            : (_cloudLoadedTabs.has('portview') && _cloudLoadedTabs.has('history') && _cloudLoadedTabs.has('handover'));
+          if(_gateOk){
             // Signal splash to start fading (critical data ready)
             if(typeof window._splashDataReady==='function') window._splashDataReady();
             _senseDataLog('🚪 GATE ✅','portview+history+handover ready → splash fade');
