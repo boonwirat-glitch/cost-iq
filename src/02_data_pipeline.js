@@ -770,7 +770,21 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
-      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(window.RenderBus)window.RenderBus.signal('sku_current');} // v223
+      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){
+        D.sku_current=bulkSkuCurrentData[currentAccountId];
+        // v752b: fast targeted re-render — sku_current loaded → show SKU section immediately
+        // ไม่รอ RenderBus 800ms debounce: ถ้า scr-overview กำลัง on และอยู่ใน KAM mode
+        // ให้ renderKamThisMonth() โดยตรง เพื่อให้ SKU Signals / สัญญาณบวก โผล่เร็ว
+        try{
+          var _scrOv=document.getElementById('scr-overview');
+          if(_scrOv&&_scrOv.classList.contains('on')&&
+             typeof isKAM!=='undefined'&&isKAM&&
+             typeof renderKamThisMonth==='function'){
+            setTimeout(function(){ try{ renderKamThisMonth(); }catch(e){} }, 0);
+          }
+        }catch(e){}
+        if(window.RenderBus)window.RenderBus.signal('sku_current'); // v223
+      }
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
