@@ -2151,10 +2151,17 @@ window.DataRegistry = (function(){
 
   function _checkTier(t){
     if(_tierReady[t]) return true;
-    var tabs = TIER_TABS[t] ? TIER_TABS[t].slice() : [];
-    // Tier 1: non-sales users also need handover
-    if(t===1 && !_isSales()) tabs.push('handover');
-    var ready = tabs.length > 0 && tabs.every(function(k){ return _loaded.has(k); });
+    var ready;
+    if(t===1){
+      // v745: delegate Tier 1 check to allCriticalReady() — it is Sales-aware
+      // (portview+history for Sales, portview+history+handover for others)
+      // DataRegistry._isSales() checked body.sales-mode which may not be set yet at boot,
+      // causing handover to be included in Tier 1 for Sales → _tierReady[1] never set.
+      ready = (typeof allCriticalReady==='function') ? allCriticalReady() : false;
+    } else {
+      var tabs = TIER_TABS[t] ? TIER_TABS[t].slice() : [];
+      ready = tabs.length > 0 && tabs.every(function(k){ return _loaded.has(k); });
+    }
     if(ready){
       _tierReady[t] = true;
       // fire callbacks
