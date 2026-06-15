@@ -597,6 +597,14 @@ function showSenseSplash(onDone){
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
+  // v736: Sales never fetches handover — pre-mark before any gate checks so allCriticalReady() works
+  try{
+    var _splashRole=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
+    if(_splashRole){
+      try{if(typeof _cloudLoadedTabs!=='undefined')_cloudLoadedTabs.add('handover');}catch(_){}
+      try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){}
+    }
+  }catch(_){}
   // v219: if IndexedDB preloaded, allCriticalReady()=true → dataReady=true immediately
   // (gate already fired before showSenseSplash was called → no need to wait for _splashDataReady signal)
   let dataReady=_cacheWarm || (_idbPreloaded && allCriticalReady());
