@@ -1,4 +1,4 @@
-<!-- Freshket Sense 723: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 724: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '723',
+      version: '724',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43439,6 +43439,7 @@ body:not(.echo-active) { background:unset; }
       // ── Save full analysis to Supabase ───────────────────────────────────────
       // Transcript was already saved in step 1 — this updates the same row
       _setStep('กำลังบันทึก...', '', 92);
+      console.log('[CI pipeline] reaching save step, _sessionId=' + _sessionId);
       await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
       _idbClear();
       _setStep('', '', 100);
@@ -43449,6 +43450,7 @@ body:not(.echo-active) { background:unset; }
     } catch (err) {
       _stopProcTimer();
       _phase = 'idle';
+      console.error('[CI pipeline] FAILED:', err.message, err.stack?.split('\n').slice(0,2).join(' | '));
       _unmount();
       try { window.SenseSentinel?.report('ci_analyze_fail',
         err.message.slice(0, 200) + ' | secs=' + _secs + ' | acct=' + (_accountName || '-')); } catch(_) {}
