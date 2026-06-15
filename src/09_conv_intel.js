@@ -3597,6 +3597,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
       _showPicker = true;
       setTimeout(_mount, 50);
     }
+    // Echo v2: check for crashed/incomplete session in IDB after mount
+    setTimeout(_checkRecoverBuffer, 300);
   }
 
   function _mountPicker() {
