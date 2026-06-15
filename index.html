@@ -1,4 +1,4 @@
-<!-- Freshket Sense 729: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 730: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '729',
+      version: '730',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -46662,10 +46662,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
 function ciOpen(accountGuid) { CI.open(accountGuid); }
 function echoOpen() {
-  // Guard: if recording in progress, expand sheet instead of killing session
-  if (typeof CI !== 'undefined' && typeof CI._phase === 'function' && CI._phase() === 'recording') {
-    echoExpand();
-    return;
+  // Guard: if recording OR processing in progress, expand sheet instead of killing session
+  if (typeof CI !== 'undefined' && typeof CI._phase === 'function') {
+    const _p = CI._phase();
+    if (_p === 'recording') { echoExpand(); return; }
+    if (_p === 'processing') { echoExpand(); return; } // v730: ไม่ kill pipeline ระหว่าง analyze
   }
   // v715 Fix 3A: MOUNT-FIRST — CI.open() has no data dependency, always open immediately.
   // Previous: silent return when !allCriticalReady() → user sees blank screen with no feedback.
