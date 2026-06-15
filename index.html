@@ -1,4 +1,4 @@
-<!-- Freshket Sense v741: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v742: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v741',
+      version: 'v742',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12324,7 +12324,10 @@ function showSenseSplash(onDone){
       if(window._pendingRefreshAll && (typeof allCriticalReady!=='function' || allCriticalReady())){
         window._pendingRefreshAll=false;
         window._suppressAnimN=true;
-        if(window.RenderBus) window.RenderBus.markRender();
+        // v742: do NOT markRender() here — refreshAll() hits splash guard (still active)
+        // and gets queued without rendering. markRender() would stamp version prematurely,
+        // causing VERSION GUARD to block the actual render after splash clears.
+        // Let _flush() stamp version itself when it truly renders.
         try{if(typeof refreshAll==='function')refreshAll();}catch(e){}
         // Re-enable animations after splash has fully disappeared
         setTimeout(()=>{ window._suppressAnimN=false; },400);
