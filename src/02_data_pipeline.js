@@ -1731,6 +1731,17 @@ async function loadFromCloudflareR2(){
   sheetsLoadStarted=true;
   const token=++_cloudLoadToken;
 
+  // v739: auto-patch Sales routing if _salesR2Override was cleared (e.g. by reloadFromCloudflareR2)
+  // but role is still Sales. Prevents handover ending up in FOREGROUND after a reload.
+  try{
+    if(Object.keys(_salesR2Override).length===0){
+      var _autoRole=(typeof getCurrentRole==='function')?getCurrentRole():'';
+      if(_autoRole==='sales'||_autoRole==='sales_tl'){
+        if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales();
+      }
+    }
+  }catch(_){}
+
   // v201c loading strategy:
   // Tier 1 (FOREGROUND): 6 lightweight files → app usable
   // Tier 2 (BACKGROUND): skus → alternatives (sequential, heavy) → Sense ready
