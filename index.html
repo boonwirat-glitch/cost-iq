@@ -1,4 +1,4 @@
-<!-- Freshket Sense 719: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v720: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '719',
+      version: 'v720',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15866,6 +15866,12 @@ window.DataRegistry = (function(){
   var version = 0;
 
   function _isSales(){
+    // v720 fix: check body.sales-mode class FIRST — set synchronously before any data fetch
+    // getCurrentRole() may not be ready when markLoaded fires on first portview/history arrival
+    try{
+      if(document.body.classList.contains('sales-mode')||
+         document.body.classList.contains('sales-tl-mode')) return true;
+    }catch(e){}
     try{
       var r = typeof getCurrentRole==='function' ? getCurrentRole() : '';
       return r==='sales'||r==='sales_tl';
@@ -43358,47 +43364,41 @@ body:not(.echo-active) { background:unset; }
   async function _processBlob(blob, _resumeFromSegments) {
     _startProcTimer();
     try {
-      // ── audio integrity check ──────────────────────────────────────────────
+      // ── audio integrity check (ยังคงไว้) ────────────────────────────────────
       const _expectedBytes = _secs * 3000;
       const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
-      console.log('[CI audio] blob=' + blob.size + 'B expected≈' + _expectedBytes + 'B ratio=' + _ratio.toFixed(2));
+      console.log('[CI audio integrity] blob=' + blob.size + 'B expected≈' + _expectedBytes +
+        'B (' + _secs + 's) ratio=' + _ratio.toFixed(2));
       if (_secs >= 60 && _ratio < 0.7) {
         const _estMins = Math.round(blob.size / 3000 / 60);
-        try { window.SenseSentinel?.report('ci_audio_gap', 'ratio=' + _ratio.toFixed(2)); } catch(_) {}
-        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ)');
+        try { window.SenseSentinel?.report('ci_audio_gap',
+          'timer=' + _secs + 's blob=' + blob.size + 'B ratio=' + _ratio.toFixed(2) +
+          ' est_audio=' + _estMins + 'min'); } catch(_) {}
+        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (สั้นกว่าเวลาที่จับ) — บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ');
       }
 
       // Load rubric from DB if not cached yet
       if (!_rubricCache) await _loadRubricFromDB();
 
-      // ── Step 1: Transcript (ground truth) ───────────────────────────────────
-      // Echo v2: save transcript to Supabase immediately after this step
-      // Analysis layers are disposable — transcript is permanent
+      // ── Step 1: Transcript ───────────────────────────────────────────────────
       let segments = _resumeFromSegments || null;
       if (!segments) {
         _setStep('กำลัง transcript...', 'Groq Whisper · ฟัง audio ทั้งหมด', 10);
-        // Dynamic timeout: at least 6 min, scale with recording length
-        const transcriptTimeout = Math.max(360000, _secs * 1000 * 1.5);
-        const transcriptResult = await _callTranscript(blob, transcriptTimeout);
+        const transcriptResult = await _callTranscript(blob);
         if (transcriptResult.no_speech) {
           _phase = 'idle'; _idbClear(); _unmount();
           _toast('ไม่พบเสียงพูดใน audio'); return;
         }
         segments = transcriptResult.segments || [];
-        // Fallback: diarize failed but Whisper text exists (source = 'whisper_fallback')
         if (!segments.length) throw new Error('Transcript ไม่ได้ผล — ไม่มี segments');
         _idbSetPipeline({ segments, stage: 'transcribed' });
-        console.log('[CI pipeline] transcript done —', segments.length, 'segments, source=' + (transcriptResult.source || 'unknown'));
-
-        // ── Echo v2: Save transcript to Supabase immediately (permanent ground truth) ──
-        _setStep('กำลังบันทึก transcript...', '', 20);
-        await _saveTranscriptOnly(segments, transcriptResult.source || 'unknown');
-
+        console.log('[CI pipeline] transcript done —', segments.length, 'segments');
       } else {
         console.log('[CI pipeline] resuming from transcript —', segments.length, 'segments');
       }
 
-      // ── Progressive: เข้าหน้า result ทันทีหลัง transcript เสร็จ ───────────
+      // ── Progressive: เข้าหน้า result ทันทีหลัง transcript เสร็จ ────────────
+      // Tab 1 แสดง "กำลังสรุป..." ระหว่างรอ Step 2-3
       _lastResult = { segments, summaryData: null, skillData: null, intelData: null,
                       transcriptSummary: null, toneSignals: null };
       _renderResult();
@@ -43408,18 +43408,10 @@ body:not(.echo-active) { background:unset; }
 
       // ── Step 2: Summary ──────────────────────────────────────────────────────
       _setStep('กำลังสรุปบทสนทนา...', 'Gemini · อ่าน transcript', 45);
-      let summaryResult = null;
-      try {
-        summaryResult = await _callSummarize(segments);
-      } catch(summaryErr) {
-        // Summary failure is non-fatal — analysis proceeds with null summary
-        console.warn('[CI pipeline] summary failed (non-fatal):', summaryErr.message);
-        summaryResult = null;
-      }
+      const summaryResult = await _callSummarize(segments);
       _idbSetPipeline({ segments, summary: summaryResult, stage: 'summarized' });
-      console.log('[CI pipeline] summary done, result=' + (summaryResult ? 'ok' : 'null'));
-
-      // Update Tab 1 immediately after summary
+      console.log('[CI pipeline] summary done');
+      // Update Tab 1 ทันทีที่ summary เสร็จ
       _lastResult.summaryData = summaryResult;
       _lastResult.transcriptSummary = summaryResult?.transcript_summary || null;
       _lastResult.toneSignals = summaryResult?.tone || null;
@@ -43429,20 +43421,19 @@ body:not(.echo-active) { background:unset; }
       _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
       const analysisResult = await _callAnalyze(segments, summaryResult);
       console.log('[CI pipeline] analysis done');
-
-      // Update Tab 2 + 3
+      // Update Tab 2 + 3 ทันทีที่ analysis เสร็จ
       _lastResult.skillData  = analysisResult.skillData;
       _lastResult.intelData  = analysisResult.intelData;
       _updatePanel(1);
       _updatePanel(2);
 
-      // ── Save full analysis to Supabase ───────────────────────────────────────
-      // Transcript was already saved in step 1 — this updates the same row
+      // ── Save to Supabase ─────────────────────────────────────────────────────
       _setStep('กำลังบันทึก...', '', 92);
-      await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
+      await _saveToSupabasePipeline(segments, summaryResult, analysisResult);
       _idbClear();
       _setStep('', '', 100);
       _stopProcTimer();
+      // ซ่อน processing banner หลัง save เสร็จ
       const procBanner = document.getElementById('ci-proc-banner');
       if (procBanner) procBanner.style.display = 'none';
 
@@ -43465,18 +43456,13 @@ body:not(.echo-active) { background:unset; }
       } else {
         _human = 'วิเคราะห์ไม่สำเร็จ';
       }
-      // If transcript was already saved, user can retry analysis from history
-      if (_sessionId) {
-        _toast(_human + ' — transcript บันทึกแล้ว กด "วิเคราะห์ใหม่" ใน history ได้เลย');
-      } else {
-        _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
-      }
+      _toast(_human + ' — บันทึกเสียงถูกเก็บไว้แล้ว เปิด Echo อีกครั้งแล้วกด "วิเคราะห์ต่อ" ได้เลย');
     }
   }
 
   // ── Pipeline API calls ────────────────────────────────────────────────────────
 
-  async function _callTranscript(audioBlob, timeoutMs) {
+  async function _callTranscript(audioBlob) {
     const arrayBuf = await audioBlob.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuf);
     let binary = '';
@@ -43486,12 +43472,12 @@ body:not(.echo-active) { background:unset; }
     }
     const b64audio = btoa(binary);
     const mimeType = audioBlob.type || 'audio/webm';
-    const FETCH_TIMEOUT_MS = timeoutMs || Math.max(360000, _secs * 1000 * 1.5); // dynamic
 
+    const FETCH_TIMEOUT_MS = 360000; // 6 นาที — transcript audio ยาวใช้เวลานาน
     let res, lastErr;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (attempt > 1) {
-        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Groq Whisper · ระบบคิวเต็ม', 10 + attempt * 5);
+        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Gemini · ระบบ AI คิวเต็ม', 10 + attempt * 5);
         await new Promise(r => setTimeout(r, attempt === 2 ? 3000 : 7000));
       }
       const ctrl = new AbortController();
@@ -43500,7 +43486,7 @@ body:not(.echo-active) { background:unset; }
         res = await fetch(`${WORKER_URL}/transcript`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs }),
+          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType }),
           signal: ctrl.signal,
         });
         if (res.ok) { clearTimeout(tmo); break; }
@@ -43509,7 +43495,7 @@ body:not(.echo-active) { background:unset; }
         if (res.status !== 503 && res.status !== 429) { clearTimeout(tmo); throw lastErr; }
         res = null;
       } catch(e) {
-        if (e.name === 'AbortError') throw new Error('หมดเวลา transcript (' + Math.round(FETCH_TIMEOUT_MS/60000) + ' นาที)');
+        if (e.name === 'AbortError') throw new Error('หมดเวลา transcript (6 นาที)');
         if (e.message && !e.message.startsWith('Transcript 503') && !e.message.startsWith('Transcript 429')) throw e;
         lastErr = e;
       } finally { clearTimeout(tmo); }
@@ -43953,100 +43939,48 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   // ── v709: pipeline save — saves transcript to new column ─────────────────────
-// ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
-  async function _saveTranscriptOnly(segments, source) {
-    const email = currentUserProfile?.email;
-    if (!email) return;
-    const nowIso = new Date().toISOString();
-    try {
-      const { data: sessionRow, error } = await supa.from('ci_sessions').insert({
-        owner_email:    email,
-        owner_type:     _ownerType,
-        account_id:     _accountGuid || null,
-        account_name:   _accountName || null,
-        visited_at:     nowIso,
-        duration_secs:  _secs,
-        transcript:     segments,
-        pipeline_stage: 'transcribed',
-        transcript_source: source || 'unknown',
-        rep_lat:        _checkinCache?.rep_lat || null,
-        rep_lng:        _checkinCache?.rep_lng || null,
-        checked_in_at:  _checkinCache?.checked_in_at || null,
-        status:         'draft'
-      }).select('id').single();
-      if (error) {
-        console.warn('[CI] _saveTranscriptOnly insert:', error.message);
-      } else if (sessionRow) {
-        _sessionId = sessionRow.id;
-        console.log('[CI] transcript saved, session_id=' + _sessionId);
-      }
-    } catch(e) {
-      console.warn('[CI] _saveTranscriptOnly unavailable:', e.message);
-    }
-  }
-
-  // ── Echo v2: Update existing session row with analysis ───────────────────
-  async function _saveAnalysisToExistingSession(segments, summaryData, analysisResult) {
+  async function _saveToSupabasePipeline(segments, summaryData, analysisResult) {
     const skillData  = analysisResult?.skillData  || null;
     const intelData  = analysisResult?.intelData  || null;
     const transcriptSummary = summaryData?.transcript_summary || null;
     const toneSignals = summaryData?.tone || null;
+
+    if (!skillData && !intelData && !segments?.length) return;
     const email = currentUserProfile?.email;
     if (!email) return;
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
 
-    // Update existing session if we have _sessionId from transcript save
-    if (_sessionId) {
-      try {
-        const { error } = await supa.from('ci_sessions').update({
-          pipeline_stage:     'analyzed',
-          skill_scores:       skillData || null,
-          customer_intel:     intelData || null,
-          next_actions:       intelData?.next_actions || [],
-          transcript_summary: transcriptSummary || null,
-          tone_signals:       toneSignals || null,
-          summary_data:       summaryData || null,
-          status:             'saved'
-        }).eq('id', _sessionId);
-        if (error) console.warn('[CI] session update:', error.message);
-        else console.log('[CI] analysis saved to session_id=' + _sessionId);
-      } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
-    } else {
-      // Fallback: insert everything together (transcript save failed earlier)
-      try {
-        const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
-          owner_email:        email,
-          owner_type:         _ownerType,
-          account_id:         _accountGuid || null,
-          account_name:       _accountName || null,
-          visited_at:         nowIso,
-          duration_secs:      _secs,
-          transcript:         segments?.length ? segments : null,
-          pipeline_stage:     'analyzed',
-          transcript_source:  'unknown',
-          skill_scores:       skillData || null,
-          customer_intel:     intelData || null,
-          next_actions:       intelData?.next_actions || [],
-          transcript_summary: transcriptSummary || null,
-          tone_signals:       toneSignals || null,
-          summary_data:       summaryData || null,
-          rep_lat:            _checkinCache?.rep_lat || null,
-          rep_lng:            _checkinCache?.rep_lng || null,
-          checked_in_at:      _checkinCache?.checked_in_at || null,
-          status:             'saved'
-        }).select('id').single();
-        if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
-        else if (sessionRow) _sessionId = sessionRow.id;
-      } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
-    }
+    // 1. Save ci_sessions — เพิ่ม transcript + pipeline_stage
+    try {
+      const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
+        owner_email:        email,
+        owner_type:         _ownerType,
+        account_id:         _accountGuid || null,
+        account_name:       _accountName || null,
+        visited_at:         nowIso,
+        duration_secs:      _secs,
+        transcript:         segments?.length ? segments : null,
+        pipeline_stage:     'analyzed',
+        skill_scores:       skillData || null,
+        customer_intel:     intelData || null,
+        next_actions:       intelData?.next_actions || [],
+        transcript_summary: transcriptSummary || null,
+        tone_signals:       toneSignals || null,
+        rep_lat:            _checkinCache?.rep_lat || null,
+        rep_lng:            _checkinCache?.rep_lng || null,
+        checked_in_at:      _checkinCache?.checked_in_at || null,
+        status:             'saved'
+      }).select('id').single();
+      if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
+      else if (sessionRow) {
+        _sessionId = sessionRow.id;
+        _checkinCache = null;
+        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+      }
+    } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
 
-    if (_sessionId) {
-      _checkinCache = null;
-      try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
-    }
-
-    // skill log
+    // 2. skill log
     if (skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
         kam_email: email, account_id: _accountGuid || null,
@@ -44059,7 +43993,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
     }
 
-    // echo_skill_observations
+    // 3. echo_skill_observations
     if (skillData?.skills?.length) {
       try {
         let _userId = null;
@@ -44085,7 +44019,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       } catch(e) { console.warn('[CI] echo_skill_observations unavailable:', e.message); }
     }
 
-    // kam_visits snapshot
+    // 4. kam_visits snapshot
     if (_accountGuid) {
       const { error: visitError } = await supa.from('kam_visits').upsert({
         kam_email: email, account_id: _accountGuid,
@@ -44096,7 +44030,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
     }
 
-    // localStorage echo visits dot
+    // 5. localStorage echo visits dot
     if (_accountGuid) {
       try {
         const _echoKey = 'ciq_echo_visits';
@@ -44174,130 +44108,126 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   // ── v709: "บทสนทนา" panel — transcript segments + tone + summary ────────────
   function _overviewPanel(summary, tone, segments, summaryData) {
+    const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
+    const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
 
-    // ── Tone & Energy (sd2-tcard) ──────────────────────────────────────────
+    // Tone & Energy
     let toneHtml = '';
     if (tone) {
-      const thaiConf = { high:'มั่นใจ', medium:'ปานกลาง', low:'ยังไม่มั่นใจ', not_applicable:'—', n_a:'—', na:'—' };
-      const thaiEng  = { increasing:'ดีขึ้น', stable:'คงที่', declining:'ลดลง', not_applicable:'—', n_a:'—', na:'—' };
       const _conf = tone.rep_confidence;
       const _eng  = tone.customer_engagement;
       const cConf = _conf==='high'?'#1F8A43':_conf==='medium'?'#B26A00':(_conf==='low'?'#C73E3E':'#8E8E93');
       const cEng  = _eng==='increasing'?'#1F8A43':_eng==='stable'?'#B26A00':(_eng==='declining'?'#C73E3E':'#8E8E93');
-      const bothNA = (!_conf||_conf==='not_applicable')&&(!_eng||_eng==='not_applicable');
+      const confTxt = thaiConf[_conf] || '—';
+      const engTxt  = thaiEng[_eng]   || '—';
+      const bothNA = (!_conf || _conf==='not_applicable') && (!_eng || _eng==='not_applicable');
       if (!bothNA) {
         toneHtml = `<div class="sd2-lbl">Tone &amp; Energy</div>
 <div class="sd2-tone">
-  <div class="sd2-tcard">
-    <div class="k">Confidence</div>
-    <div class="v" style="color:${cConf}">${thaiConf[_conf]||'—'}</div>
-    <div class="n">${tone.rep_confidence_note||''}</div>
-  </div>
-  <div class="sd2-tcard">
-    <div class="k">Engagement</div>
-    <div class="v" style="color:${cEng}">${thaiEng[_eng]||'—'}</div>
-    <div class="n">${tone.customer_engagement_note||''}</div>
-  </div>
+  <div class="sd2-tcard"><div class="k">Confidence</div><div class="v" style="color:${cConf}">${confTxt}</div><div class="n">${tone.rep_confidence_note||''}</div></div>
+  <div class="sd2-tcard"><div class="k">Engagement</div><div class="v" style="color:${cEng}">${engTxt}</div><div class="n">${tone.customer_engagement_note||''}</div></div>
 </div>`;
       }
     }
 
-    // ── Summary (sd2-sum) ──────────────────────────────────────────────────
+    // Summary
     const summaryHtml = summary
       ? `<div class="sd2-lbl">สรุปบทสนทนา</div><div class="sd2-sum">${summary}</div>` : '';
 
-    // ── Notes — Google Meet style (sd2 bullets) ────────────────────────────
-    let notesHtml = '';
-    const notes = summaryData?.notes || [];
-    if (notes.length) {
-      notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
-      notesHtml += notes.map(n => {
-        const bullets = (n.bullets||[]).map(b =>
-          `<div class="sd2-ipoint">${b}</div>`
-        ).join('');
-        return `<div style="margin-bottom:14px">
-          ${n.heading ? `<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${n.heading}</div>` : ''}
-          ${bullets}
-        </div>`;
-      }).join('');
-    } else if (!summaryData && segments && segments.length) {
-      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
-    }
-
-    // ── ลูกค้าบอกว่า (sd2-iline) ──────────────────────────────────────────
-    let customerSaidHtml = '';
-    const customerSaid = summaryData?.customer_said || [];
-    if (customerSaid.length) {
-      customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
-      customerSaidHtml += customerSaid.map(c =>
-        `<div class="sd2-iline">
-          <div class="sd2-ik">${c.ts||''}</div>
-          <div class="sd2-iv">
-            ${c.point||''}
-            ${c.quote ? `<div class="sd2-sev">&ldquo;${c.quote}&rdquo;</div>` : ''}
-          </div>
-        </div>`
-      ).join('');
-    }
-
-    // ── Transcript segments (sd2-srow style) ──────────────────────────────
+    // v709: Transcript segments — ground truth แทน key_moments
     let transcriptHtml = '';
     if (segments && segments.length) {
-      const spkColor = sp => {
-        if (!sp) return '#8E8E93';
+      const speakerColor = (sp) => {
+        if (!sp) return '#636366';
         const s = sp.toLowerCase();
         if (s === 'sales') return '#FF385C';
         if (s.startsWith('ลูกค้า')) return '#1F8A43';
-        return '#8E8E93';
+        return '#636366';
       };
       const rows = segments.map(seg => {
-        const color = spkColor(seg.speaker);
-        return `<div style="display:flex;align-items:baseline;gap:8px;padding:8px 0;border-bottom:0.5px solid #F2F2F7">
-          <div style="flex-shrink:0;min-width:80px">
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2">${seg.ts||''}</span>
-          </div>
-          <div style="flex-shrink:0;min-width:52px">
-            <span style="font-size:10px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:.04em">${seg.speaker||''}</span>
-          </div>
-          <div style="font-size:13.5px;color:#1C1C1E;line-height:1.65;flex:1">${seg.text||''}</div>
+        const color = speakerColor(seg.speaker);
+        const ts = seg.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2;margin-right:6px;flex-shrink:0">${seg.ts}</span>` : '';
+        const spk = seg.speaker ? `<span style="font-size:10px;font-weight:600;color:${color};margin-right:6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em">${seg.speaker}</span>` : '';
+        return `<div style="display:flex;align-items:baseline;gap:0;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:baseline;gap:0;flex-shrink:0;width:120px">${ts}${spk}</div>
+          <div style="font-size:13px;color:#1C1C1E;line-height:1.6;flex:1">${seg.text||''}</div>
         </div>`;
       }).join('');
       transcriptHtml = `<div class="sd2-lbl">บทสนทนา · ${segments.length} segments</div>
 <div style="margin-bottom:8px">${rows}</div>`;
     }
 
-    return (toneHtml + summaryHtml + notesHtml + customerSaidHtml + transcriptHtml)
+    // v712: notes format (Google Meet style) — แสดงแทน transcript ยาวๆ
+    let notesHtml = '';
+    const notes = summaryData?.notes || [];
+    if (notes.length) {
+      notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
+      notesHtml += notes.map(n => {
+        const bullets = (n.bullets||[]).map(b =>
+          '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;color:#1C1C1E;line-height:1.6">'
+          + '<span style="color:#AEAEB2;flex-shrink:0">•</span><span>' + b + '</span></div>'
+        ).join('');
+        return '<div style="margin-bottom:14px">'
+          + (n.heading ? '<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
+          + bullets + '</div>';
+      }).join('');
+    } else if (!summaryData && segments && segments.length) {
+      // ยังไม่มี summary — แสดง loading
+      notesHtml = _loadingPanel('กำลังสรุปบทสนทนา...');
+    }
+
+    // customer_said — สิ่งที่ลูกค้าบอก
+    let customerSaidHtml = '';
+    const customerSaid = summaryData?.customer_said || [];
+    if (customerSaid.length) {
+      customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
+      customerSaidHtml += customerSaid.map(c =>
+        '<div style="padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">'
+        + '<div style="font-size:13px;color:#1C1C1E;line-height:1.6;margin-bottom:2px">' + (c.point||'') + '</div>'
+        + (c.quote ? '<div class="sd2-sev">&ldquo;' + c.quote + '&rdquo;'
+          + (c.ts ? ' <span style="font-family:var(--mono);font-size:11px;color:#8E8E93">' + c.ts + '</span>' : '')
+          + '</div>' : '')
+        + '</div>'
+      ).join('');
+    }
+
+    return (toneHtml + summaryHtml + notesHtml + customerSaidHtml)
       || _loadingPanel('กำลังสรุปบทสนทนา...');
   }
 
   function _skillsPanel(d) {
-    if (!d) return _loadingPanel('กำลังวิเคราะห์ทักษะ...');
-
     const shortBanner = (d?._short_transcript)
       ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:12px;margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
-          <div style="flex-shrink:0;padding-top:2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+          <div style="flex-shrink:0;display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning,#FF9500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
           <div>
-            <div style="font-size:12px;font-weight:600;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
-            <div style="font-size:12px;color:#636366;line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
+            <div style="font-size:12px;font-weight:500;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
+            <div style="font-size:11px;color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
           </div>
-        </div>` : '';
+        </div>`
+      : '';
+
+    // v606: ลบ PIPC progress bar ออก — A01_PIPC เป็น skill หนึ่งใน rows อยู่แล้ว
+    // ลบ session_summary ("สรุปทักษะ") ออก — อยู่ใน tab บทสนทนาแล้ว
 
     const summary = d?.session_summary
-      ? `<div class="sd2-lbl">สรุปทักษะ</div><div class="sd2-sum" style="margin-bottom:6px">${d.session_summary}</div>` : '';
+      ? `<div class="sd2-lbl">สรุปทักษะ</div><div class="sd2-sum" style="margin-bottom:6px">${d.session_summary}</div>`
+      : '';
 
-    const _rbName = c => { const r = (_rubricCache||[]).find(x=>x.skill_code===c); return (r&&r.skill_name_en)||''; };
-    const stMap = { pass:['ทำได้ดี','ok'], developing:['กำลังพัฒนา','dev'], not_applicable:['N/A','no'], not_observed:['ไม่พบ','no'] };
+    const _rbName = c => { const r = (_rubricCache||[]).find(x => x.skill_code === c); return (r && r.skill_name_en) || ''; };
+    const stMap = { pass:['ทำได้ดี','ok'], developing:['กำลังพัฒนา','dev'], not_applicable:['N/A','no'] };
     const rows = (d?.skills||[]).map(s => {
-      const dotColor = s.score==='pass'?'#34C759':s.score==='developing'?'#FF9500':'#D1D1D6';
-      const st = stMap[s.score]||['ไม่พบ','no'];
-      const ev   = (s.evidence||s.evidence_summary)&&s.evidence!=='-' ? `<div class="sd2-sev">${s.evidence||s.evidence_summary}</div>` : '';
-      const gap  = s.gap&&s.gap!=='-' ? `<div style="font-size:12.5px;color:#8E8E93;line-height:1.6;margin-top:3px">ขาด: ${s.gap}</div>` : '';
-      const note = s.coaching_note&&s.coaching_note!=='-' ? `<div class="sd2-snote">${s.coaching_note}</div>` : '';
+      const dotColor = (typeof window._skDotColor === 'function')
+        ? window._skDotColor(s.code, s.score)
+        : (s.score==='pass'?'#34C759':s.score==='developing'?'#FF9500':'#D1D1D6');
+      const st = stMap[s.score] || ['ไม่พบ','no'];
+      const ev   = (s.evidence||s.evidence_summary) && s.evidence!=='-' ? `<div class="sd2-sev">${s.evidence||s.evidence_summary}</div>` : '';
+      const gap  = s.gap && s.gap !== '-' ? `<div style="font-size:12.5px;color:#8E8E93;line-height:1.6;margin-top:3px">ขาด: ${s.gap}</div>` : '';
+      const note = s.coaching_note && s.coaching_note !== '-' ? `<div class="sd2-snote">${s.coaching_note}</div>` : '';
       return `<div class="sd2-srow">
         <span class="sd2-sdot" style="background:${dotColor}"></span>
         <div style="flex:1;min-width:0">
           <div class="sd2-scode">${s.code||''}</div>
-          <div class="sd2-sname">${s.name||_rbName(s.code)}</div>
+          <div class="sd2-sname">${s.name || _rbName(s.code)}</div>
           ${ev}${gap}${note}
         </div>
         <span class="sd2-sstate ${st[1]}">${st[0]}</span>
@@ -44308,8 +44238,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
   }
 
   function _customerPanel(d) {
-    if (!d) return _loadingPanel('กำลังวิเคราะห์ข้อมูลลูกค้า...');
-
+    // v582 fact capture · v586 sd2 polish — type scale 14px, state pills แบบ sd2-sstate,
+    // มิติที่ยังไม่แตะยุบเหลือบรรทัดเดียว, Next Steps ต่อท้าย pane (โครงเดียวกับ session detail)
     const DIMS = [
       ['O','Operation ของร้าน'],
       ['C','ซัพเดิม · ราคา · สินค้า'],
@@ -44321,58 +44251,57 @@ OCPB (customer intel จากเสียงเท่านั้น):
       pain_medium: ['pain · med','rgba(255,149,0,.08)','#B26A00'],
       opportunity: ['โอกาส','rgba(52,199,89,.08)','#1F8A43'],
     };
+    const ST = {
+      answered:        ['ได้ข้อมูล','ok'],
+      asked_no_answer: ['ถามแล้ว ไม่ได้คำตอบ','dev'],
+      not_asked:       ['ยังไม่แตะ','no'],
+    };
+    const facts  = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
+    const status = d?.ocpb_status || {};
 
-    const ocpbStatus = d?.ocpb_status || {};
-    const facts = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
-
-    const statusLabel = v => v==='answered'?'ถามและได้คำตอบ':v==='asked_no_answer'?'ถามแต่ไม่ได้คำตอบ':'ยังไม่แตะ';
-    const statusColor = v => v==='answered'?'#1F8A43':v==='asked_no_answer'?'#B26A00':'#AEAEB2';
-
-    let ocpbHtml = '<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>';
-    DIMS.forEach(([dim, label]) => {
-      const status = ocpbStatus[dim] || 'not_asked';
-      const dimFacts = facts.filter(f => f.dim === dim);
-      const tagData = dimFacts[0]?.tag ? TAGS[dimFacts[0].tag] : null;
-
-      ocpbHtml += `<div style="padding:12px 0;border-bottom:0.5px solid #F2F2F7">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${dimFacts.length?'8px':'0'}">
-          <div style="font-size:14px;font-weight:600;color:#1C1C1E">${dim} — ${label}</div>
-          <div style="font-size:11px;font-weight:500;color:${statusColor(status)};white-space:nowrap;padding-left:8px">${statusLabel(status)}</div>
-        </div>
-        ${dimFacts.map(f => `<div style="display:flex;align-items:flex-start;gap:8px;margin-top:6px">
-          ${tagData ? `<span style="flex-shrink:0;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:${tagData[1]};color:${tagData[2]};margin-top:2px">${tagData[0]}</span>` : '<span style="width:8px;flex-shrink:0;margin-top:8px;height:5px;width:5px;border-radius:50%;background:#D1D1D6;display:inline-block"></span>'}
-          <div>
-            <div style="font-size:13.5px;color:#1C1C1E;line-height:1.7">${f.summary||''}</div>
-            ${f.quote ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo; <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2">${f.ts||''}</span></div>` : ''}
-          </div>
-        </div>`).join('')}
-      </div>`;
-    });
-
-    // Next actions
-    const nextActions = d?.next_actions || [];
-    let nextHtml = '';
-    if (nextActions.length) {
-      nextHtml = '<div class="sd2-lbl" style="margin-top:20px">Next Steps</div>';
-      nextHtml += nextActions.map((a,i) => {
-        const action = typeof a === 'string' ? a : (a.action||'');
-        const owner  = typeof a === 'object' ? a.owner : '';
-        const urg    = typeof a === 'object' ? a.urgency : '';
-        const urgColor = urg==='3_days'?'#C73E3E':urg==='this_week'?'#B26A00':'#534AB7';
-        return `<div class="sd2-next">
-          <div class="num">${i+1}</div>
-          <div style="flex:1">
-            ${action}
-            ${owner||urg ? `<div style="margin-top:4px;display:flex;gap:8px">
-              ${owner ? `<span style="font-size:11px;font-weight:600;color:#8E8E93">${owner}</span>` : ''}
-              ${urg ? `<span style="font-size:11px;font-weight:600;color:${urgColor}">${urg.replace('_',' ')}</span>` : ''}
-            </div>` : ''}
-          </div>
+    const blocks = DIMS.map(([dim, label]) => {
+      const fs = facts.filter(f => f && f.dim === dim);
+      const stKey = status[dim] || (fs.length ? 'answered' : 'not_asked');
+      const st = ST[stKey] || ST.not_asked;
+      // มิติที่ไม่มีใครแตะ — ยุบเหลือบรรทัดเดียว ไม่กินสายตา (ช่องว่างคือคำตอบ ไม่ใช่ความผิด)
+      if (!fs.length && stKey === 'not_asked') {
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 0;border-bottom:0.5px solid #ECECF0">
+          <span style="font-size:13px;color:#AEAEB2">${dim} — ${label}</span>
+          <span class="sd2-sstate no">${st[0]}</span>
+        </div>`;
+      }
+      const rows = fs.map(f => {
+        const quote = (f.quote && String(f.quote).trim())
+          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
+          : '';
+        return `<div style="padding:8px 0 8px 2px">
+          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
+          ${quote}
         </div>`;
       }).join('');
-    }
+      const empty = fs.length ? '' :
+        `<div style="font-size:12.5px;color:#8E8E93;padding:6px 0 6px 2px">rep ถามแล้ว แต่ยังไม่ได้คำตอบจากลูกค้า</div>`;
+      return `<div style="padding:11px 0;border-bottom:0.5px solid #ECECF0">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:600;color:#1C1C1E">${dim} — ${label}</span>
+          <span class="sd2-sstate ${st[1]}">${st[0]}</span>
+        </div>
+        ${rows}${empty}
+      </div>`;
+    }).join('');
 
-    return ocpbHtml + nextHtml;
+    // Next Steps — ต่อท้าย pane ลูกค้า (mirror session detail)
+    const nexts = (d?.next_actions||[]).map((a,i) => {
+      const ul = a.urgency==='3_days'?'ภายใน 3 วัน':a.urgency==='this_week'?'สัปดาห์นี้':'visit ถัดไป';
+      return `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><div><div>${a.action||''}</div><div style="font-size:12px;color:#8E8E93;margin-top:3px">${a.owner||''} · ${ul}${a.reason?` — ${a.reason}`:''}</div></div></div>`;
+    }).join('');
+    const nextsHtml = nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : '';
+
+    const hasIntel = facts.length || Object.keys(status).length;
+    const intelHtml = hasIntel
+      ? `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>${blocks}`
+      : (nextsHtml ? '' : `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
+    return intelHtml + nextsHtml;
   }
 
   function _transcriptPanel(tone, transcriptSummary) {
@@ -45390,12 +45319,9 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const toneSignals       = s.tone_signals || null;
     // v606: ส่ง transcriptSummary ให้ _overviewPanel โดยตรง (ไม่มี whyHtml กรอง)
     const transcriptSummary = s.transcript_summary || null;
-    // Echo v2: pass segments + summaryData so history matches live result
-    const segments   = Array.isArray(s.transcript) ? s.transcript : [];
-    const summaryData = s.summary_data || null;
 
     // ── Build 3 panes (v606: รวม overview+transcript → "บทสนทนา")
-    const pane1 = _overviewPanel(transcriptSummary, toneSignals, segments, summaryData);
+    const pane1 = _overviewPanel(transcriptSummary, toneSignals);
     const pane2 = _skillsPanel(skillData);
     const pane3 = _customerPanel(intelData);
 
@@ -46752,7 +46678,7 @@ function echoExpand() {
         <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
         <div>
           <div style="font-size:12px;font-weight:500;color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
-          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
+          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?'🎧 '+s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
         </div>
         <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
       </div>`).join('');
