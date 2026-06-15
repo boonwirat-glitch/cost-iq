@@ -76,7 +76,7 @@ body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-sha
   transform:translateX(-50%) translateY(102%);
   width:100%; max-width:440px;
   height:calc(100dvh - 75px);
-  background:#fff;
+  background:var(--tk-bg-base);
   border-radius:20px 20px 0 0;
   box-shadow:0 -1px 0 rgba(0,0,0,.04),
              0 -4px 16px rgba(0,0,0,.06),
@@ -134,7 +134,7 @@ body.restaurant-sheet #swipe-grp-b .scr {
   display:block !important; scroll-snap-align:start !important;
   scroll-snap-stop:always !important;
   padding-bottom:calc(env(safe-area-inset-bottom) + 24px) !important;
-  background:#fff;
+  background:var(--tk-bg-base);
 }
 
 /* Backdrop — fades in immediately (iOS pattern: background darkens first, panel follows) */
@@ -158,6 +158,6 @@ body.restaurant-sheet.rest-closing #rest-backdrop {
 /* Hide bnav + mode toggle */
 body.restaurant-sheet .bnav { display:none !important; }
 body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
-/* ── KAM/KAD mode: white sheet background ── */
-body.kam-mode #rest-sheet-body{background:#fff}
-body.kad-mode #rest-sheet-body{background:#fff}
+/* ── KAM/KAD mode: dark sheet background (prevents white flash on short content) ── */
+body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
+body.kad-mode #rest-sheet-body{background:var(--tk-bg-base)}
