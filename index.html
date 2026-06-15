@@ -1,4 +1,4 @@
-<!-- Freshket Sense v747: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 752: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v747',
+      version: '752',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6478,7 +6478,7 @@ body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-sha
   transform:translateX(-50%) translateY(102%);
   width:100%; max-width:440px;
   height:calc(100dvh - 75px);
-  background:#fff;
+  background:var(--tk-bg-base);
   border-radius:20px 20px 0 0;
   box-shadow:0 -1px 0 rgba(0,0,0,.04),
              0 -4px 16px rgba(0,0,0,.06),
@@ -6536,7 +6536,7 @@ body.restaurant-sheet #swipe-grp-b .scr {
   display:block !important; scroll-snap-align:start !important;
   scroll-snap-stop:always !important;
   padding-bottom:calc(env(safe-area-inset-bottom) + 24px) !important;
-  background:#fff;
+  background:var(--tk-bg-base);
 }
 
 /* Backdrop — fades in immediately (iOS pattern: background darkens first, panel follows) */
@@ -6560,9 +6560,9 @@ body.restaurant-sheet.rest-closing #rest-backdrop {
 /* Hide bnav + mode toggle */
 body.restaurant-sheet .bnav { display:none !important; }
 body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
-/* ── KAM/KAD mode: white sheet background ── */
-body.kam-mode #rest-sheet-body{background:#fff}
-body.kad-mode #rest-sheet-body{background:#fff}
+/* ── KAM/KAD mode: dark sheet background (prevents white flash on short content) ── */
+body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
+body.kad-mode #rest-sheet-body{background:var(--tk-bg-base)}
 </style>
 <style id="echo-module-css">
 /* ============================================================
@@ -12248,19 +12248,8 @@ function showSenseSplash(onDone){
   const startMs=Date.now();
   let faded=false;
   let appReady=false;   // onDone called
-  // v737: Sales never fetches handover — pre-mark BEFORE gate checks so allCriticalReady() works.
-  // v736 bug: body.sales-mode class is NOT set yet at splash time (set later in _splashPreFade/doFade).
-  // Fix: check getCurrentRole() as fallback — profile guaranteed loaded before showSenseSplash fires.
-  try{
-    var _splashRole=(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
-    if(!_splashRole&&typeof getCurrentRole==='function'){
-      var _sr=getCurrentRole(); _splashRole=(_sr==='sales'||_sr==='sales_tl');
-    }
-    if(_splashRole){
-      try{if(typeof _cloudLoadedTabs!=='undefined')_cloudLoadedTabs.add('handover');}catch(_){}
-      try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){}
-    }
-  }catch(_){}
+  // Sales handover pre-mark handled by _patchR2FilesForSales() via _detectAndMarkSalesSession()
+  // which runs synchronously after every profile set — no need to repeat here.
   // v219: if IndexedDB preloaded, allCriticalReady()=true → dataReady=true immediately
   // (gate already fired before showSenseSplash was called → no need to wait for _splashDataReady signal)
   let dataReady=_cacheWarm || (_idbPreloaded && allCriticalReady());
@@ -12382,26 +12371,7 @@ function showSenseSplash(onDone){
             renderTeamview();
           }
         }catch(_){}
-        // v737: Sales MAX_SHOW timeout safety render.
-        // allCriticalReady() may still be false if handover was not yet marked (race with loadFromCloudflareR2).
-        // If portviewBulkData has data and role is sales, force mark handover + flush.
-        try{
-          var _spLen=(typeof portviewBulkData!=='undefined'&&portviewBulkData)?portviewBulkData.length:0;
-          var _isSalesNow=(document.body.classList.contains('sales-mode')||
-            (typeof getCurrentRole==='function'&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl')));
-          if(_spLen>0&&_isSalesNow){
-            try{if(typeof _cloudLoadedTabs!=='undefined')_cloudLoadedTabs.add('handover');}catch(_){}
-            try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){}
-            _senseDataLog('SPLASH','🔄 Sales post-fade render (MAX_SHOW path)');
-            if(window.RenderBus&&typeof window.RenderBus.flushNow==='function'){
-              try{window.RenderBus.flushNow();}catch(e){}
-            }else if(typeof renderSalesPortview==='function'){
-              try{renderSalesPortview();}catch(e){}
-            }else if(typeof refreshAll==='function'){
-              try{refreshAll();}catch(e){}
-            }
-          }
-        }catch(_){}
+
         // v520: passive retry — if splash timed out AND portview still empty, trigger one silent R2 re-fetch
         // Runs entirely outside splash lifecycle (all flags already cleared above). Safe.
         if(!dataReady && !window._coldRetryFired){
@@ -14581,7 +14551,21 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
-      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){D.sku_current=bulkSkuCurrentData[currentAccountId];if(window.RenderBus)window.RenderBus.signal('sku_current');} // v223
+      if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){
+        D.sku_current=bulkSkuCurrentData[currentAccountId];
+        // v752b: fast targeted re-render — sku_current loaded → show SKU section immediately
+        // ไม่รอ RenderBus 800ms debounce: ถ้า scr-overview กำลัง on และอยู่ใน KAM mode
+        // ให้ renderKamThisMonth() โดยตรง เพื่อให้ SKU Signals / สัญญาณบวก โผล่เร็ว
+        try{
+          var _scrOv=document.getElementById('scr-overview');
+          if(_scrOv&&_scrOv.classList.contains('on')&&
+             typeof isKAM!=='undefined'&&isKAM&&
+             typeof renderKamThisMonth==='function'){
+            setTimeout(function(){ try{ renderKamThisMonth(); }catch(e){} }, 0);
+          }
+        }catch(e){}
+        if(window.RenderBus)window.RenderBus.signal('sku_current'); // v223
+      }
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
@@ -23478,7 +23462,7 @@ function __legacyShowScreenFallback(name){
     document.body.classList.add('kam-sense-active');
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
-    document.querySelectorAll('.scr:not(#ci-fullsheet .scr)').forEach(s=>s.classList.remove('on')); // v751
+    document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
     document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
     const _scrEl=document.getElementById('scr-'+name);
     if(_scrEl){_scrEl.classList.add('on');_scrEl.style.display='';}
@@ -23525,7 +23509,7 @@ function __legacyShowScreenFallback(name){
     if(name==='report'&&typeof renderReport==='function')renderReport();
     return;
   }
-  document.querySelectorAll('.scr:not(#ci-fullsheet .scr)').forEach(s=>s.classList.remove('on')); // v751
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   const scrEl=document.getElementById('scr-'+name);
   const navEl=document.getElementById('nav-'+name);
