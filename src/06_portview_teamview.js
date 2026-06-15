@@ -892,7 +892,23 @@ function __legacyRenderPortviewListFallback(){
   const fmtK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+(n/1000).toFixed(0)+'K':'฿'+Math.round(n);
   if(!filtered.length){
     const _r2Loading=typeof sheetsLoadStarted!=='undefined'&&sheetsLoadStarted&&(!portviewBulkData||portviewBulkData.length===0);
-    listEl.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">${_r2Loading?'กำลังโหลด...':'ไม่มีข้อมูล'}</div><div class="portview-no-data-sub">${_r2Loading?'ข้อมูล portfolio กำลังดาวน์โหลด':'อัปโหลด current_month.csv ให้ทุก account<br>เพื่อดู Pace ภาพรวม'}</div></div>`;
+    if(_r2Loading){
+      // v753a: shimmer skeleton — show during R2 fetch so user knows data is loading
+      const _shimCard=(delay)=>`<div class="pv-shimmer-card" style="animation-delay:${delay}ms">
+        <div class="pv-shimmer-left">
+          <div class="pv-shimmer-line" style="width:72%"></div>
+          <div class="pv-shimmer-line" style="width:52%;margin-top:6px"></div>
+          <div class="pv-shimmer-line" style="width:38%;margin-top:5px"></div>
+        </div>
+        <div class="pv-shimmer-right">
+          <div class="pv-shimmer-pct"></div>
+          <div class="pv-shimmer-spark"></div>
+        </div>
+      </div>`;
+      listEl.innerHTML=[0,80,160,240,320].map(_shimCard).join('');
+      return;
+    }
+    listEl.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ไม่มีข้อมูล</div><div class="portview-no-data-sub">อัปโหลด current_month.csv ให้ทุก account<br>เพื่อดู Pace ภาพรวม</div></div>`;
     return;
   }
   const _pvVisitMap=getVisitMap((currentUserProfile&&currentUserProfile.email)||'local');

@@ -578,6 +578,14 @@ body.kam-mode #kam-nav-handle{display:none;}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes skeleton-pulse{0%,100%{opacity:.45}50%{opacity:.9}}
+/* v753a: portview shimmer cards — shown during R2 bulk load before portviewBulkData arrives */
+.pv-shimmer-card{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);animation:pv-shimmer-fade-in .4s ease both}
+.pv-shimmer-left{flex:1;min-width:0}
+.pv-shimmer-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px}
+.pv-shimmer-line{height:10px;border-radius:5px;background:rgba(255,255,255,.07);animation:skeleton-pulse 1.4s ease-in-out infinite}
+.pv-shimmer-pct{width:38px;height:18px;border-radius:5px;background:rgba(255,255,255,.07);animation:skeleton-pulse 1.4s ease-in-out infinite}
+.pv-shimmer-spark{width:48px;height:13px;border-radius:4px;background:rgba(255,255,255,.05);animation:skeleton-pulse 1.4s ease-in-out infinite .15s}
+@keyframes pv-shimmer-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ KAM MODE — DARK THEME ══ */
 /* → Portview block 1 moved to styles_portview.css (Phase 0E) */

@@ -770,6 +770,12 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
+      // v753a: markLoaded unconditionally — bumps DataRegistry.version so RenderBus version guard passes
+      // previously only called inside currentAccountId check → version not bumped when portview is on
+      try{ if(window.DataRegistry) window.DataRegistry.markLoaded('sku_current'); }catch(_){}
+      // v753a: clear portview account cache unconditionally — stale cache had _churnCounts=null from
+      // pre-sku_current render; without this, portview re-render returns cached result with missing badges
+      try{ if(typeof _pvClearAccountCache==='function') _pvClearAccountCache(); }catch(_){}
       if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){
         D.sku_current=bulkSkuCurrentData[currentAccountId];
         // v752b: fast targeted re-render — sku_current loaded → show SKU section immediately
@@ -783,8 +789,10 @@ function handleFileUpload(type,input){
             setTimeout(function(){ try{ renderKamThisMonth(); }catch(e){} }, 0);
           }
         }catch(e){}
-        if(window.RenderBus)window.RenderBus.signal('sku_current'); // v223
       }
+      // v753a: signal unconditionally (not gated on currentAccountId) — portview needs re-render
+      // even when user hasn't selected an account yet (initial portview load with sku badges)
+      if(window.RenderBus)window.RenderBus.signal('sku_current');
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
@@ -1153,7 +1161,9 @@ try{
   });
 }catch(e){}
 function _senseGetTlPrewarmEmails(maxCount){
-  maxCount=maxCount||5;
+  // v753a: maxCount default raised to 999 — fetch ALL KAMs in team, not just top 8
+  // Admin sees every KAM's portfolio; capping caused badge-empty cards for KAMs outside top N
+  maxCount=maxCount||999;
   const role=(currentUserProfile&&currentUserProfile.role)||'rep';
   if(role!=='tl'&&role!=='admin')return[];
   const myEmail=(currentUserProfile&&currentUserProfile.email)||'';
@@ -1177,23 +1187,30 @@ function _startTlBundlePrewarm(){
   if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
   const runId=++_tlPrewarmRunId;
   _tlPrewarmTimer=setTimeout(async()=>{
-    const emails=_senseGetTlPrewarmEmails(8);
+    const emails=_senseGetTlPrewarmEmails();
     if(!emails.length)return;
-    _senseLog('%c[v225d bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    // v225d: restore _bundlePreWarming=true during prewarm to suppress Path 1/2 internal renders.
-    // Without this flag, _fetchKamBundle completion and ingestCSVText bulk-skus both fire
-    // direct renderPortviewList/renderTeamviewKamList calls per bundle → N renders during prewarm.
-    // Flag suppresses those; single RenderBus signal at end gives exactly 1 render.
+    _senseLog('%c[v753a bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v753a: parallel batch fetch — ดึงทุก KAM พร้อมกัน batch ละ 4
+    // ก่อนหน้า: sequential await ทีละคน → KAM คนที่ 8 รอนาน → badge ว่าง
+    // ตอนนี้: batch 4 คนพร้อมกัน → ทุก KAM โหลดเสร็จเร็วกว่าเดิมมาก
+    // _bundlePreWarming=true ระหว่าง batch เพื่อ suppress N renders → 1 render ตอนจบ
     _bundlePreWarming=true;
-    for(const e of emails){
+    const BATCH=4;
+    for(let i=0;i<emails.length;i+=BATCH){
       if(runId!==_tlPrewarmRunId)break;
-      await _fetchKamBundle(e).catch(()=>{});
-      await _senseSleep(200);
+      const batch=emails.slice(i,i+BATCH);
+      await Promise.all(batch.map(e=>_fetchKamBundle(e).catch(()=>{})));
+      // render portview หลังแต่ละ batch — user เห็น badge ทยอยขึ้น ไม่ต้องรอทุกคนเสร็จ
+      if(runId===_tlPrewarmRunId){
+        try{ if(typeof _pvClearAccountCache==='function')_pvClearAccountCache(); }catch(_){}
+        try{ if(window.RenderBus)window.RenderBus.signal('bundle:batch-'+i); }catch(_){}
+      }
     }
     _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
+    try{ if(typeof _pvClearAccountCache==='function')_pvClearAccountCache(); }catch(_){}
     try{ if(window.RenderBus) window.RenderBus.signal('bundle:prewarm-complete'); }catch(_){}
-    _senseLog('%c[v225d bundle] TL prewarm complete — 1 render signal','color:#00d070');
+    _senseLog('%c[v753a bundle] TL prewarm complete — all KAMs loaded','color:#00d070');
   },2000);
 }
 

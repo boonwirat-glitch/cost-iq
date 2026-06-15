@@ -161,3 +161,10 @@ body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
 /* ── KAM/KAD mode: dark sheet background (prevents white flash on short content) ── */
 body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
 body.kad-mode #rest-sheet-body{background:var(--tk-bg-base)}
+/* ── v753a: restaurant sheet open → white bg ──
+   body.restaurant-sheet is only active while sheet is open.
+   More specific than body.kam-mode → overrides dark bg above.
+   Account view (body.kam-mode without restaurant-sheet) keeps dark bg. ── */
+body.restaurant-sheet #rest-sheet-body{background:#ffffff}
+body.restaurant-sheet #swipe-grp-a .scr{background:#ffffff!important}
+body.restaurant-sheet #swipe-grp-b .scr{background:#ffffff!important}
