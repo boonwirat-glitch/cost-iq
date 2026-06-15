@@ -2121,7 +2121,7 @@ async function _preloadFromIndexedDB(){
 window.DataRegistry = (function(){
   // Tier definitions — which tabs must be loaded for each tier to be "ready"
   var TIER_TABS = {
-    1: ['portview','history'],          // Tier 1: shell — checked via allCriticalReady() (Sales-aware)
+    1: ['portview','history'],          // Tier 1: shell — gate checked via allCriticalReady() (Sales-aware)
     2: ['categories','sku_current','outlets'],
     3: ['skus','alternatives']
   };
@@ -2301,11 +2301,14 @@ window.RenderBus = (function(){
     // Note: DataRegistry not available = script not loaded yet → proceed (safe fallback).
     // Note: _senseSplashActive check is in signal() — _flush() can be called directly
     //       via flushNow(), so we guard here too.
-    // Tier 1 gate: Sales = portview+history, non-Sales = portview+history+handover
+    // v741: use allCriticalReady() — consistent Sales-aware check (portview+history only for Sales)
+    // DataRegistry.isReady(1) was broken for Sales: body.sales-mode not set yet → wrong Tier 1 tabs
     if(typeof allCriticalReady==='function' && !allCriticalReady()){
       window._pendingRefreshAll = true;
       _senseDataLog('RENDERBUS','⏳ _flush HELD — Tier 1 not ready yet (re-queuing)');
+      // Retry when any new data arrives (will re-check allCriticalReady each time)
       try{ if(window.DataRegistry) window.DataRegistry.onReady(1, function(){ signal('tier1-flush-retry'); }); }catch(_){}
+
       return;
     }
 
@@ -2463,10 +2466,19 @@ function refreshAll(){
       }
     }
   }catch(_e){}
-  // DATA GATE: block render until critical files loaded (Sales=portview+history, KAM+=handover)
+  // v218 DATA GATE: block render until portview+history+handover all loaded.
+  // v733: Sales doesn't use handover — allCriticalReady() already handles this via DataRegistry
   if(!allCriticalReady()){
-    _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for critical data');
-    window._pendingRefreshAll=true; return;
+    var _isSalesGate=(Object.keys(_salesR2Override).length>0)||(document.body.classList.contains('sales-mode')||document.body.classList.contains('sales-tl-mode'));
+    var _pending=[];
+    try{ if(!_cloudLoadedTabs.has('portview'))_pending.push('portview');
+         if(!_cloudLoadedTabs.has('history')) _pending.push('history');
+         if(!_isSalesGate && !_cloudLoadedTabs.has('handover'))_pending.push('handover'); }catch(e){}
+    if(_pending.length===0){ /* all critical loaded — proceed */ }
+    else{
+      _senseDataLog('RENDER','refreshAll() ⏳ QUEUED — waiting for: '+(_pending.join('+') || 'unknown'));
+      window._pendingRefreshAll=true; return;
+    }
   }
   _senseDataLog('RENDER','refreshAll() ✅ FIRED');
   renderOverview();renderPortfolio();renderOpps();renderReport();
