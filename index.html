@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753',
+      version: 'v753b',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -23485,6 +23485,8 @@ function __legacyShowScreenFallback(name){
     document.body.classList.remove('kam-sense-active');
     window._kamSenseReturn=false;
     const _ksb=document.getElementById('kam-sense-back-btn');if(_ksb)_ksb.remove();
+    // v753a: re-render nav so Skills tab shows again after leaving Save screen
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
   }
   if((name==='opportunities'||name==='report')&&!senseActivated&&(!isKAM||_kamWithAcct)){
     openSenseGate();return;
@@ -23492,6 +23494,8 @@ function __legacyShowScreenFallback(name){
   // ── KAM Sense Mode: full-screen opportunities routing ──
   if(isKAM&&window._kamSenseReturn&&(name==='opportunities'||name==='report')){
     document.body.classList.add('kam-sense-active');
+    // v753a: re-render nav so Skills tab hides when entering Save screen
+    try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
     document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
@@ -50274,7 +50278,7 @@ window._skCardRipple           = _skCardRipple;
     'restaurant':       { id: 'nav-restaurant' },
     'echo-kam':         { id: 'nav-echo-kam' },
     'opportunities':    { id: 'nav-opportunities' },
-    'skills':           { id: 'nav-skills', hideWhen: ['sense-plan-expanded'] },
+    'skills':           { id: 'nav-skills', hideWhen: ['sense-plan-expanded', 'kam-sense-active'] },
     'sales-portview':   { id: 'nav-sales-portview' },
     'sales-pipeline':   { id: 'nav-sales-pipeline' },
     'sales-echo':       { id: 'nav-echo' },
