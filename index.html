@@ -1,4 +1,4 @@
-<!-- Freshket Sense v754: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v754',
+      version: 'v753',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6563,6 +6563,13 @@ body.restaurant-sheet #mode-toggle-wrap { display:none !important; }
 /* ── KAM/KAD mode: dark sheet background (prevents white flash on short content) ── */
 body.kam-mode #rest-sheet-body{background:var(--tk-bg-base)}
 body.kad-mode #rest-sheet-body{background:var(--tk-bg-base)}
+/* ── v753a: restaurant sheet open → white bg ──
+   body.restaurant-sheet is only active while sheet is open.
+   More specific than body.kam-mode → overrides dark bg above.
+   Account view (body.kam-mode without restaurant-sheet) keeps dark bg. ── */
+body.restaurant-sheet #rest-sheet-body{background:#ffffff}
+body.restaurant-sheet #swipe-grp-a .scr{background:#ffffff!important}
+body.restaurant-sheet #swipe-grp-b .scr{background:#ffffff!important}
 </style>
 <style id="echo-module-css">
 /* ============================================================
@@ -7524,6 +7531,14 @@ body.kam-mode #kam-nav-handle{display:none;}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes skeleton-pulse{0%,100%{opacity:.45}50%{opacity:.9}}
+/* v753a: portview shimmer cards — shown during R2 bulk load before portviewBulkData arrives */
+.pv-shimmer-card{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);animation:pv-shimmer-fade-in .4s ease both}
+.pv-shimmer-left{flex:1;min-width:0}
+.pv-shimmer-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px}
+.pv-shimmer-line{height:10px;border-radius:5px;background:rgba(255,255,255,.07);animation:skeleton-pulse 1.4s ease-in-out infinite}
+.pv-shimmer-pct{width:38px;height:18px;border-radius:5px;background:rgba(255,255,255,.07);animation:skeleton-pulse 1.4s ease-in-out infinite}
+.pv-shimmer-spark{width:48px;height:13px;border-radius:4px;background:rgba(255,255,255,.05);animation:skeleton-pulse 1.4s ease-in-out infinite .15s}
+@keyframes pv-shimmer-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ══ KAM MODE — DARK THEME ══ */
 /* → Portview block 1 moved to styles_portview.css (Phase 0E) */
@@ -14551,6 +14566,12 @@ function handleFileUpload(type,input){
       bulkSkuCurrentData=byAccount;const cnt=Object.keys(byAccount).length;
       const b=document.getElementById('badge-bulk-sku-current');if(b){b.textContent=cnt?'✓ '+cnt+' ร้าน':'error';b.className='dp-slot-badge '+(cnt?'ok':'na');}
       const sl=document.getElementById('slot-bulk-sku-current');if(sl&&cnt)sl.style.borderColor='var(--g500)';
+      // v753a: markLoaded unconditionally — bumps DataRegistry.version so RenderBus version guard passes
+      // previously only called inside currentAccountId check → version not bumped when portview is on
+      try{ if(window.DataRegistry) window.DataRegistry.markLoaded('sku_current'); }catch(_){}
+      // v753a: clear portview account cache unconditionally — stale cache had _churnCounts=null from
+      // pre-sku_current render; without this, portview re-render returns cached result with missing badges
+      try{ if(typeof _pvClearAccountCache==='function') _pvClearAccountCache(); }catch(_){}
       if(currentAccountId&&bulkSkuCurrentData[currentAccountId]){
         D.sku_current=bulkSkuCurrentData[currentAccountId];
         // v752b: fast targeted re-render — sku_current loaded → show SKU section immediately
@@ -14564,8 +14585,10 @@ function handleFileUpload(type,input){
             setTimeout(function(){ try{ renderKamThisMonth(); }catch(e){} }, 0);
           }
         }catch(e){}
-        if(window.RenderBus)window.RenderBus.signal('sku_current'); // v223
       }
+      // v753a: signal unconditionally (not gated on currentAccountId) — portview needs re-render
+      // even when user hasn't selected an account yet (initial portview load with sku badges)
+      if(window.RenderBus)window.RenderBus.signal('sku_current');
       // toast removed v205a — bulk ingest noise
       if(typeof window._splashProgress==='function')window._splashProgress(55,'กำลังโหลด SKU ปัจจุบัน...');
       _done();
@@ -14934,7 +14957,9 @@ try{
   });
 }catch(e){}
 function _senseGetTlPrewarmEmails(maxCount){
-  maxCount=maxCount||5;
+  // v753a: maxCount default raised to 999 — fetch ALL KAMs in team, not just top 8
+  // Admin sees every KAM's portfolio; capping caused badge-empty cards for KAMs outside top N
+  maxCount=maxCount||999;
   const role=(currentUserProfile&&currentUserProfile.role)||'rep';
   if(role!=='tl'&&role!=='admin')return[];
   const myEmail=(currentUserProfile&&currentUserProfile.email)||'';
@@ -14958,23 +14983,30 @@ function _startTlBundlePrewarm(){
   if(_tlPrewarmTimer)clearTimeout(_tlPrewarmTimer);
   const runId=++_tlPrewarmRunId;
   _tlPrewarmTimer=setTimeout(async()=>{
-    const emails=_senseGetTlPrewarmEmails(8);
+    const emails=_senseGetTlPrewarmEmails();
     if(!emails.length)return;
-    _senseLog('%c[v225d bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
-    // v225d: restore _bundlePreWarming=true during prewarm to suppress Path 1/2 internal renders.
-    // Without this flag, _fetchKamBundle completion and ingestCSVText bulk-skus both fire
-    // direct renderPortviewList/renderTeamviewKamList calls per bundle → N renders during prewarm.
-    // Flag suppresses those; single RenderBus signal at end gives exactly 1 render.
+    _senseLog('%c[v753a bundle] TL prewarm:', 'color:#00d070', emails.length, 'KAMs', emails);
+    // v753a: parallel batch fetch — ดึงทุก KAM พร้อมกัน batch ละ 4
+    // ก่อนหน้า: sequential await ทีละคน → KAM คนที่ 8 รอนาน → badge ว่าง
+    // ตอนนี้: batch 4 คนพร้อมกัน → ทุก KAM โหลดเสร็จเร็วกว่าเดิมมาก
+    // _bundlePreWarming=true ระหว่าง batch เพื่อ suppress N renders → 1 render ตอนจบ
     _bundlePreWarming=true;
-    for(const e of emails){
+    const BATCH=4;
+    for(let i=0;i<emails.length;i+=BATCH){
       if(runId!==_tlPrewarmRunId)break;
-      await _fetchKamBundle(e).catch(()=>{});
-      await _senseSleep(200);
+      const batch=emails.slice(i,i+BATCH);
+      await Promise.all(batch.map(e=>_fetchKamBundle(e).catch(()=>{})));
+      // render portview หลังแต่ละ batch — user เห็น badge ทยอยขึ้น ไม่ต้องรอทุกคนเสร็จ
+      if(runId===_tlPrewarmRunId){
+        try{ if(typeof _pvClearAccountCache==='function')_pvClearAccountCache(); }catch(_){}
+        try{ if(window.RenderBus)window.RenderBus.signal('bundle:batch-'+i); }catch(_){}
+      }
     }
     _bundlePreWarming=false;
     if(runId!==_tlPrewarmRunId)return;
+    try{ if(typeof _pvClearAccountCache==='function')_pvClearAccountCache(); }catch(_){}
     try{ if(window.RenderBus) window.RenderBus.signal('bundle:prewarm-complete'); }catch(_){}
-    _senseLog('%c[v225d bundle] TL prewarm complete — 1 render signal','color:#00d070');
+    _senseLog('%c[v753a bundle] TL prewarm complete — all KAMs loaded','color:#00d070');
   },2000);
 }
 
@@ -27574,7 +27606,23 @@ function __legacyRenderPortviewListFallback(){
   const fmtK=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+(n/1000).toFixed(0)+'K':'฿'+Math.round(n);
   if(!filtered.length){
     const _r2Loading=typeof sheetsLoadStarted!=='undefined'&&sheetsLoadStarted&&(!portviewBulkData||portviewBulkData.length===0);
-    listEl.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">${_r2Loading?'กำลังโหลด...':'ไม่มีข้อมูล'}</div><div class="portview-no-data-sub">${_r2Loading?'ข้อมูล portfolio กำลังดาวน์โหลด':'อัปโหลด current_month.csv ให้ทุก account<br>เพื่อดู Pace ภาพรวม'}</div></div>`;
+    if(_r2Loading){
+      // v753a: shimmer skeleton — show during R2 fetch so user knows data is loading
+      const _shimCard=(delay)=>`<div class="pv-shimmer-card" style="animation-delay:${delay}ms">
+        <div class="pv-shimmer-left">
+          <div class="pv-shimmer-line" style="width:72%"></div>
+          <div class="pv-shimmer-line" style="width:52%;margin-top:6px"></div>
+          <div class="pv-shimmer-line" style="width:38%;margin-top:5px"></div>
+        </div>
+        <div class="pv-shimmer-right">
+          <div class="pv-shimmer-pct"></div>
+          <div class="pv-shimmer-spark"></div>
+        </div>
+      </div>`;
+      listEl.innerHTML=[0,80,160,240,320].map(_shimCard).join('');
+      return;
+    }
+    listEl.innerHTML=`<div class="portview-no-data"><div class="portview-no-data-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="24" height="17" rx="2" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/><path d="M4 16h6l2 3h8l2-3h6" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M11 7l5-3 5 3" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="portview-no-data-text">ไม่มีข้อมูล</div><div class="portview-no-data-sub">อัปโหลด current_month.csv ให้ทุก account<br>เพื่อดู Pace ภาพรวม</div></div>`;
     return;
   }
   const _pvVisitMap=getVisitMap((currentUserProfile&&currentUserProfile.email)||'local');
