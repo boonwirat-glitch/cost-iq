@@ -1732,6 +1732,8 @@ async function loadFromCloudflareR2(){
   // v359: Sales users skip handover fetch (no sales_handover_{key}.csv exists — not needed for render)
   const _isSalesMode=(typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl');
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
+  // v733: Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
+  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
