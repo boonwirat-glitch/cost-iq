@@ -3194,7 +3194,26 @@ function toggleSsbTooltip(){
           const okSkus=await _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`});
           await new Promise(r=>setTimeout(r,shouldAvoidGlobalHeavy()?450:180));
           const okAlts=await _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`});
-          if(okSkus&&okAlts){try{_kamBundleLoaded.add(safeKey);}catch(e){} log('[v207b bundle] ready',kamEmail);return true;}
+          // v755l: เพิ่ม outlet fetch — ไม่รอผล (non-blocking) เพราะ sequential path ช้าอยู่แล้ว
+          if(okSkus&&okAlts){
+            try{_kamBundleLoaded.add(safeKey);}catch(e){}
+            log('[v207b bundle] ready',kamEmail);
+            // fetch outlet แยก non-blocking
+            try{
+              const outletUrl=`${base}/sense_sku_outlet_${safeKey}.csv`;
+              _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
+                .then(okOutlet=>{
+                  if(okOutlet){
+                    try{_kamOutletLoaded.add(safeKey);}catch(e){}
+                    log('[v755l] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
+                    setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
+                  } else {
+                    warn('[v755l] outlet fetch failed for',kamEmail);
+                  }
+                }).catch(()=>{});
+            }catch(e){}
+            return true;
+          }
           warn('[v207b bundle] incomplete',kamEmail,{okSkus,okAlts});
           return false;
         }catch(e){warn('[v207b bundle] error',kamEmail,e&&e.message?e.message:e);return false;}
