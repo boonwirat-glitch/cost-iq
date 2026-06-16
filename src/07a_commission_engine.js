@@ -824,6 +824,7 @@ async function loadTargets(quarter) {
     ts: Date.now()
   };
   _tgtLoaded = true;
+  window._tgtLoadedFromDB = true; // v754e: flag ว่าข้อมูลมาจาก Supabase จริง ไม่ใช่ localStorage cache
   // v224e: persist to localStorage — next session reads this instantly (no Supabase cold-start flash)
   try{
     localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
