@@ -1671,20 +1671,19 @@ async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
   if(_kamBundleLoaded.has(safeKey)){
-    // v755j: ตรวจ bulkSkuOutletData จริง ไม่ใช่แค่ _kamOutletLoaded flag
-    // เพราะ flag อาจ true จาก IDB poison cache (okOutlet=true แต่ data ว่าง)
-    const _outletHasData=Object.keys(bulkSkuOutletData).length>0;
-    if(!_outletHasData){
-      // reset flag ให้ตรงกับ reality แล้ว re-fetch
-      _kamOutletLoaded.delete(safeKey);
+    // v755k: _kamOutletLoaded เป็น in-memory Set — reset ทุก page load
+    // ถ้ายังไม่ได้ mark = outlet ยังไม่โหลดจริงในรอบนี้
+    if(!_kamOutletLoaded.has(safeKey)){
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
-      console.log('[v755j] outlet data missing — re-fetch:',_outletUrl.split('/').pop());
+      console.log('[v755k] bundle cached, outlet not yet loaded — fetching:',_outletUrl.split('/').pop());
       _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
         .then(ok=>{
           if(ok){
             _kamOutletLoaded.add(safeKey);
-            console.log('[v755j] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
+            console.log('[v755k] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
             setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
+          } else {
+            console.warn('[v755k] outlet fetch failed for',kamEmail);
           }
         }).catch(()=>{});
     }
@@ -1708,7 +1707,23 @@ async function _fetchKamBundle(kamEmail){
       console.log('[v755i] bundle fetch result: okSkus=',okSkus,'okAlts=',okAlts,'okOutlet=',okOutlet,'accounts in bulkSkuOutletData=',Object.keys(bulkSkuOutletData).length);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
-        if(okOutlet)_kamOutletLoaded.add(safeKey); // v755f
+        if(okOutlet){
+          _kamOutletLoaded.add(safeKey);
+        } else {
+          // v755k: outlet fetch failed in parallel — retry independently after bundle loaded
+          console.log('[v755k] outlet fetch failed in parallel, retrying independently for',kamEmail);
+          const _retryUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
+          _fetchKamFile({url:_retryUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
+            .then(ok2=>{
+              if(ok2){
+                _kamOutletLoaded.add(safeKey);
+                console.log('[v755k] outlet retry ok for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
+                setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
+              } else {
+                console.warn('[v755k] outlet retry also failed for',kamEmail);
+              }
+            }).catch(()=>{});
+        }
         _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
         // v224e: set bulkSkusReady so _skuSnap changes from '0s'→'1s' → portview value guard passes → _churnCounts rendered
         try{bulkSkusReady=true;}catch(e){}
