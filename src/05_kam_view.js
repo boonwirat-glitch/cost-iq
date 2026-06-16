@@ -686,25 +686,38 @@ function __legacyRenderKamThisMonthFallback(){
       </div>
       <div class="kam-dc-body" style="padding-top:8px">${infoCard}`;
     const actionSigs=signals.filter(s=>s.type!=='not_yet');
-    const notYetSigs=signals.filter(s=>s.type==='not_yet');
+    const notYetSigs=signals.filter(s=>s.type==='not_yet'); // approaching อยู่ใน actionSigs แล้ว (ไม่ใช่ not_yet)
     const renderSkuRow=(s,dimmed=false)=>{
       const sub=skuSubstituteMap[String(s.id)];
       const isSub=!!sub;
-      const clr=isSub?'rgba(140,180,255,.9)':s.type==='gone'?'rgba(255,130,130,.9)':s.type==='slow'?'rgba(255,140,40,.9)':s.type==='near'?'rgba(240,176,0,.85)':'rgba(255,255,255,.3)';
-      const storyCl=s.type==='gone'?'rgba(255,130,130,.75)':s.type==='slow'?'rgba(255,140,40,.7)':s.type==='near'?'rgba(240,176,0,.7)':'rgba(255,255,255,.45)';
-      const ind=isSub?'substituted':s.type==='gone'?'neg':s.type==='slow'?'slow':s.type==='near'?'warn':'';
-      const indSymbol=isSub?'→':s.type==='gone'?'−':s.type==='slow'?`<svg width="13" height="12" viewBox="0 0 13 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;display:inline-block;margin-top:-1px"><polyline points="1,2 4,7 8,4 12,9"/><polyline points="9,9 12,9 12,6"/></svg>`:s.type==='near'?'↓':'·';
-      const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':'ยังไม่ถึงรอบ';
+      const clr=isSub?'rgba(140,180,255,.9)':s.type==='gone'?'rgba(255,130,130,.9)':s.type==='slow'?'rgba(255,140,40,.9)':s.type==='near'?'rgba(240,176,0,.85)':s.type==='approaching'?'rgba(100,180,255,.9)':'rgba(255,255,255,.3)';
+      const storyCl=s.type==='gone'?'rgba(255,130,130,.75)':s.type==='slow'?'rgba(255,140,40,.7)':s.type==='near'?'rgba(240,176,0,.7)':s.type==='approaching'?'rgba(100,180,255,.65)':'rgba(255,255,255,.45)';
+      const ind=isSub?'substituted':s.type==='gone'?'neg':s.type==='slow'?'slow':s.type==='near'?'warn':s.type==='approaching'?'approaching':'';
+      const indSymbol=isSub?'→':s.type==='gone'?'−':s.type==='slow'?`<svg width="13" height="12" viewBox="0 0 13 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;display:inline-block;margin-top:-1px"><polyline points="1,2 4,7 8,4 12,9"/><polyline points="9,9 12,9 12,6"/></svg>`:s.type==='near'?'↓':s.type==='approaching'?'◎':'·';
+      const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':s.type==='approaching'?'ใกล้ถึงรอบ · อีก '+s.daysUntil+' วัน':'ยังไม่ถึงรอบ';
       const story=isSub?'':skuStoryLine(s);
       const nameOp=dimmed?'opacity:.4':'';
-      const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
+      const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
+      // outlet tooltip — แสดงเมื่อ type เป็น gone/near/approaching (SKU ที่น่าสังเกต)
+      const _outletData=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(s.id)]:null;
+      const outletTooltipHtml=(_outletData&&_outletData.length>1&&(s.type==='gone'||s.type==='near'||s.type==='approaching'))?
+        `<div style="margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;border:1px solid rgba(255,255,255,.08)">
+          <div style="font-size:9px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase">สาขา</div>
+          ${_outletData.map(o=>{
+            const ordered=o.this_month_orders>0;
+            const hadLast=o.last_month_orders>0;
+            const dot=ordered?'rgba(80,220,160,.9)':hadLast?'rgba(255,130,130,.8)':'rgba(255,255,255,.2)';
+            const label=ordered?'สั่งแล้ว':hadLast?'ยังไม่สั่ง':'—';
+            return`<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:11px;color:rgba(255,255,255,.7);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span><span style="font-size:10px;color:${dot};flex-shrink:0">${label}</span></div>`;
+          }).join('')}
+        </div>`:''
       const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
           <div class="kam-sku-name">${s.name}</div>
-          ${deptGmv}${subHtml}
+          ${deptGmv}${subHtml}${outletTooltipHtml}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:8px">
           <span style="${badgeColor}">${badge}</span>
