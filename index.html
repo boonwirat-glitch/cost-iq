@@ -1,4 +1,4 @@
-<!-- Freshket Sense v755b: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v755c: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v755b',
+      version: 'v755c',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -30095,6 +30095,9 @@ function initOliveAvatar(){
   })()){
     // Authenticated session detected — skip useSampleData(). Real R2 data arrives shortly.
     try{ console.info('[Sense v216] useSampleData() skipped — Supabase session detected, real data loading from R2'); }catch(e){}
+  }else if(typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email){
+    // v755b: second guard — currentUserProfile set = authenticated user, skip sample data
+    try{ console.info('[Sense v755b] useSampleData() skipped — currentUserProfile present:', currentUserProfile.email); }catch(e){}
   }else{
     useSampleData();
     // Check if first visit — show onboarding (with sample data loaded as preview)
