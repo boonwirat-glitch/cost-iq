@@ -1,46 +1,37 @@
 // ════════════════════════════════════════════════════════════════════════════
-// Freshket Sense — Quarter NRR Health Sheet  (v753f)
+// Freshket Sense — Quarter NRR Health Sheet  (v753j)
 // src/07c_qnrr_view.js
-//
-// Entry:  _qnrrOpen()  — called by portview header tap
-// Close:  _qnrrClose() — backdrop tap / swipe down
-// Data:   _tgtComputeQuarterNRR() from 07b_nrr_target.js
-//         _fetchQnrrBundle() from 02_data_pipeline.js
-//
-// Scope toggle: KAM → ทีม → Admin
 // ════════════════════════════════════════════════════════════════════════════
 
 (function(){
 'use strict';
 
-// ── Constants ──────────────────────────────────────────────────────────────
-// Scope options per role — set on open
 var SCOPES   = ['KAM'];
 var SCOPE_MAP= ['kam'];
 var MONTHS_TH = {'2026-03':'มี.ค.','2026-04':'เม.ย.','2026-05':'พ.ค.','2026-06':'มิ.ย.'};
 var Q_MONTHS  = ['2026-04','2026-05','2026-06'];
 var BASE_MONTH= '2026-03';
 
-// Movement display config
 var MV_CFG = {
-  core_nrr:      {label:'Core NRR',   color:'rgba(77,220,151,.80)',  order:0},
-  handover:      {label:'Handover',   color:'rgba(240,176,0,.75)',   order:1},
-  new_sales:     {label:'New Sales',  color:'rgba(140,180,255,.55)', order:2},
-  expansion:     {label:'Expansion',  color:'rgba(77,220,151,.55)',  order:3},
-  transfer_in:   {label:'Transfer in',color:'rgba(255,255,255,.15)', order:4},
-  core_nrr_churn:{label:'Churn',      color:'rgba(229,62,62,.75)',   order:5},
-  transfer_out:  {label:'Transfer out',color:'ghost',               order:6}
+  core_nrr:       {label:'Core NRR',    color:'rgba(77,220,151,.82)', order:0},
+  handover:       {label:'Handover',    color:'rgba(240,176,0,.78)',  order:1},
+  new_sales:      {label:'New Sales',   color:'rgba(140,180,255,.60)',order:2},
+  expansion:      {label:'Expansion',   color:'rgba(77,220,151,.50)', order:3},
+  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.18)',order:4},
+  comeback:       {label:'Comeback',    color:'rgba(200,160,255,.60)',order:5},
+  core_nrr_churn: {label:'Churn',       color:'rgba(229,62,62,.75)',  order:6},
+  transfer_out:   {label:'Transfer out',color:'ghost',               order:7}
 };
-var LEGEND_ORDER = ['core_nrr','handover','expansion','new_sales','transfer_in','core_nrr_churn','transfer_out'];
+// Stack order: core_nrr at bottom, others on top (column-reverse in CSS)
+var STACK_ORDER = ['transfer_in','comeback','expansion','new_sales','handover','core_nrr'];
+var LEGEND_ORDER= ['core_nrr','handover','expansion','new_sales','comeback','transfer_in','core_nrr_churn','transfer_out'];
 
-// ── State ──────────────────────────────────────────────────────────────────
 var _scopeIdx  = 0;
 var _selBar    = '2026-04';
 var _selMv     = 'all';
-var _data      = null;   // result of _tgtComputeQuarterNRR
+var _data      = null;
 var _swipeY0   = null;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
 function _fmtM(n){
   n=Math.round(n||0);
   if(n>=1000000)return'฿'+(n/1000000).toFixed(1)+'M';
@@ -56,11 +47,9 @@ function _qnrrOpen(){
   var sheet  =_el('qnrr-sheet');
   if(!overlay||!sheet)return;
 
-  // Role guard — Sales never has QNRR
   var role=(typeof getCurrentRole==='function')?getCurrentRole():'';
   if(role==='sales'||role==='sales_tl')return;
 
-  // Set scope options based on role
   if(role==='tl'||role==='ad_tl'){
     SCOPES=['KAM','ทีม']; SCOPE_MAP=['kam','tl'];
   } else if(role==='admin'||role==='ad'){
@@ -68,7 +57,6 @@ function _qnrrOpen(){
   } else {
     SCOPES=['KAM']; SCOPE_MAP=['kam'];
   }
-  // Reset scope to KAM on each open
   _scopeIdx=0;
   var scopeBtn=_el('qnrr-scope-btn');
   var scopeLbl=_el('qnrr-scope-lbl');
@@ -82,10 +70,8 @@ function _qnrrOpen(){
 
   var qd=window.bulkQnrrData;
   if(qd&&qd.loaded){
-    // Warm path: data already in memory → render immediately
     _qnrrRender();
   } else {
-    // Cold path: show skeleton → fetch → render
     _qnrrShowSkeleton();
     if(typeof _fetchQnrrBundle==='function'){
       _fetchQnrrBundle()
@@ -108,7 +94,6 @@ function _qnrrClose(){
 }
 window._qnrrClose=_qnrrClose;
 
-// ── Swipe down to dismiss ──────────────────────────────────────────────────
 function _qnrrInitSwipe(sheet){
   var handle=_el('qnrr-handle');
   if(!handle||handle._swipeInit)return;
@@ -128,7 +113,6 @@ function _qnrrInitSwipe(sheet){
   },{passive:true});
 }
 
-// ── Cycle scope ────────────────────────────────────────────────────────────
 function _qnrrCycleScope(){
   _scopeIdx=(_scopeIdx+1)%SCOPES.length;
   var lbl=_el('qnrr-scope-lbl');
@@ -137,7 +121,6 @@ function _qnrrCycleScope(){
 }
 window._qnrrCycleScope=_qnrrCycleScope;
 
-// ── Filter ─────────────────────────────────────────────────────────────────
 function _qnrrSetMv(mv,btn){
   _selMv=mv;
   var btns=document.querySelectorAll('.qnrr-mv-btn');
@@ -147,7 +130,6 @@ function _qnrrSetMv(mv,btn){
 }
 window._qnrrSetMv=_qnrrSetMv;
 
-// ── Select bar ─────────────────────────────────────────────────────────────
 function _qnrrSelBar(month){
   _selBar=month;
   document.querySelectorAll('.qnrr-bar-col').forEach(function(c){
@@ -157,7 +139,6 @@ function _qnrrSelBar(month){
 }
 window._qnrrSelBar=_qnrrSelBar;
 
-// ── Toggle account row ─────────────────────────────────────────────────────
 function _qnrrToggleAcct(id,row){
   var wrap=_el('qnrr-ow-'+id);
   if(!wrap)return;
@@ -166,7 +147,6 @@ function _qnrrToggleAcct(id,row){
 }
 window._qnrrToggleAcct=_qnrrToggleAcct;
 
-// ── Sparkline hover ────────────────────────────────────────────────────────
 function _qnrrSparkMove(e,wrap){
   var bars=wrap.querySelectorAll('.qnrr-sb');
   var rect=wrap.getBoundingClientRect();
@@ -184,58 +164,33 @@ function _qnrrSparkLeave(wrap){
 window._qnrrSparkMove=_qnrrSparkMove;
 window._qnrrSparkLeave=_qnrrSparkLeave;
 
-// ── Main render ────────────────────────────────────────────────────────────
-function _qnrrRender(){
-  var email=(currentUserProfile&&currentUserProfile.email)||'';
-  var scope=SCOPE_MAP[_scopeIdx]||'kam';
-  // Guard: if data not loaded yet, show skeleton
-  if(!window.bulkQnrrData||!window.bulkQnrrData.loaded){_qnrrShowSkeleton();return;}
-
-  // compute
-  _data=null;
-  if(typeof _tgtComputeQuarterNRR==='function'){
-    try{_data=_tgtComputeQuarterNRR(email,scope);}catch(e){console.warn('[qnrr]',e);}
-  }
-
-  _qnrrRenderBase();
-  _qnrrRenderChart();
-  _qnrrRenderLegend();
-  _qnrrRenderDrill();
-}
-
-// ── Skeleton loading state ────────────────────────────────────────────────
+// ── Skeleton ───────────────────────────────────────────────────────────────
 function _qnrrShowSkeleton(){
-  var baseVal=_el('qnrr-base-val');var baseSub=_el('qnrr-base-sub');
-  var nrrVals=_el('qnrr-nrr-vals');var barsRow=_el('qnrr-bars-row');
-  var list=_el('qnrr-acct-list');var lbl=_el('qnrr-drill-lbl');
+  var barsRow=_el('qnrr-bars-row');
+  var list=_el('qnrr-acct-list');
+  var lbl=_el('qnrr-drill-lbl');
+  var baseVal=_el('qnrr-base-val');
+  var nrrVals=_el('qnrr-nrr-vals');
   if(baseVal)baseVal.innerHTML='<span class="qnrr-skel">฿—</span>';
-  if(baseSub)baseSub.innerHTML='<span class="qnrr-skel">— outlets</span>';
   if(nrrVals)nrrVals.innerHTML='<span class="qnrr-skel">—% · —% · —%</span>';
   if(lbl)lbl.textContent='กำลังโหลด...';
-  // Skeleton bars (4 bars, varied heights, pulse animation)
   if(barsRow){
     var skelH=[148,120,140,100];
     barsRow.innerHTML=skelH.map(function(h){
-      return '<div class="qnrr-bar-col">'
-        +'<div class="qnrr-skel-bar" style="height:'+h+'px"></div>'
-        +'<div class="qnrr-bar-lbl"><span class="qnrr-skel" style="width:24px;display:inline-block">&nbsp;</span></div>'
-        +'<div class="qnrr-bar-nrr"><span class="qnrr-skel" style="width:32px;display:inline-block">&nbsp;</span></div>'
-        +'</div>';
+      return '<div class="qnrr-bar-col"><div class="qnrr-skel-bar" style="height:'+h+'px"></div>'+
+             '<div class="qnrr-bar-lbl"><span class="qnrr-skel" style="width:24px;display:inline-block">&nbsp;</span></div>'+
+             '<div class="qnrr-bar-nrr"><span class="qnrr-skel" style="width:32px;display:inline-block">&nbsp;</span></div></div>';
     }).join('');
   }
-  // Skeleton rows (3 account placeholders)
   if(list){
     list.innerHTML=[1,2,3].map(function(){
-      return '<div class="qnrr-acct-row" style="pointer-events:none">'
-        +'<div class="qnrr-mv-dot qnrr-skel"></div>'
-        +'<div class="qnrr-acct-left">'
-          +'<div class="qnrr-skel" style="height:12px;width:60%;border-radius:4px;margin-bottom:5px"></div>'
-          +'<div class="qnrr-skel" style="height:8px;width:30%;border-radius:3px"></div>'
-        +'</div>'
-        +'<div class="qnrr-acct-right">'
-          +'<div class="qnrr-skel" style="width:44px;height:22px;border-radius:3px"></div>'
-        +'</div>'
-      +'</div>';
+      return '<div class="qnrr-acct-row" style="pointer-events:none">'+
+        '<div class="qnrr-mv-dot qnrr-skel"></div>'+
+        '<div class="qnrr-acct-left">'+
+          '<div class="qnrr-skel" style="height:13px;width:60%;border-radius:4px;margin-bottom:5px"></div>'+
+        '</div>'+
+        '<div class="qnrr-acct-right"><div class="qnrr-skel" style="width:44px;height:22px;border-radius:3px"></div></div>'+
+      '</div>';
     }).join('');
   }
 }
@@ -247,6 +202,23 @@ function _qnrrShowError(){
   if(lbl)lbl.textContent='โหลดไม่สำเร็จ';
   if(barsRow)barsRow.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px 0;color:rgba(255,255,255,.25);font-size:11px">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:9px;opacity:.6">sense_qnrr_2026q2.csv ยังไม่ได้อัปโหลด</span></div>';
   if(list)list.innerHTML='';
+}
+
+// ── Main render ────────────────────────────────────────────────────────────
+function _qnrrRender(){
+  var email=(currentUserProfile&&currentUserProfile.email)||'';
+  var scope=SCOPE_MAP[_scopeIdx]||'kam';
+  if(!window.bulkQnrrData||!window.bulkQnrrData.loaded){_qnrrShowSkeleton();return;}
+
+  _data=null;
+  if(typeof _tgtComputeQuarterNRR==='function'){
+    try{_data=_tgtComputeQuarterNRR(email,scope);}catch(e){console.warn('[qnrr]',e);}
+  }
+
+  _qnrrRenderBase();
+  _qnrrRenderChart();
+  _qnrrRenderLegend();
+  _qnrrRenderDrill();
 }
 
 // ── Zone B: base strip ─────────────────────────────────────────────────────
@@ -265,7 +237,6 @@ function _qnrrRenderBase(){
   if(baseVal)baseVal.textContent=_fmtM(_data.base_gmv);
   if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort';
 
-  // NRR% per month
   var vals=[];var mos=[];
   Q_MONTHS.forEach(function(m){
     var bm=_data.by_month[m];
@@ -291,16 +262,15 @@ function _qnrrRenderChart(){
     return;
   }
 
-  // compute max GMV across all months for scaling
   var allGmvs=[_data.base_gmv];
   Q_MONTHS.forEach(function(m){
     var bm=_data.by_month[m];
     if(bm)allGmvs.push(bm.total_gmv);
   });
   var maxGmv=Math.max.apply(null,allGmvs)||1;
-  var chartH=148; // px
+  var chartH=148;
 
-  // detect transfer_out
+  // transfer_out note
   var hasTout=false;var toutGmv=0;var toutMonths=[];
   Q_MONTHS.forEach(function(m){
     var bm=_data.by_month[m];
@@ -308,15 +278,6 @@ function _qnrrRenderChart(){
       hasTout=true;toutGmv+=bm.segments.transfer_out;toutMonths.push(MONTHS_TH[m]||m);
     }
   });
-
-  // reference lines
-  if(refLines){
-    var baseTop=chartH-Math.round(_data.base_gmv/maxGmv*chartH);
-    var html='<div class="qnrr-ref-line" style="top:'+baseTop+'px"><span class="qnrr-ref-label">'+_fmtM(_data.base_gmv)+' ฐาน</span></div>';
-    refLines.innerHTML=html;
-  }
-
-  // transfer_out explanation
   if(toutNote){
     if(hasTout){
       toutNote.style.display='flex';
@@ -327,7 +288,13 @@ function _qnrrRenderChart(){
     }
   }
 
-  // build bars
+  // reference line at base GMV height
+  if(refLines){
+    var baseTop=chartH-Math.round(_data.base_gmv/maxGmv*chartH);
+    refLines.innerHTML='<div class="qnrr-ref-line" style="top:'+baseTop+'px">'+
+      '<span class="qnrr-ref-label">'+_fmtM(_data.base_gmv)+' ฐาน</span></div>';
+  }
+
   var allBars=[{month:BASE_MONTH,isBase:true}];
   Q_MONTHS.forEach(function(m){allBars.push({month:m,isBase:false});});
 
@@ -335,51 +302,57 @@ function _qnrrRenderChart(){
     var m=b.month;
     var isBase=b.isBase;
     var bm=_data.by_month[m];
-    var barH=isBase?Math.max(6,Math.round(_data.base_gmv/maxGmv*chartH)):bm?Math.max(6,Math.round(bm.total_gmv/maxGmv*chartH)):6;
-    var active=(!isBase&&m===_selBar)?'active':'';
+    // FIX: use base_gmv for Mar height, total_gmv for Q months
+    var barH=isBase
+      ? Math.max(6,Math.round(_data.base_gmv/maxGmv*chartH))
+      : bm ? Math.max(6,Math.round(bm.total_gmv/maxGmv*chartH)) : 6;
+    var isActive=(!isBase&&m===_selBar);
     var lbl=MONTHS_TH[m]||m;
-    var onclick=isBase?'_qnrrSelBar(\''+m+'\')':'_qnrrSelBar(\''+m+'\')';
+    var lblColor=isActive?'rgba(188,215,255,.75)':'rgba(255,255,255,.45)';
 
-    // NRR label
+    // NRR% label above bar (not below)
     var nrrHtml='';
     if(isBase){
-      nrrHtml='<div class="qnrr-bar-nrr" style="color:rgba(255,255,255,.22);font-size:10px;font-weight:700">BASE</div>';
+      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.35)">฿'+Math.round(_data.base_gmv/1e6*10)/10+'M</div>';
     } else if(bm&&bm.nrr_pct!==null){
       var pctColor=bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'#4ddc97':'var(--amb)';
-      nrrHtml='<div class="qnrr-bar-nrr" style="color:'+pctColor+'">'+bm.nrr_pct+'%</div>';
+      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:'+pctColor+'">'+bm.nrr_pct+'%</div>';
     } else {
-      nrrHtml='<div class="qnrr-bar-nrr" style="color:rgba(255,255,255,.2)">—</div>';
+      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.2)">—</div>';
     }
 
-    // bar body segments
+    // bar body — FIX stack: core_nrr at BOTTOM, movements on top
+    // CSS flex-direction:column + reverse order in HTML = core_nrr renders at bottom
     var segsHtml='';
     if(isBase){
-      segsHtml='<div class="qnrr-seg" style="height:'+barH+'px;background:linear-gradient(180deg,rgba(38,96,200,.28) 0%,rgba(38,96,200,.12) 100%);border:1px solid rgba(38,96,200,.22)"></div>';
+      // Mar reference bar — single solid segment
+      segsHtml='<div class="qnrr-seg" style="height:'+barH+'px;'+
+        'background:linear-gradient(180deg,rgba(38,96,200,.35) 0%,rgba(38,96,200,.15) 100%);'+
+        'border:1px dashed rgba(38,96,200,.40);border-radius:5px"></div>';
     } else if(bm){
-      // stack: core_nrr (bottom) → handover → new_sales → expansion → transfer_in (top)
-      var stackOrder=['transfer_in','expansion','new_sales','handover','core_nrr'];
-      var totalSeg=bm.total_gmv||1;
-      stackOrder.forEach(function(mv){
+      // STACK_ORDER: last item in array renders at bottom of column-reverse flex
+      // So core_nrr (last) appears at physical bottom ✓
+      STACK_ORDER.forEach(function(mv){
         var gmv=(bm.segments&&bm.segments[mv])||0;
         if(gmv<=0)return;
-        var h=Math.max(4,Math.round(gmv/maxGmv*chartH));
+        var h=Math.max(3,Math.round(gmv/maxGmv*chartH));
         var cfg=MV_CFG[mv];
-        segsHtml+='<div class="qnrr-seg" style="height:'+h+'px;background:'+cfg.color+'"></div>';
+        segsHtml+='<div class="qnrr-seg" style="height:'+h+'px;background:'+cfg.color+';min-height:3px"></div>';
       });
     }
 
-    // ghost bar for transfer_out
+    // ghost for transfer_out
     var ghostHtml='';
     if(!isBase&&bm&&bm.segments&&bm.segments.transfer_out>0){
       var ghostH=Math.max(6,Math.round(_data.base_gmv/maxGmv*chartH));
       ghostHtml='<div class="qnrr-ghost-bar" style="height:'+ghostH+'px"></div>';
     }
 
-    return '<div class="qnrr-bar-col '+active+'" data-month="'+m+'" onclick="'+onclick+'">'+
+    return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
+      nrrHtml+
       ghostHtml+
       '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
-      '<div class="qnrr-bar-lbl"'+(_selBar===m&&!isBase?' style="color:rgba(188,215,255,.65)"':'')+'>'+_esc(lbl)+'</div>'+
-      nrrHtml+
+      '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
   }).join('');
 
@@ -415,24 +388,42 @@ function _qnrrRenderDrill(){
   var bm=_data.by_month[_selBar];
   var rows=bm.rows||[];
 
-  // filter by movement
   var filtered=rows;
-  if(_selMv==='churn') filtered=rows.filter(function(r){return r.movement_type==='core_nrr_churn';});
-  else if(_selMv==='handover') filtered=rows.filter(function(r){return r.movement_type==='handover';});
+  if(_selMv==='churn')     filtered=rows.filter(function(r){return r.movement_type==='core_nrr_churn';});
+  else if(_selMv==='handover')  filtered=rows.filter(function(r){return r.movement_type==='handover';});
   else if(_selMv==='expansion') filtered=rows.filter(function(r){return r.movement_type==='expansion';});
 
-  // group by account
+  // group by account_id, collect GMV across ALL months
   var byAcct={};var acctOrder=[];
   filtered.forEach(function(r){
     var aid=r.account_id;
     if(!byAcct[aid]){
-      byAcct[aid]={name:r.account_name,type:r.movement_type,outlets:[],baseGmv:0,currGmv:0};
+      byAcct[aid]={name:r.account_name||aid,type:r.movement_type,outlets:[],
+                   gmvByMonth:{},baseGmv:0,currGmv:0};
       acctOrder.push(aid);
     }
     byAcct[aid].outlets.push(r);
     byAcct[aid].baseGmv+=r.base_gmv||0;
     byAcct[aid].currGmv+=r.curr_gmv||0;
   });
+
+  // Collect GMV across all Q months for sparkline (from full data)
+  if(_data){
+    Q_MONTHS.forEach(function(qm){
+      var qbm=_data.by_month[qm];
+      if(!qbm)return;
+      (qbm.rows||[]).forEach(function(r){
+        if(byAcct[r.account_id]){
+          byAcct[r.account_id].gmvByMonth[qm]=(byAcct[r.account_id].gmvByMonth[qm]||0)+r.curr_gmv;
+        }
+      });
+    });
+    // base month GMV
+    acctOrder.forEach(function(aid){
+      var a=byAcct[aid];
+      a.gmvByMonth[BASE_MONTH]=a.baseGmv;
+    });
+  }
 
   if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts';
 
@@ -441,48 +432,58 @@ function _qnrrRenderDrill(){
     return;
   }
 
-  // sort by currGmv desc
   acctOrder.sort(function(a,b){return (byAcct[b].currGmv||0)-(byAcct[a].currGmv||0);});
 
   var html=acctOrder.map(function(aid,idx){
     var a=byAcct[aid];
     var cfg=MV_CFG[a.type]||{color:'rgba(255,255,255,.3)'};
     var dotColor=cfg.color==='ghost'?'rgba(229,62,62,.6)':cfg.color;
-    var tagColor=a.type==='core_nrr_churn'?'rgba(229,62,62,.45)':
-                 a.type==='handover'?'rgba(240,176,0,.45)':
-                 a.type==='expansion'?'rgba(77,220,151,.4)':
-                 a.type==='new_sales'?'rgba(140,180,255,.4)':'rgba(255,255,255,.2)';
 
-    // build sparkline — GMV across Q months for this account
+    // Sparkline: 4 bars (Mar/Apr/May/Jun) — use full month GMV
     var allMonths=[BASE_MONTH].concat(Q_MONTHS);
-    var acctGmvByMonth={};
-    // for base month, use base_gmv of any outlet
-    acctGmvByMonth[BASE_MONTH]=a.outlets.reduce(function(s,o){return s+(o.base_gmv||0);},0);
-    // for Q months, only this month has curr_gmv; we'd need full data — use available
-    acctGmvByMonth[_selBar]=a.currGmv;
-    var maxSp=Math.max.apply(null,Object.values(acctGmvByMonth).filter(function(v){return v>0;}))||1;
+    var gmvVals=allMonths.map(function(m){return a.gmvByMonth[m]||0;});
+    var maxSp=Math.max.apply(null,gmvVals)||1;
 
-    var sbHtml=allMonths.map(function(m){
-      var v=acctGmvByMonth[m]||0;
-      var h=v>0?Math.max(3,Math.round(v/maxSp*18)):2;
-      var bg=v>0?(m===BASE_MONTH?'rgba(38,96,200,.3)':dotColor):'rgba(255,255,255,.06)';
+    var sbHtml=allMonths.map(function(m,mi){
+      var v=gmvVals[mi];
+      var h=v>0?Math.max(4,Math.round(v/maxSp*20)):2;
+      var bg=v>0?(m===BASE_MONTH?'rgba(38,96,200,.45)':dotColor):'rgba(255,255,255,.06)';
       return '<div class="qnrr-sb" style="height:'+h+'px;background:'+bg+'" data-m="'+(MONTHS_TH[m]||m)+'" data-v="'+_fmtM(v)+'"></div>';
     }).join('');
 
-    // outlet rows
+    // Sparkline labels: base month + selected month
+    var baseGmvLabel=_fmtM(a.baseGmv);
+    var currGmvLabel=_fmtM(a.currGmv);
+    var sparkLabels='<div class="qnrr-spark-labels">'+
+      '<span class="qnrr-spark-base">'+baseGmvLabel+'</span>'+
+      '<span class="qnrr-spark-curr" style="color:'+dotColor+'">'+currGmvLabel+'</span>'+
+    '</div>';
+
+    // Outlet rows — use outlet_name if available, fallback to outlet_id
     var outHtml=a.outlets.map(function(o){
-      var oColor=dotColor;
-      var oName=_esc((o.outlet_id||'—').slice(0,38));
-      // outlet sparkline (base vs curr)
-      var oMax=Math.max(o.base_gmv||0,o.curr_gmv||0)||1;
-      var obH=o.base_gmv>0?Math.max(2,Math.round(o.base_gmv/oMax*11)):1;
-      var ocH=o.curr_gmv>0?Math.max(2,Math.round(o.curr_gmv/oMax*11)):1;
+      // FIX: use account_name + outlet context, not raw outlet_id
+      var oName=o.outlet_name||o.account_name||o.outlet_id||'—';
+      // If multiple outlets in same account, show outlet_id as suffix
+      if(a.outlets.length>1&&o.outlet_id){
+        oName=o.account_name||o.outlet_id;
+      }
+      var oBaseGmv=o.base_gmv||0;
+      var oCurrGmv=o.curr_gmv||0;
+      var oMax=Math.max(oBaseGmv,oCurrGmv)||1;
+      var obH=oBaseGmv>0?Math.max(3,Math.round(oBaseGmv/oMax*14)):2;
+      var ocH=oCurrGmv>0?Math.max(3,Math.round(oCurrGmv/oMax*14)):2;
       return '<div class="qnrr-out-row">'+
-        '<div class="qnrr-out-dot" style="background:'+oColor+'"></div>'+
-        '<div class="qnrr-out-name">'+oName+'</div>'+
-        '<div class="qnrr-out-spark">'+
-          '<div class="qnrr-osb" style="height:'+obH+'px;background:rgba(38,96,200,.3)"></div>'+
-          '<div class="qnrr-osb" style="height:'+ocH+'px;background:'+oColor+'"></div>'+
+        '<div class="qnrr-out-dot" style="background:'+dotColor+'"></div>'+
+        '<div class="qnrr-out-name">'+_esc(String(oName).slice(0,45))+'</div>'+
+        '<div class="qnrr-out-spark-wrap">'+
+          '<div class="qnrr-out-spark">'+
+            '<div class="qnrr-osb" style="height:'+obH+'px;background:rgba(38,96,200,.4)" title="ฐาน '+_fmtM(oBaseGmv)+'"></div>'+
+            '<div class="qnrr-osb" style="height:'+ocH+'px;background:'+dotColor+'" title="'+MONTHS_TH[_selBar]+' '+_fmtM(oCurrGmv)+'"></div>'+
+          '</div>'+
+          '<div class="qnrr-out-spark-lbl">'+
+            '<span>'+_fmtM(oBaseGmv)+'</span>'+
+            '<span style="color:'+dotColor+'">'+_fmtM(oCurrGmv)+'</span>'+
+          '</div>'+
         '</div>'+
       '</div>';
     }).join('');
@@ -492,12 +493,14 @@ function _qnrrRenderDrill(){
       '<div class="qnrr-mv-dot" style="background:'+dotColor+'"></div>'+
       '<div class="qnrr-acct-left">'+
         '<div class="qnrr-acct-name">'+_esc(a.name||aid)+'</div>'+
-        '<div class="qnrr-acct-tag" style="color:'+tagColor+'">'+_esc(a.type)+'</div>'+
       '</div>'+
       '<div class="qnrr-acct-right">'+
-        '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
-          sbHtml+
-          '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+        '<div class="qnrr-spark-col">'+
+          sparkLabels+
+          '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
+            sbHtml+
+            '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+          '</div>'+
         '</div>'+
         '<div class="qnrr-chev">›</div>'+
       '</div>'+
