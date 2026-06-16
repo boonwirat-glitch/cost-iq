@@ -1,4 +1,4 @@
-<!-- Freshket Sense v755k: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v755l: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v755k',
+      version: 'v755l',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -23963,7 +23963,26 @@ function toggleSsbTooltip(){
           const okSkus=await _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`});
           await new Promise(r=>setTimeout(r,shouldAvoidGlobalHeavy()?450:180));
           const okAlts=await _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`});
-          if(okSkus&&okAlts){try{_kamBundleLoaded.add(safeKey);}catch(e){} log('[v207b bundle] ready',kamEmail);return true;}
+          // v755l: เพิ่ม outlet fetch — ไม่รอผล (non-blocking) เพราะ sequential path ช้าอยู่แล้ว
+          if(okSkus&&okAlts){
+            try{_kamBundleLoaded.add(safeKey);}catch(e){}
+            log('[v207b bundle] ready',kamEmail);
+            // fetch outlet แยก non-blocking
+            try{
+              const outletUrl=`${base}/sense_sku_outlet_${safeKey}.csv`;
+              _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
+                .then(okOutlet=>{
+                  if(okOutlet){
+                    try{_kamOutletLoaded.add(safeKey);}catch(e){}
+                    log('[v755l] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
+                    setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
+                  } else {
+                    warn('[v755l] outlet fetch failed for',kamEmail);
+                  }
+                }).catch(()=>{});
+            }catch(e){}
+            return true;
+          }
           warn('[v207b bundle] incomplete',kamEmail,{okSkus,okAlts});
           return false;
         }catch(e){warn('[v207b bundle] error',kamEmail,e&&e.message?e.message:e);return false;}
