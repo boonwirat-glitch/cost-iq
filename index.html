@@ -1,4 +1,4 @@
-<!-- Freshket Sense v755f: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v755g: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v755f',
+      version: 'v755g',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15044,7 +15044,17 @@ function handleFileUpload(type,input){
         rowCount++;
       });
       console.log('[Q12B] sku_outlet loaded:',rowCount,'rows',Object.keys(bulkSkuOutletData).length,'accounts');
-      // v755b: re-render SKU signals หลัง outlet load เสร็จ เพื่อให้ tooltip แสดงทันที
+      if(rowCount===0){
+        // v755f: rowCount=0 → น่าจะเป็น cache จาก 404 เก่า → clear cache แล้ว return false
+        console.warn('[Q12B] outlet rowCount=0 — possible stale 404 cache, will retry next load');
+        // clear IDB cache สำหรับ tab นี้เพื่อให้ fetch ใหม่ครั้งถัดไป
+        try{
+          const _tabKey=tab;
+          if(typeof _csvCacheSet==='function')_csvCacheSet(_tabKey,'__INVALID__');
+        }catch(e){}
+        _done(false); return;
+      }
+      // v755b: re-render SKU signals หลัง outlet load เสร็จ
       try{
         if(currentAccountId&&typeof renderKamThisMonth==='function'){
           setTimeout(()=>{ try{ renderKamThisMonth(); }catch(e){} },50);
@@ -15424,6 +15434,7 @@ let _cloudInitialPromise = null;
 let _cloudBackgroundPromise = null;
 let _cloudLoadToken = 0;
 const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded to memory
+const _kamOutletLoaded = new Set();   // v755f: safeEmail → outlet data loaded successfully
 let _bundlePreWarming = false;         // v225: always false — suppress flag removed (never set to true)
 const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
@@ -15857,19 +15868,14 @@ async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
   if(_kamBundleLoaded.has(safeKey)){
-    // v755e: เช็คเฉพาะ KAM นี้ว่ามี outlet data ไหม (ไม่ใช่เช็ค global)
-    const _hasOutletForThisKam=typeof bulkSkuOutletData!=='undefined'&&
-      Object.values(bulkSkuOutletData).length>0&&
-      // ตรวจว่ามี account ของ KAM นี้ใน bulkSkuOutletData ไหม โดยดูจาก portviewBulkData
-      (typeof portviewBulkData!=='undefined'&&portviewBulkData&&
-        Object.keys(portviewBulkData).some(aid=>bulkSkuOutletData[aid]));
-    if(!_hasOutletForThisKam){
-      const _sk=safeKey;
-      const _outletUrl=`${R2_BASE}/sense_sku_outlet_${_sk}.csv`;
-      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${_sk}`})
+    // v755f: ถ้า outlet ยังไม่โหลด → fetch แยก (ไม่ขึ้นกับ bundle cache)
+    if(!_kamOutletLoaded.has(safeKey)){
+      const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
+      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`})
         .then(ok=>{
           if(ok){
-            console.log('[v755e] outlet loaded for',kamEmail,'— re-rendering');
+            _kamOutletLoaded.add(safeKey);
+            console.log('[v755f] outlet loaded for',kamEmail);
             setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
           }
         }).catch(()=>{});
@@ -15892,6 +15898,7 @@ async function _fetchKamBundle(kamEmail){
       ]);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
+        if(okOutlet)_kamOutletLoaded.add(safeKey); // v755f
         _senseLog('%c[v206d bundle] LOADED FROM BUNDLE (not bulk):', 'color:#00d070;font-weight:bold', kamEmail);
         // v224e: set bulkSkusReady so _skuSnap changes from '0s'→'1s' → portview value guard passes → _churnCounts rendered
         try{bulkSkusReady=true;}catch(e){}
