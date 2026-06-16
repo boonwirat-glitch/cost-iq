@@ -1674,6 +1674,7 @@ async function _fetchKamBundle(kamEmail){
     // v755f: ถ้า outlet ยังไม่โหลด → fetch แยก (ไม่ขึ้นกับ bundle cache)
     if(!_kamOutletLoaded.has(safeKey)){
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
+      console.log('[v755i] outlet retry fetch:',_outletUrl.split('/').pop());
       _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
         .then(ok=>{
           if(ok){
@@ -1694,11 +1695,13 @@ async function _fetchKamBundle(kamEmail){
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', outletUrl);
+      console.log('[v755i] bundle fetch start: outlet url=',outletUrl.split('/').pop());
       const[okSkus,okAlts,okOutlet]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
         _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`}),
       ]);
+      console.log('[v755i] bundle fetch result: okSkus=',okSkus,'okAlts=',okAlts,'okOutlet=',okOutlet,'accounts in bulkSkuOutletData=',Object.keys(bulkSkuOutletData).length);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
         if(okOutlet)_kamOutletLoaded.add(safeKey); // v755f
