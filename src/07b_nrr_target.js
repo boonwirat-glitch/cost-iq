@@ -1379,19 +1379,32 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 function _tgtComputeQuarterNRR(kamEmail, scope) {
   scope = scope || 'kam';
   if (!kamEmail) return null;
-  if (!window.bulkQnrrData || !window.bulkQnrrData[kamEmail]) return null;
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return null;
 
-  const allRows = window.bulkQnrrData[kamEmail].rows || [];
+  // ── v753g: single file indexed by byKamEmail / byTlEmail ──────────────
+  // Get candidate rows based on scope
+  var myTlEmail = '';
+  var kamRows = (qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
+  if (kamRows.length) {
+    myTlEmail = (kamRows.find(function(r){return r.period_tl_email;}) || {}).period_tl_email || '';
+  }
+
+  // For TL/admin scopes, start from TL row index for performance
+  var allRows;
+  if (scope === 'tl' && myTlEmail && qd.byTlEmail && qd.byTlEmail[myTlEmail]) {
+    allRows = qd.byTlEmail[myTlEmail];
+  } else if (scope === 'admin') {
+    allRows = qd.allRows || [];
+  } else {
+    allRows = kamRows;
+  }
   if (!allRows.length) return null;
-
-  // ── Determine which rows to include based on scope ──────────────────────
-  // For TL/admin: include all KAMs with same tl_email as kamEmail
-  const myTlEmail = (allRows.find(r => r.period_kam_email === kamEmail) || {}).period_tl_email || '';
 
   function _rowInScope(r) {
     if (scope === 'kam')   return r.period_kam_email === kamEmail;
     if (scope === 'tl')    return r.period_tl_email  === myTlEmail;
-    if (scope === 'admin') return true; // all rows in the bundle
+    if (scope === 'admin') return true;
     return r.period_kam_email === kamEmail;
   }
 

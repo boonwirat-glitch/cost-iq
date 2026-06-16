@@ -1088,45 +1088,54 @@ function handleFileUpload(type,input){
   _done();
 }
 
-// v753e: Quarter NRR Health CSV handler
-// CSV columns (from quarterly_nrr_2026_Q2.sql output):
-//   0: period_month   1: base_month     2: movement_type  3: period_kam_email
-//   4: period_kam_name 5: period_tl_email 6: base_kam_email 7: account_id
-//   8: account_name   9: account_type   10: outlet_id     11: base_gmv
-//   12: curr_gmv      13: base_days     14: curr_days
-// File: sense_qnrr_YYYY_QN_${safeKey}.csv (per-KAM bundle, fetched on demand)
-// _qnrrIngestEmail set by _fetchQnrrBundle before calling ingestCSVText
-if(type==='bulk-qnrr'){
+// v753g: Quarter NRR Health CSV handler — SINGLE FILE (all KAMs, ~2.6MB)
+// File: sense_qnrr_2026q2.csv
+// CSV columns: period_month, base_month, movement_type, period_kam_email,
+//   period_kam_name, period_tl_email, base_kam_email, account_id, account_name,
+//   account_type, outlet_id, base_gmv, curr_gmv, base_days, curr_days
+// Index: byKamEmail[email]=[rows], byTlEmail[email]=[rows]
+if(type==='bulk-qnrr-single'){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
-      const kamEmail=(window._qnrrIngestEmail||'').trim();
-      if(!kamEmail){console.warn('[Sense qnrr] no _qnrrIngestEmail set');_done();return;}
-      const rows=[];
+      const byKamEmail={},byTlEmail={},allRows=[];
       lines.forEach(l=>{
         const p=parseCSVRow(l);
-        if(!p[0]||!p[2])return; // need period_month + movement_type
-        rows.push({
-          period_month:   (p[0]||'').trim(),
-          base_month:     (p[1]||'').trim(),
-          movement_type:  (p[2]||'').trim(),
+        if(!p[0]||!p[2])return;
+        const row={
+          period_month:    (p[0]||'').trim(),
+          base_month:      (p[1]||'').trim(),
+          movement_type:   (p[2]||'').trim(),
           period_kam_email:(p[3]||'').trim(),
-          period_kam_name:(p[4]||'').trim(),
-          period_tl_email:(p[5]||'').trim(),
-          base_kam_email: (p[6]||'').trim(),
-          account_id:     (p[7]||'').trim(),
-          account_name:   (p[8]||'').trim(),
-          account_type:   (p[9]||'').trim(),
-          outlet_id:      (p[10]||'').trim(),
-          base_gmv:       parseFloat(p[11])||0,
-          curr_gmv:       parseFloat(p[12])||0,
-          base_days:      parseInt(p[13])||31,
-          curr_days:      parseInt(p[14])||30
-        });
+          period_kam_name: (p[4]||'').trim(),
+          period_tl_email: (p[5]||'').trim(),
+          base_kam_email:  (p[6]||'').trim(),
+          account_id:      (p[7]||'').trim(),
+          account_name:    (p[8]||'').trim(),
+          account_type:    (p[9]||'').trim(),
+          outlet_id:       (p[10]||'').trim(),
+          base_gmv:        parseFloat(p[11])||0,
+          curr_gmv:        parseFloat(p[12])||0,
+          base_days:       parseInt(p[13])||31,
+          curr_days:       parseInt(p[14])||30
+        };
+        allRows.push(row);
+        if(row.period_kam_email){
+          if(!byKamEmail[row.period_kam_email])byKamEmail[row.period_kam_email]=[];
+          byKamEmail[row.period_kam_email].push(row);
+        }
+        if(row.period_tl_email){
+          if(!byTlEmail[row.period_tl_email])byTlEmail[row.period_tl_email]=[];
+          byTlEmail[row.period_tl_email].push(row);
+        }
       });
-      window.bulkQnrrData[kamEmail]={rows,loadedAt:Date.now()};
-      console.log('%c[Sense qnrr] loaded','color:#4ddc97',{email:kamEmail,rows:rows.length});
+      window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
+      console.log('%c[Sense qnrr] loaded','color:#4ddc97',{
+        total:allRows.length,
+        kams:Object.keys(byKamEmail).length,
+        tls:Object.keys(byTlEmail).length
+      });
       if(window.RenderBus)window.RenderBus.signal('qnrr');
     }catch(err){console.warn('[Sense qnrr] parse failed',err);}
     _done();
@@ -1187,13 +1196,11 @@ const _kamBundleLoaded = new Set();   // v202: safeEmail → bundle fully loaded
 let _bundlePreWarming = false;         // v225: always false — suppress flag removed (never set to true)
 const _kamBundleInFlight = {};        // v202: safeEmail → Promise (dedup concurrent fetches)
 
-// v753e: Quarter NRR Health data (per KAM bundle, loaded on demand)
-// bulkQnrrData[kamEmail] = { rows: [{period_month,base_month,movement_type,
-//   period_kam_email,period_tl_email,base_kam_email,account_id,account_name,
-//   account_type,outlet_id,base_gmv,curr_gmv,base_days,curr_days},...] }
-window.bulkQnrrData = {};
-const _qnrrBundleLoaded = new Set();   // safeKey → loaded
-const _qnrrBundleInFlight = {};        // safeKey → Promise (dedup)
+// v753g: Quarter NRR Health data — SINGLE FILE
+// bulkQnrrData = { byKamEmail:{}, byTlEmail:{}, allRows:[], loaded:bool, loadedAt:ts }
+window.bulkQnrrData = {loaded:false};
+const _qnrrBundleLoaded = new Set();   // 'single' → loaded flag
+// _qnrrFetchPromise declared near _fetchQnrrBundle (global dedup)
 
 // v206d: performance guardrails for mobile/PWA.
 // Default console is quiet; turn on with localStorage.setItem('senseDebug','1').
@@ -1333,6 +1340,7 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   // Q10: transfer-out per KAM
   handover:{type:'bulk-handover',tab:'handover',cache:true},
   current_movements:{type:'bulk-current-movements',tab:'current_movements',cache:true},
+  qnrr:{type:'bulk-qnrr-single',tab:'qnrr',cache:true},
   // Q3C team summary: pre-computed P1/P3 totals per KAM for TL multiplier
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
 };
@@ -1367,7 +1375,8 @@ const _csvSentinelSpec={
   outlets:{minCols:4},
   handover:{minCols:8},
   upsell_team:{minCols:5},
-  current_movements:{minCols:8}
+  current_movements:{minCols:8},
+  qnrr:{minCols:13}
 };
 const _csvQuarantineToasted=new Set();
 function _senseCsvSentinel(tab,text){
@@ -1693,40 +1702,57 @@ async function _fetchUpsellBundle(kamEmail){
 }
 window._fetchUpsellBundle=_fetchUpsellBundle;
 
-// v753e: Fetch Quarter NRR bundle for a KAM (on-demand, same dedup pattern as KAM bundle)
-// File: sense_qnrr_2026q2_${safeKey}.csv
-// Quarter key: hardcoded per deploy — update each Q (2026q2, 2026q3, etc.)
+// v753g: Fetch Quarter NRR — SINGLE FILE for all KAMs (~2.6MB)
+// File: sense_qnrr_2026q2.csv (no per-KAM split)
+// Quarter key: update each Q. IDB cache tab='qnrr' TTL=6h
 const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q2';
-async function _fetchQnrrBundle(kamEmail){
-  if(!kamEmail)return false;
-  const safeKey=_kamSafeKey(kamEmail);
-  if(_qnrrBundleLoaded.has(safeKey))return true;
-  if(_qnrrBundleInFlight[safeKey])return _qnrrBundleInFlight[safeKey];
-  const p=(async()=>{
+let _qnrrFetchPromise = null; // global dedup — only one fetch ever
+async function _fetchQnrrBundle(){
+  // Already loaded in memory
+  if(window.bulkQnrrData && window.bulkQnrrData.loaded)return true;
+  // Deduplicate concurrent calls
+  if(_qnrrFetchPromise)return _qnrrFetchPromise;
+  _qnrrFetchPromise=(async()=>{
     try{
-      const url=`${R2_BASE}/sense_qnrr_${_QNRR_QUARTER}_${safeKey}.csv`;
-      console.log('%c[Sense qnrr] fetching','color:#4ddc97;font-weight:bold',url);
-      window._qnrrIngestEmail=kamEmail;
-      const ok=await _fetchKamFile({url,type:'bulk-qnrr',tab:`bundle-qnrr-${safeKey}`});
-      window._qnrrIngestEmail='';
+      const url=`${R2_BASE}/sense_qnrr_${_QNRR_QUARTER}.csv`;
+      console.log('%c[Sense qnrr] fetching single file','color:#4ddc97;font-weight:bold',url);
+      const ok=await _fetchKamFile({url,type:'bulk-qnrr-single',tab:'qnrr'});
       if(ok){
-        _qnrrBundleLoaded.add(safeKey);
-        console.log('%c[Sense qnrr] ✓ loaded','color:#4ddc97',kamEmail);
+        _qnrrBundleLoaded.add('single');
+        console.log('%c[Sense qnrr] ✓ single file loaded','color:#4ddc97',
+          Object.keys((window.bulkQnrrData||{}).byKamEmail||{}).length,'KAMs');
       }else{
-        console.warn('[Sense qnrr] ⚠️ load failed — file may not exist yet:',url);
+        console.warn('[Sense qnrr] ⚠️ load failed — CSV may not be uploaded yet');
       }
       return ok;
     }catch(e){
-      console.warn('[Sense qnrr] ❌ error',kamEmail,e&&e.message?e.message:e);
+      console.warn('[Sense qnrr] ❌ fetch error',e&&e.message?e.message:e);
       return false;
     }finally{
-      delete _qnrrBundleInFlight[safeKey];
+      _qnrrFetchPromise=null;
     }
   })();
-  _qnrrBundleInFlight[safeKey]=p;
-  return p;
+  return _qnrrFetchPromise;
 }
 window._fetchQnrrBundle=_fetchQnrrBundle;
+
+// v753g: Background prefetch — runs after FOREGROUND complete, non-blocking
+// Only for roles that have QNRR sheet (not Sales)
+function _prefetchQnrrIfNeeded(){
+  try{
+    const role=(typeof getCurrentRole==='function')?getCurrentRole():'';
+    const salesRoles=['sales','sales_tl'];
+    if(salesRoles.indexOf(role)>=0)return; // Sales never needs QNRR
+    if(window.bulkQnrrData&&window.bulkQnrrData.loaded)return; // already in memory
+    // Delay 2s after FOREGROUND done — don't compete with critical files
+    setTimeout(function(){
+      if(window.bulkQnrrData&&window.bulkQnrrData.loaded)return;
+      console.log('%c[Sense qnrr] background prefetch start','color:#4ddc97');
+      _fetchQnrrBundle().catch(function(){});
+    },2000);
+  }catch(e){}
+}
+window._prefetchQnrrIfNeeded=_prefetchQnrrIfNeeded;
 
 function _startCloudBackgroundLoad({token,fgLoaded=0,total=8}={}){
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
@@ -1947,6 +1973,8 @@ async function loadFromCloudflareR2(){
 
     // Fire-and-forget background load. Do not await this; Sense can await the same in-flight promise only when needed.
     _startCloudBackgroundLoad({token,fgLoaded:fgOk,total:ALL.length});
+    // v753g: background prefetch QNRR after FOREGROUND done (non-blocking, role-gated)
+    try{_prefetchQnrrIfNeeded();}catch(_){}
   })().finally(()=>{if(token===_cloudLoadToken)_cloudInitialPromise=null;});
   return _cloudInitialPromise;
 }
@@ -1954,8 +1982,8 @@ async function reloadFromCloudflareR2(){
   await _csvCacheClear();
   sheetsLoadStarted=false;
   bulkSkusReady=false;bulkAltsReady=false;
-  // v753e: clear quarter NRR data on logout
-  try{window.bulkQnrrData={};_qnrrBundleLoaded.clear();}catch(_){}
+  // v753g: clear quarter NRR data on logout
+  try{window.bulkQnrrData={loaded:false};_qnrrBundleLoaded.clear();_qnrrFetchPromise=null;}catch(_){}
   _cloudLoadedTabs.clear();
   _salesR2Override = {}; // v738: reset Sales routing on full reload
   try{ if(window.DataRegistry) window.DataRegistry.reset(); }catch(_){} // Phase 0G
@@ -2171,7 +2199,7 @@ async function _preloadFromIndexedDB(){
   var _isSalesPreload=(Object.keys(_salesR2Override).length>0)||
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   var CRITICAL=['portview','history','handover'];
-  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
+  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements','qnrr']; // v222+v226+v259+v753g: also preload — cache:true in IDB
   var TABS=_isSalesPreload
     ? [...CRITICAL,...EXTRA].filter(function(t){return t!=='portview'&&t!=='handover';})
     : [...CRITICAL,...EXTRA];

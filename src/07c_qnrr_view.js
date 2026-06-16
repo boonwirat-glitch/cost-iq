@@ -14,8 +14,9 @@
 'use strict';
 
 // ── Constants ──────────────────────────────────────────────────────────────
-var SCOPES   = ['KAM','ทีม','Admin'];
-var SCOPE_MAP= ['kam','tl','admin'];
+// Scope options per role — set on open
+var SCOPES   = ['KAM'];
+var SCOPE_MAP= ['kam'];
 var MONTHS_TH = {'2026-03':'มี.ค.','2026-04':'เม.ย.','2026-05':'พ.ค.','2026-06':'มิ.ย.'};
 var Q_MONTHS  = ['2026-04','2026-05','2026-06'];
 var BASE_MONTH= '2026-03';
@@ -54,17 +55,46 @@ function _qnrrOpen(){
   var overlay=_el('qnrr-overlay');
   var sheet  =_el('qnrr-sheet');
   if(!overlay||!sheet)return;
+
+  // Role guard — Sales never has QNRR
+  var role=(typeof getCurrentRole==='function')?getCurrentRole():'';
+  if(role==='sales'||role==='sales_tl')return;
+
+  // Set scope options based on role
+  if(role==='tl'||role==='ad_tl'){
+    SCOPES=['KAM','ทีม']; SCOPE_MAP=['kam','tl'];
+  } else if(role==='admin'||role==='ad'){
+    SCOPES=['KAM','ทีม','Admin']; SCOPE_MAP=['kam','tl','admin'];
+  } else {
+    SCOPES=['KAM']; SCOPE_MAP=['kam'];
+  }
+  // Reset scope to KAM on each open
+  _scopeIdx=0;
+  var scopeBtn=_el('qnrr-scope-btn');
+  var scopeLbl=_el('qnrr-scope-lbl');
+  if(scopeBtn)scopeBtn.style.display=SCOPES.length>1?'flex':'none';
+  if(scopeLbl)scopeLbl.textContent=SCOPES[0];
+
   overlay.classList.add('on');
   sheet.classList.add('on');
   document.body.style.overflow='hidden';
-  // fetch bundle if needed
-  var email=(currentUserProfile&&currentUserProfile.email)||'';
-  if(email&&typeof _fetchQnrrBundle==='function'){
-    _fetchQnrrBundle(email).then(function(){_qnrrRender();}).catch(function(){_qnrrRender();});
-  } else {
-    _qnrrRender();
-  }
   _qnrrInitSwipe(sheet);
+
+  var qd=window.bulkQnrrData;
+  if(qd&&qd.loaded){
+    // Warm path: data already in memory → render immediately
+    _qnrrRender();
+  } else {
+    // Cold path: show skeleton → fetch → render
+    _qnrrShowSkeleton();
+    if(typeof _fetchQnrrBundle==='function'){
+      _fetchQnrrBundle()
+        .then(function(){_qnrrRender();})
+        .catch(function(){_qnrrShowError();});
+    } else {
+      _qnrrShowError();
+    }
+  }
 }
 window._qnrrOpen=_qnrrOpen;
 
@@ -158,6 +188,8 @@ window._qnrrSparkLeave=_qnrrSparkLeave;
 function _qnrrRender(){
   var email=(currentUserProfile&&currentUserProfile.email)||'';
   var scope=SCOPE_MAP[_scopeIdx]||'kam';
+  // Guard: if data not loaded yet, show skeleton
+  if(!window.bulkQnrrData||!window.bulkQnrrData.loaded){_qnrrShowSkeleton();return;}
 
   // compute
   _data=null;
@@ -169,6 +201,52 @@ function _qnrrRender(){
   _qnrrRenderChart();
   _qnrrRenderLegend();
   _qnrrRenderDrill();
+}
+
+// ── Skeleton loading state ────────────────────────────────────────────────
+function _qnrrShowSkeleton(){
+  var baseVal=_el('qnrr-base-val');var baseSub=_el('qnrr-base-sub');
+  var nrrVals=_el('qnrr-nrr-vals');var barsRow=_el('qnrr-bars-row');
+  var list=_el('qnrr-acct-list');var lbl=_el('qnrr-drill-lbl');
+  if(baseVal)baseVal.innerHTML='<span class="qnrr-skel">฿—</span>';
+  if(baseSub)baseSub.innerHTML='<span class="qnrr-skel">— outlets</span>';
+  if(nrrVals)nrrVals.innerHTML='<span class="qnrr-skel">—% · —% · —%</span>';
+  if(lbl)lbl.textContent='กำลังโหลด...';
+  // Skeleton bars (4 bars, varied heights, pulse animation)
+  if(barsRow){
+    var skelH=[148,120,140,100];
+    barsRow.innerHTML=skelH.map(function(h){
+      return '<div class="qnrr-bar-col">'
+        +'<div class="qnrr-skel-bar" style="height:'+h+'px"></div>'
+        +'<div class="qnrr-bar-lbl"><span class="qnrr-skel" style="width:24px;display:inline-block">&nbsp;</span></div>'
+        +'<div class="qnrr-bar-nrr"><span class="qnrr-skel" style="width:32px;display:inline-block">&nbsp;</span></div>'
+        +'</div>';
+    }).join('');
+  }
+  // Skeleton rows (3 account placeholders)
+  if(list){
+    list.innerHTML=[1,2,3].map(function(){
+      return '<div class="qnrr-acct-row" style="pointer-events:none">'
+        +'<div class="qnrr-mv-dot qnrr-skel"></div>'
+        +'<div class="qnrr-acct-left">'
+          +'<div class="qnrr-skel" style="height:12px;width:60%;border-radius:4px;margin-bottom:5px"></div>'
+          +'<div class="qnrr-skel" style="height:8px;width:30%;border-radius:3px"></div>'
+        +'</div>'
+        +'<div class="qnrr-acct-right">'
+          +'<div class="qnrr-skel" style="width:44px;height:22px;border-radius:3px"></div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+}
+
+function _qnrrShowError(){
+  var list=_el('qnrr-acct-list');
+  var barsRow=_el('qnrr-bars-row');
+  var lbl=_el('qnrr-drill-lbl');
+  if(lbl)lbl.textContent='โหลดไม่สำเร็จ';
+  if(barsRow)barsRow.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px 0;color:rgba(255,255,255,.25);font-size:11px">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:9px;opacity:.6">sense_qnrr_2026q2.csv ยังไม่ได้อัปโหลด</span></div>';
+  if(list)list.innerHTML='';
 }
 
 // ── Zone B: base strip ─────────────────────────────────────────────────────

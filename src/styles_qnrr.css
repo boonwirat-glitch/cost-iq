@@ -337,3 +337,35 @@
 /* ── Portview header tap hint (tappable hero card) ── */
 #portview-pace-bar { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 #portview-pace-bar:active { opacity: .85; transform: scale(.99); transition: all .1s; }
+
+/* ── Skeleton loading state ── */
+.qnrr-skel {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,.06) 0%,
+    rgba(255,255,255,.12) 50%,
+    rgba(255,255,255,.06) 100%);
+  background-size: 200% 100%;
+  animation: qnrrSkelPulse 1.6s ease-in-out infinite;
+  border-radius: 3px; display: inline-block;
+}
+.qnrr-skel-bar {
+  width: 100%; border-radius: 6px;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,.05) 0%,
+    rgba(255,255,255,.10) 50%,
+    rgba(255,255,255,.05) 100%);
+  background-size: 200% 100%;
+  animation: qnrrSkelPulse 1.6s ease-in-out infinite;
+}
+.qnrr-bar-col:nth-child(1) .qnrr-skel-bar{animation-delay:.0s}
+.qnrr-bar-col:nth-child(2) .qnrr-skel-bar{animation-delay:.1s}
+.qnrr-bar-col:nth-child(3) .qnrr-skel-bar{animation-delay:.2s}
+.qnrr-bar-col:nth-child(4) .qnrr-skel-bar{animation-delay:.3s}
+@keyframes qnrrSkelPulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Sales role: hide portview-pace-bar tap (portview-pace-bar onclick only fires for non-sales) ── */
+body.sales-mode #portview-pace-bar,
+body.sales-tl-mode #portview-pace-bar { cursor: default; }
