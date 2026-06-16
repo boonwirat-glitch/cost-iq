@@ -63,7 +63,7 @@ params AS (
     ) + 1               AS jun_days,  -- วันที่มีข้อมูลจริง (16 มิ.ย. → 15 วัน)
 
     -- ever_seen lookback (comeback vs expansion)
-    DATE('2024-09-01') AS history_start
+    DATE('2024-11-01') AS history_start   -- align with commission SQL (18M lookback)
 ),
 
 -- ── 2. KAM roster ────────────────────────────────────────────────────────────
@@ -160,7 +160,8 @@ jun_ownership AS (
     o.account_name,
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner)             AS staff_owner
+    TRIM(o.staff_owner)             AS staff_owner,
+    DATE(o.first_dollar_date)       AS first_dollar_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
@@ -209,15 +210,11 @@ jun_gmv AS (
   GROUP BY 1
 ),
 
--- ── 5. ever_seen — เคยมี order ก่อน Apr (แยก expansion vs comeback) ──────────
-ever_seen AS (
-  SELECT DISTINCT CAST(o.user_id AS STRING) AS outlet_id
-  FROM `freshket-rn.dwh.order` o CROSS JOIN params p
-  WHERE o.delivery_date >= p.history_start
-    AND o.delivery_date <  p.apr_start
-    AND o.gmv_ex_vat > 0
-    AND o.account_type IN ('SA','MC','Chain','Unknown')
-),
+-- ── 5. ever_seen — dropped (v2) ──────────────────────────────────────────────
+-- ไม่ใช้ ever_seen table แล้ว ใช้ first_dollar_date แทน (align กับ commission SQL)
+-- expansion  = first_dollar_date >= 2026-04-01 (เกิดใหม่ใน Q)
+-- comeback   = first_dollar_date <  2026-04-01 (เคยซื้อมาก่อน + กลับมา)
+-- transfer_in = first_dollar_date IS NULL หรือมาจาก KAM อื่น
 
 -- ── 6a. current_kam_snapshot — user_master ณ ขณะ run SQL ─────────────────────
 -- ใช้แยก core_nrr_churn (ยังอยู่กับ KAM เดิม) vs transfer_out (โอนออกแล้ว)
@@ -307,20 +304,27 @@ apr_rows AS (
         AND COALESCE(ag.gmv, 0) = 0
         THEN 'core_nrr_churn'
 
-      -- [5] Transfer In: รับจาก KAM อื่น (มีใน Mar cohort ของคนอื่น)
+      -- [5] Transfer In: รับจาก KAM อื่นใน roster (มีใน Mar cohort ของคนอื่น)
       WHEN mc.base_kam_email IS NOT NULL
         AND mc.base_kam_email != k.kam_email
         THEN 'transfer_in'
 
-      -- [6] Expansion: ไม่มีใน Mar cohort ของใครเลย, first_dollar ใน Q
+      -- [6] Expansion: ร้านใหม่แท้ — first_dollar_date อยู่ใน Q (Apr-Jun)
+      -- ใช้ first_dollar_date เหมือน commission SQL (ไม่ใช้ ever_seen table)
       WHEN mc.base_kam_email IS NULL
-        AND (es.outlet_id IS NULL)   -- ไม่เคยมี order ก่อน Apr
+        AND ao.first_dollar_date >= '2026-04-01'
         AND COALESCE(ag.gmv, 0) > 0
         THEN 'expansion'
 
-      -- [7] Transfer In: ไม่มีใน Mar cohort แต่เคยมีประวัติ
+      -- [7] Comeback: เคยซื้อก่อน Apr (first_dollar < Apr) + ไม่อยู่ Mar cohort + กลับมา
       WHEN mc.base_kam_email IS NULL
-        AND es.outlet_id IS NOT NULL
+        AND ao.first_dollar_date < '2026-04-01'
+        AND ao.first_dollar_date IS NOT NULL
+        AND COALESCE(ag.gmv, 0) > 0
+        THEN 'comeback'
+
+      -- [8] Transfer In: ไม่มีใน Mar cohort + ไม่มี first_dollar (ไม่รู้ที่มา)
+      WHEN mc.base_kam_email IS NULL
         THEN 'transfer_in'
 
       ELSE 'transfer_in'
@@ -332,7 +336,6 @@ apr_rows AS (
    AND TRIM(ao.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN mar_cohort mc ON ao.outlet_id = mc.outlet_id
   LEFT JOIN apr_gmv    ag ON ao.outlet_id = ag.outlet_id
-  LEFT JOIN ever_seen  es ON ao.outlet_id = es.outlet_id
 
   UNION ALL
 
@@ -437,9 +440,19 @@ may_rows AS (
         THEN 'core_nrr_churn'
       WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email != k.kam_email
         THEN 'transfer_in'
-      WHEN mc.base_kam_email IS NULL AND es.outlet_id IS NULL
+      -- Expansion: first_dollar ใน Q (Apr-Jun)
+      WHEN mc.base_kam_email IS NULL
+        AND mo.first_dollar_date >= '2026-04-01'
         AND COALESCE(mg.gmv, 0) > 0
         THEN 'expansion'
+      -- Comeback: เคยซื้อก่อน Apr + ไม่อยู่ Mar cohort + กลับมา
+      WHEN mc.base_kam_email IS NULL
+        AND mo.first_dollar_date < '2026-04-01'
+        AND mo.first_dollar_date IS NOT NULL
+        AND COALESCE(mg.gmv, 0) > 0
+        THEN 'comeback'
+      WHEN mc.base_kam_email IS NULL
+        THEN 'transfer_in'
       ELSE 'transfer_in'
     END AS movement_type
 
@@ -449,7 +462,6 @@ may_rows AS (
    AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN mar_cohort mc ON mo.outlet_id = mc.outlet_id
   LEFT JOIN may_gmv    mg ON mo.outlet_id = mg.outlet_id
-  LEFT JOIN ever_seen  es ON mo.outlet_id = es.outlet_id
 
   UNION ALL
 
@@ -548,9 +560,19 @@ jun_rows AS (
         THEN 'core_nrr_churn'
       WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email != k.kam_email
         THEN 'transfer_in'
-      WHEN mc.base_kam_email IS NULL AND es.outlet_id IS NULL
+      -- Expansion: first_dollar ใน Q (Apr-Jun)
+      WHEN mc.base_kam_email IS NULL
+        AND jo.first_dollar_date >= '2026-04-01'
         AND COALESCE(jg.gmv, 0) > 0
         THEN 'expansion'
+      -- Comeback: เคยซื้อก่อน Apr + ไม่อยู่ Mar cohort + กลับมา
+      WHEN mc.base_kam_email IS NULL
+        AND jo.first_dollar_date < '2026-04-01'
+        AND jo.first_dollar_date IS NOT NULL
+        AND COALESCE(jg.gmv, 0) > 0
+        THEN 'comeback'
+      WHEN mc.base_kam_email IS NULL
+        THEN 'transfer_in'
       ELSE 'transfer_in'
     END AS movement_type
 
@@ -561,7 +583,6 @@ jun_rows AS (
   LEFT JOIN mar_cohort   mc     ON jo.outlet_id = mc.outlet_id
   LEFT JOIN apr_ownership ao_jun ON jo.outlet_id = ao_jun.outlet_id  -- for handover/new_sales new_user_exp_date
   LEFT JOIN jun_gmv      jg     ON jo.outlet_id = jg.outlet_id
-  LEFT JOIN ever_seen    es     ON jo.outlet_id = es.outlet_id
 
   UNION ALL
 
