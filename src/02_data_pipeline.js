@@ -1652,7 +1652,17 @@ async function _fetchKamFile({url,type,tab}){
 async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
-  if(_kamBundleLoaded.has(safeKey))return true;
+  if(_kamBundleLoaded.has(safeKey)){
+    // v755d: ถ้า bundle loaded แล้วแต่ outlet ยังว่าง (เช่น ไฟล์ upload หลัง bundle load แรก)
+    if(typeof bulkSkuOutletData!=='undefined' && Object.keys(bulkSkuOutletData).length===0){
+      const _sk=_kamSafeKey(kamEmail);
+      const _outletUrl=`${R2_BASE}/sense_sku_outlet_${_sk}.csv`;
+      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${_sk}`})
+        .then(ok=>{ if(ok&&typeof renderKamThisMonth==='function')setTimeout(()=>{try{renderKamThisMonth();}catch(e){}},50); })
+        .catch(()=>{});
+    }
+    return true;
+  }
   if(_kamBundleInFlight[safeKey])return _kamBundleInFlight[safeKey];
   const p=(async()=>{
     try{
