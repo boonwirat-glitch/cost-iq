@@ -1121,8 +1121,8 @@
   function _cdsFooterHtml(showExport, exportFn){
     return '<div class="cds-footer">'
       +(showExport?'<button class="cds-btn primary" onclick="'+esc(exportFn||'')+'">↓ Export CSV</button>':'')
+      +(showExport?'<button class="cds-btn secondary" onclick="_cdsCopyTSV&&_cdsCopyTSV()">⎙ Copy TSV</button>':'')
       +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
-      +'<button class="cds-btn secondary" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">Commission ย้อนหลัง</button>'
       +'</div>';
   }
 
@@ -1480,7 +1480,8 @@ window._cdsRenderL1 = function(src, st) {
     +heroHtml
     +exportBtn
     +'<div style="padding:0 18px 18px;display:flex;gap:7px;margin-top:6px">'
-    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionHistory,80)">Commission ย้อนหลัง</button>'
+    +'<button class="cds-btn primary" style="flex:1" onclick="_cdsExportCSV&&_cdsExportCSV()">↓ CSV</button>'
+    +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsCopyTSV&&_cdsCopyTSV()">⎙ TSV</button>'
     +'<button class="cds-btn secondary" style="flex:1" onclick="_cdsClose();setTimeout(openCommissionRulebook,80)">กฎค่าคอมฯ</button>'
     +'</div>';
 
@@ -2099,6 +2100,49 @@ window._cdsExportCSV = function() {
   } catch(err) {
     console.error('[cds] _cdsExportCSV error', err);
     if (typeof showToast === 'function') showToast('Export \u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + err.message, '!');
+  }
+};
+
+
+// ── _cdsCopyTSV: Copy NRR cohort data as TSV (same data as _cdsExportCSV) ─
+window._cdsCopyTSV = function() {
+  try {
+    var nr = window._ncsLastNrrResult || null;
+    var cohort = (nr && nr.cohortDetail) ? nr.cohortDetail : [];
+    var daysElapsed = (nr && nr.daysElapsed > 0) ? nr.daysElapsed : 1;
+    var daysInMonth = (nr && nr.daysInMonth)     ? nr.daysInMonth : 30;
+    function rr(v){ return Math.round(v / daysElapsed * daysInMonth); }
+    var rows = [['Account ID', 'Account', 'Outlet ID (res_id)', 'Outlet', 'GMV \u0e10\u0e32\u0e19', 'Run Rate', 'GMV MTD']];
+    cohort.forEach(function(g) {
+      (g.outlets || []).forEach(function(o) {
+        rows.push([
+          g.acctId  || '',
+          g.acctName || '',
+          o.outletId || '',
+          o.outletName || o.outletId || '',
+          Math.round(o.prevGmv || 0),
+          rr(o.currGmv || 0),
+          Math.round(o.currGmv || 0)
+        ]);
+      });
+    });
+    if (rows.length <= 1) {
+      if (typeof showToast === 'function') showToast('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 NRR \u2014 \u0e40\u0e1b\u0e34\u0e14\u0e2b\u0e19\u0e49\u0e32 NRR \u0e01\u0e48\u0e2d\u0e19', '!');
+      return;
+    }
+    var tsv = rows.map(function(r) { return r.join('\t'); }).join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsv).then(function() {
+        if (typeof showToast === 'function') showToast('Copy \u0e41\u0e25\u0e49\u0e27 \u2014 paste \u0e25\u0e07 Sheets \u0e44\u0e14\u0e49\u0e40\u0e25\u0e22', '\u2713');
+      }).catch(function() {
+        if (typeof showToast === 'function') showToast('Copy \u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 \u2014 \u0e25\u0e2d\u0e07 CSV \u0e41\u0e17\u0e19', '!');
+      });
+    } else {
+      if (typeof showToast === 'function') showToast('\u0e1a\u0e23\u0e32\u0e27\u0e4c\u0e40\u0e0b\u0e2d\u0e23\u0e4c\u0e44\u0e21\u0e48\u0e23\u0e2d\u0e07\u0e23\u0e31\u0e1a clipboard', '!');
+    }
+  } catch(err) {
+    console.error('[cds] _cdsCopyTSV error', err);
+    if (typeof showToast === 'function') showToast('Copy \u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + err.message, '!');
   }
 };
 
