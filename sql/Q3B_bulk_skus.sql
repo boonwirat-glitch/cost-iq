@@ -103,7 +103,7 @@ agg AS (
     ROUND(AVG(r.price_ex_vat), 2)                                      AS avg_piece_price,
     -- outlet_count_sku = outlets that actually ordered this SKU (≠ total outlet count)
     -- used for per-outlet frequency → churn interval logic in app
-    COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku,
+    COUNT(DISTINCT r.res_id)                                           AS outlet_count_sku,
     -- NEW v4: วันสั่งล่าสุดของ SKU นี้ในเดือนนี้
     -- ใช้สำหรับ approaching signal: SKU order_count=1 → คาดว่าจะสั่งแถวๆ วันนี้ของเดือนถัดไป
     FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date
