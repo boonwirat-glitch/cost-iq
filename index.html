@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753o: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753p: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753o',
+      version: 'v753p',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -28522,6 +28522,13 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
+
+  // v753p: expose reset function so _tgtToggleDetail can force re-measure
+  window._pvResetExpandedH = function(){
+    expandedH = 0;  // force _frame() to re-measure on next tick
+    lastAppliedH = -1;
+    if(!rafId) rafId = requestAnimationFrame(_frame);
+  };
   // v672b: restore collapse state — use _pvWasCollapsed (snapshotted before scroll reset)
   // _pvLastCollapseMs may be stale if browser reset scroll before reinit
   var isCollapsed = !!(window._pvWasCollapsed||(window._pvLastCollapseMs||0)>0);
@@ -28583,14 +28590,12 @@ function _pvInitCollapseObserver(){
     rafId=0;
     if(!screen.classList.contains('on'))return;
 
-    // v669: Measure expandedH once (or re-measure if dirty/not yet done)
-    // v753n: _pvExpandedHDirty flag set by _tgtToggleDetail when detail panel opens/closes
-    if(expandedH<=0 || window._pvExpandedHDirty){
-      window._pvExpandedHDirty = false;
-      collapsible.style.maxHeight = '';  // clear constraint so scrollHeight is accurate
-      var newH = collapsible.scrollHeight || 200;
-      expandedH = newH;
-      lastAppliedH = -1;  // force DOM write on next iteration
+    // v669: Measure expandedH once (or re-measure if reset by _pvResetExpandedH)
+    if(expandedH<=0){
+      var prev=collapsible.style.maxHeight;
+      collapsible.style.maxHeight='';
+      expandedH=collapsible.scrollHeight||200;
+      collapsible.style.maxHeight=prev;
     }
 
     var y=_scrollTop();
@@ -39228,14 +39233,13 @@ function _tgtToggleDetail(panelId, handleId) {
   const open=p.classList.toggle('open');
   h.classList.toggle('open',open);
 
-  // v753n: signal _frame() to re-measure expandedH on next tick
-  // expandedH is inside closure — can't set directly, use dirty flag
+  // v753p: force pv-collapsible to re-measure height to accommodate expanded panel
+  // expandedH was captured before panel existed → stale → clips panel
+  // _pvResetExpandedH() is exposed from _pvInitCollapseObserver closure
   try {
-    window._pvExpandedHDirty = true;
-    // Trigger scroll listener so _frame() runs immediately with new flag
-    var scr = document.getElementById('scr-portview');
-    if (scr) scr.dispatchEvent(new Event('scroll', {bubbles:true}));
-    else window.dispatchEvent(new Event('scroll'));
+    if (typeof window._pvResetExpandedH === 'function') {
+      window._pvResetExpandedH();
+    }
   } catch(e) {}
 }
 
