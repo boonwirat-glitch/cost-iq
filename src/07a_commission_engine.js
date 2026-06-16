@@ -1541,21 +1541,10 @@ function _tgtRenderTeamGovCard() {
 
 // SECTION:COMMISSION_CORE
 function _commDefaultTiers(role) {
-  if (isTLRole(role)) {
-    return [
-      {min_value:null, max_value:98.5, payout_value:0, payout_label:'Below threshold'},
-      {min_value:98.5, max_value:99.0, payout_value:5000, payout_label:'Tier 2'},
-      {min_value:99.0, max_value:100.0, payout_value:8000, payout_label:'Tier 3'},
-      {min_value:100.0, max_value:102.0, payout_value:12000, payout_label:'Tier 4'},
-      {min_value:102.0, max_value:103.0, payout_value:30000, payout_label:'Tier 5'},
-      {min_value:103.0, max_value:null, payout_value:50000, payout_label:'Tier 6'}
-    ];
-  }
-  return [
-    {min_value:null, max_value:99.0, payout_value:0, payout_label:'Below threshold'},
-    {min_value:99.0, max_value:102.0, payout_value:5000, payout_label:'Base NRR'},
-    {min_value:102.0, max_value:null, payout_value:7500, payout_label:'Bonus NRR'}
-  ];
+  // v754f: ลบ hardcoded tiers ทิ้ง — ไม่มี fallback อีกต่อไป
+  // ถ้า Supabase ยังไม่โหลด commission_rule_tiers → return [] → strip แสดง skeleton
+  // ป้องกัน stale tier (฿5,000/฿7,500 เก่า) flash ก่อน DB data มา
+  return [];
 }
 function _commPlanCode(role) {
   return role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
