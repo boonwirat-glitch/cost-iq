@@ -1085,62 +1085,57 @@ function handleFileUpload(type,input){
     };
     reader.readAsText(file);return;
   }
+  // v753g: Quarter NRR Health CSV handler — SINGLE FILE (all KAMs, ~2.6MB)
+  if(type==='bulk-qnrr-single'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        const byKamEmail={},byTlEmail={},allRows=[];
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          if(!p[0]||!p[2])return;
+          const row={
+            period_month:    (p[0]||'').trim(),
+            base_month:      (p[1]||'').trim(),
+            movement_type:   (p[2]||'').trim(),
+            period_kam_email:(p[3]||'').trim(),
+            period_kam_name: (p[4]||'').trim(),
+            period_tl_email: (p[5]||'').trim(),
+            base_kam_email:  (p[6]||'').trim(),
+            account_id:      (p[7]||'').trim(),
+            account_name:    (p[8]||'').trim(),
+            account_type:    (p[9]||'').trim(),
+            outlet_id:       (p[10]||'').trim(),
+            base_gmv:        parseFloat(p[11])||0,
+            curr_gmv:        parseFloat(p[12])||0,
+            base_days:       parseInt(p[13])||31,
+            curr_days:       parseInt(p[14])||30
+          };
+          allRows.push(row);
+          if(row.period_kam_email){
+            if(!byKamEmail[row.period_kam_email])byKamEmail[row.period_kam_email]=[];
+            byKamEmail[row.period_kam_email].push(row);
+          }
+          if(row.period_tl_email){
+            if(!byTlEmail[row.period_tl_email])byTlEmail[row.period_tl_email]=[];
+            byTlEmail[row.period_tl_email].push(row);
+          }
+        });
+        window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
+        console.log('%c[Sense qnrr] loaded','color:#4ddc97',{
+          total:allRows.length,
+          kams:Object.keys(byKamEmail).length,
+          tls:Object.keys(byTlEmail).length
+        });
+        if(window.RenderBus)window.RenderBus.signal('qnrr');
+      }catch(err){console.warn('[Sense qnrr] parse failed',err);}
+      _done();
+    };reader.readAsText(file);return;
+  }
   _done();
 }
 
-// v753g: Quarter NRR Health CSV handler — SINGLE FILE (all KAMs, ~2.6MB)
-// File: sense_qnrr_2026q2.csv
-// CSV columns: period_month, base_month, movement_type, period_kam_email,
-//   period_kam_name, period_tl_email, base_kam_email, account_id, account_name,
-//   account_type, outlet_id, base_gmv, curr_gmv, base_days, curr_days
-// Index: byKamEmail[email]=[rows], byTlEmail[email]=[rows]
-if(type==='bulk-qnrr-single'){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
-      const byKamEmail={},byTlEmail={},allRows=[];
-      lines.forEach(l=>{
-        const p=parseCSVRow(l);
-        if(!p[0]||!p[2])return;
-        const row={
-          period_month:    (p[0]||'').trim(),
-          base_month:      (p[1]||'').trim(),
-          movement_type:   (p[2]||'').trim(),
-          period_kam_email:(p[3]||'').trim(),
-          period_kam_name: (p[4]||'').trim(),
-          period_tl_email: (p[5]||'').trim(),
-          base_kam_email:  (p[6]||'').trim(),
-          account_id:      (p[7]||'').trim(),
-          account_name:    (p[8]||'').trim(),
-          account_type:    (p[9]||'').trim(),
-          outlet_id:       (p[10]||'').trim(),
-          base_gmv:        parseFloat(p[11])||0,
-          curr_gmv:        parseFloat(p[12])||0,
-          base_days:       parseInt(p[13])||31,
-          curr_days:       parseInt(p[14])||30
-        };
-        allRows.push(row);
-        if(row.period_kam_email){
-          if(!byKamEmail[row.period_kam_email])byKamEmail[row.period_kam_email]=[];
-          byKamEmail[row.period_kam_email].push(row);
-        }
-        if(row.period_tl_email){
-          if(!byTlEmail[row.period_tl_email])byTlEmail[row.period_tl_email]=[];
-          byTlEmail[row.period_tl_email].push(row);
-        }
-      });
-      window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
-      console.log('%c[Sense qnrr] loaded','color:#4ddc97',{
-        total:allRows.length,
-        kams:Object.keys(byKamEmail).length,
-        tls:Object.keys(byTlEmail).length
-      });
-      if(window.RenderBus)window.RenderBus.signal('qnrr');
-    }catch(err){console.warn('[Sense qnrr] parse failed',err);}
-    _done();
-  };reader.readAsText(file);return;
-}
 
 // SECTION:DATA_LOADER
 function applyMeta(){
