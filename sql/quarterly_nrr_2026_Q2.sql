@@ -56,8 +56,11 @@ params AS (
     31                  AS may_days,
 
     DATE('2026-06-01') AS jun_start,
-    DATE('2026-06-30') AS jun_end,  -- adjust if running mid-month
-    30                  AS jun_days,
+    DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY) AS jun_end,  -- day-1 lag (same as portview)
+    DATE_DIFF(
+      DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY),
+      DATE('2026-06-01'), DAY
+    ) + 1               AS jun_days,  -- วันที่มีข้อมูลจริง (16 มิ.ย. → 15 วัน)
 
     -- ever_seen lookback (comeback vs expansion)
     DATE('2024-09-01') AS history_start
