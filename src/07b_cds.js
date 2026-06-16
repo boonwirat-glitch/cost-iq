@@ -2054,6 +2054,53 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   }
 };
 
+// ── _cdsExportCSV: Export NRR cohort data from commission panel ────────────
+// Called by Export CSV button in CDS commission sheet (NRR tab + L1 summary)
+window._cdsExportCSV = function() {
+  try {
+    var nr = window._ncsLastNrrResult || null;
+    var st = window._cdsKamSt || {};
+    var kamLabel = (st.kamName || st.email || '').split('@')[0].replace(/\s/g,'_');
+    var mo = (nr && nr.currentMonthLabel ? nr.currentMonthLabel : '').replace(/\s/g,'_');
+    var cohort = (nr && nr.cohortDetail) ? nr.cohortDetail : [];
+    // Build rows: Account ID, Account, Outlet, GMV ฐาน, Run Rate, GMV MTD
+    var daysElapsed = (nr && nr.daysElapsed > 0) ? nr.daysElapsed : 1;
+    var daysInMonth = (nr && nr.daysInMonth)     ? nr.daysInMonth : 30;
+    function rr(v){ return Math.round(v / daysElapsed * daysInMonth); }
+    var rows = [['Account ID', 'Account', 'Outlet', 'GMV \u0e10\u0e32\u0e19', 'Run Rate', 'GMV MTD']];
+    cohort.forEach(function(g) {
+      (g.outlets || []).forEach(function(o) {
+        rows.push([
+          g.acctId  || '',
+          g.acctName || '',
+          o.outletName || o.outletId || '',
+          Math.round(o.prevGmv || 0),
+          rr(o.currGmv || 0),
+          Math.round(o.currGmv || 0)
+        ]);
+      });
+    });
+    if (rows.length <= 1) {
+      if (typeof showToast === 'function') showToast('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 NRR \u2014 \u0e40\u0e1b\u0e34\u0e14\u0e2b\u0e19\u0e49\u0e32 NRR \u0e01\u0e48\u0e2d\u0e19', '!');
+      return;
+    }
+    var csv = rows.map(function(r) {
+      return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\n');
+    var blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url;
+    a.download = 'nrr_commission_' + kamLabel + '_' + mo + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    if (typeof showToast === 'function') showToast('\u0e14\u0e32\u0e27\u0e19\u0e4c\u0e42\u0e2b\u0e25\u0e14 CSV \u0e41\u0e25\u0e49\u0e27', '\u2193');
+  } catch(err) {
+    console.error('[cds] _cdsExportCSV error', err);
+    if (typeof showToast === 'function') showToast('Export \u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + err.message, '!');
+  }
+};
+
 
 //////////////////////////////////////////////////////////////////////////////
 
