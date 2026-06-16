@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753l: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753m: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753l',
+      version: 'v753m',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7468,7 +7468,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
-.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px)}
+.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px);overflow:visible;}
 
 /* ── Collapsible summary block ── */
 .pv-collapsible{overflow:hidden}
@@ -8113,6 +8113,10 @@ body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; po
 #portview-list:has(#tv-shimmer-wrap) .portview-acct-badge-row {
   visibility: hidden;
 }
+
+/* v753l: allow detail panel to expand below hero card boundary */
+#tgt-portview-bar { overflow: visible !important; }
+#tgt-portview-bar:has(.tgt-detail-panel.open) { padding-bottom: 12px; }
 </style>
 <style id="tv-module-css">
 /* ============================================================
@@ -39170,7 +39174,15 @@ async function renderPortviewTargetBar() {
     : '';
 
   // v753h: tap bar → open Quarter NRR Health sheet
-  bar.onclick = function(){ try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(e){} };
+  // Guard: don't fire if click originated from i-button or detail panel
+  bar.onclick = function(e){
+    if(e.target && (
+      e.target.classList.contains('tgt-info-btn') ||
+      e.target.closest('.tgt-detail-panel') ||
+      e.target.closest('.tgt-info-btn')
+    )) return;
+    try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(err){}
+  };
   bar.style.cursor = 'pointer';
   bar.title = 'ดูสุขภาพพอร์ต Q2';
   bar.setAttribute('-webkit-tap-highlight-color','transparent');
@@ -39200,7 +39212,7 @@ async function renderPortviewTargetBar() {
       ${nrrLeg}${cbLeg}${exLeg}
       ${overflowBadge}
       ${setupBtn}
-      <button class="tgt-info-btn${false?' open':''}" id="${detHandleId}" onclick="_tgtToggleDetail('${detPanelId}','${detHandleId}')">i</button>
+      <button class="tgt-info-btn${false?' open':''}" id="${detHandleId}" onclick="event.stopPropagation();_tgtToggleDetail('${detPanelId}','${detHandleId}')">i</button>
     </div>
     ${mvSection}
     <div class="tgt-detail-panel" id="${detPanelId}">
