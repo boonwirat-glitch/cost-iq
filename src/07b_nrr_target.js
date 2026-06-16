@@ -1007,14 +1007,6 @@ async function renderPortviewTargetBar() {
   if (_existingPctEl) _existingPctEl.dataset.renderKey = _renderKey;
 
   void bar.offsetHeight;
-  const colorKeySection = `<div class="tgt-det-section">
-    <div class="tgt-det-stitle">สีของตัวเลข เป้าหมาย</div>
-    <div class="tgt-color-key">
-      <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:var(--tk-ok-bright)"></div><span class="tgt-ck-lbl">สีเขียว = Target จริงที่ TL ตั้ง</span></div>
-      <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:var(--amb,#f0b000)"></div><span class="tgt-ck-lbl">อำพัน = ประมาณการจากโควต้าทีม</span></div>
-      <div class="tgt-ck-item"><div class="tgt-ck-swatch" style="background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.2)"></div><span class="tgt-ck-lbl">ขาวหมอง = baseline avg 3 เดือน (ยังไม่มี Target)</span></div>
-    </div>
-  </div>`;
 
   const overflowBadge = pct > 100
     ? `<span class="tgt-overflow-badge">+${pct-100}%</span>`
@@ -1063,7 +1055,7 @@ async function renderPortviewTargetBar() {
     </div>
     ${mvSection}
     <div class="tgt-detail-panel" id="${detPanelId}">
-      ${gmvSection}${nrrSection}${baselineSection}${colorKeySection}
+      ${gmvSection}${nrrSection}${baselineSection}
     </div>`;
 
 }
@@ -1078,11 +1070,17 @@ function _tgtToggleDetail(panelId, handleId) {
   // v753p: force pv-collapsible to re-measure height to accommodate expanded panel
   // expandedH was captured before panel existed → stale → clips panel
   // _pvResetExpandedH() is exposed from _pvInitCollapseObserver closure
-  try {
-    if (typeof window._pvResetExpandedH === 'function') {
-      window._pvResetExpandedH();
-    }
-  } catch(e) {}
+  // v754c: delay reset so panel layout settles before _frame() re-measures
+  // calling immediately → scrollHeight measured before CSS transition → clips
+  var _delayReset = function() {
+    try {
+      if (typeof window._pvResetExpandedH === 'function') {
+        window._pvResetExpandedH();
+      }
+    } catch(e) {}
+  };
+  // two-frame delay: first rAF = class applied + reflow, second = paint settled
+  requestAnimationFrame(function(){ requestAnimationFrame(_delayReset); });
 }
 
 // ── Teamview: target rows are now rendered in the main KAM card metrics ───────
