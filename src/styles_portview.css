@@ -757,6 +757,4 @@ body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; po
   visibility: hidden;
 }
 
-/* v753l: allow detail panel to expand below hero card boundary */
-#tgt-portview-bar { overflow: visible !important; }
-#tgt-portview-bar:has(.tgt-detail-panel.open) { padding-bottom: 12px; }
+/* v753n: detail panel expansion handled via _pvExpandedHDirty flag in JS */

@@ -1075,18 +1075,14 @@ function _tgtToggleDetail(panelId, handleId) {
   const open=p.classList.toggle('open');
   h.classList.toggle('open',open);
 
-  // v753m: after panel open/close, re-measure pv-collapsible height
-  // expandedH was captured before panel existed → stale → clips panel
-  // Force re-measure by resetting expandedH signal via custom event
+  // v753n: signal _frame() to re-measure expandedH on next tick
+  // expandedH is inside closure — can't set directly, use dirty flag
   try {
-    const collapsible = document.querySelector('.pv-collapsible');
-    if (collapsible) {
-      // Remove maxHeight constraint temporarily so scrollHeight is accurate
-      const prev = collapsible.style.maxHeight;
-      collapsible.style.maxHeight = '';
-      const newH = collapsible.scrollHeight || 0;
-      collapsible.style.maxHeight = newH > 0 ? newH + 'px' : prev;
-    }
+    window._pvExpandedHDirty = true;
+    // Trigger scroll listener so _frame() runs immediately with new flag
+    var scr = document.getElementById('scr-portview');
+    if (scr) scr.dispatchEvent(new Event('scroll', {bubbles:true}));
+    else window.dispatchEvent(new Event('scroll'));
   } catch(e) {}
 }
 

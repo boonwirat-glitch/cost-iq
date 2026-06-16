@@ -1346,12 +1346,14 @@ function _pvInitCollapseObserver(){
     rafId=0;
     if(!screen.classList.contains('on'))return;
 
-    // v669: Measure expandedH once (or re-measure if not yet done)
-    if(expandedH<=0){
-      var prev=collapsible.style.maxHeight;
-      collapsible.style.maxHeight='';
-      expandedH=collapsible.scrollHeight||200;
-      collapsible.style.maxHeight=prev;
+    // v669: Measure expandedH once (or re-measure if dirty/not yet done)
+    // v753n: _pvExpandedHDirty flag set by _tgtToggleDetail when detail panel opens/closes
+    if(expandedH<=0 || window._pvExpandedHDirty){
+      window._pvExpandedHDirty = false;
+      collapsible.style.maxHeight = '';  // clear constraint so scrollHeight is accurate
+      var newH = collapsible.scrollHeight || 200;
+      expandedH = newH;
+      lastAppliedH = -1;  // force DOM write on next iteration
     }
 
     var y=_scrollTop();
