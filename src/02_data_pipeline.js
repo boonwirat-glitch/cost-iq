@@ -1635,11 +1635,16 @@ async function _fetchKamFile({url,type,tab}){
   try{
     const cached=await _csvCacheGet(tab);
     if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL){
-      const ageMin=Math.round((Date.now()-cached.ts)/60000);
-      _senseLog('%c[v206d bundle] IndexedDB cache hit:','color:#adf',tab,'age:',ageMin,'min');
-      const ok=await ingestCSVText(type,cached.text,{timeoutMs:90000});
-      if(ok)return true;
-      console.warn('[v202 bundle] cache ingest failed, retrying from R2:',tab);
+      // v755h Fix A: skip poisoned cache entries written during 404 era
+      if(cached.text==='__INVALID__'){
+        console.warn('[v755h] stale poison cache for',tab,'— skip, force R2 fetch');
+      } else {
+        const ageMin=Math.round((Date.now()-cached.ts)/60000);
+        _senseLog('%c[v206d bundle] IndexedDB cache hit:','color:#adf',tab,'age:',ageMin,'min');
+        const ok=await ingestCSVText(type,cached.text,{timeoutMs:90000});
+        if(ok)return true;
+        console.warn('[v202 bundle] cache ingest failed, retrying from R2:',tab);
+      }
     }
   }catch(e){}
   try{
@@ -1669,7 +1674,7 @@ async function _fetchKamBundle(kamEmail){
     // v755f: ถ้า outlet ยังไม่โหลด → fetch แยก (ไม่ขึ้นกับ bundle cache)
     if(!_kamOutletLoaded.has(safeKey)){
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
-      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`})
+      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
         .then(ok=>{
           if(ok){
             _kamOutletLoaded.add(safeKey);
@@ -1692,7 +1697,7 @@ async function _fetchKamBundle(kamEmail){
       const[okSkus,okAlts,okOutlet]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
-        _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`}),
+        _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`}),
       ]);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
