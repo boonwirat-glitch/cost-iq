@@ -142,7 +142,8 @@ may_ownership AS (
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
-    DATE(o.new_user_exp_date)       AS new_user_exp_date
+    DATE(o.new_user_exp_date)       AS new_user_exp_date,
+    DATE(o.first_dollar_date)       AS first_dollar_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
