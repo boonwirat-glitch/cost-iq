@@ -216,6 +216,25 @@ ever_seen AS (
     AND o.account_type IN ('SA','MC','Chain','Unknown')
 ),
 
+-- ── 6a. current_kam_snapshot — user_master ณ ขณะ run SQL ─────────────────────
+-- ใช้แยก core_nrr_churn (ยังอยู่กับ KAM เดิม) vs transfer_out (โอนออกแล้ว)
+-- สำหรับ outlet ที่ "เงียบ" ไม่มี order เดือนนั้นเลย
+current_kam_snapshot AS (
+  SELECT
+    CAST(um.res_id AS STRING) AS outlet_id,
+    k.kam_email               AS current_kam_email
+  FROM `freshket-rn.dim.user_master` um
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  WHERE um.commercial_owner = 'KAM'
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
+    AND um.res_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY CAST(um.res_id AS STRING)
+    ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
+),
+
 -- ── 6. Mar KAM cohort — core set ที่ใช้เป็น Q2 base ──────────────────────────
 -- outlet ที่ Mar ownership = KAM ใน roster + มี GMV Mar
 -- นี่คือ denominator ของ NRR ตลอด Q
@@ -347,6 +366,37 @@ apr_rows AS (
      AND TRIM(ao2.staff_owner) = TRIM(k2.kam_name)
      AND k2.kam_email = mc.base_kam_email
   )
+
+  UNION ALL
+
+  -- ── LEG 1C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order Apr เลย ──────
+  -- ไม่ปรากฏใน apr_ownership → LEG 1A จับไม่ได้
+  -- แยก: ยังอยู่กับ KAM เดิม (user_master) = core_nrr_churn
+  --       เปลี่ยน KAM แล้ว (user_master) = transfer_out
+  SELECT
+    '2026-04'               AS period_month,
+    '2026-03'               AS base_month,
+    mc.outlet_id,
+    mc.account_id,
+    mc.account_name,
+    mc.account_type,
+    mc.base_kam_email       AS period_kam_email,
+    mc.base_kam_name        AS period_kam_name,
+    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email,
+    mc.base_kam_name,
+    mc.base_gmv,
+    0                       AS curr_gmv,
+    CASE
+      WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                     AS movement_type
+
+  FROM mar_cohort mc
+  LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
+
+  -- ไม่มี order Apr เลย (ไม่ปรากฏใน apr_ownership ไม่ว่า KAM ใด)
+  WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM apr_ownership)
 ),
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -431,6 +481,33 @@ may_rows AS (
      AND TRIM(mo2.staff_owner) = TRIM(k2.kam_name)
      AND k2.kam_email = mc.base_kam_email
   )
+
+  UNION ALL
+
+  -- ── LEG 2C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order May เลย ──────
+  SELECT
+    '2026-05'               AS period_month,
+    '2026-03'               AS base_month,
+    mc.outlet_id,
+    mc.account_id,
+    mc.account_name,
+    mc.account_type,
+    mc.base_kam_email       AS period_kam_email,
+    mc.base_kam_name        AS period_kam_name,
+    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email,
+    mc.base_kam_name,
+    mc.base_gmv,
+    0                       AS curr_gmv,
+    CASE
+      WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                     AS movement_type
+
+  FROM mar_cohort mc
+  LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
+
+  WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM may_ownership)
 ),
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -516,6 +593,33 @@ jun_rows AS (
      AND TRIM(jo2.staff_owner) = TRIM(k2.kam_name)
      AND k2.kam_email = mc.base_kam_email
   )
+
+  UNION ALL
+
+  -- ── LEG 3C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order Jun เลย ──────
+  SELECT
+    '2026-06'               AS period_month,
+    '2026-03'               AS base_month,
+    mc.outlet_id,
+    mc.account_id,
+    mc.account_name,
+    mc.account_type,
+    mc.base_kam_email       AS period_kam_email,
+    mc.base_kam_name        AS period_kam_name,
+    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email,
+    mc.base_kam_name,
+    mc.base_gmv,
+    0                       AS curr_gmv,
+    CASE
+      WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                     AS movement_type
+
+  FROM mar_cohort mc
+  LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
+
+  WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jun_ownership)
 ),
 
 -- ── 8. Union all months ───────────────────────────────────────────────────────
