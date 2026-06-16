@@ -596,13 +596,13 @@ function _tgtShowCohortSheet(tab) {
     const isNrr = t.key === 'nrr';
     const rows = [];
     const hdr = isNrr
-      ? ['Account ID', 'Account', 'Outlet', 'GMV \u0e10\u0e32\u0e19 (' + nr.prevMonth + ')', 'Run Rate', 'GMV MTD']
-      : ['Account ID', 'Account', 'Outlet', 'GMV MTD'];
+      ? ['Account ID', 'Account', 'Outlet ID (res_id)', 'Outlet', 'GMV \u0e10\u0e32\u0e19 (' + nr.prevMonth + ')', 'Run Rate', 'GMV MTD']
+      : ['Account ID', 'Account', 'Outlet ID (res_id)', 'Outlet', 'GMV MTD'];
     rows.push(hdr);
     (t.data || []).forEach(function(g) {
       g.outlets.forEach(function(o) {
-        if (isNrr) rows.push([g.acctId || '', g.acctName, o.outletName || o.outletId, Math.round(o.prevGmv), Math.round(_rr(o.currGmv)), Math.round(o.currGmv)]);
-        else       rows.push([g.acctId || '', g.acctName, o.outletName || o.outletId, Math.round(o.currGmv)]);
+        if (isNrr) rows.push([g.acctId || '', g.acctName, o.outletId || '', o.outletName || o.outletId, Math.round(o.prevGmv), Math.round(_rr(o.currGmv)), Math.round(o.currGmv)]);
+        else       rows.push([g.acctId || '', g.acctName, o.outletId || '', o.outletName || o.outletId, Math.round(o.currGmv)]);
       });
     });
     return rows;
