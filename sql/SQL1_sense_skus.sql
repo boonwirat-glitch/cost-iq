@@ -58,7 +58,8 @@ raw AS (
     i.qty,
     i.price_ex_vat,
     o.order_id,
-    o.user_id
+    o.user_id,
+    o.delivery_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
@@ -83,7 +84,9 @@ agg AS (
     ROUND(SAFE_DIVIDE(SUM(r.gmv_ex_vat), NULLIF(SUM(r.qty),0)), 2)    AS unit_price,
     COUNT(DISTINCT r.order_id)                                         AS order_count,
     ROUND(AVG(r.price_ex_vat), 2)                                      AS avg_piece_price,
-    COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku
+    COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku,
+    -- v207h: วันสั่งล่าสุดของ SKU นี้ในเดือนนั้น — ใช้สำหรับ approaching signal (order_count=1)
+    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date
   FROM raw r GROUP BY r.account_id, r.kam_email, r.month_date, r.item_id
 )
 
@@ -114,7 +117,8 @@ SELECT
   a.outlet_count_sku,
   COALESCE(m.default_unit_group, '')  AS default_unit_group,
   COALESCE(m.ea_unit_name, '')        AS ea_unit_name,
-  COALESCE(m.universal_ea_value, 0)   AS universal_ea_value
+  COALESCE(m.universal_ea_value, 0)   AS universal_ea_value,
+  a.last_order_date                    -- v207h: YYYY-MM-DD, ใช้คำนวณ approaching signal
 FROM agg a
 JOIN monthly_total t USING (account_id, month_date)
 LEFT JOIN (
