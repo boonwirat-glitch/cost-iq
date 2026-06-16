@@ -1671,15 +1671,19 @@ async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
   if(_kamBundleLoaded.has(safeKey)){
-    // v755f: ถ้า outlet ยังไม่โหลด → fetch แยก (ไม่ขึ้นกับ bundle cache)
-    if(!_kamOutletLoaded.has(safeKey)){
+    // v755j: ตรวจ bulkSkuOutletData จริง ไม่ใช่แค่ _kamOutletLoaded flag
+    // เพราะ flag อาจ true จาก IDB poison cache (okOutlet=true แต่ data ว่าง)
+    const _outletHasData=Object.keys(bulkSkuOutletData).length>0;
+    if(!_outletHasData){
+      // reset flag ให้ตรงกับ reality แล้ว re-fetch
+      _kamOutletLoaded.delete(safeKey);
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
-      console.log('[v755i] outlet retry fetch:',_outletUrl.split('/').pop());
+      console.log('[v755j] outlet data missing — re-fetch:',_outletUrl.split('/').pop());
       _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
         .then(ok=>{
           if(ok){
             _kamOutletLoaded.add(safeKey);
-            console.log('[v755f] outlet loaded for',kamEmail);
+            console.log('[v755j] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
             setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
           }
         }).catch(()=>{});
