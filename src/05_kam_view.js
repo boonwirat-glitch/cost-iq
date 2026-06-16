@@ -496,6 +496,44 @@ function _renderKamZone3Ctx(sig){
 
 // ── Tab 1 "เดือนนี้": ก่อนเข้าร้าน brief card (new schema: situation/driver/pattern/probe) ──
 // ── Tab 1 "เดือนนี้": rule-based data shown immediately; AI card injected after Insight ──
+// ── v755d: floating outlet tooltip ──────────────────────────
+function _showSkuOutletTooltip(event,dataId){
+  event.stopPropagation();
+  const existing=document.getElementById('_sku-outlet-tip');
+  if(existing){
+    if(existing.dataset.src===dataId){existing.remove();return;}
+    existing.remove();
+  }
+  const src=document.getElementById(dataId);
+  if(!src)return;
+  const tip=document.createElement('div');
+  tip.id='_sku-outlet-tip';
+  tip.dataset.src=dataId;
+  tip.innerHTML=`<div style="font-size:9px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.6px;margin-bottom:6px;text-transform:uppercase">สาขา</div>${src.innerHTML}`;
+  Object.assign(tip.style,{
+    position:'fixed',zIndex:'9999',
+    background:'rgba(18,22,32,.97)',
+    border:'1px solid rgba(255,255,255,.12)',
+    borderRadius:'10px',padding:'10px 12px',
+    minWidth:'200px',maxWidth:'280px',
+    boxShadow:'0 8px 24px rgba(0,0,0,.5)',
+    fontSize:'12px',color:'rgba(255,255,255,.85)',
+    fontFamily:"'Noto Sans Thai','IBM Plex Mono',sans-serif",
+  });
+  document.body.appendChild(tip);
+  const rect=event.currentTarget.getBoundingClientRect();
+  const tw=tip.offsetWidth||220;
+  const th=tip.offsetHeight||120;
+  let left=rect.left;
+  let top=rect.bottom+6;
+  if(left+tw>window.innerWidth-8)left=window.innerWidth-tw-8;
+  if(top+th>window.innerHeight-8)top=rect.top-th-6;
+  tip.style.left=left+'px';
+  tip.style.top=top+'px';
+  const close=e=>{if(!tip.contains(e.target)){tip.remove();document.removeEventListener('click',close,true);}};
+  setTimeout(()=>document.addEventListener('click',close,true),10);
+}
+
 function renderKamThisMonth(){
   const renderer = window.FreshketSenseKamTeamRenderer;
   if(renderer && typeof renderer.renderKamThisMonthFromLegacy === 'function'){
@@ -699,26 +737,26 @@ function __legacyRenderKamThisMonthFallback(){
       const nameOp=dimmed?'opacity:.4':'';
       const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
-      // outlet info — แสดงเมื่อ type เป็น gone/near/approaching, tap ชื่อ SKU เพื่อ toggle
+      // outlet info — floating tooltip เมื่อ tap ชื่อ SKU
       const _outletData=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(s.id)]:null;
       const _hasOutlet=_outletData&&_outletData.length>=1&&(s.type==='gone'||s.type==='near'||s.type==='approaching');
       const _outletId='ot-'+String(s.id).replace(/[^a-z0-9]/gi,'_');
+      // pre-render tooltip content ใน hidden div — floating tooltip จะ clone content นี้
       const outletTooltipHtml=_hasOutlet?
-        `<div id="${_outletId}" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;border:1px solid rgba(255,255,255,.08)">
-          <div style="font-size:9px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase">สาขา</div>
+        `<div id="${_outletId}" style="display:none" aria-hidden="true">
           ${_outletData.map(o=>{
             const ordered=o.this_month_orders>0;
             const hadLast=o.last_month_orders>0;
             const dot=ordered?'rgba(80,220,160,.9)':hadLast?'rgba(255,130,130,.8)':'rgba(255,255,255,.2)';
             const label=ordered?'สั่งแล้ว':hadLast?'ยังไม่สั่ง':'—';
-            return`<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:11px;color:rgba(255,255,255,.7);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span><span style="font-size:10px;color:${dot};flex-shrink:0">${label}</span></div>`;
+            return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0;margin-top:1px"></span><span style="font-size:12px;color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span><span style="font-size:11px;color:${dot};flex-shrink:0;font-weight:600">${label}</span></div>`;
           }).join('')}
         </div>`:''
       const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
-          <div class="kam-sku-name" ${_hasOutlet?`onclick="var el=document.getElementById('${_outletId}');if(el)el.style.display=el.style.display==='none'?'block':'none'" style="cursor:pointer"`:''}>${s.name}${_hasOutlet?'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>':''}</div>
+          <div class="kam-sku-name" ${_hasOutlet?`onclick="_showSkuOutletTooltip(event,'${_outletId}')" style="cursor:pointer"`:''}>${s.name}${_hasOutlet?'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>':''}</div>
           ${deptGmv}${subHtml}${outletTooltipHtml}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:8px">
