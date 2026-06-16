@@ -49,53 +49,46 @@ kam_outlets AS (
 raw AS (
   SELECT
     ko.account_id,
-    CAST(i.item_id AS STRING)        AS item_id,
-    CAST(o.user_id AS STRING)        AS outlet_id,
-    ANY_VALUE(o.res_name)            AS outlet_name,
+    CAST(i.item_id AS STRING)          AS item_id,
+    CAST(o.user_id AS STRING)          AS outlet_id,
+    ANY_VALUE(o.res_name)              AS outlet_name,
     DATE_TRUNC(o.delivery_date, MONTH) AS month_date,
-    COUNT(DISTINCT o.order_id)       AS order_count,
-    ROUND(SUM(i.gmv_ex_vat), 2)      AS gmv
+    COUNT(DISTINCT o.order_id)         AS order_count,
+    ROUND(SUM(i.gmv_ex_vat), 2)        AS gmv
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
-  WHERE TRUE
-    AND o.delivery_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH), INTERVAL 1 MONTH)
+  WHERE o.delivery_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH), INTERVAL 1 MONTH)
     AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)
     AND i.item_id IS NOT NULL
   GROUP BY 1, 2, 3, 5
 ),
 
--- pivot: แยก last_month vs this_month เป็น wide format
--- เหตุผลที่ pivot แทนที่จะส่ง 2 rows: app อ่านได้ง่ายกว่า ไม่ต้อง loop หา month ที่ต้องการ
--- และ CSV เล็กกว่า (1 row ต่อ outlet ต่อ SKU แทน 2 rows)
-last_month_start AS (
-  SELECT DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 MONTH), MONTH) AS dt
-),
-this_month_start AS (
-  SELECT DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH) AS dt
+-- outlet ที่สั่ง SKU นั้นในเดือนที่แล้ว — ใช้ INNER JOIN แทน correlated subquery
+last_month_outlets AS (
+  SELECT DISTINCT account_id, item_id, outlet_id
+  FROM raw
+  WHERE month_date = DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 MONTH), MONTH)
 )
 
 SELECT
   r.account_id,
   r.item_id,
   r.outlet_id,
-  ANY_VALUE(r.outlet_name)                                                     AS outlet_name,
-  COALESCE(SUM(CASE WHEN r.month_date = lm.dt THEN r.order_count END), 0)    AS last_month_orders,
-  COALESCE(ROUND(SUM(CASE WHEN r.month_date = lm.dt THEN r.gmv END), 2), 0)  AS last_month_gmv,
-  COALESCE(SUM(CASE WHEN r.month_date = tm.dt THEN r.order_count END), 0)    AS this_month_orders,
-  COALESCE(ROUND(SUM(CASE WHEN r.month_date = tm.dt THEN r.gmv END), 2), 0)  AS this_month_gmv
+  ANY_VALUE(r.outlet_name)                                                              AS outlet_name,
+  COALESCE(SUM(CASE WHEN r.month_date < DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH)
+                    THEN r.order_count END), 0)                                         AS last_month_orders,
+  COALESCE(ROUND(SUM(CASE WHEN r.month_date < DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH)
+                          THEN r.gmv END), 2), 0)                                       AS last_month_gmv,
+  COALESCE(SUM(CASE WHEN r.month_date = DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH)
+                    THEN r.order_count END), 0)                                         AS this_month_orders,
+  COALESCE(ROUND(SUM(CASE WHEN r.month_date = DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH)
+                          THEN r.gmv END), 2), 0)                                       AS this_month_gmv
 FROM raw r
-CROSS JOIN last_month_start lm
-CROSS JOIN this_month_start tm
--- กรองเฉพาะ outlet ที่เคยสั่ง SKU นั้นในเดือนที่แล้ว
--- (outlet ที่ไม่เคยสั่งเลยไม่ต้องแสดงใน tooltip)
-WHERE EXISTS (
-  SELECT 1 FROM raw r2
-  CROSS JOIN last_month_start lm2
-  WHERE r2.account_id = r.account_id
-    AND r2.item_id    = r.item_id
-    AND r2.outlet_id  = r.outlet_id
-    AND r2.month_date = lm2.dt
-)
+-- INNER JOIN กรองเฉพาะ outlet ที่เคยสั่ง SKU นั้นในเดือนที่แล้ว
+INNER JOIN last_month_outlets lmo
+  ON  r.account_id = lmo.account_id
+  AND r.item_id    = lmo.item_id
+  AND r.outlet_id  = lmo.outlet_id
 GROUP BY 1, 2, 3
 ORDER BY account_id, item_id, last_month_gmv DESC;
