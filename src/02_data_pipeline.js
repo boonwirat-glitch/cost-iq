@@ -1655,13 +1655,22 @@ async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
   if(_kamBundleLoaded.has(safeKey)){
-    // v755d: ถ้า bundle loaded แล้วแต่ outlet ยังว่าง (เช่น ไฟล์ upload หลัง bundle load แรก)
-    if(typeof bulkSkuOutletData!=='undefined' && Object.keys(bulkSkuOutletData).length===0){
-      const _sk=_kamSafeKey(kamEmail);
+    // v755e: เช็คเฉพาะ KAM นี้ว่ามี outlet data ไหม (ไม่ใช่เช็ค global)
+    const _hasOutletForThisKam=typeof bulkSkuOutletData!=='undefined'&&
+      Object.values(bulkSkuOutletData).length>0&&
+      // ตรวจว่ามี account ของ KAM นี้ใน bulkSkuOutletData ไหม โดยดูจาก portviewBulkData
+      (typeof portviewBulkData!=='undefined'&&portviewBulkData&&
+        Object.keys(portviewBulkData).some(aid=>bulkSkuOutletData[aid]));
+    if(!_hasOutletForThisKam){
+      const _sk=safeKey;
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${_sk}.csv`;
       _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${_sk}`})
-        .then(ok=>{ if(ok&&typeof renderKamThisMonth==='function')setTimeout(()=>{try{renderKamThisMonth();}catch(e){}},50); })
-        .catch(()=>{});
+        .then(ok=>{
+          if(ok){
+            console.log('[v755e] outlet loaded for',kamEmail,'— re-rendering');
+            setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
+          }
+        }).catch(()=>{});
     }
     return true;
   }
