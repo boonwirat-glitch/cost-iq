@@ -66,7 +66,6 @@ raw AS (
     i.qty,
     i.price_ex_vat,                      -- price per ordering unit (ขวด, ถัง, kg, etc.)
     o.order_id,
-    ko.account_id,
     CAST(o.user_id AS STRING)             AS res_id,  -- outlet identifier for outlet_count_sku
     o.delivery_date                                    -- NEW v4: เก็บไว้ MAX ใน agg
   FROM `freshket-rn.dwh.order` o
