@@ -818,6 +818,31 @@ function handleFileUpload(type,input){
       _done();
     };reader.readAsText(file);return;
   }
+  if(type==='bulk-sku-outlet'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+      let rowCount=0;
+      lines.forEach(l=>{
+        const p=parseCSVRow(l);
+        const aid=(p[0]||'').trim();
+        const itemId=String((p[1]||'').trim());
+        const outletId=(p[2]||'').trim();
+        const outletName=(p[3]||'').trim();
+        const lastMoOrders=parseInt(p[4])||0;
+        const lastMoGmv=parseFloat(p[5])||0;
+        const thisMoOrders=parseInt(p[6])||0;
+        const thisMoGmv=parseFloat(p[7])||0;
+        if(!aid||!itemId||!outletId)return;
+        if(!bulkSkuOutletData[aid])bulkSkuOutletData[aid]={};
+        if(!bulkSkuOutletData[aid][itemId])bulkSkuOutletData[aid][itemId]=[];
+        bulkSkuOutletData[aid][itemId].push({outlet_id:outletId,outlet_name:outletName,last_month_orders:lastMoOrders,last_month_gmv:lastMoGmv,this_month_orders:thisMoOrders,this_month_gmv:thisMoGmv});
+        rowCount++;
+      });
+      console.log('[Q12B] sku_outlet loaded:',rowCount,'rows',Object.keys(bulkSkuOutletData).length,'accounts');
+      _done();
+    };reader.readAsText(file);return;
+  }
   if(type==='bulk-outlets'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -1182,6 +1207,7 @@ function ingestCSVText(type,text,{timeoutMs=120000}={}){
 
 // Background fetch flags — true once big files arrive
 let bulkSkusReady = false;
+let bulkSkuOutletData = {}; // Q12B: {accountId: {itemId: [{outlet_id,outlet_name,last_month_orders,last_month_gmv,this_month_orders,this_month_gmv}]}}
 let bulkAltsReady = false;
 let sheetsLoadStarted = false; // guard: prevent double-fetch if login completes after prefetch
 let _cloudInitialPromise = null;
@@ -1626,11 +1652,14 @@ async function _fetchKamBundle(kamEmail){
     try{
       const skusUrl=`${R2_BASE}/sense_skus_${safeKey}.csv`;
       const altsUrl=`${R2_BASE}/sense_alts_${safeKey}.csv`;
+      const outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
-      const[okSkus,okAlts]=await Promise.all([
+      _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', outletUrl);
+      const[okSkus,okAlts,okOutlet]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
+        _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`}),
       ]);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
