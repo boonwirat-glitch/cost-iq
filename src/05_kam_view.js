@@ -699,10 +699,12 @@ function __legacyRenderKamThisMonthFallback(){
       const nameOp=dimmed?'opacity:.4':'';
       const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
-      // outlet tooltip — แสดงเมื่อ type เป็น gone/near/approaching (SKU ที่น่าสังเกต)
+      // outlet info — แสดงเมื่อ type เป็น gone/near/approaching, tap ชื่อ SKU เพื่อ toggle
       const _outletData=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(s.id)]:null;
-      const outletTooltipHtml=(_outletData&&_outletData.length>1&&(s.type==='gone'||s.type==='near'||s.type==='approaching'))?
-        `<div style="margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;border:1px solid rgba(255,255,255,.08)">
+      const _hasOutlet=_outletData&&_outletData.length>=1&&(s.type==='gone'||s.type==='near'||s.type==='approaching');
+      const _outletId='ot-'+String(s.id).replace(/[^a-z0-9]/gi,'_');
+      const outletTooltipHtml=_hasOutlet?
+        `<div id="${_outletId}" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;border:1px solid rgba(255,255,255,.08)">
           <div style="font-size:9px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase">สาขา</div>
           ${_outletData.map(o=>{
             const ordered=o.this_month_orders>0;
@@ -716,7 +718,7 @@ function __legacyRenderKamThisMonthFallback(){
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
-          <div class="kam-sku-name">${s.name}</div>
+          <div class="kam-sku-name" ${_hasOutlet?`onclick="var el=document.getElementById('${_outletId}');if(el)el.style.display=el.style.display==='none'?'block':'none'" style="cursor:pointer"`:''}>${s.name}${_hasOutlet?'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>':''}</div>
           ${deptGmv}${subHtml}${outletTooltipHtml}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:8px">
