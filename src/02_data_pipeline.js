@@ -411,6 +411,7 @@ function handleFileUpload(type,input){
         const defaultUnitGroup=(p[14+off]||'').trim().toUpperCase();
         const eaUnitName=(p[15+off]||'').trim();
         const universalEaValue=parseFloat(p[16+off])||0;
+        const lastOrderDate=(p[17+off]||'').trim()||null; // SQL1 v207h: YYYY-MM-DD
         if(!aid||!mo||!itemId)return null;
 
         // ── 4-tier display_price logic ──────────────────────────────────────
@@ -480,7 +481,8 @@ function handleFileUpload(type,input){
           ea_unit_value:universalEaValue||null,
           q6b_factor:_q6bFactor,
           // legacy compat: keep q6b_ea_divide for any code still reading it
-          q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1
+          q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1,
+          last_order_date: lastOrderDate  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
         }};
       }
 
