@@ -2067,12 +2067,13 @@ window._cdsExportCSV = function() {
     var daysElapsed = (nr && nr.daysElapsed > 0) ? nr.daysElapsed : 1;
     var daysInMonth = (nr && nr.daysInMonth)     ? nr.daysInMonth : 30;
     function rr(v){ return Math.round(v / daysElapsed * daysInMonth); }
-    var rows = [['Account ID', 'Account', 'Outlet', 'GMV \u0e10\u0e32\u0e19', 'Run Rate', 'GMV MTD']];
+    var rows = [['Account ID', 'Account', 'Outlet ID (res_id)', 'Outlet', 'GMV \u0e10\u0e32\u0e19', 'Run Rate', 'GMV MTD']];
     cohort.forEach(function(g) {
       (g.outlets || []).forEach(function(o) {
         rows.push([
           g.acctId  || '',
           g.acctName || '',
+          o.outletId || '',
           o.outletName || o.outletId || '',
           Math.round(o.prevGmv || 0),
           rr(o.currGmv || 0),
