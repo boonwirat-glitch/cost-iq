@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753h: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753i: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753h',
+      version: 'v753i',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -39137,6 +39137,12 @@ async function renderPortviewTargetBar() {
   const overflowBadge = pct > 100
     ? `<span class="tgt-overflow-badge">+${pct-100}%</span>`
     : '';
+
+  // v753h: tap bar → open Quarter NRR Health sheet
+  bar.onclick = function(){ try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(e){} };
+  bar.style.cursor = 'pointer';
+  bar.title = 'ดูสุขภาพพอร์ต Q2';
+  bar.setAttribute('-webkit-tap-highlight-color','transparent');
 
   bar.innerHTML = `
     <div class="tgt-bar-header">
