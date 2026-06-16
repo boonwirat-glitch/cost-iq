@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753j: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753k: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753j',
+      version: 'v753k',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6410,11 +6410,11 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 
 /* ── Sheet variables (movement palette) ── */
 #qnrr-sheet {
-  --qnrr-core:         rgba(77,220,151,.80);
+  --qnrr-core:         rgba(77,220,151,.88);   /* solid green */
   --qnrr-core-dim:     rgba(77,220,151,.12);
-  --qnrr-core-border:  rgba(77,220,151,.22);
-  --qnrr-handover:     rgba(240,176,0,.75);
-  --qnrr-expansion:    rgba(77,220,151,.60);
+  --qnrr-core-border:  rgba(77,220,151,.25);
+  --qnrr-handover:     rgba(240,176,0,.82);    /* amber */
+  --qnrr-expansion:    rgba(100,180,255,.75);  /* blue — distinct from core */
   --qnrr-ti:           rgba(255,255,255,.15);
   --qnrr-churn:        rgba(229,62,62,.75);
   --qnrr-ns:           rgba(140,180,255,.55);
@@ -6519,7 +6519,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   font-family: var(--tk-font-mono); letter-spacing: -.02em;
 }
 .qnrr-nrr-sep { font-size: 10px; color: rgba(255,255,255,.12); }
-.qnrr-nrr-mos { font-size: 9px; color: rgba(255,255,255,.2); margin-top: 2px; font-family: var(--tk-font-mono); }
+.qnrr-nrr-mos { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.50); margin-top: 3px; font-family: var(--tk-font-mono); letter-spacing: .02em; }
 
 /* ── Chart zone ── */
 .qnrr-chart-zone {
@@ -6547,7 +6547,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bar-col {
   display: flex; flex-direction: column; align-items: center;
   cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative;
-  padding-top: 24px; /* room for top label */
+  padding-top: 20px; /* room for GMV top label */
 }
 .qnrr-bar-col:active .qnrr-bar-body { filter: brightness(1.15); }
 .qnrr-bar-col.active .qnrr-bar-body::after {
@@ -6584,17 +6584,20 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 
 .qnrr-bar-lbl {
   font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .4px;
-  color: rgba(255,255,255,.40); margin-top: 6px;
+  text-transform: uppercase; letter-spacing: .3px;
+  color: rgba(255,255,255,.50); margin-top: 5px;
   font-family: var(--tk-font-mono); transition: color .2s;
+  white-space: nowrap; /* prevent wrapping */
+  overflow: hidden;
 }
-.qnrr-bar-col.active .qnrr-bar-lbl { color: rgba(188,215,255,.75); }
+.qnrr-bar-col.active .qnrr-bar-lbl { color: rgba(188,215,255,.80); }
 /* top label (NRR% / GMV) — positioned above bar */
 .qnrr-bar-top-label {
-  position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
-  font-size: 11px; font-weight: 800;
-  font-family: var(--tk-font-mono); letter-spacing: -.02em;
+  position: absolute; top: 1px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 700;
+  font-family: var(--tk-font-mono); letter-spacing: -.01em;
   white-space: nowrap; animation: qnrrCountIn .5s ease both;
+  color: rgba(255,255,255,.60);
 }
 .qnrr-bar-nrr {
   font-size: 11px; font-weight: 800;
@@ -6661,8 +6664,8 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 /* ── Account list ── */
 .qnrr-acct-list { overflow-y: auto; flex: 1; }
 .qnrr-acct-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 18px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
   border-bottom: 1px solid rgba(255,255,255,.04);
   cursor: pointer; transition: background .12s;
   -webkit-tap-highlight-color: transparent;
@@ -6678,18 +6681,22 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-mv-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; margin-top: 1px; }
 .qnrr-acct-left { flex: 1; min-width: 0; }
 .qnrr-acct-name {
-  font-size: 13px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   color: rgba(255,255,255,.88); letter-spacing: -.01em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .qnrr-acct-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.qnrr-spark-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.qnrr-spark-labels {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10px; font-weight: 700; font-family: var(--tk-font-mono);
+.qnrr-spark-col { display: flex; flex-direction: column; align-items: flex-end; }
+.qnrr-spark-row {
+  display: flex; align-items: flex-end; gap: 4px;
 }
-.qnrr-spark-base { color: rgba(38,96,200,.7); }
-.qnrr-spark-curr { font-size: 11px; font-weight: 800; }
+.qnrr-slbl-base, .qnrr-slbl-curr {
+  font-size: 9px; font-weight: 700;
+  font-family: var(--tk-font-mono); white-space: nowrap;
+  line-height: 1; padding-bottom: 1px;
+}
+.qnrr-slbl-base { color: rgba(255,255,255,.30); }
+.qnrr-slbl-curr { font-size: 10px; font-weight: 800; }
 
 /* ── Sparkline ── */
 .qnrr-spark {
@@ -6786,6 +6793,15 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 /* ── Sales role: hide portview-pace-bar tap (portview-pace-bar onclick only fires for non-sales) ── */
 body.sales-mode #portview-pace-bar,
 body.sales-tl-mode #portview-pace-bar { cursor: default; }
+
+/* NRR% overlaid inside bar body */
+.qnrr-bar-nrr-overlay {
+  position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; font-weight: 900;
+  font-family: var(--tk-font-mono); letter-spacing: -.02em;
+  white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,.5);
+  pointer-events: none; z-index: 2;
+}
 </style>
 <style id="restaurant-module-css">
 /* ============================================================
@@ -51008,17 +51024,17 @@ var Q_MONTHS  = ['2026-04','2026-05','2026-06'];
 var BASE_MONTH= '2026-03';
 
 var MV_CFG = {
-  core_nrr:       {label:'Core NRR',    color:'rgba(77,220,151,.82)', order:0},
-  handover:       {label:'Handover',    color:'rgba(240,176,0,.78)',  order:1},
-  new_sales:      {label:'New Sales',   color:'rgba(140,180,255,.60)',order:2},
-  expansion:      {label:'Expansion',   color:'rgba(77,220,151,.50)', order:3},
-  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.18)',order:4},
-  comeback:       {label:'Comeback',    color:'rgba(200,160,255,.60)',order:5},
-  core_nrr_churn: {label:'Churn',       color:'rgba(229,62,62,.75)',  order:6},
-  transfer_out:   {label:'Transfer out',color:'ghost',               order:7}
+  core_nrr:       {label:'Core NRR',    color:'rgba(77,220,151,.88)',  order:0},
+  handover:       {label:'Handover',    color:'rgba(240,176,0,.82)',   order:1},
+  new_sales:      {label:'New Sales',   color:'rgba(160,200,255,.65)', order:2},
+  expansion:      {label:'Expansion',   color:'rgba(100,180,255,.75)', order:3},
+  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.20)', order:4},
+  comeback:       {label:'Comeback',    color:'rgba(200,160,255,.68)', order:5},
+  core_nrr_churn: {label:'Churn',       color:'rgba(229,62,62,.78)',   order:6},
+  transfer_out:   {label:'Transfer out',color:'ghost',                order:7}
 };
 // Stack order: core_nrr at bottom, others on top (column-reverse in CSS)
-var STACK_ORDER = ['transfer_in','comeback','expansion','new_sales','handover','core_nrr'];
+var STACK_ORDER = ['core_nrr','handover','new_sales','expansion','comeback','transfer_in'];
 var LEGEND_ORDER= ['core_nrr','handover','expansion','new_sales','comeback','transfer_in','core_nrr_churn','transfer_out'];
 
 var _scopeIdx  = 0;
@@ -51305,15 +51321,15 @@ function _qnrrRenderChart(){
     var lbl=MONTHS_TH[m]||m;
     var lblColor=isActive?'rgba(188,215,255,.75)':'rgba(255,255,255,.45)';
 
-    // NRR% label above bar (not below)
-    var nrrHtml='';
+    // Labels: GMV on top, NRR% overlaid inside bar
+    var topLabelHtml=''; var overlayHtml='';
     if(isBase){
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.35)">฿'+Math.round(_data.base_gmv/1e6*10)/10+'M</div>';
-    } else if(bm&&bm.nrr_pct!==null){
-      var pctColor=bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'#4ddc97':'var(--amb)';
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:'+pctColor+'">'+bm.nrr_pct+'%</div>';
-    } else {
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.2)">—</div>';
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_data.base_gmv)+'</div>';
+    } else if(bm){
+      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'rgba(77,220,151,.9)':'var(--amb)'):'rgba(255,255,255,.2)';
+      var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(bm.total_gmv)+'</div>';
+      overlayHtml='<div class="qnrr-bar-nrr-overlay" style="color:'+pctColor+'">'+pctLabel+'</div>';
     }
 
     // bar body — FIX stack: core_nrr at BOTTOM, movements on top
@@ -51344,9 +51360,9 @@ function _qnrrRenderChart(){
     }
 
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
-      nrrHtml+
+      topLabelHtml+
       ghostHtml+
-      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+overlayHtml+'</div>'+
       '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
   }).join('');
@@ -51446,13 +51462,8 @@ function _qnrrRenderDrill(){
       return '<div class="qnrr-sb" style="height:'+h+'px;background:'+bg+'" data-m="'+(MONTHS_TH[m]||m)+'" data-v="'+_fmtM(v)+'"></div>';
     }).join('');
 
-    // Sparkline labels: base month + selected month
     var baseGmvLabel=_fmtM(a.baseGmv);
     var currGmvLabel=_fmtM(a.currGmv);
-    var sparkLabels='<div class="qnrr-spark-labels">'+
-      '<span class="qnrr-spark-base">'+baseGmvLabel+'</span>'+
-      '<span class="qnrr-spark-curr" style="color:'+dotColor+'">'+currGmvLabel+'</span>'+
-    '</div>';
 
     // Outlet rows — use outlet_name if available, fallback to outlet_id
     var outHtml=a.outlets.map(function(o){
@@ -51491,10 +51502,13 @@ function _qnrrRenderDrill(){
       '</div>'+
       '<div class="qnrr-acct-right">'+
         '<div class="qnrr-spark-col">'+
-          sparkLabels+
-          '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
-            sbHtml+
-            '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+          '<div class="qnrr-spark-row">'+
+            '<span class="qnrr-slbl-base">'+baseGmvLabel+'</span>'+
+            '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
+              sbHtml+
+              '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+            '</div>'+
+            '<span class="qnrr-slbl-curr" style="color:'+dotColor+'">'+currGmvLabel+'</span>'+
           '</div>'+
         '</div>'+
         '<div class="qnrr-chev">›</div>'+
