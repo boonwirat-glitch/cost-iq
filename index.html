@@ -1,4 +1,4 @@
-<!-- Freshket Sense v754f: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v755: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v754f',
+      version: 'v755',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15020,6 +15020,31 @@ function handleFileUpload(type,input){
       _done();
     };reader.readAsText(file);return;
   }
+  if(type==='bulk-sku-outlet'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+      let rowCount=0;
+      lines.forEach(l=>{
+        const p=parseCSVRow(l);
+        const aid=(p[0]||'').trim();
+        const itemId=String((p[1]||'').trim());
+        const outletId=(p[2]||'').trim();
+        const outletName=(p[3]||'').trim();
+        const lastMoOrders=parseInt(p[4])||0;
+        const lastMoGmv=parseFloat(p[5])||0;
+        const thisMoOrders=parseInt(p[6])||0;
+        const thisMoGmv=parseFloat(p[7])||0;
+        if(!aid||!itemId||!outletId)return;
+        if(!bulkSkuOutletData[aid])bulkSkuOutletData[aid]={};
+        if(!bulkSkuOutletData[aid][itemId])bulkSkuOutletData[aid][itemId]=[];
+        bulkSkuOutletData[aid][itemId].push({outlet_id:outletId,outlet_name:outletName,last_month_orders:lastMoOrders,last_month_gmv:lastMoGmv,this_month_orders:thisMoOrders,this_month_gmv:thisMoGmv});
+        rowCount++;
+      });
+      console.log('[Q12B] sku_outlet loaded:',rowCount,'rows',Object.keys(bulkSkuOutletData).length,'accounts');
+      _done();
+    };reader.readAsText(file);return;
+  }
   if(type==='bulk-outlets'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -15384,6 +15409,7 @@ function ingestCSVText(type,text,{timeoutMs=120000}={}){
 
 // Background fetch flags — true once big files arrive
 let bulkSkusReady = false;
+let bulkSkuOutletData = {}; // Q12B: {accountId: {itemId: [{outlet_id,outlet_name,last_month_orders,last_month_gmv,this_month_orders,this_month_gmv}]}}
 let bulkAltsReady = false;
 let sheetsLoadStarted = false; // guard: prevent double-fetch if login completes after prefetch
 let _cloudInitialPromise = null;
@@ -15828,11 +15854,14 @@ async function _fetchKamBundle(kamEmail){
     try{
       const skusUrl=`${R2_BASE}/sense_skus_${safeKey}.csv`;
       const altsUrl=`${R2_BASE}/sense_alts_${safeKey}.csv`;
+      const outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
-      const[okSkus,okAlts]=await Promise.all([
+      _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', outletUrl);
+      const[okSkus,okAlts,okOutlet]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
+        _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`}),
       ]);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
@@ -24641,25 +24670,38 @@ function __legacyRenderKamThisMonthFallback(){
       </div>
       <div class="kam-dc-body" style="padding-top:8px">${infoCard}`;
     const actionSigs=signals.filter(s=>s.type!=='not_yet');
-    const notYetSigs=signals.filter(s=>s.type==='not_yet');
+    const notYetSigs=signals.filter(s=>s.type==='not_yet'); // approaching อยู่ใน actionSigs แล้ว (ไม่ใช่ not_yet)
     const renderSkuRow=(s,dimmed=false)=>{
       const sub=skuSubstituteMap[String(s.id)];
       const isSub=!!sub;
-      const clr=isSub?'rgba(140,180,255,.9)':s.type==='gone'?'rgba(255,130,130,.9)':s.type==='slow'?'rgba(255,140,40,.9)':s.type==='near'?'rgba(240,176,0,.85)':'rgba(255,255,255,.3)';
-      const storyCl=s.type==='gone'?'rgba(255,130,130,.75)':s.type==='slow'?'rgba(255,140,40,.7)':s.type==='near'?'rgba(240,176,0,.7)':'rgba(255,255,255,.45)';
-      const ind=isSub?'substituted':s.type==='gone'?'neg':s.type==='slow'?'slow':s.type==='near'?'warn':'';
-      const indSymbol=isSub?'→':s.type==='gone'?'−':s.type==='slow'?`<svg width="13" height="12" viewBox="0 0 13 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;display:inline-block;margin-top:-1px"><polyline points="1,2 4,7 8,4 12,9"/><polyline points="9,9 12,9 12,6"/></svg>`:s.type==='near'?'↓':'·';
-      const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':'ยังไม่ถึงรอบ';
+      const clr=isSub?'rgba(140,180,255,.9)':s.type==='gone'?'rgba(255,130,130,.9)':s.type==='slow'?'rgba(255,140,40,.9)':s.type==='near'?'rgba(240,176,0,.85)':s.type==='approaching'?'rgba(100,180,255,.9)':'rgba(255,255,255,.3)';
+      const storyCl=s.type==='gone'?'rgba(255,130,130,.75)':s.type==='slow'?'rgba(255,140,40,.7)':s.type==='near'?'rgba(240,176,0,.7)':s.type==='approaching'?'rgba(100,180,255,.65)':'rgba(255,255,255,.45)';
+      const ind=isSub?'substituted':s.type==='gone'?'neg':s.type==='slow'?'slow':s.type==='near'?'warn':s.type==='approaching'?'approaching':'';
+      const indSymbol=isSub?'→':s.type==='gone'?'−':s.type==='slow'?`<svg width="13" height="12" viewBox="0 0 13 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;display:inline-block;margin-top:-1px"><polyline points="1,2 4,7 8,4 12,9"/><polyline points="9,9 12,9 12,6"/></svg>`:s.type==='near'?'↓':s.type==='approaching'?'◎':'·';
+      const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':s.type==='approaching'?'ใกล้ถึงรอบ · อีก '+s.daysUntil+' วัน':'ยังไม่ถึงรอบ';
       const story=isSub?'':skuStoryLine(s);
       const nameOp=dimmed?'opacity:.4':'';
-      const deptGmv=(s.type!=='not_yet'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
+      const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
       const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
+      // outlet tooltip — แสดงเมื่อ type เป็น gone/near/approaching (SKU ที่น่าสังเกต)
+      const _outletData=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(s.id)]:null;
+      const outletTooltipHtml=(_outletData&&_outletData.length>1&&(s.type==='gone'||s.type==='near'||s.type==='approaching'))?
+        `<div style="margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;border:1px solid rgba(255,255,255,.08)">
+          <div style="font-size:9px;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase">สาขา</div>
+          ${_outletData.map(o=>{
+            const ordered=o.this_month_orders>0;
+            const hadLast=o.last_month_orders>0;
+            const dot=ordered?'rgba(80,220,160,.9)':hadLast?'rgba(255,130,130,.8)':'rgba(255,255,255,.2)';
+            const label=ordered?'สั่งแล้ว':hadLast?'ยังไม่สั่ง':'—';
+            return`<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:11px;color:rgba(255,255,255,.7);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span><span style="font-size:10px;color:${dot};flex-shrink:0">${label}</span></div>`;
+          }).join('')}
+        </div>`:''
       const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
           <div class="kam-sku-name">${s.name}</div>
-          ${deptGmv}${subHtml}
+          ${deptGmv}${subHtml}${outletTooltipHtml}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:8px">
           <span style="${badgeColor}">${badge}</span>
@@ -27348,15 +27390,40 @@ function computeChurnSignals(){
       }
       continue;
     }
-    // zero orders → classify gone/near/not_yet as before
-    // Classify by how far past the expected reorder point we are
+    // zero orders → classify gone/near/approaching/not_yet
     let type;
-    if(daysElapsed<avgInterval)type='not_yet';           // ยังไม่ถึงรอบ
-    else if(daysElapsed<avgInterval*1.5)type='near';     // เพิ่งเลยรอบ — เฝ้าดู
-    else type='gone';                                     // เลยรอบมากแล้ว — น่าหาย
     const roundedInterval=Math.round(avgInterval);
     const daysLate=Math.max(0,Math.round(daysElapsed-avgInterval));
-    const daysUntil=Math.max(0,Math.round(avgInterval-daysElapsed));
+    let daysUntil=Math.max(0,Math.round(avgInterval-daysElapsed));
+    if(daysElapsed>=avgInterval*1.5){
+      type='gone';                                        // เลยรอบมากแล้ว — น่าหาย
+    } else if(daysElapsed>=avgInterval){
+      type='near';                                        // เพิ่งเลยรอบ — เฝ้าดู
+    } else if(orderCount===1&&(sku.last_order_date||'')!==''){
+      // SKU สั่ง 1 ครั้ง/เดือน — ใช้ lastOrderDay แทน avgInterval
+      // คาด: จะสั่งใกล้เดียวกับวันที่สั่งในเดือนที่แล้ว
+      const lastDay=new Date(sku.last_order_date).getDate();
+      const today=new Date();
+      const expectedDate=new Date(today.getFullYear(),today.getMonth(),lastDay);
+      const msLeft=expectedDate-today;
+      daysUntil=Math.max(0,Math.round(msLeft/(1000*60*60*24)));
+      if(msLeft<0){
+        // เลยวันที่คาดแล้วยังไม่สั่ง
+        type=Math.abs(msLeft)/(1000*60*60*24)>avgInterval*0.5?'gone':'near';
+      } else if(daysUntil<=5){
+        type='approaching';                               // ใกล้ถึงรอบ — แจ้งเตือน
+      } else {
+        type='not_yet';
+      }
+    } else {
+      // SKU สั่งหลายครั้ง/เดือน — ใช้ avgInterval เดิม
+      const approachThreshold=Math.max(5,Math.round(avgInterval*0.2));
+      if(daysUntil<=approachThreshold){
+        type='approaching';                               // ใกล้ถึงรอบ — แจ้งเตือน
+      } else {
+        type='not_yet';
+      }
+    }
     signals.push({
       id:String(sku.id||sku.item_id),
       name:sku.n||sku.name||sku.item_name_th||'—',
@@ -27367,7 +27434,7 @@ function computeChurnSignals(){
       gmv:sku.gmv||0
     });
   }
-  const typeOrder={gone:0,slow:1,near:2,not_yet:3};
+  const typeOrder={gone:0,slow:1,near:2,approaching:3,not_yet:4};
   signals.sort((a,b)=>{
     const td=(typeOrder[a.type]||0)-(typeOrder[b.type]||0);
     return td!==0?td:b.gmv-a.gmv;
