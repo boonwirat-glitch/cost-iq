@@ -13,17 +13,17 @@ var Q_MONTHS  = ['2026-04','2026-05','2026-06'];
 var BASE_MONTH= '2026-03';
 
 var MV_CFG = {
-  core_nrr:       {label:'Core NRR',    color:'rgba(77,220,151,.82)', order:0},
-  handover:       {label:'Handover',    color:'rgba(240,176,0,.78)',  order:1},
-  new_sales:      {label:'New Sales',   color:'rgba(140,180,255,.60)',order:2},
-  expansion:      {label:'Expansion',   color:'rgba(77,220,151,.50)', order:3},
-  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.18)',order:4},
-  comeback:       {label:'Comeback',    color:'rgba(200,160,255,.60)',order:5},
-  core_nrr_churn: {label:'Churn',       color:'rgba(229,62,62,.75)',  order:6},
-  transfer_out:   {label:'Transfer out',color:'ghost',               order:7}
+  core_nrr:       {label:'Core NRR',    color:'rgba(77,220,151,.88)',  order:0},
+  handover:       {label:'Handover',    color:'rgba(240,176,0,.82)',   order:1},
+  new_sales:      {label:'New Sales',   color:'rgba(160,200,255,.65)', order:2},
+  expansion:      {label:'Expansion',   color:'rgba(100,180,255,.75)', order:3},
+  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.20)', order:4},
+  comeback:       {label:'Comeback',    color:'rgba(200,160,255,.68)', order:5},
+  core_nrr_churn: {label:'Churn',       color:'rgba(229,62,62,.78)',   order:6},
+  transfer_out:   {label:'Transfer out',color:'ghost',                order:7}
 };
 // Stack order: core_nrr at bottom, others on top (column-reverse in CSS)
-var STACK_ORDER = ['transfer_in','comeback','expansion','new_sales','handover','core_nrr'];
+var STACK_ORDER = ['core_nrr','handover','new_sales','expansion','comeback','transfer_in'];
 var LEGEND_ORDER= ['core_nrr','handover','expansion','new_sales','comeback','transfer_in','core_nrr_churn','transfer_out'];
 
 var _scopeIdx  = 0;
@@ -310,15 +310,15 @@ function _qnrrRenderChart(){
     var lbl=MONTHS_TH[m]||m;
     var lblColor=isActive?'rgba(188,215,255,.75)':'rgba(255,255,255,.45)';
 
-    // NRR% label above bar (not below)
-    var nrrHtml='';
+    // Labels: GMV on top, NRR% overlaid inside bar
+    var topLabelHtml=''; var overlayHtml='';
     if(isBase){
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.35)">฿'+Math.round(_data.base_gmv/1e6*10)/10+'M</div>';
-    } else if(bm&&bm.nrr_pct!==null){
-      var pctColor=bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'#4ddc97':'var(--amb)';
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:'+pctColor+'">'+bm.nrr_pct+'%</div>';
-    } else {
-      nrrHtml='<div class="qnrr-bar-nrr qnrr-bar-top-label" style="color:rgba(255,255,255,.2)">—</div>';
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_data.base_gmv)+'</div>';
+    } else if(bm){
+      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'rgba(77,220,151,.9)':'var(--amb)'):'rgba(255,255,255,.2)';
+      var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(bm.total_gmv)+'</div>';
+      overlayHtml='<div class="qnrr-bar-nrr-overlay" style="color:'+pctColor+'">'+pctLabel+'</div>';
     }
 
     // bar body — FIX stack: core_nrr at BOTTOM, movements on top
@@ -349,9 +349,9 @@ function _qnrrRenderChart(){
     }
 
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
-      nrrHtml+
+      topLabelHtml+
       ghostHtml+
-      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+overlayHtml+'</div>'+
       '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
   }).join('');
@@ -451,13 +451,8 @@ function _qnrrRenderDrill(){
       return '<div class="qnrr-sb" style="height:'+h+'px;background:'+bg+'" data-m="'+(MONTHS_TH[m]||m)+'" data-v="'+_fmtM(v)+'"></div>';
     }).join('');
 
-    // Sparkline labels: base month + selected month
     var baseGmvLabel=_fmtM(a.baseGmv);
     var currGmvLabel=_fmtM(a.currGmv);
-    var sparkLabels='<div class="qnrr-spark-labels">'+
-      '<span class="qnrr-spark-base">'+baseGmvLabel+'</span>'+
-      '<span class="qnrr-spark-curr" style="color:'+dotColor+'">'+currGmvLabel+'</span>'+
-    '</div>';
 
     // Outlet rows — use outlet_name if available, fallback to outlet_id
     var outHtml=a.outlets.map(function(o){
@@ -496,10 +491,13 @@ function _qnrrRenderDrill(){
       '</div>'+
       '<div class="qnrr-acct-right">'+
         '<div class="qnrr-spark-col">'+
-          sparkLabels+
-          '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
-            sbHtml+
-            '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+          '<div class="qnrr-spark-row">'+
+            '<span class="qnrr-slbl-base">'+baseGmvLabel+'</span>'+
+            '<div class="qnrr-spark" onmousemove="_qnrrSparkMove(event,this)" onmouseleave="_qnrrSparkLeave(this)">'+
+              sbHtml+
+              '<div class="qnrr-sp-tt"><div class="qnrr-tt-mo"></div><div class="qnrr-tt-v"></div></div>'+
+            '</div>'+
+            '<span class="qnrr-slbl-curr" style="color:'+dotColor+'">'+currGmvLabel+'</span>'+
           '</div>'+
         '</div>'+
         '<div class="qnrr-chev">›</div>'+
