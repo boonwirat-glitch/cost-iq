@@ -1392,6 +1392,13 @@ function _pvInitCollapseObserver(){
     var collapsed=(h===0);
     var expanding=(h===expandedH);
 
+    // v754c: if a detail panel is open, allow collapsible to grow beyond expandedH
+    // expandedH was measured before panel opened → clips content at old height
+    if(!collapsed && collapsible.querySelector('.tgt-detail-panel.open')){
+      var liveH=collapsible.scrollHeight;
+      if(liveH>h){ h=liveH; }
+    }
+
     // Skip DOM write if value unchanged (saves layout thrash)
     if(lastAppliedH!==h){
       lastAppliedH=h;
