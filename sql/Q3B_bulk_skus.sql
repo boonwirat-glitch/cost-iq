@@ -1,9 +1,11 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q3B v3 — Bulk SKU Monthly (KAM Cost IQ · pack_size + outlet_count_sku + bi_source unit)
--- Columns (18): account_id, month_label, item_id, item_name_th, dept,
+-- Q3B v4 — Bulk SKU Monthly (KAM Cost IQ · pack_size + outlet_count_sku + bi_source unit)
+-- Columns (19): account_id, month_label, item_id, item_name_th, dept,
 --               subclass, temperature, pack_size,
 --               gmv_ex_vat, pct, qty_kg, unit_price, order_count, avg_piece_price,
---               outlet_count_sku, default_unit_group, ea_unit_name, universal_ea_value
+--               outlet_count_sku, default_unit_group, ea_unit_name, universal_ea_value,
+--               last_order_date  ← NEW v4: วันสั่งล่าสุดของ SKU นั้นในเดือนนั้น
+--                                   ใช้สำหรับ approaching signal ของ SKU ที่สั่งเดือนละครั้ง
 -- Window: last 2 complete months + current month MTD (Mar/Apr/May at time of export)
 -- Locked rules: gmv_ex_vat, no order status filter, account_id from dwh.order
 -- pack_size: from item.pack_size in dwh.order → drives unit label detection (ขวด/ถัง/กก.)
@@ -65,7 +67,8 @@ raw AS (
     i.price_ex_vat,                      -- price per ordering unit (ขวด, ถัง, kg, etc.)
     o.order_id,
     ko.account_id,
-    CAST(o.user_id AS STRING)             AS res_id  -- outlet identifier for outlet_count_sku
+    CAST(o.user_id AS STRING)             AS res_id,  -- outlet identifier for outlet_count_sku
+    o.delivery_date                                    -- NEW v4: เก็บไว้ MAX ใน agg
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   JOIN kam_outlets ko ON CAST(o.user_id AS STRING) = ko.res_id
@@ -101,7 +104,10 @@ agg AS (
     ROUND(AVG(r.price_ex_vat), 2)                                      AS avg_piece_price,
     -- outlet_count_sku = outlets that actually ordered this SKU (≠ total outlet count)
     -- used for per-outlet frequency → churn interval logic in app
-    COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku
+    COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku,
+    -- NEW v4: วันสั่งล่าสุดของ SKU นี้ในเดือนนี้
+    -- ใช้สำหรับ approaching signal: SKU order_count=1 → คาดว่าจะสั่งแถวๆ วันนี้ของเดือนถัดไป
+    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date
   FROM raw r
   GROUP BY r.account_id, r.month_date, r.item_id
 )
@@ -133,7 +139,8 @@ SELECT
   a.outlet_count_sku,
   COALESCE(m.default_unit_group, '')  AS default_unit_group,   -- 'EACH' | 'WEIGHT' | ''
   COALESCE(m.ea_unit_name, '')        AS ea_unit_name,          -- กระป๋อง/ขวด/ถุง/แพ็ค etc.
-  COALESCE(m.universal_ea_value, 0)   AS universal_ea_value     -- N per pack (24, 12, 20 ...)
+  COALESCE(m.universal_ea_value, 0)   AS universal_ea_value,    -- N per pack (24, 12, 20 ...)
+  a.last_order_date                                             -- NEW v4: YYYY-MM-DD
 FROM agg a
 JOIN monthly_total t USING (account_id, month_date)
 LEFT JOIN `freshket-rn.bi_source.item_master_merchandise` m ON CAST(m.item_id AS STRING) = a.item_id
