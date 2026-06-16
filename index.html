@@ -1,4 +1,4 @@
-<!-- Freshket Sense v753m: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v753n: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v753m',
+      version: 'v753n',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -39227,6 +39227,20 @@ function _tgtToggleDetail(panelId, handleId) {
   if(!p||!h) return;
   const open=p.classList.toggle('open');
   h.classList.toggle('open',open);
+
+  // v753m: after panel open/close, re-measure pv-collapsible height
+  // expandedH was captured before panel existed → stale → clips panel
+  // Force re-measure by resetting expandedH signal via custom event
+  try {
+    const collapsible = document.querySelector('.pv-collapsible');
+    if (collapsible) {
+      // Remove maxHeight constraint temporarily so scrollHeight is accurate
+      const prev = collapsible.style.maxHeight;
+      collapsible.style.maxHeight = '';
+      const newH = collapsible.scrollHeight || 0;
+      collapsible.style.maxHeight = newH > 0 ? newH + 'px' : prev;
+    }
+  } catch(e) {}
 }
 
 // ── Teamview: target rows are now rendered in the main KAM card metrics ───────
