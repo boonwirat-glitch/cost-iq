@@ -111,7 +111,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
-.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px)}
+.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px);overflow:visible;}
 
 /* ── Collapsible summary block ── */
 .pv-collapsible{overflow:hidden}
@@ -756,3 +756,7 @@ body.kam-sense-active.kam-mode .bnav #nav-echo-kam { opacity: .25 !important; po
 #portview-list:has(#tv-shimmer-wrap) .portview-acct-badge-row {
   visibility: hidden;
 }
+
+/* v753l: allow detail panel to expand below hero card boundary */
+#tgt-portview-bar { overflow: visible !important; }
+#tgt-portview-bar:has(.tgt-detail-panel.open) { padding-bottom: 12px; }

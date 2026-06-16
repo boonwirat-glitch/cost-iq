@@ -1021,7 +1021,15 @@ async function renderPortviewTargetBar() {
     : '';
 
   // v753h: tap bar → open Quarter NRR Health sheet
-  bar.onclick = function(){ try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(e){} };
+  // Guard: don't fire if click originated from i-button or detail panel
+  bar.onclick = function(e){
+    if(e.target && (
+      e.target.classList.contains('tgt-info-btn') ||
+      e.target.closest('.tgt-detail-panel') ||
+      e.target.closest('.tgt-info-btn')
+    )) return;
+    try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(err){}
+  };
   bar.style.cursor = 'pointer';
   bar.title = 'ดูสุขภาพพอร์ต Q2';
   bar.setAttribute('-webkit-tap-highlight-color','transparent');
@@ -1051,7 +1059,7 @@ async function renderPortviewTargetBar() {
       ${nrrLeg}${cbLeg}${exLeg}
       ${overflowBadge}
       ${setupBtn}
-      <button class="tgt-info-btn${false?' open':''}" id="${detHandleId}" onclick="_tgtToggleDetail('${detPanelId}','${detHandleId}')">i</button>
+      <button class="tgt-info-btn${false?' open':''}" id="${detHandleId}" onclick="event.stopPropagation();_tgtToggleDetail('${detPanelId}','${detHandleId}')">i</button>
     </div>
     ${mvSection}
     <div class="tgt-detail-panel" id="${detPanelId}">
