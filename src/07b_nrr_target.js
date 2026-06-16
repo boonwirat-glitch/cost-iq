@@ -1074,6 +1074,20 @@ function _tgtToggleDetail(panelId, handleId) {
   if(!p||!h) return;
   const open=p.classList.toggle('open');
   h.classList.toggle('open',open);
+
+  // v753m: after panel open/close, re-measure pv-collapsible height
+  // expandedH was captured before panel existed → stale → clips panel
+  // Force re-measure by resetting expandedH signal via custom event
+  try {
+    const collapsible = document.querySelector('.pv-collapsible');
+    if (collapsible) {
+      // Remove maxHeight constraint temporarily so scrollHeight is accurate
+      const prev = collapsible.style.maxHeight;
+      collapsible.style.maxHeight = '';
+      const newH = collapsible.scrollHeight || 0;
+      collapsible.style.maxHeight = newH > 0 ? newH + 'px' : prev;
+    }
+  } catch(e) {}
 }
 
 // ── Teamview: target rows are now rendered in the main KAM card metrics ───────
