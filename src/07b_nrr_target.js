@@ -1020,6 +1020,12 @@ async function renderPortviewTargetBar() {
     ? `<span class="tgt-overflow-badge">+${pct-100}%</span>`
     : '';
 
+  // v753h: tap bar → open Quarter NRR Health sheet
+  bar.onclick = function(){ try{ if(typeof _qnrrOpen==='function')_qnrrOpen(); }catch(e){} };
+  bar.style.cursor = 'pointer';
+  bar.title = 'ดูสุขภาพพอร์ต Q2';
+  bar.setAttribute('-webkit-tap-highlight-color','transparent');
+
   bar.innerHTML = `
     <div class="tgt-bar-header">
       <div class="tgt-bar-left">
