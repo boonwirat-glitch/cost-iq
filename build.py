@@ -30,6 +30,8 @@ commission_js = (
     read('src/07b_cds.js') +
     read('src/07b_commission_history.js')
 )
+qnrr_js       = read('src/07c_qnrr_view.js')
+styles_qnrr   = read('src/styles_qnrr.css')
 patches_js    = read('src/08_patches.js')
 conv_intel_js = read('src/09_conv_intel.js')
 sales_js     = read('src/10_sales_view.js')
@@ -78,6 +80,8 @@ out = (shell
              f'<script id="freshket-sales">\n{sales_js}</script>\n')
     .replace('<script id="freshket-skills">\n<!-- INJECT_SKILLS -->\n</script>\n',
              f'<script id="freshket-skills">\n{skills_js}</script>\n')
+    .replace('<script id="freshket-qnrr">\n<!-- INJECT_QNRR -->\n</script>\n',
+             f'<script id="freshket-qnrr">\n{qnrr_js}</script>\n')
     .replace('<script id="freshket-nav-config">\n<!-- INJECT_NAV_CONFIG -->\n</script>',
              f'<script id="freshket-nav-config">\n{nav_config_js}</script>')
     .replace('<style id="restaurant-module-css">\n<!-- INJECT_STYLES_RESTAURANT -->\n</style>',
@@ -101,7 +105,9 @@ out = (shell
              .replace('<style id="aichat-module-css">\n<!-- INJECT_STYLES_AICHAT -->\n</style>',
              f'<style id="aichat-module-css">\n{styles_aichat}</style>') \
              .replace('<style id="skills-module-css">\n<!-- INJECT_STYLES_SKILLS -->\n</style>',
-             f'<style id="skills-module-css">\n{styles_skills}</style>')
+             f'<style id="skills-module-css">\n{styles_skills}</style>') \
+             .replace('<style id="qnrr-module-css">\n<!-- INJECT_STYLES_QNRR -->\n</style>',
+             f'<style id="qnrr-module-css">\n{styles_qnrr}</style>')
     .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
              f'<style id="sales-module-css">\n{styles_sales}</style>')
     # ── Build version ──
@@ -112,7 +118,7 @@ out = (shell
 )
 
 # Verify no unresolved placeholders remain
-for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS',
+for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS', 'INJECT_QNRR', 'INJECT_STYLES_QNRR',
           'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
           'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT',
           'INJECT_NAV_CONFIG']:
