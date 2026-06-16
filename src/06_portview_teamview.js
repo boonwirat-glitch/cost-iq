@@ -2808,6 +2808,9 @@ function initOliveAvatar(){
   })()){
     // Authenticated session detected — skip useSampleData(). Real R2 data arrives shortly.
     try{ console.info('[Sense v216] useSampleData() skipped — Supabase session detected, real data loading from R2'); }catch(e){}
+  }else if(typeof currentUserProfile!=='undefined'&&currentUserProfile&&currentUserProfile.email){
+    // v755b: second guard — currentUserProfile set = authenticated user, skip sample data
+    try{ console.info('[Sense v755b] useSampleData() skipped — currentUserProfile present:', currentUserProfile.email); }catch(e){}
   }else{
     useSampleData();
     // Check if first visit — show onboarding (with sample data loaded as preview)
