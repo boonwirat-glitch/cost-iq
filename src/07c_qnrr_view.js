@@ -1,5 +1,162 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// _qnrrCompute — Quarter NRR Health compute (moved from 07b, fixed base dedup)
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// _qnrrCompute(kamEmail, scope)
+//
+// scope: 'kam' | 'tl' | 'admin'
+//
+// Returns:
+//   { quarter, base_month, months, base_gmv, cohort_outlets,
+//     base_norm,  ← SUM(base_gmv/base_days) per unique outlet (true denominator)
+//     by_month: {
+//       '2026-04': {
+//         nrr_pct, total_gmv,
+//         segments: { core_nrr, core_nrr_churn, handover, new_sales,
+//                     expansion, comeback, transfer_in, transfer_out },
+//         outlets:  { ... },
+//         rows:     []  // raw rows for drill
+//       }, ...
+//     }
+//   }
+//
+// BUG FIX (v753l):
+//   base_gmv previously summed per-row inside month loop → outlet counted
+//   3× (one per Q month). Now deduped by outlet_id ONCE before month loop.
+//   Denominator = SUM(unique_outlet.base_gmv / base_days) — correct.
+//
+function _qnrrCompute(kamEmail, scope) {
+  scope = scope || 'kam';
+  if (!kamEmail) return null;
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return null;
+
+  // ── Resolve row set based on scope ──────────────────────────────────────
+  var myTlEmail = '';
+  var kamRows = (qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
+  if (kamRows.length) {
+    myTlEmail = (kamRows.find(function(r){return r.period_tl_email;}) || {}).period_tl_email || '';
+  }
+
+  var allRows;
+  if (scope === 'tl' && myTlEmail && qd.byTlEmail && qd.byTlEmail[myTlEmail]) {
+    allRows = qd.byTlEmail[myTlEmail];
+  } else if (scope === 'admin') {
+    allRows = qd.allRows || [];
+  } else {
+    allRows = kamRows;
+  }
+  if (!allRows || !allRows.length) return null;
+
+  function _rowInScope(r) {
+    if (scope === 'kam')   return r.period_kam_email === kamEmail;
+    if (scope === 'tl')    return r.period_tl_email  === myTlEmail;
+    if (scope === 'admin') return true;
+    return r.period_kam_email === kamEmail;
+  }
+
+  // For TL/admin: internal team transfers collapse to core_nrr
+  function _effectiveMovement(r) {
+    if (scope === 'kam') return r.movement_type;
+    var sameTeam = r.base_kam_email && r.period_tl_email === myTlEmail
+      && (r.base_kam_email !== r.period_kam_email);
+    if (sameTeam && r.movement_type === 'transfer_out') return null;
+    if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
+    return r.movement_type;
+  }
+
+  var scopedRows = allRows.filter(_rowInScope);
+  if (!scopedRows.length) return null;
+
+  var base_month  = scopedRows[0].base_month || '2026-03';
+  var months      = [];
+  var monthSet    = {};
+  scopedRows.forEach(function(r){
+    if (!monthSet[r.period_month]){ monthSet[r.period_month]=1; months.push(r.period_month); }
+  });
+  months.sort();
+
+  // ── FIX: Build unique outlet base map ONCE — not per month ────────────
+  // outlet_id → { base_gmv, base_days }
+  // Use first occurrence (all rows for same outlet have same base values)
+  var baseMap = {}; // outlet_id → { gmv, days }
+  scopedRows.forEach(function(r){
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id]) {
+      baseMap[r.outlet_id] = {
+        gmv:  r.base_gmv,
+        days: r.base_days || 31
+      };
+    }
+  });
+
+  var base_gmv = 0;
+  var base_norm = 0; // normalized daily rate (true NRR denominator)
+  Object.keys(baseMap).forEach(function(oid){
+    var b = baseMap[oid];
+    base_gmv  += b.gmv;
+    base_norm += b.gmv / b.days;
+  });
+  var cohort_outlets = Object.keys(baseMap).length;
+
+  // ── Per-month aggregation ────────────────────────────────────────────────
+  var MOVEMENTS = ['core_nrr','core_nrr_churn','handover','new_sales',
+                   'expansion','comeback','transfer_in','transfer_out'];
+
+  var by_month = {};
+  months.forEach(function(month){
+    var monthRows = scopedRows.filter(function(r){ return r.period_month === month; });
+    var segments  = {};
+    var outlets   = {};
+    MOVEMENTS.forEach(function(m){ segments[m] = 0; outlets[m] = 0; });
+
+    // Numerator: deduplicate outlet_id per month
+    var seenOutlets = {};
+    var nrr_curr_norm = 0; // SUM(curr_gmv / curr_days) for unique core outlets
+
+    monthRows.forEach(function(r){
+      var mv = _effectiveMovement(r);
+      if (!mv) return;
+      segments[mv] = (segments[mv] || 0) + r.curr_gmv;
+      outlets[mv]  = (outlets[mv]  || 0) + 1;
+
+      // NRR numerator — core cohort, deduplicated per outlet per month
+      if ((mv === 'core_nrr' || mv === 'core_nrr_churn') && r.base_gmv > 0) {
+        if (!seenOutlets[r.outlet_id]) {
+          seenOutlets[r.outlet_id] = true;
+          var curr_days = r.curr_days || 30;
+          nrr_curr_norm += curr_days > 0 ? r.curr_gmv / curr_days : 0;
+        }
+      }
+    });
+
+    // NRR% = normalized curr / normalized base × 100
+    var nrr_pct = base_norm > 0
+      ? Math.round(nrr_curr_norm / base_norm * 100)
+      : null;
+
+    // total_gmv = all positive movements (excludes transfer_out, churn)
+    var total_gmv = MOVEMENTS
+      .filter(function(m){ return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
+      .reduce(function(s,m){ return s + (segments[m] || 0); }, 0);
+
+    by_month[month] = { nrr_pct: nrr_pct, total_gmv: total_gmv,
+                        segments: segments, outlets: outlets, rows: monthRows };
+  });
+
+  return {
+    quarter:        window._QNRR_QUARTER || '2026q2',
+    base_month:     base_month,
+    months:         months,
+    base_gmv:       base_gmv,
+    base_norm:      base_norm,
+    cohort_outlets: cohort_outlets,
+    by_month:       by_month
+  };
+}
+window._qnrrCompute = _qnrrCompute;
+
 // ════════════════════════════════════════════════════════════════════════════
-// Freshket Sense — Quarter NRR Health Sheet  (v753j)
+// Freshket Sense — Quarter NRR Health Sheet  (v753l)
 // src/07c_qnrr_view.js
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -211,9 +368,7 @@ function _qnrrRender(){
   if(!window.bulkQnrrData||!window.bulkQnrrData.loaded){_qnrrShowSkeleton();return;}
 
   _data=null;
-  if(typeof _tgtComputeQuarterNRR==='function'){
-    try{_data=_tgtComputeQuarterNRR(email,scope);}catch(e){console.warn('[qnrr]',e);}
-  }
+  try{_data=_qnrrCompute(email,scope);}catch(e){console.warn('[qnrr]',e);}
 
   _qnrrRenderBase();
   _qnrrRenderChart();
