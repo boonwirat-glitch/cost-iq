@@ -206,7 +206,8 @@
     // tiers → strip showed e.g. ฿7,500 (default ≥102% tier) then snapped to ฿10,000
     // (real DB tier ≥103%) — a money-trust violation. Treat tiers-not-ready as loading;
     // _commGatedRender's 'กำลังโหลด' peek + _tgtInitCheck both retry once tiers arrive.
-    var _tiersReady=(typeof _tgtLoaded!=='undefined')?!!_tgtLoaded:true;
+    // v754e: require DB fetch (not just localStorage cache) to prevent stale hardcoded tier flash
+    var _tiersReady=!!(window._tgtLoadedFromDB);
     var _stripLoading=!!src.loading||!_tiersReady;
     var finalAmt=_stripLoading?null:src.final;
     var paid=!_stripLoading&&finalAmt>0;
