@@ -1285,6 +1285,13 @@ function _pvInitCollapseObserver(){
 
   var expandedH = 0;       // measured on first scroll or init
   var rafId = 0;
+
+  // v753p: expose reset function so _tgtToggleDetail can force re-measure
+  window._pvResetExpandedH = function(){
+    expandedH = 0;  // force _frame() to re-measure on next tick
+    lastAppliedH = -1;
+    if(!rafId) rafId = requestAnimationFrame(_frame);
+  };
   // v672b: restore collapse state — use _pvWasCollapsed (snapshotted before scroll reset)
   // _pvLastCollapseMs may be stale if browser reset scroll before reinit
   var isCollapsed = !!(window._pvWasCollapsed||(window._pvLastCollapseMs||0)>0);
@@ -1346,14 +1353,12 @@ function _pvInitCollapseObserver(){
     rafId=0;
     if(!screen.classList.contains('on'))return;
 
-    // v669: Measure expandedH once (or re-measure if dirty/not yet done)
-    // v753n: _pvExpandedHDirty flag set by _tgtToggleDetail when detail panel opens/closes
-    if(expandedH<=0 || window._pvExpandedHDirty){
-      window._pvExpandedHDirty = false;
-      collapsible.style.maxHeight = '';  // clear constraint so scrollHeight is accurate
-      var newH = collapsible.scrollHeight || 200;
-      expandedH = newH;
-      lastAppliedH = -1;  // force DOM write on next iteration
+    // v669: Measure expandedH once (or re-measure if reset by _pvResetExpandedH)
+    if(expandedH<=0){
+      var prev=collapsible.style.maxHeight;
+      collapsible.style.maxHeight='';
+      expandedH=collapsible.scrollHeight||200;
+      collapsible.style.maxHeight=prev;
     }
 
     var y=_scrollTop();

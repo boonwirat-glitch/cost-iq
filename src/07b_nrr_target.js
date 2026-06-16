@@ -1075,14 +1075,13 @@ function _tgtToggleDetail(panelId, handleId) {
   const open=p.classList.toggle('open');
   h.classList.toggle('open',open);
 
-  // v753n: signal _frame() to re-measure expandedH on next tick
-  // expandedH is inside closure — can't set directly, use dirty flag
+  // v753p: force pv-collapsible to re-measure height to accommodate expanded panel
+  // expandedH was captured before panel existed → stale → clips panel
+  // _pvResetExpandedH() is exposed from _pvInitCollapseObserver closure
   try {
-    window._pvExpandedHDirty = true;
-    // Trigger scroll listener so _frame() runs immediately with new flag
-    var scr = document.getElementById('scr-portview');
-    if (scr) scr.dispatchEvent(new Event('scroll', {bubbles:true}));
-    else window.dispatchEvent(new Event('scroll'));
+    if (typeof window._pvResetExpandedH === 'function') {
+      window._pvResetExpandedH();
+    }
   } catch(e) {}
 }
 
