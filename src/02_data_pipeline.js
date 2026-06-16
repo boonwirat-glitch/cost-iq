@@ -840,6 +840,12 @@ function handleFileUpload(type,input){
         rowCount++;
       });
       console.log('[Q12B] sku_outlet loaded:',rowCount,'rows',Object.keys(bulkSkuOutletData).length,'accounts');
+      // v755b: re-render SKU signals หลัง outlet load เสร็จ เพื่อให้ tooltip แสดงทันที
+      try{
+        if(currentAccountId&&typeof renderKamThisMonth==='function'){
+          setTimeout(()=>{ try{ renderKamThisMonth(); }catch(e){} },50);
+        }
+      }catch(e){}
       _done();
     };reader.readAsText(file);return;
   }
@@ -1646,18 +1652,7 @@ async function _fetchKamFile({url,type,tab}){
 async function _fetchKamBundle(kamEmail){
   if(!kamEmail)return false;
   const safeKey=_kamSafeKey(kamEmail);
-  // v755: ถ้า bundle loaded แต่ outlet ยังว่าง (เช่น ไฟล์อยู่บน R2 หลัง bundle load แรก)
-  // ให้ retry outlet fetch อย่างเดียว ไม่ต้อง re-fetch skus/alts
-  if(_kamBundleLoaded.has(safeKey)){
-    if(typeof bulkSkuOutletData!=='undefined'&&!(bulkSkuOutletData[Object.keys(bulkSkuOutletData||{})[0]])){
-      // outlet ยังว่าง — retry outlet only
-      const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
-      _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-${safeKey}`})
-        .then(ok=>{ if(ok)console.log('[v755] outlet retry OK for',kamEmail); })
-        .catch(()=>{});
-    }
-    return true;
-  }
+  if(_kamBundleLoaded.has(safeKey))return true;
   if(_kamBundleInFlight[safeKey])return _kamBundleInFlight[safeKey];
   const p=(async()=>{
     try{
