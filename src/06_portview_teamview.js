@@ -111,15 +111,40 @@ function computeChurnSignals(){
       }
       continue;
     }
-    // zero orders → classify gone/near/not_yet as before
-    // Classify by how far past the expected reorder point we are
+    // zero orders → classify gone/near/approaching/not_yet
     let type;
-    if(daysElapsed<avgInterval)type='not_yet';           // ยังไม่ถึงรอบ
-    else if(daysElapsed<avgInterval*1.5)type='near';     // เพิ่งเลยรอบ — เฝ้าดู
-    else type='gone';                                     // เลยรอบมากแล้ว — น่าหาย
     const roundedInterval=Math.round(avgInterval);
     const daysLate=Math.max(0,Math.round(daysElapsed-avgInterval));
-    const daysUntil=Math.max(0,Math.round(avgInterval-daysElapsed));
+    let daysUntil=Math.max(0,Math.round(avgInterval-daysElapsed));
+    if(daysElapsed>=avgInterval*1.5){
+      type='gone';                                        // เลยรอบมากแล้ว — น่าหาย
+    } else if(daysElapsed>=avgInterval){
+      type='near';                                        // เพิ่งเลยรอบ — เฝ้าดู
+    } else if(orderCount===1&&(sku.last_order_date||'')!==''){
+      // SKU สั่ง 1 ครั้ง/เดือน — ใช้ lastOrderDay แทน avgInterval
+      // คาด: จะสั่งใกล้เดียวกับวันที่สั่งในเดือนที่แล้ว
+      const lastDay=new Date(sku.last_order_date).getDate();
+      const today=new Date();
+      const expectedDate=new Date(today.getFullYear(),today.getMonth(),lastDay);
+      const msLeft=expectedDate-today;
+      daysUntil=Math.max(0,Math.round(msLeft/(1000*60*60*24)));
+      if(msLeft<0){
+        // เลยวันที่คาดแล้วยังไม่สั่ง
+        type=Math.abs(msLeft)/(1000*60*60*24)>avgInterval*0.5?'gone':'near';
+      } else if(daysUntil<=5){
+        type='approaching';                               // ใกล้ถึงรอบ — แจ้งเตือน
+      } else {
+        type='not_yet';
+      }
+    } else {
+      // SKU สั่งหลายครั้ง/เดือน — ใช้ avgInterval เดิม
+      const approachThreshold=Math.max(5,Math.round(avgInterval*0.2));
+      if(daysUntil<=approachThreshold){
+        type='approaching';                               // ใกล้ถึงรอบ — แจ้งเตือน
+      } else {
+        type='not_yet';
+      }
+    }
     signals.push({
       id:String(sku.id||sku.item_id),
       name:sku.n||sku.name||sku.item_name_th||'—',
@@ -130,7 +155,7 @@ function computeChurnSignals(){
       gmv:sku.gmv||0
     });
   }
-  const typeOrder={gone:0,slow:1,near:2,not_yet:3};
+  const typeOrder={gone:0,slow:1,near:2,approaching:3,not_yet:4};
   signals.sort((a,b)=>{
     const td=(typeOrder[a.type]||0)-(typeOrder[b.type]||0);
     return td!==0?td:b.gmv-a.gmv;
