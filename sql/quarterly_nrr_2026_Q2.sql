@@ -114,6 +114,9 @@ mar_ownership AS (
 apr_ownership AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
+    CAST(o.account_id AS STRING)    AS account_id,
+    o.account_name,
+    o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date,
@@ -131,6 +134,9 @@ apr_ownership AS (
 may_ownership AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
+    CAST(o.account_id AS STRING)    AS account_id,
+    o.account_name,
+    o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
@@ -147,6 +153,9 @@ may_ownership AS (
 jun_ownership AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
+    CAST(o.account_id AS STRING)    AS account_id,
+    o.account_name,
+    o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner
   FROM `freshket-rn.dwh.order` o
@@ -244,9 +253,9 @@ apr_rows AS (
     '2026-04'                    AS period_month,
     '2026-03'                    AS base_month,
     ao.outlet_id,
-    COALESCE(mc.account_id, ao.outlet_id) AS account_id,
-    COALESCE(mc.account_name, '')         AS account_name,
-    COALESCE(mc.account_type, ao.account_type) AS account_type,
+    COALESCE(mc.account_id, ao.account_id, ao.outlet_id) AS account_id,
+    COALESCE(mc.account_name, ao.account_name, '')        AS account_name,
+    COALESCE(mc.account_type, ao.account_type, '')        AS account_type,
     k.kam_email                  AS period_kam_email,
     k.kam_name                   AS period_kam_name,
     k.tl_email                   AS period_tl_email,
@@ -350,9 +359,9 @@ may_rows AS (
     '2026-05'               AS period_month,
     '2026-03'               AS base_month,
     mo.outlet_id,
-    COALESCE(mc.account_id, mo.outlet_id) AS account_id,
-    COALESCE(mc.account_name, '')         AS account_name,
-    COALESCE(mc.account_type, mo.account_type) AS account_type,
+    COALESCE(mc.account_id, mo.account_id, mo.outlet_id) AS account_id,
+    COALESCE(mc.account_name, mo.account_name, '')        AS account_name,
+    COALESCE(mc.account_type, mo.account_type, '')        AS account_type,
     k.kam_email             AS period_kam_email,
     k.kam_name              AS period_kam_name,
     k.tl_email              AS period_tl_email,
@@ -433,9 +442,9 @@ jun_rows AS (
     '2026-06'               AS period_month,
     '2026-03'               AS base_month,
     jo.outlet_id,
-    COALESCE(mc.account_id, jo.outlet_id) AS account_id,
-    COALESCE(mc.account_name, '')         AS account_name,
-    COALESCE(mc.account_type, '')         AS account_type,
+    COALESCE(mc.account_id, jo.account_id, jo.outlet_id) AS account_id,
+    COALESCE(mc.account_name, jo.account_name, '')        AS account_name,
+    COALESCE(mc.account_type, jo.account_type, '')        AS account_type,
     k.kam_email             AS period_kam_email,
     k.kam_name              AS period_kam_name,
     k.tl_email              AS period_tl_email,
