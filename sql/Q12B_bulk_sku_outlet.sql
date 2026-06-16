@@ -31,7 +31,8 @@ WITH kam_list AS (
 kam_outlets AS (
   SELECT
     CAST(um.res_id AS STRING)       AS res_id,
-    CAST(um.account_guid AS STRING) AS account_id
+    CAST(um.account_guid AS STRING) AS account_id,
+    k.kam_email
   FROM `freshket-rn.dim.user_master` um
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
@@ -48,6 +49,7 @@ kam_outlets AS (
 -- raw: 2 เดือนเท่านั้น — เดือนที่แล้ว + MTD เดือนนี้
 raw AS (
   SELECT
+    ko.kam_email,
     ko.account_id,
     CAST(i.item_id AS STRING)          AS item_id,
     CAST(o.user_id AS STRING)          AS outlet_id,
@@ -61,7 +63,7 @@ raw AS (
   WHERE o.delivery_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), MONTH), INTERVAL 1 MONTH)
     AND o.delivery_date <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)
     AND i.item_id IS NOT NULL
-  GROUP BY 1, 2, 3, 5
+  GROUP BY 1, 2, 3, 4, 6
 ),
 
 -- outlet ที่สั่ง SKU นั้นในเดือนที่แล้ว — ใช้ INNER JOIN แทน correlated subquery
@@ -72,6 +74,7 @@ last_month_outlets AS (
 )
 
 SELECT
+  r.kam_email,   -- ← splitter ใช้ column นี้, ไม่อยู่ใน output file
   r.account_id,
   r.item_id,
   r.outlet_id,
@@ -90,5 +93,5 @@ INNER JOIN last_month_outlets lmo
   ON  r.account_id = lmo.account_id
   AND r.item_id    = lmo.item_id
   AND r.outlet_id  = lmo.outlet_id
-GROUP BY 1, 2, 3
-ORDER BY account_id, item_id, last_month_gmv DESC;
+GROUP BY 1, 2, 3, 4
+ORDER BY r.kam_email, account_id, item_id, last_month_gmv DESC;
