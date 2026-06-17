@@ -439,3 +439,37 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-family: var(--tk-font-mono); padding: 2px 18px 6px;
   flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ── Stats row: NRR GMV + active/churn per month ── */
+.qnrr-stats-row {
+  display: flex; align-items: stretch;
+  background: rgba(0,0,0,.15);
+  border-bottom: 1px solid var(--tk-border);
+  flex-shrink: 0; padding: 0 18px;
+}
+.qnrr-stat-slot {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: flex-start; padding: 8px 0 8px;
+  gap: 2px;
+}
+.qnrr-stat-divider {
+  width: 1px; background: var(--tk-border);
+  margin: 8px 12px;
+}
+.qnrr-stat-v {
+  font-size: 14px; font-weight: 800;
+  font-family: var(--tk-font-mono); letter-spacing: -.02em;
+  line-height: 1;
+}
+.qnrr-stat-sub {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; margin-top: 1px;
+}
+.qnrr-stat-active { color: #4ddc97; }
+.qnrr-stat-sep { color: rgba(255,255,255,.20); }
+.qnrr-stat-churn { color: rgba(229,62,62,.80); }
+.qnrr-stat-mo {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: rgba(255,255,255,.35); margin-top: 2px;
+  font-family: var(--tk-font-mono);
+}
