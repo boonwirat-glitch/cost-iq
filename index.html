@@ -1,4 +1,4 @@
-<!-- Freshket Sense v759: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v760: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v759',
+      version: 'v760',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -24700,7 +24700,23 @@ function __legacyRenderKamThisMonthFallback(){
     html+=`<div class="kam-dc" style="margin-bottom:12px">
       <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:rgba(80,220,160,.85)">สัญญาณบวกเดือนนี้</span></div>
       <div class="kam-dc-body">`;
-    // v759: outlet tooltip helper for positive signals
+    // v760: commission badge — match subclass to p1/p3 groups
+    const _commNewSet=new Set(),_commUpsellSet=new Set();
+    try{
+      const _cp=typeof _commBuildKamPayout==='function'?_commBuildKamPayout(currentUserProfile&&currentUserProfile.email):null;
+      (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p1&&_cp.upsell_sku.p1.groups||[]).forEach(g=>{if(g.groupKey)_commNewSet.add(g.groupKey.toUpperCase());});
+      (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p3&&_cp.upsell_sku.p3.groups||[]).forEach(g=>{if(g.groupKey)_commUpsellSet.add(g.groupKey.toUpperCase());});
+    }catch(e){}
+    const _subclassMap=new Map();
+    (D.skus_monthly[_prevClosedMoA]||D.skus||[]).forEach(s=>{if(s.id||s.item_id)_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());});
+    const _commBadge=(subclass)=>{
+      if(!subclass)return'';
+      const sc=subclass.toUpperCase();
+      if(_commNewSet.has(sc))return`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(80,220,160,.12);color:rgba(80,220,160,.85);border:0.5px solid rgba(80,220,160,.25);margin-left:5px;letter-spacing:.3px">new</span>`;
+      if(_commUpsellSet.has(sc))return`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(100,180,255,.1);color:rgba(100,180,255,.85);border:0.5px solid rgba(100,180,255,.25);margin-left:5px;letter-spacing:.3px">upsell</span>`;
+      return'';
+    };
+    // v759: outlet tooltip helper
     const _posOutletTip=(itemId,nameForId)=>{
       const _od=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(itemId)]:null;
       if(!_od||!_od.length)return{html:'',chevron:'',onclick:''};
@@ -24716,7 +24732,9 @@ function __legacyRenderKamThisMonthFallback(){
       html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">เพิ่งเริ่มสั่ง (${newThisMonth.length})</div>`;
       html+=newThisMonth.map(s=>{
         const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.item_name_th||'—'}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);margin-left:5px;font-weight:700;letter-spacing:.3px">MTD</span></div></div>`;
+        const _sc=_subclassMap.get(String(s.item_id))||'';
+        const _badge=_commBadge(_sc);
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.item_name_th||'—'}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);font-weight:700;letter-spacing:.3px">MTD</span></div></div>`;
       }).join('');
     }
     if(growing.length){
@@ -24725,7 +24743,9 @@ function __legacyRenderKamThisMonthFallback(){
       html+=growing.map(s=>{
         const projInc=Math.max(0,s.projGmv-s.lastGmv);
         const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.name}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
+        const _sc=_subclassMap.get(String(s.item_id))||'';
+        const _badge=_commBadge(_sc);
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.name}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
       }).join('');
     }
     html+=`</div></div>`;
