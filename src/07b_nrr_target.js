@@ -1240,6 +1240,10 @@ setTimeout(async function _tgtInitCheck() {
   await loadTargets(_tgtCurrentQuarter());
   // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
+  // v761: also call _commGatedRender with key reset — _tgtLoadedFromDB now true so
+  // _dataKey returns new value → re-render fires even if R2 was already loaded before this point
+  try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+  try{ if(typeof window._commGatedRender==='function') window._commGatedRender(); }catch(e){}
   // NRR/target bars need portview GMV — wait for allCriticalReady
   (function _waitAndRenderBars(){
     if(typeof allCriticalReady==='function' && !allCriticalReady()){
@@ -1290,7 +1294,11 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var hh = (typeof bulkHistoryData!=='undefined' && bulkHistoryData) ? Object.keys(bulkHistoryData).length : -1;
       var r  = (typeof getCurrentRole==='function') ? getCurrentRole()
                 : ((window.currentUserProfile&&window.currentUserProfile.role)||'');
-      return r + ':' + ph + ':' + hh;
+      // v761: include _tgtLoadedFromDB in key — when Supabase tiers load after R2 data,
+      // key changes from '0' → '1' → triggers re-render → commission strip shows real value
+      // without this, key was frozen once R2 loaded → commission stuck on 'กำลังโหลด'
+      var db = window._tgtLoadedFromDB ? '1' : '0';
+      return r + ':' + ph + ':' + hh + ':' + db;
     }catch(e){ return ''; }
   }
 
