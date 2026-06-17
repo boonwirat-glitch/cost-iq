@@ -1,38 +1,30 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql
+-- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v3)
 -- ════════════════════════════════════════════════════════════════════════════
 --
--- Purpose: classify every outlet per Q2 month (Apr/May/Jun) relative to
---          a FIXED base month (Mar 2026). Powers the Quarter Health Screen
---          in Freshket Sense.
+-- v3 fixes (vs v2):
+--   FIX 1: outlet_first_dollar CTE แยกต่างหาก — ไม่ดึง first_dollar_date
+--           ผ่าน delivery_date filter ป้องกัน NULL ที่ไม่ควรมี
+--   FIX 2: comeback เพิ่มเงื่อนไข mar_any.outlet_id IS NULL — กันร้านที่
+--           อยู่กับ KAM อื่นใน Mar ไม่ให้ misclassify เป็น comeback
+--   FIX 3: apr_labels CTE — lock movement label ของทุก outlet ตั้งแต่ Apr
+--           May/Jun inherit label จาก apr_labels แทนการ re-classify ใหม่
+--           ทำให้ core cohort fixed ตลอด Q (handover/new_sales ไม่กลายเป็น core)
 --
--- Base month: Mar 2026 — "who owned what in Mar, and how much GMV"
--- Target months: Apr, May, Jun 2026
---
--- Ownership resolution: dwh.order.staff_owner ณ เดือนที่วัด
---   (same as May2026_KAM_portfolio_reconcile.sql — ground truth for commission)
---   ไม่ใช้ dim.user_master เป็น primary เพราะ snapshot ล่าสุดเท่านั้น
---   ทำให้ ownership ย้อนหลังผิดได้ถ้า KAM โอน outlet หลัง run SQL
---
--- Classification: outlet ถูก classify ครั้งเดียวจาก Mar base
---   label คง fixed ตลอด Q ยกเว้น core_nrr vs core_nrr_churn (dynamic per month)
---
--- Movement labels:
---   core_nrr       — Mar cohort + ยังอยู่กับ KAM เดิม + มี GMV เดือนนั้น
---   core_nrr_churn — Mar cohort + ยังอยู่กับ KAM เดิม + ไม่มี GMV เดือนนั้น
---   handover       — รับจาก Sales ใน Mar (new_user_exp_date=2026-03) → fixed ทั้ง Q
---   new_sales      — รับจาก Sales ใน Apr (new_user_exp_date=2026-04) → fixed May/Jun
---   expansion      — ไม่มีใน Mar cohort + first_dollar ใน Q → fixed
---   transfer_in    — ไม่มีใน Mar cohort + มาจาก KAM อื่น/ลาออก → fixed
---   transfer_out   — Mar cohort + โอนออก → fixed (may_gmv=0)
+-- Movement definitions (confirmed with Bucci 2026-06-17):
+--   core_nrr       — Mar cohort (active Mar) + KAM เดิม + GMV > 0
+--   core_nrr_churn — Mar cohort + KAM เดิม + GMV = 0 (dynamic per month)
+--   handover       — new_user_exp_date = Mar 2026 → fixed ทั้ง Q
+--   new_sales      — new_user_exp_date = Apr/May/Jun 2026 → fixed ทั้ง Q
+--   expansion      — first_dollar >= 2026-04-01 (ร้านใหม่แท้ใน Q) + GMV > 0
+--   comeback       — first_dollar < 2026-04-01 + ไม่อยู่ Mar cohort ของ KAM ใดเลย + GMV > 0
+--   transfer_in    — ย้ายมาจาก KAM/AD/PM/Admin อื่น → KAM คนนี้
+--   transfer_out   — Mar cohort ของ KAM นี้ → เปลี่ยน owner ออกไป
 --
 -- NRR computation:
---   denominator = SUM(base_gmv) ของ core_nrr cohort (Mar GMV, fixed)
---   numerator   = SUM(curr_gmv) ของ core_nrr + core_nrr_churn (per month)
---   NRR%        = normalize by days (curr/curr_days) / (base/mar_days) × 100
---
--- Output grain: 1 row per outlet × period_month
--- R2 file: sense_qnrr_2026q2_${kam_safe_key}.csv (split per KAM downstream)
+--   denominator = SUM(base_gmv / base_days) per unique outlet in Mar cohort (fixed)
+--   numerator   = SUM(curr_gmv / curr_days) for core_nrr + core_nrr_churn outlets
+--   NRR%        = numerator / denominator × 100
 --
 -- ════════════════════════════════════════════════════════════════════════════
 
@@ -41,12 +33,10 @@ WITH
 -- ── 1. Date anchors ──────────────────────────────────────────────────────────
 params AS (
   SELECT
-    -- Base month (fixed denominator)
     DATE('2026-03-01') AS base_start,
     DATE('2026-03-31') AS base_end,
     31                  AS base_days,
 
-    -- Q2 target months
     DATE('2026-04-01') AS apr_start,
     DATE('2026-04-30') AS apr_end,
     30                  AS apr_days,
@@ -56,19 +46,14 @@ params AS (
     31                  AS may_days,
 
     DATE('2026-06-01') AS jun_start,
-    DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY) AS jun_end,  -- day-1 lag (same as portview)
+    DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY) AS jun_end,
     DATE_DIFF(
       DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY),
       DATE('2026-06-01'), DAY
-    ) + 1               AS jun_days,  -- วันที่มีข้อมูลจริง (16 มิ.ย. → 15 วัน)
-
-    -- ever_seen lookback (comeback vs expansion)
-    DATE('2024-11-01') AS history_start   -- align with commission SQL (18M lookback)
+    ) + 1               AS jun_days
 ),
 
 -- ── 2. KAM roster ────────────────────────────────────────────────────────────
--- Source of truth: same list as portview + commission SQLs
--- Add/remove KAMs here when roster changes
 kam_list AS (
   SELECT kam_name, kam_email, tl_email FROM UNNEST([
     STRUCT('Anusorn (Bookbig) Khamphasuk'         AS kam_name, 'anusorn.k@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
@@ -89,11 +74,20 @@ kam_list AS (
   ])
 ),
 
--- ── 3. Ownership per outlet per month (dwh.order — last order ณ เดือนนั้น) ──
--- Pattern: เหมือน May2026_KAM_portfolio_reconcile.sql
--- ใช้ QUALIFY ROW_NUMBER() เพื่อเอา order ล่าสุดต่อ outlet ต่อเดือน
--- → ownership ตรงกับ commission ground truth
+-- ── 3. FIX 1: outlet_first_dollar — ไม่มี date range filter ─────────────────
+outlet_first_dollar AS (
+  SELECT
+    CAST(o.user_id AS STRING)      AS outlet_id,
+    DATE(MIN(o.first_dollar_date)) AS first_dollar_date
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.user_id IS NOT NULL
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.first_dollar_date IS NOT NULL
+  GROUP BY 1
+),
 
+-- ── 4. Ownership per outlet per month ────────────────────────────────────────
+-- ไม่ดึง first_dollar_date จาก ownership CTEs อีกต่อไป — ใช้ outlet_first_dollar แทน
 mar_ownership AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
@@ -102,8 +96,7 @@ mar_ownership AS (
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
-    DATE(o.new_user_exp_date)       AS new_user_exp_date,
-    DATE(o.first_dollar_date)       AS first_dollar_date
+    DATE(o.new_user_exp_date)       AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
@@ -122,8 +115,7 @@ apr_ownership AS (
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
-    DATE(o.new_user_exp_date)       AS new_user_exp_date,
-    DATE(o.first_dollar_date)       AS first_dollar_date
+    DATE(o.new_user_exp_date)       AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
@@ -141,9 +133,8 @@ may_ownership AS (
     o.account_name,
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner)             AS staff_owner,
-    DATE(o.new_user_exp_date)       AS new_user_exp_date,
-    DATE(o.first_dollar_date)       AS first_dollar_date
+    TRIM(o.staff_owner)             AS staff_owner
+    -- ไม่ดึง new_user_exp_date จาก May — ใช้จาก apr_labels แทน (FIX 3)
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
@@ -161,8 +152,8 @@ jun_ownership AS (
     o.account_name,
     o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner)             AS staff_owner,
-    DATE(o.first_dollar_date)       AS first_dollar_date
+    TRIM(o.staff_owner)             AS staff_owner
+    -- ไม่ดึง new_user_exp_date จาก Jun — ใช้จาก apr_labels แทน (FIX 3)
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
@@ -173,7 +164,7 @@ jun_ownership AS (
   ) = 1
 ),
 
--- ── 4. GMV per outlet per month ───────────────────────────────────────────────
+-- ── 5. GMV per outlet per month ───────────────────────────────────────────────
 base_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id,
          ROUND(SUM(o.gmv_ex_vat), 0) AS gmv
@@ -211,15 +202,7 @@ jun_gmv AS (
   GROUP BY 1
 ),
 
--- ── 5. ever_seen — dropped (v2) ──────────────────────────────────────────────
--- ไม่ใช้ ever_seen table แล้ว ใช้ first_dollar_date แทน (align กับ commission SQL)
--- expansion  = first_dollar_date >= 2026-04-01 (เกิดใหม่ใน Q)
--- comeback   = first_dollar_date <  2026-04-01 (เคยซื้อมาก่อน + กลับมา)
--- transfer_in = first_dollar_date IS NULL หรือมาจาก KAM อื่น
-
--- ── 6a. current_kam_snapshot — user_master ณ ขณะ run SQL ─────────────────────
--- ใช้แยก core_nrr_churn (ยังอยู่กับ KAM เดิม) vs transfer_out (โอนออกแล้ว)
--- สำหรับ outlet ที่ "เงียบ" ไม่มี order เดือนนั้นเลย
+-- ── 6. current_kam_snapshot ───────────────────────────────────────────────────
 current_kam_snapshot AS (
   SELECT
     CAST(um.res_id AS STRING) AS outlet_id,
@@ -236,9 +219,7 @@ current_kam_snapshot AS (
   ) = 1
 ),
 
--- ── 6. Mar KAM cohort — core set ที่ใช้เป็น Q2 base ──────────────────────────
--- outlet ที่ Mar ownership = KAM ใน roster + มี GMV Mar
--- นี่คือ denominator ของ NRR ตลอด Q
+-- ── 7. Mar KAM cohort ─────────────────────────────────────────────────────────
 mar_cohort AS (
   SELECT
     mo.outlet_id,
@@ -246,7 +227,7 @@ mar_cohort AS (
     mo.account_name,
     mo.account_type,
     mo.new_user_exp_date,
-    mo.first_dollar_date,
+    ofd.first_dollar_date,
     k.kam_email  AS base_kam_email,
     k.kam_name   AS base_kam_name,
     k.tl_email   AS base_tl_email,
@@ -255,117 +236,129 @@ mar_cohort AS (
   JOIN kam_list k
     ON mo.commercial_owner = 'KAM'
    AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
-  LEFT JOIN base_gmv bg ON mo.outlet_id = bg.outlet_id
-  -- กรอง: ต้องมี GMV Mar (เป็น active outlet ใน Mar)
+  LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE COALESCE(bg.gmv, 0) > 0
 ),
 
--- ── 7. Universe per target month — รวม mar_cohort + ร้านใหม่ที่เข้ามาใน Q ──
--- ใช้ UNION ALL 3 เดือน แล้ว classify movement per row
-
--- ────────────────────────────────────────────────────────────────────────────
--- MONTH: April
--- ────────────────────────────────────────────────────────────────────────────
-apr_rows AS (
-  -- LEG 1A: outlets ที่ Apr ownership = KAM ใน roster
-  -- classify: core_nrr, core_nrr_churn, handover, new_sales, expansion, transfer_in
+-- ── 8. FIX 3: apr_labels — lock classification ของทุก outlet ตั้งแต่ Apr ──────
+-- May/Jun จะ inherit label จาก CTE นี้แทนการ re-classify ใหม่
+-- ทำให้ handover/new_sales ไม่กลายเป็น core ใน May/Jun
+-- core_nrr vs core_nrr_churn ยังคง dynamic (ขึ้นกับ curr_gmv แต่ละเดือน)
+-- แต่ label หลัก (handover/new_sales/expansion/comeback/transfer_in) = fixed
+apr_labels AS (
   SELECT
-    '2026-04'                    AS period_month,
-    '2026-03'                    AS base_month,
     ao.outlet_id,
+    k.kam_email AS period_kam_email,
     COALESCE(mc.account_id, ao.account_id, ao.outlet_id) AS account_id,
     COALESCE(mc.account_name, ao.account_name, '')        AS account_name,
     COALESCE(mc.account_type, ao.account_type, '')        AS account_type,
-    k.kam_email                  AS period_kam_email,
-    k.kam_name                   AS period_kam_name,
-    k.tl_email                   AS period_tl_email,
+    k.kam_name  AS period_kam_name,
+    k.tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
-    COALESCE(mc.base_gmv, 0)     AS base_gmv,
-    COALESCE(ag.gmv, 0)          AS curr_gmv,
+    COALESCE(mc.base_gmv, 0) AS base_gmv,
 
+    -- Fixed label — ใช้ตลอด Q สำหรับ non-core movements
     CASE
-      -- [1] Handover: รับจาก Sales ใน Mar → fixed label ทั้ง Q
+      -- handover: new_user_exp_date = Mar
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
         THEN 'handover'
-
-      -- [2] New Sales: รับจาก Sales ใน Apr → fixed May/Jun (ใน Apr นี้ยังเป็น new_sales)
-      WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-04'
+      -- new_sales: new_user_exp_date = Apr/May/Jun
+      WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
-
-      -- [3] Core NRR: อยู่ใน Mar cohort, KAM เดิม, มี GMV
-      WHEN mc.base_kam_email IS NOT NULL
-        AND mc.base_kam_email = k.kam_email
-        AND COALESCE(ag.gmv, 0) > 0
-        THEN 'core_nrr'
-
-      -- [4] Core NRR Churn: อยู่ใน Mar cohort, KAM เดิม, ไม่มี GMV
-      WHEN mc.base_kam_email IS NOT NULL
-        AND mc.base_kam_email = k.kam_email
-        AND COALESCE(ag.gmv, 0) = 0
-        THEN 'core_nrr_churn'
-
-      -- [5] Transfer In: รับจาก KAM อื่นใน roster (มีใน Mar cohort ของคนอื่น)
-      WHEN mc.base_kam_email IS NOT NULL
-        AND mc.base_kam_email != k.kam_email
+      -- core: อยู่ Mar cohort + KAM เดิม (dynamic per month ใน final select)
+      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email = k.kam_email
+        THEN 'core'
+      -- transfer_in: อยู่ Mar cohort ของ KAM อื่น
+      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email != k.kam_email
         THEN 'transfer_in'
-
-      -- [6] Expansion: ร้านใหม่แท้ — first_dollar_date อยู่ใน Q (Apr-Jun)
-      -- ใช้ first_dollar_date เหมือน commission SQL (ไม่ใช้ ever_seen table)
+      -- expansion: first_dollar ใน Q
       WHEN mc.base_kam_email IS NULL
-        AND ao.first_dollar_date >= '2026-04-01'
-        AND COALESCE(ag.gmv, 0) > 0
+        AND ofd.first_dollar_date >= '2026-04-01'
         THEN 'expansion'
-
-      -- [7] Comeback: เคยซื้อก่อน Apr (first_dollar < Apr) + ไม่อยู่ Mar cohort + กลับมา
+      -- comeback: FIX 2 — ต้องไม่อยู่ Mar cohort ของ KAM ใดเลย
       WHEN mc.base_kam_email IS NULL
-        AND ao.first_dollar_date < '2026-04-01'
-        AND ao.first_dollar_date IS NOT NULL
-        AND COALESCE(ag.gmv, 0) > 0
+        AND mar_any.outlet_id IS NULL
+        AND ofd.first_dollar_date < '2026-04-01'
         THEN 'comeback'
-
-      -- [8] Transfer In: ไม่มีใน Mar cohort + ไม่มี first_dollar (ไม่รู้ที่มา)
+      -- transfer_in: อยู่กับ KAM อื่นใน Mar
       WHEN mc.base_kam_email IS NULL
+        AND mar_any.outlet_id IS NOT NULL
         THEN 'transfer_in'
-
       ELSE 'transfer_in'
-    END AS movement_type
+    END AS fixed_label
 
   FROM apr_ownership ao
   JOIN kam_list k
     ON ao.commercial_owner = 'KAM'
    AND TRIM(ao.staff_owner) = TRIM(k.kam_name)
-  LEFT JOIN mar_cohort mc ON ao.outlet_id = mc.outlet_id
-  LEFT JOIN apr_gmv    ag ON ao.outlet_id = ag.outlet_id
+  LEFT JOIN mar_cohort mc           ON ao.outlet_id = mc.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
+  LEFT JOIN (SELECT DISTINCT outlet_id FROM mar_cohort) mar_any
+    ON ao.outlet_id = mar_any.outlet_id
+),
+
+-- ── 9. MONTH: April ───────────────────────────────────────────────────────────
+apr_rows AS (
+
+  -- LEG 1A: outlets ที่ Apr ownership = KAM ใน roster
+  SELECT
+    '2026-04'         AS period_month,
+    '2026-03'         AS base_month,
+    al.outlet_id,
+    al.account_id,
+    al.account_name,
+    al.account_type,
+    al.period_kam_email,
+    al.period_kam_name,
+    al.period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    al.base_gmv,
+    COALESCE(ag.gmv, 0) AS curr_gmv,
+
+    -- Apr: resolve core → core_nrr or core_nrr_churn based on GMV
+    CASE
+      WHEN al.fixed_label = 'core' AND COALESCE(ag.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core' AND COALESCE(ag.gmv, 0) = 0 THEN 'core_nrr_churn'
+      -- expansion ต้องมี GMV ถึงจะนับ
+      WHEN al.fixed_label = 'expansion' AND COALESCE(ag.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(ag.gmv, 0) = 0 THEN 'transfer_in'
+      -- comeback ต้องมี GMV
+      WHEN al.fixed_label = 'comeback' AND COALESCE(ag.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback' AND COALESCE(ag.gmv, 0) = 0 THEN 'transfer_in'
+      ELSE al.fixed_label
+    END AS movement_type
+
+  FROM apr_labels al
+  LEFT JOIN apr_gmv ag ON al.outlet_id = ag.outlet_id
 
   UNION ALL
 
-  -- LEG 1B: transfer_out — อยู่ใน Mar cohort แต่ Apr ownership เปลี่ยน KAM
+  -- LEG 1B: transfer_out — Mar cohort แต่ Apr ownership เปลี่ยน KAM
   SELECT
-    '2026-04'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-04'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
-    'transfer_out'          AS movement_type
+    0                 AS curr_gmv,
+    'transfer_out'    AS movement_type
 
   FROM mar_cohort mc
-  -- Apr owner เป็น KAM คนอื่นใน roster
   JOIN apr_ownership ao ON mc.outlet_id = ao.outlet_id
   JOIN kam_list k_apr
     ON ao.commercial_owner = 'KAM'
    AND TRIM(ao.staff_owner) = TRIM(k_apr.kam_name)
    AND k_apr.kam_email != mc.base_kam_email
-
-  -- ไม่ต้องการ outlet ที่ยังอยู่กับ KAM เดิม (จัดการโดย LEG 1A แล้ว)
   WHERE mc.outlet_id NOT IN (
     SELECT ao2.outlet_id FROM apr_ownership ao2
     JOIN kam_list k2
@@ -376,112 +369,92 @@ apr_rows AS (
 
   UNION ALL
 
-  -- ── LEG 1C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order Apr เลย ──────
-  -- ไม่ปรากฏใน apr_ownership → LEG 1A จับไม่ได้
-  -- แยก: ยังอยู่กับ KAM เดิม (user_master) = core_nrr_churn
-  --       เปลี่ยน KAM แล้ว (user_master) = transfer_out
+  -- LEG 1C: silent outlets
   SELECT
-    '2026-04'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-04'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
+    0                 AS curr_gmv,
     CASE
       WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
       ELSE 'transfer_out'
-    END                     AS movement_type
+    END               AS movement_type
 
   FROM mar_cohort mc
   LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
-
-  -- ไม่มี order Apr เลย (ไม่ปรากฏใน apr_ownership ไม่ว่า KAM ใด)
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM apr_ownership)
 ),
 
--- ────────────────────────────────────────────────────────────────────────────
--- MONTH: May
--- Same logic แต่ inherit fixed classification จาก Apr rows (handover/new_sales/expansion/transfer_in)
--- ────────────────────────────────────────────────────────────────────────────
+-- ── 10. MONTH: May ────────────────────────────────────────────────────────────
+-- FIX 3: ใช้ apr_labels เป็น source of truth ไม่ re-classify ใหม่
 may_rows AS (
-  -- LEG 2A: May ownership = KAM ใน roster
+
+  -- LEG 2A
   SELECT
-    '2026-05'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-05'         AS period_month,
+    '2026-03'         AS base_month,
     mo.outlet_id,
-    COALESCE(mc.account_id, mo.account_id, mo.outlet_id) AS account_id,
-    COALESCE(mc.account_name, mo.account_name, '')        AS account_name,
-    COALESCE(mc.account_type, mo.account_type, '')        AS account_type,
-    k.kam_email             AS period_kam_email,
-    k.kam_name              AS period_kam_name,
-    k.tl_email              AS period_tl_email,
-    mc.base_kam_email,
-    mc.base_kam_name,
-    COALESCE(mc.base_gmv, 0) AS base_gmv,
+    COALESCE(al.account_id, mo.account_id, mo.outlet_id) AS account_id,
+    COALESCE(al.account_name, mo.account_name, '')        AS account_name,
+    COALESCE(al.account_type, mo.account_type, '')        AS account_type,
+    k.kam_email       AS period_kam_email,
+    k.kam_name        AS period_kam_name,
+    k.tl_email        AS period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    COALESCE(al.base_gmv, 0) AS base_gmv,
     COALESCE(mg.gmv, 0)      AS curr_gmv,
 
+    -- May: inherit fixed_label จาก apr_labels, resolve core → nrr/churn
     CASE
-      -- Fixed labels จาก Q classification (handover/new_sales inherit ตลอด Q)
-      WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03'
-        THEN 'handover'
-      WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) IN ('2026-04','2026-05')
-        THEN 'new_sales'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email = k.kam_email
-        AND COALESCE(mg.gmv, 0) > 0
-        THEN 'core_nrr'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email = k.kam_email
-        AND COALESCE(mg.gmv, 0) = 0
-        THEN 'core_nrr_churn'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email != k.kam_email
-        THEN 'transfer_in'
-      -- Expansion: first_dollar ใน Q (Apr-Jun)
-      WHEN mc.base_kam_email IS NULL
-        AND mo.first_dollar_date >= '2026-04-01'
-        AND COALESCE(mg.gmv, 0) > 0
-        THEN 'expansion'
-      -- Comeback: เคยซื้อก่อน Apr + ไม่อยู่ Mar cohort + กลับมา
-      WHEN mc.base_kam_email IS NULL
-        AND mo.first_dollar_date < '2026-04-01'
-        AND mo.first_dollar_date IS NOT NULL
-        AND COALESCE(mg.gmv, 0) > 0
-        THEN 'comeback'
-      WHEN mc.base_kam_email IS NULL
-        THEN 'transfer_in'
-      ELSE 'transfer_in'
+      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv, 0) = 0 THEN 'core_nrr_churn'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
+      -- outlet ใหม่ที่เข้ามาใน May แต่ไม่มีใน apr_labels = new_sales
+      WHEN al.outlet_id IS NULL THEN 'new_sales'
+      ELSE al.fixed_label
     END AS movement_type
 
   FROM may_ownership mo
   JOIN kam_list k
     ON mo.commercial_owner = 'KAM'
    AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
-  LEFT JOIN mar_cohort mc ON mo.outlet_id = mc.outlet_id
-  LEFT JOIN may_gmv    mg ON mo.outlet_id = mg.outlet_id
+  -- FIX 3: JOIN apr_labels แทนการ re-classify
+  LEFT JOIN apr_labels al
+    ON mo.outlet_id = al.outlet_id
+   AND al.period_kam_email = k.kam_email
+  LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
 
   UNION ALL
 
   -- LEG 2B: transfer_out ของ May
   SELECT
-    '2026-05'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-05'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
-    'transfer_out'          AS movement_type
+    0                 AS curr_gmv,
+    'transfer_out'    AS movement_type
 
   FROM mar_cohort mc
   JOIN may_ownership mo ON mc.outlet_id = mo.outlet_id
@@ -489,7 +462,6 @@ may_rows AS (
     ON mo.commercial_owner = 'KAM'
    AND TRIM(mo.staff_owner) = TRIM(k_may.kam_name)
    AND k_may.kam_email != mc.base_kam_email
-
   WHERE mc.outlet_id NOT IN (
     SELECT mo2.outlet_id FROM may_ownership mo2
     JOIN kam_list k2
@@ -500,109 +472,89 @@ may_rows AS (
 
   UNION ALL
 
-  -- ── LEG 2C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order May เลย ──────
+  -- LEG 2C: silent outlets May
   SELECT
-    '2026-05'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-05'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
+    0                 AS curr_gmv,
     CASE
       WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
       ELSE 'transfer_out'
-    END                     AS movement_type
+    END               AS movement_type
 
   FROM mar_cohort mc
   LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
-
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM may_ownership)
 ),
 
--- ────────────────────────────────────────────────────────────────────────────
--- MONTH: June
--- ────────────────────────────────────────────────────────────────────────────
+-- ── 11. MONTH: June ───────────────────────────────────────────────────────────
 jun_rows AS (
+
   -- LEG 3A
   SELECT
-    '2026-06'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-06'         AS period_month,
+    '2026-03'         AS base_month,
     jo.outlet_id,
-    COALESCE(mc.account_id, jo.account_id, jo.outlet_id) AS account_id,
-    COALESCE(mc.account_name, jo.account_name, '')        AS account_name,
-    COALESCE(mc.account_type, jo.account_type, '')        AS account_type,
-    k.kam_email             AS period_kam_email,
-    k.kam_name              AS period_kam_name,
-    k.tl_email              AS period_tl_email,
-    mc.base_kam_email,
-    mc.base_kam_name,
-    COALESCE(mc.base_gmv, 0) AS base_gmv,
+    COALESCE(al.account_id, jo.account_id, jo.outlet_id) AS account_id,
+    COALESCE(al.account_name, jo.account_name, '')        AS account_name,
+    COALESCE(al.account_type, jo.account_type, '')        AS account_type,
+    k.kam_email       AS period_kam_email,
+    k.kam_name        AS period_kam_name,
+    k.tl_email        AS period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    COALESCE(al.base_gmv, 0) AS base_gmv,
     COALESCE(jg.gmv, 0)      AS curr_gmv,
 
+    -- Jun: inherit fixed_label จาก apr_labels
     CASE
-      -- handover: new_user_exp_date = Mar (fixed for whole Q — use Apr ownership as proxy)
-      WHEN FORMAT_DATE('%Y-%m', ao_jun.new_user_exp_date) = '2026-03'
-        THEN 'handover'
-      -- new_sales: new_user_exp_date = Apr or May (rับจาก Sales ใน Q, fixed)
-      WHEN FORMAT_DATE('%Y-%m', ao_jun.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        THEN 'new_sales'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email = k.kam_email
-        AND COALESCE(jg.gmv, 0) > 0
-        THEN 'core_nrr'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email = k.kam_email
-        AND COALESCE(jg.gmv, 0) = 0
-        THEN 'core_nrr_churn'
-      WHEN mc.base_kam_email IS NOT NULL AND mc.base_kam_email != k.kam_email
-        THEN 'transfer_in'
-      -- Expansion: first_dollar ใน Q (Apr-Jun)
-      WHEN mc.base_kam_email IS NULL
-        AND jo.first_dollar_date >= '2026-04-01'
-        AND COALESCE(jg.gmv, 0) > 0
-        THEN 'expansion'
-      -- Comeback: เคยซื้อก่อน Apr + ไม่อยู่ Mar cohort + กลับมา
-      WHEN mc.base_kam_email IS NULL
-        AND jo.first_dollar_date < '2026-04-01'
-        AND jo.first_dollar_date IS NOT NULL
-        AND COALESCE(jg.gmv, 0) > 0
-        THEN 'comeback'
-      WHEN mc.base_kam_email IS NULL
-        THEN 'transfer_in'
-      ELSE 'transfer_in'
+      WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv, 0) = 0 THEN 'core_nrr_churn'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(jg.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NULL THEN 'new_sales'
+      ELSE al.fixed_label
     END AS movement_type
 
   FROM jun_ownership jo
   JOIN kam_list k
     ON jo.commercial_owner = 'KAM'
    AND TRIM(jo.staff_owner) = TRIM(k.kam_name)
-  LEFT JOIN mar_cohort   mc     ON jo.outlet_id = mc.outlet_id
-  LEFT JOIN apr_ownership ao_jun ON jo.outlet_id = ao_jun.outlet_id  -- for handover/new_sales new_user_exp_date
-  LEFT JOIN jun_gmv      jg     ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN apr_labels al
+    ON jo.outlet_id = al.outlet_id
+   AND al.period_kam_email = k.kam_email
+  LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
 
   UNION ALL
 
   -- LEG 3B: transfer_out ของ Jun
   SELECT
-    '2026-06'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-06'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
-    'transfer_out'          AS movement_type
+    0                 AS curr_gmv,
+    'transfer_out'    AS movement_type
 
   FROM mar_cohort mc
   JOIN jun_ownership jo ON mc.outlet_id = jo.outlet_id
@@ -610,7 +562,6 @@ jun_rows AS (
     ON jo.commercial_owner = 'KAM'
    AND TRIM(jo.staff_owner) = TRIM(k_jun.kam_name)
    AND k_jun.kam_email != mc.base_kam_email
-
   WHERE mc.outlet_id NOT IN (
     SELECT jo2.outlet_id FROM jun_ownership jo2
     JOIN kam_list k2
@@ -621,33 +572,32 @@ jun_rows AS (
 
   UNION ALL
 
-  -- ── LEG 3C: silent outlets — อยู่ใน Mar cohort แต่ไม่มี order Jun เลย ──────
+  -- LEG 3C: silent outlets Jun
   SELECT
-    '2026-06'               AS period_month,
-    '2026-03'               AS base_month,
+    '2026-06'         AS period_month,
+    '2026-03'         AS base_month,
     mc.outlet_id,
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email       AS period_kam_email,
-    mc.base_kam_name        AS period_kam_name,
-    mc.base_tl_email        AS period_tl_email,
+    mc.base_kam_email AS period_kam_email,
+    mc.base_kam_name  AS period_kam_name,
+    mc.base_tl_email  AS period_tl_email,
     mc.base_kam_email,
     mc.base_kam_name,
     mc.base_gmv,
-    0                       AS curr_gmv,
+    0                 AS curr_gmv,
     CASE
       WHEN cks.current_kam_email = mc.base_kam_email THEN 'core_nrr_churn'
       ELSE 'transfer_out'
-    END                     AS movement_type
+    END               AS movement_type
 
   FROM mar_cohort mc
   LEFT JOIN current_kam_snapshot cks ON mc.outlet_id = cks.outlet_id
-
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jun_ownership)
 ),
 
--- ── 8. Union all months ───────────────────────────────────────────────────────
+-- ── 12. Union all months ──────────────────────────────────────────────────────
 all_rows AS (
   SELECT * FROM apr_rows
   UNION ALL
@@ -657,22 +607,20 @@ all_rows AS (
 )
 
 -- ── FINAL OUTPUT ──────────────────────────────────────────────────────────────
--- grain: 1 row per outlet × period_month
--- downstream: split per KAM by period_kam_email → upload to R2 per KAM
 SELECT
-  r.period_month,                      -- '2026-04' / '2026-05' / '2026-06'
-  r.base_month,                        -- '2026-03' (fixed)
-  r.movement_type,                     -- classification
-  r.period_kam_email,                  -- KAM ที่ถือ outlet ใน period นั้น
+  r.period_month,
+  r.base_month,
+  r.movement_type,
+  r.period_kam_email,
   r.period_kam_name,
   r.period_tl_email,
-  r.base_kam_email,                    -- KAM ที่ถือ outlet ใน Mar (null = ไม่อยู่ใน Mar cohort)
+  r.base_kam_email,
   r.account_id,
   r.account_name,
   r.account_type,
   r.outlet_id,
-  r.base_gmv,                          -- Mar GMV (fixed denominator)
-  r.curr_gmv,                          -- GMV ของ period_month
+  r.base_gmv,
+  r.curr_gmv,
   p.base_days,
   CASE r.period_month
     WHEN '2026-04' THEN p.apr_days
