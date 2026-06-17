@@ -139,8 +139,11 @@ function _qnrrCompute(kamEmail, scope) {
       .filter(function(m){ return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
       .reduce(function(s,m){ return s + (segments[m] || 0); }, 0);
 
+    var curr_days_sample = monthRows.find(function(r){return r.curr_days>0;});
+    var curr_days = curr_days_sample ? curr_days_sample.curr_days : 30;
     by_month[month] = { nrr_pct: nrr_pct, total_gmv: total_gmv,
-                        segments: segments, outlets: outlets, rows: monthRows };
+                        segments: segments, outlets: outlets, rows: monthRows,
+                        curr_days: curr_days };
   });
 
   return {
@@ -389,8 +392,8 @@ function _qnrrRenderBase(){
     if(nrrMos) nrrMos.textContent='';
     return;
   }
-  var effectiveBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
-  if(baseVal)baseVal.textContent=_fmtM(effectiveBase);
+  var DISPLAY_BASE=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+  if(baseVal)baseVal.textContent=_fmtM(DISPLAY_BASE);
   if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort (normalized)';
 
   var slots=[];
@@ -409,7 +412,7 @@ function _qnrrRenderBase(){
   var statsRow=_el('qnrr-stats-row');
   if(statsRow){
     // Mar base slot
-    var marGmv=_data.base_gmv||0;
+    var marGmv=_data.base_norm>0?Math.round(_data.base_norm*30):(_data.base_gmv||0);
     var marOutlets=_data.cohort_outlets||0;
     var marSlot='<div class="qnrr-stat-slot qnrr-stat-base">'+
       '<div class="qnrr-stat-v" style="color:rgba(255,255,255,.70)">'+_fmtM(marGmv)+'</div>'+
@@ -489,8 +492,9 @@ function _qnrrRenderChart(){
   // reference line at base GMV height
   if(refLines){
     var baseTop=chartH-Math.round(_data.base_gmv/maxGmv*chartH);
+    var _refBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
     refLines.innerHTML='<div class="qnrr-ref-line" style="top:'+baseTop+'px">'+
-      '<span class="qnrr-ref-label">'+_fmtM(_data.base_gmv)+' ฐาน</span></div>';
+      '<span class="qnrr-ref-label">'+_fmtM(_refBase)+' ฐาน</span></div>';
   }
 
   var allBars=[{month:BASE_MONTH,isBase:true}];
@@ -511,8 +515,8 @@ function _qnrrRenderChart(){
     // Labels: GMV on top, NRR% overlaid inside bar
     var topLabelHtml=''; var overlayHtml='';
     if(isBase){
-      var _effBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
-      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_effBase)+'</div><div class="qnrr-bar-mar-sub">'+_data.cohort_outlets+' outlets</div>';
+      var _dispBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_dispBase)+'</div><div class="qnrr-bar-mar-sub">'+_data.cohort_outlets+' outlets</div>';
     } else if(bm){
       var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.2)';
       var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
@@ -689,7 +693,7 @@ function _qnrrRenderDrill(){
     var coreGmv=coreRows.reduce(function(s,r){return s+(r.curr_gmv||0);},0);
     var churnCount=churnRows.length;
     var churnGmv=churnRows.reduce(function(s,r){return s+(r.base_gmv||0);},0);
-    coreInfo=' · core '+coreRows.length+' outlets '+_fmtM(coreGmv)+' | churn '+churnCount+' outlets '+_fmtM(churnGmv);
+    coreInfo='core '+coreRows.length+' · churn '+churnCount+' · GMV '+_fmtM(coreGmv);
   }
   if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts'+_fmark;
   var subLbl=_el('qnrr-drill-sublbl');
