@@ -572,9 +572,16 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 
 /* ── List filter bar ────────────────────────────────────────────────────── */
 .qnrr-list-filter-bar {
-  display: flex; gap: 6px; padding: 8px 16px 6px;
-  flex-wrap: wrap; flex-shrink: 0;
+  display: flex; gap: 5px; padding: 8px 16px 7px;
+  flex-wrap: nowrap; overflow-x: auto; flex-shrink: 0;
   border-bottom: 1px solid rgba(140,180,255,.08);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.qnrr-list-filter-bar::-webkit-scrollbar { display: none; }
+.qnrr-list-filter-bar .qnrr-mv-btn {
+  flex-shrink: 0; white-space: nowrap;
+  font-size: 11px; padding: 5px 12px; min-height: 30px;
 }
 
 /* ── List table: replace mini bar ────────────────────────────────────────── */

@@ -889,7 +889,7 @@ function _qnrrRenderDrill(){
   list.innerHTML = html;
 }
 
-})();
+
 
 // ── _qnrrRenderList — full-quarter account × outlet list (v781) ──────────────
 var _listFilter = 'all';
@@ -1034,3 +1034,5 @@ function _qnrrRenderList(){
   wrap.innerHTML = html;
 }
 window._qnrrRenderList = _qnrrRenderList;
+
+})();
