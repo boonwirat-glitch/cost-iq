@@ -140,15 +140,15 @@
 .qnrr-ref-label.adj { color: rgba(229,62,62,.38); }
 
 .qnrr-bars-row {
-  display: grid; grid-template-columns: repeat(4,1fr);
-  gap: 6px; align-items: end;
-  height: 210px; /* fixed total col height */
+  display: flex; align-items: stretch; gap: 6px;
+  height: 210px;
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
+  flex: 1; min-width: 0;
   display: flex; flex-direction: column; align-items: center;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  height: 100%; /* fill grid cell */
+  transition: background .15s;
 }
 .qnrr-bar-col:active .qnrr-bar-body { filter: brightness(1.15); }
 .qnrr-bar-col.active .qnrr-bar-body::after {
@@ -445,20 +445,21 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 
 /* Drill core stats sublabel */
 .qnrr-drill-sublbl {
-  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.38);
-  font-family: var(--tk-font-mono); padding: 2px 18px 6px;
+  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.40);
+  font-family: var(--tk-font-mono); padding: 0 18px 6px;
   flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: .01em;
 }
 
 /* ── Stats row: NRR GMV + active/churn per month ── */
 .qnrr-stats-row {
-  display: grid; grid-template-columns: repeat(4,1fr);
-  gap: 0;
+  display: flex; align-items: stretch;
   background: rgba(0,0,0,.15);
   border-bottom: 1px solid var(--tk-border);
   flex-shrink: 0; padding: 0 18px;
 }
 .qnrr-stat-slot {
+  flex: 1; min-width: 0;
   display: flex; flex-direction: column;
   align-items: flex-start; padding: 8px 4px 8px 0;
   gap: 2px;
@@ -482,9 +483,10 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-family: var(--tk-font-mono);
 }
 
-/* Bar chart area — shared height container, bars are absolute inside */
+/* Bar chart area — takes remaining height, bar-body absolute inside */
 .qnrr-bar-chart-area {
   flex: 1; width: 100%; position: relative; min-height: 0;
+  overflow: visible;
 }
 
 .qnrr-stat-base .qnrr-stat-mo { color: rgba(188,215,255,.45); }
