@@ -2877,7 +2877,7 @@ function _unlockScore(){
   if(descEl)setTimeout(()=>{descEl.textContent=scoreDesc;},600);
 }
 // ── Category bars with tonal palette + expand/collapse ──────────────────
-let _catExpanded=false;
+let _catExpanded=true; // v764: default expanded
 function renderCatBars(cats,defaultShow){
   if(!cats||!cats.length)return'';
   const show=_catExpanded?cats.length:Math.min(defaultShow,cats.length);
