@@ -1,4 +1,4 @@
-<!-- Freshket Sense 770: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 771: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '770',
+      version: '771',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51848,43 +51848,45 @@ function _qnrrRenderDrill(){
   else if(_selMv==='handover')  filtered=rows.filter(function(r){return r.movement_type==='handover';});
   else if(_selMv==='expansion') filtered=rows.filter(function(r){return r.movement_type==='expansion';});
 
-  // group by account_id — show account at top level, outlets on expand
-  // outlet name = account_name + outlet_id suffix (if multiple)
+  // group by outlet_id — each outlet is its own top-level row
+  // account_name ใช้เป็น display name (outlet ไม่มีชื่อแยกใน CSV)
+  // dot movement อยู่ที่ outlet row ตรงๆ
   var byAcct={};var acctOrder=[];
   filtered.forEach(function(r){
-    var aid=r.account_id;
-    if(!byAcct[aid]){
-      byAcct[aid]={name:r.account_name||aid,type:r.movement_type,outlets:[],
-                   gmvByMonth:{},baseGmv:0,currGmv:0};
-      acctOrder.push(aid);
+    var oid=r.outlet_id;                       // KEY = outlet_id
+    if(!byAcct[oid]){
+      byAcct[oid]={
+        name: r.account_name||oid,             // display = account_name
+        acct_id: r.account_id,
+        type: r.movement_type,                 // movement ของ outlet นี้จริงๆ
+        outlets: [],
+        gmvByMonth:{}, baseGmv:0, currGmv:0
+      };
+      acctOrder.push(oid);
     }
-    // store outlet with unique identity
-    byAcct[aid].outlets.push({
+    byAcct[oid].baseGmv += r.base_gmv||0;
+    byAcct[oid].currGmv += r.curr_gmv||0;
+    byAcct[oid].outlets.push({
       outlet_id: r.outlet_id,
-      outlet_name: r.outlet_id, // CSV ไม่มี outlet_name แยก — ใช้ outlet_id เป็น identifier
       base_gmv: r.base_gmv||0,
       curr_gmv: r.curr_gmv||0,
       movement_type: r.movement_type
     });
-    byAcct[aid].baseGmv+=r.base_gmv||0;
-    byAcct[aid].currGmv+=r.curr_gmv||0;
   });
 
-  // Collect GMV across all Q months for sparkline (from full data)
+  // Collect GMV across all Q months for sparkline (from full data) per outlet
   if(_data){
     Q_MONTHS.forEach(function(qm){
       var qbm=_data.by_month[qm];
       if(!qbm)return;
       (qbm.rows||[]).forEach(function(r){
-        if(byAcct[r.account_id]){
-          byAcct[r.account_id].gmvByMonth[qm]=(byAcct[r.account_id].gmvByMonth[qm]||0)+r.curr_gmv;
+        if(byAcct[r.outlet_id]){                // lookup by outlet_id
+          byAcct[r.outlet_id].gmvByMonth[qm]=(byAcct[r.outlet_id].gmvByMonth[qm]||0)+r.curr_gmv;
         }
       });
     });
-    // base month GMV
-    acctOrder.forEach(function(aid){
-      var a=byAcct[aid];
-      a.gmvByMonth[BASE_MONTH]=a.baseGmv;
+    acctOrder.forEach(function(oid){
+      byAcct[oid].gmvByMonth[BASE_MONTH]=byAcct[oid].baseGmv;
     });
   }
 
@@ -51900,7 +51902,7 @@ function _qnrrRenderDrill(){
     var churnGmv=churnRows.reduce(function(s,r){return s+(r.base_gmv||0);},0);
     coreInfo=' · core '+coreRows.length+' outlets '+_fmtM(coreGmv)+' | churn '+churnCount+' outlets '+_fmtM(churnGmv);
   }
-  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts'+_fmark;
+  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' outlets'+_fmark;
   var subLbl=_el('qnrr-drill-sublbl');
   if(subLbl)subLbl.textContent=coreInfo;
 
@@ -51909,7 +51911,11 @@ function _qnrrRenderDrill(){
     return;
   }
 
-  acctOrder.sort(function(a,b){return (byAcct[b].currGmv||0)-(byAcct[a].currGmv||0);});
+  acctOrder.sort(function(a,b){
+    // sort by currGmv DESC, ถ้า currGmv=0 ให้ sort by baseGmv DESC
+    var cv=(byAcct[b].currGmv||0)-(byAcct[a].currGmv||0);
+    return cv!==0?cv:(byAcct[b].baseGmv||0)-(byAcct[a].baseGmv||0);
+  });
 
   var html=acctOrder.map(function(aid,idx){
     var a=byAcct[aid];
@@ -51931,12 +51937,10 @@ function _qnrrRenderDrill(){
     var baseGmvLabel=_fmtM(a.baseGmv);
     var currGmvLabel=_fmtM(a.currGmv);
 
-    // Outlet rows — outlet_id เป็น identifier หลัก
-    // ถ้า account มีหลาย outlets → แสดง outlet_id แยกชัดเจน
+    // Expand rows — แสดง GMV breakdown ต่อเดือน (เพราะ outlet คือ top row แล้ว)
+    // ไม่ต้องแสดง dot movement ซ้ำ
     var outHtml=a.outlets.map(function(o){
-      var oName=a.outlets.length>1
-        ? 'Outlet #'+o.outlet_id
-        : (o.outlet_name||a.name||o.outlet_id||'—');
+      var oName='Outlet #'+o.outlet_id;
       // outlet 4-bar sparkline: Mar + Apr + May + Jun
       var oAllMonths=[BASE_MONTH].concat(Q_MONTHS);
       var oGmvs=oAllMonths.map(function(qm){
