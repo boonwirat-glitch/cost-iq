@@ -52,7 +52,9 @@ function _qnrrCompute(kamEmail, scope) {
 
   var baseMap = {};
   scopedRows.forEach(function(r){
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id]) {
+    // v4: exclude handover outlets from NRR denominator
+    // handover = รับมาช่วง 15/30 Mar — KAM ไม่ได้ดูแลจริงๆ ใน Mar
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
     }
   });
@@ -64,7 +66,7 @@ function _qnrrCompute(kamEmail, scope) {
     base_gmv  += b.gmv;
     base_norm += b.gmv / b.days;
   });
-  var cohort_outlets = Object.keys(baseMap).length;
+  var cohort_outlets = Object.keys(baseMap).length; // excl. handover (v4)
 
   var MOVEMENTS = ['core_nrr','core_nrr_churn','handover','new_sales',
                    'expansion','comeback','transfer_in','transfer_out'];
@@ -443,7 +445,7 @@ function _qnrrRenderHero(){
 
   var DISPLAY_BASE = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
   if (baseVal) baseVal.textContent = _fmtM(DISPLAY_BASE);
-  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort · normalized ÷days×30';
+  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort · excl. handover · ÷days×30';
 
   // NRR cluster — 3 slots with separators, NO stats row duplication
   if (nrrVals) {
