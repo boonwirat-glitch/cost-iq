@@ -3787,11 +3787,11 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
   <span class="fp-time" id="echo-float-time">0:00</span>
 </div>
 
-<!-- QNRR HEALTH SHEET — Quarter NRR Portfolio Health (v775) -->
+<!-- QNRR HEALTH SHEET — Quarter NRR Portfolio Health (v780) -->
 <div class="qnrr-overlay" id="qnrr-overlay" onclick="_qnrrClose()"></div>
 <div class="qnrr-sheet" id="qnrr-sheet" role="dialog" aria-label="สุขภาพพอร์ต Q2">
   <div class="qnrr-handle-row" id="qnrr-handle"><div class="qnrr-handle-pill"></div></div>
-  <!-- Zone A: Hero header — base GMV left, NRR cluster right -->
+  <!-- Zone A: Hero -->
   <div class="qnrr-head" id="qnrr-head">
     <div class="qnrr-title-row">
       <div class="qnrr-eyebrow" style="margin-bottom:0">Portfolio Health · Q2 2026</div>
@@ -3802,7 +3802,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     <div class="qnrr-hero-row">
       <div class="qnrr-base-block">
         <div class="qnrr-base-val" id="qnrr-base-val">—</div>
-        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค. (normalized)</div>
+        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค. · normalized ÷days×30</div>
       </div>
       <div class="qnrr-nrr-right">
         <div class="qnrr-nrr-eyebrow">Core NRR vs ฐาน</div>
@@ -3810,44 +3810,47 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
       </div>
     </div>
   </div>
-  <!-- Zone B: Chart zone with toggle -->
+  <!-- Zone B: Main tabs — กราฟ | List -->
   <div class="qnrr-chart-zone" id="qnrr-chart-zone">
     <div class="qnrr-view-toggle">
       <button class="qnrr-vtog on" onclick="_qnrrSetView('chart',this)">กราฟ</button>
-      <button class="qnrr-vtog" onclick="_qnrrSetView('break',this)">Breakdown</button>
+      <button class="qnrr-vtog" onclick="_qnrrSetView('list',this)">List</button>
     </div>
-    <!-- Chart view -->
+    <!-- กราฟ tab: bar chart + breakdown table stacked -->
     <div id="qnrr-chart-bars-wrap">
       <div class="qnrr-ref-lines" id="qnrr-ref-lines"></div>
       <div class="qnrr-bars-row" id="qnrr-bars-row"></div>
     </div>
-    <!-- Breakdown view -->
     <div class="qnrr-breakdown-wrap" id="qnrr-breakdown-wrap"></div>
-  </div>
-  <!-- Transfer out callout card (shown only when selected month has transfer_out) -->
-  <div class="qnrr-tout-card" id="qnrr-tout-card">
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px">
-      <rect x=".5" y=".5" width="14" height="14" rx="2.5" stroke="rgba(248,113,113,.48)" stroke-dasharray="2.5 1.5" fill="none"/>
-      <path d="M4 7.5h7M9 5.5l2 2-2 2" stroke="rgba(248,113,113,.55)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <div style="flex:1;min-width:0">
-      <div class="qnrr-tout-card-label">Transfer Out</div>
-      <div class="qnrr-tout-card-row">
-        <span class="qnrr-tout-card-desc" id="qnrr-tout-card-desc">—</span>
-        <span class="qnrr-tout-card-val" id="qnrr-tout-card-val">—</span>
+    <!-- Transfer out callout card -->
+    <div class="qnrr-tout-card" id="qnrr-tout-card">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px">
+        <rect x=".5" y=".5" width="14" height="14" rx="2.5" stroke="rgba(248,113,113,.48)" stroke-dasharray="2.5 1.5" fill="none"/>
+        <path d="M4 7.5h7M9 5.5l2 2-2 2" stroke="rgba(248,113,113,.55)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="flex:1;min-width:0">
+        <div class="qnrr-tout-card-label">Transfer Out</div>
+        <div class="qnrr-tout-card-row">
+          <span class="qnrr-tout-card-desc" id="qnrr-tout-card-desc">—</span>
+          <span class="qnrr-tout-card-val" id="qnrr-tout-card-val">—</span>
+        </div>
+        <div class="qnrr-tout-card-note">ฐาน NRR คงเป็น มี.ค. — transfer out ไม่หักจากฐาน เพื่อให้เห็น true impact ของ Q</div>
       </div>
-      <div class="qnrr-tout-card-note">ฐาน NRR คงเป็น มี.ค. — transfer out ไม่หักจากฐาน เพื่อให้เห็น true impact ของ Q</div>
+    </div>
+    <!-- Legend (กราฟ tab only) -->
+    <div class="qnrr-legend" id="qnrr-legend"></div>
+    <!-- List tab: full-quarter account × outlet list -->
+    <div class="qnrr-list-wrap" id="qnrr-list-wrap" style="display:none">
+      <div class="qnrr-acct-list" id="qnrr-acct-list"></div>
     </div>
   </div>
-  <!-- Zone E: Legend -->
-  <div class="qnrr-legend" id="qnrr-legend"></div>
-  <!-- Zone F: Drill header -->
-  <div class="qnrr-drill-head">
-    <div class="qnrr-drill-lbl" id="qnrr-drill-lbl">— accounts</div>
-    <div class="qnrr-mv-filters" id="qnrr-mv-filters">
-      <button class="qnrr-mv-btn on" onclick="_qnrrSetMv('all',this)">ทั้งหมด</button>
-      <button class="qnrr-mv-btn" onclick="_qnrrSetMv('churn',this)">Churn</button>
-      <button class="qnrr-mv-btn" onclick="_qnrrSetMv('handover',this)">Handover</button>
+  <!-- REMOVED: old drill-head + mv-filters + separate acct-list (now inside list tab) -->
+  <!-- dummy IDs kept for JS compatibility -->
+  <div id="qnrr-drill-lbl" style="display:none">— accounts</div>
+  <div id="qnrr-mv-filters" style="display:none">
+    <button class="qnrr-mv-btn on" onclick="_qnrrSetMv('all',this)">ทั้งหมด</button>
+    <button class="qnrr-mv-btn" onclick="_qnrrSetMv('churn',this)">Churn</button>
+    <button class="qnrr-mv-btn" onclick="_qnrrSetMv('handover',this)">Handover</button
       <button class="qnrr-mv-btn" onclick="_qnrrSetMv('expansion',this)">Expansion</button>
     </div>
   </div>

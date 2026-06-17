@@ -1,4 +1,4 @@
-<!-- Freshket Sense v779: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v780: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v779',
+      version: 'v780',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6542,18 +6542,18 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   display: flex; gap: 5px; margin-bottom: 9px;
 }
 .qnrr-vtog {
-  font-size: 9px; font-weight: 700; padding: 3px 11px;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.09);
-  background: transparent; color: rgba(255,255,255,.36);
+  font-size: 12px; font-weight: 700; padding: 7px 16px;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
+  background: transparent; color: rgba(255,255,255,.45);
   cursor: pointer; font-family: var(--tk-font-mono);
   transition: all .15s; -webkit-tap-highlight-color: transparent;
-  letter-spacing: .03em;
+  letter-spacing: .02em; min-height: 34px;
 }
 .qnrr-vtog.on {
-  border-color: rgba(188,215,255,.36);
-  background: rgba(188,215,255,.07); color: #bcd7ff;
+  border-color: rgba(188,215,255,.40);
+  background: rgba(188,215,255,.09); color: #bcd7ff;
 }
-.qnrr-vtog:active { transform: scale(.94); }
+.qnrr-vtog:active { transform: scale(.95); }
 
 /* ── Bar chart ── */
 .qnrr-ref-lines {
@@ -6773,16 +6773,17 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 }
 .qnrr-mv-filters { display: flex; gap: 3px; flex-wrap: wrap; }
 .qnrr-mv-btn {
-  font-size: 8px; font-weight: 700; padding: 3px 8px;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.08);
-  background: transparent; color: rgba(255,255,255,.38);
+  font-size: 11px; font-weight: 700; padding: 6px 13px;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.10);
+  background: transparent; color: rgba(255,255,255,.45);
   cursor: pointer; font-family: var(--tk-font-mono);
   transition: all .16s; -webkit-tap-highlight-color: transparent; letter-spacing: .02em;
+  min-height: 32px;
 }
-.qnrr-mv-btn:active { transform: scale(.93); }
+.qnrr-mv-btn:active { transform: scale(.94); }
 .qnrr-mv-btn.on {
-  border-color: rgba(188,215,255,.32);
-  background: rgba(188,215,255,.06); color: #bcd7ff;
+  border-color: rgba(188,215,255,.36);
+  background: rgba(188,215,255,.07); color: #bcd7ff;
 }
 
 /* ── Account list ── */
@@ -6902,6 +6903,69 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 #portview-pace-bar:active { opacity: .85; transform: scale(.99); transition: all .1s; }
 body.sales-mode #portview-pace-bar,
 body.sales-tl-mode #portview-pace-bar { cursor: default; }
+
+/* ── List tab ────────────────────────────────────────────────────────────── */
+.qnrr-list-wrap {
+  flex: 1; overflow-y: auto; min-height: 0;
+}
+/* account row — no dot, just name as section header */
+.qnrr-acct-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px 4px;
+  border-top: 1px solid rgba(140,180,255,.10);
+  background: rgba(10,22,45,.70);
+  position: sticky; top: 0; z-index: 4;
+}
+.qnrr-acct-hdr-name {
+  font-size: 11px; font-weight: 800;
+  color: rgba(255,255,255,.72); letter-spacing: -.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0;
+}
+.qnrr-acct-hdr-tot {
+  font-size: 10px; font-weight: 700;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.50);
+  flex-shrink: 0; padding-left: 8px;
+}
+/* outlet row — indented, dot shows movement */
+.qnrr-ol-row {
+  display: flex; align-items: flex-start; gap: 0;
+  padding: 5px 14px 5px 28px;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.qnrr-ol-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; margin-top: 4px; margin-right: 8px; }
+.qnrr-ol-left { flex: 1; min-width: 0; }
+.qnrr-ol-name {
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,.60); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qnrr-ol-mv {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; margin-top: 1px;
+}
+/* 4-month GMV mini-table per outlet */
+.qnrr-ol-gmv-row {
+  display: flex; gap: 0; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,.06); border-radius: 4px; overflow: hidden;
+}
+.qnrr-ol-gmv-cell {
+  display: flex; flex-direction: column; align-items: flex-end;
+  padding: 2px 5px; min-width: 38px;
+  border-right: 1px solid rgba(255,255,255,.04);
+}
+.qnrr-ol-gmv-cell:last-child { border-right: none; }
+.qnrr-ol-gmv-cell.base { background: rgba(38,96,200,.12); }
+.qnrr-ol-gmv-mo {
+  font-size: 8px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: rgba(188,215,255,.35);
+  font-family: var(--tk-font-mono);
+}
+.qnrr-ol-gmv-val {
+  font-size: 10px; font-weight: 700;
+  font-family: var(--tk-font-mono); color: rgba(255,255,255,.55);
+  white-space: nowrap;
+}
+.qnrr-ol-gmv-val.zero { color: rgba(248,113,113,.55); }
+.qnrr-ol-gmv-val.hi   { color: rgba(74,222,128,.72); }
 </style>
 <style id="restaurant-module-css">
 /* ============================================================
@@ -51543,10 +51607,12 @@ var _data     = null;
 var _swipeY0  = null;
 
 function _fmtM(n){
-  n = Math.round(n || 0);
-  if (n >= 1000000) return '฿' + (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000)    return '฿' + Math.round(n/1000) + 'K';
-  return '฿' + n;
+  var neg = n < 0; n = Math.abs(Math.round(n || 0));
+  var s;
+  if (n >= 1000000) s = '฿' + (n/1000000).toFixed(1) + 'M';
+  else if (n >= 1000) s = '฿' + (n/1000).toFixed(0) + 'K';
+  else s = '฿' + n;
+  return neg ? '-' + s : s;
 }
 function _el(id){ return document.getElementById(id); }
 function _esc(s){ return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];}); }
@@ -51667,11 +51733,26 @@ function _qnrrSetView(mode, btn){
   _viewMode = mode;
   document.querySelectorAll('.qnrr-vtog').forEach(function(b){ b.classList.remove('on'); });
   if (btn) btn.classList.add('on');
+
   var chartWrap = _el('qnrr-chart-bars-wrap');
   var bkWrap    = _el('qnrr-breakdown-wrap');
-  if (chartWrap) chartWrap.style.display = mode === 'chart' ? 'block' : 'none';
-  if (bkWrap)    bkWrap.classList.toggle('show', mode === 'break');
-  if (mode === 'break') _qnrrRenderBreakdown();
+  var legend    = _el('qnrr-legend');
+  var toutCard  = _el('qnrr-tout-card');
+  var listWrap  = _el('qnrr-list-wrap');
+
+  if (mode === 'chart') {
+    if (chartWrap) chartWrap.style.display = 'block';
+    if (bkWrap)    { bkWrap.classList.add('show'); _qnrrRenderBreakdown(); }
+    if (legend)    legend.style.display = '';
+    if (toutCard)  toutCard.style.display = '';
+    if (listWrap)  listWrap.style.display = 'none';
+  } else if (mode === 'list') {
+    if (chartWrap) chartWrap.style.display = 'none';
+    if (bkWrap)    bkWrap.classList.remove('show');
+    if (legend)    legend.style.display = 'none';
+    if (toutCard)  toutCard.style.display = 'none';
+    if (listWrap)  { listWrap.style.display = 'block'; _qnrrRenderList(); }
+  }
   _qnrrRenderToutCard();
 }
 window._qnrrSetView = _qnrrSetView;
@@ -51743,9 +51824,15 @@ function _qnrrRender(){
   _qnrrRenderHero();
   _qnrrRenderChart();
   _qnrrRenderLegend();
-  if (_viewMode === 'break') _qnrrRenderBreakdown();
+  // breakdown always visible in chart mode (stacked below bar chart)
+  var bkWrap = _el('qnrr-breakdown-wrap');
+  if (_viewMode === 'chart') {
+    if (bkWrap) bkWrap.classList.add('show');
+    _qnrrRenderBreakdown();
+  } else if (_viewMode === 'list') {
+    _qnrrRenderList();
+  }
   _qnrrRenderToutCard();
-  _qnrrRenderDrill();
 }
 
 // ── Zone A: Hero ─────────────────────────────────────────────────────────────
@@ -51958,7 +52045,7 @@ function _qnrrRenderBreakdown(){
       html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return;
     }
     // negative = ซื้อลด, positive = ซื้อเพิ่ม (expansion ภายใน core)
-    var col = c >= 0 ? 'rgba(74,222,128,.72)' : 'rgba(251,191,36,.82)';
+    var col = c >= 0 ? 'rgba(74,222,128,.72)' : 'rgba(248,113,113,.80)';
     var prefix = c >= 0 ? '+' : '';
     html += '<td style="color:' + col + '">' + prefix + _fmtM(c) + '</td>';
   });
@@ -52223,6 +52310,127 @@ function _qnrrRenderDrill(){
 }
 
 })();
+
+// ── _qnrrRenderList — full-quarter account × outlet list (v780) ──────────────
+// แสดงทุก account × outlet พร้อม 4-month GMV table ไม่ต้อง filter
+function _qnrrRenderList(){
+  var wrap = _el('qnrr-acct-list');
+  if (!wrap) return;
+  if (!_data) { wrap.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มีข้อมูล</div>'; return; }
+
+  var ALL_MONTHS = ['2026-03'].concat(['2026-04','2026-05','2026-06']);
+  var MTH_SHORT  = {'2026-03':'มี.ค.','2026-04':'เม.ย.','2026-05':'พ.ค.','2026-06':'มิ.ย.'};
+
+  // Collect all rows across all Q months
+  var allRows = [];
+  ['2026-04','2026-05','2026-06'].forEach(function(m){
+    var bm = _data.by_month[m];
+    if (bm) (bm.rows || []).forEach(function(r){ allRows.push(r); });
+  });
+
+  // Group by account → outlet
+  var byAcct = {}; var acctOrder = [];
+  allRows.forEach(function(r){
+    var aid = r.account_id;
+    if (!byAcct[aid]) {
+      byAcct[aid] = {name: r.account_name || aid, outlets: {}, totalCurr: 0};
+      acctOrder.push(aid);
+    }
+    var oid = r.outlet_id;
+    if (!byAcct[aid].outlets[oid]) {
+      byAcct[aid].outlets[oid] = {
+        name: r.account_name || String(oid),
+        gmv: {'2026-03': 0, '2026-04': 0, '2026-05': 0, '2026-06': 0},
+        mv:  {'2026-04': null, '2026-05': null, '2026-06': null},
+        baseGmv: r.base_gmv || 0
+      };
+      // base from first row
+      byAcct[aid].outlets[oid].gmv['2026-03'] = r.base_gmv || 0;
+    }
+    var od = byAcct[aid].outlets[oid];
+    od.gmv[r.period_month] = (od.gmv[r.period_month] || 0) + (parseFloat(r.curr_gmv) || 0);
+    if (!od.mv[r.period_month]) od.mv[r.period_month] = r.movement_type;
+    byAcct[aid].totalCurr += parseFloat(r.curr_gmv) || 0;
+  });
+
+  // Sort accounts by totalCurr DESC
+  acctOrder.sort(function(a,b){ return byAcct[b].totalCurr - byAcct[a].totalCurr; });
+
+  // Dominant movement color per outlet (priority: churn > transfer_out > handover > expansion > new_sales > comeback > core_nrr)
+  var MV_PRIO = ['core_nrr_churn','transfer_out','handover','expansion','new_sales','comeback','transfer_in','core_nrr'];
+  function _domMv(od){
+    for (var i=0; i<MV_PRIO.length; i++){
+      var mv = MV_PRIO[i];
+      var found = ['2026-04','2026-05','2026-06'].some(function(m){ return od.mv[m] === mv; });
+      if (found) return mv;
+    }
+    return 'core_nrr';
+  }
+
+  var html = '';
+  acctOrder.forEach(function(aid){
+    var a = byAcct[aid];
+    var outletIds = Object.keys(a.outlets);
+    // account total curr (sum of latest active month)
+    var acctTotal = outletIds.reduce(function(s,oid){ return s + (a.outlets[oid].gmv['2026-06'] || a.outlets[oid].gmv['2026-05'] || a.outlets[oid].gmv['2026-04'] || 0); }, 0);
+
+    // account header (sticky, no dot)
+    html += '<div class="qnrr-acct-hdr">' +
+      '<div class="qnrr-acct-hdr-name">' + _esc(a.name) + '</div>' +
+      '<div class="qnrr-acct-hdr-tot">' + _fmtM(a.totalCurr) + '</div>' +
+    '</div>';
+
+    // Sort outlets: churn last, by gmv DESC otherwise
+    outletIds.sort(function(x,y){
+      var xd = _domMv(a.outlets[x]); var yd = _domMv(a.outlets[y]);
+      var xChurn = xd === 'core_nrr_churn' || xd === 'transfer_out';
+      var yChurn = yd === 'core_nrr_churn' || yd === 'transfer_out';
+      if (xChurn !== yChurn) return xChurn ? 1 : -1;
+      return (a.outlets[y].gmv['2026-04']||0) - (a.outlets[x].gmv['2026-04']||0);
+    });
+
+    outletIds.forEach(function(oid){
+      var od = a.outlets[oid];
+      var domMv = _domMv(od);
+      var cfg   = MV_CFG[domMv] || {color:'rgba(255,255,255,.3)'};
+      var dotColor = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
+      var mvLabel  = cfg.label || domMv;
+      var mvColor  = (domMv === 'core_nrr_churn' || domMv === 'transfer_out')
+        ? 'rgba(248,113,113,.70)'
+        : (domMv === 'expansion' || domMv === 'new_sales' || domMv === 'comeback')
+          ? 'rgba(74,222,128,.65)'
+          : (domMv === 'handover' || domMv === 'transfer_in')
+            ? 'rgba(96,165,250,.65)'
+            : 'rgba(255,255,255,.28)';
+
+      // 4-month GMV cells
+      var gmvCells = ALL_MONTHS.map(function(m){
+        var v = od.gmv[m] || 0;
+        var isBase = (m === '2026-03');
+        var isZero = (!isBase && v === 0);
+        var isHi   = (!isBase && v > 0 && v > (od.gmv['2026-03'] || 0) * 1.05);
+        var cls    = isZero ? ' zero' : isHi ? ' hi' : '';
+        var label  = MTH_SHORT[m] || m;
+        return '<div class="qnrr-ol-gmv-cell' + (isBase ? ' base' : '') + '">' +
+          '<span class="qnrr-ol-gmv-mo">' + label + '</span>' +
+          '<span class="qnrr-ol-gmv-val' + cls + '">' + (v > 0 ? _fmtM(v) : (isBase ? '—' : '<span style="color:rgba(248,113,113,.50)">✕</span>')) + '</span>' +
+        '</div>';
+      }).join('');
+
+      html += '<div class="qnrr-ol-row">' +
+        '<div class="qnrr-ol-dot" style="background:' + dotColor + '"></div>' +
+        '<div class="qnrr-ol-left">' +
+          '<div class="qnrr-ol-name">' + _esc(String(od.name || oid).slice(0,44)) + '</div>' +
+          '<div class="qnrr-ol-mv" style="color:' + mvColor + '">' + _esc(mvLabel) + '</div>' +
+        '</div>' +
+        '<div class="qnrr-ol-gmv-row">' + gmvCells + '</div>' +
+      '</div>';
+    });
+  });
+
+  wrap.innerHTML = html;
+}
+window._qnrrRenderList = _qnrrRenderList;
 </script>
 <script id="freshket-nav-config">
 /**
@@ -52359,11 +52567,11 @@ function _qnrrRenderDrill(){
   <span class="fp-time" id="echo-float-time">0:00</span>
 </div>
 
-<!-- QNRR HEALTH SHEET — Quarter NRR Portfolio Health (v775) -->
+<!-- QNRR HEALTH SHEET — Quarter NRR Portfolio Health (v780) -->
 <div class="qnrr-overlay" id="qnrr-overlay" onclick="_qnrrClose()"></div>
 <div class="qnrr-sheet" id="qnrr-sheet" role="dialog" aria-label="สุขภาพพอร์ต Q2">
   <div class="qnrr-handle-row" id="qnrr-handle"><div class="qnrr-handle-pill"></div></div>
-  <!-- Zone A: Hero header — base GMV left, NRR cluster right -->
+  <!-- Zone A: Hero -->
   <div class="qnrr-head" id="qnrr-head">
     <div class="qnrr-title-row">
       <div class="qnrr-eyebrow" style="margin-bottom:0">Portfolio Health · Q2 2026</div>
@@ -52374,7 +52582,7 @@ function _qnrrRenderDrill(){
     <div class="qnrr-hero-row">
       <div class="qnrr-base-block">
         <div class="qnrr-base-val" id="qnrr-base-val">—</div>
-        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค. (normalized)</div>
+        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค. · normalized ÷days×30</div>
       </div>
       <div class="qnrr-nrr-right">
         <div class="qnrr-nrr-eyebrow">Core NRR vs ฐาน</div>
@@ -52382,44 +52590,47 @@ function _qnrrRenderDrill(){
       </div>
     </div>
   </div>
-  <!-- Zone B: Chart zone with toggle -->
+  <!-- Zone B: Main tabs — กราฟ | List -->
   <div class="qnrr-chart-zone" id="qnrr-chart-zone">
     <div class="qnrr-view-toggle">
       <button class="qnrr-vtog on" onclick="_qnrrSetView('chart',this)">กราฟ</button>
-      <button class="qnrr-vtog" onclick="_qnrrSetView('break',this)">Breakdown</button>
+      <button class="qnrr-vtog" onclick="_qnrrSetView('list',this)">List</button>
     </div>
-    <!-- Chart view -->
+    <!-- กราฟ tab: bar chart + breakdown table stacked -->
     <div id="qnrr-chart-bars-wrap">
       <div class="qnrr-ref-lines" id="qnrr-ref-lines"></div>
       <div class="qnrr-bars-row" id="qnrr-bars-row"></div>
     </div>
-    <!-- Breakdown view -->
     <div class="qnrr-breakdown-wrap" id="qnrr-breakdown-wrap"></div>
-  </div>
-  <!-- Transfer out callout card (shown only when selected month has transfer_out) -->
-  <div class="qnrr-tout-card" id="qnrr-tout-card">
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px">
-      <rect x=".5" y=".5" width="14" height="14" rx="2.5" stroke="rgba(248,113,113,.48)" stroke-dasharray="2.5 1.5" fill="none"/>
-      <path d="M4 7.5h7M9 5.5l2 2-2 2" stroke="rgba(248,113,113,.55)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <div style="flex:1;min-width:0">
-      <div class="qnrr-tout-card-label">Transfer Out</div>
-      <div class="qnrr-tout-card-row">
-        <span class="qnrr-tout-card-desc" id="qnrr-tout-card-desc">—</span>
-        <span class="qnrr-tout-card-val" id="qnrr-tout-card-val">—</span>
+    <!-- Transfer out callout card -->
+    <div class="qnrr-tout-card" id="qnrr-tout-card">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px">
+        <rect x=".5" y=".5" width="14" height="14" rx="2.5" stroke="rgba(248,113,113,.48)" stroke-dasharray="2.5 1.5" fill="none"/>
+        <path d="M4 7.5h7M9 5.5l2 2-2 2" stroke="rgba(248,113,113,.55)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="flex:1;min-width:0">
+        <div class="qnrr-tout-card-label">Transfer Out</div>
+        <div class="qnrr-tout-card-row">
+          <span class="qnrr-tout-card-desc" id="qnrr-tout-card-desc">—</span>
+          <span class="qnrr-tout-card-val" id="qnrr-tout-card-val">—</span>
+        </div>
+        <div class="qnrr-tout-card-note">ฐาน NRR คงเป็น มี.ค. — transfer out ไม่หักจากฐาน เพื่อให้เห็น true impact ของ Q</div>
       </div>
-      <div class="qnrr-tout-card-note">ฐาน NRR คงเป็น มี.ค. — transfer out ไม่หักจากฐาน เพื่อให้เห็น true impact ของ Q</div>
+    </div>
+    <!-- Legend (กราฟ tab only) -->
+    <div class="qnrr-legend" id="qnrr-legend"></div>
+    <!-- List tab: full-quarter account × outlet list -->
+    <div class="qnrr-list-wrap" id="qnrr-list-wrap" style="display:none">
+      <div class="qnrr-acct-list" id="qnrr-acct-list"></div>
     </div>
   </div>
-  <!-- Zone E: Legend -->
-  <div class="qnrr-legend" id="qnrr-legend"></div>
-  <!-- Zone F: Drill header -->
-  <div class="qnrr-drill-head">
-    <div class="qnrr-drill-lbl" id="qnrr-drill-lbl">— accounts</div>
-    <div class="qnrr-mv-filters" id="qnrr-mv-filters">
-      <button class="qnrr-mv-btn on" onclick="_qnrrSetMv('all',this)">ทั้งหมด</button>
-      <button class="qnrr-mv-btn" onclick="_qnrrSetMv('churn',this)">Churn</button>
-      <button class="qnrr-mv-btn" onclick="_qnrrSetMv('handover',this)">Handover</button>
+  <!-- REMOVED: old drill-head + mv-filters + separate acct-list (now inside list tab) -->
+  <!-- dummy IDs kept for JS compatibility -->
+  <div id="qnrr-drill-lbl" style="display:none">— accounts</div>
+  <div id="qnrr-mv-filters" style="display:none">
+    <button class="qnrr-mv-btn on" onclick="_qnrrSetMv('all',this)">ทั้งหมด</button>
+    <button class="qnrr-mv-btn" onclick="_qnrrSetMv('churn',this)">Churn</button>
+    <button class="qnrr-mv-btn" onclick="_qnrrSetMv('handover',this)">Handover</button
       <button class="qnrr-mv-btn" onclick="_qnrrSetMv('expansion',this)">Expansion</button>
     </div>
   </div>
