@@ -259,7 +259,7 @@
 /* ── Breakdown table ── */
 .qnrr-breakdown-wrap {
   display: none; overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 0 2px 6px;
 }
 .qnrr-breakdown-wrap.show { display: block; }
 .qnrr-bk-table {
@@ -267,31 +267,48 @@
   font-family: var(--tk-font-mono);
 }
 .qnrr-bk-table th {
-  font-size: 8px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .07em;
-  color: rgba(188,215,255,.38); padding: 4px 4px 5px;
-  text-align: right; border-bottom: 1px solid rgba(255,255,255,.07);
-}
-.qnrr-bk-table th:first-child { text-align: left; }
-.qnrr-bk-table td {
-  font-size: 9px; font-weight: 700; padding: 4px 4px;
-  text-align: right; color: rgba(255,255,255,.55);
-  border-bottom: 1px solid rgba(255,255,255,.035);
-}
-.qnrr-bk-table td:first-child { text-align: left; }
-.qnrr-bk-mv-cell { display: flex; align-items: center; gap: 4px; }
-.qnrr-bk-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
-.qnrr-bk-mv-name {
-  font-size: 8px; font-weight: 700;
-  color: rgba(255,255,255,.45); font-family: var(--tk-font-mono);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: rgba(188,215,255,.45); padding: 5px 6px 6px;
+  text-align: right; border-bottom: 1px solid rgba(255,255,255,.08);
   white-space: nowrap;
 }
-.qnrr-bk-table .bk-churn { color: rgba(248,113,113,.78); }
-.qnrr-bk-table .bk-pos   { color: rgba(74,222,128,.70); }
-.qnrr-bk-table .bk-neut  { color: rgba(96,165,250,.70); }
+.qnrr-bk-table th:first-child { text-align: left; min-width: 90px; }
+.qnrr-bk-table td {
+  font-size: 12px; font-weight: 700; padding: 5px 6px;
+  text-align: right; color: rgba(255,255,255,.60);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.qnrr-bk-table td:first-child { text-align: left; }
+.qnrr-bk-mv-cell { display: flex; align-items: center; gap: 5px; }
+.qnrr-bk-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.qnrr-bk-mv-name {
+  font-size: 11px; font-weight: 700;
+  color: rgba(255,255,255,.50); font-family: var(--tk-font-mono);
+  white-space: nowrap;
+}
+/* sub-rows: churn + net core indented under Core NRR */
+.qnrr-bk-table tr.bk-subrow td {
+  font-size: 11px; padding: 3px 6px 3px 8px;
+  border-bottom: none; color: rgba(255,255,255,.42);
+}
+.qnrr-bk-table tr.bk-subrow td:first-child { padding-left: 16px; }
+.qnrr-bk-mv-cell.sub { gap: 4px; }
+.qnrr-bk-dot.sub { width: 5px; height: 5px; opacity: .6; }
+.qnrr-bk-mv-name.sub { font-size: 10px; color: rgba(255,255,255,.35); }
+/* net core row */
+.qnrr-bk-table tr.bk-net-row td {
+  font-size: 11px; padding: 3px 6px 5px 8px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: rgba(255,255,255,.55);
+}
+.qnrr-bk-table tr.bk-net-row td:first-child { padding-left: 16px; }
+.qnrr-bk-table .bk-churn { color: rgba(248,113,113,.82) !important; }
+.qnrr-bk-table .bk-pos   { color: rgba(74,222,128,.75) !important; }
+.qnrr-bk-table .bk-neut  { color: rgba(96,165,250,.75) !important; }
 .qnrr-bk-table tr.bk-total td {
   border-top: 1px solid rgba(255,255,255,.10); border-bottom: none;
-  color: rgba(255,255,255,.72); padding-top: 6px;
+  color: rgba(255,255,255,.78); padding-top: 7px; font-size: 12px;
 }
 
 /* ── Transfer out callout card ── */

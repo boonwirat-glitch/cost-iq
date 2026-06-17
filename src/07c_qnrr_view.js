@@ -511,52 +511,98 @@ function _qnrrRenderBreakdown(){
   var ALL_MONTHS = [BASE_MONTH].concat(Q_MONTHS);
   var MONTH_HDRS = ALL_MONTHS.map(function(m){ return MONTHS_TH[m] || m; });
 
-  // Build outlet counts: active (core_nrr) + churn per month
-  // Format: "436+40" active+churn
+  // Header: active outlets only (core_nrr, not including churn)
   var outletHeaders = ALL_MONTHS.map(function(m){
-    if (m === BASE_MONTH) {
-      return _data.cohort_outlets + ' outlets';
-    }
+    if (m === BASE_MONTH) return _data.cohort_outlets + ' out';
     var bm = _data.by_month[m];
     if (!bm) return '—';
-    var active = bm.outlets.core_nrr || 0;
-    var churn  = bm.outlets.core_nrr_churn || 0;
-    return active + '+' + churn;
+    return (bm.outlets.core_nrr || 0) + ' out';
   });
 
-  var maxSegs = {}; // mv → max across all months (for visual bar widths in future)
-  BK_ORDER.forEach(function(mv){
-    var max = 0;
-    ALL_MONTHS.forEach(function(m){
-      var bm = (m === BASE_MONTH) ? null : _data.by_month[m];
-      if (!bm) return;
-      var v = bm.segments[mv] || 0;
-      if (v > max) max = v;
-    });
-    maxSegs[mv] = max;
-  });
+  var dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
 
   var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month"><thead><tr>' +
     '<th>Movement</th>' +
     ALL_MONTHS.map(function(m, i){
-      return '<th>' + MONTH_HDRS[i] + '<br><span style="color:rgba(188,215,255,.30);font-size:7px;font-weight:600;text-transform:none">' + outletHeaders[i] + '</span></th>';
+      var isLast = (m === Q_MONTHS[Q_MONTHS.length-1]);
+      return '<th>' + MONTH_HDRS[i] + (isLast ? '~' : '') +
+        '<br><span style="color:rgba(188,215,255,.35);font-size:10px;font-weight:600;text-transform:none;letter-spacing:0">'
+        + outletHeaders[i] + '</span></th>';
     }).join('') +
     '</tr></thead><tbody>';
 
+  // ── Core NRR block: main row + 2 sub-rows (churn + net) ──────────────────
+  var coreColor = MV_CFG.core_nrr.color;
+  var coreSqStyle = 'background:' + coreColor;
+
+  // Main "Core NRR active" row
+  html += '<tr>' +
+    '<td><div class="qnrr-bk-mv-cell">' +
+      '<div class="qnrr-bk-dot" style="' + coreSqStyle + '"></div>' +
+      '<span class="qnrr-bk-mv-name">Core NRR active</span>' +
+    '</div></td>';
+  ALL_MONTHS.forEach(function(m){
+    if (m === BASE_MONTH) {
+      html += '<td style="color:rgba(74,222,128,.65)">' + _fmtM(dispBase) + '</td>';
+      return;
+    }
+    var bm = _data.by_month[m];
+    var g  = (bm && bm.segments.core_nrr) || 0;
+    html += '<td class="bk-pos">' + (g > 0 ? _fmtM(g) : '<span style="color:rgba(255,255,255,.18)">—</span>') + '</td>';
+  });
+  html += '</tr>';
+
+  // Sub-row: Churn (negative)
+  html += '<tr class="bk-subrow">' +
+    '<td><div class="qnrr-bk-mv-cell sub">' +
+      '<div class="qnrr-bk-dot sub" style="background:rgba(248,113,113,.82)"></div>' +
+      '<span class="qnrr-bk-mv-name sub">└ Churn</span>' +
+    '</div></td>';
+  ALL_MONTHS.forEach(function(m){
+    if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
+    var bm = _data.by_month[m];
+    var g  = (bm && bm.segments.core_nrr_churn) || 0;
+    html += '<td class="bk-churn">' + (g > 0 ? '-' + _fmtM(g) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
+  });
+  html += '</tr>';
+
+  // Sub-row: Net core (active − churn) — shows the real retention delta
+  html += '<tr class="bk-net-row">' +
+    '<td><div class="qnrr-bk-mv-cell sub">' +
+      '<div class="qnrr-bk-dot sub" style="background:rgba(255,255,255,.20)"></div>' +
+      '<span class="qnrr-bk-mv-name sub" style="color:rgba(255,255,255,.45)">└ Net core</span>' +
+    '</div></td>';
+  ALL_MONTHS.forEach(function(m){
+    if (m === BASE_MONTH) {
+      html += '<td style="color:rgba(255,255,255,.42)">' + _fmtM(dispBase) + '</td>';
+      return;
+    }
+    var bm = _data.by_month[m];
+    var active = (bm && bm.segments.core_nrr) || 0;
+    var churn  = (bm && bm.segments.core_nrr_churn) || 0;
+    var net    = active - churn;
+    var col    = net >= 0 ? 'rgba(255,255,255,.50)' : 'rgba(248,113,113,.72)';
+    var prefix = net < 0 ? '' : ''; // net already negative from churn
+    html += '<td style="color:' + col + '">' + (active > 0 || churn > 0 ? _fmtM(net) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
+  });
+  html += '</tr>';
+
+  // ── Other movements (skip core_nrr and core_nrr_churn — already handled) ─
+  var SKIP = {core_nrr: true, core_nrr_churn: true};
   BK_ORDER.forEach(function(mv){
+    if (SKIP[mv]) return;
     var cfg = MV_CFG[mv];
-    // Check if any month has value
     var hasAny = ALL_MONTHS.some(function(m){
-      if (m === BASE_MONTH) return false; // base month has no period segments
+      if (m === BASE_MONTH) return false;
       var bm = _data.by_month[m];
       return bm && (bm.segments[mv] || 0) > 0;
     });
     if (!hasAny) return;
 
-    var isChurn  = (mv === 'core_nrr_churn' || mv === 'transfer_out');
-    var isPos    = (mv === 'expansion' || mv === 'new_sales' || mv === 'comeback');
-    var isNeut   = (mv === 'handover' || mv === 'transfer_in');
-    var sqStyle  = cfg.color === 'ghost'
+    var isChurn = (mv === 'transfer_out');
+    var isPos   = (mv === 'expansion' || mv === 'new_sales' || mv === 'comeback');
+    var isNeut  = (mv === 'handover' || mv === 'transfer_in');
+    var sqStyle = cfg.color === 'ghost'
       ? 'border:1px dashed rgba(255,255,255,.28);background:transparent'
       : 'background:' + cfg.color;
 
@@ -567,25 +613,23 @@ function _qnrrRenderBreakdown(){
       '</div></td>';
 
     ALL_MONTHS.forEach(function(m){
-      if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.18)">—</td>'; return; }
+      if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
       var bm = _data.by_month[m];
       var g  = (bm && bm.segments[mv]) || 0;
       var cls = g > 0 ? (isChurn ? 'bk-churn' : isPos ? 'bk-pos' : isNeut ? 'bk-neut' : '') : '';
-      html += '<td class="' + cls + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '<span style="color:rgba(255,255,255,.18)">—</span>') + '</td>';
+      html += '<td class="' + cls + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
     });
-
     html += '</tr>';
   });
 
-  // Total row
-  html += '<tr class="bk-total"><td><div class="qnrr-bk-mv-cell"><span class="qnrr-bk-mv-name" style="color:rgba(255,255,255,.60)">Total GMV</span></div></td>';
+  // ── Total GMV row ─────────────────────────────────────────────────────────
+  html += '<tr class="bk-total"><td><div class="qnrr-bk-mv-cell"><span class="qnrr-bk-mv-name" style="color:rgba(255,255,255,.65)">Total GMV</span></div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) {
-      var _dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
-      html += '<td style="color:rgba(255,255,255,.68)">' + _fmtM(_dispBase) + '</td>';
+      html += '<td style="color:rgba(255,255,255,.72)">' + _fmtM(dispBase) + '</td>';
     } else {
       var bm = _data.by_month[m];
-      html += '<td style="color:rgba(255,255,255,.68)">' + (bm ? _fmtM(bm.total_gmv) : '—') + '</td>';
+      html += '<td style="color:rgba(255,255,255,.72)">' + (bm ? _fmtM(bm.total_gmv) : '—') + '</td>';
     }
   });
   html += '</tr></tbody></table>';
