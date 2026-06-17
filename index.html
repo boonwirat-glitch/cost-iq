@@ -1,4 +1,4 @@
-<!-- Freshket Sense 764: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 765: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '764',
+      version: '765',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -14086,7 +14086,7 @@ function switchAccount(accountId){
   // switchAccount debug log removed (v257)
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
-  churnExpanded=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
+  churnExpanded=false;_catExpanded=true;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
   skuSubstituteMapLM={};skuSubstituteLoadingLM=false;skuSubstituteDoneLM=false;
   // Reset insight button to default (non-done) state
   const _ib=document.getElementById('kam-insight-btn');
@@ -17079,7 +17079,7 @@ function _unlockScore(){
   if(descEl)setTimeout(()=>{descEl.textContent=scoreDesc;},600);
 }
 // ── Category bars with tonal palette + expand/collapse ──────────────────
-let _catExpanded=false;
+let _catExpanded=true; // v764: default expanded
 function renderCatBars(cats,defaultShow){
   if(!cats||!cats.length)return'';
   const show=_catExpanded?cats.length:Math.min(defaultShow,cats.length);
