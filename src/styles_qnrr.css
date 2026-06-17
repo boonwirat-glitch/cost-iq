@@ -94,30 +94,32 @@
   flex-shrink: 0;
 }
 .qnrr-base-eyebrow {
-  font-size: 9px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em;
-  color: var(--tk-text-muted); margin-bottom: 3px;
+  color: rgba(188,215,255,.65); margin-bottom: 3px;
 }
 .qnrr-base-val {
   font-size: 20px; font-weight: 900;
   font-family: var(--tk-font-mono);
   color: #fff; letter-spacing: -.03em; line-height: 1;
 }
-.qnrr-base-sub { font-size: 11px; color: rgba(255,255,255,.40); margin-top: 3px; font-weight: 600; }
+.qnrr-base-sub { font-size: 11px; color: rgba(255,255,255,.60); margin-top: 3px; font-weight: 600; }
 .qnrr-vsep { width: 1px; height: 36px; background: var(--tk-border); flex-shrink: 0; }
 .qnrr-nrr-trend { flex: 1; }
 .qnrr-nrr-label {
-  font-size: 9px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em;
-  color: var(--tk-text-muted); margin-bottom: 4px;
+  color: rgba(188,215,255,.60); margin-bottom: 4px;
 }
-.qnrr-nrr-vals { display: flex; align-items: center; gap: 8px; }
+.qnrr-nrr-vals { display: flex; align-items: flex-start; gap: 12px; }
 .qnrr-nrr-v {
-  font-size: 15px; font-weight: 900;
-  font-family: var(--tk-font-mono); letter-spacing: -.02em;
+  font-size: 16px; font-weight: 900;
+  font-family: var(--tk-font-mono); letter-spacing: -.02em; line-height: 1;
 }
-.qnrr-nrr-sep { font-size: 10px; color: rgba(255,255,255,.12); }
-.qnrr-nrr-mos { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.50); margin-top: 3px; font-family: var(--tk-font-mono); letter-spacing: .02em; }
+.qnrr-nrr-sep { width: 1px; height: 28px; background: rgba(255,255,255,.10); align-self: center; flex-shrink: 0; }
+.qnrr-nrr-mos { display: none; }
+.qnrr-nrr-slot { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.qnrr-nrr-mo-lbl { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.45); font-family: var(--tk-font-mono); letter-spacing: .03em; }
 
 /* ── Chart zone ── */
 .qnrr-chart-zone {
@@ -156,6 +158,10 @@
 .qnrr-bar-col.active {
   background: rgba(255,255,255,.04);
   border-radius: 8px;
+}
+.qnrr-bar-col.active .qnrr-bar-lbl {
+  border-bottom: 2px solid rgba(188,215,255,.55);
+  padding-bottom: 2px;
 }
 .qnrr-bar-body {
   width: 100%; border-radius: 5px; overflow: hidden;
@@ -411,4 +417,12 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-family: var(--tk-font-mono); letter-spacing: -.02em;
   margin-top: 3px; text-align: center; width: 100%;
   animation: qnrrCountIn .5s ease both;
+}
+
+
+/* Mar bar cohort count */
+.qnrr-bar-mar-sub {
+  font-size: 9px; font-weight: 700;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.50);
+  text-align: center; width: 100%; margin-top: 1px; white-space: nowrap;
 }
