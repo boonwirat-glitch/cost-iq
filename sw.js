@@ -1,4 +1,4 @@
-// Freshket Sense — Service Worker v753p
+// Freshket Sense — Service Worker v756
 // Strategy: Cache-first, background revalidate (stale-while-revalidate)
 //
 // v753 rewrite: fixed all redirect-related ERR_FAILED bugs.
@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v755l';
+const CACHE_NAME = 'sense-v756';
 const APP_URL = '/index.html';
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
