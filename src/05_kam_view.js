@@ -644,7 +644,11 @@ function __legacyRenderKamThisMonthFallback(){
       (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p3&&_cp.upsell_sku.p3.groups||[]).forEach(g=>{if(g.groupKey)_commUpsellSet.add(g.groupKey.toUpperCase());});
     }catch(e){}
     const _subclassMap=new Map();
-    (D.skus_monthly[_prevClosedMoA]||D.skus||[]).forEach(s=>{if(s.id||s.item_id)_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());});
+    // v762: loop ALL months (incl. current MTD) so new-this-month SKUs get subclass
+    // Old: only _prevClosedMoA → item_id ใหม่เดือนนี้ไม่มีใน prev → subclass empty → badge ไม่ขึ้น
+    Object.values(D.skus_monthly||{}).forEach(arr=>(arr||[]).forEach(s=>{if((s.id||s.item_id)&&(s.d||s.subclass))_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());}));
+    // fallback: also seed from D.skus (alias of latest month)
+    (D.skus||[]).forEach(s=>{if((s.id||s.item_id)&&(s.d||s.subclass)&&!_subclassMap.has(String(s.id||s.item_id)))_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());});
     const _commBadge=(subclass)=>{
       if(!subclass)return'';
       const sc=subclass.toUpperCase();
