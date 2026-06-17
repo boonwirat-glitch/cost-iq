@@ -506,7 +506,7 @@ function _qnrrRenderChart(){
     }
 
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
-      topLabelHtml+
+      '<div class="qnrr-bar-top-wrap">'+topLabelHtml+'</div>'+
       ghostHtml+
       '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
       overlayHtml+
@@ -551,7 +551,8 @@ function _qnrrRenderDrill(){
   else if(_selMv==='handover')  filtered=rows.filter(function(r){return r.movement_type==='handover';});
   else if(_selMv==='expansion') filtered=rows.filter(function(r){return r.movement_type==='expansion';});
 
-  // group by account_id, collect GMV across ALL months
+  // group by account_id — show account at top level, outlets on expand
+  // outlet name = account_name + outlet_id suffix (if multiple)
   var byAcct={};var acctOrder=[];
   filtered.forEach(function(r){
     var aid=r.account_id;
@@ -560,7 +561,14 @@ function _qnrrRenderDrill(){
                    gmvByMonth:{},baseGmv:0,currGmv:0};
       acctOrder.push(aid);
     }
-    byAcct[aid].outlets.push(r);
+    // store outlet with unique identity
+    byAcct[aid].outlets.push({
+      outlet_id: r.outlet_id,
+      outlet_name: r.outlet_id, // CSV ไม่มี outlet_name แยก — ใช้ outlet_id เป็น identifier
+      base_gmv: r.base_gmv||0,
+      curr_gmv: r.curr_gmv||0,
+      movement_type: r.movement_type
+    });
     byAcct[aid].baseGmv+=r.base_gmv||0;
     byAcct[aid].currGmv+=r.curr_gmv||0;
   });
@@ -584,7 +592,20 @@ function _qnrrRenderDrill(){
   }
 
   var _fmark=_selMv!=='all'?' · กรอง: '+(_selMv==='churn'?'Churn':_selMv==='handover'?'Handover':'Expansion'):'';
+  // เพิ่ม core NRR stats ใน subtitle
+  var bmSel=_data&&_data.by_month[_selBar];
+  var coreInfo='';
+  if(bmSel&&bmSel.rows){
+    var coreRows=bmSel.rows.filter(function(r){return r.movement_type==='core_nrr';});
+    var churnRows=bmSel.rows.filter(function(r){return r.movement_type==='core_nrr_churn';});
+    var coreGmv=coreRows.reduce(function(s,r){return s+(r.curr_gmv||0);},0);
+    var churnCount=churnRows.length;
+    var churnGmv=churnRows.reduce(function(s,r){return s+(r.base_gmv||0);},0);
+    coreInfo=' · core '+coreRows.length+' outlets '+_fmtM(coreGmv)+' | churn '+churnCount+' outlets '+_fmtM(churnGmv);
+  }
   if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts'+_fmark;
+  var subLbl=_el('qnrr-drill-sublbl');
+  if(subLbl)subLbl.textContent=coreInfo;
 
   if(!acctOrder.length){
     list.innerHTML='<div style="padding:24px;text-align:center;color:rgba(255,255,255,.25);font-size:11px">ไม่มีข้อมูล</div>';
@@ -613,30 +634,39 @@ function _qnrrRenderDrill(){
     var baseGmvLabel=_fmtM(a.baseGmv);
     var currGmvLabel=_fmtM(a.currGmv);
 
-    // Outlet rows — use outlet_name if available, fallback to outlet_id
+    // Outlet rows — outlet_id เป็น identifier หลัก
+    // ถ้า account มีหลาย outlets → แสดง outlet_id แยกชัดเจน
     var outHtml=a.outlets.map(function(o){
-      // FIX: use account_name + outlet context, not raw outlet_id
-      var oName=o.outlet_name||o.account_name||o.outlet_id||'—';
-      // If multiple outlets in same account, show outlet_id as suffix
-      if(a.outlets.length>1&&o.outlet_id){
-        oName=o.account_name||o.outlet_id;
-      }
+      var oName=a.outlets.length>1
+        ? 'Outlet #'+o.outlet_id
+        : (o.outlet_name||a.name||o.outlet_id||'—');
+      // outlet 4-bar sparkline: Mar + Apr + May + Jun
+      var oAllMonths=[BASE_MONTH].concat(Q_MONTHS);
+      var oGmvs=oAllMonths.map(function(qm){
+        if(qm===BASE_MONTH) return o.base_gmv||0;
+        var qbm=_data&&_data.by_month[qm];
+        if(!qbm) return 0;
+        var found=(qbm.rows||[]).find(function(rr){return rr.outlet_id===o.outlet_id;});
+        return found?found.curr_gmv:0;
+      });
+      var oMax=Math.max.apply(null,oGmvs)||1;
+      var oSparkHtml=oAllMonths.map(function(qm,qi){
+        var v=oGmvs[qi];
+        var h=v>0?Math.max(3,Math.round(v/oMax*16)):2;
+        var bg=qm===BASE_MONTH?'rgba(38,96,200,.45)':(qm===_selBar?dotColor:'rgba(255,255,255,.15)');
+        var mLbl=(MONTHS_TH[qm]||qm)+' '+_fmtM(v);
+        return '<div class="qnrr-osb" style="height:'+h+'px;background:'+bg+'" title="'+mLbl+'"></div>';
+      }).join('');
+      var oSelGmv=oGmvs[oAllMonths.indexOf(_selBar)]||0;
       var oBaseGmv=o.base_gmv||0;
-      var oCurrGmv=o.curr_gmv||0;
-      var oMax=Math.max(oBaseGmv,oCurrGmv)||1;
-      var obH=oBaseGmv>0?Math.max(3,Math.round(oBaseGmv/oMax*14)):2;
-      var ocH=oCurrGmv>0?Math.max(3,Math.round(oCurrGmv/oMax*14)):2;
       return '<div class="qnrr-out-row">'+
         '<div class="qnrr-out-dot" style="background:'+dotColor+'"></div>'+
         '<div class="qnrr-out-name">'+_esc(String(oName).slice(0,45))+'</div>'+
         '<div class="qnrr-out-spark-wrap">'+
-          '<div class="qnrr-out-spark">'+
-            '<div class="qnrr-osb" style="height:'+obH+'px;background:rgba(38,96,200,.4)" title="ฐาน '+_fmtM(oBaseGmv)+'"></div>'+
-            '<div class="qnrr-osb" style="height:'+ocH+'px;background:'+dotColor+'" title="'+MONTHS_TH[_selBar]+' '+_fmtM(oCurrGmv)+'"></div>'+
-          '</div>'+
+          '<div class="qnrr-out-spark">'+oSparkHtml+'</div>'+
           '<div class="qnrr-out-spark-lbl">'+
             '<span>'+_fmtM(oBaseGmv)+'</span>'+
-            '<span style="color:'+dotColor+'">'+_fmtM(oCurrGmv)+'</span>'+
+            '<span style="color:'+dotColor+'">'+_fmtM(oSelGmv)+'</span>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -669,5 +699,6 @@ function _qnrrRenderDrill(){
 }
 
 })();
+
 
 
