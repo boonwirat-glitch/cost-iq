@@ -1,4 +1,4 @@
-<!-- Freshket Sense 766: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 767: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '766',
+      version: '767',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -17080,13 +17080,24 @@ function _unlockScore(){
 }
 // ── Category bars with tonal palette + expand/collapse ──────────────────
 let _catExpanded=true; // v764: default expanded
+const _CAT_MASTER=['Beverage Alcohol','Beverage Non-alcohol','DG Food','DG Non-food','Egg','Fish & Seafood','Fruit','Meat','Processed Food','Vegetable'];
 function renderCatBars(cats,defaultShow){
-  if(!cats||!cats.length)return'';
-  const show=_catExpanded?cats.length:Math.min(defaultShow,cats.length);
-  const maxP=Math.max(...cats.slice(0,show).map(x=>x.p),1);
-  const rows=cats.slice(0,show).map((c,i)=>`<div class="cbi" style="--cat-i:${i}"><div class="cbn">${c.n}</div><div class="cbt"><div class="cbf" style="width:${Math.min(c.p/maxP*100,100)}%;background:${catColor(i)}"></div></div><div style="display:grid;grid-template-columns:62px 28px;flex-shrink:0"><span class="cbv" style="text-align:right">${fmt(c.s)}</span><span class="cbp" style="text-align:right;padding-left:2px">${c.p}%</span></div></div>`).join('');
-  const btn=cats.length>defaultShow?`<button class="cat-expand-btn" onclick="toggleCatExpand()">${_catExpanded?'ย่อ':'ดูอีก '+(cats.length-defaultShow)+' หมวด'}</button>`:'';
-  return rows+btn;
+  // v767: merge with _CAT_MASTER — show all 10 categories, highlight missing ones in amber
+  const purchasedNames=new Set((cats||[]).map(c=>c.n));
+  const notPurchased=_CAT_MASTER.filter(n=>!purchasedNames.has(n)).map(n=>({n,s:0,p:0,empty:true}));
+  const allCats=[...(cats||[]).slice().sort((a,b)=>(b.s||0)-(a.s||0)),...notPurchased];
+  if(!allCats.length)return'';
+  const maxP=Math.max(...allCats.map(x=>x.p||0),1);
+  const rows=allCats.map((c,i)=>{
+    const isEmpty=!!c.empty;
+    const barColor=isEmpty?'rgba(240,176,0,.35)':catColor(i);
+    const nameStyle=isEmpty?'color:rgba(240,176,0,.85);font-weight:600':'';
+    const valHtml=isEmpty
+      ?`<span style="font-size:10px;color:rgba(240,176,0,.7);text-align:right;font-family:var(--mono)">ยังไม่สั่ง</span><span class="cbp" style="text-align:right;padding-left:2px;opacity:0"></span>`
+      :`<span class="cbv" style="text-align:right">${fmt(c.s)}</span><span class="cbp" style="text-align:right;padding-left:2px">${c.p}%</span>`;
+    return`<div class="cbi" style="--cat-i:${i}"><div class="cbn" style="${nameStyle}">${c.n}</div><div class="cbt"><div class="cbf" style="width:${isEmpty?8:Math.min((c.p||0)/maxP*100,100)}%;background:${barColor};${isEmpty?'opacity:.4':''}"></div></div><div style="display:grid;grid-template-columns:62px 28px;flex-shrink:0">${valHtml}</div></div>`;
+  }).join('');
+  return rows;
 }
 function toggleCatExpand(){
   _catExpanded=!_catExpanded;
