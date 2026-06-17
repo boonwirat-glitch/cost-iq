@@ -393,17 +393,17 @@ function _qnrrRenderBase(){
   if(baseVal)baseVal.textContent=_fmtM(effectiveBase);
   if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort (normalized)';
 
-  var vals=[];var mos=[];
-  Q_MONTHS.forEach(function(m){
+  var slots=[];
+  Q_MONTHS.forEach(function(m,idx){
     var bm=_data.by_month[m];
     var pct=bm?bm.nrr_pct:null;
     var color=pct===null?'rgba(255,255,255,.2)':pct>=100?'#4ddc97':pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)';
     var label=pct===null?'—':pct+'%';
-    vals.push('<span class="qnrr-nrr-v" style="color:'+color+'">'+_esc(label)+'</span>');
-    mos.push(MONTHS_TH[m]||m);
+    if(idx>0)slots.push('<div class="qnrr-nrr-sep"></div>');
+    slots.push('<div class="qnrr-nrr-slot"><span class="qnrr-nrr-v" style="color:'+color+'">'+_esc(label)+'</span><span class="qnrr-nrr-mo-lbl">'+(MONTHS_TH[m]||m)+'</span></div>');
   });
-  if(nrrVals)nrrVals.innerHTML=vals.join('<span class="qnrr-nrr-sep">·</span>');
-  if(nrrMos) nrrMos.textContent=mos.join(' · ')+' (normalized)';
+  if(nrrVals)nrrVals.innerHTML=slots.join('');
+  if(nrrMos) nrrMos.textContent='';
 }
 
 // ── Zone C: chart ──────────────────────────────────────────────────────────
@@ -470,7 +470,7 @@ function _qnrrRenderChart(){
     var topLabelHtml=''; var overlayHtml='';
     if(isBase){
       var _effBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
-      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_effBase)+'</div>';
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_effBase)+'</div><div class="qnrr-bar-mar-sub">'+_data.cohort_outlets+' outlets</div>';
     } else if(bm){
       var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.2)';
       var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
@@ -583,7 +583,8 @@ function _qnrrRenderDrill(){
     });
   }
 
-  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts';
+  var _fmark=_selMv!=='all'?' · กรอง: '+(_selMv==='churn'?'Churn':_selMv==='handover'?'Handover':'Expansion'):'';
+  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts'+_fmark;
 
   if(!acctOrder.length){
     list.innerHTML='<div style="padding:24px;text-align:center;color:rgba(255,255,255,.25);font-size:11px">ไม่มีข้อมูล</div>';
@@ -668,4 +669,5 @@ function _qnrrRenderDrill(){
 }
 
 })();
+
 
