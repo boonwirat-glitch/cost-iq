@@ -3841,6 +3841,15 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     <div class="qnrr-legend" id="qnrr-legend"></div>
     <!-- List tab: full-quarter account × outlet list -->
     <div class="qnrr-list-wrap" id="qnrr-list-wrap" style="display:none">
+      <!-- Filter bar -->
+      <div class="qnrr-list-filter-bar">
+        <button class="qnrr-mv-btn on" onclick="_qnrrListFilter('all',this)">ทั้งหมด</button>
+        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('core_nrr',this)">Core</button>
+        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('core_nrr_churn',this)">Churn</button>
+        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('handover',this)">Handover</button>
+        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('expansion',this)">Expansion</button>
+        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('new_sales',this)">New</button>
+      </div>
       <div class="qnrr-acct-list" id="qnrr-acct-list"></div>
     </div>
   </div>
