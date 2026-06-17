@@ -1120,6 +1120,9 @@ function handleFileUpload(type,input){
         try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
         // Trigger commission strip re-render now that upsell data is available
         try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        // v763: re-render account view so commission badges on newThisMonth SKUs appear
+        // badge relies on _commBuildKamPayout which uses bulkUpsellData — must re-render after load
+        try{ if(currentAccountId&&typeof renderKamThisMonth==='function') setTimeout(()=>renderKamThisMonth(),80); }catch(e){}
       }catch(err){
         console.warn('[Q3C] parse error',err);
         bulkUpsellData={byKam:{},baselineGroups:{},loaded:false};
