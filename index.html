@@ -1,4 +1,4 @@
-<!-- Freshket Sense 767: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 768: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '767',
+      version: '768',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6466,7 +6466,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   flex-shrink: 0;
 }
 .qnrr-eyebrow {
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .09em;
   color: rgba(188,215,255,.60); margin-bottom: 4px;
 }
@@ -6552,8 +6552,12 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bar-col:active .qnrr-bar-body { filter: brightness(1.15); }
 .qnrr-bar-col.active .qnrr-bar-body::after {
   content: ''; position: absolute; inset: -3px;
-  border: 1.5px solid rgba(255,255,255,.32);
+  border: 1.5px solid rgba(188,215,255,.50);
   border-radius: 9px; pointer-events: none;
+}
+.qnrr-bar-col.active {
+  background: rgba(255,255,255,.04);
+  border-radius: 8px;
 }
 .qnrr-bar-body {
   width: 100%; border-radius: 5px; overflow: hidden;
@@ -6583,9 +6587,9 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 @keyframes qnrrGhostPulse { 0%,100%{opacity:.4} 50%{opacity:.85} }
 
 .qnrr-bar-lbl {
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .3px;
-  color: rgba(255,255,255,.50); margin-top: 5px;
+  color: rgba(255,255,255,.60); margin-top: 5px;
   font-family: var(--tk-font-mono); transition: color .2s;
   white-space: nowrap; /* prevent wrapping */
   overflow: hidden;
@@ -6594,10 +6598,10 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 /* top label (NRR% / GMV) — positioned above bar */
 .qnrr-bar-top-label {
   position: absolute; top: 1px; left: 50%; transform: translateX(-50%);
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   font-family: var(--tk-font-mono); letter-spacing: -.01em;
   white-space: nowrap; animation: qnrrCountIn .5s ease both;
-  color: rgba(255,255,255,.60);
+  color: rgba(255,255,255,.75);
 }
 .qnrr-bar-nrr {
   font-size: 11px; font-weight: 800;
@@ -6631,7 +6635,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 }
 .qnrr-leg {
   display: flex; align-items: center; gap: 4px;
-  font-size: 9px; font-weight: 700; color: rgba(255,255,255,.30);
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,.55);
   letter-spacing: .02em;
 }
 .qnrr-leg-sq { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
@@ -6651,7 +6655,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-mv-btn {
   font-size: 9px; font-weight: 700; padding: 3px 8px;
   border-radius: 999px; border: 1px solid rgba(255,255,255,.08);
-  background: transparent; color: rgba(255,255,255,.28);
+  background: transparent; color: rgba(255,255,255,.55);
   cursor: pointer; font-family: var(--tk-font-mono);
   transition: all .18s; -webkit-tap-highlight-color: transparent;
 }
@@ -6801,6 +6805,14 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-family: var(--tk-font-mono); letter-spacing: -.02em;
   white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,.5);
   pointer-events: none; z-index: 2;
+}
+
+/* NRR% label — below bar, outside animated bar-body */
+.qnrr-bar-nrr-below {
+  font-size: 12px; font-weight: 800;
+  font-family: var(--tk-font-mono); letter-spacing: -.02em;
+  margin-top: 3px; text-align: center; width: 100%;
+  animation: qnrrCountIn .5s ease both;
 }
 </style>
 <style id="restaurant-module-css">
@@ -24834,7 +24846,7 @@ function __legacyRenderKamThisMonthFallback(){
     const _vBtnCls='sku-verify-btn'+(_verifyDone?' done':_verifyLoading?' loading':'');
     const _vIcon=`<svg class="svb-icon" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>`;
     // v758: GMV filter
-    if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=1000;
+    if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=3000; // v763: default <3K
     const _f1A=skuGmvFilter===1000,_f3A=skuGmvFilter===3000;
     const _fBase='font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--tk-font-body);border:1px solid';
     const _f1S=_fBase+(_f1A?' rgba(100,180,255,.6);background:rgba(100,180,255,.12);color:rgba(100,180,255,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
@@ -24920,7 +24932,12 @@ function __legacyRenderKamThisMonthFallback(){
     const prevCatMoKeys=Object.keys(D.cats_monthly).sort((a,b)=>{const toD=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};return toD(b)-toD(a);});
     const prevCats=prevCatMoKeys.length?D.cats_monthly[prevCatMoKeys[0]]||[]:[];
     const curCatNames=new Set();
-    (D.sku_current||[]).forEach(sc=>{const si=(D.skus||[]).find(s=>String(s.id)===String(sc.item_id));if(si)curCatNames.add(si.d);});
+    // v765: build category lookup from ALL months (incl. current MTD) not just D.skus (prev month alias)
+    // D.skus = alias of last closed month → new-this-month SKUs not found → false category gap
+    const _allSkuMap=new Map();
+    Object.values(D.skus_monthly||{}).forEach(arr=>(arr||[]).forEach(s=>{if(s.id||s.item_id)_allSkuMap.set(String(s.id||s.item_id),s.d||'');}));
+    (D.skus||[]).forEach(s=>{if((s.id||s.item_id)&&!_allSkuMap.has(String(s.id||s.item_id)))_allSkuMap.set(String(s.id||s.item_id),s.d||'');});
+    (D.sku_current||[]).forEach(sc=>{const cat=_allSkuMap.get(String(sc.item_id));if(cat)curCatNames.add(cat);});
     const missingCats=prevCats.filter(c=>c.s>5000&&!curCatNames.has(c.n));
     if(missingCats.length){
       html+=`<div class="kam-dc" style="margin-bottom:12px;border-color:rgba(240,176,0,.2)">
@@ -51642,14 +51659,15 @@ function _qnrrRenderBase(){
     if(nrrMos) nrrMos.textContent='';
     return;
   }
-  if(baseVal)baseVal.textContent=_fmtM(_data.base_gmv);
-  if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort';
+  var effectiveBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+  if(baseVal)baseVal.textContent=_fmtM(effectiveBase);
+  if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort (normalized)';
 
   var vals=[];var mos=[];
   Q_MONTHS.forEach(function(m){
     var bm=_data.by_month[m];
     var pct=bm?bm.nrr_pct:null;
-    var color=pct===null?'rgba(255,255,255,.2)':pct>=100?'#4ddc97':pct>=90?'#4ddc97':'var(--amb)';
+    var color=pct===null?'rgba(255,255,255,.2)':pct>=100?'#4ddc97':pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)';
     var label=pct===null?'—':pct+'%';
     vals.push('<span class="qnrr-nrr-v" style="color:'+color+'">'+_esc(label)+'</span>');
     mos.push(MONTHS_TH[m]||m);
@@ -51721,12 +51739,13 @@ function _qnrrRenderChart(){
     // Labels: GMV on top, NRR% overlaid inside bar
     var topLabelHtml=''; var overlayHtml='';
     if(isBase){
-      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_data.base_gmv)+'</div>';
+      var _effBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_effBase)+'</div>';
     } else if(bm){
-      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'rgba(77,220,151,.9)':'var(--amb)'):'rgba(255,255,255,.2)';
+      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.2)';
       var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
       topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(bm.total_gmv)+'</div>';
-      overlayHtml='<div class="qnrr-bar-nrr-overlay" style="color:'+pctColor+'">'+pctLabel+'</div>';
+      overlayHtml='<div class="qnrr-bar-nrr-below" style="color:'+pctColor+'">'+pctLabel+'</div>';
     }
 
     // bar body — FIX stack: core_nrr at BOTTOM, movements on top
@@ -51759,7 +51778,8 @@ function _qnrrRenderChart(){
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
       topLabelHtml+
       ghostHtml+
-      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+overlayHtml+'</div>'+
+      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+      overlayHtml+
       '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
   }).join('');
@@ -51918,6 +51938,7 @@ function _qnrrRenderDrill(){
 }
 
 })();
+
 </script>
 <script id="freshket-nav-config">
 /**
