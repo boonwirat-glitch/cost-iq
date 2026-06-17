@@ -404,6 +404,32 @@ function _qnrrRenderBase(){
   });
   if(nrrVals)nrrVals.innerHTML=slots.join('');
   if(nrrMos) nrrMos.textContent='';
+
+  // ── stats row: NRR GMV + active + churn per month ──
+  var statsRow=_el('qnrr-stats-row');
+  if(statsRow){
+    var statSlots=Q_MONTHS.map(function(m){
+      var bm=_data.by_month[m];
+      if(!bm||!bm.rows) return '<div class="qnrr-stat-slot"><div class="qnrr-stat-v">—</div><div class="qnrr-stat-sub">—</div><div class="qnrr-stat-mo">'+(MONTHS_TH[m]||m)+'</div></div>';
+      var coreRows=bm.rows.filter(function(r){return r.movement_type==='core_nrr';});
+      var churnRows=bm.rows.filter(function(r){return r.movement_type==='core_nrr_churn';});
+      var coreGmv=coreRows.reduce(function(s,r){return s+(r.curr_gmv||0);},0);
+      var activeCount=coreRows.length;
+      var churnCount=churnRows.length;
+      var pct=bm.nrr_pct;
+      var gmvColor=pct!==null?(pct>=100?'#4ddc97':pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.5)';
+      return '<div class="qnrr-stat-slot">'+
+        '<div class="qnrr-stat-v" style="color:'+gmvColor+'">'+_fmtM(coreGmv)+'</div>'+
+        '<div class="qnrr-stat-sub">'+
+          '<span class="qnrr-stat-active">'+activeCount+' active</span>'+
+          '<span class="qnrr-stat-sep">·</span>'+
+          '<span class="qnrr-stat-churn">'+churnCount+' churn</span>'+
+        '</div>'+
+        '<div class="qnrr-stat-mo">'+(MONTHS_TH[m]||m)+'</div>'+
+      '</div>';
+    });
+    statsRow.innerHTML=statSlots.join('<div class="qnrr-stat-divider"></div>');
+  }
 }
 
 // ── Zone C: chart ──────────────────────────────────────────────────────────
@@ -551,45 +577,63 @@ function _qnrrRenderDrill(){
   else if(_selMv==='handover')  filtered=rows.filter(function(r){return r.movement_type==='handover';});
   else if(_selMv==='expansion') filtered=rows.filter(function(r){return r.movement_type==='expansion';});
 
-  // group by outlet_id — each outlet is its own top-level row
-  // account_name ใช้เป็น display name (outlet ไม่มีชื่อแยกใน CSV)
-  // dot movement อยู่ที่ outlet row ตรงๆ
+  // group by account_id — account row = header
+  // outlet rows = expand, dot movement อยู่ที่ outlet level
+  // outlet name lookup จาก bulkOutletsData (global)
+
+  // build outlet_id → outlet_name map จาก bulkOutletsData
+  var outletNameMap={};
+  if(typeof bulkOutletsData!=='undefined'){
+    Object.values(bulkOutletsData).forEach(function(monthsObj){
+      Object.values(monthsObj).forEach(function(outletArr){
+        if(!Array.isArray(outletArr))return;
+        outletArr.forEach(function(o){
+          if(o.outlet_id&&o.outlet_name&&!outletNameMap[o.outlet_id]){
+            outletNameMap[o.outlet_id]=o.outlet_name;
+          }
+        });
+      });
+    });
+  }
+
   var byAcct={};var acctOrder=[];
   filtered.forEach(function(r){
-    var oid=r.outlet_id;                       // KEY = outlet_id
-    if(!byAcct[oid]){
-      byAcct[oid]={
-        name: r.account_name||oid,             // display = account_name
-        acct_id: r.account_id,
-        type: r.movement_type,                 // movement ของ outlet นี้จริงๆ
+    var aid=r.account_id;
+    if(!byAcct[aid]){
+      byAcct[aid]={
+        name: r.account_name||aid,
+        type: r.movement_type,    // movement_type ของ account (ใช้ตัวแรกเป็น representative)
         outlets: [],
         gmvByMonth:{}, baseGmv:0, currGmv:0
       };
-      acctOrder.push(oid);
+      acctOrder.push(aid);
     }
-    byAcct[oid].baseGmv += r.base_gmv||0;
-    byAcct[oid].currGmv += r.curr_gmv||0;
-    byAcct[oid].outlets.push({
+    // outlet name: lookup จาก bulkOutletsData ก่อน fallback to account_name
+    var oName=outletNameMap[String(r.outlet_id)]||outletNameMap[r.outlet_id]||r.account_name||r.outlet_id;
+    byAcct[aid].outlets.push({
       outlet_id: r.outlet_id,
+      outlet_name: oName,
       base_gmv: r.base_gmv||0,
       curr_gmv: r.curr_gmv||0,
-      movement_type: r.movement_type
+      movement_type: r.movement_type   // movement ของ outlet นี้จริงๆ
     });
+    byAcct[aid].baseGmv+=r.base_gmv||0;
+    byAcct[aid].currGmv+=r.curr_gmv||0;
   });
 
-  // Collect GMV across all Q months for sparkline (from full data) per outlet
+  // Collect GMV across all Q months for account sparkline
   if(_data){
     Q_MONTHS.forEach(function(qm){
       var qbm=_data.by_month[qm];
       if(!qbm)return;
       (qbm.rows||[]).forEach(function(r){
-        if(byAcct[r.outlet_id]){                // lookup by outlet_id
-          byAcct[r.outlet_id].gmvByMonth[qm]=(byAcct[r.outlet_id].gmvByMonth[qm]||0)+r.curr_gmv;
+        if(byAcct[r.account_id]){
+          byAcct[r.account_id].gmvByMonth[qm]=(byAcct[r.account_id].gmvByMonth[qm]||0)+r.curr_gmv;
         }
       });
     });
-    acctOrder.forEach(function(oid){
-      byAcct[oid].gmvByMonth[BASE_MONTH]=byAcct[oid].baseGmv;
+    acctOrder.forEach(function(aid){
+      byAcct[aid].gmvByMonth[BASE_MONTH]=byAcct[aid].baseGmv;
     });
   }
 
@@ -605,7 +649,7 @@ function _qnrrRenderDrill(){
     var churnGmv=churnRows.reduce(function(s,r){return s+(r.base_gmv||0);},0);
     coreInfo=' · core '+coreRows.length+' outlets '+_fmtM(coreGmv)+' | churn '+churnCount+' outlets '+_fmtM(churnGmv);
   }
-  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' outlets'+_fmark;
+  if(lbl)lbl.textContent=(MONTHS_TH[_selBar]||_selBar)+' — '+acctOrder.length+' accounts'+_fmark;
   var subLbl=_el('qnrr-drill-sublbl');
   if(subLbl)subLbl.textContent=coreInfo;
 
@@ -640,10 +684,11 @@ function _qnrrRenderDrill(){
     var baseGmvLabel=_fmtM(a.baseGmv);
     var currGmvLabel=_fmtM(a.currGmv);
 
-    // Expand rows — แสดง GMV breakdown ต่อเดือน (เพราะ outlet คือ top row แล้ว)
-    // ไม่ต้องแสดง dot movement ซ้ำ
+    // Outlet rows — dot สี movement ของ outlet นั้น + ชื่อ outlet จาก bulkOutletsData
     var outHtml=a.outlets.map(function(o){
-      var oName='Outlet #'+o.outlet_id;
+      var oName=o.outlet_name||o.outlet_id;
+      var oCfg=MV_CFG[o.movement_type]||{color:'rgba(255,255,255,.3)'};
+      var oDotColor=oCfg.color==='ghost'?'rgba(229,62,62,.6)':oCfg.color;
       // outlet 4-bar sparkline: Mar + Apr + May + Jun
       var oAllMonths=[BASE_MONTH].concat(Q_MONTHS);
       var oGmvs=oAllMonths.map(function(qm){
@@ -657,20 +702,20 @@ function _qnrrRenderDrill(){
       var oSparkHtml=oAllMonths.map(function(qm,qi){
         var v=oGmvs[qi];
         var h=v>0?Math.max(3,Math.round(v/oMax*16)):2;
-        var bg=qm===BASE_MONTH?'rgba(38,96,200,.45)':(qm===_selBar?dotColor:'rgba(255,255,255,.15)');
+        var bg=qm===BASE_MONTH?'rgba(38,96,200,.45)':(qm===_selBar?oDotColor:'rgba(255,255,255,.15)');
         var mLbl=(MONTHS_TH[qm]||qm)+' '+_fmtM(v);
         return '<div class="qnrr-osb" style="height:'+h+'px;background:'+bg+'" title="'+mLbl+'"></div>';
       }).join('');
       var oSelGmv=oGmvs[oAllMonths.indexOf(_selBar)]||0;
       var oBaseGmv=o.base_gmv||0;
       return '<div class="qnrr-out-row">'+
-        '<div class="qnrr-out-dot" style="background:'+dotColor+'"></div>'+
-        '<div class="qnrr-out-name">'+_esc(String(oName).slice(0,45))+'</div>'+
+        '<div class="qnrr-out-dot" style="background:'+oDotColor+'"></div>'+
+        '<div class="qnrr-out-name">'+_esc(String(oName).slice(0,40))+'</div>'+
         '<div class="qnrr-out-spark-wrap">'+
           '<div class="qnrr-out-spark">'+oSparkHtml+'</div>'+
           '<div class="qnrr-out-spark-lbl">'+
             '<span>'+_fmtM(oBaseGmv)+'</span>'+
-            '<span style="color:'+dotColor+'">'+_fmtM(oSelGmv)+'</span>'+
+            '<span style="color:'+oDotColor+'">'+_fmtM(oSelGmv)+'</span>'+
           '</div>'+
         '</div>'+
       '</div>';
