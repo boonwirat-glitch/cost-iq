@@ -842,7 +842,12 @@ function __legacyRenderKamThisMonthFallback(){
     const prevCatMoKeys=Object.keys(D.cats_monthly).sort((a,b)=>{const toD=m=>{const p=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+mo.indexOf(p[0]);};return toD(b)-toD(a);});
     const prevCats=prevCatMoKeys.length?D.cats_monthly[prevCatMoKeys[0]]||[]:[];
     const curCatNames=new Set();
-    (D.sku_current||[]).forEach(sc=>{const si=(D.skus||[]).find(s=>String(s.id)===String(sc.item_id));if(si)curCatNames.add(si.d);});
+    // v765: build category lookup from ALL months (incl. current MTD) not just D.skus (prev month alias)
+    // D.skus = alias of last closed month → new-this-month SKUs not found → false category gap
+    const _allSkuMap=new Map();
+    Object.values(D.skus_monthly||{}).forEach(arr=>(arr||[]).forEach(s=>{if(s.id||s.item_id)_allSkuMap.set(String(s.id||s.item_id),s.d||'');}));
+    (D.skus||[]).forEach(s=>{if((s.id||s.item_id)&&!_allSkuMap.has(String(s.id||s.item_id)))_allSkuMap.set(String(s.id||s.item_id),s.d||'');});
+    (D.sku_current||[]).forEach(sc=>{const cat=_allSkuMap.get(String(sc.item_id));if(cat)curCatNames.add(cat);});
     const missingCats=prevCats.filter(c=>c.s>5000&&!curCatNames.has(c.n));
     if(missingCats.length){
       html+=`<div class="kam-dc" style="margin-bottom:12px;border-color:rgba(240,176,0,.2)">
