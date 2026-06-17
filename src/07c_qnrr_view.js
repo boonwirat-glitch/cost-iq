@@ -79,6 +79,9 @@ function _qnrrCompute(kamEmail, scope) {
     var seenOutlets = {};
     var nrr_curr_norm = 0;
 
+    // extra tracker: base_gmv ของ core_nrr active (เพื่อคำนวณ contraction)
+    var core_nrr_base_sum = 0;
+
     monthRows.forEach(function(r){
       var mv = _effectiveMovement(r);
       if (!mv) return;
@@ -89,6 +92,10 @@ function _qnrrCompute(kamEmail, scope) {
         : (r.curr_gmv || 0);
       segments[mv] = (segments[mv] || 0) + gmvVal;
       outlets[mv]  = (outlets[mv]  || 0) + 1;
+      // track base_gmv ของ core_nrr active เพื่อ derive contraction
+      if (mv === 'core_nrr') {
+        core_nrr_base_sum += (r.base_gmv || 0);
+      }
 
       if ((mv === 'core_nrr' || mv === 'core_nrr_churn') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
@@ -110,13 +117,20 @@ function _qnrrCompute(kamEmail, scope) {
     var curr_days_sample = monthRows.find(function(r){return r.curr_days>0;});
     var curr_days = curr_days_sample ? curr_days_sample.curr_days : 30;
 
+    // contraction = curr_gmv - base_gmv of core_nrr active outlets
+    // negative = outlets still ordering but spending less
+    // positive = outlets still ordering and spending more (expansion within core)
+    var contraction = (segments.core_nrr || 0) - core_nrr_base_sum;
+
     by_month[month] = {
-      nrr_pct:   nrr_pct,
-      total_gmv: total_gmv,
-      segments:  segments,
-      outlets:   outlets,
-      rows:      monthRows,
-      curr_days: curr_days
+      nrr_pct:        nrr_pct,
+      total_gmv:      total_gmv,
+      segments:       segments,
+      outlets:        outlets,
+      rows:           monthRows,
+      curr_days:      curr_days,
+      core_nrr_base:  core_nrr_base_sum,
+      contraction:    contraction
     };
   });
 
@@ -571,11 +585,32 @@ function _qnrrRenderBreakdown(){
   });
   html += '</tr>';
 
-  // Sub-row: Net core (active − churn) — shows the real retention delta
+  // Sub-row: Contraction (core active outlets ที่ซื้อลดลง)
+  // = curr_gmv - base_gmv ของ active outlets เท่านั้น (ไม่รวม churn)
+  html += '<tr class="bk-subrow">' +
+    '<td><div class="qnrr-bk-mv-cell sub">' +
+      '<div class="qnrr-bk-dot sub" style="background:rgba(251,191,36,.70)"></div>' +
+      '<span class="qnrr-bk-mv-name sub">└ Contraction</span>' +
+    '</div></td>';
+  ALL_MONTHS.forEach(function(m){
+    if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
+    var bm = _data.by_month[m];
+    var c  = bm ? (bm.contraction || 0) : 0;
+    if (!bm || (bm.segments.core_nrr === 0 && bm.segments.core_nrr_churn === 0)) {
+      html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return;
+    }
+    // negative = ซื้อลด, positive = ซื้อเพิ่ม (expansion ภายใน core)
+    var col = c >= 0 ? 'rgba(74,222,128,.72)' : 'rgba(251,191,36,.82)';
+    var prefix = c >= 0 ? '+' : '';
+    html += '<td style="color:' + col + '">' + prefix + _fmtM(c) + '</td>';
+  });
+  html += '</tr>';
+
+  // Sub-row: Net core (active − churn − contraction reconcile)
   html += '<tr class="bk-net-row">' +
     '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(255,255,255,.20)"></div>' +
-      '<span class="qnrr-bk-mv-name sub" style="color:rgba(255,255,255,.45)">└ Net core</span>' +
+      '<div class="qnrr-bk-dot sub" style="background:rgba(255,255,255,.22)"></div>' +
+      '<span class="qnrr-bk-mv-name sub" style="color:rgba(255,255,255,.48)">└ Net core</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) {
@@ -586,8 +621,7 @@ function _qnrrRenderBreakdown(){
     var active = (bm && bm.segments.core_nrr) || 0;
     var churn  = (bm && bm.segments.core_nrr_churn) || 0;
     var net    = active - churn;
-    var col    = net >= 0 ? 'rgba(255,255,255,.50)' : 'rgba(248,113,113,.72)';
-    var prefix = net < 0 ? '' : ''; // net already negative from churn
+    var col    = net >= dispBase * 0.95 ? 'rgba(74,222,128,.65)' : net >= dispBase * 0.85 ? 'rgba(251,191,36,.72)' : 'rgba(248,113,113,.65)';
     html += '<td style="color:' + col + '">' + (active > 0 || churn > 0 ? _fmtM(net) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
   });
   html += '</tr>';
