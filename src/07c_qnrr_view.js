@@ -389,14 +389,15 @@ function _qnrrRenderBase(){
     if(nrrMos) nrrMos.textContent='';
     return;
   }
-  if(baseVal)baseVal.textContent=_fmtM(_data.base_gmv);
-  if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort';
+  var effectiveBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+  if(baseVal)baseVal.textContent=_fmtM(effectiveBase);
+  if(baseSub)baseSub.textContent=_data.cohort_outlets+' outlets · core cohort (normalized)';
 
   var vals=[];var mos=[];
   Q_MONTHS.forEach(function(m){
     var bm=_data.by_month[m];
     var pct=bm?bm.nrr_pct:null;
-    var color=pct===null?'rgba(255,255,255,.2)':pct>=100?'#4ddc97':pct>=90?'#4ddc97':'var(--amb)';
+    var color=pct===null?'rgba(255,255,255,.2)':pct>=100?'#4ddc97':pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)';
     var label=pct===null?'—':pct+'%';
     vals.push('<span class="qnrr-nrr-v" style="color:'+color+'">'+_esc(label)+'</span>');
     mos.push(MONTHS_TH[m]||m);
@@ -468,12 +469,13 @@ function _qnrrRenderChart(){
     // Labels: GMV on top, NRR% overlaid inside bar
     var topLabelHtml=''; var overlayHtml='';
     if(isBase){
-      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_data.base_gmv)+'</div>';
+      var _effBase=_data.base_norm>0?Math.round(_data.base_norm*30):_data.base_gmv;
+      topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(_effBase)+'</div>';
     } else if(bm){
-      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'rgba(77,220,151,.9)':'var(--amb)'):'rgba(255,255,255,.2)';
+      var pctColor=bm.nrr_pct!==null?(bm.nrr_pct>=100?'#4ddc97':bm.nrr_pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.2)';
       var pctLabel=bm.nrr_pct!==null?bm.nrr_pct+'%':'—';
       topLabelHtml='<div class="qnrr-bar-top-label">'+_fmtM(bm.total_gmv)+'</div>';
-      overlayHtml='<div class="qnrr-bar-nrr-overlay" style="color:'+pctColor+'">'+pctLabel+'</div>';
+      overlayHtml='<div class="qnrr-bar-nrr-below" style="color:'+pctColor+'">'+pctLabel+'</div>';
     }
 
     // bar body — FIX stack: core_nrr at BOTTOM, movements on top
@@ -506,7 +508,8 @@ function _qnrrRenderChart(){
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
       topLabelHtml+
       ghostHtml+
-      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+overlayHtml+'</div>'+
+      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+      overlayHtml+
       '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
   }).join('');
@@ -665,3 +668,4 @@ function _qnrrRenderDrill(){
 }
 
 })();
+
