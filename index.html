@@ -1,4 +1,4 @@
-<!-- Freshket Sense v758: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v759: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v758',
+      version: 'v759',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -24692,7 +24692,7 @@ function __legacyRenderKamThisMonthFallback(){
       const proj=(s.gmv_to_date||0)*ratio;
       const chgPct=lastSku.gmv>0?Math.round((proj-lastSku.gmv)/lastSku.gmv*100):0;
       const projGmv=(s.gmv_to_date||0)*ratio;
-      if(chgPct>=20&&(s.gmv_to_date||0)>2000)growing.push({name:s.item_name_th||lastSku.n||'—',gmv:s.gmv_to_date||0,chgPct,projGmv:Math.round(projGmv),lastGmv:lastSku.gmv||0});
+      if(chgPct>=20&&(s.gmv_to_date||0)>2000)growing.push({name:s.item_name_th||lastSku.n||'—',gmv:s.gmv_to_date||0,chgPct,projGmv:Math.round(projGmv),lastGmv:lastSku.gmv||0,item_id:String(s.item_id)});
     });
     growing.sort((a,b)=>b.gmv-a.gmv);growing.splice(5);
   }
@@ -24700,16 +24700,32 @@ function __legacyRenderKamThisMonthFallback(){
     html+=`<div class="kam-dc" style="margin-bottom:12px">
       <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:rgba(80,220,160,.85)">สัญญาณบวกเดือนนี้</span></div>
       <div class="kam-dc-body">`;
+    // v759: outlet tooltip helper for positive signals
+    const _posOutletTip=(itemId,nameForId)=>{
+      const _od=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(itemId)]:null;
+      if(!_od||!_od.length)return{html:'',chevron:'',onclick:''};
+      const _oid='otp-'+String(nameForId).replace(/[^a-z0-9]/gi,'_');
+      const tipHtml=`<div id="${_oid}" style="display:none" aria-hidden="true">${_od.map(o=>{
+        const bought=o.this_month_orders>0;
+        const dot=bought?'rgba(80,220,160,.9)':'rgba(255,130,130,.8)';
+        return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:12px;color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span></div>`;
+      }).join('')}</div>`;
+      return{html:tipHtml,chevron:'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>',onclick:`onclick="_showSkuOutletTooltip(event,'${_oid}')" style="cursor:pointer"`};
+    };
     if(newThisMonth.length){
       html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">เพิ่งเริ่มสั่ง (${newThisMonth.length})</div>`;
-      html+=newThisMonth.map(s=>`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${s.item_name_th||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);margin-left:5px;font-weight:700;letter-spacing:.3px">MTD</span></div></div>`).join('');
+      html+=newThisMonth.map(s=>{
+        const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.item_name_th||'—'}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);margin-left:5px;font-weight:700;letter-spacing:.3px">MTD</span></div></div>`;
+      }).join('');
     }
     if(growing.length){
       if(newThisMonth.length)html+=`<div style="margin-top:8px"></div>`;
       html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">สั่งเพิ่มขึ้น (${growing.length})</div>`;
       html+=growing.map(s=>{
         const projInc=Math.max(0,s.projGmv-s.lastGmv);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><span class="kam-sku-name">${s.name}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
+        const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.name}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
       }).join('');
     }
     html+=`</div></div>`;
