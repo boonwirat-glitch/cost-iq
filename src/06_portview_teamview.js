@@ -120,7 +120,13 @@ function computeChurnSignals(){
       type='gone';                                        // เลยรอบมากแล้ว — น่าหาย
     } else if(daysElapsed>=avgInterval){
       type='near';                                        // เพิ่งเลยรอบ — เฝ้าดู
-    } else if(orderCount===1&&(sku.last_order_date||'')!==''){
+    } else if(orderCount===1&&(sku.last_order_date||'')!==''&&(()=>{
+      // v756: guard — last_order_date จาก SQL1 คือ MAX ของ 2 เดือน (lastClosed + MTD)
+      // ถ้าวันที่อยู่ในเดือนปัจจุบัน → ข้อมูลเป็นของเดือนนี้ ไม่ใช่เดือนปิด → ใช้ avgInterval แทน
+      const _lodDate=new Date(sku.last_order_date);
+      const _todayChk=new Date();
+      return !(_lodDate.getFullYear()===_todayChk.getFullYear()&&_lodDate.getMonth()===_todayChk.getMonth());
+    })()){
       // SKU สั่ง 1 ครั้ง/เดือน — ใช้ lastOrderDay แทน avgInterval
       // คาด: จะสั่งใกล้เดียวกับวันที่สั่งในเดือนที่แล้ว
       const lastDay=new Date(sku.last_order_date).getDate();
