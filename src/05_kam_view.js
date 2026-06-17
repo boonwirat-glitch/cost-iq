@@ -756,7 +756,7 @@ function __legacyRenderKamThisMonthFallback(){
     const _vBtnCls='sku-verify-btn'+(_verifyDone?' done':_verifyLoading?' loading':'');
     const _vIcon=`<svg class="svb-icon" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>`;
     // v758: GMV filter
-    if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=1000;
+    if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=3000; // v763: default <3K
     const _f1A=skuGmvFilter===1000,_f3A=skuGmvFilter===3000;
     const _fBase='font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--tk-font-body);border:1px solid';
     const _f1S=_fBase+(_f1A?' rgba(100,180,255,.6);background:rgba(100,180,255,.12);color:rgba(100,180,255,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
