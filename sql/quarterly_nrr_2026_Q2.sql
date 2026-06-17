@@ -1,8 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v4)
--- v4: exclude handover outlets from NRR denominator (mar_cohort)
---     handover = new_user_exp_date = Mar 2026 → รับมาช่วง 15/30 Mar
---     ไม่ควรนับเป็นฐาน NRR เพราะ KAM ไม่ได้ดูแลจริงๆ ใน Mar
+-- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v3)
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- v3 fixes (vs v2):
@@ -224,9 +221,6 @@ current_kam_snapshot AS (
 
 -- ── 7. Mar KAM cohort ─────────────────────────────────────────────────────────
 mar_cohort AS (
-  -- v4 fix: exclude handover outlets from denominator
-  -- handover = new_user_exp_date = Mar 2026 (รับมาช่วง 15/30 Mar)
-  -- ไม่ควรอยู่ใน NRR base เพราะ KAM แทบไม่ได้ดูแลร้านนี้จริงๆ ใน Mar
   SELECT
     mo.outlet_id,
     mo.account_id,
@@ -245,8 +239,6 @@ mar_cohort AS (
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE COALESCE(bg.gmv, 0) > 0
-    -- v4: exclude handover — new_user_exp_date = Mar คือรับมาช่วง 15/30 Mar
-    AND FORMAT_DATE('%Y-%m', mo.new_user_exp_date) != '2026-03'
 ),
 
 -- ── 8. FIX 3: apr_labels — lock classification ของทุก outlet ตั้งแต่ Apr ──────
