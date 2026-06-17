@@ -1,4 +1,4 @@
-<!-- Freshket Sense v760: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 761: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v760',
+      version: '761',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -39645,6 +39645,10 @@ setTimeout(async function _tgtInitCheck() {
   await loadTargets(_tgtCurrentQuarter());
   // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
+  // v761: also call _commGatedRender with key reset — _tgtLoadedFromDB now true so
+  // _dataKey returns new value → re-render fires even if R2 was already loaded before this point
+  try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+  try{ if(typeof window._commGatedRender==='function') window._commGatedRender(); }catch(e){}
   // NRR/target bars need portview GMV — wait for allCriticalReady
   (function _waitAndRenderBars(){
     if(typeof allCriticalReady==='function' && !allCriticalReady()){
@@ -39695,7 +39699,11 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var hh = (typeof bulkHistoryData!=='undefined' && bulkHistoryData) ? Object.keys(bulkHistoryData).length : -1;
       var r  = (typeof getCurrentRole==='function') ? getCurrentRole()
                 : ((window.currentUserProfile&&window.currentUserProfile.role)||'');
-      return r + ':' + ph + ':' + hh;
+      // v761: include _tgtLoadedFromDB in key — when Supabase tiers load after R2 data,
+      // key changes from '0' → '1' → triggers re-render → commission strip shows real value
+      // without this, key was frozen once R2 loaded → commission stuck on 'กำลังโหลด'
+      var db = window._tgtLoadedFromDB ? '1' : '0';
+      return r + ':' + ph + ':' + hh + ':' + db;
     }catch(e){ return ''; }
   }
 
