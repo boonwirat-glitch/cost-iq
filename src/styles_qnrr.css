@@ -140,14 +140,15 @@
 .qnrr-ref-label.adj { color: rgba(229,62,62,.38); }
 
 .qnrr-bars-row {
-  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 8px; align-items: flex-end; height: 168px;
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 6px; align-items: end;
+  height: 210px; /* fixed total col height */
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
   display: flex; flex-direction: column; align-items: center;
-  cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative;
-  padding-top: 20px; /* room for GMV top label */
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  height: 100%; /* fill grid cell */
 }
 .qnrr-bar-col:active .qnrr-bar-body { filter: brightness(1.15); }
 .qnrr-bar-col.active .qnrr-bar-body::after {
@@ -164,8 +165,9 @@
   padding-bottom: 2px;
 }
 .qnrr-bar-body {
-  width: 100%; border-radius: 5px; overflow: hidden;
-  display: flex; flex-direction: column-reverse; position: relative;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  border-radius: 5px 5px 3px 3px; overflow: hidden;
+  display: flex; flex-direction: column-reverse;
   transition: filter .15s;
   animation: qnrrBarRise .48s cubic-bezier(.4,0,.2,1) both;
 }
@@ -182,11 +184,18 @@
 
 /* ghost bar for transfer_out */
 .qnrr-ghost-bar {
-  position: absolute; left: 0; right: 0; bottom: 28px;
-  border: 1px dashed rgba(229,62,62,.32);
-  border-radius: 6px; background: rgba(229,62,62,.04);
-  pointer-events: none; z-index: 1;
+  position: absolute; left: 0; right: 0; bottom: 0;
+  border-radius: 6px; pointer-events: none; z-index: 2;
+}
+.qnrr-ghost-tout {
+  border: 1px dashed rgba(229,62,62,.40);
+  background: rgba(229,62,62,.05);
   animation: qnrrGhostPulse 2.8s ease-in-out infinite;
+}
+.qnrr-ghost-proj {
+  border: 1.5px dashed rgba(188,215,255,.35);
+  background: rgba(188,215,255,.04);
+  animation: qnrrGhostPulse 3.5s ease-in-out infinite;
 }
 @keyframes qnrrGhostPulse { 0%,100%{opacity:.4} 50%{opacity:.85} }
 
@@ -428,9 +437,10 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 
 /* Bar top label wrapper — fixed height 42px กันแต่ละ bar label zone เท่ากัน */
 .qnrr-bar-top-wrap {
-  height: 42px; display: flex; flex-direction: column;
+  height: 44px; flex-shrink: 0;
+  display: flex; flex-direction: column;
   align-items: center; justify-content: flex-end;
-  width: 100%; padding-bottom: 3px;
+  width: 100%; padding-bottom: 4px;
 }
 
 /* Drill core stats sublabel */
@@ -442,20 +452,18 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 
 /* ── Stats row: NRR GMV + active/churn per month ── */
 .qnrr-stats-row {
-  display: flex; align-items: stretch;
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 0;
   background: rgba(0,0,0,.15);
   border-bottom: 1px solid var(--tk-border);
   flex-shrink: 0; padding: 0 18px;
 }
 .qnrr-stat-slot {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: flex-start; padding: 8px 0 8px;
+  display: flex; flex-direction: column;
+  align-items: flex-start; padding: 8px 4px 8px 0;
   gap: 2px;
 }
-.qnrr-stat-divider {
-  width: 1px; background: var(--tk-border);
-  margin: 8px 12px;
-}
+.qnrr-stat-divider { display: none; }
 .qnrr-stat-v {
   font-size: 14px; font-weight: 800;
   font-family: var(--tk-font-mono); letter-spacing: -.02em;
@@ -473,3 +481,11 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   letter-spacing: .07em; color: rgba(255,255,255,.35); margin-top: 2px;
   font-family: var(--tk-font-mono);
 }
+
+/* Bar chart area — shared height container, bars are absolute inside */
+.qnrr-bar-chart-area {
+  flex: 1; width: 100%; position: relative; min-height: 0;
+}
+
+.qnrr-stat-base .qnrr-stat-mo { color: rgba(188,215,255,.45); }
+.qnrr-stat-proj { color: rgba(188,215,255,.55); font-size: 11px; }
