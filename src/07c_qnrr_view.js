@@ -82,7 +82,12 @@ function _qnrrCompute(kamEmail, scope) {
     monthRows.forEach(function(r){
       var mv = _effectiveMovement(r);
       if (!mv) return;
-      segments[mv] = (segments[mv] || 0) + r.curr_gmv;
+      // core_nrr_churn: curr_gmv = 0 เสมอ ใช้ base_gmv แทนเพื่อแสดง GMV ที่หายไป
+      // transfer_out: เช่นเดียวกัน — แสดง base_gmv ที่ย้ายออก
+      var gmvVal = (mv === 'core_nrr_churn' || mv === 'transfer_out')
+        ? (r.base_gmv || 0)
+        : (r.curr_gmv || 0);
+      segments[mv] = (segments[mv] || 0) + gmvVal;
       outlets[mv]  = (outlets[mv]  || 0) + 1;
 
       if ((mv === 'core_nrr' || mv === 'core_nrr_churn') && r.base_gmv > 0) {
