@@ -408,27 +408,43 @@ function _qnrrRenderBase(){
   // ── stats row: NRR GMV + active + churn per month ──
   var statsRow=_el('qnrr-stats-row');
   if(statsRow){
-    var statSlots=Q_MONTHS.map(function(m){
+    // Mar base slot
+    var marGmv=_data.base_gmv||0;
+    var marOutlets=_data.cohort_outlets||0;
+    var marSlot='<div class="qnrr-stat-slot qnrr-stat-base">'+
+      '<div class="qnrr-stat-v" style="color:rgba(255,255,255,.70)">'+_fmtM(marGmv)+'</div>'+
+      '<div class="qnrr-stat-sub">'+
+        '<span class="qnrr-stat-active">'+marOutlets+' outlets</span>'+
+      '</div>'+
+      '<div class="qnrr-stat-mo">มี.ค. (ฐาน)</div>'+
+    '</div>';
+
+    // Q months slots
+    var qSlots=Q_MONTHS.map(function(m){
       var bm=_data.by_month[m];
       if(!bm||!bm.rows) return '<div class="qnrr-stat-slot"><div class="qnrr-stat-v">—</div><div class="qnrr-stat-sub">—</div><div class="qnrr-stat-mo">'+(MONTHS_TH[m]||m)+'</div></div>';
       var coreRows=bm.rows.filter(function(r){return r.movement_type==='core_nrr';});
       var churnRows=bm.rows.filter(function(r){return r.movement_type==='core_nrr_churn';});
       var coreGmv=coreRows.reduce(function(s,r){return s+(r.curr_gmv||0);},0);
-      var activeCount=coreRows.length;
-      var churnCount=churnRows.length;
       var pct=bm.nrr_pct;
       var gmvColor=pct!==null?(pct>=100?'#4ddc97':pct>=90?'var(--tk-warn)':'rgba(229,62,62,.9)'):'rgba(255,255,255,.5)';
+      var isLast=(m===Q_MONTHS[Q_MONTHS.length-1]);
+      var projNote='';
+      if(isLast&&bm.curr_days>0&&bm.curr_days<28){
+        var proj=Math.round(coreGmv/bm.curr_days*30);
+        projNote='<span class="qnrr-stat-proj"> ~'+_fmtM(proj)+'</span>';
+      }
       return '<div class="qnrr-stat-slot">'+
-        '<div class="qnrr-stat-v" style="color:'+gmvColor+'">'+_fmtM(coreGmv)+'</div>'+
+        '<div class="qnrr-stat-v" style="color:'+gmvColor+'">'+_fmtM(coreGmv)+projNote+'</div>'+
         '<div class="qnrr-stat-sub">'+
-          '<span class="qnrr-stat-active">'+activeCount+' active</span>'+
+          '<span class="qnrr-stat-active">'+coreRows.length+' active</span>'+
           '<span class="qnrr-stat-sep">·</span>'+
-          '<span class="qnrr-stat-churn">'+churnCount+' churn</span>'+
+          '<span class="qnrr-stat-churn">'+churnRows.length+' churn</span>'+
         '</div>'+
         '<div class="qnrr-stat-mo">'+(MONTHS_TH[m]||m)+'</div>'+
       '</div>';
     });
-    statsRow.innerHTML=statSlots.join('<div class="qnrr-stat-divider"></div>');
+    statsRow.innerHTML=marSlot+'<div class="qnrr-stat-divider"></div>'+qSlots.join('<div class="qnrr-stat-divider"></div>');
   }
 }
 
@@ -524,17 +540,27 @@ function _qnrrRenderChart(){
       });
     }
 
-    // ghost for transfer_out
+    // ghost: (1) transfer_out dashed outline OR (2) Jun run-rate projection
     var ghostHtml='';
+    var isLastMonth=(m===Q_MONTHS[Q_MONTHS.length-1]);
     if(!isBase&&bm&&bm.segments&&bm.segments.transfer_out>0){
       var ghostH=Math.max(6,Math.round(_data.base_gmv/maxGmv*chartH));
-      ghostHtml='<div class="qnrr-ghost-bar" style="height:'+ghostH+'px"></div>';
+      ghostHtml='<div class="qnrr-ghost-bar qnrr-ghost-tout" style="height:'+ghostH+'px"></div>';
+    } else if(!isBase&&isLastMonth&&bm&&bm.curr_days>0&&bm.curr_days<28){
+      // Jun MTD: project run rate = total_gmv / curr_days * 30
+      var projected=Math.round(bm.total_gmv/bm.curr_days*30);
+      var projH=Math.max(6,Math.round(projected/maxGmv*chartH));
+      if(projH>barH){
+        ghostHtml='<div class="qnrr-ghost-bar qnrr-ghost-proj" style="height:'+projH+'px" title="Run rate: '+_fmtM(projected)+'/เดือน"></div>';
+      }
     }
 
     return '<div class="qnrr-bar-col'+(isActive?' active':'')+'" data-month="'+m+'" onclick="_qnrrSelBar(\''+m+'\')">'+
       '<div class="qnrr-bar-top-wrap">'+topLabelHtml+'</div>'+
-      ghostHtml+
-      '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+      '<div class="qnrr-bar-chart-area">'+
+        '<div class="qnrr-bar-body" style="height:'+barH+'px">'+segsHtml+'</div>'+
+        ghostHtml+
+      '</div>'+
       overlayHtml+
       '<div class="qnrr-bar-lbl" style="color:'+lblColor+'">'+_esc(lbl)+'</div>'+
     '</div>';
@@ -602,7 +628,7 @@ function _qnrrRenderDrill(){
     if(!byAcct[aid]){
       byAcct[aid]={
         name: r.account_name||aid,
-        type: r.movement_type,    // movement_type ของ account (ใช้ตัวแรกเป็น representative)
+        type: r.movement_type,    // จะ recalculate เป็น dominant type หลัง collect ครบ
         outlets: [],
         gmvByMonth:{}, baseGmv:0, currGmv:0
       };
@@ -619,6 +645,22 @@ function _qnrrRenderDrill(){
     });
     byAcct[aid].baseGmv+=r.base_gmv||0;
     byAcct[aid].currGmv+=r.curr_gmv||0;
+  });
+
+  // Recalculate dominant movement_type per account (by GMV weight)
+  acctOrder.forEach(function(aid){
+    var a=byAcct[aid];
+    var mvGmv={};
+    a.outlets.forEach(function(o){
+      var mv=o.movement_type;
+      mvGmv[mv]=(mvGmv[mv]||0)+(o.curr_gmv||o.base_gmv||0);
+    });
+    var dominant=a.outlets[0]&&a.outlets[0].movement_type||'core_nrr';
+    var maxGmvMv=0;
+    Object.keys(mvGmv).forEach(function(mv){
+      if(mvGmv[mv]>maxGmvMv){maxGmvMv=mvGmv[mv];dominant=mv;}
+    });
+    a.type=dominant;
   });
 
   // Collect GMV across all Q months for account sparkline
