@@ -2031,7 +2031,7 @@ function switchAccount(accountId){
   // switchAccount debug log removed (v257)
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
-  churnExpanded=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
+  churnExpanded=false;_catExpanded=true;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
   skuSubstituteMapLM={};skuSubstituteLoadingLM=false;skuSubstituteDoneLM=false;
   // Reset insight button to default (non-done) state
   const _ib=document.getElementById('kam-insight-btn');
