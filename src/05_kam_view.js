@@ -715,11 +715,19 @@ function __legacyRenderKamThisMonthFallback(){
     const _verifyLoading=skuSubstituteLoading;
     const _vBtnCls='sku-verify-btn'+(_verifyDone?' done':_verifyLoading?' loading':'');
     const _vIcon=`<svg class="svb-icon" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg>`;
+    // v758: GMV filter
+    if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=1000;
+    const _f1A=skuGmvFilter===1000,_f3A=skuGmvFilter===3000;
+    const _fBase='font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--tk-font-body);border:1px solid';
+    const _f1S=_fBase+(_f1A?' rgba(100,180,255,.6);background:rgba(100,180,255,.12);color:rgba(100,180,255,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
+    const _f3S=_fBase+(_f3A?' rgba(240,176,0,.6);background:rgba(240,176,0,.1);color:rgba(240,176,0,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
     html+=`<div class="kam-dc" style="margin-bottom:12px">
       <div class="kam-dc-head">
         <span class="kam-dc-head-label" style="color:rgba(255,130,130,.85)">SKU Signals</span>
         <button onclick="skuSignalInfoOpen=!skuSignalInfoOpen;refreshAll()" style="width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.45);font-size:10px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;font-weight:700">i</button>
         <span style="flex:1"></span>
+        <button onclick="skuGmvFilter=skuGmvFilter===1000?0:1000;refreshAll()" style="${_f1S};margin-right:4px">&lt;฿1K</button>
+        <button onclick="skuGmvFilter=skuGmvFilter===3000?0:3000;refreshAll()" style="${_f3S};margin-right:6px">&lt;฿3K</button>
         <button id="sku-verify-tm-btn" class="${_vBtnCls}" onclick="triggerSkuVerifyFromThisMonth()">${_vIcon}${_verifyLoading?'กำลังตรวจ...':_verifyDone?'✓ SKU Verify':'SKU Verify'}</button>
       </div>
       <div class="kam-dc-body" style="padding-top:8px">${infoCard}`;
@@ -764,15 +772,22 @@ function __legacyRenderKamThisMonthFallback(){
         </div>
       </div>`;
     };
-    // v757: approaching ขึ้นก่อนเสมอ — gone/near/slow ตามหลัง (ไม่มี limit)
-    const approachingSigs=actionSigs.filter(s=>s.type==='approaching');
-    const urgentSigs=actionSigs.filter(s=>s.type!=='approaching');
-    html+=approachingSigs.map(s=>renderSkuRow(s)).join('');
-    html+=urgentSigs.map(s=>renderSkuRow(s)).join('');
-    if(notYetSigs.length){
-      const showNotYet=churnExpanded?notYetSigs:notYetSigs.slice(0,0);
+    // v758: section-based render with GMV filter
+    const _gmvMin=skuGmvFilter||0;
+    const filteredAct=actionSigs.filter(s=>(s.gmv||0)>=_gmvMin);
+    const _goneSigs=filteredAct.filter(s=>s.type==='gone');
+    const _watchSigs=filteredAct.filter(s=>s.type==='slow'||s.type==='near');
+    const _apprSigs=filteredAct.filter(s=>s.type==='approaching');
+    const _secH=(lbl,n,c)=>`<div style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${c};padding:8px 0 3px;border-top:1px solid rgba(255,255,255,.05);margin-top:2px">${lbl} · ${n}</div>`;
+    if(_goneSigs.length){html+=_secH('ไม่มียอด',_goneSigs.length,'rgba(255,130,130,.5)');html+=_goneSigs.map(s=>renderSkuRow(s)).join('');}
+    if(_watchSigs.length){html+=_secH('ต้องดูแล',_watchSigs.length,'rgba(240,176,0,.5)');html+=_watchSigs.map(s=>renderSkuRow(s)).join('');}
+    if(_apprSigs.length){html+=_secH('ใกล้ถึงรอบ',_apprSigs.length,'rgba(100,180,255,.5)');html+=_apprSigs.map(s=>renderSkuRow(s)).join('');}
+    if(!filteredAct.length&&actionSigs.length)html+=`<div style="font-size:11px;color:rgba(255,255,255,.3);padding:8px 0;text-align:center">ไม่มี SKU ที่เข้าเกณฑ์ — <button onclick="skuGmvFilter=0;refreshAll()" style="background:none;border:none;color:rgba(100,180,255,.7);cursor:pointer;font-size:11px;text-decoration:underline">ล้าง filter</button></div>`;
+    const filteredNY=notYetSigs.filter(s=>(s.gmv||0)>=_gmvMin);
+    if(filteredNY.length){
+      const showNotYet=churnExpanded?filteredNY:filteredNY.slice(0,0);
       if(showNotYet.length)html+=showNotYet.map(s=>renderSkuRow(s,true)).join('');
-      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:11px;font-weight:600;font-family:var(--tk-font-body);cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+notYetSigs.length+' รายการ — กดดู'}</button>`;
+      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:11px;font-weight:600;font-family:var(--tk-font-body);cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+filteredNY.length+' รายการ — กดดู'}</button>`;
     }
     html+=`</div></div>`;
   } else if(D.sku_current&&D.sku_current.length&&!signals.length){
