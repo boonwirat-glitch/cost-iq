@@ -386,7 +386,7 @@ function _qnrrRenderHero(){
 
   var DISPLAY_BASE = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
   if (baseVal) baseVal.textContent = _fmtM(DISPLAY_BASE);
-  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort (normalized)';
+  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort · normalized ÷days×30';
 
   // NRR cluster — 3 slots with separators, NO stats row duplication
   if (nrrVals) {

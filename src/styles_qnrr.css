@@ -170,6 +170,7 @@
 }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
+  overflow: hidden;
   height: 178px; /* top-wrap 32px + chart-area flex:1 + label ~22px */
   position: relative; z-index: 3;
 }
@@ -207,7 +208,7 @@
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
-  flex: 1; width: 100%; position: relative; min-height: 0; overflow: visible;
+  flex: 1; width: 100%; position: relative; min-height: 0; overflow: hidden;
 }
 .qnrr-bar-body {
   position: absolute; bottom: 0; left: 0; right: 0;

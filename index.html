@@ -1,4 +1,4 @@
-<!-- Freshket Sense v775: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v776: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v775',
+      version: 'v776',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6572,6 +6572,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
+  overflow: hidden;
   height: 178px; /* top-wrap 32px + chart-area flex:1 + label ~22px */
   position: relative; z-index: 3;
 }
@@ -6609,7 +6610,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
-  flex: 1; width: 100%; position: relative; min-height: 0; overflow: visible;
+  flex: 1; width: 100%; position: relative; min-height: 0; overflow: hidden;
 }
 .qnrr-bar-body {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -51726,7 +51727,7 @@ function _qnrrRenderHero(){
 
   var DISPLAY_BASE = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
   if (baseVal) baseVal.textContent = _fmtM(DISPLAY_BASE);
-  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort (normalized)';
+  if (baseSub) baseSub.textContent = _data.cohort_outlets + ' outlets · core cohort · normalized ÷days×30';
 
   // NRR cluster — 3 slots with separators, NO stats row duplication
   if (nrrVals) {
@@ -52273,7 +52274,7 @@ function _qnrrRenderDrill(){
     <div class="qnrr-hero-row">
       <div class="qnrr-base-block">
         <div class="qnrr-base-val" id="qnrr-base-val">—</div>
-        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค.</div>
+        <div class="qnrr-base-sub" id="qnrr-base-sub">ฐาน มี.ค. (normalized)</div>
       </div>
       <div class="qnrr-nrr-right">
         <div class="qnrr-nrr-eyebrow">Core NRR vs ฐาน</div>
