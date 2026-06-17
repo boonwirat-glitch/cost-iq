@@ -1,4 +1,4 @@
-<!-- Freshket Sense v782: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v783: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v782',
+      version: 'v783',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51548,22 +51548,25 @@ function _qnrrCompute(kamEmail, scope) {
     var seenOutlets = {};
     var nrr_curr_norm = 0;
 
-    // extra tracker: base_gmv ของ core_nrr active (เพื่อคำนวณ contraction)
+    // extra tracker: base_gmv normalized ของ core_nrr active (เพื่อคำนวณ contraction)
     var core_nrr_base_sum = 0;
 
     monthRows.forEach(function(r){
       var mv = _effectiveMovement(r);
       if (!mv) return;
-      // core_nrr_churn: curr_gmv = 0 เสมอ ใช้ base_gmv แทนเพื่อแสดง GMV ที่หายไป
-      // transfer_out: เช่นเดียวกัน — แสดง base_gmv ที่ย้ายออก
+      // Normalize ÷days×30 ทุกตัว
+      // churn/transfer_out: curr_gmv=0 ใช้ base_gmv แทน (normalized ด้วย base_days)
+      // others: curr_gmv normalized ด้วย curr_days
+      var base_d = parseFloat(r.base_days) || 31;
+      var curr_d = parseFloat(r.curr_days) || 30;
       var gmvVal = (mv === 'core_nrr_churn' || mv === 'transfer_out')
-        ? (r.base_gmv || 0)
-        : (r.curr_gmv || 0);
+        ? (parseFloat(r.base_gmv) || 0) / base_d * 30
+        : (parseFloat(r.curr_gmv) || 0) / curr_d * 30;
       segments[mv] = (segments[mv] || 0) + gmvVal;
       outlets[mv]  = (outlets[mv]  || 0) + 1;
-      // track base_gmv ของ core_nrr active เพื่อ derive contraction
+      // track normalized base_gmv ของ core_nrr active สำหรับ contraction
       if (mv === 'core_nrr') {
-        core_nrr_base_sum += (r.base_gmv || 0);
+        core_nrr_base_sum += (parseFloat(r.base_gmv) || 0) / base_d * 30;
       }
 
       if ((mv === 'core_nrr' || mv === 'core_nrr_churn') && r.base_gmv > 0) {
@@ -51579,17 +51582,22 @@ function _qnrrCompute(kamEmail, scope) {
       ? Math.round(nrr_curr_norm / base_norm * 100)
       : null;
 
+    // total_gmv = sum of normalized segments (excl. churn/transfer_out ซึ่งเป็น negative)
     var total_gmv = MOVEMENTS
       .filter(function(m){ return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
       .reduce(function(s,m){ return s + (segments[m] || 0); }, 0);
+    // ยัง normalize อยู่แล้วเพราะ segments ทุกตัว normalize แล้ว
 
     var curr_days_sample = monthRows.find(function(r){return r.curr_days>0;});
     var curr_days = curr_days_sample ? curr_days_sample.curr_days : 30;
 
-    // contraction = curr_gmv - base_gmv of core_nrr active outlets
-    // negative = outlets still ordering but spending less
-    // positive = outlets still ordering and spending more (expansion within core)
+    // contraction = normalized curr − normalized base ของ core_nrr active
     var contraction = (segments.core_nrr || 0) - core_nrr_base_sum;
+
+    // days_in_month: จำนวนวันจริงของเดือนนั้น (สำหรับ partial month detection)
+    var monthParts   = month.split('-');
+    var daysInMonth  = new Date(parseInt(monthParts[0]), parseInt(monthParts[1]), 0).getDate();
+    var isPartial    = curr_days > 0 && curr_days < daysInMonth - 2; // tolerance 2 วัน
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
@@ -51598,6 +51606,8 @@ function _qnrrCompute(kamEmail, scope) {
       outlets:        outlets,
       rows:           monthRows,
       curr_days:      curr_days,
+      days_in_month:  daysInMonth,
+      is_partial:     isPartial,
       core_nrr_base:  core_nrr_base_sum,
       contraction:    contraction
     };
@@ -51968,14 +51978,21 @@ function _qnrrRenderChart(){
       topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(_dispBase) + '</div>' +
                 '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' out</div>';
     } else if (bm) {
-      var projSuffix = '';
-      if (isLast && bm.curr_days > 0 && bm.curr_days < 28) {
-        var proj = Math.round(bm.total_gmv / bm.curr_days * 30);
-        projSuffix = '<span style="color:rgba(188,215,255,.35)"> ~' + _fmtM(proj) + '</span>';
-      }
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
-      var outSuffix = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
-      topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + projSuffix + '</div>' + outSuffix;
+      var outLabel  = '';
+      if (bm.is_partial) {
+        // Partial month: show actual raw + progress days
+        var rawTotal = bm.rows ? bm.rows.reduce(function(s,r){
+          return s + (parseFloat(r.curr_gmv)||0);
+        }, 0) : bm.total_gmv;
+        var daysLabel = bm.curr_days + '/' + bm.days_in_month + ' วัน';
+        topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
+          '<span style="color:rgba(188,215,255,.35)"> actual</span></div>' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.60);font-weight:700">' + daysLabel + '</div>';
+      } else {
+        outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
+        topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + '</div>' + outLabel;
+      }
     }
 
     // Bar body segments
@@ -51991,13 +52008,13 @@ function _qnrrRenderChart(){
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
-      // Jun ghost projection
+      // Partial month ghost projection (run-rate)
       var ghostHtml = '';
-      if (isLast && bm.curr_days > 0 && bm.curr_days < 28) {
-        var projected = Math.round(bm.total_gmv / bm.curr_days * 30);
-        var projH     = Math.max(6, Math.round(projected / maxGmv * chartH));
+      if (bm.is_partial && bm.curr_days > 0) {
+        // ghost bar = normalized total_gmv (already ÷days×30)
+        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
         if (projH > barH) {
-          ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run rate: ' + _fmtM(projected) + '/เดือน"></div>';
+          ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '/30 วัน"></div>';
         }
       }
       bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
@@ -52029,7 +52046,9 @@ function _qnrrRenderBreakdown(){
     if (m === BASE_MONTH) return _data.cohort_outlets + ' out';
     var bm = _data.by_month[m];
     if (!bm) return '—';
-    return (bm.outlets.core_nrr || 0) + ' out';
+    var active = bm.outlets.core_nrr || 0;
+    var partial = bm.is_partial ? ' · ' + bm.curr_days + '/' + bm.days_in_month + 'd' : '';
+    return active + ' out' + partial;
   });
 
   var dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
@@ -52038,7 +52057,9 @@ function _qnrrRenderBreakdown(){
     '<th>Movement</th>' +
     ALL_MONTHS.map(function(m, i){
       var isLast = (m === Q_MONTHS[Q_MONTHS.length-1]);
-      return '<th>' + MONTH_HDRS[i] + (isLast ? '~' : '') +
+      var bm2 = _data.by_month[m];
+      var isPartialCol = bm2 && bm2.is_partial;
+      return '<th>' + MONTH_HDRS[i] + (isPartialCol ? '~' : '') +
         '<br><span style="color:rgba(188,215,255,.35);font-size:10px;font-weight:600;text-transform:none;letter-spacing:0">'
         + outletHeaders[i] + '</span></th>';
     }).join('') +
@@ -52100,25 +52121,7 @@ function _qnrrRenderBreakdown(){
   });
   html += '</tr>';
 
-  // Sub-row: Net core (active − churn − contraction reconcile)
-  html += '<tr class="bk-net-row">' +
-    '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(255,255,255,.22)"></div>' +
-      '<span class="qnrr-bk-mv-name sub" style="color:rgba(255,255,255,.48)">└ Net core</span>' +
-    '</div></td>';
-  ALL_MONTHS.forEach(function(m){
-    if (m === BASE_MONTH) {
-      html += '<td style="color:rgba(255,255,255,.42)">' + _fmtM(dispBase) + '</td>';
-      return;
-    }
-    var bm = _data.by_month[m];
-    var active = (bm && bm.segments.core_nrr) || 0;
-    var churn  = (bm && bm.segments.core_nrr_churn) || 0;
-    var net    = active - churn;
-    var col    = net >= dispBase * 0.95 ? 'rgba(74,222,128,.65)' : net >= dispBase * 0.85 ? 'rgba(251,191,36,.72)' : 'rgba(248,113,113,.65)';
-    html += '<td style="color:' + col + '">' + (active > 0 || churn > 0 ? _fmtM(net) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
-  });
-  html += '</tr>';
+
 
   // ── Other movements (skip core_nrr and core_nrr_churn — already handled) ─
   var SKIP = {core_nrr: true, core_nrr_churn: true};
@@ -52401,10 +52404,12 @@ function _qnrrRenderList(){
         gmv:  {'2026-03':0,'2026-04':0,'2026-05':0,'2026-06':0},
         mv:   {'2026-04':null,'2026-05':null,'2026-06':null}
       };
-      byAcct[aid].outlets[oid].gmv['2026-03'] = parseFloat(r.base_gmv) || 0;
+      var _bd = parseFloat(r.base_days) || 31;
+      byAcct[aid].outlets[oid].gmv['2026-03'] = ((parseFloat(r.base_gmv) || 0) / _bd) * 30;
     }
     var od = byAcct[aid].outlets[oid];
-    od.gmv[r.period_month] = (od.gmv[r.period_month]||0) + (parseFloat(r.curr_gmv)||0);
+    var _cd = parseFloat(r.curr_days) || 30;
+    od.gmv[r.period_month] = (od.gmv[r.period_month]||0) + ((parseFloat(r.curr_gmv)||0) / _cd * 30);
     if (!od.mv[r.period_month]) od.mv[r.period_month] = r.movement_type;
     byAcct[aid].totalCurr += parseFloat(r.curr_gmv)||0;
   });
@@ -52482,7 +52487,9 @@ function _qnrrRenderList(){
       }).join('');
 
       var tblHdr = ALL_MONTHS.map(function(m){
-        return '<td class="mo-hdr">' + (MTH_SHORT[m]||m) + '</td>';
+        var bmP = _data.by_month[m];
+        var tilde = bmP && bmP.is_partial ? '~' : '';
+        return '<td class="mo-hdr">' + (MTH_SHORT[m]||m) + tilde + '</td>';
       }).join('');
 
       html += '<div class="qnrr-ol-row">' +
