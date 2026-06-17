@@ -1,4 +1,4 @@
-<!-- Freshket Sense 761: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 762: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '761',
+      version: '762',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -24708,7 +24708,11 @@ function __legacyRenderKamThisMonthFallback(){
       (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p3&&_cp.upsell_sku.p3.groups||[]).forEach(g=>{if(g.groupKey)_commUpsellSet.add(g.groupKey.toUpperCase());});
     }catch(e){}
     const _subclassMap=new Map();
-    (D.skus_monthly[_prevClosedMoA]||D.skus||[]).forEach(s=>{if(s.id||s.item_id)_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());});
+    // v762: loop ALL months (incl. current MTD) so new-this-month SKUs get subclass
+    // Old: only _prevClosedMoA → item_id ใหม่เดือนนี้ไม่มีใน prev → subclass empty → badge ไม่ขึ้น
+    Object.values(D.skus_monthly||{}).forEach(arr=>(arr||[]).forEach(s=>{if((s.id||s.item_id)&&(s.d||s.subclass))_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());}));
+    // fallback: also seed from D.skus (alias of latest month)
+    (D.skus||[]).forEach(s=>{if((s.id||s.item_id)&&(s.d||s.subclass)&&!_subclassMap.has(String(s.id||s.item_id)))_subclassMap.set(String(s.id||s.item_id),(s.d||s.subclass||'').toUpperCase());});
     const _commBadge=(subclass)=>{
       if(!subclass)return'';
       const sc=subclass.toUpperCase();
