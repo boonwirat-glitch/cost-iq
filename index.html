@@ -1,4 +1,4 @@
-<!-- Freshket Sense v756: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v757: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v756',
+      version: 'v757',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -24828,7 +24828,11 @@ function __legacyRenderKamThisMonthFallback(){
         </div>
       </div>`;
     };
-    html+=actionSigs.slice(0,8).map(s=>renderSkuRow(s)).join('');
+    // v757: approaching ขึ้นก่อนเสมอ — gone/near/slow ตามหลัง (ไม่มี limit)
+    const approachingSigs=actionSigs.filter(s=>s.type==='approaching');
+    const urgentSigs=actionSigs.filter(s=>s.type!=='approaching');
+    html+=approachingSigs.map(s=>renderSkuRow(s)).join('');
+    html+=urgentSigs.map(s=>renderSkuRow(s)).join('');
     if(notYetSigs.length){
       const showNotYet=churnExpanded?notYetSigs:notYetSigs.slice(0,0);
       if(showNotYet.length)html+=showNotYet.map(s=>renderSkuRow(s,true)).join('');

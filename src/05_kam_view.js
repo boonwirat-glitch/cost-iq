@@ -764,7 +764,11 @@ function __legacyRenderKamThisMonthFallback(){
         </div>
       </div>`;
     };
-    html+=actionSigs.slice(0,8).map(s=>renderSkuRow(s)).join('');
+    // v757: approaching ขึ้นก่อนเสมอ — gone/near/slow ตามหลัง (ไม่มี limit)
+    const approachingSigs=actionSigs.filter(s=>s.type==='approaching');
+    const urgentSigs=actionSigs.filter(s=>s.type!=='approaching');
+    html+=approachingSigs.map(s=>renderSkuRow(s)).join('');
+    html+=urgentSigs.map(s=>renderSkuRow(s)).join('');
     if(notYetSigs.length){
       const showNotYet=churnExpanded?notYetSigs:notYetSigs.slice(0,0);
       if(showNotYet.length)html+=showNotYet.map(s=>renderSkuRow(s,true)).join('');
