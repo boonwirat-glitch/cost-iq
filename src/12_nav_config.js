@@ -112,6 +112,20 @@
   window.showScreen = function(name) {
     var r = _origShow ? _origShow.call(this, name) : undefined;
     updateSaveState(name);
+    // v806: re-render nav whenever returning to a non-Save screen.
+    // showScreen (05_kam_view) removes kam-sense-active before calling _origShow,
+    // but only when _kamSenseReturn is true. If the user entered Save without an
+    // account selected (_kamSenseReturn never set), kam-sense-active stays on body
+    // and Skills stays hidden after returning to portview.
+    // Calling renderNav here — AFTER _origShow — sees the final body class state
+    // and always shows the correct tabs for the destination screen.
+    var _screensNeedingNavRefresh = ['portview','overview','teamview','skills','echo-kam'];
+    if (_screensNeedingNavRefresh.indexOf(name) !== -1) {
+      try {
+        var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : null;
+        if (role) renderNav(role);
+      } catch(_e) {}
+    }
     return r;
   };
 
