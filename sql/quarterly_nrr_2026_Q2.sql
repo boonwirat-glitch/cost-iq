@@ -462,7 +462,7 @@ may_rows AS (
       WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
       -- outlet ใหม่ที่เข้ามาใน May แต่ไม่มีใน apr_labels:
       -- ต้องเช็ค first_dollar ก่อน — อาจเป็น expansion ไม่ใช่ new_sales
-      WHEN al.outlet_id IS NULL AND ofd_may.first_dollar_date >= '2026-05-01' THEN 'expansion'
+      WHEN al.outlet_id IS NULL AND ofd_may.first_dollar_date >= '2026-04-01' THEN 'expansion'
       WHEN al.outlet_id IS NULL THEN 'new_sales'
       ELSE al.fixed_label
     END AS movement_type
@@ -563,7 +563,7 @@ jun_rows AS (
       WHEN al.fixed_label = 'expansion' AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
       WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) > 0 THEN 'comeback'
       WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
-      WHEN al.outlet_id IS NULL AND ofd_jun.first_dollar_date >= '2026-06-01' THEN 'expansion'
+      WHEN al.outlet_id IS NULL AND ofd_jun.first_dollar_date >= '2026-04-01' THEN 'expansion'
       WHEN al.outlet_id IS NULL THEN 'new_sales'
       ELSE al.fixed_label
     END AS movement_type
