@@ -1,6 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v4)
+-- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v5)
 -- ════════════════════════════════════════════════════════════════════════════
+--
+-- v5 fixes (vs v4):
+--   FIX 7: เพิ่ม LEG D (Apr/May/Jun) — จับ outlets ที่ account อยู่ในพอร์ต KAM
+--           แต่ขณะสั่ง commercial_owner ≠ 'KAM' → ตก INNER JOIN LEG A
+--           JOIN dim.user_master ด้วย account_id เพื่อหา KAM จริง
+--           ผลลัพธ์: QNRR total_gmv = Portfolio gmv_to_date (ต่างกัน 5% เดิม)
 --
 -- v4 fixes (vs v3):
 --   FIX 4: expansion ตรวจ first_dollar_date >= Apr ก่อน handover/new_sales
@@ -374,6 +380,64 @@ apr_rows AS (
   FROM apr_labels al
   LEFT JOIN apr_gmv ag ON al.outlet_id = ag.outlet_id
 
+
+  UNION ALL
+
+  -- LEG 1D: Apr outlets ที่ account_id อยู่ในพอร์ต KAM (via dim.user_master)
+  -- แต่ขณะสั่ง commercial_owner ≠ 'KAM' → ตก LEG 1A INNER JOIN
+  -- Fix: ดึง KAM จาก dim.user_master ด้วย account_id แทน commercial_owner ณ วันสั่ง
+  SELECT
+    '2026-04'         AS period_month,
+    '2026-03'         AS base_month,
+    ao.outlet_id,
+    COALESCE(al.account_id, ao.account_id, ao.outlet_id) AS account_id,
+    COALESCE(al.account_name, ao.account_name, '')        AS account_name,
+    COALESCE(al.account_type, ao.account_type, '')        AS account_type,
+    k.kam_email       AS period_kam_email,
+    k.kam_name        AS period_kam_name,
+    k.tl_email        AS period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    COALESCE(al.base_gmv, 0) AS base_gmv,
+    COALESCE(ag.gmv, 0)      AS curr_gmv,
+
+    CASE
+      WHEN al.fixed_label = 'core'      AND COALESCE(ag.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core'      AND COALESCE(ag.gmv, 0) = 0 THEN 'core_nrr_churn'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(ag.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(ag.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(ag.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(ag.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NULL AND ofd.first_dollar_date >= '2026-04-01' THEN 'expansion'
+      WHEN al.outlet_id IS NULL THEN 'new_sales'
+      ELSE al.fixed_label
+    END AS movement_type
+
+  FROM apr_ownership ao
+  -- หา KAM จาก dim.user_master ด้วย account_id (ไม่ใช่ commercial_owner ณ วันสั่ง)
+  JOIN `freshket-rn.dim.user_master` um
+    ON CAST(ao.account_id AS STRING) = CAST(um.account_id AS STRING)
+   AND um.account_type IN ('SA','MC','Chain','Unknown')
+   AND um.res_id IS NOT NULL
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  LEFT JOIN apr_labels al
+    ON ao.outlet_id = al.outlet_id
+   AND al.period_kam_email = k.kam_email
+  LEFT JOIN apr_gmv ag ON ao.outlet_id = ag.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
+  WHERE ao.commercial_owner != 'KAM'                      -- เฉพาะที่ตก LEG 1A
+    AND ao.outlet_id NOT IN (                             -- ไม่ซ้ำกับ LEG 1A
+      SELECT ao2.outlet_id FROM apr_ownership ao2
+      JOIN kam_list k2
+        ON ao2.commercial_owner = 'KAM'
+       AND TRIM(ao2.staff_owner) = TRIM(k2.kam_name)
+       AND k2.kam_email = k.kam_email
+    )
+  QUALIFY ROW_NUMBER() OVER (                             -- กัน dup กรณี outlet มี 2 KAM
+    PARTITION BY ao.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
+
   UNION ALL
 
   -- LEG 1B: transfer_out — Mar cohort แต่ Apr ownership เปลี่ยน KAM
@@ -477,6 +541,61 @@ may_rows AS (
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_may ON mo.outlet_id = ofd_may.outlet_id
 
+
+  UNION ALL
+
+  -- LEG 2D: May outlets ที่ account_id อยู่ในพอร์ต KAM แต่ commercial_owner ≠ 'KAM' ณ วันสั่ง
+  SELECT
+    '2026-05'         AS period_month,
+    '2026-03'         AS base_month,
+    mo.outlet_id,
+    COALESCE(al.account_id, mo.account_id, mo.outlet_id) AS account_id,
+    COALESCE(al.account_name, mo.account_name, '')        AS account_name,
+    COALESCE(al.account_type, mo.account_type, '')        AS account_type,
+    k.kam_email       AS period_kam_email,
+    k.kam_name        AS period_kam_name,
+    k.tl_email        AS period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    COALESCE(al.base_gmv, 0) AS base_gmv,
+    COALESCE(mg.gmv, 0)      AS curr_gmv,
+
+    CASE
+      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv, 0) = 0 THEN 'core_nrr_churn'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NULL AND ofd.first_dollar_date >= '2026-04-01' THEN 'expansion'
+      WHEN al.outlet_id IS NULL THEN 'new_sales'
+      ELSE al.fixed_label
+    END AS movement_type
+
+  FROM may_ownership mo
+  JOIN `freshket-rn.dim.user_master` um
+    ON CAST(mo.account_id AS STRING) = CAST(um.account_id AS STRING)
+   AND um.account_type IN ('SA','MC','Chain','Unknown')
+   AND um.res_id IS NOT NULL
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  LEFT JOIN apr_labels al
+    ON mo.outlet_id = al.outlet_id
+   AND al.period_kam_email = k.kam_email
+  LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
+  WHERE mo.commercial_owner != 'KAM'
+    AND mo.outlet_id NOT IN (
+      SELECT mo2.outlet_id FROM may_ownership mo2
+      JOIN kam_list k2
+        ON mo2.commercial_owner = 'KAM'
+       AND TRIM(mo2.staff_owner) = TRIM(k2.kam_name)
+       AND k2.kam_email = k.kam_email
+    )
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY mo.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
+
   UNION ALL
 
   -- LEG 2B: transfer_out ของ May
@@ -577,6 +696,61 @@ jun_rows AS (
    AND al.period_kam_email = k.kam_email
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_jun ON jo.outlet_id = ofd_jun.outlet_id
+
+
+  UNION ALL
+
+  -- LEG 3D: Jun outlets ที่ account_id อยู่ในพอร์ต KAM แต่ commercial_owner ≠ 'KAM' ณ วันสั่ง
+  SELECT
+    '2026-06'         AS period_month,
+    '2026-03'         AS base_month,
+    jo.outlet_id,
+    COALESCE(al.account_id, jo.account_id, jo.outlet_id) AS account_id,
+    COALESCE(al.account_name, jo.account_name, '')        AS account_name,
+    COALESCE(al.account_type, jo.account_type, '')        AS account_type,
+    k.kam_email       AS period_kam_email,
+    k.kam_name        AS period_kam_name,
+    k.tl_email        AS period_tl_email,
+    al.base_kam_email,
+    al.base_kam_name,
+    COALESCE(al.base_gmv, 0) AS base_gmv,
+    COALESCE(jg.gmv, 0)      AS curr_gmv,
+
+    CASE
+      WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv, 0) > 0 THEN 'core_nrr'
+      WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv, 0) = 0 THEN 'core_nrr_churn'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(jg.gmv, 0) > 0 THEN 'expansion'
+      WHEN al.fixed_label = 'expansion' AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) > 0 THEN 'comeback'
+      WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NULL AND ofd.first_dollar_date >= '2026-04-01' THEN 'expansion'
+      WHEN al.outlet_id IS NULL THEN 'new_sales'
+      ELSE al.fixed_label
+    END AS movement_type
+
+  FROM jun_ownership jo
+  JOIN `freshket-rn.dim.user_master` um
+    ON CAST(jo.account_id AS STRING) = CAST(um.account_id AS STRING)
+   AND um.account_type IN ('SA','MC','Chain','Unknown')
+   AND um.res_id IS NOT NULL
+  JOIN kam_list k
+    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
+  LEFT JOIN apr_labels al
+    ON jo.outlet_id = al.outlet_id
+   AND al.period_kam_email = k.kam_email
+  LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
+  WHERE jo.commercial_owner != 'KAM'
+    AND jo.outlet_id NOT IN (
+      SELECT jo2.outlet_id FROM jun_ownership jo2
+      JOIN kam_list k2
+        ON jo2.commercial_owner = 'KAM'
+       AND TRIM(jo2.staff_owner) = TRIM(k2.kam_name)
+       AND k2.kam_email = k.kam_email
+    )
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY jo.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
+  ) = 1
 
   UNION ALL
 
