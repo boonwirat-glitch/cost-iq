@@ -545,7 +545,14 @@ function _qnrrRenderChart(){
     // Bar body segments
     var bodyHtml = '';
     if (isBase) {
-      bodyHtml = '<div class="qnrr-base-bar" style="height:' + barH + 'px"></div>';
+      // Base bar: แยก 2 layers — core cohort (dashed) + handover (สีน้ำเงินอ่อน overlay)
+      var coreH     = Math.max(6, Math.round(_data.base_norm * 30 / maxGmv * chartH));
+      var hovNorm   = _data.handover_base_norm || 0;
+      var hovH      = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
+      var hovHtml   = hovH > 0
+        ? '<div class="qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
+        : '';
+      bodyHtml = '<div class="qnrr-base-bar" style="height:' + barH + 'px">' + hovHtml + '</div>';
     } else if (bm) {
       var segsHtml = '';
       STACK_ORDER.forEach(function(mv){
@@ -1097,5 +1104,6 @@ function _qnrrToggleAcctRows(id, hdr){
 window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
 })();
+
 
 

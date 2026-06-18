@@ -621,13 +621,15 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 /* outlet rows wrapper — collapsible */
 .qnrr-ol-rows { display: block; }
 
-/* ── List toolbar: filter bar + expand/collapse ──────────────────────────── */
+/* ── List toolbar: filter bar + expand/collapse — ล้อ portview token ─────── */
 .qnrr-list-toolbar {
   display: flex; align-items: center;
-  padding: 6px 12px 6px 16px;
+  padding: 7px 10px 7px 14px;
   border-bottom: 1px solid rgba(140,180,255,.08);
-  gap: 8px; flex-shrink: 0;
+  gap: 6px; flex-shrink: 0;
 }
+
+/* filter bar scroll container */
 .qnrr-list-filter-bar {
   display: flex; gap: 5px;
   flex-wrap: nowrap; overflow-x: auto; flex: 1;
@@ -638,41 +640,58 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-list-filter-bar::-webkit-scrollbar { display: none; }
 
-/* pill filter buttons */
+/* pill — ล้อ .portview-fpill */
 .qnrr-pill {
   flex-shrink: 0; white-space: nowrap;
-  font-size: 10px; font-weight: 700; padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.04);
-  color: rgba(255,255,255,.40);
-  cursor: pointer; font-family: var(--tk-font-mono);
-  transition: all .16s; -webkit-tap-highlight-color: transparent;
-  min-height: 26px; letter-spacing: .02em;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  font-family: var(--tk-font-body);
+  border: 1.5px solid rgba(255,255,255,.15);
+  background: transparent;
+  color: rgba(255,255,255,.45);
+  cursor: pointer;
+  transition: background 220ms ease, color 220ms ease, border-color 220ms ease, transform 150ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.qnrr-pill:active { transform: scale(.94); }
 .qnrr-pill.on {
-  border-color: rgba(188,215,255,.40);
-  background: rgba(188,215,255,.10);
-  color: rgba(188,215,255,.90);
+  border-color: var(--tk-accent-solid);
+  background: var(--tk-accent-dim-2);
+  color: #fff; transform: scale(1.03);
 }
+.qnrr-pill:active { transform: scale(.95); }
 
-/* expand/collapse icon buttons */
-.qnrr-list-xpand { display: flex; gap: 2px; flex-shrink: 0; }
+/* expand/collapse — ล้อ .pv-toggle-btn */
+.qnrr-list-xpand { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .qnrr-xpand-btn {
-  width: 28px; height: 28px;
-  border-radius: 6px; border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.04);
-  color: rgba(255,255,255,.40);
+  width: 30px; height: 28px;
+  border: none; background: transparent;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all .16s; -webkit-tap-highlight-color: transparent;
+  border-radius: 6px;
+  color: rgba(255,255,255,.25);
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.qnrr-xpand-btn:active { transform: scale(.92); background: rgba(255,255,255,.09); }
-.qnrr-xpand-btn:hover  { color: rgba(188,215,255,.80); border-color: rgba(188,215,255,.25); }
+.qnrr-xpand-btn:hover { color: rgba(255,255,255,.7); }
+.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
 
-/* month header only on first outlet row — sticky within account */
+/* month header only on first outlet row */
 .qnrr-ol-mo-hdr td {
   font-size: 8px; font-weight: 700; text-transform: uppercase;
   color: rgba(188,215,255,.40); letter-spacing: .04em;
   padding-bottom: 2px; text-align: right;
 }
+
+/* partial month column — ไม่ให้ถ่างออก */
+.qnrr-ol-tbl { table-layout: fixed; width: auto; }
+.qnrr-ol-tbl td { max-width: 44px; min-width: 36px; }
+
+/* Base bar handover layer — แสดงด้านบน core (handover = ส่วนเกินที่ไม่นับใน NRR denom) */
+.qnrr-base-hov-seg {
+  width: 100%;
+  background: rgba(96,165,250,.45);
+  border-radius: 5px 5px 0 0;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  pointer-events: none;
+}
+.qnrr-base-bar { overflow: hidden; position: relative; }
+
