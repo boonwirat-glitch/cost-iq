@@ -51,8 +51,12 @@ function _qnrrCompute(kamEmail, scope) {
   months.sort();
 
   var baseMap = {};
-  scopedRows.forEach(function(r){
-    // v4: exclude handover outlets from NRR denominator
+  // v5: build baseMap from base_month rows ONLY (first period_month = Apr)
+  // ใช้เฉพาะ rows ที่ period_month === months[0] เพื่อป้องกัน outlets จาก May/Jun
+  // แอบเข้า baseMap ผ่าน movement_type ที่ต่างกัน (เช่น handover→Apr, core_nrr_churn→May)
+  var baseMonthRows = scopedRows.filter(function(r){ return r.period_month === months[0]; });
+  baseMonthRows.forEach(function(r){
+    // exclude handover outlets from NRR denominator
     // handover = รับมาช่วง 15/30 Mar — KAM ไม่ได้ดูแลจริงๆ ใน Mar
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
@@ -66,7 +70,16 @@ function _qnrrCompute(kamEmail, scope) {
     base_gmv  += b.gmv;
     base_norm += b.gmv / b.days;
   });
-  var cohort_outlets = Object.keys(baseMap).length; // excl. handover (v4)
+  var cohort_outlets = Object.keys(baseMap).length; // excl. handover (v5)
+
+  // handover base: Mar GMV ของ handover outlets (แสดงใน Mar column แต่ไม่นับใน NRR denom)
+  var handover_base_norm = 0;
+  baseMonthRows.forEach(function(r){
+    if (r.movement_type === 'handover' && r.base_gmv > 0) {
+      var base_d = parseFloat(r.base_days) || 31;
+      handover_base_norm += (parseFloat(r.base_gmv) || 0) / base_d * 30;
+    }
+  });
 
   var MOVEMENTS = ['core_nrr','core_nrr_churn','handover','new_sales',
                    'expansion','comeback','transfer_in','transfer_out'];
@@ -147,13 +160,14 @@ function _qnrrCompute(kamEmail, scope) {
   });
 
   return {
-    quarter:        window._QNRR_QUARTER || '2026q2',
-    base_month:     base_month,
-    months:         months,
-    base_gmv:       base_gmv,
-    base_norm:      base_norm,
-    cohort_outlets: cohort_outlets,
-    by_month:       by_month
+    quarter:            window._QNRR_QUARTER || '2026q2',
+    base_month:         base_month,
+    months:             months,
+    base_gmv:           base_gmv,
+    base_norm:          base_norm,
+    handover_base_norm: handover_base_norm,
+    cohort_outlets:     cohort_outlets,
+    by_month:           by_month
   };
 }
 window._qnrrCompute = _qnrrCompute;
@@ -480,7 +494,9 @@ function _qnrrRenderChart(){
     return;
   }
 
-  var allGmvs = [_data.base_gmv];
+  // Mar bar total = core cohort base + handover base (GMV จริงทั้งหมดใน Mar)
+  var marBarTotal = Math.round((_data.base_norm + (_data.handover_base_norm / 30)) * 30);
+  var allGmvs = [marBarTotal];
   Q_MONTHS.forEach(function(m){
     var bm = _data.by_month[m];
     if (bm) allGmvs.push(bm.total_gmv);
@@ -499,7 +515,7 @@ function _qnrrRenderChart(){
     var isBase = b.isBase;
     var bm     = _data.by_month[m];
     var barH   = isBase
-      ? Math.max(6, Math.round(_data.base_gmv / maxGmv * chartH))
+      ? Math.max(6, Math.round(marBarTotal / maxGmv * chartH))
       : (bm ? Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH)) : 6);
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
@@ -507,8 +523,7 @@ function _qnrrRenderChart(){
     // Top label: GMV only (NRR% removed — lives in hero zone now)
     var topHtml = '';
     if (isBase) {
-      var _dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
-      topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(_dispBase) + '</div>' +
+      topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(marBarTotal) + '</div>' +
                 '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' out</div>';
     } else if (bm) {
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
@@ -682,7 +697,15 @@ function _qnrrRenderBreakdown(){
       '</div></td>';
 
     ALL_MONTHS.forEach(function(m){
-      if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
+      // Handover Mar column: แสดง base_gmv normalized (Mar GMV ของ handover outlets)
+      if (m === BASE_MONTH) {
+        if (mv === 'handover' && _data.handover_base_norm > 0) {
+          html += '<td class="bk-neut">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>';
+        } else {
+          html += '<td style="color:rgba(255,255,255,.15)">—</td>';
+        }
+        return;
+      }
       var bm = _data.by_month[m];
       var g  = (bm && bm.segments[mv]) || 0;
       var cls = g > 0 ? (isChurn ? 'bk-churn' : isPos ? 'bk-pos' : isNeut ? 'bk-neut' : '') : '';
@@ -692,10 +715,12 @@ function _qnrrRenderBreakdown(){
   });
 
   // ── Total GMV row ─────────────────────────────────────────────────────────
+  // Mar Total = core cohort base (excl handover) + handover base = GMV จริงทุก outlet ใน Mar
+  var dispBaseTotalMar = Math.round((_data.base_norm + (_data.handover_base_norm / 30)) * 30);
   html += '<tr class="bk-total"><td><div class="qnrr-bk-mv-cell"><span class="qnrr-bk-mv-name" style="color:rgba(255,255,255,.65)">Total GMV</span></div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) {
-      html += '<td style="color:rgba(255,255,255,.72)">' + _fmtM(dispBase) + '</td>';
+      html += '<td style="color:rgba(255,255,255,.72)">' + _fmtM(dispBaseTotalMar) + '</td>';
     } else {
       var bm = _data.by_month[m];
       html += '<td style="color:rgba(255,255,255,.72)">' + (bm ? _fmtM(bm.total_gmv) : '—') + '</td>';
@@ -1045,3 +1070,4 @@ function _qnrrRenderList(){
 window._qnrrRenderList = _qnrrRenderList;
 
 })();
+
