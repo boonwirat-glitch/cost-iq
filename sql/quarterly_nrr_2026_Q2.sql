@@ -1,6 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v6)
+-- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v7)
 -- ════════════════════════════════════════════════════════════════════════════
+--
+-- v7 fixes (vs v6):
+--   Revert mar_cohort + apr_labels to commercial_owner='KAM' filter
+--   Mar cohort MUST use commercial_owner='KAM' — NRR denominator requires
+--   true KAM outlets in Mar only (not Sales/PM with staff_owner set to KAM)
+--   Fix scope: remove commercial_owner filter ONLY from LEG 2A + LEG 3A
+--   (May/Jun outlets where commercial_owner lags behind staff_owner update)
 --
 -- v6 fixes (vs v5):
 --   FIX 7 revised: ลบ LEG D ออก เปลี่ยน approach
@@ -244,7 +251,8 @@ mar_cohort AS (
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM mar_ownership mo
   JOIN kam_list k
-    ON TRIM(mo.staff_owner) = TRIM(k.kam_name)
+    ON mo.commercial_owner = 'KAM'
+   AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE COALESCE(bg.gmv, 0) > 0
@@ -346,7 +354,8 @@ apr_labels AS (
 
   FROM apr_ownership ao
   JOIN kam_list k
-    ON TRIM(ao.staff_owner) = TRIM(k.kam_name)
+    ON ao.commercial_owner = 'KAM'
+   AND TRIM(ao.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN mar_cohort mc              ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd    ON ao.outlet_id = ofd.outlet_id
   LEFT JOIN pre_mar_ownership pmo      ON ao.outlet_id = pmo.outlet_id
