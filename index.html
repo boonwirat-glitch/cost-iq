@@ -1,4 +1,4 @@
-<!-- Freshket Sense 791: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 792: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '791',
+      version: '792',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6467,7 +6467,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-eyebrow {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .09em;
-  color: rgba(188,215,255,.52); margin-bottom: 4px;
+  color: rgba(188,215,255,.68); margin-bottom: 4px;
 }
 /* Hero row: base block LEFT, NRR cluster RIGHT */
 .qnrr-hero-row {
@@ -6481,15 +6481,15 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   font-family: var(--tk-font-mono); line-height: 1.05;
 }
 .qnrr-base-sub {
-  font-size: 10px; color: rgba(188,215,255,.50);
+  font-size: 11px; color: rgba(188,215,255,.72);
   margin-top: 2px; font-weight: 600;
 }
 /* NRR cluster: 3 slots with separators */
 .qnrr-nrr-right {}
 .qnrr-nrr-eyebrow {
-  font-size: 9px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em;
-  color: rgba(188,215,255,.42); margin-bottom: 4px;
+  color: rgba(188,215,255,.62); margin-bottom: 4px;
   text-align: right;
 }
 .qnrr-nrr-cluster {
@@ -6507,9 +6507,9 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   font-family: var(--tk-font-mono); letter-spacing: -.03em; line-height: 1;
 }
 .qnrr-nrr-mo {
-  font-size: 8px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .05em;
-  color: rgba(255,255,255,.28); font-family: var(--tk-font-mono);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: rgba(188,215,255,.58); font-family: var(--tk-font-mono);
 }
 /* Scope chip */
 .qnrr-title-row {
@@ -6574,7 +6574,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
   overflow: hidden;
-  height: 178px; /* top-wrap 32px + chart-area flex:1 + label ~22px */
+  height: 188px; /* top-wrap 32px + chart-area flex:1 + label ~22px + axis cut label 10px */
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
@@ -6605,12 +6605,12 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bar-top-label {
   font-size: 9px; font-weight: 700;
   font-family: var(--tk-font-mono); letter-spacing: -.01em;
-  white-space: nowrap; color: rgba(255,255,255,.60); text-align: center;
+  white-space: nowrap; color: rgba(255,255,255,.82); text-align: center;
   animation: qnrrCountIn .5s ease both;
 }
 .qnrr-bar-mar-sub {
-  font-size: 7px; font-weight: 700;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.38);
+  font-size: 9px; font-weight: 700;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.62);
   text-align: center; width: 100%; white-space: nowrap;
 }
 /* bar chart area — takes remaining height */
@@ -6673,7 +6673,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bar-lbl {
   font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .04em;
-  color: rgba(255,255,255,.38); margin-top: 4px;
+  color: rgba(255,255,255,.60); margin-top: 4px;
   font-family: var(--tk-font-mono); transition: color .2s;
   white-space: nowrap; overflow: hidden; flex-shrink: 0; padding-bottom: 5px;
 }
@@ -6699,26 +6699,26 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bk-table th:first-child { text-align: left; min-width: 90px; }
 .qnrr-bk-table td {
   font-size: 12px; font-weight: 700; padding: 5px 6px;
-  text-align: right; color: rgba(255,255,255,.60);
-  border-bottom: 1px solid rgba(255,255,255,.04);
+  text-align: right; color: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(255,255,255,.06);
 }
 .qnrr-bk-table td:first-child { text-align: left; }
 .qnrr-bk-mv-cell { display: flex; align-items: center; gap: 5px; }
 .qnrr-bk-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
 .qnrr-bk-mv-name {
   font-size: 11px; font-weight: 700;
-  color: rgba(255,255,255,.50); font-family: var(--tk-font-mono);
+  color: rgba(255,255,255,.75); font-family: var(--tk-font-mono);
   white-space: nowrap;
 }
 /* sub-rows: churn + net core indented under Core NRR */
 .qnrr-bk-table tr.bk-subrow td {
   font-size: 11px; padding: 3px 6px 3px 8px;
-  border-bottom: none; color: rgba(255,255,255,.42);
+  border-bottom: none; color: rgba(255,255,255,.62);
 }
 .qnrr-bk-table tr.bk-subrow td:first-child { padding-left: 16px; }
 .qnrr-bk-mv-cell.sub { gap: 4px; }
 .qnrr-bk-dot.sub { width: 5px; height: 5px; opacity: .6; }
-.qnrr-bk-mv-name.sub { font-size: 10px; color: rgba(255,255,255,.35); }
+.qnrr-bk-mv-name.sub { font-size: 11px; color: rgba(255,255,255,.55); }
 /* net core row */
 .qnrr-bk-table tr.bk-net-row td {
   font-size: 11px; padding: 3px 6px 5px 8px;
@@ -6943,7 +6943,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-acct-hdr-name {
   font-size: 11px; font-weight: 800;
-  color: rgba(255,255,255,.72); letter-spacing: -.01em;
+  color: rgba(255,255,255,.88); letter-spacing: -.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0;
 }
 .qnrr-acct-hdr-tot {
@@ -7112,24 +7112,21 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 /* ── List: sticky month header row ──────────────────────────────────────── */
 /* Sits above all account rows, aligns with table colgroup (auto + 4×42px) */
 .qnrr-list-mo-hdr {
-  display: grid;
-  /* name col = fills remaining, 4 month cols = 42px each */
-  grid-template-columns: 1fr repeat(4, 42px);
+  display: flex;
   padding: 5px 14px 4px;
   background: rgba(10,22,45,.95);
   border-bottom: 1px solid rgba(140,180,255,.08);
   position: sticky; top: 0; z-index: 5;
 }
 .qnrr-list-mo-hdr-name {
-  /* spacer for account name col */
-  min-width: 0;
+  flex: 1; min-width: 0;
 }
 .qnrr-list-mo-hdr-cell {
   font-family: var(--tk-font-mono);
-  font-size: 9px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em;
-  color: rgba(188,215,255,.38);
-  text-align: right; padding-right: 4px;
+  color: rgba(188,215,255,.62);
+  width: 42px; flex-shrink: 0; text-align: right; padding-right: 4px;
 }
 
 /* ── List: account grid ──────────────────────────────────────────────────── */
@@ -7145,7 +7142,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-acct-hdr-name {
   font-size: 11px; font-weight: 800;
-  color: rgba(255,255,255,.72);
+  color: rgba(255,255,255,.88);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex: 1; min-width: 0;
 }
@@ -52165,8 +52162,25 @@ function _qnrrRenderChart(){
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
   var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
 
-  // ref-line removed (v781) — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
-  if (refLines) refLines.innerHTML = '';
+  // ── Zoomed axis (v792) ────────────────────────────────
+  // Floor = 88% of base GMV — so small diffs (94% vs 98%) are visually meaningful
+  // Bars use (value - zoomFloor) / (maxGmv - zoomFloor) for height
+  // ref-line drawn at floor with broken-axis cue
+  var zoomFloor = Math.round(_data.base_gmv * 0.88);
+  var zoomRange = Math.max(maxGmv - zoomFloor, 1);
+
+  // Draw ref-lines: base line + floor break marker
+  if (refLines) {
+    var baseLineH = Math.round((Math.round(_data.base_norm * 30) - zoomFloor) / zoomRange * chartH);
+    var baseLinePct = 100 - Math.round(baseLineH / chartH * 100);
+    refLines.innerHTML =
+      '<div class="qnrr-ref-line" style="top:' + baseLinePct + '%;border-color:rgba(96,165,250,.28)">' +
+        '<span class="qnrr-ref-label">฿' + Math.round(_data.base_norm * 30 / 1e6 * 10) / 10 + 'M base</span>' +
+      '</div>' +
+      '<div style="position:absolute;bottom:0;left:0;right:0;height:8px;display:flex;align-items:flex-end;justify-content:center">' +
+        '<span style="font-size:8px;font-family:var(--tk-font-mono);color:rgba(188,215,255,.30);letter-spacing:.04em">⌇ axis cut at ' + Math.round(zoomFloor/1e6*10)/10 + 'M</span>' +
+      '</div>';
+  }
 
   var allBars = [{month: BASE_MONTH, isBase: true}];
   Q_MONTHS.forEach(function(m){ allBars.push({month: m, isBase: false}); });
@@ -52175,9 +52189,14 @@ function _qnrrRenderChart(){
     var m      = b.month;
     var isBase = b.isBase;
     var bm     = _data.by_month[m];
+    // zoomed axis: height = (val - floor) / range * chartH
+    function _zoomH(val) {
+      var v = Math.max(zoomFloor, val);
+      return Math.max(4, Math.round((v - zoomFloor) / zoomRange * chartH));
+    }
     var barH   = isBase
-      ? Math.max(6, Math.round(marBarTotal / maxGmv * chartH))
-      : (bm ? Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH)) : 6);
+      ? _zoomH(marBarTotal)
+      : (bm ? _zoomH(bm.total_gmv) : 4);
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
@@ -52210,9 +52229,11 @@ function _qnrrRenderChart(){
     if (isBase) {
       // Base bar: ใช้ structure เดียวกับ qnrr-bar-body (flex + column-reverse)
       // core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
-      var coreH   = Math.max(4, Math.round(_data.base_norm * 30 / maxGmv * chartH));
+      var baseTotal = Math.round(_data.base_norm * 30) + Math.round((_data.handover_base_norm || 0));
       var hovNorm = _data.handover_base_norm || 0;
-      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
+      var hovFrac = baseTotal > 0 ? hovNorm / baseTotal : 0;
+      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovFrac * barH)) : 0;
+      var coreH   = Math.max(4, barH - hovH);
       var hovSeg  = hovH > 0
         ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
@@ -52220,10 +52241,12 @@ function _qnrrRenderChart(){
       bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
+      // segments are proportional slices of barH (not independent zoom)
+      var totalSegGmv = STACK_ORDER.reduce(function(s,mv){ return s+(bm.segments&&bm.segments[mv]||0); },0) || 1;
       STACK_ORDER.forEach(function(mv){
         var gmv = (bm.segments && bm.segments[mv]) || 0;
         if (gmv <= 0) return;
-        var h   = Math.max(3, Math.round(gmv / maxGmv * chartH));
+        var h   = Math.max(3, Math.round(gmv / totalSegGmv * barH));
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
@@ -52231,7 +52254,7 @@ function _qnrrRenderChart(){
       var ghostHtml = '';
       if (bm.is_partial && bm.curr_days > 0) {
         // ghost bar = normalized total_gmv (already ÷days×30)
-        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
+        var projH = _zoomH(bm.total_gmv);
         if (projH > barH) {
           ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '/30 วัน"></div>';
         }
@@ -52312,9 +52335,9 @@ function _qnrrRenderBreakdown(){
 
   // Sub-row: Churn (negative)
   html += '<tr class="bk-subrow">' +
-    '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(248,113,113,.82)"></div>' +
-      '<span class="qnrr-bk-mv-name sub">└ Churn</span>' +
+    '<td><div class="qnrr-bk-mv-cell">' +
+      '<div class="qnrr-bk-dot" style="background:rgba(248,113,113,.82)"></div>' +
+      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Churn</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -52327,9 +52350,9 @@ function _qnrrRenderBreakdown(){
   // Sub-row: Contraction (core active outlets ที่ซื้อลดลง)
   // = curr_gmv - base_gmv ของ active outlets เท่านั้น (ไม่รวม churn)
   html += '<tr class="bk-subrow">' +
-    '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(251,191,36,.70)"></div>' +
-      '<span class="qnrr-bk-mv-name sub">└ Contraction</span>' +
+    '<td><div class="qnrr-bk-mv-cell">' +
+      '<div class="qnrr-bk-dot" style="background:rgba(251,191,36,.70)"></div>' +
+      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Contraction</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -52408,9 +52431,9 @@ function _qnrrRenderBreakdown(){
       COHORTS.forEach(function(co){
         if (co.key === 'new_sales' && !hasNewSales) return;
         html += '<tr class="bk-subrow">' +
-          '<td><div class="qnrr-bk-mv-cell sub">' +
-            '<div class="qnrr-bk-dot sub" style="background:' + co.color + '"></div>' +
-            '<span class="qnrr-bk-mv-name sub">' + _esc(co.label) + '</span>' +
+          '<td><div class="qnrr-bk-mv-cell">' +
+            '<div class="qnrr-bk-dot" style="background:' + co.color + '"></div>' +
+            '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">' + _esc(co.label) + '</span>' +
           '</div></td>';
         ALL_MONTHS.forEach(function(m){
           if (m === BASE_MONTH) {

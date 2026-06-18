@@ -505,8 +505,25 @@ function _qnrrRenderChart(){
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
   var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
 
-  // ref-line removed (v781) — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
-  if (refLines) refLines.innerHTML = '';
+  // ── Zoomed axis (v792) ────────────────────────────────
+  // Floor = 88% of base GMV — so small diffs (94% vs 98%) are visually meaningful
+  // Bars use (value - zoomFloor) / (maxGmv - zoomFloor) for height
+  // ref-line drawn at floor with broken-axis cue
+  var zoomFloor = Math.round(_data.base_gmv * 0.88);
+  var zoomRange = Math.max(maxGmv - zoomFloor, 1);
+
+  // Draw ref-lines: base line + floor break marker
+  if (refLines) {
+    var baseLineH = Math.round((Math.round(_data.base_norm * 30) - zoomFloor) / zoomRange * chartH);
+    var baseLinePct = 100 - Math.round(baseLineH / chartH * 100);
+    refLines.innerHTML =
+      '<div class="qnrr-ref-line" style="top:' + baseLinePct + '%;border-color:rgba(96,165,250,.28)">' +
+        '<span class="qnrr-ref-label">฿' + Math.round(_data.base_norm * 30 / 1e6 * 10) / 10 + 'M base</span>' +
+      '</div>' +
+      '<div style="position:absolute;bottom:0;left:0;right:0;height:8px;display:flex;align-items:flex-end;justify-content:center">' +
+        '<span style="font-size:8px;font-family:var(--tk-font-mono);color:rgba(188,215,255,.30);letter-spacing:.04em">⌇ axis cut at ' + Math.round(zoomFloor/1e6*10)/10 + 'M</span>' +
+      '</div>';
+  }
 
   var allBars = [{month: BASE_MONTH, isBase: true}];
   Q_MONTHS.forEach(function(m){ allBars.push({month: m, isBase: false}); });
@@ -515,9 +532,14 @@ function _qnrrRenderChart(){
     var m      = b.month;
     var isBase = b.isBase;
     var bm     = _data.by_month[m];
+    // zoomed axis: height = (val - floor) / range * chartH
+    function _zoomH(val) {
+      var v = Math.max(zoomFloor, val);
+      return Math.max(4, Math.round((v - zoomFloor) / zoomRange * chartH));
+    }
     var barH   = isBase
-      ? Math.max(6, Math.round(marBarTotal / maxGmv * chartH))
-      : (bm ? Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH)) : 6);
+      ? _zoomH(marBarTotal)
+      : (bm ? _zoomH(bm.total_gmv) : 4);
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
@@ -550,9 +572,11 @@ function _qnrrRenderChart(){
     if (isBase) {
       // Base bar: ใช้ structure เดียวกับ qnrr-bar-body (flex + column-reverse)
       // core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
-      var coreH   = Math.max(4, Math.round(_data.base_norm * 30 / maxGmv * chartH));
+      var baseTotal = Math.round(_data.base_norm * 30) + Math.round((_data.handover_base_norm || 0));
       var hovNorm = _data.handover_base_norm || 0;
-      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
+      var hovFrac = baseTotal > 0 ? hovNorm / baseTotal : 0;
+      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovFrac * barH)) : 0;
+      var coreH   = Math.max(4, barH - hovH);
       var hovSeg  = hovH > 0
         ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
@@ -560,10 +584,12 @@ function _qnrrRenderChart(){
       bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
+      // segments are proportional slices of barH (not independent zoom)
+      var totalSegGmv = STACK_ORDER.reduce(function(s,mv){ return s+(bm.segments&&bm.segments[mv]||0); },0) || 1;
       STACK_ORDER.forEach(function(mv){
         var gmv = (bm.segments && bm.segments[mv]) || 0;
         if (gmv <= 0) return;
-        var h   = Math.max(3, Math.round(gmv / maxGmv * chartH));
+        var h   = Math.max(3, Math.round(gmv / totalSegGmv * barH));
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
@@ -571,7 +597,7 @@ function _qnrrRenderChart(){
       var ghostHtml = '';
       if (bm.is_partial && bm.curr_days > 0) {
         // ghost bar = normalized total_gmv (already ÷days×30)
-        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
+        var projH = _zoomH(bm.total_gmv);
         if (projH > barH) {
           ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '/30 วัน"></div>';
         }
@@ -652,9 +678,9 @@ function _qnrrRenderBreakdown(){
 
   // Sub-row: Churn (negative)
   html += '<tr class="bk-subrow">' +
-    '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(248,113,113,.82)"></div>' +
-      '<span class="qnrr-bk-mv-name sub">└ Churn</span>' +
+    '<td><div class="qnrr-bk-mv-cell">' +
+      '<div class="qnrr-bk-dot" style="background:rgba(248,113,113,.82)"></div>' +
+      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Churn</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -667,9 +693,9 @@ function _qnrrRenderBreakdown(){
   // Sub-row: Contraction (core active outlets ที่ซื้อลดลง)
   // = curr_gmv - base_gmv ของ active outlets เท่านั้น (ไม่รวม churn)
   html += '<tr class="bk-subrow">' +
-    '<td><div class="qnrr-bk-mv-cell sub">' +
-      '<div class="qnrr-bk-dot sub" style="background:rgba(251,191,36,.70)"></div>' +
-      '<span class="qnrr-bk-mv-name sub">└ Contraction</span>' +
+    '<td><div class="qnrr-bk-mv-cell">' +
+      '<div class="qnrr-bk-dot" style="background:rgba(251,191,36,.70)"></div>' +
+      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Contraction</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -748,9 +774,9 @@ function _qnrrRenderBreakdown(){
       COHORTS.forEach(function(co){
         if (co.key === 'new_sales' && !hasNewSales) return;
         html += '<tr class="bk-subrow">' +
-          '<td><div class="qnrr-bk-mv-cell sub">' +
-            '<div class="qnrr-bk-dot sub" style="background:' + co.color + '"></div>' +
-            '<span class="qnrr-bk-mv-name sub">' + _esc(co.label) + '</span>' +
+          '<td><div class="qnrr-bk-mv-cell">' +
+            '<div class="qnrr-bk-dot" style="background:' + co.color + '"></div>' +
+            '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">' + _esc(co.label) + '</span>' +
           '</div></td>';
         ALL_MONTHS.forEach(function(m){
           if (m === BASE_MONTH) {
