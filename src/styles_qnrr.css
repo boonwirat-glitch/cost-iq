@@ -343,20 +343,21 @@
   margin: 8px 18px 0;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid rgba(248,113,113,.45);
-  background: rgba(220,38,38,.12);
+  /* v807: neutral muted — transfer-out is informational, not alarming */
+  border: 1px solid rgba(140,180,255,.20);
+  background: rgba(140,180,255,.06);
   display: none; gap: 10px; align-items: flex-start;
 }
 .qnrr-tout-card.show { display: flex; }
 .qnrr-tout-icon {
   font-size: 16px; line-height: 1; flex-shrink: 0; margin-top: 2px;
-  color: rgba(248,113,113,.9);
+  color: rgba(140,180,255,.60);
 }
 .qnrr-tout-body { flex: 1; min-width: 0; }
 .qnrr-tout-card-label {
   font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .10em;
-  color: rgba(248,113,113,.80);
+  color: rgba(140,180,255,.55);
   font-family: var(--tk-font-mono); margin-bottom: 4px;
 }
 .qnrr-tout-card-row {
@@ -367,20 +368,20 @@
 }
 .qnrr-tout-card-val {
   font-size: 14px; font-weight: 800;
-  font-family: var(--tk-font-mono); color: rgba(248,113,113,.95); flex-shrink: 0;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.80); flex-shrink: 0;
 }
 .qnrr-tout-card-note {
   font-size: 10px; color: rgba(255,255,255,.50); margin-top: 4px; line-height: 1.5;
 }
-/* ── Transfer out chip in list filter ── */
+/* ── Transfer out chip in list filter — v807: neutral, not alarming ── */
 .qnrr-tout-chip {
-  border-color: rgba(248,113,113,.45) !important;
-  color: rgba(248,113,113,.85) !important;
+  border-color: rgba(140,180,255,.30) !important;
+  color: rgba(188,215,255,.70) !important;
 }
 .qnrr-tout-chip.on {
-  background: rgba(220,38,38,.18) !important;
-  border-color: rgba(248,113,113,.70) !important;
-  color: rgba(248,113,113,1) !important;
+  background: rgba(140,180,255,.12) !important;
+  border-color: rgba(140,180,255,.45) !important;
+  color: rgba(188,215,255,.95) !important;
 }
 /* ── Ghost segment on Mar base bar (transfer_out หัก) ── */
 .qnrr-base-tout-seg {
@@ -757,19 +758,21 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-chip:active { opacity: .7; }
 
-/* expand/collapse — single toggle button */
-.qnrr-list-xpand { display: flex; align-items: center; flex-shrink: 0; padding-top: 4px; }
+/* expand/collapse — v807: Apple/Spotify clean pill — no border, icon-forward */
+.qnrr-list-xpand { display: flex; align-items: center; flex-shrink: 0; }
 .qnrr-xpand-btn {
-  min-width: 28px; height: 28px; padding: 0 6px;
-  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
-  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px;
-  border-radius: 6px; color: rgba(255,255,255,.45);
+  /* Pill shape with no hard border — like iOS control buttons */
+  height: 28px; padding: 0 10px 0 8px;
+  border: none; background: rgba(255,255,255,.09);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 14px; color: rgba(255,255,255,.55);
   font-size: 10px; font-weight: 600; font-family: var(--tk-font-body);
-  transition: color .15s, background .15s, border-color .15s;
+  transition: color .12s, background .12s;
   -webkit-tap-highlight-color: transparent; white-space: nowrap;
 }
-.qnrr-xpand-btn:hover { color: rgba(255,255,255,.80); border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
-.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); transform: scale(.96); }
+.qnrr-xpand-btn svg { transition: transform .2s cubic-bezier(.34,1.4,.64,1); }
+.qnrr-xpand-btn:hover { color: rgba(255,255,255,.80); background: rgba(255,255,255,.14); }
+.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); background: rgba(255,255,255,.18); transform: scale(.95); }
 
 /* ── List: sticky month header row ──────────────────────────────────────── */
 /* Sits above all account rows, aligns with table colgroup (auto + 4×42px) */

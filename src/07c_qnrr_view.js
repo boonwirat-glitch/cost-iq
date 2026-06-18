@@ -584,22 +584,20 @@ function _qnrrRenderChart(){
         ? _fmtM(adjBase) + '<span class="qnrr-base-adj-tag">adj</span>'
         : _fmtM(marBarTotal);
       topHtml = '<div class="qnrr-bar-top-label">' + baseLabel + '</div>' +
-                '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' out</div>';
+                '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' สาขา</div>';
     } else if (bm) {
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
         // Partial month: single-line top label (same height as normal months)
-        // Run-rate + days info lives in ghost bar tooltip only
+        // Run-rate + days info lives in ghost bar tooltip only (17/30d removed from header v807)
         var rawTotal = rawTotals[m] || bm.total_gmv;
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
-            '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
-            bm.curr_days + '/' + bm.days_in_month + 'd</div>';
+            '<span class="qnrr-top-actual-tag"> mtd</span></div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
-        outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
+        outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' สาขา</div>' : '';
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + '</div>' + outLabel;
       }
     }
@@ -686,12 +684,11 @@ function _qnrrRenderBreakdown(){
 
   // Header: active outlets only (core_nrr, not including churn)
   var outletHeaders = ALL_MONTHS.map(function(m){
-    if (m === BASE_MONTH) return _data.cohort_outlets + ' out';
+    if (m === BASE_MONTH) return _data.cohort_outlets + ' สาขา';
     var bm = _data.by_month[m];
     if (!bm) return '—';
     var active = bm.outlets.core_nrr || 0;
-    var partial = bm.is_partial ? ' · ' + bm.curr_days + '/' + bm.days_in_month + 'd' : '';
-    return active + ' out' + partial;
+    return active + ' สาขา';  // v807: removed 17/30d — days info in tooltip only
   });
 
   // v776: dispBase = adjusted base (หัก core transfer_out แล้ว)
@@ -712,7 +709,7 @@ function _qnrrRenderBreakdown(){
     adjNoteHtml = '<tr class="bk-base-adj-row">' +
       '<td colspan="' + (ALL_MONTHS.length + 1) + '">' +
         '<div class="qnrr-base-adj-note">' +
-          '<span class="qnrr-base-adj-icon">⤵</span>' +
+          '<span class="qnrr-base-adj-icon"></span>' +
           'ฐานปรับจาก ' + _fmtM(origBase) + ' → ' + _fmtM(dispBase) +
           ' (หัก ' + toutOuts + ' outlet core ที่ transfer ออกใน Q: −' + _fmtM(adjAmt) + ')' +
         '</div>' +
@@ -966,7 +963,7 @@ function _qnrrRenderToutCard(){
   if (toutG > 0 && _viewMode === 'chart') {
     card.className = 'qnrr-tout-card show';
     var html =
-      '<div class="qnrr-tout-icon">⤵</div>' +
+      '<div class="qnrr-tout-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3" opacity=".7"/><path d="M8 7v4M8 5.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></div>' +
       '<div class="qnrr-tout-body">' +
         '<div class="qnrr-tout-card-label">TRANSFER OUT · ' + (MONTHS_TH[_selBar] || _selBar) + '</div>' +
         '<div class="qnrr-tout-card-row">' +
@@ -1081,7 +1078,7 @@ function _qnrrRenderDrill(){
   var html = acctOrder.map(function(aid, idx){
     var a   = byAcct[aid];
     var cfg = MV_CFG[a.dominantMv] || {color:'rgba(255,255,255,.3)'};
-    var dotColor = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
+    var dotColor = cfg.color === 'ghost' ? 'rgba(180,180,200,.40)' : cfg.color;
 
     // Sparkline: 4 bars (Mar/Apr/May/Jun)
     var allMonths = [BASE_MONTH].concat(Q_MONTHS);
@@ -1098,7 +1095,7 @@ function _qnrrRenderDrill(){
     var outHtml = a.outlets.map(function(o){
       var oName   = o.outlet_name || String(o.outlet_id);
       var oCfg    = MV_CFG[o.movement_type] || {color:'rgba(255,255,255,.3)'};
-      var oDotCol = oCfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : oCfg.color;
+      var oDotCol = oCfg.color === 'ghost' ? 'rgba(180,180,200,.40)' : oCfg.color;
       // outlet 4-bar sparkline
       var oAllM   = [BASE_MONTH].concat(Q_MONTHS);
       var oGmvs   = oAllM.map(function(qm){
@@ -1357,7 +1354,7 @@ function _qnrrRenderList(){
       var oName  = outletNameMap2[String(oid)] || od.name || String(oid);
       var domMv  = _domMv(od);
       var cfg    = MV_CFG[domMv] || {color:'rgba(255,255,255,.3)'};
-      var dotCol = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
+      var dotCol = cfg.color === 'ghost' ? 'rgba(180,180,200,.40)' : cfg.color;
 
       var cells = ALL_MONTHS.map(function(m){
         var v = od.gmv[m] || 0;
