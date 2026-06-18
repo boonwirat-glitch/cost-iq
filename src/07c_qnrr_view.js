@@ -84,12 +84,14 @@ function _qnrrCompute(kamEmail, scope) {
   // Rule: movement_type='transfer_out' ในเดือนไหนก็ได้ใน Q
   //       AND outlet_id อยู่ใน baseMap (core cohort)
   var coreTransferOutSet = {}; // outlet_id → {gmv_norm, account_name, period_month}
+  // gmv_norm ใช้ unit เดียวกับ base_norm_original = gmv / days (ไม่ × 30)
+  // เพื่อให้ base_norm = base_norm_original − transfer_out_base_norm หักได้ถูก
   scopedRows.forEach(function(r){
     var mv = _effectiveMovement(r);
     if (mv === 'transfer_out' && baseMap[r.outlet_id] && !coreTransferOutSet[r.outlet_id]) {
       var b = baseMap[r.outlet_id];
       coreTransferOutSet[r.outlet_id] = {
-        gmv_norm:     b.gmv / b.days * 30,
+        gmv_norm:     b.gmv / b.days,   // unit: GMV/day (same as base_norm_original)
         account_name: r.account_name || '',
         period_month: r.period_month
       };
@@ -973,7 +975,7 @@ function _qnrrRenderToutCard(){
         '</div>' +
         (coreCount > 0
           ? '<div class="qnrr-tout-card-note">' +
-              coreCount + ' outlet เป็น core cohort → ฐาน NRR ถูกปรับลด −' + _fmtM(Math.round(coreNorm)) +
+              coreCount + ' outlet เป็น core cohort → ฐาน NRR ถูกปรับลด −' + _fmtM(Math.round(coreNorm * 30)) +
             '</div>'
           : '<div class="qnrr-tout-card-note">outlet เหล่านี้ไม่ได้อยู่ใน core cohort → ฐาน NRR ไม่เปลี่ยน</div>'
         ) +
