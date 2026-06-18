@@ -3841,14 +3841,25 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     <div class="qnrr-legend" id="qnrr-legend"></div>
     <!-- List tab: full-quarter account × outlet list -->
     <div class="qnrr-list-wrap" id="qnrr-list-wrap" style="display:none">
-      <!-- Filter bar -->
-      <div class="qnrr-list-filter-bar">
-        <button class="qnrr-mv-btn on" onclick="_qnrrListFilter('all',this)">ทั้งหมด</button>
-        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('core_nrr',this)">Core</button>
-        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('core_nrr_churn',this)">Churn</button>
-        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('handover',this)">Handover</button>
-        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('expansion',this)">Expansion</button>
-        <button class="qnrr-mv-btn" onclick="_qnrrListFilter('new_sales',this)">New</button>
+      <!-- Filter bar + expand/collapse all -->
+      <div class="qnrr-list-toolbar">
+        <div class="qnrr-list-filter-bar">
+          <button class="qnrr-pill on" onclick="_qnrrListFilter('all',this)">ทั้งหมด</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('core_nrr',this)">Core</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('core_nrr_churn',this)">Churn</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('handover',this)">Handover</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('expansion',this)">Expansion</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('new_sales',this)">New Sales</button>
+          <button class="qnrr-pill" onclick="_qnrrListFilter('comeback',this)">Comeback</button>
+        </div>
+        <div class="qnrr-list-xpand">
+          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(true)" title="Expand all">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(false)" title="Collapse all">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 9l5-4 5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
       </div>
       <div class="qnrr-acct-list" id="qnrr-acct-list"></div>
     </div>
@@ -3869,5 +3880,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 
 </body>
 </html>
+
 
 

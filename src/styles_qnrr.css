@@ -610,4 +610,69 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-ol-tbl td.hi-col   { color: rgba(74,222,128,.72); }
 
 /* acct-hdr: no dot — remove old dot style */
-.qnrr-acct-hdr { gap: 0; }
+.qnrr-acct-hdr { gap: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.qnrr-acct-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.qnrr-hdr-chev {
+  color: rgba(188,215,255,.40); transition: transform .18s;
+  flex-shrink: 0;
+}
+.qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
+
+/* outlet rows wrapper — collapsible */
+.qnrr-ol-rows { display: block; }
+
+/* ── List toolbar: filter bar + expand/collapse ──────────────────────────── */
+.qnrr-list-toolbar {
+  display: flex; align-items: center;
+  padding: 6px 12px 6px 16px;
+  border-bottom: 1px solid rgba(140,180,255,.08);
+  gap: 8px; flex-shrink: 0;
+}
+.qnrr-list-filter-bar {
+  display: flex; gap: 5px;
+  flex-wrap: nowrap; overflow-x: auto; flex: 1;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0;
+  border-bottom: none;
+}
+.qnrr-list-filter-bar::-webkit-scrollbar { display: none; }
+
+/* pill filter buttons */
+.qnrr-pill {
+  flex-shrink: 0; white-space: nowrap;
+  font-size: 10px; font-weight: 700; padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.40);
+  cursor: pointer; font-family: var(--tk-font-mono);
+  transition: all .16s; -webkit-tap-highlight-color: transparent;
+  min-height: 26px; letter-spacing: .02em;
+}
+.qnrr-pill:active { transform: scale(.94); }
+.qnrr-pill.on {
+  border-color: rgba(188,215,255,.40);
+  background: rgba(188,215,255,.10);
+  color: rgba(188,215,255,.90);
+}
+
+/* expand/collapse icon buttons */
+.qnrr-list-xpand { display: flex; gap: 2px; flex-shrink: 0; }
+.qnrr-xpand-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px; border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.40);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .16s; -webkit-tap-highlight-color: transparent;
+}
+.qnrr-xpand-btn:active { transform: scale(.92); background: rgba(255,255,255,.09); }
+.qnrr-xpand-btn:hover  { color: rgba(188,215,255,.80); border-color: rgba(188,215,255,.25); }
+
+/* month header only on first outlet row — sticky within account */
+.qnrr-ol-mo-hdr td {
+  font-size: 8px; font-weight: 700; text-transform: uppercase;
+  color: rgba(188,215,255,.40); letter-spacing: .04em;
+  padding-bottom: 2px; text-align: right;
+}

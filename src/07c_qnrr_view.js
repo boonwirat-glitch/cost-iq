@@ -529,14 +529,13 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: show actual raw + progress days
+        // Partial month: show actual raw + progress days on 2 separate lines by design
         var rawTotal = bm.rows ? bm.rows.reduce(function(s,r){
           return s + (parseFloat(r.curr_gmv)||0);
         }, 0) : bm.total_gmv;
-        var daysLabel = bm.curr_days + '/' + bm.days_in_month + ' วัน';
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
           '<span style="color:rgba(188,215,255,.35)"> actual</span></div>' +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.60);font-weight:700">' + daysLabel + '</div>';
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.60);font-weight:700">' + bm.curr_days + '/' + bm.days_in_month + 'd</div>';
       } else {
         outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + '</div>' + outLabel;
@@ -708,8 +707,14 @@ function _qnrrRenderBreakdown(){
       }
       var bm = _data.by_month[m];
       var g  = (bm && bm.segments[mv]) || 0;
-      var cls = g > 0 ? (isChurn ? 'bk-churn' : isPos ? 'bk-pos' : isNeut ? 'bk-neut' : '') : '';
-      html += '<td class="' + cls + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '<span style="color:rgba(255,255,255,.15)">—</span>') + '</td>';
+      // ใช้สีจาก MV_CFG โดยตรง ไม่ใช้ bk-pos (เพราะ bk-pos=green ทุกตัว ทำให้ expansion/new_sales/comeback สีผิด)
+      var cellColor = g > 0
+        ? (isChurn ? 'rgba(248,113,113,.84)'
+          : isNeut ? 'rgba(96,165,250,.80)'
+          : cfg.color !== 'ghost' ? cfg.color : 'rgba(255,255,255,.5)')
+        : '';
+      var cellStyle = cellColor ? 'color:' + cellColor : 'color:rgba(255,255,255,.15)';
+      html += '<td style="' + cellStyle + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '—') + '</td>';
     });
     html += '</tr>';
   });
@@ -926,11 +931,22 @@ var _listFilter = 'all';
 
 function _qnrrListFilter(mv, btn){
   _listFilter = mv;
-  document.querySelectorAll('.qnrr-list-filter-bar .qnrr-mv-btn').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.qnrr-list-filter-bar .qnrr-pill').forEach(function(b){ b.classList.remove('on'); });
   if (btn) btn.classList.add('on');
   _qnrrRenderList();
 }
 window._qnrrListFilter = _qnrrListFilter;
+
+function _qnrrExpandAll(expand){
+  // expand=true: show all outlet rows; expand=false: hide all
+  document.querySelectorAll('.qnrr-ol-rows').forEach(function(el){
+    el.style.display = expand ? 'block' : 'none';
+  });
+  document.querySelectorAll('.qnrr-acct-hdr').forEach(function(el){
+    el.classList.toggle('expanded', expand);
+  });
+}
+window._qnrrExpandAll = _qnrrExpandAll;
 
 function _qnrrRenderList(){
   var wrap = _el('qnrr-acct-list');
@@ -1013,14 +1029,17 @@ function _qnrrRenderList(){
       return (a.outlets[y].gmv['2026-04']||0)-(a.outlets[x].gmv['2026-04']||0);
     });
 
-    // Account header — NO dot
-    var acctTotal = outletIds.reduce(function(s,oid){
-      return s + Math.max(a.outlets[oid].gmv['2026-04']||0, a.outlets[oid].gmv['2026-05']||0, a.outlets[oid].gmv['2026-06']||0);
-    },0);
-    html += '<div class="qnrr-acct-hdr">' +
+    // Account header with expand/collapse toggle
+    var isFirst = (filteredAccts.indexOf(aid) === 0);
+    var acctId = 'qnrr-olrows-' + aid.replace(/[^a-z0-9]/gi,'_');
+    html += '<div class="qnrr-acct-hdr expanded" onclick="_qnrrToggleAcctRows(\'' + acctId + '\',this)">' +
       '<div class="qnrr-acct-hdr-name">' + _esc(a.name) + '</div>' +
-      '<div class="qnrr-acct-hdr-tot">' + outletIds.length + ' outlets</div>' +
+      '<div class="qnrr-acct-hdr-right">' +
+        '<div class="qnrr-acct-hdr-tot">' + outletIds.length + ' outlets</div>' +
+        '<svg class="qnrr-hdr-chev" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '</div>' +
     '</div>';
+    html += '<div class="qnrr-ol-rows" id="' + acctId + '">';
 
     outletIds.forEach(function(oid){
       var od = a.outlets[oid];
@@ -1028,10 +1047,7 @@ function _qnrrRenderList(){
       var cfg    = MV_CFG[domMv] || {color:'rgba(255,255,255,.3)'};
       var dotCol = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
       var mvLabel= cfg.label || domMv;
-      var mvColor= (domMv==='core_nrr_churn'||domMv==='transfer_out') ? 'rgba(248,113,113,.70)'
-                 : (domMv==='expansion'||domMv==='new_sales'||domMv==='comeback') ? 'rgba(74,222,128,.65)'
-                 : (domMv==='handover'||domMv==='transfer_in') ? 'rgba(96,165,250,.65)'
-                 : 'rgba(255,255,255,.28)';
+      // ใช้ dotCol โดยตรง (มาจาก MV_CFG แล้ว) — ไม่ต้องมี mvColor แยก
 
       // 4-month GMV table
       var tblCells = ALL_MONTHS.map(function(m){
@@ -1050,18 +1066,20 @@ function _qnrrRenderList(){
         return '<td class="mo-hdr">' + (MTH_SHORT[m]||m) + tilde + '</td>';
       }).join('');
 
+      // month header แสดงเฉพาะ row แรกของ account (ไม่ซ้ำทุก outlet)
+      var isFirstOutlet = (outletIds.indexOf(oid) === 0);
       html += '<div class="qnrr-ol-row">' +
         '<div class="qnrr-ol-dot" style="background:' + dotCol + '"></div>' +
         '<div class="qnrr-ol-left">' +
           '<div class="qnrr-ol-name">' + _esc(String(od.name||oid).slice(0,38)) + '</div>' +
-          '<div class="qnrr-ol-mv" style="color:' + mvColor + '">' + _esc(mvLabel) + '</div>' +
         '</div>' +
         '<table class="qnrr-ol-tbl">' +
-          '<tr>' + tblHdr + '</tr>' +
-          '<tr>' + tblCells + '</tr>' +
+          (isFirstOutlet ? '<thead><tr class="qnrr-ol-mo-hdr">' + tblHdr + '</tr></thead>' : '') +
+          '<tbody><tr>' + tblCells + '</tr></tbody>' +
         '</table>' +
       '</div>';
     });
+    html += '</div>'; // close qnrr-ol-rows
   });
 
   if (!html) html = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มี outlet ใน filter นี้</div>';
@@ -1069,5 +1087,15 @@ function _qnrrRenderList(){
 }
 window._qnrrRenderList = _qnrrRenderList;
 
+function _qnrrToggleAcctRows(id, hdr){
+  var el = document.getElementById(id);
+  if (!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (hdr) hdr.classList.toggle('expanded', !open);
+}
+window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
+
 })();
+
 
