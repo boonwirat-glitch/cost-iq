@@ -383,9 +383,9 @@ apr_rows AS (
 
   UNION ALL
 
-  -- LEG 1D: Apr outlets ที่ account_id อยู่ในพอร์ต KAM (via dim.user_master)
-  -- แต่ขณะสั่ง commercial_owner ≠ 'KAM' → ตก LEG 1A INNER JOIN
-  -- Fix: ดึง KAM จาก dim.user_master ด้วย account_id แทน commercial_owner ณ วันสั่ง
+  -- LEG 1D: Apr outlets ที่ขณะสั่ง commercial_owner ≠ 'KAM'
+  -- แต่ dim.user_master บอกว่า outlet นี้อยู่ในพอร์ต KAM (staff_owner_email match)
+  -- JOIN ด้วย res_id (= outlet_id) โดยตรง — ไม่ใช้ account_id
   SELECT
     '2026-04'         AS period_month,
     '2026-03'         AS base_month,
@@ -414,11 +414,10 @@ apr_rows AS (
     END AS movement_type
 
   FROM apr_ownership ao
-  -- หา KAM จาก dim.user_master ด้วย account_id (ไม่ใช่ commercial_owner ณ วันสั่ง)
+  -- JOIN dim.user_master ด้วย res_id = outlet_id (ไม่ใช้ account_id)
   JOIN `freshket-rn.dim.user_master` um
-    ON CAST(ao.account_id AS STRING) = CAST(um.account_id AS STRING)
+    ON CAST(um.res_id AS STRING) = ao.outlet_id
    AND um.account_type IN ('SA','MC','Chain','Unknown')
-   AND um.res_id IS NOT NULL
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   LEFT JOIN apr_labels al
@@ -426,17 +425,14 @@ apr_rows AS (
    AND al.period_kam_email = k.kam_email
   LEFT JOIN apr_gmv ag ON ao.outlet_id = ag.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
-  WHERE ao.commercial_owner != 'KAM'                      -- เฉพาะที่ตก LEG 1A
-    AND ao.outlet_id NOT IN (                             -- ไม่ซ้ำกับ LEG 1A
+  WHERE ao.commercial_owner != 'KAM'
+    AND ao.outlet_id NOT IN (
       SELECT ao2.outlet_id FROM apr_ownership ao2
       JOIN kam_list k2
         ON ao2.commercial_owner = 'KAM'
        AND TRIM(ao2.staff_owner) = TRIM(k2.kam_name)
        AND k2.kam_email = k.kam_email
     )
-  QUALIFY ROW_NUMBER() OVER (                             -- กัน dup กรณี outlet มี 2 KAM
-    PARTITION BY ao.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
-  ) = 1
 
   UNION ALL
 
@@ -544,7 +540,8 @@ may_rows AS (
 
   UNION ALL
 
-  -- LEG 2D: May outlets ที่ account_id อยู่ในพอร์ต KAM แต่ commercial_owner ≠ 'KAM' ณ วันสั่ง
+  -- LEG 2D: May outlets ที่ขณะสั่ง commercial_owner ≠ 'KAM'
+  -- แต่ dim.user_master บอกว่าอยู่ในพอร์ต KAM
   SELECT
     '2026-05'         AS period_month,
     '2026-03'         AS base_month,
@@ -574,9 +571,8 @@ may_rows AS (
 
   FROM may_ownership mo
   JOIN `freshket-rn.dim.user_master` um
-    ON CAST(mo.account_id AS STRING) = CAST(um.account_id AS STRING)
+    ON CAST(um.res_id AS STRING) = mo.outlet_id
    AND um.account_type IN ('SA','MC','Chain','Unknown')
-   AND um.res_id IS NOT NULL
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   LEFT JOIN apr_labels al
@@ -592,9 +588,6 @@ may_rows AS (
        AND TRIM(mo2.staff_owner) = TRIM(k2.kam_name)
        AND k2.kam_email = k.kam_email
     )
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY mo.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
-  ) = 1
 
   UNION ALL
 
@@ -700,7 +693,8 @@ jun_rows AS (
 
   UNION ALL
 
-  -- LEG 3D: Jun outlets ที่ account_id อยู่ในพอร์ต KAM แต่ commercial_owner ≠ 'KAM' ณ วันสั่ง
+  -- LEG 3D: Jun outlets ที่ขณะสั่ง commercial_owner ≠ 'KAM'
+  -- แต่ dim.user_master บอกว่าอยู่ในพอร์ต KAM
   SELECT
     '2026-06'         AS period_month,
     '2026-03'         AS base_month,
@@ -730,9 +724,8 @@ jun_rows AS (
 
   FROM jun_ownership jo
   JOIN `freshket-rn.dim.user_master` um
-    ON CAST(jo.account_id AS STRING) = CAST(um.account_id AS STRING)
+    ON CAST(um.res_id AS STRING) = jo.outlet_id
    AND um.account_type IN ('SA','MC','Chain','Unknown')
-   AND um.res_id IS NOT NULL
   JOIN kam_list k
     ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
   LEFT JOIN apr_labels al
@@ -748,9 +741,6 @@ jun_rows AS (
        AND TRIM(jo2.staff_owner) = TRIM(k2.kam_name)
        AND k2.kam_email = k.kam_email
     )
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY jo.outlet_id ORDER BY um.lasted_order_date DESC NULLS LAST
-  ) = 1
 
   UNION ALL
 
