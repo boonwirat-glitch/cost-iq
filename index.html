@@ -6788,18 +6788,18 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-base-tout-seg {
   background: repeating-linear-gradient(
     45deg,
-    rgba(248,113,113,.35),
-    rgba(248,113,113,.35) 3px,
+    rgba(255,255,255,.06),
+    rgba(255,255,255,.06) 3px,
     transparent 3px,
     transparent 7px
   );
-  border-top: 1px dashed rgba(248,113,113,.60);
+  border-top: 1px dashed rgba(255,255,255,.22);
   flex-shrink: 0;
   position: relative;
 }
 .qnrr-base-tout-seg::after {
   content: attr(title);
-  display: none; /* tooltip via native title attr */
+  display: none;
 }
 /* ── Base adjusted tag ── */
 .qnrr-base-adj-tag {
@@ -7123,27 +7123,27 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
 
 /* ── List: filter chip tabs ─────────────────────────────────────────────── */
-/* toolbar = 2-row layout: chips wrap (row 1) + expand btns (right of row 1) */
 .qnrr-list-toolbar {
   display: flex; align-items: flex-start;
   padding: 6px 10px 0 14px;
   border-bottom: 1px solid rgba(140,180,255,.08);
   flex-shrink: 0; gap: 4px;
 }
-/* chip bar: wrap ไม่ scroll, 2 rows ถ้าล้น */
+/* chip bar: wrap, max 2 rows */
 .qnrr-list-filter-bar {
   display: flex; flex: 1;
   flex-wrap: wrap;
-  gap: 2px 0;
-  overflow: visible;
+  gap: 0;
+  overflow: hidden;
+  max-height: 58px;
   padding-bottom: 4px;
 }
 
-/* chip tab — underline style, ไม่มี border box */
+/* chip tab — underline style */
 .qnrr-chip {
   flex-shrink: 0; white-space: nowrap;
-  padding: 7px 9px;
-  font-size: 11px; font-weight: 600;
+  padding: 6px 7px;
+  font-size: 10px; font-weight: 600;
   font-family: var(--tk-font-body);
   border: none; background: transparent;
   color: rgba(255,255,255,.38);
@@ -7159,16 +7159,19 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-chip:active { opacity: .7; }
 
-/* expand/collapse — ล้อ pv-toggle-btn */
-.qnrr-list-xpand { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-top: 4px; }
+/* expand/collapse — single toggle button */
+.qnrr-list-xpand { display: flex; align-items: center; flex-shrink: 0; padding-top: 4px; }
 .qnrr-xpand-btn {
-  width: 30px; height: 28px;
-  border: none; background: transparent;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  border-radius: 6px; color: rgba(255,255,255,.25);
-  transition: color .15s; -webkit-tap-highlight-color: transparent;
+  min-width: 28px; height: 28px; padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 6px; color: rgba(255,255,255,.45);
+  font-size: 10px; font-weight: 600; font-family: var(--tk-font-body);
+  transition: color .15s, background .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
 }
-.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
+.qnrr-xpand-btn:hover { color: rgba(255,255,255,.80); border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
+.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); transform: scale(.96); }
 
 /* ── List: sticky month header row ──────────────────────────────────────── */
 /* Sits above all account rows, aligns with table colgroup (auto + 4×42px) */
@@ -52497,7 +52500,7 @@ function _qnrrRenderBreakdown(){
   html += '<tr class="bk-subrow">' +
     '<td><div class="qnrr-bk-mv-cell">' +
       '<div class="qnrr-bk-dot" style="background:rgba(251,191,36,.70)"></div>' +
-      '<span class="qnrr-bk-mv-name">└ Contraction</span>' +
+      '<span class="qnrr-bk-mv-name">└ Up/Down</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -52895,7 +52898,6 @@ function _qnrrListFilter(mv, btn){
 window._qnrrListFilter = _qnrrListFilter;
 
 function _qnrrExpandAll(expand){
-  // expand=true: show all outlet rows; expand=false: hide all
   document.querySelectorAll('.qnrr-ol-rows').forEach(function(el){
     el.style.display = expand ? 'block' : 'none';
   });
@@ -52904,6 +52906,20 @@ function _qnrrExpandAll(expand){
   });
 }
 window._qnrrExpandAll = _qnrrExpandAll;
+
+// v776c: single toggle button
+var _allExpanded = true;
+function _qnrrToggleAll(btn){
+  _allExpanded = !_allExpanded;
+  _qnrrExpandAll(_allExpanded);
+  if (btn) {
+    var label = btn.querySelector('span');
+    var path  = btn.querySelector('path');
+    if (label) label.textContent = _allExpanded ? 'กาง' : 'หุบ';
+    if (path)  path.setAttribute('d', _allExpanded ? 'M2 5l5 4 5-4' : 'M2 9l5-4 5 4');
+  }
+}
+window._qnrrToggleAll = _qnrrToggleAll;
 
 function _qnrrRenderList(){
   var wrap = _el('qnrr-acct-list');
@@ -53317,11 +53333,9 @@ window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
           <button class="qnrr-chip" onclick="_qnrrListFilter('comeback',this)">Comeback</button>
         </div>
         <div class="qnrr-list-xpand">
-          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(true)" title="Expand all">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(false)" title="Collapse all">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 9l5-4 5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <button class="qnrr-xpand-btn" id="qnrr-toggle-all-btn" onclick="_qnrrToggleAll(this)" title="กาง/หุบทั้งหมด">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>กาง</span>
           </button>
         </div>
       </div>
