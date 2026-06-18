@@ -1,5 +1,16 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// _qnrrCompute — Quarter NRR Health compute (v775 — unchanged logic)
+// _qnrrCompute — Quarter NRR Health compute (v776 — adjusted base for core transfer_out)
+//
+// KEY CHANGE v776:
+//   transfer_out outlets ที่อยู่ใน core cohort (baseMap) จะถูกหักออกจาก base_norm
+//   แบบ retroactive — ไม่ว่า transfer จะเกิดเดือนไหนใน Q ก็ตาม
+//   → adjusted_base_norm ใช้คำนวณ NRR ทุกเดือน (Apr/May/Jun)
+//   → base_norm_original เก็บไว้แสดง ghost bar บน Mar
+//
+//   Rule: เฉพาะ outlet ที่ (1) movement_type='transfer_out' ใน Q และ
+//         (2) outlet_id อยู่ใน baseMap (core cohort Mar)
+//   outlet ที่มาจาก transfer_in/handover/new_sales/comeback แล้ว transfer_out ใน Q
+//   → ไม่หักฐาน (ไม่อยู่ใน baseMap)
 // ══════════════════════════════════════════════════════════════════════════════
 function _qnrrCompute(kamEmail, scope) {
   scope = scope || 'kam';
@@ -50,29 +61,58 @@ function _qnrrCompute(kamEmail, scope) {
   });
   months.sort();
 
+  // ── Build baseMap from first period month rows ──────────────────────────────
   var baseMap = {};
-  // v5: build baseMap from base_month rows ONLY (first period_month = Apr)
-  // ใช้เฉพาะ rows ที่ period_month === months[0] เพื่อป้องกัน outlets จาก May/Jun
-  // แอบเข้า baseMap ผ่าน movement_type ที่ต่างกัน (เช่น handover→Apr, core_nrr_churn→May)
   var baseMonthRows = scopedRows.filter(function(r){ return r.period_month === months[0]; });
   baseMonthRows.forEach(function(r){
-    // exclude handover outlets from NRR denominator
-    // handover = รับมาช่วง 15/30 Mar — KAM ไม่ได้ดูแลจริงๆ ใน Mar
+    // exclude handover outlets — KAM ไม่ได้ดูแลจริงๆ ใน base month
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
     }
   });
 
-  var base_gmv = 0;
-  var base_norm = 0;
+  // ── Compute original base (before transfer_out adjustment) ──────────────────
+  var base_gmv_original = 0;
+  var base_norm_original = 0;
   Object.keys(baseMap).forEach(function(oid){
     var b = baseMap[oid];
-    base_gmv  += b.gmv;
-    base_norm += b.gmv / b.days;
+    base_gmv_original  += b.gmv;
+    base_norm_original += b.gmv / b.days;
   });
-  var cohort_outlets = Object.keys(baseMap).length; // excl. handover (v5)
 
-  // handover base: Mar GMV ของ handover outlets (แสดงใน Mar column แต่ไม่นับใน NRR denom)
+  // ── Find all core-cohort transfer_out outlets across entire Q ───────────────
+  // Rule: movement_type='transfer_out' ในเดือนไหนก็ได้ใน Q
+  //       AND outlet_id อยู่ใน baseMap (core cohort)
+  var coreTransferOutSet = {}; // outlet_id → {gmv_norm, account_name, period_month}
+  scopedRows.forEach(function(r){
+    var mv = _effectiveMovement(r);
+    if (mv === 'transfer_out' && baseMap[r.outlet_id] && !coreTransferOutSet[r.outlet_id]) {
+      var b = baseMap[r.outlet_id];
+      coreTransferOutSet[r.outlet_id] = {
+        gmv_norm:     b.gmv / b.days * 30,
+        account_name: r.account_name || '',
+        period_month: r.period_month
+      };
+    }
+  });
+
+  // ── Adjusted base = original base − core transfer_out ──────────────────────
+  var transfer_out_base_norm = 0;
+  var transfer_out_base_gmv  = 0;
+  var transfer_out_outlets   = [];
+  Object.keys(coreTransferOutSet).forEach(function(oid){
+    var t = coreTransferOutSet[oid];
+    transfer_out_base_norm += t.gmv_norm;
+    transfer_out_base_gmv  += baseMap[oid].gmv;
+    transfer_out_outlets.push({ outlet_id: oid, gmv_norm: t.gmv_norm,
+      account_name: t.account_name, period_month: t.period_month });
+  });
+
+  var base_norm = base_norm_original - transfer_out_base_norm;
+  var base_gmv  = base_gmv_original  - transfer_out_base_gmv;
+  var cohort_outlets = Object.keys(baseMap).length; // แสดง original cohort count
+
+  // handover base: Mar GMV ของ handover outlets (แสดงใน Mar bar แต่ไม่นับใน NRR denom)
   var handover_base_norm = 0;
   baseMonthRows.forEach(function(r){
     if (r.movement_type === 'handover' && r.base_gmv > 0) {
@@ -93,16 +133,11 @@ function _qnrrCompute(kamEmail, scope) {
 
     var seenOutlets = {};
     var nrr_curr_norm = 0;
-
-    // extra tracker: base_gmv normalized ของ core_nrr active (เพื่อคำนวณ contraction)
     var core_nrr_base_sum = 0;
 
     monthRows.forEach(function(r){
       var mv = _effectiveMovement(r);
       if (!mv) return;
-      // Normalize ÷days×30 ทุกตัว
-      // churn/transfer_out: curr_gmv=0 ใช้ base_gmv แทน (normalized ด้วย base_days)
-      // others: curr_gmv normalized ด้วย curr_days
       var base_d = parseFloat(r.base_days) || 31;
       var curr_d = parseFloat(r.curr_days) || 30;
       var gmvVal = (mv === 'core_nrr_churn' || mv === 'transfer_out')
@@ -110,7 +145,7 @@ function _qnrrCompute(kamEmail, scope) {
         : (parseFloat(r.curr_gmv) || 0) / curr_d * 30;
       segments[mv] = (segments[mv] || 0) + gmvVal;
       outlets[mv]  = (outlets[mv]  || 0) + 1;
-      // track normalized base_gmv ของ core_nrr active สำหรับ contraction
+
       if (mv === 'core_nrr') {
         core_nrr_base_sum += (parseFloat(r.base_gmv) || 0) / base_d * 30;
       }
@@ -124,26 +159,23 @@ function _qnrrCompute(kamEmail, scope) {
       }
     });
 
+    // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive)
     var nrr_pct = base_norm > 0
       ? Math.round(nrr_curr_norm / base_norm * 100)
       : null;
 
-    // total_gmv = sum of normalized segments (excl. churn/transfer_out ซึ่งเป็น negative)
     var total_gmv = MOVEMENTS
       .filter(function(m){ return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
       .reduce(function(s,m){ return s + (segments[m] || 0); }, 0);
-    // ยัง normalize อยู่แล้วเพราะ segments ทุกตัว normalize แล้ว
 
     var curr_days_sample = monthRows.find(function(r){return r.curr_days>0;});
     var curr_days = curr_days_sample ? curr_days_sample.curr_days : 30;
 
-    // contraction = normalized curr − normalized base ของ core_nrr active
     var contraction = (segments.core_nrr || 0) - core_nrr_base_sum;
 
-    // days_in_month: จำนวนวันจริงของเดือนนั้น (สำหรับ partial month detection)
-    var monthParts   = month.split('-');
-    var daysInMonth  = new Date(parseInt(monthParts[0]), parseInt(monthParts[1]), 0).getDate();
-    var isPartial    = curr_days > 0 && curr_days < daysInMonth - 2; // tolerance 2 วัน
+    var monthParts  = month.split('-');
+    var daysInMonth = new Date(parseInt(monthParts[0]), parseInt(monthParts[1]), 0).getDate();
+    var isPartial   = curr_days > 0 && curr_days < daysInMonth - 2;
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
@@ -160,14 +192,17 @@ function _qnrrCompute(kamEmail, scope) {
   });
 
   return {
-    quarter:            window._QNRR_QUARTER || '2026q2',
-    base_month:         base_month,
-    months:             months,
-    base_gmv:           base_gmv,
-    base_norm:          base_norm,
-    handover_base_norm: handover_base_norm,
-    cohort_outlets:     cohort_outlets,
-    by_month:           by_month
+    quarter:                window._QNRR_QUARTER || '2026q2',
+    base_month:             base_month,
+    months:                 months,
+    base_gmv:               base_gmv,
+    base_norm:              base_norm,
+    base_norm_original:     base_norm_original,      // v776: ฐานก่อนหัก transfer_out
+    transfer_out_base_norm: transfer_out_base_norm,  // v776: จำนวนที่ถูกหัก
+    transfer_out_outlets:   transfer_out_outlets,    // v776: รายการ outlet ที่ถูกหัก
+    handover_base_norm:     handover_base_norm,
+    cohort_outlets:         cohort_outlets,
+    by_month:               by_month
   };
 }
 window._qnrrCompute = _qnrrCompute;
@@ -495,8 +530,11 @@ function _qnrrRenderChart(){
     return;
   }
 
-  // Mar bar total = core cohort base + handover base (GMV จริงทั้งหมดใน Mar)
-  var marBarTotal = Math.round((_data.base_norm + (_data.handover_base_norm / 30)) * 30);
+  // Mar bar total = original base (ก่อนหัก transfer_out) + handover
+  // ใช้ base_norm_original เพื่อให้ bar height = ฐานเดิมทั้งหมด
+  // ghost segment จะแสดงส่วน transfer_out ที่ถูกหัก (อยู่บนสุดของ bar)
+  var baseNormOrig = _data.base_norm_original || _data.base_norm;
+  var marBarTotal = Math.round((baseNormOrig + (_data.handover_base_norm / 30)) * 30);
   var allGmvs = [marBarTotal];
   // Pre-compute rawTotals for partial months so maxGmv covers both MTD and run-rate
   var rawTotals = {};
@@ -537,7 +575,13 @@ function _qnrrRenderChart(){
     // Top label: GMV only (NRR% removed — lives in hero zone now)
     var topHtml = '';
     if (isBase) {
-      topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(marBarTotal) + '</div>' +
+      // v776: ถ้ามี core transfer_out → แสดงฐานที่ปรับแล้ว + indicator
+      var hasTout = (_data.transfer_out_base_norm || 0) > 0;
+      var adjBase = Math.round(_data.base_norm * 30);
+      var baseLabel = hasTout
+        ? _fmtM(adjBase) + '<span class="qnrr-base-adj-tag">adj</span>'
+        : _fmtM(marBarTotal);
+      topHtml = '<div class="qnrr-bar-top-label">' + baseLabel + '</div>' +
                 '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' out</div>';
     } else if (bm) {
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
@@ -561,16 +605,33 @@ function _qnrrRenderChart(){
     // Bar body segments
     var bodyHtml = '';
     if (isBase) {
-      // Base bar: ใช้ structure เดียวกับ qnrr-bar-body (flex + column-reverse)
-      // core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
+      // Base bar: core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
+      // v776: ถ้ามี transfer_out ที่ถูกหักออกจากฐาน → แสดง ghost segment บนสุด
+      var toutNorm = _data.transfer_out_base_norm || 0;
+      var toutOuts = (_data.transfer_out_outlets || []).length;
+
+      // coreH คำนวณจาก adjusted base_norm (หัก transfer_out แล้ว)
       var coreH   = Math.max(4, Math.round(_data.base_norm * 30 / maxGmv * chartH));
       var hovNorm = _data.handover_base_norm || 0;
       var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
+      var toutH   = toutNorm > 0 ? Math.max(3, Math.round(toutNorm * 30 / maxGmv * chartH)) : 0;
+
       var hovSeg  = hovH > 0
         ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
       var coreSeg = '<div class="qnrr-seg qnrr-base-core-seg" style="height:' + coreH + 'px"></div>';
-      bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + '</div>';
+
+      // Ghost segment: dashed red — แทน transfer_out ที่ถูกตัดออกจากฐาน
+      var toutTooltip = toutH > 0
+        ? 'ฐานเดิม ' + _fmtM(Math.round(_data.base_norm_original * 30)) +
+          ' → ปรับเหลือ ' + _fmtM(Math.round(_data.base_norm * 30)) +
+          ' (หัก ' + toutOuts + ' outlet transfer ออก −' + _fmtM(Math.round(toutNorm * 30)) + ')'
+        : '';
+      var toutSeg = toutH > 0
+        ? '<div class="qnrr-seg qnrr-base-tout-seg" style="height:' + toutH + 'px" title="' + toutTooltip + '"></div>'
+        : '';
+
+      bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + toutSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
       STACK_ORDER.forEach(function(mv){
@@ -631,12 +692,31 @@ function _qnrrRenderBreakdown(){
     return active + ' out' + partial;
   });
 
+  // v776: dispBase = adjusted base (หัก core transfer_out แล้ว)
   var dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
+  var hasToutAdj = (_data.transfer_out_base_norm || 0) > 0;
 
   // colgroup: fixed width ป้องกัน partial month column ถ่าง
   var colgroup = '<colgroup><col style="width:100px">' +
     ALL_MONTHS.map(function(){ return '<col style="width:58px">'; }).join('') +
     '</colgroup>';
+
+  // ── Base adjustment note row (แสดงเมื่อมี core transfer_out ถูกหักจากฐาน) ──
+  var adjNoteHtml = '';
+  if (hasToutAdj) {
+    var toutOuts = (_data.transfer_out_outlets || []).length;
+    var origBase = Math.round(_data.base_norm_original * 30);
+    var adjAmt   = Math.round(_data.transfer_out_base_norm * 30);
+    adjNoteHtml = '<tr class="bk-base-adj-row">' +
+      '<td colspan="' + (ALL_MONTHS.length + 1) + '">' +
+        '<div class="qnrr-base-adj-note">' +
+          '<span class="qnrr-base-adj-icon">⤵</span>' +
+          'ฐานปรับจาก ' + _fmtM(origBase) + ' → ' + _fmtM(dispBase) +
+          ' (หัก ' + toutOuts + ' outlet core ที่ transfer ออกใน Q: −' + _fmtM(adjAmt) + ')' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }
 
   var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month">' + colgroup + '<thead><tr>' +
     '<th>Movement</th>' +
@@ -647,7 +727,7 @@ function _qnrrRenderBreakdown(){
         '<br><span style="color:rgba(188,215,255,.35);font-size:9px;font-weight:600;text-transform:none;letter-spacing:0">'
         + outletHeaders[i] + '</span></th>';
     }).join('') +
-    '</tr></thead><tbody>';
+    '</tr></thead><tbody>' + adjNoteHtml;
 
   // ── Core NRR block: main row + 2 sub-rows (churn + net) ──────────────────
   var coreColor = MV_CFG.core_nrr.color;
@@ -846,8 +926,9 @@ function _qnrrRenderBreakdown(){
   });
 
   // ── Total GMV row ─────────────────────────────────────────────────────────
-  // Mar Total = core cohort base (excl handover) + handover base = GMV จริงทุก outlet ใน Mar
-  var dispBaseTotalMar = Math.round((_data.base_norm + (_data.handover_base_norm / 30)) * 30);
+  // Mar Total = original base (ก่อนหัก transfer_out) + handover = GMV จริงใน Mar
+  var baseOrigForTotal = _data.base_norm_original || _data.base_norm;
+  var dispBaseTotalMar = Math.round((baseOrigForTotal + (_data.handover_base_norm / 30)) * 30);
   html += '<tr class="bk-total"><td><div class="qnrr-bk-mv-cell"><span class="qnrr-bk-mv-name" style="color:rgba(255,255,255,.65)">Total GMV</span></div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) {
@@ -863,6 +944,7 @@ function _qnrrRenderBreakdown(){
 }
 
 // ── Transfer out callout card ────────────────────────────────────────────────
+// v776: แสดงข้อมูลครบ — outlet count, GMV, แยก core vs non-core
 function _qnrrRenderToutCard(){
   var card = _el('qnrr-tout-card');
   if (!card) return;
@@ -870,15 +952,36 @@ function _qnrrRenderToutCard(){
 
   var bm    = _data.by_month[_selBar];
   var toutG = (bm && bm.segments && bm.segments.transfer_out) || 0;
+  var toutN = (bm && bm.outlets  && bm.outlets.transfer_out)  || 0;
+
+  // ตรวจว่าใน transfer_out เดือนที่เลือก มีกี่ outlet ที่เป็น core cohort
+  var coreSet = _data.transfer_out_outlets || [];
+  var selMonth = _selBar;
+  var coreToutThisMonth = coreSet.filter(function(t){ return t.period_month === selMonth; });
+  var coreCount = coreToutThisMonth.length;
+  var coreNorm  = coreToutThisMonth.reduce(function(s,t){ return s + t.gmv_norm; }, 0);
 
   if (toutG > 0 && _viewMode === 'chart') {
     card.className = 'qnrr-tout-card show';
-    var descEl = _el('qnrr-tout-card-desc');
-    var valEl  = _el('qnrr-tout-card-val');
-    if (descEl) descEl.textContent = (bm.outlets.transfer_out || 0) + ' outlets ย้ายออก ' + (MONTHS_TH[_selBar] || _selBar);
-    if (valEl)  valEl.textContent  = '-' + _fmtM(toutG);
+    var html =
+      '<div class="qnrr-tout-icon">⤵</div>' +
+      '<div class="qnrr-tout-body">' +
+        '<div class="qnrr-tout-card-label">TRANSFER OUT · ' + (MONTHS_TH[_selBar] || _selBar) + '</div>' +
+        '<div class="qnrr-tout-card-row">' +
+          '<span class="qnrr-tout-card-desc">' + toutN + ' outlet' + (toutN !== 1 ? 's' : '') + ' ย้ายออก</span>' +
+          '<span class="qnrr-tout-card-val">−' + _fmtM(toutG) + '</span>' +
+        '</div>' +
+        (coreCount > 0
+          ? '<div class="qnrr-tout-card-note">' +
+              coreCount + ' outlet เป็น core cohort → ฐาน NRR ถูกปรับลด −' + _fmtM(Math.round(coreNorm)) +
+            '</div>'
+          : '<div class="qnrr-tout-card-note">outlet เหล่านี้ไม่ได้อยู่ใน core cohort → ฐาน NRR ไม่เปลี่ยน</div>'
+        ) +
+      '</div>';
+    card.innerHTML = html;
   } else {
     card.className = 'qnrr-tout-card';
+    card.innerHTML = '';
   }
 }
 
@@ -1145,16 +1248,26 @@ function _qnrrRenderList(){
       mvCounts['all'] = (mvCounts['all'] || 0) + 1;
     });
   });
-  // Map filter key → chip dataset-mv (chips in HTML have onclick="...('mv',this)")
-  var MV_CHIP_KEYS = ['all','core_nrr','core_nrr_churn','handover','expansion','new_sales','comeback'];
+
+  // v776: inject transfer_out chip ถ้ายังไม่มีใน DOM
+  var filterBar = document.querySelector('.qnrr-list-filter-bar');
+  if (filterBar && !filterBar.querySelector('[data-mv="transfer_out"]')) {
+    var toutChip = document.createElement('button');
+    toutChip.className = 'qnrr-chip qnrr-tout-chip';
+    toutChip.setAttribute('data-mv', 'transfer_out');
+    toutChip.setAttribute('data-orig-label', 'Transfer out');
+    toutChip.setAttribute('onclick', "_qnrrListFilter('transfer_out',this)");
+    toutChip.textContent = 'Transfer out';
+    toutChip.style.display = 'none'; // hidden until count > 0
+    filterBar.appendChild(toutChip);
+  }
+
   document.querySelectorAll('.qnrr-list-filter-bar .qnrr-chip').forEach(function(btn){
-    // Extract mv key from onclick attr
     var onclick = btn.getAttribute('onclick') || '';
     var mvMatch = onclick.match(/'([a-z_]+)'/);
     var mv = mvMatch ? mvMatch[1] : null;
     if (!mv) return;
     var cnt = mvCounts[mv] || 0;
-    // Store original text (strip any old count suffix)
     var origText = btn.dataset.origLabel || btn.textContent.replace(/\s*\d+$/, '').trim();
     btn.dataset.origLabel = origText;
     btn.textContent = cnt > 0 ? origText + ' ' + cnt : origText;
