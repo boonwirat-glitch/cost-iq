@@ -545,14 +545,16 @@ function _qnrrRenderChart(){
     // Bar body segments
     var bodyHtml = '';
     if (isBase) {
-      // Base bar: แยก 2 layers — core cohort (dashed) + handover (สีน้ำเงินอ่อน overlay)
-      var coreH     = Math.max(6, Math.round(_data.base_norm * 30 / maxGmv * chartH));
-      var hovNorm   = _data.handover_base_norm || 0;
-      var hovH      = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
-      var hovHtml   = hovH > 0
-        ? '<div class="qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
+      // Base bar: ใช้ structure เดียวกับ qnrr-bar-body (flex + column-reverse)
+      // core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
+      var coreH   = Math.max(4, Math.round(_data.base_norm * 30 / maxGmv * chartH));
+      var hovNorm = _data.handover_base_norm || 0;
+      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
+      var hovSeg  = hovH > 0
+        ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
-      bodyHtml = '<div class="qnrr-base-bar" style="height:' + barH + 'px">' + hovHtml + '</div>';
+      var coreSeg = '<div class="qnrr-seg qnrr-base-core-seg" style="height:' + coreH + 'px"></div>';
+      bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + hovSeg + coreSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
       STACK_ORDER.forEach(function(mv){
@@ -1048,15 +1050,29 @@ function _qnrrRenderList(){
     '</div>';
     html += '<div class="qnrr-ol-rows" id="' + acctId + '">';
 
-    outletIds.forEach(function(oid){
+    outletIds.forEach(function(oid, oidx){
       var od = a.outlets[oid];
+      // FIX 2: ดึง outlet name จาก outletNameMap ตอน render (ไม่ใช่ตอน init)
+      var outletNameMap2 = {};
+      if (typeof bulkOutletsData !== 'undefined') {
+        Object.values(bulkOutletsData).forEach(function(mo){
+          Object.values(mo).forEach(function(arr){
+            if (!Array.isArray(arr)) return;
+            arr.forEach(function(o){ if (o.outlet_id && o.outlet_name) outletNameMap2[String(o.outlet_id)] = o.outlet_name; });
+          });
+        });
+      }
+      var oName = outletNameMap2[String(oid)] || od.name || String(oid);
+
       var domMv  = _domMv(od);
       var cfg    = MV_CFG[domMv] || {color:'rgba(255,255,255,.3)'};
       var dotCol = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
-      var mvLabel= cfg.label || domMv;
-      // ใช้ dotCol โดยตรง (มาจาก MV_CFG แล้ว) — ไม่ต้องมี mvColor แยก
 
-      // 4-month GMV table
+      // FIX 3+4: ใช้ fixed col width ผ่าน colgroup — ทุก outlet ใช้ width เดียวกัน
+      // month header แสดงเฉพาะ outlet แรกของ account
+      var COL_W = 40; // px per month column
+      var colgroup = '<colgroup><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"></colgroup>';
+
       var tblCells = ALL_MONTHS.map(function(m){
         var v = od.gmv[m] || 0;
         var isBase = (m==='2026-03');
@@ -1067,21 +1083,19 @@ function _qnrrRenderList(){
         return '<td class="' + cls + '">' + disp + '</td>';
       }).join('');
 
-      var tblHdr = ALL_MONTHS.map(function(m){
+      var isFirstOutlet = (oidx === 0);
+      var tblHdr = isFirstOutlet ? '<thead><tr class="qnrr-ol-mo-hdr">' + ALL_MONTHS.map(function(m){
         var bmP = _data.by_month[m];
         var tilde = bmP && bmP.is_partial ? '~' : '';
-        return '<td class="mo-hdr">' + (MTH_SHORT[m]||m) + tilde + '</td>';
-      }).join('');
+        return '<td>' + (MTH_SHORT[m]||m) + tilde + '</td>';
+      }).join('') + '</tr></thead>' : '';
 
-      // month header แสดงเฉพาะ row แรกของ account (ไม่ซ้ำทุก outlet)
-      var isFirstOutlet = (outletIds.indexOf(oid) === 0);
       html += '<div class="qnrr-ol-row">' +
         '<div class="qnrr-ol-dot" style="background:' + dotCol + '"></div>' +
         '<div class="qnrr-ol-left">' +
-          '<div class="qnrr-ol-name">' + _esc(String(od.name||oid).slice(0,38)) + '</div>' +
+          '<div class="qnrr-ol-name">' + _esc(String(oName).slice(0,38)) + '</div>' +
         '</div>' +
-        '<table class="qnrr-ol-tbl">' +
-          (isFirstOutlet ? '<thead><tr class="qnrr-ol-mo-hdr">' + tblHdr + '</tr></thead>' : '') +
+        '<table class="qnrr-ol-tbl">' + colgroup + tblHdr +
           '<tbody><tr>' + tblCells + '</tr></tbody>' +
         '</table>' +
       '</div>';
@@ -1104,6 +1118,7 @@ function _qnrrToggleAcctRows(id, hdr){
 window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
 })();
+
 
 
 

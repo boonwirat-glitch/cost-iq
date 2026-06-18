@@ -232,12 +232,27 @@
 }
 .qnrr-seg { width: 100%; min-height: 3px; }
 .qnrr-seg + .qnrr-seg { border-top: 1px solid rgba(0,0,0,.22); }
-/* Mar reference bar */
+/* Mar reference bar — ใช้ qnrr-bar-body เป็น base แล้ว override */
 .qnrr-base-bar {
   position: absolute; bottom: 0; left: 0; right: 0;
   border-radius: 5px 5px 3px 3px;
   border: 1px dashed rgba(100,160,255,.26);
   background: rgba(38,96,200,.09);
+}
+/* base bar body — ล้อ qnrr-bar-body แต่ไม่มี animation */
+.qnrr-base-body {
+  animation: none !important;
+}
+/* core segment ใน base bar */
+.qnrr-base-core-seg {
+  background: rgba(38,96,200,.13);
+  width: 100%;
+}
+/* handover segment ใน base bar — น้ำเงินอ่อน อยู่บนสุด (flex column-reverse = วางหลัง = top) */
+.qnrr-base-hov-seg {
+  background: rgba(96,165,250,.50);
+  width: 100%;
+  border-top: 1px solid rgba(0,0,0,.15);
 }
 /* ghost projection bar */
 .qnrr-ghost-proj {
@@ -643,8 +658,8 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 /* pill — ล้อ .portview-fpill */
 .qnrr-pill {
   flex-shrink: 0; white-space: nowrap;
-  padding: 4px 10px; border-radius: 20px;
-  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 10px; font-weight: 600;
   font-family: var(--tk-font-body);
   border: 1.5px solid rgba(255,255,255,.15);
   background: transparent;
@@ -681,17 +696,12 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   padding-bottom: 2px; text-align: right;
 }
 
-/* partial month column — ไม่ให้ถ่างออก */
-.qnrr-ol-tbl { table-layout: fixed; width: auto; }
-.qnrr-ol-tbl td { max-width: 44px; min-width: 36px; }
-
-/* Base bar handover layer — แสดงด้านบน core (handover = ส่วนเกินที่ไม่นับใน NRR denom) */
-.qnrr-base-hov-seg {
-  width: 100%;
-  background: rgba(96,165,250,.45);
-  border-radius: 5px 5px 0 0;
-  position: absolute; bottom: 0; left: 0; right: 0;
-  pointer-events: none;
+/* partial month column — fixed width ผ่าน colgroup ใน JS แล้ว */
+.qnrr-ol-tbl { border-collapse: collapse; table-layout: fixed; }
+.qnrr-ol-tbl td { width: 40px; padding: 1px 4px; text-align: right; }
+.qnrr-ol-tbl .qnrr-ol-mo-hdr td {
+  font-size: 8px; font-weight: 700; text-transform: uppercase;
+  color: rgba(188,215,255,.40); letter-spacing: .03em; padding-bottom: 2px;
 }
-.qnrr-base-bar { overflow: hidden; position: relative; }
+
 
