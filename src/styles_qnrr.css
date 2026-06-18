@@ -132,27 +132,12 @@
 
 /* ── Zone B: Chart zone with toggle ── */
 .qnrr-chart-zone {
-  padding: 10px 18px 0;
+  padding: 6px 18px 0;
   flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative;
   overflow-y: auto;
 }
 /* Chart/Breakdown toggle */
-.qnrr-view-toggle {
-  display: flex; gap: 5px; margin-bottom: 9px;
-}
-.qnrr-vtog {
-  font-size: 12px; font-weight: 700; padding: 7px 16px;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
-  background: transparent; color: rgba(255,255,255,.45);
-  cursor: pointer; font-family: var(--tk-font-mono);
-  transition: all .15s; -webkit-tap-highlight-color: transparent;
-  letter-spacing: .02em; min-height: 34px;
-}
-.qnrr-vtog.on {
-  border-color: rgba(188,215,255,.40);
-  background: rgba(188,215,255,.09); color: #bcd7ff;
-}
-.qnrr-vtog:active { transform: scale(.95); }
+/* v809: qnrr-view-toggle + qnrr-vtog removed — toggle is now inline icon buttons in each view's header */
 
 /* ── Bar chart ── */
 .qnrr-ref-lines {

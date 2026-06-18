@@ -378,8 +378,7 @@ window._qnrrToggleAcct = _qnrrToggleAcct;
 
 function _qnrrSetView(mode, btn){
   _viewMode = mode;
-  document.querySelectorAll('.qnrr-vtog').forEach(function(b){ b.classList.remove('on'); });
-  if (btn) btn.classList.add('on');
+  // v809: toggle is now inline icon buttons inside each view's header — no qnrr-vtog class needed
 
   var chartWrap = _el('qnrr-chart-bars-wrap');
   var bkWrap    = _el('qnrr-breakdown-wrap');
@@ -589,12 +588,13 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: single-line top label (same height as normal months)
-        // Run-rate + days info lives in ghost bar tooltip only (17/30d removed from header v807)
+        // Partial month: show days on bar header, days info also in ghost bar tooltip
         var rawTotal = rawTotals[m] || bm.total_gmv;
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
-            '<span class="qnrr-top-actual-tag"> mtd</span></div>';
+            '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
+            bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
         outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' สาขา</div>' : '';
@@ -672,6 +672,32 @@ function _qnrrRenderChart(){
   barsRow.innerHTML = barsHtml;
 }
 
+// ── Inline view toggle icon HTML (concept E) ────────────────────────────────
+// Returns two icon-only buttons (bar-chart / list) to embed in existing header rows.
+// active = 'chart' | 'list'
+function _qnrrToggleHtml(active){
+  var chartActive = active === 'chart';
+  var aStyle = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;background:';
+  var aOn  = aStyle + 'rgba(255,255,255,.14);';
+  var aOff = aStyle + 'rgba(255,255,255,.04);';
+  // bar-chart icon SVG
+  var barSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
+    + '<rect x="1" y="6" width="3" height="6" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="5" y="3" width="3" height="9" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="9" y="5" width="3" height="7" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '</svg>';
+  // list icon SVG
+  var listSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
+    + '<rect x="1" y="2.5" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="1" y="5.75" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="1" y="9" width="8" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '</svg>';
+  return '<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">'
+    + '<button style="' + (chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'chart\',null)" aria-label="กราฟ" title="กราฟ">' + barSvg + '</button>'
+    + '<button style="' + (!chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'list\',null)" aria-label="List" title="List">' + listSvg + '</button>'
+    + '</span>';
+}
+
 // ── Breakdown table — 4 months × movement ──────────────────────────────────
 function _qnrrRenderBreakdown(){
   var wrap = _el('qnrr-breakdown-wrap');
@@ -718,7 +744,7 @@ function _qnrrRenderBreakdown(){
   }
 
   var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month">' + colgroup + '<thead><tr>' +
-    '<th>Movement</th>' +
+    '<th style="text-align:left"><div style="display:flex;align-items:center;justify-content:space-between">Movement' + _qnrrToggleHtml('chart') + '</div></th>' +
     ALL_MONTHS.map(function(m, i){
       var bm2 = _data.by_month[m];
       var isPartialCol = bm2 && bm2.is_partial;
@@ -1308,7 +1334,7 @@ function _qnrrRenderList(){
   var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
-    '<div class="qnrr-list-mo-hdr-name"></div>' +
+    '<div class="qnrr-list-mo-hdr-name" style="display:flex;align-items:center">' + _qnrrToggleHtml('list') + '</div>' +
     listMoHdrs.map(function(mo){
       return '<div class="qnrr-list-mo-hdr-cell">' + mo + '</div>';
     }).join('') +

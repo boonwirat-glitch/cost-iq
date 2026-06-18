@@ -1,4 +1,4 @@
-<!-- Freshket Sense v808: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v809: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v808',
+      version: 'v809',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6535,27 +6535,12 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 
 /* ── Zone B: Chart zone with toggle ── */
 .qnrr-chart-zone {
-  padding: 10px 18px 0;
+  padding: 6px 18px 0;
   flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative;
   overflow-y: auto;
 }
 /* Chart/Breakdown toggle */
-.qnrr-view-toggle {
-  display: flex; gap: 5px; margin-bottom: 9px;
-}
-.qnrr-vtog {
-  font-size: 12px; font-weight: 700; padding: 7px 16px;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
-  background: transparent; color: rgba(255,255,255,.45);
-  cursor: pointer; font-family: var(--tk-font-mono);
-  transition: all .15s; -webkit-tap-highlight-color: transparent;
-  letter-spacing: .02em; min-height: 34px;
-}
-.qnrr-vtog.on {
-  border-color: rgba(188,215,255,.40);
-  background: rgba(188,215,255,.09); color: #bcd7ff;
-}
-.qnrr-vtog:active { transform: scale(.95); }
+/* v809: qnrr-view-toggle + qnrr-vtog removed — toggle is now inline icon buttons in each view's header */
 
 /* ── Bar chart ── */
 .qnrr-ref-lines {
@@ -52194,8 +52179,7 @@ window._qnrrToggleAcct = _qnrrToggleAcct;
 
 function _qnrrSetView(mode, btn){
   _viewMode = mode;
-  document.querySelectorAll('.qnrr-vtog').forEach(function(b){ b.classList.remove('on'); });
-  if (btn) btn.classList.add('on');
+  // v809: toggle is now inline icon buttons inside each view's header — no qnrr-vtog class needed
 
   var chartWrap = _el('qnrr-chart-bars-wrap');
   var bkWrap    = _el('qnrr-breakdown-wrap');
@@ -52405,12 +52389,13 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: single-line top label (same height as normal months)
-        // Run-rate + days info lives in ghost bar tooltip only (17/30d removed from header v807)
+        // Partial month: show days on bar header, days info also in ghost bar tooltip
         var rawTotal = rawTotals[m] || bm.total_gmv;
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
-            '<span class="qnrr-top-actual-tag"> mtd</span></div>';
+            '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
+            bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
         outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' สาขา</div>' : '';
@@ -52488,6 +52473,32 @@ function _qnrrRenderChart(){
   barsRow.innerHTML = barsHtml;
 }
 
+// ── Inline view toggle icon HTML (concept E) ────────────────────────────────
+// Returns two icon-only buttons (bar-chart / list) to embed in existing header rows.
+// active = 'chart' | 'list'
+function _qnrrToggleHtml(active){
+  var chartActive = active === 'chart';
+  var aStyle = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;background:';
+  var aOn  = aStyle + 'rgba(255,255,255,.14);';
+  var aOff = aStyle + 'rgba(255,255,255,.04);';
+  // bar-chart icon SVG
+  var barSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
+    + '<rect x="1" y="6" width="3" height="6" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="5" y="3" width="3" height="9" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="9" y="5" width="3" height="7" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '</svg>';
+  // list icon SVG
+  var listSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
+    + '<rect x="1" y="2.5" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="1" y="5.75" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '<rect x="1" y="9" width="8" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
+    + '</svg>';
+  return '<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">'
+    + '<button style="' + (chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'chart\',null)" aria-label="กราฟ" title="กราฟ">' + barSvg + '</button>'
+    + '<button style="' + (!chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'list\',null)" aria-label="List" title="List">' + listSvg + '</button>'
+    + '</span>';
+}
+
 // ── Breakdown table — 4 months × movement ──────────────────────────────────
 function _qnrrRenderBreakdown(){
   var wrap = _el('qnrr-breakdown-wrap');
@@ -52534,7 +52545,7 @@ function _qnrrRenderBreakdown(){
   }
 
   var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month">' + colgroup + '<thead><tr>' +
-    '<th>Movement</th>' +
+    '<th style="text-align:left"><div style="display:flex;align-items:center;justify-content:space-between">Movement' + _qnrrToggleHtml('chart') + '</div></th>' +
     ALL_MONTHS.map(function(m, i){
       var bm2 = _data.by_month[m];
       var isPartialCol = bm2 && bm2.is_partial;
@@ -53124,7 +53135,7 @@ function _qnrrRenderList(){
   var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
-    '<div class="qnrr-list-mo-hdr-name"></div>' +
+    '<div class="qnrr-list-mo-hdr-name" style="display:flex;align-items:center">' + _qnrrToggleHtml('list') + '</div>' +
     listMoHdrs.map(function(mo){
       return '<div class="qnrr-list-mo-hdr-cell">' + mo + '</div>';
     }).join('') +
@@ -53388,12 +53399,8 @@ window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
       </div>
     </div>
   </div>
-  <!-- Zone B: Main tabs — กราฟ | List -->
+  <!-- Zone B: chart + breakdown + list. Toggle icon lives inline in each view's sticky header. -->
   <div class="qnrr-chart-zone" id="qnrr-chart-zone">
-    <div class="qnrr-view-toggle">
-      <button class="qnrr-vtog on" onclick="_qnrrSetView('chart',this)">กราฟ</button>
-      <button class="qnrr-vtog" onclick="_qnrrSetView('list',this)">List</button>
-    </div>
     <!-- กราฟ tab: bar chart + breakdown table stacked -->
     <div id="qnrr-chart-bars-wrap">
       <div class="qnrr-ref-lines" id="qnrr-ref-lines"></div>
