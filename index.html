@@ -1,4 +1,4 @@
-<!-- Freshket Sense 796: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 797: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '796',
+      version: '797',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7213,15 +7213,8 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   color: rgba(188,215,255,.50);
   font-size: 8px; font-weight: 600;
 }
-.qnrr-top-runrate {
-  color: rgba(167,139,250,.80);
-  font-size: 8px; font-weight: 700;
-  white-space: nowrap;
-}
-/* partial needs 3-line top-wrap: MTD + run-rate + days */
-.qnrr-bar-top-wrap.partial {
-  height: 54px !important;
-}
+
+/* partial top-wrap: same height as normal (32px) — extra info is in tooltip */
 </style>
 <style id="restaurant-module-css">
 /* ============================================================
@@ -52221,15 +52214,13 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: MTD actual (raw) from pre-computed cache
+        // Partial month: single-line top label (same height as normal months)
+        // Run-rate + days info lives in ghost bar tooltip only
         var rawTotal = rawTotals[m] || bm.total_gmv;
-        var runRate  = bm.total_gmv; // normalized ÷curr_days×30
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
-          '<div class="qnrr-bar-mar-sub qnrr-top-runrate">' +
-            '~' + _fmtM(runRate) + ' run</div>' +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.45);font-weight:600">' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
             bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
@@ -52267,7 +52258,9 @@ function _qnrrRenderChart(){
         var gapH  = projH - barH; // pixels above actual bar
         if (gapH > 3) {
           // ghost-top: dashed box floating above actual bar, sized to just the gap
-          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '"></div>';
+          var runRate = bm.total_gmv; // normalized ÷curr_days×30
+          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)';
+          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
         } else if (gapH <= 3) {
           // run-rate ≈ actual (overperformance or same) — show thin line at run-rate level
           var lineBottom = Math.max(barH, projH);

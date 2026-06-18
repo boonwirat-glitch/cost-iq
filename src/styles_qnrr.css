@@ -811,12 +811,5 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   color: rgba(188,215,255,.50);
   font-size: 8px; font-weight: 600;
 }
-.qnrr-top-runrate {
-  color: rgba(167,139,250,.80);
-  font-size: 8px; font-weight: 700;
-  white-space: nowrap;
-}
-/* partial needs 3-line top-wrap: MTD + run-rate + days */
-.qnrr-bar-top-wrap.partial {
-  height: 54px !important;
-}
+
+/* partial top-wrap: same height as normal (32px) — extra info is in tooltip */

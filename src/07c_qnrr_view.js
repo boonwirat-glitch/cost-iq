@@ -543,15 +543,13 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: MTD actual (raw) from pre-computed cache
+        // Partial month: single-line top label (same height as normal months)
+        // Run-rate + days info lives in ghost bar tooltip only
         var rawTotal = rawTotals[m] || bm.total_gmv;
-        var runRate  = bm.total_gmv; // normalized ÷curr_days×30
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
-          '<div class="qnrr-bar-mar-sub qnrr-top-runrate">' +
-            '~' + _fmtM(runRate) + ' run</div>' +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.45);font-weight:600">' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
             bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
@@ -589,7 +587,9 @@ function _qnrrRenderChart(){
         var gapH  = projH - barH; // pixels above actual bar
         if (gapH > 3) {
           // ghost-top: dashed box floating above actual bar, sized to just the gap
-          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '"></div>';
+          var runRate = bm.total_gmv; // normalized ÷curr_days×30
+          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)';
+          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
         } else if (gapH <= 3) {
           // run-rate ≈ actual (overperformance or same) — show thin line at run-rate level
           var lineBottom = Math.max(barH, projH);
