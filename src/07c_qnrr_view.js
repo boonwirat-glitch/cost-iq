@@ -530,14 +530,19 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: show actual raw + progress days on 2 separate lines by design
+        // Partial month: MTD actual (raw, not normalized) + run-rate projection
         var rawTotal = bm.rows ? bm.rows.reduce(function(s,r){
           return s + (parseFloat(r.curr_gmv)||0);
         }, 0) : bm.total_gmv;
-        topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
-          '<span style="color:rgba(188,215,255,.35)"> actual</span></div>' +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.60);font-weight:700">' + bm.curr_days + '/' + bm.days_in_month + 'd</div>';
-        // mark as partial for CSS height override
+        // run-rate = normalized total_gmv (÷curr_days×30) — already in bm.total_gmv
+        var runRate = bm.total_gmv;
+        topHtml =
+          '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
+            '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
+          '<div class="qnrr-bar-mar-sub qnrr-top-runrate">' +
+            '~' + _fmtM(runRate) + ' run</div>' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.45);font-weight:600">' +
+            bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
         outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
@@ -567,14 +572,13 @@ function _qnrrRenderChart(){
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
-      // Partial month ghost projection (run-rate)
+      // Partial month ghost projection — always show regardless of height vs actual bar
       var ghostHtml = '';
       if (bm.is_partial && bm.curr_days > 0) {
-        // ghost bar = normalized total_gmv (already ÷days×30)
+        // ghost height = run-rate (÷curr_days×30) — always visible
         var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
-        if (projH > barH) {
-          ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '/30 วัน"></div>';
-        }
+        // ghost is always rendered; if run-rate < actual that means overperformance — still show
+        ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate ÷' + bm.curr_days + 'd×30: ' + _fmtM(bm.total_gmv) + '"></div>';
       }
       bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
     }
@@ -753,25 +757,25 @@ function _qnrrRenderBreakdown(){
       });
       html += '</tr>';
 
-      // cohort Apr / May / Jun = new_sales outlets whose new_user_exp falls in that month
-      // Data: segments['new_sales'] in by_month[m] = new_sales that appeared in month m
-      var NS_COHORTS = [
+      // cohort Apr / May / Jun — tracked through subsequent months
+      // Step 1: build outlet-id sets per cohort month (outlets whose movement = new_sales in that month)
+      var nsCohortDefs = [
         {month:'2026-04', label:'└ cohort เม.ย.', color:'rgba(167,139,250,.55)'},
         {month:'2026-05', label:'└ cohort พ.ค.',  color:'rgba(167,139,250,.65)'},
         {month:'2026-06', label:'└ cohort มิ.ย.', color:'rgba(167,139,250,.75)'},
       ];
-      NS_COHORTS.forEach(function(nc){
-        // Only show row if this cohort-month has data at all
-        // new_sales in nc.month = outlets that first appeared in nc.month
-        // They appear in that month's segment AND carry forward (but forward data = same outlet in later months... 
-        // actually: new_sales = outlet's first-ever purchase month in Q, so same outlet shows as new_sales only in nc.month)
-        // For later months, that outlet becomes core_nrr or churn (not new_sales anymore)
-        // So each row = GMV of that cohort only IN that column month (sparse)
-        var hasCohort = (function(){
-          var bm = _data.by_month[nc.month];
-          return bm && (bm.segments['new_sales'] || 0) > 0;
-        })();
-        if (!hasCohort) return;
+      nsCohortDefs.forEach(function(nc){
+        // Collect outlet_ids that are new_sales in nc.month
+        var cohortBm = _data.by_month[nc.month];
+        if (!cohortBm) return;
+        var cohortOutlets = {};
+        (cohortBm.rows || []).forEach(function(r){
+          if (r.movement_type === 'new_sales') cohortOutlets[r.outlet_id] = true;
+        });
+        if (!Object.keys(cohortOutlets).length) return;
+
+        // Step 2: for each month in ALL_MONTHS, sum curr_gmv of those outlet_ids
+        // (in nc.month itself: their new_sales curr_gmv; in later months: whatever movement they became)
         html += '<tr class="bk-subrow">' +
           '<td><div class="qnrr-bk-mv-cell">' +
             '<div class="qnrr-bk-dot" style="background:' + nc.color + '"></div>' +
@@ -779,10 +783,22 @@ function _qnrrRenderBreakdown(){
           '</div></td>';
         ALL_MONTHS.forEach(function(m){
           if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
-          var bm = _data.by_month[m];
-          // only show new_sales GMV for the specific cohort month column
-          var g = (m === nc.month) ? ((bm && bm.segments['new_sales']) || 0) : 0;
-          html += '<td style="color:' + (g>0 ? nc.color : 'rgba(255,255,255,.10)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
+          var bm2 = _data.by_month[m];
+          if (!bm2) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
+          // Sum normalized curr_gmv for outlet_ids in this cohort
+          var g = 0;
+          (bm2.rows || []).forEach(function(r){
+            if (cohortOutlets[r.outlet_id]) {
+              var cd = parseFloat(r.curr_days) || 30;
+              // churn/transfer_out: curr_gmv=0, skip (they show as 0 naturally)
+              g += (parseFloat(r.curr_gmv) || 0) / cd * 30;
+            }
+          });
+          g = Math.round(g);
+          // Grey out months before cohort entry
+          var isBeforeCohort = (m < nc.month);
+          var col = isBeforeCohort ? 'rgba(255,255,255,.10)' : (g > 0 ? nc.color : 'rgba(255,255,255,.20)');
+          html += '<td style="color:' + col + '">' + (g > 0 && !isBeforeCohort ? _fmtM(g) : '—') + '</td>';
         });
         html += '</tr>';
       });
