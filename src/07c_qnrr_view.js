@@ -554,7 +554,7 @@ function _qnrrRenderChart(){
         ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
       var coreSeg = '<div class="qnrr-seg qnrr-base-core-seg" style="height:' + coreH + 'px"></div>';
-      bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + hovSeg + coreSeg + '</div>';
+      bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
       STACK_ORDER.forEach(function(mv){
@@ -609,14 +609,18 @@ function _qnrrRenderBreakdown(){
 
   var dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
 
-  var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month"><thead><tr>' +
+  // colgroup: fixed width ป้องกัน partial month column ถ่าง
+  var colgroup = '<colgroup><col style="width:100px">' +
+    ALL_MONTHS.map(function(){ return '<col style="width:58px">'; }).join('') +
+    '</colgroup>';
+
+  var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month">' + colgroup + '<thead><tr>' +
     '<th>Movement</th>' +
     ALL_MONTHS.map(function(m, i){
-      var isLast = (m === Q_MONTHS[Q_MONTHS.length-1]);
       var bm2 = _data.by_month[m];
       var isPartialCol = bm2 && bm2.is_partial;
       return '<th>' + MONTH_HDRS[i] + (isPartialCol ? '~' : '') +
-        '<br><span style="color:rgba(188,215,255,.35);font-size:10px;font-weight:600;text-transform:none;letter-spacing:0">'
+        '<br><span style="color:rgba(188,215,255,.35);font-size:9px;font-weight:600;text-transform:none;letter-spacing:0">'
         + outletHeaders[i] + '</span></th>';
     }).join('') +
     '</tr></thead><tbody>';
@@ -940,7 +944,7 @@ var _listFilter = 'all';
 
 function _qnrrListFilter(mv, btn){
   _listFilter = mv;
-  document.querySelectorAll('.qnrr-list-filter-bar .qnrr-pill').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.qnrr-list-filter-bar .qnrr-chip').forEach(function(b){ b.classList.remove('on'); });
   if (btn) btn.classList.add('on');
   _qnrrRenderList();
 }
@@ -1018,18 +1022,30 @@ function _qnrrRenderList(){
   // Sort by totalCurr DESC
   filteredAccts.sort(function(a,b){ return byAcct[b].totalCurr - byAcct[a].totalCurr; });
 
+  // Build outletNameMap once — ไม่ build ซ้ำใน loop
+  var outletNameMap2 = {};
+  if (typeof bulkOutletsData !== 'undefined') {
+    Object.values(bulkOutletsData).forEach(function(mo){
+      Object.values(mo).forEach(function(arr){
+        if (!Array.isArray(arr)) return;
+        arr.forEach(function(o){ if (o.outlet_id && o.outlet_name) outletNameMap2[String(o.outlet_id)] = o.outlet_name; });
+      });
+    });
+  }
+
+  var partialTilde = (_data.by_month['2026-06'] && _data.by_month['2026-06'].is_partial) ? '~' : '';
+  var COL_W = 42;
+
   var html = '';
   filteredAccts.forEach(function(aid){
     var a = byAcct[aid];
 
-    // Filter outlets too
     var outletIds = Object.keys(a.outlets).filter(function(oid){
       if (_listFilter === 'all') return true;
       return _domMv(a.outlets[oid]) === _listFilter;
     });
     if (!outletIds.length) return;
 
-    // Sort outlets: churn/transfer_out last, by Apr GMV DESC
     outletIds.sort(function(x,y){
       var xd=_domMv(a.outlets[x]), yd=_domMv(a.outlets[y]);
       var xB=(xd==='core_nrr_churn'||xd==='transfer_out');
@@ -1038,9 +1054,8 @@ function _qnrrRenderList(){
       return (a.outlets[y].gmv['2026-04']||0)-(a.outlets[x].gmv['2026-04']||0);
     });
 
-    // Account header with expand/collapse toggle
-    var isFirst = (filteredAccts.indexOf(aid) === 0);
     var acctId = 'qnrr-olrows-' + aid.replace(/[^a-z0-9]/gi,'_');
+
     html += '<div class="qnrr-acct-hdr expanded" onclick="_qnrrToggleAcctRows(\'' + acctId + '\',this)">' +
       '<div class="qnrr-acct-hdr-name">' + _esc(a.name) + '</div>' +
       '<div class="qnrr-acct-hdr-right">' +
@@ -1048,32 +1063,28 @@ function _qnrrRenderList(){
         '<svg class="qnrr-hdr-chev" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       '</div>' +
     '</div>';
-    html += '<div class="qnrr-ol-rows" id="' + acctId + '">';
+    html += '<div class="qnrr-ol-rows" id="' + acctId + '">' +
+      '<table class="qnrr-acct-tbl">' +
+      '<colgroup>' +
+        '<col style="width:auto">' +  // name col flexible
+        ALL_MONTHS.map(function(){ return '<col style="width:' + COL_W + 'px">'; }).join('') +
+      '</colgroup>' +
+      '<thead><tr class="qnrr-acct-tbl-hdr">' +
+        '<td></td>' +  // dot + name placeholder
+        ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + partialTilde].map(function(mo){
+          return '<td>' + mo + '</td>';
+        }).join('') +
+      '</tr></thead>' +
+      '<tbody>';
 
-    outletIds.forEach(function(oid, oidx){
+    outletIds.forEach(function(oid){
       var od = a.outlets[oid];
-      // FIX 2: ดึง outlet name จาก outletNameMap ตอน render (ไม่ใช่ตอน init)
-      var outletNameMap2 = {};
-      if (typeof bulkOutletsData !== 'undefined') {
-        Object.values(bulkOutletsData).forEach(function(mo){
-          Object.values(mo).forEach(function(arr){
-            if (!Array.isArray(arr)) return;
-            arr.forEach(function(o){ if (o.outlet_id && o.outlet_name) outletNameMap2[String(o.outlet_id)] = o.outlet_name; });
-          });
-        });
-      }
-      var oName = outletNameMap2[String(oid)] || od.name || String(oid);
-
+      var oName  = outletNameMap2[String(oid)] || od.name || String(oid);
       var domMv  = _domMv(od);
       var cfg    = MV_CFG[domMv] || {color:'rgba(255,255,255,.3)'};
       var dotCol = cfg.color === 'ghost' ? 'rgba(248,113,113,.65)' : cfg.color;
 
-      // FIX 3+4: ใช้ fixed col width ผ่าน colgroup — ทุก outlet ใช้ width เดียวกัน
-      // month header แสดงเฉพาะ outlet แรกของ account
-      var COL_W = 40; // px per month column
-      var colgroup = '<colgroup><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"><col style="width:' + COL_W + 'px"></colgroup>';
-
-      var tblCells = ALL_MONTHS.map(function(m){
+      var cells = ALL_MONTHS.map(function(m){
         var v = od.gmv[m] || 0;
         var isBase = (m==='2026-03');
         var isZero = !isBase && v===0;
@@ -1083,25 +1094,18 @@ function _qnrrRenderList(){
         return '<td class="' + cls + '">' + disp + '</td>';
       }).join('');
 
-      var isFirstOutlet = (oidx === 0);
-      var tblHdr = isFirstOutlet ? '<thead><tr class="qnrr-ol-mo-hdr">' + ALL_MONTHS.map(function(m){
-        var bmP = _data.by_month[m];
-        var tilde = bmP && bmP.is_partial ? '~' : '';
-        return '<td>' + (MTH_SHORT[m]||m) + tilde + '</td>';
-      }).join('') + '</tr></thead>' : '';
-
-      html += '<div class="qnrr-ol-row">' +
-        '<div class="qnrr-ol-dot" style="background:' + dotCol + '"></div>' +
-        '<div class="qnrr-ol-left">' +
-          '<div class="qnrr-ol-name">' + _esc(String(oName).slice(0,38)) + '</div>' +
-        '</div>' +
-        '<table class="qnrr-ol-tbl">' + colgroup + tblHdr +
-          '<tbody><tr>' + tblCells + '</tr></tbody>' +
-        '</table>' +
-      '</div>';
+      html +=
+        '<tr>' +
+          '<td class="qnrr-ol-name-cell">' +
+            '<span class="qnrr-ol-dot2" style="background:' + dotCol + '"></span>' +
+            '<span class="qnrr-ol-name2">' + _esc(String(oName).slice(0,32)) + '</span>' +
+          '</td>' +
+          cells +
+        '</tr>';
     });
-    html += '</div>'; // close qnrr-ol-rows
-  });
+
+    html += '</tbody></table></div>';
+  }); // end filteredAccts.forEach
 
   if (!html) html = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มี outlet ใน filter นี้</div>';
   wrap.innerHTML = html;

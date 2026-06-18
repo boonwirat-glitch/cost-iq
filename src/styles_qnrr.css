@@ -585,44 +585,9 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-ol-gmv-val.zero { color: rgba(248,113,113,.55); }
 .qnrr-ol-gmv-val.hi   { color: rgba(74,222,128,.72); }
 
-/* ── List filter bar ────────────────────────────────────────────────────── */
-.qnrr-list-filter-bar {
-  display: flex; gap: 5px; padding: 8px 16px 7px;
-  flex-wrap: nowrap; overflow-x: auto; flex-shrink: 0;
-  border-bottom: 1px solid rgba(140,180,255,.08);
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.qnrr-list-filter-bar::-webkit-scrollbar { display: none; }
-.qnrr-list-filter-bar .qnrr-mv-btn {
-  flex-shrink: 0; white-space: nowrap;
-  font-size: 11px; padding: 5px 12px; min-height: 30px;
-}
+/* removed duplicate */
 
-/* ── List table: replace mini bar ────────────────────────────────────────── */
-.qnrr-ol-row {
-  padding: 5px 14px 5px 24px;
-  gap: 0;
-}
-.qnrr-ol-tbl {
-  border-collapse: collapse; flex-shrink: 0;
-  font-family: var(--tk-font-mono);
-}
-.qnrr-ol-tbl td {
-  font-size: 10px; font-weight: 700;
-  padding: 1px 5px; text-align: right;
-  color: rgba(255,255,255,.55); min-width: 36px;
-  border-left: 1px solid rgba(255,255,255,.05);
-}
-.qnrr-ol-tbl td:first-child { border-left: none; }
-.qnrr-ol-tbl .mo-hdr {
-  font-size: 8px; font-weight: 700; text-transform: uppercase;
-  color: rgba(188,215,255,.40); letter-spacing: .04em;
-  padding-bottom: 2px;
-}
-.qnrr-ol-tbl td.base-col { color: rgba(188,215,255,.45); }
-.qnrr-ol-tbl td.zero-col { color: rgba(248,113,113,.55); }
-.qnrr-ol-tbl td.hi-col   { color: rgba(74,222,128,.72); }
+/* removed duplicate */
 
 /* acct-hdr: no dot — remove old dot style */
 .qnrr-acct-hdr { gap: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -689,19 +654,119 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-xpand-btn:hover { color: rgba(255,255,255,.7); }
 .qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
 
-/* month header only on first outlet row */
-.qnrr-ol-mo-hdr td {
-  font-size: 8px; font-weight: 700; text-transform: uppercase;
-  color: rgba(188,215,255,.40); letter-spacing: .04em;
-  padding-bottom: 2px; text-align: right;
+/* ── List: filter chip tabs ─────────────────────────────────────────────── */
+.qnrr-list-toolbar {
+  display: flex; align-items: center;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid rgba(140,180,255,.08);
+  flex-shrink: 0;
 }
-
-/* partial month column — fixed width ผ่าน colgroup ใน JS แล้ว */
-.qnrr-ol-tbl { border-collapse: collapse; table-layout: fixed; }
-.qnrr-ol-tbl td { width: 40px; padding: 1px 4px; text-align: right; }
-.qnrr-ol-tbl .qnrr-ol-mo-hdr td {
-  font-size: 8px; font-weight: 700; text-transform: uppercase;
-  color: rgba(188,215,255,.40); letter-spacing: .03em; padding-bottom: 2px;
+.qnrr-list-filter-bar {
+  display: flex; flex: 1;
+  overflow-x: auto; overflow-y: visible;
+  flex-wrap: nowrap;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
+.qnrr-list-filter-bar::-webkit-scrollbar { display: none; }
 
+/* chip tab — underline style, ไม่มี border box */
+.qnrr-chip {
+  flex-shrink: 0; white-space: nowrap;
+  padding: 8px 10px;
+  font-size: 11px; font-weight: 600;
+  font-family: var(--tk-font-body);
+  border: none; background: transparent;
+  color: rgba(255,255,255,.38);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1;
+}
+.qnrr-chip.on {
+  color: rgba(188,215,255,.90);
+  border-bottom-color: rgba(188,215,255,.60);
+}
+.qnrr-chip:active { opacity: .7; }
+
+/* expand/collapse — ล้อ pv-toggle-btn */
+.qnrr-list-xpand { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-left: 4px; }
+.qnrr-xpand-btn {
+  width: 30px; height: 30px;
+  border: none; background: transparent;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: rgba(255,255,255,.25);
+  transition: color .15s; -webkit-tap-highlight-color: transparent;
+}
+.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
+
+/* ── List: account grid ──────────────────────────────────────────────────── */
+/* account header sticky */
+.qnrr-acct-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px 4px;
+  border-top: 1px solid rgba(140,180,255,.10);
+  background: rgba(10,22,45,.80);
+  position: sticky; top: 0; z-index: 4;
+  cursor: pointer; gap: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.qnrr-acct-hdr-name {
+  font-size: 11px; font-weight: 800;
+  color: rgba(255,255,255,.72);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.qnrr-acct-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.qnrr-acct-hdr-tot {
+  font-size: 10px; font-weight: 700;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.45);
+}
+.qnrr-hdr-chev { color: rgba(188,215,255,.35); transition: transform .18s; flex-shrink: 0; }
+.qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
+
+/* outlet rows wrapper */
+.qnrr-ol-rows { display: block; }
+
+/* account table — 1 per account, colgroup fixed width */
+.qnrr-acct-tbl {
+  width: 100%; border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--tk-font-mono);
+}
+/* thead row: month labels */
+.qnrr-acct-tbl-hdr td {
+  font-size: 8px; font-weight: 700; text-transform: uppercase;
+  color: rgba(188,215,255,.40); letter-spacing: .03em;
+  padding: 4px 4px 3px; text-align: right;
+}
+.qnrr-acct-tbl-hdr td:first-child { text-align: left; padding-left: 28px; }
+/* data rows */
+.qnrr-acct-tbl tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.qnrr-acct-tbl tbody td {
+  font-size: 10px; font-weight: 700;
+  padding: 4px 4px; text-align: right;
+  color: rgba(255,255,255,.55);
+}
+/* name cell */
+.qnrr-ol-name-cell {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 4px 4px 14px; overflow: hidden;
+  text-align: left;
+}
+.qnrr-ol-dot2 {
+  width: 6px; height: 6px; border-radius: 2px;
+  flex-shrink: 0; display: inline-block;
+}
+.qnrr-ol-name2 {
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,.60);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* cell color classes */
+.qnrr-acct-tbl td.base-col { color: rgba(188,215,255,.45); }
+.qnrr-acct-tbl td.zero-col { color: rgba(248,113,113,.55); }
+.qnrr-acct-tbl td.hi-col   { color: rgba(74,222,128,.72); }
 
