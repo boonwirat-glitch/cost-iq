@@ -280,6 +280,7 @@
 .qnrr-breakdown-wrap.show { display: block; }
 .qnrr-bk-table {
   width: 100%; border-collapse: collapse;
+  table-layout: fixed;
   font-family: var(--tk-font-mono);
 }
 .qnrr-bk-table th {
