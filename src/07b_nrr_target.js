@@ -984,15 +984,16 @@ async function renderPortviewTargetBar() {
 
   // ── Target color code ─────────────────────────────────────────
   const targetCls = fbMode===null ? 'tgt-real' : fbMode==='team' ? 'tgt-alloc' : 'tgt-base';
-  bar.className = fbMode==='team'?'fb-team':fbMode==='base'?'fb-base':'';
+  // v802: do NOT set bar.className / display:block yet — value guard below may return early,
+  // which previously left the bar as a visible empty box (CSS background+border showed but
+  // no innerHTML). Class + display are set AFTER the guard, or synced inside it.
+  const _newClass = fbMode==='team'?'fb-team':fbMode==='base'?'fb-base':'';
   // Ensure pace bar is hidden — tgt bar is the single visible widget (v190)
   const oldBar = document.getElementById('portview-pace-bar');
   if (oldBar) oldBar.style.display = 'none';
-  bar.style.display = target > 0 ? 'block' : 'none';
-  bar.style.opacity = '1';
-  bar.classList.remove('tgt-skeleton');
   if (!target) {
-    // No target set — reveal legacy pace bar as fallback (v190)
+    // No target set — hide tgt bar, reveal legacy pace bar as fallback (v190)
+    bar.style.display = 'none';
     if (oldBar) oldBar.style.display = 'block';
     return;
   }
@@ -1001,10 +1002,22 @@ async function renderPortviewTargetBar() {
   const _existingPctEl = bar.querySelector('#tgt-pct-num');
   // v225g: include outlets state in key — forces re-render when outlets arrive (shimmer→real)
   const _renderKey = `${pct}|${_outletsReady ? (nrrPct !== null ? nrrPct : 'x') : 'loading'}`;
-  if (_existingPctEl && _existingPctEl.dataset.renderKey === _renderKey) return;
+  if (_existingPctEl && _existingPctEl.dataset.renderKey === _renderKey) {
+    // Content unchanged — just sync class and visibility (fbMode may have changed)
+    bar.className = _newClass;
+    bar.style.display = 'block';
+    bar.style.opacity = '1';
+    return;
+  }
   if (_existingPctEl) _existingPctEl.dataset.renderKey = _renderKey;
 
   void bar.offsetHeight;
+
+  // Guard passed — full re-render. Apply class + visibility now (content follows immediately).
+  bar.className = _newClass;
+  bar.classList.remove('tgt-skeleton');
+  bar.style.display = 'block';
+  bar.style.opacity = '1';
 
   const overflowBadge = pct > 100
     ? `<span class="tgt-overflow-badge">+${pct-100}%</span>`
