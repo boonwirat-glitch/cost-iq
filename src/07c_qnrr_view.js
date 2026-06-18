@@ -194,7 +194,7 @@ var MV_CFG = {
   handover:       {label:'Handover',    color:'rgba(96,165,250,.80)',   order:1},
   new_sales:      {label:'New Sales',   color:'rgba(167,139,250,.72)', order:2},
   expansion:      {label:'Expansion',   color:'rgba(52,211,153,.72)',   order:3},
-  transfer_in:    {label:'Transfer in', color:'rgba(255,255,255,.19)', order:4},
+  transfer_in:    {label:'Transfer in', color:'rgba(64,200,216,.62)',  order:4},
   comeback:       {label:'Comeback',    color:'rgba(251,191,36,.72)',   order:5},
   core_nrr_churn: {label:'Churn',       color:'rgba(248,113,113,.84)', order:6},
   transfer_out:   {label:'Transfer out',color:'ghost',                 order:7}
@@ -572,13 +572,19 @@ function _qnrrRenderChart(){
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
-      // Partial month ghost projection — always show regardless of height vs actual bar
+      // Partial month ghost — dashed outline only ABOVE the actual bar
       var ghostHtml = '';
       if (bm.is_partial && bm.curr_days > 0) {
-        // ghost height = run-rate (÷curr_days×30) — always visible
         var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
-        // ghost is always rendered; if run-rate < actual that means overperformance — still show
-        ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate ÷' + bm.curr_days + 'd×30: ' + _fmtM(bm.total_gmv) + '"></div>';
+        var gapH  = projH - barH; // pixels above actual bar
+        if (gapH > 3) {
+          // ghost-top: dashed box floating above actual bar, sized to just the gap
+          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '"></div>';
+        } else if (gapH <= 3) {
+          // run-rate ≈ actual (overperformance or same) — show thin line at run-rate level
+          var lineBottom = Math.max(barH, projH);
+          ghostHtml = '<div class="qnrr-ghost-line" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(bm.total_gmv) + '"></div>';
+        }
       }
       bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
     }

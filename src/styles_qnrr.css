@@ -256,15 +256,23 @@
   width: 100%;
   border-top: 1px solid rgba(0,0,0,.15);
 }
-/* ghost projection bar */
-.qnrr-ghost-proj {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  border-radius: 6px; pointer-events: none; z-index: 1;
-  border: 1.5px dashed rgba(188,215,255,.26);
-  background: rgba(188,215,255,.03);
-  animation: qnrrGhostPulse 3.5s ease-in-out infinite;
+/* ghost projection — dashed outline only above actual bar */
+.qnrr-ghost-top {
+  position: absolute; left: 0; right: 0;
+  border-radius: 4px 4px 0 0; pointer-events: none; z-index: 3;
+  border: 1.5px dashed rgba(188,215,255,.40);
+  border-bottom: none;
+  background: rgba(188,215,255,.04);
+  animation: qnrrGhostPulse 3s ease-in-out infinite;
 }
-@keyframes qnrrGhostPulse { 0%,100%{opacity:.4} 50%{opacity:.85} }
+/* run-rate ≈ actual: thin line at projection level */
+.qnrr-ghost-line {
+  position: absolute; left: 2px; right: 2px; height: 2px;
+  background: rgba(188,215,255,.50); border-radius: 1px;
+  pointer-events: none; z-index: 3;
+  animation: qnrrGhostPulse 3s ease-in-out infinite;
+}
+@keyframes qnrrGhostPulse { 0%,100%{opacity:.45} 50%{opacity:.90} }
 /* bar bottom label */
 .qnrr-bar-lbl {
   font-size: 9px; font-weight: 700;
