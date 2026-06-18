@@ -19,10 +19,14 @@ function showScreen(name){
 
 function __legacyShowScreenFallback(name){
   // v601: ถ้า body.overflow:hidden ค้าง (Echo lock) แต่ sheet ไม่อยู่ → restore ก่อน render
+  // v801: also restore when sheet exists but is NOT actively open (.ci-open) — covers
+  // the case where PWA was killed/backgrounded mid-Echo and the sheet went stale,
+  // leaving body.overflow:hidden locked and the whole app unscrollable.
   try {
     if (document.body.style.overflow === 'hidden') {
       const _sheet = document.getElementById('ci-fullsheet');
-      if (!_sheet || _sheet.style.display === 'none') {
+      const _sheetActive = _sheet && _sheet.style.display !== 'none' && _sheet.classList.contains('ci-open');
+      if (!_sheetActive) {
         if (typeof CI !== 'undefined' && typeof CI._restoreBodyScroll === 'function') {
           CI._restoreBodyScroll();
         } else {
@@ -113,6 +117,17 @@ function __legacyShowScreenFallback(name){
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   const scrEl=document.getElementById('scr-'+name);
   const navEl=document.getElementById('nav-'+name);
+  // v801: tear down portview scroll-collapse observer when leaving portview.
+  // Prevents the rAF loop + scroll listeners from surviving into another screen
+  // (Echo, account view, teamview) and racing a fresh observer on return.
+  // Also clears the collapse snapshot so re-entering portview starts EXPANDED —
+  // this is what makes the pace bar / commission strip (both inside pv-collapsible)
+  // reliably visible again in the installed PWA after navigating around.
+  // Routed through window._pvTeardownCollapseObserver (defined in 06_portview) to
+  // avoid a temporal-dead-zone reference to that module's `let` binding.
+  if(name!=='portview' && typeof window._pvTeardownCollapseObserver==='function'){
+    window._pvTeardownCollapseObserver();
+  }
   if(scrEl){scrEl.classList.add('on');scrEl.style.display='';}
   if(navEl)navEl.classList.add('on');
   if(name==='report')renderReport();

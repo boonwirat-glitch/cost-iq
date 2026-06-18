@@ -1183,6 +1183,9 @@ function __legacyRenderPortviewListFallback(){
 function setPvSort(mode){
   if(pvSortMode===mode){pvSortDir*=-1;}else{pvSortMode=mode;pvSortDir=1;}
   window._pvLastRenderMs=Date.now();
+  // v801: snapshot collapse state before re-render (parity with schedulePortviewListRender).
+  // The not-scrollable guard in _frame() will still re-expand if the new list is short.
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   renderPortviewList();
 }
 
@@ -1236,6 +1239,18 @@ function _pvBuildCompactStrip(){
 }
 
 let _pvCollapseObserver=null;
+// v801: generation token — every _pvInitCollapseObserver() bumps this.
+// Any rAF frame or scroll handler from a previous generation becomes a no-op,
+// so overlapping init calls (Echo return + showScreen + RenderBus settle firing
+// within the same 120ms window) can never run two _frame() loops at once.
+let _pvObsGen=0;
+// v801: safe teardown exposed on window — callable from showScreen (05_kam_view,
+// concatenated earlier) without touching the `let` binding directly and risking a
+// temporal-dead-zone throw if invoked before this module's lets are evaluated.
+window._pvTeardownCollapseObserver=function(){
+  try{ if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;} }catch(_e){}
+  try{ window._pvLastCollapseMs=0; window._pvWasCollapsed=false; }catch(_e){}
+};
 
 // v669b: sync portview-list padding-top to actual portview-header height
 // portview-header is position:sticky (not in flow), so list needs explicit top offset
@@ -1292,6 +1307,9 @@ function _pvSyncChips(){
 function _pvInitCollapseObserver(){
   if(_pvCollapseObserver){_pvCollapseObserver.disconnect();_pvCollapseObserver=null;}
   const old=document.getElementById('pv-collapse-sentinel');if(old)old.remove();
+  // v801: claim a new generation. Any frame/scroll/timeout from an older
+  // generation checks _myGen===_pvObsGen and bails — kills overlapping loops.
+  const _myGen=++_pvObsGen;
   const screen=document.getElementById('scr-portview');
   const collapsible=document.getElementById('pv-collapsible');
   const strip=document.getElementById('pv-compact-strip');
@@ -1319,6 +1337,7 @@ function _pvInitCollapseObserver(){
 
   // v753p: expose reset function so _tgtToggleDetail can force re-measure
   window._pvResetExpandedH = function(){
+    if(_myGen!==_pvObsGen)return; // v801: only the active generation may reset
     expandedH = 0;  // force _frame() to re-measure on next tick
     lastAppliedH = -1;
     if(!rafId) rafId = requestAnimationFrame(_frame);
@@ -1382,6 +1401,8 @@ function _pvInitCollapseObserver(){
 
   function _frame(){
     rafId=0;
+    // v801: stale-generation guard — a newer observer has taken over, stop.
+    if(_myGen!==_pvObsGen)return;
     if(!screen.classList.contains('on'))return;
 
     // v669: Measure expandedH once (or re-measure if reset by _pvResetExpandedH)
@@ -1396,19 +1417,16 @@ function _pvInitCollapseObserver(){
     // h goes from expandedH (at y=0) to 0 (at y=expandedH), clamped
     var h=Math.max(0, Math.min(expandedH, expandedH-y));
 
-    // v672c: if user was collapsed before render (scroll reset to 0 by browser)
-    // restore collapsed state — don't let scroll=0 mean "expanded"
-    if(y===0&&(window._pvWasCollapsed||isCollapsed)){
-      h=0;
-      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
-      // but strip class can be stale after re-render (filter/search/sort reinit)
-      if(isCollapsed&&strip.className.indexOf('visible')===-1){
-        strip.className='pv-compact-strip visible';
-      }
-    }
-
-    // Few-cards guard — only on fresh load (never collapsed before)
-    if(!_scrollable()&&!isCollapsed&&!(window._pvWasCollapsed)){
+    // v801: NOT-SCROLLABLE GUARD comes FIRST and is unconditional.
+    // After a filter/search shrinks the list, the page may no longer be scrollable.
+    // Keeping the header collapsed in that state traps the user — there is nothing
+    // to scroll back up with to re-expand it. So if the page can't scroll, force
+    // the header open and clear the stale collapse snapshot. This supersedes the
+    // old few-cards guard (which skipped when _pvWasCollapsed was set) and the
+    // y===0 collapse-restore below.
+    if(!_scrollable()){
+      window._pvWasCollapsed=false;
+      window._pvLastCollapseMs=0;
       if(lastAppliedH!==expandedH){
         lastAppliedH=expandedH;
         collapsible.style.maxHeight=expandedH+'px';
@@ -1418,6 +1436,18 @@ function _pvInitCollapseObserver(){
       }
       _applyStrip(false);
       return;
+    }
+
+    // v672c: if user was collapsed before render (scroll reset to 0 by browser)
+    // restore collapsed state — don't let scroll=0 mean "expanded".
+    // (Only reached when the page IS scrollable — see guard above.)
+    if(y===0&&(window._pvWasCollapsed||isCollapsed)){
+      h=0;
+      // v673: force strip visible — _applyStrip guard may skip if isCollapsed already true
+      // but strip class can be stale after re-render (filter/search/sort reinit)
+      if(isCollapsed&&strip.className.indexOf('visible')===-1){
+        strip.className='pv-compact-strip visible';
+      }
     }
 
     var collapsed=(h===0);
@@ -1451,11 +1481,14 @@ function _pvInitCollapseObserver(){
   }
 
   function _onScroll(){
+    // v801: ignore scroll events routed to a superseded observer generation
+    if(_myGen!==_pvObsGen)return;
     if(!rafId) rafId=requestAnimationFrame(_frame);
   }
 
   // Init: measure and set correct initial state
   setTimeout(function(){
+    if(_myGen!==_pvObsGen)return; // v801: superseded before init settled
     if(!screen.classList.contains('on'))return;
     expandedH=collapsible.scrollHeight||200;
     lastAppliedH=-1; // force first write
@@ -1465,6 +1498,7 @@ function _pvInitCollapseObserver(){
   },180);
   // v669b: also sync after a longer delay in case data loads slow
   setTimeout(function(){
+    if(_myGen!==_pvObsGen)return; // v801: superseded
     if(!screen.classList.contains('on'))return;
     _pvSyncListOffset();
   },600);
@@ -1488,6 +1522,8 @@ function _pvInitCollapseObserver(){
 
 function setPvView(mode){
   pvViewMode=mode;
+  // v801: parity with other re-render entry points
+  window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   renderPortviewList();
 }
 
@@ -1687,6 +1723,19 @@ function portviewSelectAccount(accountId){
       || ((_pvRole!=='tl'&&_pvRole!=='admin')&&currentUser&&currentUser.email?currentUser.email:null);
     if(_pvKamEmail&&typeof _fetchKamBundle==='function'){
       _fetchKamBundle(_pvKamEmail).catch(()=>{});
+    } else if((_pvRole==='tl'||_pvRole==='admin')&&typeof _fetchKamBundle==='function'){
+      // v801: admin/TL — kamEmail not resolvable yet (portviewBulkData empty during a
+      // token-refresh race). Do NOT fetch with the admin's own email (wrong key → 404 →
+      // 90s timeout was the root of "SKU movement takes a minute" for admins).
+      // Instead poll briefly for portviewBulkData to land, then fetch the correct bundle.
+      let _retries=0;
+      const _resolveAdminBundle=()=>{
+        if(String(currentAccountId||'')!==String(accountId))return; // user moved on
+        const _e=(typeof _getKamEmailForAccount==='function')?_getKamEmailForAccount(accountId):null;
+        if(_e){ _fetchKamBundle(_e).catch(()=>{}); return; }
+        if(_retries++<8) setTimeout(_resolveAdminBundle,400); // up to ~3.2s
+      };
+      setTimeout(_resolveAdminBundle,300);
     }
     switchAccount(accountId);
     showScreen('overview');

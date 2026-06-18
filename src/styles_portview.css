@@ -152,7 +152,11 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .pv-sort-search-expand input{width:100%;box-sizing:border-box;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;font-family:var(--tk-font-body);font-size:12px;outline:none;transition:border-color .2s}
 .pv-sort-search-expand input:focus{border-color:var(--tk-subtab-active)}
 .portview-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.portview-title{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px}
+.portview-title{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+.portview-title svg{flex-shrink:0}
+/* v801: long KAM names (admin rep-detail drill) truncate to one row instead of wrapping to two */
+#portview-heading{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#pv-action-btns{flex-shrink:0}
 .portview-level-badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:2px 8px;border-radius:10px;background:var(--tk-accent-dim-3);color:rgba(180,210,255,.9)}
 .portview-summary-row{display:flex;gap:10px;margin-bottom:12px}
 .portview-stat{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px;text-align:center}
