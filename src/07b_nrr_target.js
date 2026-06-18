@@ -1035,7 +1035,7 @@ async function renderPortviewTargetBar() {
   };
   bar.style.cursor = 'pointer';
   bar.title = 'ดูสุขภาพพอร์ต Q2';
-  bar.setAttribute('-webkit-tap-highlight-color','transparent');
+  bar.style.webkitTapHighlightColor='transparent'; // v803: setAttribute throws InvalidCharacterError on Safari iOS
 
   bar.innerHTML = `
     <div class="tgt-bar-header">
