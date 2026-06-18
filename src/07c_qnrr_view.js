@@ -771,7 +771,7 @@ function _qnrrRenderBreakdown(){
   html += '<tr class="bk-subrow">' +
     '<td><div class="qnrr-bk-mv-cell">' +
       '<div class="qnrr-bk-dot" style="background:rgba(251,191,36,.70)"></div>' +
-      '<span class="qnrr-bk-mv-name">└ Contraction</span>' +
+      '<span class="qnrr-bk-mv-name">└ Up/Down</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -1169,7 +1169,6 @@ function _qnrrListFilter(mv, btn){
 window._qnrrListFilter = _qnrrListFilter;
 
 function _qnrrExpandAll(expand){
-  // expand=true: show all outlet rows; expand=false: hide all
   document.querySelectorAll('.qnrr-ol-rows').forEach(function(el){
     el.style.display = expand ? 'block' : 'none';
   });
@@ -1178,6 +1177,20 @@ function _qnrrExpandAll(expand){
   });
 }
 window._qnrrExpandAll = _qnrrExpandAll;
+
+// v776c: single toggle button
+var _allExpanded = true;
+function _qnrrToggleAll(btn){
+  _allExpanded = !_allExpanded;
+  _qnrrExpandAll(_allExpanded);
+  if (btn) {
+    var label = btn.querySelector('span');
+    var path  = btn.querySelector('path');
+    if (label) label.textContent = _allExpanded ? 'กาง' : 'หุบ';
+    if (path)  path.setAttribute('d', _allExpanded ? 'M2 5l5 4 5-4' : 'M2 9l5-4 5 4');
+  }
+}
+window._qnrrToggleAll = _qnrrToggleAll;
 
 function _qnrrRenderList(){
   var wrap = _el('qnrr-acct-list');

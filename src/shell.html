@@ -3853,11 +3853,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
           <button class="qnrr-chip" onclick="_qnrrListFilter('comeback',this)">Comeback</button>
         </div>
         <div class="qnrr-list-xpand">
-          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(true)" title="Expand all">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="qnrr-xpand-btn" onclick="_qnrrExpandAll(false)" title="Collapse all">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 9l5-4 5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <button class="qnrr-xpand-btn" id="qnrr-toggle-all-btn" onclick="_qnrrToggleAll(this)" title="กาง/หุบทั้งหมด">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>กาง</span>
           </button>
         </div>
       </div>
