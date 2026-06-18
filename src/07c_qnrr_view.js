@@ -199,9 +199,10 @@ var MV_CFG = {
   core_nrr_churn: {label:'Churn',       color:'rgba(248,113,113,.84)', order:6},
   transfer_out:   {label:'Transfer out',color:'ghost',                 order:7}
 };
-var STACK_ORDER  = ['core_nrr','handover','expansion','new_sales','comeback','transfer_in'];
-var LEGEND_ORDER = ['core_nrr','handover','expansion','new_sales','comeback','transfer_in','core_nrr_churn','transfer_out'];
-var BK_ORDER     = ['core_nrr','handover','expansion','new_sales','comeback','transfer_in','core_nrr_churn','transfer_out'];
+var STACK_ORDER  = ['core_nrr','handover','new_sales','expansion','comeback','transfer_in'];
+var LEGEND_ORDER = ['core_nrr','handover','expansion','comeback','transfer_in','core_nrr_churn','transfer_out'];
+var BK_ORDER     = ['core_nrr','handover','expansion','comeback','transfer_in','core_nrr_churn','transfer_out'];
+// new_sales ถูก merge เข้า handover cohort block — ไม่ render แยก
 
 var _scopeIdx = 0;
 var _selBar   = null; // ไม่ highlight bar ไหนจนกว่า user จะ tap
@@ -536,6 +537,8 @@ function _qnrrRenderChart(){
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
           '<span style="color:rgba(188,215,255,.35)"> actual</span></div>' +
           '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.60);font-weight:700">' + bm.curr_days + '/' + bm.days_in_month + 'd</div>';
+        // mark as partial for CSS height override
+        topHtml = '<!-- partial -->' + topHtml;
       } else {
         outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' out</div>' : '';
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + '</div>' + outLabel;
@@ -577,8 +580,9 @@ function _qnrrRenderChart(){
     }
 
     var onclickStr = isBase ? '' : 'onclick="_qnrrSelBar(\'' + m + '\')"';
+    var isPartialBar = !isBase && bm && bm.is_partial;
     return '<div class="qnrr-bar-col' + (isBase ? ' base-col' : '') + (isActive ? ' active' : '') + '" data-month="' + m + '" ' + onclickStr + '>' +
-      '<div class="qnrr-bar-top-wrap">' + topHtml + '</div>' +
+      '<div class="qnrr-bar-top-wrap' + (isPartialBar ? ' partial' : '') + '">' + topHtml.replace('<!-- partial -->','') + '</div>' +
       '<div class="qnrr-bar-chart-area">' + bodyHtml + '</div>' +
       '<div class="qnrr-bar-lbl">' + _esc(MONTHS_TH[m] || m) + (isLast ? '~' : '') + '</div>' +
     '</div>';
@@ -683,53 +687,111 @@ function _qnrrRenderBreakdown(){
 
 
 
-  // ── Other movements (skip core_nrr and core_nrr_churn — already handled) ─
-  var SKIP = {core_nrr: true, core_nrr_churn: true};
+  // ── Other movements (skip core_nrr, core_nrr_churn, new_sales — handled separately) ─
+  var SKIP = {core_nrr: true, core_nrr_churn: true, new_sales: true};
   BK_ORDER.forEach(function(mv){
     if (SKIP[mv]) return;
     var cfg = MV_CFG[mv];
     var hasAny = ALL_MONTHS.some(function(m){
       if (m === BASE_MONTH) return false;
       var bm = _data.by_month[m];
+      if (!bm) return false;
+      if (mv === 'handover') return (bm.segments['handover'] || 0) + (bm.segments['new_sales'] || 0) > 0;
       return bm && (bm.segments[mv] || 0) > 0;
     });
     if (!hasAny) return;
 
     var isChurn = (mv === 'transfer_out');
-    var isPos   = (mv === 'expansion' || mv === 'new_sales' || mv === 'comeback');
+    var isPos   = (mv === 'expansion' || mv === 'comeback');
     var isNeut  = (mv === 'handover' || mv === 'transfer_in');
     var sqStyle = cfg.color === 'ghost'
       ? 'border:1px dashed rgba(255,255,255,.28);background:transparent'
       : 'background:' + cfg.color;
 
-    html += '<tr>' +
-      '<td><div class="qnrr-bk-mv-cell">' +
-        '<div class="qnrr-bk-dot" style="' + sqStyle + '"></div>' +
-        '<span class="qnrr-bk-mv-name">' + _esc(cfg.label) + '</span>' +
-      '</div></td>';
-
-    ALL_MONTHS.forEach(function(m){
-      // Handover Mar column: แสดง base_gmv normalized (Mar GMV ของ handover outlets)
-      if (m === BASE_MONTH) {
-        if (mv === 'handover' && _data.handover_base_norm > 0) {
-          html += '<td class="bk-neut">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>';
-        } else {
-          html += '<td style="color:rgba(255,255,255,.15)">—</td>';
+    if (mv === 'handover') {
+      // ── Handover + New Sales cohort block ────────────────────────────────
+      // Main row = total (handover + new_sales) ทุกเดือน
+      html += '<tr>' +
+        '<td><div class="qnrr-bk-mv-cell">' +
+          '<div class="qnrr-bk-dot" style="' + sqStyle + '"></div>' +
+          '<span class="qnrr-bk-mv-name">Handover & New</span>' +
+        '</div></td>';
+      ALL_MONTHS.forEach(function(m){
+        if (m === BASE_MONTH) {
+          // Mar: แสดง handover base (Mar GMV ของ handover cohort)
+          if (_data.handover_base_norm > 0) {
+            html += '<td class="bk-neut">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>';
+          } else {
+            html += '<td style="color:rgba(255,255,255,.15)">—</td>';
+          }
+          return;
         }
-        return;
-      }
-      var bm = _data.by_month[m];
-      var g  = (bm && bm.segments[mv]) || 0;
-      // ใช้สีจาก MV_CFG โดยตรง ไม่ใช้ bk-pos (เพราะ bk-pos=green ทุกตัว ทำให้ expansion/new_sales/comeback สีผิด)
-      var cellColor = g > 0
-        ? (isChurn ? 'rgba(248,113,113,.84)'
-          : isNeut ? 'rgba(96,165,250,.80)'
-          : cfg.color !== 'ghost' ? cfg.color : 'rgba(255,255,255,.5)')
-        : '';
-      var cellStyle = cellColor ? 'color:' + cellColor : 'color:rgba(255,255,255,.15)';
-      html += '<td style="' + cellStyle + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '—') + '</td>';
-    });
-    html += '</tr>';
+        var bm = _data.by_month[m];
+        var g  = ((bm && bm.segments['handover']) || 0) + ((bm && bm.segments['new_sales']) || 0);
+        html += '<td style="color:' + (g>0 ? 'rgba(96,165,250,.80)' : 'rgba(255,255,255,.15)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
+      });
+      html += '</tr>';
+
+      // Sub-rows: cohort breakdown by start month
+      // Cohort Mar = handover (new_user_exp = Mar, pre-Mar owner = SALE)
+      // Cohort Apr/May/Jun = new_sales (new_user_exp = each month)
+      var COHORTS = [
+        {key:'handover',  label:'└ cohort Mar', color:'rgba(96,165,250,.60)'},
+        {key:'new_sales', label:'└ cohort Apr+', color:'rgba(167,139,250,.65)'},
+      ];
+      // Check if we even have new_sales data
+      var hasNewSales = ALL_MONTHS.some(function(m){
+        if (m === BASE_MONTH) return false;
+        var bm = _data.by_month[m];
+        return bm && (bm.segments['new_sales'] || 0) > 0;
+      });
+      COHORTS.forEach(function(co){
+        if (co.key === 'new_sales' && !hasNewSales) return;
+        html += '<tr class="bk-subrow">' +
+          '<td><div class="qnrr-bk-mv-cell sub">' +
+            '<div class="qnrr-bk-dot sub" style="background:' + co.color + '"></div>' +
+            '<span class="qnrr-bk-mv-name sub">' + _esc(co.label) + '</span>' +
+          '</div></td>';
+        ALL_MONTHS.forEach(function(m){
+          if (m === BASE_MONTH) {
+            if (co.key === 'handover' && _data.handover_base_norm > 0) {
+              html += '<td style="color:' + co.color + ';font-size:9px">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>';
+            } else {
+              html += '<td style="color:rgba(255,255,255,.12)">—</td>';
+            }
+            return;
+          }
+          var bm = _data.by_month[m];
+          var g  = (bm && bm.segments[co.key]) || 0;
+          html += '<td style="color:' + (g>0 ? co.color : 'rgba(255,255,255,.12)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
+        });
+        html += '</tr>';
+      });
+    } else {
+      // ── Standard movement row ──────────────────────────────────────────────
+      html += '<tr>' +
+        '<td><div class="qnrr-bk-mv-cell">' +
+          '<div class="qnrr-bk-dot" style="' + sqStyle + '"></div>' +
+          '<span class="qnrr-bk-mv-name">' + _esc(cfg.label) + '</span>' +
+        '</div></td>';
+
+      ALL_MONTHS.forEach(function(m){
+        if (m === BASE_MONTH) {
+          html += '<td style="color:rgba(255,255,255,.15)">—</td>';
+          return;
+        }
+        var bm = _data.by_month[m];
+        var g  = (bm && bm.segments[mv]) || 0;
+        var cellColor = g > 0
+          ? (isChurn ? 'rgba(248,113,113,.84)'
+            : isNeut ? 'rgba(96,165,250,.80)'
+            : cfg.color !== 'ghost' ? cfg.color : 'rgba(255,255,255,.5)')
+          : '';
+        var cellStyle = cellColor ? 'color:' + cellColor : 'color:rgba(255,255,255,.15)';
+        html += '<td style="' + cellStyle + '">' + (g > 0 ? (isChurn ? '-' : '') + _fmtM(g) : '—') + '</td>';
+      });
+      html += '</tr>';
+    }
   });
 
   // ── Total GMV row ─────────────────────────────────────────────────────────
@@ -1022,6 +1084,33 @@ function _qnrrRenderList(){
   // Sort by totalCurr DESC
   filteredAccts.sort(function(a,b){ return byAcct[b].totalCurr - byAcct[a].totalCurr; });
 
+  // ── Update filter chip counts ─────────────────────────────────────────────
+  // Count outlets per movement type across all accounts
+  var mvCounts = {all: 0};
+  acctOrder.forEach(function(aid){
+    Object.keys(byAcct[aid].outlets).forEach(function(oid){
+      var mv = _domMv(byAcct[aid].outlets[oid]);
+      mvCounts[mv] = (mvCounts[mv] || 0) + 1;
+      mvCounts['all'] = (mvCounts['all'] || 0) + 1;
+    });
+  });
+  // Map filter key → chip dataset-mv (chips in HTML have onclick="...('mv',this)")
+  var MV_CHIP_KEYS = ['all','core_nrr','core_nrr_churn','handover','expansion','new_sales','comeback'];
+  document.querySelectorAll('.qnrr-list-filter-bar .qnrr-chip').forEach(function(btn){
+    // Extract mv key from onclick attr
+    var onclick = btn.getAttribute('onclick') || '';
+    var mvMatch = onclick.match(/'([a-z_]+)'/);
+    var mv = mvMatch ? mvMatch[1] : null;
+    if (!mv) return;
+    var cnt = mvCounts[mv] || 0;
+    // Store original text (strip any old count suffix)
+    var origText = btn.dataset.origLabel || btn.textContent.replace(/\s*\d+$/, '').trim();
+    btn.dataset.origLabel = origText;
+    btn.textContent = cnt > 0 ? origText + ' ' + cnt : origText;
+    // Hide chip if zero count and not 'all'
+    btn.style.display = (mv !== 'all' && cnt === 0) ? 'none' : '';
+  });
+
   // Build outletNameMap once — ไม่ build ซ้ำใน loop
   var outletNameMap2 = {};
   if (typeof bulkOutletsData !== 'undefined') {
@@ -1036,7 +1125,20 @@ function _qnrrRenderList(){
   var partialTilde = (_data.by_month['2026-06'] && _data.by_month['2026-06'].is_partial) ? '~' : '';
   var COL_W = 42;
 
-  var html = '';
+  // ── Sticky month header (outside account tables) ─────────────────────────
+  // header row ครอบทั้ง list — align กับ table colgroup (auto + 4×42px)
+  // ใช้ div+grid ไม่ใช้ table เพราะ account name col width เปลี่ยนตาม screen
+  var partialJun = _data.by_month['2026-06'] && _data.by_month['2026-06'].is_partial;
+  var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
+  // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
+  var headerHtml = '<div class="qnrr-list-mo-hdr">' +
+    '<div class="qnrr-list-mo-hdr-name"></div>' +
+    listMoHdrs.map(function(mo){
+      return '<div class="qnrr-list-mo-hdr-cell">' + mo + '</div>';
+    }).join('') +
+  '</div>';
+
+  var html = headerHtml;
   filteredAccts.forEach(function(aid){
     var a = byAcct[aid];
 
@@ -1069,12 +1171,6 @@ function _qnrrRenderList(){
         '<col style="width:auto">' +  // name col flexible
         ALL_MONTHS.map(function(){ return '<col style="width:' + COL_W + 'px">'; }).join('') +
       '</colgroup>' +
-      '<thead><tr class="qnrr-acct-tbl-hdr">' +
-        '<td></td>' +  // dot + name placeholder
-        ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + partialTilde].map(function(mo){
-          return '<td>' + mo + '</td>';
-        }).join('') +
-      '</tr></thead>' +
       '<tbody>';
 
     outletIds.forEach(function(oid){
@@ -1122,6 +1218,7 @@ function _qnrrToggleAcctRows(id, hdr){
 window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
 })();
+
 
 
 
