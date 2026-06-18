@@ -498,9 +498,19 @@ function _qnrrRenderChart(){
   // Mar bar total = core cohort base + handover base (GMV จริงทั้งหมดใน Mar)
   var marBarTotal = Math.round((_data.base_norm + (_data.handover_base_norm / 30)) * 30);
   var allGmvs = [marBarTotal];
+  // Pre-compute rawTotals for partial months so maxGmv covers both MTD and run-rate
+  var rawTotals = {};
   Q_MONTHS.forEach(function(m){
     var bm = _data.by_month[m];
-    if (bm) allGmvs.push(bm.total_gmv);
+    if (!bm) return;
+    if (bm.is_partial) {
+      var raw = bm.rows ? bm.rows.reduce(function(s,r){ return s+(parseFloat(r.curr_gmv)||0); },0) : bm.total_gmv;
+      rawTotals[m] = raw;
+      allGmvs.push(bm.total_gmv); // run-rate (normalized) drives max height
+      allGmvs.push(raw);          // also include raw so it fits within chart
+    } else {
+      allGmvs.push(bm.total_gmv);
+    }
   });
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
   var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
@@ -515,9 +525,12 @@ function _qnrrRenderChart(){
     var m      = b.month;
     var isBase = b.isBase;
     var bm     = _data.by_month[m];
-    var barH   = isBase
-      ? Math.max(6, Math.round(marBarTotal / maxGmv * chartH))
-      : (bm ? Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH)) : 6);
+    // For partial months: barH = raw MTD (shorter), projH = run-rate (taller)
+    // For full months: barH = normalized total_gmv
+    var _gmvForHeight = (!isBase && bm && bm.is_partial && rawTotals[m])
+      ? rawTotals[m]
+      : (isBase ? marBarTotal : (bm ? bm.total_gmv : 0));
+    var barH = Math.max(6, Math.round(_gmvForHeight / maxGmv * chartH));
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
@@ -530,12 +543,9 @@ function _qnrrRenderChart(){
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
       if (bm.is_partial) {
-        // Partial month: MTD actual (raw, not normalized) + run-rate projection
-        var rawTotal = bm.rows ? bm.rows.reduce(function(s,r){
-          return s + (parseFloat(r.curr_gmv)||0);
-        }, 0) : bm.total_gmv;
-        // run-rate = normalized total_gmv (÷curr_days×30) — already in bm.total_gmv
-        var runRate = bm.total_gmv;
+        // Partial month: MTD actual (raw) from pre-computed cache
+        var rawTotal = rawTotals[m] || bm.total_gmv;
+        var runRate  = bm.total_gmv; // normalized ÷curr_days×30
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
