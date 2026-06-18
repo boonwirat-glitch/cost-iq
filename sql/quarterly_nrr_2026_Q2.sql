@@ -1,26 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v7)
+-- Q2 2026 Quarter NRR Health — quarterly_nrr_2026_Q2.sql  (v4)
 -- ════════════════════════════════════════════════════════════════════════════
---
--- v7 fixes (vs v6):
---   Revert mar_cohort + apr_labels to commercial_owner='KAM' filter
---   Mar cohort MUST use commercial_owner='KAM' — NRR denominator requires
---   true KAM outlets in Mar only (not Sales/PM with staff_owner set to KAM)
---   Fix scope: remove commercial_owner filter ONLY from LEG 2A + LEG 3A
---   (May/Jun outlets where commercial_owner lags behind staff_owner update)
---
--- v6 fixes (vs v5):
---   FIX 7 revised: ลบ LEG D ออก เปลี่ยน approach
---   แก้ที่ JOIN condition ใน apr_labels, LEG 2A (May), LEG 3A (Jun):
---   ลบ commercial_owner = 'KAM' condition ออกจาก JOIN kam_list
---   ใช้แค่ TRIM(staff_owner) = TRIM(kam_name) — staff_owner บอก KAM จริง ณ วันสั่ง
---   commercial_owner เป็น flag ที่ lag/incorrect → ไม่ควรใช้กรอง
---
--- v5 fixes (vs v4):
---   FIX 7: เพิ่ม LEG D (Apr/May/Jun) — จับ outlets ที่ account อยู่ในพอร์ต KAM
---           แต่ขณะสั่ง commercial_owner ≠ 'KAM' → ตก INNER JOIN LEG A
---           JOIN dim.user_master ด้วย account_id เพื่อหา KAM จริง
---           ผลลัพธ์: QNRR total_gmv = Portfolio gmv_to_date (ต่างกัน 5% เดิม)
 --
 -- v4 fixes (vs v3):
 --   FIX 4: expansion ตรวจ first_dollar_date >= Apr ก่อน handover/new_sales
@@ -394,7 +374,6 @@ apr_rows AS (
   FROM apr_labels al
   LEFT JOIN apr_gmv ag ON al.outlet_id = ag.outlet_id
 
-
   UNION ALL
 
   -- LEG 1B: transfer_out — Mar cohort แต่ Apr ownership เปลี่ยน KAM
@@ -490,13 +469,13 @@ may_rows AS (
 
   FROM may_ownership mo
   JOIN kam_list k
-    ON TRIM(mo.staff_owner) = TRIM(k.kam_name)
+    ON mo.commercial_owner = 'KAM'
+   AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN apr_labels al
     ON mo.outlet_id = al.outlet_id
    AND al.period_kam_email = k.kam_email
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_may ON mo.outlet_id = ofd_may.outlet_id
-
 
   UNION ALL
 
@@ -591,13 +570,13 @@ jun_rows AS (
 
   FROM jun_ownership jo
   JOIN kam_list k
-    ON TRIM(jo.staff_owner) = TRIM(k.kam_name)
+    ON jo.commercial_owner = 'KAM'
+   AND TRIM(jo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN apr_labels al
     ON jo.outlet_id = al.outlet_id
    AND al.period_kam_email = k.kam_email
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_jun ON jo.outlet_id = ofd_jun.outlet_id
-
 
   UNION ALL
 
