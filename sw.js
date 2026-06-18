@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v800';
+const CACHE_NAME = 'sense-v801';
 const APP_URL = '/index.html';
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────

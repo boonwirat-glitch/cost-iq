@@ -984,8 +984,6 @@ async function renderPortviewTargetBar() {
 
   // ── Target color code ─────────────────────────────────────────
   const targetCls = fbMode===null ? 'tgt-real' : fbMode==='team' ? 'tgt-alloc' : 'tgt-base';
-  const denomTilde = fbMode ? '~' : '';
-
   bar.className = fbMode==='team'?'fb-team':fbMode==='base'?'fb-base':'';
   // Ensure pace bar is hidden — tgt bar is the single visible widget (v190)
   const oldBar = document.getElementById('portview-pace-bar');
@@ -1037,8 +1035,7 @@ async function renderPortviewTargetBar() {
         <div class="tgt-rr-row">
           <span class="tgt-rr-actual">${_tgtFmtM(runRate)}</span>
           <span class="tgt-rr-sep">/</span>
-          <span class="tgt-rr-target ${targetCls}">${denomTilde}${_tgtFmtM(target)}</span>
-          ${(fbMode!=='base'&&_baseline3mo>0)?`<span style="font-size:11px;color:rgba(255,255,255,.55);margin-left:3px">(${_tgtFmtM(_baseline3mo)})</span>`:``}
+          <span class="tgt-rr-target ${targetCls}">${_tgtFmtM(target)}</span>
         </div>
       </div>
     </div>
