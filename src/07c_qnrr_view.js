@@ -505,25 +505,8 @@ function _qnrrRenderChart(){
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
   var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
 
-  // ── Zoomed axis (v792) ────────────────────────────────
-  // Floor = 88% of base GMV — so small diffs (94% vs 98%) are visually meaningful
-  // Bars use (value - zoomFloor) / (maxGmv - zoomFloor) for height
-  // ref-line drawn at floor with broken-axis cue
-  var zoomFloor = Math.round(_data.base_gmv * 0.88);
-  var zoomRange = Math.max(maxGmv - zoomFloor, 1);
-
-  // Draw ref-lines: base line + floor break marker
-  if (refLines) {
-    var baseLineH = Math.round((Math.round(_data.base_norm * 30) - zoomFloor) / zoomRange * chartH);
-    var baseLinePct = 100 - Math.round(baseLineH / chartH * 100);
-    refLines.innerHTML =
-      '<div class="qnrr-ref-line" style="top:' + baseLinePct + '%;border-color:rgba(96,165,250,.28)">' +
-        '<span class="qnrr-ref-label">฿' + Math.round(_data.base_norm * 30 / 1e6 * 10) / 10 + 'M base</span>' +
-      '</div>' +
-      '<div style="position:absolute;bottom:0;left:0;right:0;height:8px;display:flex;align-items:flex-end;justify-content:center">' +
-        '<span style="font-size:8px;font-family:var(--tk-font-mono);color:rgba(188,215,255,.30);letter-spacing:.04em">⌇ axis cut at ' + Math.round(zoomFloor/1e6*10)/10 + 'M</span>' +
-      '</div>';
-  }
+  // ref-line removed — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
+  if (refLines) refLines.innerHTML = '';
 
   var allBars = [{month: BASE_MONTH, isBase: true}];
   Q_MONTHS.forEach(function(m){ allBars.push({month: m, isBase: false}); });
@@ -532,14 +515,9 @@ function _qnrrRenderChart(){
     var m      = b.month;
     var isBase = b.isBase;
     var bm     = _data.by_month[m];
-    // zoomed axis: height = (val - floor) / range * chartH
-    function _zoomH(val) {
-      var v = Math.max(zoomFloor, val);
-      return Math.max(4, Math.round((v - zoomFloor) / zoomRange * chartH));
-    }
     var barH   = isBase
-      ? _zoomH(marBarTotal)
-      : (bm ? _zoomH(bm.total_gmv) : 4);
+      ? Math.max(6, Math.round(marBarTotal / maxGmv * chartH))
+      : (bm ? Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH)) : 6);
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
@@ -572,11 +550,9 @@ function _qnrrRenderChart(){
     if (isBase) {
       // Base bar: ใช้ structure เดียวกับ qnrr-bar-body (flex + column-reverse)
       // core segment (dashed bg) + handover segment (น้ำเงิน) อยู่บนสุด
-      var baseTotal = Math.round(_data.base_norm * 30) + Math.round((_data.handover_base_norm || 0));
+      var coreH   = Math.max(4, Math.round(_data.base_norm * 30 / maxGmv * chartH));
       var hovNorm = _data.handover_base_norm || 0;
-      var hovFrac = baseTotal > 0 ? hovNorm / baseTotal : 0;
-      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovFrac * barH)) : 0;
-      var coreH   = Math.max(4, barH - hovH);
+      var hovH    = hovNorm > 0 ? Math.max(3, Math.round(hovNorm / maxGmv * chartH)) : 0;
       var hovSeg  = hovH > 0
         ? '<div class="qnrr-seg qnrr-base-hov-seg" style="height:' + hovH + 'px"></div>'
         : '';
@@ -584,12 +560,10 @@ function _qnrrRenderChart(){
       bodyHtml = '<div class="qnrr-bar-body qnrr-base-body" style="height:' + barH + 'px">' + coreSeg + hovSeg + '</div>';
     } else if (bm) {
       var segsHtml = '';
-      // segments are proportional slices of barH (not independent zoom)
-      var totalSegGmv = STACK_ORDER.reduce(function(s,mv){ return s+(bm.segments&&bm.segments[mv]||0); },0) || 1;
       STACK_ORDER.forEach(function(mv){
         var gmv = (bm.segments && bm.segments[mv]) || 0;
         if (gmv <= 0) return;
-        var h   = Math.max(3, Math.round(gmv / totalSegGmv * barH));
+        var h   = Math.max(3, Math.round(gmv / maxGmv * chartH));
         var cfg = MV_CFG[mv];
         segsHtml += '<div class="qnrr-seg" style="height:' + h + 'px;background:' + cfg.color + ';min-height:3px"></div>';
       });
@@ -597,7 +571,7 @@ function _qnrrRenderChart(){
       var ghostHtml = '';
       if (bm.is_partial && bm.curr_days > 0) {
         // ghost bar = normalized total_gmv (already ÷days×30)
-        var projH = _zoomH(bm.total_gmv);
+        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
         if (projH > barH) {
           ghostHtml = '<div class="qnrr-ghost-proj" style="height:' + projH + 'px" title="Run-rate: ' + _fmtM(bm.total_gmv) + '/30 วัน"></div>';
         }
@@ -680,7 +654,7 @@ function _qnrrRenderBreakdown(){
   html += '<tr class="bk-subrow">' +
     '<td><div class="qnrr-bk-mv-cell">' +
       '<div class="qnrr-bk-dot" style="background:rgba(248,113,113,.82)"></div>' +
-      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Churn</span>' +
+      '<span class="qnrr-bk-mv-name">└ Churn</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -695,7 +669,7 @@ function _qnrrRenderBreakdown(){
   html += '<tr class="bk-subrow">' +
     '<td><div class="qnrr-bk-mv-cell">' +
       '<div class="qnrr-bk-dot" style="background:rgba(251,191,36,.70)"></div>' +
-      '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">└ Contraction</span>' +
+      '<span class="qnrr-bk-mv-name">└ Contraction</span>' +
     '</div></td>';
   ALL_MONTHS.forEach(function(m){
     if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.15)">—</td>'; return; }
@@ -758,38 +732,57 @@ function _qnrrRenderBreakdown(){
       });
       html += '</tr>';
 
-      // Sub-rows: cohort breakdown by start month
-      // Cohort Mar = handover (new_user_exp = Mar, pre-Mar owner = SALE)
-      // Cohort Apr/May/Jun = new_sales (new_user_exp = each month)
-      var COHORTS = [
-        {key:'handover',  label:'└ cohort Mar', color:'rgba(96,165,250,.60)'},
-        {key:'new_sales', label:'└ cohort Apr+', color:'rgba(167,139,250,.65)'},
-      ];
-      // Check if we even have new_sales data
-      var hasNewSales = ALL_MONTHS.some(function(m){
-        if (m === BASE_MONTH) return false;
+      // Sub-rows: cohort Mar (handover) + cohort Apr / May / Jun (new_sales by month)
+      // cohort Mar = handover outlets — Mar GMV in base col, then their curr GMV each month
+      var hovColor = 'rgba(96,165,250,.60)';
+      html += '<tr class="bk-subrow">' +
+        '<td><div class="qnrr-bk-mv-cell">' +
+          '<div class="qnrr-bk-dot" style="background:' + hovColor + '"></div>' +
+          '<span class="qnrr-bk-mv-name">└ cohort มี.ค.</span>' +
+        '</div></td>';
+      ALL_MONTHS.forEach(function(m){
+        if (m === BASE_MONTH) {
+          html += _data.handover_base_norm > 0
+            ? '<td class="bk-neut">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>'
+            : '<td style="color:rgba(255,255,255,.12)">—</td>';
+          return;
+        }
         var bm = _data.by_month[m];
-        return bm && (bm.segments['new_sales'] || 0) > 0;
+        var g  = (bm && bm.segments['handover']) || 0;
+        html += '<td style="color:' + (g>0 ? hovColor : 'rgba(255,255,255,.12)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
       });
-      COHORTS.forEach(function(co){
-        if (co.key === 'new_sales' && !hasNewSales) return;
+      html += '</tr>';
+
+      // cohort Apr / May / Jun = new_sales outlets whose new_user_exp falls in that month
+      // Data: segments['new_sales'] in by_month[m] = new_sales that appeared in month m
+      var NS_COHORTS = [
+        {month:'2026-04', label:'└ cohort เม.ย.', color:'rgba(167,139,250,.55)'},
+        {month:'2026-05', label:'└ cohort พ.ค.',  color:'rgba(167,139,250,.65)'},
+        {month:'2026-06', label:'└ cohort มิ.ย.', color:'rgba(167,139,250,.75)'},
+      ];
+      NS_COHORTS.forEach(function(nc){
+        // Only show row if this cohort-month has data at all
+        // new_sales in nc.month = outlets that first appeared in nc.month
+        // They appear in that month's segment AND carry forward (but forward data = same outlet in later months... 
+        // actually: new_sales = outlet's first-ever purchase month in Q, so same outlet shows as new_sales only in nc.month)
+        // For later months, that outlet becomes core_nrr or churn (not new_sales anymore)
+        // So each row = GMV of that cohort only IN that column month (sparse)
+        var hasCohort = (function(){
+          var bm = _data.by_month[nc.month];
+          return bm && (bm.segments['new_sales'] || 0) > 0;
+        })();
+        if (!hasCohort) return;
         html += '<tr class="bk-subrow">' +
           '<td><div class="qnrr-bk-mv-cell">' +
-            '<div class="qnrr-bk-dot" style="background:' + co.color + '"></div>' +
-            '<span class="qnrr-bk-mv-name" style="font-size:11px;color:rgba(255,255,255,.55)">' + _esc(co.label) + '</span>' +
+            '<div class="qnrr-bk-dot" style="background:' + nc.color + '"></div>' +
+            '<span class="qnrr-bk-mv-name">' + _esc(nc.label) + '</span>' +
           '</div></td>';
         ALL_MONTHS.forEach(function(m){
-          if (m === BASE_MONTH) {
-            if (co.key === 'handover' && _data.handover_base_norm > 0) {
-              html += '<td style="color:' + co.color + ';font-size:9px">' + _fmtM(Math.round(_data.handover_base_norm)) + '</td>';
-            } else {
-              html += '<td style="color:rgba(255,255,255,.12)">—</td>';
-            }
-            return;
-          }
+          if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
           var bm = _data.by_month[m];
-          var g  = (bm && bm.segments[co.key]) || 0;
-          html += '<td style="color:' + (g>0 ? co.color : 'rgba(255,255,255,.12)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
+          // only show new_sales GMV for the specific cohort month column
+          var g = (m === nc.month) ? ((bm && bm.segments['new_sales']) || 0) : 0;
+          html += '<td style="color:' + (g>0 ? nc.color : 'rgba(255,255,255,.10)') + '">' + (g > 0 ? _fmtM(g) : '—') + '</td>';
         });
         html += '</tr>';
       });
