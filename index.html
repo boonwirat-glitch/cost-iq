@@ -1,4 +1,4 @@
-<!-- Freshket Sense 813: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense 814: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: '813',
+      version: '814',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -15837,14 +15837,15 @@ function handleFileUpload(type,input){
             period_kam_name: (p[4]||'').trim(),
             period_tl_email: (p[5]||'').trim(),
             base_kam_email:  (p[6]||'').trim(),
-            account_id:      (p[7]||'').trim(),
-            account_name:    (p[8]||'').trim(),
-            account_type:    (p[9]||'').trim(),
-            outlet_id:       (p[10]||'').trim(),
-            base_gmv:        parseFloat(p[11])||0,
-            curr_gmv:        parseFloat(p[12])||0,
-            base_days:       parseInt(p[13])||31,
-            curr_days:       parseInt(p[14])||30
+            base_tl_email:   (p[7]||'').trim(),
+            account_id:      (p[8]||'').trim(),
+            account_name:    (p[9]||'').trim(),
+            account_type:    (p[10]||'').trim(),
+            outlet_id:       (p[11]||'').trim(),
+            base_gmv:        parseFloat(p[12])||0,
+            curr_gmv:        parseFloat(p[13])||0,
+            base_days:       parseInt(p[14])||31,
+            curr_days:       parseInt(p[15])||30
           };
           allRows.push(row);
           if(row.period_kam_email){
@@ -51861,8 +51862,12 @@ function _qnrrCompute(kamEmail, scope) {
 
   function _effectiveMovement(r) {
     if (scope === 'kam') return r.movement_type;
-    var sameTeam = r.base_kam_email && r.period_tl_email === myTlEmail
-      && (r.base_kam_email !== r.period_kam_email);
+    // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
+    // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
+    // transfer_in/out ข้าม squad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
+    var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
+    var sameTlPeriod = r.period_tl_email === myTlEmail;
+    var sameTeam     = sameTlBase && sameTlPeriod;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
     return r.movement_type;
