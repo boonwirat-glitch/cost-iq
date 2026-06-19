@@ -1,3 +1,18 @@
+// ── QNRR Quarter Config (global) — แก้แค่ที่นี่ทุก quarter ─────────────────
+// Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
+// Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
+var QNRR_CFG = {
+  quarter:    '2026q2',
+  base_month: '2026-03',
+  q_months:   ['2026-04','2026-05','2026-06'],
+  months_th:  {
+    '2026-03':'มี.ค.','2026-04':'เม.ย.',
+    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
+  },
+  csv_file:   'sense_qnrr_2026q2.csv'
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ══════════════════════════════════════════════════════════════════════════════
 // _qnrrCompute — Quarter NRR Health compute (v776 — adjusted base for core transfer_out)
 //
@@ -223,8 +238,6 @@ window._qnrrCompute = _qnrrCompute;
 (function(){
 'use strict';
 
-var SCOPES    = ['KAM'];
-var SCOPE_MAP = ['kam'];
 // ── QNRR Quarter Config — แก้แค่ที่นี่ทุก quarter ──────────────────────────
 // Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
 // Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
@@ -242,6 +255,9 @@ var QNRR_CFG = {
 var MONTHS_TH = QNRR_CFG.months_th;
 var Q_MONTHS  = QNRR_CFG.q_months;
 var BASE_MONTH= QNRR_CFG.base_month;
+
+var SCOPES    = ['KAM'];
+var SCOPE_MAP = ['kam'];
 
 // ── v775 semantic color palette ────────────────────────────────────────────
 var MV_CFG = {
@@ -836,7 +852,6 @@ function _qnrrRenderBreakdown(){
   html += '</tr>';
 
 
-
   // ── Other movements (skip core_nrr, core_nrr_churn, new_sales — handled separately) ─
   var SKIP = {core_nrr: true, core_nrr_churn: true, new_sales: true};
   BK_ORDER.forEach(function(mv){
@@ -1202,7 +1217,6 @@ function _qnrrRenderDrill(){
 }
 
 
-
 // ── _qnrrRenderList — full-quarter account × outlet list (v781) ──────────────
 var _listFilter = 'all';
 
@@ -1454,8 +1468,6 @@ function _qnrrToggleAcctRows(id, hdr){
 window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
 })();
-
-
 
 
 
