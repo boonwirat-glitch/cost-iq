@@ -1149,14 +1149,15 @@ function handleFileUpload(type,input){
             period_kam_name: (p[4]||'').trim(),
             period_tl_email: (p[5]||'').trim(),
             base_kam_email:  (p[6]||'').trim(),
-            account_id:      (p[7]||'').trim(),
-            account_name:    (p[8]||'').trim(),
-            account_type:    (p[9]||'').trim(),
-            outlet_id:       (p[10]||'').trim(),
-            base_gmv:        parseFloat(p[11])||0,
-            curr_gmv:        parseFloat(p[12])||0,
-            base_days:       parseInt(p[13])||31,
-            curr_days:       parseInt(p[14])||30
+            base_tl_email:   (p[7]||'').trim(),
+            account_id:      (p[8]||'').trim(),
+            account_name:    (p[9]||'').trim(),
+            account_type:    (p[10]||'').trim(),
+            outlet_id:       (p[11]||'').trim(),
+            base_gmv:        parseFloat(p[12])||0,
+            curr_gmv:        parseFloat(p[13])||0,
+            base_days:       parseInt(p[14])||31,
+            curr_days:       parseInt(p[15])||30
           };
           allRows.push(row);
           if(row.period_kam_email){
