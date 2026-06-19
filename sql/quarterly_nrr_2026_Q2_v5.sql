@@ -362,6 +362,7 @@ apr_rows AS (
     al.period_kam_name,
     al.period_tl_email,
     al.base_kam_email,
+    al.base_tl_email,
     al.base_kam_name,
     al.base_gmv,
     COALESCE(ag.gmv, 0) AS curr_gmv,
