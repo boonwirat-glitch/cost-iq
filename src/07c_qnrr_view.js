@@ -43,8 +43,12 @@ function _qnrrCompute(kamEmail, scope) {
 
   function _effectiveMovement(r) {
     if (scope === 'kam') return r.movement_type;
-    var sameTeam = r.base_kam_email && r.period_tl_email === myTlEmail
-      && (r.base_kam_email !== r.period_kam_email);
+    // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
+    // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
+    // transfer_in/out ข้าม squad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
+    var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
+    var sameTlPeriod = r.period_tl_email === myTlEmail;
+    var sameTeam     = sameTlBase && sameTlPeriod;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
     return r.movement_type;
