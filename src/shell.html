@@ -3810,7 +3810,37 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
       </div>
     </div>
   </div>
-  <!-- Zone B: chart + breakdown + list. Toggle icon lives inline in each view's sticky header. -->
+  <!-- Zone B: chart + breakdown + list. Toggle lives in fixed toolbar below hero. -->
+  <!-- FIXED TOOLBAR: always visible, consistent position both views -->
+  <div class="qnrr-toolbar" id="qnrr-toolbar">
+    <!-- iOS segmented control: bar-chart icon (กราฟ) | list icon -->
+    <div class="qnrr-seg" id="qnrr-seg" onclick="_qnrrSegTap(this)" role="group" aria-label="เลือก view">
+      <div class="qnrr-seg-thumb" id="qnrr-seg-thumb"></div>
+      <!-- bar-chart icon -->
+      <button class="qnrr-seg-btn active" id="qnrr-seg-chart" aria-label="กราฟ" aria-pressed="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <rect x="1" y="6" width="3" height="7" rx="1" fill="currentColor"/>
+          <rect x="5.5" y="3" width="3" height="10" rx="1" fill="currentColor"/>
+          <rect x="10" y="5" width="3" height="8" rx="1" fill="currentColor"/>
+        </svg>
+      </button>
+      <!-- list icon -->
+      <button class="qnrr-seg-btn" id="qnrr-seg-list" aria-label="List" aria-pressed="false">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <rect x="1" y="2.5" width="12" height="1.8" rx=".9" fill="currentColor"/>
+          <rect x="1" y="6.1" width="12" height="1.8" rx=".9" fill="currentColor"/>
+          <rect x="1" y="9.7" width="8.5" height="1.8" rx=".9" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+    <!-- double-chevron expand btn: list-view only -->
+    <button class="qnrr-expand-btn" id="qnrr-expand-btn" onclick="_qnrrToggleAll(this)" title="กาง/หุบทั้งหมด" aria-label="กาง/หุบทั้งหมด" style="display:none">
+      <svg id="qnrr-expand-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <polyline points="3,10 8,4 13,10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="3,14 8,8 13,14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
   <div class="qnrr-chart-zone" id="qnrr-chart-zone">
     <!-- กราฟ tab: bar chart + breakdown table stacked -->
     <div id="qnrr-chart-bars-wrap">
@@ -3837,7 +3867,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     <div class="qnrr-legend" id="qnrr-legend"></div>
     <!-- List tab: full-quarter account × outlet list -->
     <div class="qnrr-list-wrap" id="qnrr-list-wrap" style="display:none">
-      <!-- Filter bar + expand/collapse all -->
+      <!-- Filter bar -->
       <div class="qnrr-list-toolbar">
         <div class="qnrr-list-filter-bar">
           <button class="qnrr-chip on" onclick="_qnrrListFilter('all',this)">ทั้งหมด</button>
@@ -3847,12 +3877,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
           <button class="qnrr-chip" onclick="_qnrrListFilter('expansion',this)">Expansion</button>
           <button class="qnrr-chip" onclick="_qnrrListFilter('new_sales',this)">New</button>
           <button class="qnrr-chip" onclick="_qnrrListFilter('comeback',this)">Comeback</button>
-        </div>
-        <div class="qnrr-list-xpand">
-          <button class="qnrr-xpand-btn" id="qnrr-toggle-all-btn" onclick="_qnrrToggleAll(this)" title="กาง/หุบทั้งหมด">
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 5l5 4 5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>กาง</span>
-          </button>
         </div>
       </div>
       <div class="qnrr-acct-list" id="qnrr-acct-list"></div>

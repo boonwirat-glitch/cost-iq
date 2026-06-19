@@ -291,6 +291,9 @@ function _qnrrOpen(){
   sheet.classList.add('on');
   document.body.style.overflow = 'hidden';
   _qnrrInitSwipe(sheet);
+  // v810: sync toolbar to default chart view on every open
+  _allExpanded = true;
+  _qnrrSyncToolbar('chart');
 
   var qd = window.bulkQnrrData;
   if (qd && qd.loaded) {
@@ -378,7 +381,8 @@ window._qnrrToggleAcct = _qnrrToggleAcct;
 
 function _qnrrSetView(mode, btn){
   _viewMode = mode;
-  // v809: toggle is now inline icon buttons inside each view's header — no qnrr-vtog class needed
+  // v810: sync iOS segmented control + expand btn via toolbar helper
+  _qnrrSyncToolbar(mode);
 
   var chartWrap = _el('qnrr-chart-bars-wrap');
   var bkWrap    = _el('qnrr-breakdown-wrap');
@@ -672,30 +676,30 @@ function _qnrrRenderChart(){
   barsRow.innerHTML = barsHtml;
 }
 
-// ── Inline view toggle icon HTML (concept E) ────────────────────────────────
-// Returns two icon-only buttons (bar-chart / list) to embed in existing header rows.
-// active = 'chart' | 'list'
-function _qnrrToggleHtml(active){
-  var chartActive = active === 'chart';
-  var aStyle = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;background:';
-  var aOn  = aStyle + 'rgba(255,255,255,.14);';
-  var aOff = aStyle + 'rgba(255,255,255,.04);';
-  // bar-chart icon SVG
-  var barSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
-    + '<rect x="1" y="6" width="3" height="6" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '<rect x="5" y="3" width="3" height="9" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '<rect x="9" y="5" width="3" height="7" rx="1" fill="' + (chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '</svg>';
-  // list icon SVG
-  var listSvg = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">'
-    + '<rect x="1" y="2.5" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '<rect x="1" y="5.75" width="11" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '<rect x="1" y="9" width="8" height="1.5" rx=".75" fill="' + (!chartActive?'rgba(255,255,255,.9)':'rgba(255,255,255,.32)') + '"/>'
-    + '</svg>';
-  return '<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle">'
-    + '<button style="' + (chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'chart\',null)" aria-label="กราฟ" title="กราฟ">' + barSvg + '</button>'
-    + '<button style="' + (!chartActive?aOn:aOff) + '" onclick="_qnrrSetView(\'list\',null)" aria-label="List" title="List">' + listSvg + '</button>'
-    + '</span>';
+// ── iOS segmented control tap handler ───────────────────────────────────────
+// Called when user taps anywhere on the qnrr-seg pill
+function _qnrrSegTap(seg){
+  var chartBtn = document.getElementById('qnrr-seg-chart');
+  var listBtn  = document.getElementById('qnrr-seg-list');
+  if (!chartBtn || !listBtn) return;
+  // Determine which side was tapped by comparing clientX to pill midpoint
+  var rect = seg.getBoundingClientRect();
+  var mid  = rect.left + rect.width / 2;
+  var mode = (window.event && window.event.clientX < mid) ? 'chart' : 'list';
+  _qnrrSetView(mode, null);
+}
+window._qnrrSegTap = _qnrrSegTap;
+
+// ── Update segmented control + expand btn to match current view ──────────────
+function _qnrrSyncToolbar(mode){
+  var chartBtn  = document.getElementById('qnrr-seg-chart');
+  var listBtn   = document.getElementById('qnrr-seg-list');
+  var thumb     = document.getElementById('qnrr-seg-thumb');
+  var expandBtn = document.getElementById('qnrr-expand-btn');
+  if (chartBtn) { chartBtn.classList.toggle('active', mode === 'chart'); chartBtn.setAttribute('aria-pressed', String(mode === 'chart')); }
+  if (listBtn)  { listBtn.classList.toggle('active',  mode === 'list');  listBtn.setAttribute('aria-pressed', String(mode === 'list')); }
+  if (thumb)    thumb.style.transform = mode === 'chart' ? 'translateX(0)' : 'translateX(100%)';
+  if (expandBtn) expandBtn.style.display = mode === 'list' ? 'flex' : 'none';
 }
 
 // ── Breakdown table — 4 months × movement ──────────────────────────────────
@@ -744,7 +748,7 @@ function _qnrrRenderBreakdown(){
   }
 
   var html = '<table class="qnrr-bk-table" aria-label="NRR movement breakdown by month">' + colgroup + '<thead><tr>' +
-    '<th style="text-align:left"><div style="display:flex;align-items:center;justify-content:space-between">Movement' + _qnrrToggleHtml('chart') + '</div></th>' +
+    '<th style="text-align:left">Movement</th>' +
     ALL_MONTHS.map(function(m, i){
       var bm2 = _data.by_month[m];
       var isPartialCol = bm2 && bm2.is_partial;
@@ -1206,12 +1210,22 @@ var _allExpanded = true;
 function _qnrrToggleAll(btn){
   _allExpanded = !_allExpanded;
   _qnrrExpandAll(_allExpanded);
-  if (btn) {
-    var label = btn.querySelector('span');
-    var path  = btn.querySelector('path');
-    if (label) label.textContent = _allExpanded ? 'กาง' : 'หุบ';
-    if (path)  path.setAttribute('d', _allExpanded ? 'M2 5l5 4 5-4' : 'M2 9l5-4 5 4');
+  // v810: update double-chevron icon direction (up=กาง, down=หุบ)
+  var icon = document.getElementById('qnrr-expand-icon');
+  if (icon) {
+    // กาง (expanded) = chevrons point UP; หุบ (collapsed) = chevrons point DOWN
+    var polylines = icon.querySelectorAll('polyline');
+    if (_allExpanded) {
+      if (polylines[0]) polylines[0].setAttribute('points', '3,10 8,4 13,10');
+      if (polylines[1]) polylines[1].setAttribute('points', '3,14 8,8 13,14');
+    } else {
+      if (polylines[0]) polylines[0].setAttribute('points', '3,4 8,10 13,4');
+      if (polylines[1]) polylines[1].setAttribute('points', '3,8 8,14 13,8');
+    }
   }
+  // dim the button slightly when all collapsed
+  var expandBtn = document.getElementById('qnrr-expand-btn');
+  if (expandBtn) expandBtn.style.opacity = _allExpanded ? '1' : '0.55';
 }
 window._qnrrToggleAll = _qnrrToggleAll;
 
@@ -1334,7 +1348,7 @@ function _qnrrRenderList(){
   var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
-    '<div class="qnrr-list-mo-hdr-name" style="display:flex;align-items:center">' + _qnrrToggleHtml('list') + '</div>' +
+    '<div class="qnrr-list-mo-hdr-name"></div>' +
     listMoHdrs.map(function(mo){
       return '<div class="qnrr-list-mo-hdr-cell">' + mo + '</div>';
     }).join('') +

@@ -139,6 +139,53 @@
 /* Chart/Breakdown toggle */
 /* v809: qnrr-view-toggle + qnrr-vtog removed — toggle is now inline icon buttons in each view's header */
 
+/* ── v810: Fixed toolbar — iOS segmented control + expand btn ─────────────── */
+.qnrr-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 18px 6px; flex-shrink: 0;
+  border-bottom: 1px solid rgba(140,180,255,.07);
+}
+/* iOS segmented control */
+.qnrr-seg {
+  position: relative;
+  display: flex; align-items: center;
+  width: 72px; height: 28px;
+  background: rgba(255,255,255,.08);
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.qnrr-seg-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: calc(50% - 2px); height: calc(100% - 4px);
+  background: rgba(255,255,255,.18);
+  border-radius: 6px;
+  transition: transform .22s cubic-bezier(.34,1.3,.64,1);
+  pointer-events: none;
+}
+.qnrr-seg-btn {
+  position: relative; z-index: 1;
+  flex: 1; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: rgba(255,255,255,.32);
+  transition: color .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.qnrr-seg-btn.active { color: rgba(255,255,255,.90); }
+/* double-chevron expand btn */
+.qnrr-expand-btn {
+  width: 30px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.07); border: none;
+  border-radius: 7px; cursor: pointer;
+  color: rgba(255,255,255,.65);
+  transition: color .15s, background .15s, opacity .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.qnrr-expand-btn:active { background: rgba(255,255,255,.14); transform: scale(.93); }
+.qnrr-expand-btn svg { transition: transform .25s cubic-bezier(.34,1.3,.64,1); }
+
 /* ── Bar chart ── */
 .qnrr-ref-lines {
   position: absolute; left: 18px; right: 18px;
@@ -692,20 +739,6 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-pill:active { transform: scale(.95); }
 
-/* expand/collapse — ล้อ .pv-toggle-btn */
-.qnrr-list-xpand { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.qnrr-xpand-btn {
-  width: 30px; height: 28px;
-  border: none; background: transparent;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  color: rgba(255,255,255,.25);
-  transition: color .15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.qnrr-xpand-btn:hover { color: rgba(255,255,255,.7); }
-.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); }
-
 /* ── List: filter chip tabs ─────────────────────────────────────────────── */
 .qnrr-list-toolbar {
   display: flex; align-items: flex-start;
@@ -742,22 +775,6 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   border-bottom-color: rgba(188,215,255,.60);
 }
 .qnrr-chip:active { opacity: .7; }
-
-/* expand/collapse — v807: Apple/Spotify clean pill — no border, icon-forward */
-.qnrr-list-xpand { display: flex; align-items: center; flex-shrink: 0; }
-.qnrr-xpand-btn {
-  /* Pill shape with no hard border — like iOS control buttons */
-  height: 28px; padding: 0 10px 0 8px;
-  border: none; background: rgba(255,255,255,.09);
-  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;
-  border-radius: 14px; color: rgba(255,255,255,.55);
-  font-size: 10px; font-weight: 600; font-family: var(--tk-font-body);
-  transition: color .12s, background .12s;
-  -webkit-tap-highlight-color: transparent; white-space: nowrap;
-}
-.qnrr-xpand-btn svg { transition: transform .2s cubic-bezier(.34,1.4,.64,1); }
-.qnrr-xpand-btn:hover { color: rgba(255,255,255,.80); background: rgba(255,255,255,.14); }
-.qnrr-xpand-btn:active { color: rgba(255,255,255,.9); background: rgba(255,255,255,.18); transform: scale(.95); }
 
 /* ── List: sticky month header row ──────────────────────────────────────── */
 /* Sits above all account rows, aligns with table colgroup (auto + 4×42px) */
