@@ -464,7 +464,10 @@ function _qnrrShowError(){
 
 // ── Main render ─────────────────────────────────────────────────────────────
 function _qnrrRender(){
-  var email = (currentUserProfile && currentUserProfile.email) || '';
+  // v812: ถ้า admin/TL กำลัง drill-down ดูพอร์ต KAM รายคน ให้ใช้ email ของ KAM คนนั้นแทน
+  var email = (typeof portviewRepEmail !== 'undefined' && portviewRepEmail)
+    ? portviewRepEmail
+    : ((currentUserProfile && currentUserProfile.email) || '');
   var scope = SCOPE_MAP[_scopeIdx] || 'kam';
   if (!window.bulkQnrrData || !window.bulkQnrrData.loaded) { _qnrrShowSkeleton(); return; }
 
