@@ -53,7 +53,7 @@ function _qnrrCompute(kamEmail, scope) {
   var scopedRows = allRows.filter(_rowInScope);
   if (!scopedRows.length) return null;
 
-  var base_month  = scopedRows[0].base_month || '2026-03';
+  var base_month  = scopedRows[0].base_month || QNRR_CFG.base_month;
   var months      = [];
   var monthSet    = {};
   scopedRows.forEach(function(r){
@@ -194,7 +194,7 @@ function _qnrrCompute(kamEmail, scope) {
   });
 
   return {
-    quarter:                window._QNRR_QUARTER || '2026q2',
+    quarter:                window._QNRR_QUARTER || QNRR_CFG.quarter,
     base_month:             base_month,
     months:                 months,
     base_gmv:               base_gmv,
@@ -221,9 +221,23 @@ window._qnrrCompute = _qnrrCompute;
 
 var SCOPES    = ['KAM'];
 var SCOPE_MAP = ['kam'];
-var MONTHS_TH = {'2026-03':'มี.ค.','2026-04':'เม.ย.','2026-05':'พ.ค.','2026-06':'มิ.ย.'};
-var Q_MONTHS  = ['2026-04','2026-05','2026-06'];
-var BASE_MONTH= '2026-03';
+// ── QNRR Quarter Config — แก้แค่ที่นี่ทุก quarter ──────────────────────────
+// Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
+// Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
+var QNRR_CFG = {
+  quarter:    '2026q2',
+  base_month: '2026-03',
+  q_months:   ['2026-04','2026-05','2026-06'],
+  months_th:  {
+    '2026-03':'มี.ค.','2026-04':'เม.ย.',
+    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
+  },
+  csv_file:   'sense_qnrr_2026q2.csv'
+};
+// ─────────────────────────────────────────────────────────────────────────────
+var MONTHS_TH = QNRR_CFG.months_th;
+var Q_MONTHS  = QNRR_CFG.q_months;
+var BASE_MONTH= QNRR_CFG.base_month;
 
 // ── v775 semantic color palette ────────────────────────────────────────────
 var MV_CFG = {
@@ -458,7 +472,7 @@ function _qnrrShowError(){
   var barsRow = _el('qnrr-bars-row');
   var dl      = _el('qnrr-drill-lbl');
   if (dl) dl.textContent = 'โหลดไม่สำเร็จ';
-  if (barsRow) barsRow.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,.20);font-size:11px">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:9px;opacity:.6">sense_qnrr_2026q2.csv ยังไม่ได้อัปโหลด</span></div>';
+  if (barsRow) barsRow.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,.20);font-size:11px">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:9px;opacity:.6">' + QNRR_CFG.csv_file + ' ยังไม่ได้อัปโหลด</span></div>';
   if (list) list.innerHTML = '';
 }
 
@@ -885,13 +899,11 @@ function _qnrrRenderBreakdown(){
       });
       html += '</tr>';
 
-      // cohort Apr / May / Jun — tracked through subsequent months
-      // Step 1: build outlet-id sets per cohort month (outlets whose movement = new_sales in that month)
-      var nsCohortDefs = [
-        {month:'2026-04', label:'└ cohort เม.ย.', color:'rgba(167,139,250,.55)'},
-        {month:'2026-05', label:'└ cohort พ.ค.',  color:'rgba(167,139,250,.65)'},
-        {month:'2026-06', label:'└ cohort มิ.ย.', color:'rgba(167,139,250,.75)'},
-      ];
+      // cohort Apr/May/Jun — derived from QNRR_CFG.q_months (auto-updates each quarter)
+      var nsColors = ['rgba(167,139,250,.55)','rgba(167,139,250,.65)','rgba(167,139,250,.75)'];
+      var nsCohortDefs = QNRR_CFG.q_months.map(function(m, i){
+        return {month: m, label: '└ cohort ' + (QNRR_CFG.months_th[m] || m), color: nsColors[i] || 'rgba(167,139,250,.65)'};
+      });
       nsCohortDefs.forEach(function(nc){
         // Collect outlet_ids that are new_sales in nc.month
         var cohortBm = _data.by_month[nc.month];
@@ -1237,12 +1249,12 @@ function _qnrrRenderList(){
   if (!wrap) return;
   if (!_data) { wrap.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มีข้อมูล</div>'; return; }
 
-  var ALL_MONTHS = ['2026-03','2026-04','2026-05','2026-06'];
-  var MTH_SHORT  = {'2026-03':'มี.ค.','2026-04':'เม.ย.','2026-05':'พ.ค.','2026-06':'มิ.ย.'};
+  var ALL_MONTHS = [QNRR_CFG.base_month].concat(QNRR_CFG.q_months);
+  var MTH_SHORT  = QNRR_CFG.months_th;
 
   // Collect all rows across Q months
   var allRows = [];
-  ['2026-04','2026-05','2026-06'].forEach(function(m){
+  QNRR_CFG.q_months.forEach(function(m){
     var bm = _data.by_month[m];
     if (bm) (bm.rows || []).forEach(function(r){ allRows.push(r); });
   });
@@ -1259,11 +1271,11 @@ function _qnrrRenderList(){
     if (!byAcct[aid].outlets[oid]) {
       byAcct[aid].outlets[oid] = {
         name: r.account_name || String(oid),
-        gmv:  {'2026-03':0,'2026-04':0,'2026-05':0,'2026-06':0},
-        mv:   {'2026-04':null,'2026-05':null,'2026-06':null}
+        gmv:  Object.fromEntries([QNRR_CFG.base_month].concat(QNRR_CFG.q_months).map(function(m){ return [m, 0]; })),
+        mv:   Object.fromEntries(QNRR_CFG.q_months.map(function(m){ return [m, null]; }))
       };
       var _bd = parseFloat(r.base_days) || 31;
-      byAcct[aid].outlets[oid].gmv['2026-03'] = ((parseFloat(r.base_gmv) || 0) / _bd) * 30;
+      byAcct[aid].outlets[oid].gmv[QNRR_CFG.base_month] = ((parseFloat(r.base_gmv) || 0) / _bd) * 30;
     }
     var od = byAcct[aid].outlets[oid];
     var _cd = parseFloat(r.curr_days) || 30;
@@ -1277,7 +1289,7 @@ function _qnrrRenderList(){
   function _domMv(od){
     for (var i=0;i<MV_PRIO.length;i++){
       var mv=MV_PRIO[i];
-      if (['2026-04','2026-05','2026-06'].some(function(m){ return od.mv[m]===mv; })) return mv;
+      if (QNRR_CFG.q_months.some(function(m){ return od.mv[m]===mv; })) return mv;
     }
     return 'core_nrr';
   }
@@ -1341,13 +1353,14 @@ function _qnrrRenderList(){
     });
   }
 
-  var partialTilde = (_data.by_month['2026-06'] && _data.by_month['2026-06'].is_partial) ? '~' : '';
+  var _lastMonth = QNRR_CFG.q_months[QNRR_CFG.q_months.length - 1];
+  var partialTilde = (_data.by_month[_lastMonth] && _data.by_month[_lastMonth].is_partial) ? '~' : '';
   var COL_W = 42;
 
   // ── Sticky month header (outside account tables) ─────────────────────────
   // header row ครอบทั้ง list — align กับ table colgroup (auto + 4×42px)
   // ใช้ div+grid ไม่ใช้ table เพราะ account name col width เปลี่ยนตาม screen
-  var partialJun = _data.by_month['2026-06'] && _data.by_month['2026-06'].is_partial;
+  var partialJun = _data.by_month[_lastMonth] && _data.by_month[_lastMonth].is_partial;
   var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
@@ -1372,7 +1385,7 @@ function _qnrrRenderList(){
       var xB=(xd==='core_nrr_churn'||xd==='transfer_out');
       var yB=(yd==='core_nrr_churn'||yd==='transfer_out');
       if (xB!==yB) return xB?1:-1;
-      return (a.outlets[y].gmv['2026-04']||0)-(a.outlets[x].gmv['2026-04']||0);
+      return (a.outlets[y].gmv[QNRR_CFG.q_months[0]]||0)-(a.outlets[x].gmv[QNRR_CFG.q_months[0]]||0);
     });
 
     var acctId = 'qnrr-olrows-' + aid.replace(/[^a-z0-9]/gi,'_');
@@ -1401,9 +1414,9 @@ function _qnrrRenderList(){
 
       var cells = ALL_MONTHS.map(function(m){
         var v = od.gmv[m] || 0;
-        var isBase = (m==='2026-03');
+        var isBase = (m === QNRR_CFG.base_month);
         var isZero = !isBase && v===0;
-        var isHi   = !isBase && v>0 && od.gmv['2026-03']>0 && v > od.gmv['2026-03']*1.05;
+        var isHi   = !isBase && v>0 && od.gmv[QNRR_CFG.base_month]>0 && v > od.gmv[QNRR_CFG.base_month]*1.05;
         var cls    = isBase?'base-col':isZero?'zero-col':isHi?'hi-col':'';
         var disp   = isZero ? '✕' : (v>0 ? _fmtM(v) : '—');
         return '<td class="' + cls + '">' + disp + '</td>';
