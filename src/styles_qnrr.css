@@ -265,7 +265,7 @@
   to   { opacity:1; transform: translateY(0); }
 }
 .qnrr-seg { width: 100%; min-height: 3px; }
-.qnrr-seg + .qnrr-seg { border-top: 1px solid rgba(0,0,0,.22); }
+/* v810: removed border-top gap between segments — bar is now one unit, no "stacked separately" look */
 /* Mar reference bar — ใช้ qnrr-bar-body เป็น base แล้ว override */
 .qnrr-base-bar {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -286,7 +286,7 @@
 .qnrr-base-hov-seg {
   background: rgba(96,165,250,.50);
   width: 100%;
-  border-top: 1px solid rgba(0,0,0,.15);
+  /* v810: removed border-top gap — no separation between segments */
 }
 /* ghost projection — dashed outline only above actual bar */
 .qnrr-ghost-top {
@@ -447,9 +447,9 @@
 .qnrr-base-adj-note {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px;
-  font-size: 10px; color: rgba(248,113,113,.75);
-  background: rgba(220,38,38,.07);
-  border-bottom: 1px solid rgba(248,113,113,.15);
+  font-size: 10px; color: rgba(140,180,255,.60);
+  background: rgba(140,180,255,.05);
+  border-bottom: 1px solid rgba(140,180,255,.12);
   font-family: var(--tk-font-mono);
 }
 .qnrr-base-adj-icon {
