@@ -38,10 +38,17 @@ function _qnrrCompute(kamEmail, scope) {
   if (kamRows.length) {
     myTlEmail = (kamRows.find(function(r){return r.period_tl_email;}) || {}).period_tl_email || '';
   }
+  // v817: TL/Admin login ตรงๆ — email ของตัวเองอาจอยู่ใน byTlEmail โดยตรง
+  if (!myTlEmail && qd.byTlEmail && qd.byTlEmail[kamEmail]) {
+    myTlEmail = kamEmail;
+  }
 
   var allRows;
   if (scope === 'tl' && myTlEmail && qd.byTlEmail && qd.byTlEmail[myTlEmail]) {
     allRows = qd.byTlEmail[myTlEmail];
+  } else if (scope === 'tl' && !myTlEmail) {
+    // Admin ดู tl scope แต่ไม่มี myTlEmail → ใช้ allRows (portfolio ทั้งองค์กร)
+    allRows = qd.allRows || [];
   } else if (scope === 'admin') {
     allRows = qd.allRows || [];
   } else {
@@ -51,7 +58,7 @@ function _qnrrCompute(kamEmail, scope) {
 
   function _rowInScope(r) {
     if (scope === 'kam')   return r.period_kam_email === kamEmail;
-    if (scope === 'tl')    return r.period_tl_email  === myTlEmail;
+    if (scope === 'tl')    return myTlEmail ? r.period_tl_email === myTlEmail : true;
     if (scope === 'admin') return true;
     return r.period_kam_email === kamEmail;
   }
