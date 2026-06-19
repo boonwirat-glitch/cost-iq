@@ -309,9 +309,9 @@ function _qnrrOpen(){
   if (role === 'sales' || role === 'sales_tl') return;
 
   if (role === 'tl' || role === 'ad_tl') {
-    SCOPES = ['KAM','ทีม']; SCOPE_MAP = ['kam','tl'];
+    SCOPES = ['ทีม','KAM']; SCOPE_MAP = ['tl','kam'];
   } else if (role === 'admin' || role === 'ad') {
-    SCOPES = ['KAM','ทีม','Admin']; SCOPE_MAP = ['kam','tl','admin'];
+    SCOPES = ['ทีม','KAM','Admin']; SCOPE_MAP = ['tl','kam','admin'];
   } else {
     SCOPES = ['KAM']; SCOPE_MAP = ['kam'];
   }
