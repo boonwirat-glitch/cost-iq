@@ -515,6 +515,20 @@ jun_rows AS (
   FROM mar_cohort mc
   LEFT JOIN jun_ownership jo ON mc.outlet_id = jo.outlet_id
   WHERE mc.outlet_id NOT IN (
+    SELECT outlet_id FROM jun_ownership
+    WHERE commercial_owner = 'KAM'
+  )
+),
+
+-- ── 12. Union all months ──────────────────────────────────────────────────────
+all_rows AS (
+  SELECT * FROM apr_rows
+  UNION ALL
+  SELECT * FROM may_rows
+  UNION ALL
+  SELECT * FROM jun_rows
+)
+
 
 -- ── VERIFY: Apr core cohort count (เป้า ~2,696 outlets ~฿136.8M) ─────────────
 SELECT
