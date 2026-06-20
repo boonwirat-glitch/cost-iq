@@ -295,7 +295,10 @@ apr_labels AS (
 
       -- [8] transfer_in: อื่นๆ
       ELSE 'transfer_in'
-    END AS fixed_label
+    END AS fixed_label,
+
+    -- from_portfolio สำหรับ carry forward ไป May/Jun
+    mc.base_portfolio AS from_portfolio
 
   FROM apr_own ao
   LEFT JOIN mar_cohort mc              ON ao.outlet_id = mc.outlet_id
