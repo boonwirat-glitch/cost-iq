@@ -341,36 +341,43 @@ combined AS (
   -- MAY LEG A
   SELECT '2026-05',
     CASE
-      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv,0) > 0 THEN 'core_nrr'
-      WHEN al.fixed_label = 'core'      AND COALESCE(mg.gmv,0) = 0 THEN 'core_nrr_churn'
-      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) > 0 THEN 'expansion'
-      WHEN al.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
-      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) > 0 THEN 'comeback'
-      WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
-      WHEN al.outlet_id IS NULL AND ofd_m.first_dollar_date >= '2026-04-01'
-           AND pmo_m.outlet_id IS NULL                                THEN 'expansion'
-      WHEN al.outlet_id IS NULL AND pmo_m.commercial_owner = 'SALE'  THEN 'new_sales'
-      WHEN al.outlet_id IS NULL AND pmo_m.commercial_owner = 'KAM'   THEN 'comeback'
-      WHEN al.outlet_id IS NULL THEN 'transfer_in'
-      ELSE al.fixed_label
+      -- อยู่ใน apr_labels → inherit จาก Apr
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'core'      AND COALESCE(mg.gmv,0) > 0 THEN 'core_nrr'
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'core'      AND COALESCE(mg.gmv,0) = 0 THEN 'core_nrr_churn'
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) > 0 THEN 'expansion'
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) > 0 THEN 'comeback'
+      WHEN al.outlet_id IS NOT NULL AND al.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
+      WHEN al.outlet_id IS NOT NULL THEN al.fixed_label
+      -- ไม่อยู่ใน apr_labels → ใช้ may_labels
+      WHEN ml.outlet_id IS NOT NULL AND ml.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) > 0 THEN 'expansion'
+      WHEN ml.outlet_id IS NOT NULL AND ml.fixed_label = 'expansion' AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
+      WHEN ml.outlet_id IS NOT NULL AND ml.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) > 0 THEN 'comeback'
+      WHEN ml.outlet_id IS NOT NULL AND ml.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
+      WHEN ml.outlet_id IS NOT NULL THEN ml.fixed_label
+      -- outlet ใหม่ใน May (ไม่อยู่ทั้ง apr และ may)
+      WHEN ofd_m.first_dollar_date >= '2026-04-01' AND pmo_m.outlet_id IS NULL THEN 'expansion'
+      WHEN pmo_m.commercial_owner = 'SALE'                                      THEN 'new_sales'
+      ELSE 'transfer_in'
     END,
     mo.outlet_id,
     COALESCE(al.account_id, mo.account_id),
     COALESCE(al.account_name, mo.account_name),
     COALESCE(al.account_type, mo.account_type),
-    COALESCE(mg.gmv,0), COALESCE(al.base_gmv,0),
+    COALESCE(mg.gmv,0), COALESCE(al.base_gmv, ml.base_gmv, 0),
     COALESCE(al.first_dollar_date, ofd_m.first_dollar_date),
     COALESCE(al.new_user_exp_date, mo.new_user_exp_date),
-    COALESCE(al.prev_commercial_owner, pmo_m.commercial_owner),
-    COALESCE(al.prev_staff_owner, al.prev_staff_owner_raw, pmo_m.staff_owner),
+    COALESCE(al.prev_commercial_owner, ml.prev_commercial_owner, pmo_m.commercial_owner),
+    COALESCE(al.prev_staff_owner, al.prev_staff_owner_raw, ml.prev_staff_owner, pmo_m.staff_owner),
     'KAM', mo.staff_owner,
-    COALESCE(al.period_tl_email, k_m.tl_email)
+    COALESCE(al.period_tl_email, ml.period_tl_email, k_m.tl_email)
   FROM may_own mo
-  LEFT JOIN apr_labels al ON mo.outlet_id = al.outlet_id
-  LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
+  LEFT JOIN apr_labels al  ON mo.outlet_id = al.outlet_id
+  LEFT JOIN may_labels ml  ON mo.outlet_id = ml.outlet_id
+  LEFT JOIN may_gmv mg     ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_m ON mo.outlet_id = ofd_m.outlet_id
   LEFT JOIN pre_may_own pmo_m ON mo.outlet_id = pmo_m.outlet_id
-  LEFT JOIN kam_list k_m ON TRIM(mo.staff_owner) = TRIM(k_m.kam_name)
+  LEFT JOIN kam_list k_m   ON TRIM(mo.staff_owner) = TRIM(k_m.kam_name)
   WHERE mo.commercial_owner = 'KAM'
 
   UNION ALL
