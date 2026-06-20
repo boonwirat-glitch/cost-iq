@@ -177,9 +177,10 @@ jun_own AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
--- ── 6. pre_mar_own: last B2B order ก่อน Mar ──────────────────────────────────
--- ใช้: [3] new_sales (pre_mar=SALE) และ [6] comeback (pre_mar=same portfolio)
--- ต่างจาก pre_period_own — ใช้ทุกเดือนไม่เปลี่ยน
+-- ── 6. pre_period_own: last B2B order ก่อนแต่ละ period month ─────────────────
+-- pre_mar_own: ใช้สำหรับ [3] new_sales เท่านั้น (pre_mar = SALE?)
+-- pre_may_own: ใช้สำหรับ [1] expansion และ [6] comeback ใน May fallback
+-- pre_jun_own: ใช้สำหรับ [1] expansion และ [6] comeback ใน Jun fallback
 pre_mar_own AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
@@ -187,6 +188,29 @@ pre_mar_own AS (
     TRIM(o.staff_owner)             AS staff_owner
   FROM `freshket-rn.dwh.order` o
   WHERE o.delivery_date < '2026-03-01'
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+
+pre_may_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    TRIM(o.staff_owner)             AS staff_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date < '2026-05-01'
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+pre_jun_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    TRIM(o.staff_owner)             AS staff_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date < '2026-06-01'
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
     AND o.user_id IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
@@ -328,9 +352,9 @@ may_labels AS (
         THEN al.fixed_label
 
       -- outlet ใหม่ใน May หรือ portfolio เปลี่ยนจาก Apr — รัน priority เต็ม
-      -- [1] expansion
+      -- [1] expansion: ใช้ pre_may_own (ไม่เคยมี B2B order ก่อน May)
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND pmo.outlet_id IS NULL
+        AND pmay.outlet_id IS NULL
         THEN 'expansion'
       -- [2] handover
       WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03'
@@ -345,9 +369,11 @@ may_labels AS (
       -- [5] transfer_in (from cohort)
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback
+      -- [6] comeback: ใช้ pre_may_own (last order ก่อน May) ไม่ใช่ pre_mar_own
+      -- outlet ที่ Apr อยู่ KAM แล้ว May ยังอยู่ KAM: pre_may_own=KAM → comeback ✓
+      -- outlet ที่ pre_mar=SALE แต่ Apr กลับมา KAM: pre_may_own=KAM → comeback ✓
       WHEN mc.outlet_id IS NULL
-        AND pmo.commercial_owner = mo.commercial_owner
+        AND pmay.commercial_owner = mo.commercial_owner
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -419,6 +445,7 @@ may_labels AS (
   LEFT JOIN mar_cohort mc           ON mo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   LEFT JOIN pre_mar_own pmo         ON mo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_may_own pmay        ON mo.outlet_id = pmay.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
@@ -482,7 +509,7 @@ apr_rows AS (
       WHEN ao_any.outlet_id IS NULL THEN 'core_nrr_churn'
       ELSE 'transfer_out'
     END                                AS movement_type,
-    mc.base_portfolio                  AS from_portfolio,
+    CASE WHEN ao_any.outlet_id IS NOT NULL THEN mc.base_portfolio ELSE NULL END AS from_portfolio,
     ao_any.commercial_owner            AS to_portfolio,
     CASE
       WHEN ao_any.outlet_id IS NULL THEN NULL
@@ -556,7 +583,7 @@ may_rows AS (
       WHEN ao_any.outlet_id IS NULL THEN 'core_nrr_churn'
       ELSE 'transfer_out'
     END,
-    mc.base_portfolio,
+    CASE WHEN ao_any.outlet_id IS NOT NULL THEN mc.base_portfolio ELSE NULL END,
     ao_any.commercial_owner,
     CASE
       WHEN ao_any.outlet_id IS NULL THEN NULL
@@ -620,7 +647,8 @@ jun_rows AS (
           ELSE ml.fixed_label
         END
       -- outlet ใหม่ใน Jun — รัน priority เต็ม
-      WHEN ofd.first_dollar_date >= '2026-04-01' AND pmo.outlet_id IS NULL
+      -- [1] expansion: ใช้ pre_jun_own
+      WHEN ofd.first_dollar_date >= '2026-04-01' AND pjun.outlet_id IS NULL
         THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03'
         THEN 'handover'
@@ -631,8 +659,9 @@ jun_rows AS (
         THEN CASE WHEN COALESCE(jg.gmv,0) > 0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
         THEN 'transfer_in'
+      -- [6] comeback: ใช้ pre_jun_own (last order ก่อน Jun)
       WHEN mc.outlet_id IS NULL
-        AND pmo.commercial_owner = jo.commercial_owner
+        AND pjun.commercial_owner = jo.commercial_owner
         AND (jo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -725,6 +754,7 @@ jun_rows AS (
   LEFT JOIN mar_cohort mc           ON jo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
   LEFT JOIN pre_mar_own pmo         ON jo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_jun_own pjun        ON jo.outlet_id = pjun.outlet_id
   LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
@@ -750,7 +780,7 @@ jun_rows AS (
       WHEN ao_any.outlet_id IS NULL THEN 'core_nrr_churn'
       ELSE 'transfer_out'
     END,
-    mc.base_portfolio,
+    CASE WHEN ao_any.outlet_id IS NOT NULL THEN mc.base_portfolio ELSE NULL END,
     ao_any.commercial_owner,
     CASE
       WHEN ao_any.outlet_id IS NULL THEN NULL
