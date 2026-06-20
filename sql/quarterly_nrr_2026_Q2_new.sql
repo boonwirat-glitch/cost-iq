@@ -401,7 +401,6 @@ may_rows AS (
     END AS movement_type
 
   FROM may_ownership mo
-  WHERE mo.commercial_owner = 'KAM'
   LEFT JOIN apr_labels al
     ON mo.outlet_id = al.outlet_id
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
@@ -409,6 +408,7 @@ may_rows AS (
   LEFT JOIN pre_mar_ownership pmo_may   ON mo.outlet_id = pmo_may.outlet_id
   LEFT JOIN kam_list k_cur
     ON TRIM(mo.staff_owner) = TRIM(k_cur.kam_name)
+  WHERE mo.commercial_owner = 'KAM'
 
   UNION ALL
 
@@ -471,7 +471,6 @@ jun_rows AS (
     END AS movement_type
 
   FROM jun_ownership jo
-  WHERE jo.commercial_owner = 'KAM'
   LEFT JOIN apr_labels al
     ON jo.outlet_id = al.outlet_id
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
@@ -479,6 +478,7 @@ jun_rows AS (
   LEFT JOIN pre_mar_ownership pmo_jun   ON jo.outlet_id = pmo_jun.outlet_id
   LEFT JOIN kam_list k_cur
     ON TRIM(jo.staff_owner) = TRIM(k_cur.kam_name)
+  WHERE jo.commercial_owner = 'KAM'
 
   UNION ALL
 
