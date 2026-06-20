@@ -957,6 +957,7 @@ function _qnrrRenderBreakdown(){
 
         // Render row: for each month, sum curr_gmv ของ outlet_ids ใน cohort นี้
         // carry-forward = ดู GMV outlet เหล่านี้ในเดือนถัดๆ ไปด้วย
+        // dedupe outlet_id ต่อเดือน — TL/Admin scope อาจมีหลาย rows ต่อ outlet (transfer rows)
         html += '<tr class="bk-subrow">' +
           '<td><div class="qnrr-bk-mv-cell">' +
             '<div class="qnrr-bk-dot" style="background:' + nc.color + '"></div>' +
@@ -967,10 +968,15 @@ function _qnrrRenderBreakdown(){
           var bm2 = _data.by_month[m];
           if (!bm2) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
           var g = 0;
+          var seenInMonth = {};
           (bm2.rows || []).forEach(function(r){
-            if (cohortOutlets[r.outlet_id]) {
+            if (cohortOutlets[r.outlet_id] && !seenInMonth[r.outlet_id]) {
               var cd = parseFloat(r.curr_days) || 30;
-              g += (parseFloat(r.curr_gmv) || 0) / cd * 30;
+              var gmv = parseFloat(r.curr_gmv) || 0;
+              if (gmv > 0) {
+                seenInMonth[r.outlet_id] = true;
+                g += gmv / cd * 30;
+              }
             }
           });
           g = Math.round(g);
