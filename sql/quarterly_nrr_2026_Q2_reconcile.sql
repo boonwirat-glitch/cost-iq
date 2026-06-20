@@ -243,6 +243,10 @@ apr_labels AS (
       WHEN mc.outlet_id IS NOT NULL
         THEN 'core'
 
+      -- [4.5] handover: new_user_exp_date = Mar → handover เสมอ ไม่ว่า pre-Mar owner จะเป็นใคร
+      WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
+        THEN 'handover'
+
       -- [5] comeback: ไม่มี Mar GMV + pre-Mar = KAM + ไม่มี new_user_exp_date ใน Q
       WHEN mc.outlet_id IS NULL AND pmo.commercial_owner = 'KAM'
         AND (ao.new_user_exp_date IS NULL
