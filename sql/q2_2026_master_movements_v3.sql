@@ -256,9 +256,12 @@ apr_labels AS (
       -- [5] transfer_in from cohort (inter-portfolio)
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != ao.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback: เคยซื้อก่อน Q + ไม่มี Mar GMV
+      -- [6] comeback: เคยเป็น B2B customer ก่อน Q + ไม่ใช่ SALE channel
+      -- pre_apr_own NOT SALE = เคยถูกดูแลโดย KAM/PM/ADMIN มาก่อน (consistent กับ validated SQL)
       WHEN mc.outlet_id IS NULL
         AND ofd.first_dollar_date < '2026-04-01'
+        AND papr.commercial_owner NOT IN ('SALE')
+        AND papr.outlet_id IS NOT NULL
         AND (ao.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -330,9 +333,11 @@ may_labels AS (
       -- [5] transfer_in
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback
+      -- [6] comeback: เคยเป็น B2B customer ก่อน Q + ไม่ใช่ SALE channel
       WHEN mc.outlet_id IS NULL
         AND ofd.first_dollar_date < '2026-04-01'
+        AND pmay.commercial_owner NOT IN ('SALE')
+        AND pmay.outlet_id IS NOT NULL
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -615,6 +620,8 @@ jun_rows AS (
         THEN CASE WHEN COALESCE(jg.gmv,0)>0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner THEN 'transfer_in'
       WHEN mc.outlet_id IS NULL AND ofd.first_dollar_date < '2026-04-01'
+        AND pjun.commercial_owner NOT IN ('SALE')
+        AND pjun.outlet_id IS NOT NULL
         AND (jo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
