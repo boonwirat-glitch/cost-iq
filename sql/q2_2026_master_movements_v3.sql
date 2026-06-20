@@ -284,9 +284,10 @@ apr_labels AS (
         AND mc.base_portfolio != ao.commercial_owner
         THEN 'transfer_in'
 
-      -- [6] comeback: ไม่อยู่ cohort + pre_mar = same portfolio + ไม่มี Q exp_date
+      -- [6] comeback: ไม่อยู่ cohort (ไม่มี Mar GMV) + เคยซื้อก่อน Q
+      -- ไม่สนใจ pre_mar portfolio — comeback = เคยเป็นลูกค้า Freshket แล้วไม่ซื้อใน Mar
       WHEN mc.outlet_id IS NULL
-        AND pmo.commercial_owner = ao.commercial_owner
+        AND ofd.first_dollar_date < '2026-04-01'
         AND (ao.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -369,11 +370,9 @@ may_labels AS (
       -- [5] transfer_in (from cohort)
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback: ใช้ pre_may_own (last order ก่อน May) ไม่ใช่ pre_mar_own
-      -- outlet ที่ Apr อยู่ KAM แล้ว May ยังอยู่ KAM: pre_may_own=KAM → comeback ✓
-      -- outlet ที่ pre_mar=SALE แต่ Apr กลับมา KAM: pre_may_own=KAM → comeback ✓
+      -- [6] comeback: ไม่มี Mar GMV + เคยซื้อก่อน Q
       WHEN mc.outlet_id IS NULL
-        AND pmay.commercial_owner = mo.commercial_owner
+        AND ofd.first_dollar_date < '2026-04-01'
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -382,20 +381,19 @@ may_labels AS (
       ELSE 'transfer_in'
     END AS fixed_label,
 
-    -- transfer metadata
-    -- ถ้า portfolio ยังเดิม: inherit จาก Apr (non-transfer → NULL)
-    -- ถ้า portfolio เปลี่ยน: from = Apr portfolio (outlet ออกจาก Apr portfolio มา May)
+    -- transfer metadata: มีค่าเฉพาะ transfer_in จาก cohort [5]
+    -- = outlet อยู่ mar_cohort portfolio อื่น โอนเข้ามา
     CASE
       WHEN al.outlet_id IS NOT NULL
         AND al.current_portfolio = mo.commercial_owner
         THEN al.from_portfolio
       WHEN al.outlet_id IS NOT NULL
         AND al.current_portfolio != mo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN al.current_portfolio
-      WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
+      WHEN al.outlet_id IS NULL
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN mc.base_portfolio
-      WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
-        THEN pmo.commercial_owner
       ELSE NULL
     END AS from_portfolio,
 
@@ -659,9 +657,9 @@ jun_rows AS (
         THEN CASE WHEN COALESCE(jg.gmv,0) > 0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback: ใช้ pre_jun_own (last order ก่อน Jun)
+      -- [6] comeback: ไม่มี Mar GMV + เคยซื้อก่อน Q
       WHEN mc.outlet_id IS NULL
-        AND pjun.commercial_owner = jo.commercial_owner
+        AND ofd.first_dollar_date < '2026-04-01'
         AND (jo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
