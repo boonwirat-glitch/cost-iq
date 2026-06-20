@@ -226,6 +226,20 @@ pre_mar_own AS (
   ) = 1
 ),
 
+
+-- ── outlet_name from order (ใช้ชื่อจาก Mar order ก่อน fallback Apr) ────────
+outlet_names AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    o.res_name                AS outlet_name
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date BETWEEN '2026-03-01' AND '2026-06-19'
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+    AND o.res_name IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+
 -- ── 7. Mar cohort — fixed denominator ทั้ง Q ────────────────────────────
 -- ทุก portfolio ที่มี GMV ใน Mar
 -- ไม่นับ handover_in Mar (new_user_exp_date = Mar จาก SALE)
@@ -376,6 +390,9 @@ apr_rows AS (
 apr_labels AS (
   SELECT
     outlet_id,
+    account_id,
+    account_name,
+    account_type,
     current_portfolio,
     current_staff_owner,
     base_portfolio,
@@ -577,7 +594,7 @@ all_rows AS (
 SELECT
   r.period_month,
   r.outlet_id,
-  um.res_name                                        AS outlet_name,
+  on2.outlet_name,
   r.account_id,
   r.account_name,
   r.account_type,
@@ -610,8 +627,7 @@ SELECT
 
 FROM all_rows r
 CROSS JOIN params p
-LEFT JOIN `freshket-rn.dim.user_master` um
-  ON CAST(um.res_id AS STRING) = r.outlet_id
+LEFT JOIN outlet_names on2 ON r.outlet_id = on2.outlet_id
 
 ORDER BY
   r.period_month,
