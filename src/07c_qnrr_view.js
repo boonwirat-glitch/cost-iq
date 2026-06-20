@@ -906,7 +906,7 @@ function _qnrrRenderBreakdown(){
 
       // Sub-rows: cohort Mar (handover) + cohort Apr / May / Jun (new_sales by month)
       // cohort Mar = handover outlets — Mar GMV in base col, then their curr GMV each month
-      var hovColor = 'rgba(96,165,250,.60)';
+      var hovColor = 'rgba(96,165,250,.72)';
       html += '<tr class="bk-subrow">' +
         '<td><div class="qnrr-bk-mv-cell">' +
           '<div class="qnrr-bk-dot" style="background:' + hovColor + '"></div>' +
@@ -927,7 +927,7 @@ function _qnrrRenderBreakdown(){
 
       // cohort Apr/May/Jun — derived from QNRR_CFG.q_months (auto-updates each quarter)
       // สีน้ำเงินเหมือน cohort มี.ค. — ต่างแค่ opacity เพื่อแยกชั้น
-      var nsColors = ['rgba(96,165,250,.50)','rgba(96,165,250,.62)','rgba(96,165,250,.74)'];
+      var nsColors = ['rgba(96,165,250,.72)','rgba(96,165,250,.72)','rgba(96,165,250,.72)'];
       var nsCohortDefs = QNRR_CFG.q_months.map(function(m, i){
         return {month: m, label: '└ cohort ' + (QNRR_CFG.months_th[m] || m), color: nsColors[i] || 'rgba(96,165,250,.60)'};
       });

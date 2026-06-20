@@ -1,4 +1,4 @@
-<!-- Freshket Sense v819: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v819a: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v819',
+      version: 'v819a',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -52725,7 +52725,7 @@ function _qnrrRenderBreakdown(){
 
       // Sub-rows: cohort Mar (handover) + cohort Apr / May / Jun (new_sales by month)
       // cohort Mar = handover outlets — Mar GMV in base col, then their curr GMV each month
-      var hovColor = 'rgba(96,165,250,.60)';
+      var hovColor = 'rgba(96,165,250,.72)';
       html += '<tr class="bk-subrow">' +
         '<td><div class="qnrr-bk-mv-cell">' +
           '<div class="qnrr-bk-dot" style="background:' + hovColor + '"></div>' +
@@ -52746,7 +52746,7 @@ function _qnrrRenderBreakdown(){
 
       // cohort Apr/May/Jun — derived from QNRR_CFG.q_months (auto-updates each quarter)
       // สีน้ำเงินเหมือน cohort มี.ค. — ต่างแค่ opacity เพื่อแยกชั้น
-      var nsColors = ['rgba(96,165,250,.50)','rgba(96,165,250,.62)','rgba(96,165,250,.74)'];
+      var nsColors = ['rgba(96,165,250,.72)','rgba(96,165,250,.72)','rgba(96,165,250,.72)'];
       var nsCohortDefs = QNRR_CFG.q_months.map(function(m, i){
         return {month: m, label: '└ cohort ' + (QNRR_CFG.months_th[m] || m), color: nsColors[i] || 'rgba(96,165,250,.60)'};
       });
