@@ -272,27 +272,24 @@ apr_labels AS (
       ELSE 'transfer_in'
     END AS fixed_label,
 
-    -- transfer metadata สำหรับ Layer 2/3
+    -- transfer metadata: มีค่าเฉพาะ transfer_in [5] เท่านั้น
+    -- comeback, expansion, handover, new_sales, core = NULL
     CASE
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != ao.commercial_owner
         THEN mc.base_portfolio
-      WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
-        THEN pmo.commercial_owner
       ELSE NULL
     END AS from_portfolio,
 
-    ao.commercial_owner             AS to_portfolio,
+    CASE
+      WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != ao.commercial_owner
+        THEN ao.commercial_owner
+      ELSE NULL
+    END AS to_portfolio,
 
     CASE
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != ao.commercial_owner
         THEN CASE
           WHEN mc.base_portfolio IN ('KAM','PM','ADMIN')
-            AND ao.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
-          ELSE 'external'
-        END
-      WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
-        THEN CASE
-          WHEN pmo.commercial_owner IN ('KAM','PM','ADMIN')
             AND ao.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
           ELSE 'external'
         END
@@ -324,10 +321,13 @@ may_labels AS (
     COALESCE(al.pre_mar_portfolio, pmo.commercial_owner)   AS pre_mar_portfolio,
 
     CASE
-      -- inherit จาก Apr ถ้า outlet อยู่ใน apr_labels
-      WHEN al.outlet_id IS NOT NULL THEN al.fixed_label
+      -- inherit จาก Apr เฉพาะเมื่อ portfolio ไม่เปลี่ยน
+      -- ถ้า portfolio เปลี่ยน (เช่น Apr=PM แต่ May=KAM) → re-classify ใหม่
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio = mo.commercial_owner
+        THEN al.fixed_label
 
-      -- outlet ใหม่ใน May — รัน priority เต็ม
+      -- outlet ใหม่ใน May หรือ portfolio เปลี่ยนจาก Apr — รัน priority เต็ม
       -- [1] expansion
       WHEN ofd.first_dollar_date >= '2026-04-01'
         AND pmo.outlet_id IS NULL
@@ -356,16 +356,16 @@ may_labels AS (
       ELSE 'transfer_in'
     END AS fixed_label,
 
-    -- transfer metadata (carry forward หรือ compute ใหม่)
-    -- ถ้า outlet เปลี่ยน portfolio จาก Apr → May (multi-hop):
-    --   from_portfolio = al.current_portfolio (Apr portfolio ที่เพิ่งออกมา)
-    --   ไม่ inherit al.from_portfolio เพราะนั่นคือ perspective ของ Apr
+    -- transfer metadata
+    -- ถ้า portfolio ยังเดิม: inherit จาก Apr (non-transfer → NULL)
+    -- ถ้า portfolio เปลี่ยน: from = Apr portfolio (outlet ออกจาก Apr portfolio มา May)
     CASE
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio = mo.commercial_owner
+        THEN al.from_portfolio
       WHEN al.outlet_id IS NOT NULL
         AND al.current_portfolio != mo.commercial_owner
         THEN al.current_portfolio
-      WHEN al.outlet_id IS NOT NULL
-        THEN al.from_portfolio
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN mc.base_portfolio
       WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
@@ -376,7 +376,16 @@ may_labels AS (
     mo.commercial_owner AS to_portfolio,
 
     CASE
-      WHEN al.outlet_id IS NOT NULL THEN al.transfer_scope
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio = mo.commercial_owner
+        THEN al.transfer_scope
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio != mo.commercial_owner
+        THEN CASE
+          WHEN al.current_portfolio IN ('KAM','PM','ADMIN')
+            AND mo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
+          ELSE 'external'
+        END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN CASE
           WHEN mc.base_portfolio IN ('KAM','PM','ADMIN')
