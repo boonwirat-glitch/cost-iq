@@ -310,8 +310,8 @@ combined AS (
       WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv,0) = 0 THEN 'transfer_in'
       WHEN al.outlet_id IS NULL AND ofd_m.first_dollar_date >= '2026-04-01'
            AND pmo_m.outlet_id IS NULL                                THEN 'expansion'
-      WHEN al.outlet_id IS NULL AND pmo_m.commercial_owner = 'SALE'  THEN 'new_sales'
-      WHEN al.outlet_id IS NULL AND pmo_m.commercial_owner = 'KAM'   THEN 'comeback'
+      WHEN al.outlet_id IS NULL AND pmo_m.commercial_owner = 'SALE'   THEN 'new_sales'
+      WHEN al.outlet_id IS NULL AND pmo_mar_m.commercial_owner = 'KAM' THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
     END,
@@ -331,6 +331,7 @@ combined AS (
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_m ON mo.outlet_id = ofd_m.outlet_id
   LEFT JOIN pre_may_own pmo_m ON mo.outlet_id = pmo_m.outlet_id
+  LEFT JOIN pre_mar_own pmo_mar_m ON mo.outlet_id = pmo_mar_m.outlet_id
   LEFT JOIN kam_list k_m ON TRIM(mo.staff_owner) = TRIM(k_m.kam_name)
   WHERE mo.commercial_owner = 'KAM'
 
@@ -361,8 +362,8 @@ combined AS (
       WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv,0) = 0 THEN 'transfer_in'
       WHEN al.outlet_id IS NULL AND ofd_j.first_dollar_date >= '2026-04-01'
            AND pmo_j.outlet_id IS NULL                                THEN 'expansion'
-      WHEN al.outlet_id IS NULL AND pmo_j.commercial_owner = 'SALE'  THEN 'new_sales'
-      WHEN al.outlet_id IS NULL AND pmo_j.commercial_owner = 'KAM'   THEN 'comeback'
+      WHEN al.outlet_id IS NULL AND pmo_j.commercial_owner = 'SALE'    THEN 'new_sales'
+      WHEN al.outlet_id IS NULL AND pmo_mar_j.commercial_owner = 'KAM' THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
     END,
@@ -382,6 +383,7 @@ combined AS (
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_j ON jo.outlet_id = ofd_j.outlet_id
   LEFT JOIN pre_jun_own pmo_j ON jo.outlet_id = pmo_j.outlet_id
+  LEFT JOIN pre_mar_own pmo_mar_j ON jo.outlet_id = pmo_mar_j.outlet_id
   LEFT JOIN kam_list k_j ON TRIM(jo.staff_owner) = TRIM(k_j.kam_name)
   WHERE jo.commercial_owner = 'KAM'
 
