@@ -357,8 +357,15 @@ may_labels AS (
     END AS fixed_label,
 
     -- transfer metadata (carry forward หรือ compute ใหม่)
+    -- ถ้า outlet เปลี่ยน portfolio จาก Apr → May (multi-hop):
+    --   from_portfolio = al.current_portfolio (Apr portfolio ที่เพิ่งออกมา)
+    --   ไม่ inherit al.from_portfolio เพราะนั่นคือ perspective ของ Apr
     CASE
-      WHEN al.outlet_id IS NOT NULL THEN al.from_portfolio
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio != mo.commercial_owner
+        THEN al.current_portfolio
+      WHEN al.outlet_id IS NOT NULL
+        THEN al.from_portfolio
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN mc.base_portfolio
       WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
