@@ -926,22 +926,37 @@ function _qnrrRenderBreakdown(){
       html += '</tr>';
 
       // cohort Apr/May/Jun — derived from QNRR_CFG.q_months (auto-updates each quarter)
-      var nsColors = ['rgba(167,139,250,.55)','rgba(167,139,250,.65)','rgba(167,139,250,.75)'];
+      // สีน้ำเงินเหมือน cohort มี.ค. — ต่างแค่ opacity เพื่อแยกชั้น
+      var nsColors = ['rgba(96,165,250,.50)','rgba(96,165,250,.62)','rgba(96,165,250,.74)'];
       var nsCohortDefs = QNRR_CFG.q_months.map(function(m, i){
-        return {month: m, label: '└ cohort ' + (QNRR_CFG.months_th[m] || m), color: nsColors[i] || 'rgba(167,139,250,.65)'};
+        return {month: m, label: '└ cohort ' + (QNRR_CFG.months_th[m] || m), color: nsColors[i] || 'rgba(96,165,250,.60)'};
       });
+
+      // Build cumulative set of outlet_ids ที่ถูก claim โดย cohort ก่อนหน้าแล้ว
+      // เพื่อ prevent double-count ข้าม cohort
+      var claimedByEarlierCohort = {};
+
       nsCohortDefs.forEach(function(nc){
-        // Collect outlet_ids that are new_sales in nc.month
+        // Collect outlet_ids ที่เป็น new_sales ใน nc.month เท่านั้น
+        // และต้องไม่ถูก claim โดย cohort เดือนก่อนหน้าแล้ว
         var cohortBm = _data.by_month[nc.month];
         if (!cohortBm) return;
         var cohortOutlets = {};
         (cohortBm.rows || []).forEach(function(r){
-          if (r.movement_type === 'new_sales') cohortOutlets[r.outlet_id] = true;
+          if (r.movement_type === 'new_sales' && !claimedByEarlierCohort[r.outlet_id]) {
+            cohortOutlets[r.outlet_id] = true;
+          }
         });
         if (!Object.keys(cohortOutlets).length) return;
 
-        // Step 2: for each month in ALL_MONTHS, sum curr_gmv of those outlet_ids
-        // (in nc.month itself: their new_sales curr_gmv; in later months: whatever movement they became)
+        // Mark outlet_ids ของ cohort นี้ว่า claimed แล้ว
+        // cohort เดือนถัดไปจะ exclude ออก ไม่ให้ double-count
+        Object.keys(cohortOutlets).forEach(function(oid){
+          claimedByEarlierCohort[oid] = true;
+        });
+
+        // Render row: for each month, sum curr_gmv ของ outlet_ids ใน cohort นี้
+        // carry-forward = ดู GMV outlet เหล่านี้ในเดือนถัดๆ ไปด้วย
         html += '<tr class="bk-subrow">' +
           '<td><div class="qnrr-bk-mv-cell">' +
             '<div class="qnrr-bk-dot" style="background:' + nc.color + '"></div>' +
@@ -951,17 +966,14 @@ function _qnrrRenderBreakdown(){
           if (m === BASE_MONTH) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
           var bm2 = _data.by_month[m];
           if (!bm2) { html += '<td style="color:rgba(255,255,255,.10)">—</td>'; return; }
-          // Sum normalized curr_gmv for outlet_ids in this cohort
           var g = 0;
           (bm2.rows || []).forEach(function(r){
             if (cohortOutlets[r.outlet_id]) {
               var cd = parseFloat(r.curr_days) || 30;
-              // churn/transfer_out: curr_gmv=0, skip (they show as 0 naturally)
               g += (parseFloat(r.curr_gmv) || 0) / cd * 30;
             }
           });
           g = Math.round(g);
-          // Grey out months before cohort entry
           var isBeforeCohort = (m < nc.month);
           var col = isBeforeCohort ? 'rgba(255,255,255,.10)' : (g > 0 ? nc.color : 'rgba(255,255,255,.20)');
           html += '<td style="color:' + col + '">' + (g > 0 && !isBeforeCohort ? _fmtM(g) : '—') + '</td>';
