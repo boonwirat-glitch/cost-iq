@@ -275,6 +275,8 @@ may_labels AS (
         AND (pmo_mar_ml.commercial_owner = 'SALE' OR pmo_mar_ml.outlet_id IS NULL) THEN 'new_sales'
       WHEN al.outlet_id IS NOT NULL                                              THEN al.fixed_label
       WHEN pmo_mar_ml.commercial_owner = 'KAM'
+        AND FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03'              THEN 'handover'
+      WHEN pmo_mar_ml.commercial_owner = 'KAM'
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))                THEN 'comeback'
@@ -403,6 +405,8 @@ combined AS (
       -- outlet ใหม่ใน Jun (ไม่อยู่ทั้ง apr และ may)
       WHEN ofd_j.first_dollar_date >= '2026-04-01' AND pmo_j.outlet_id IS NULL THEN 'expansion'
       WHEN pmo_j.commercial_owner = 'SALE'                                      THEN 'new_sales'
+      WHEN pmo_mar_j.commercial_owner = 'KAM'
+        AND FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03'             THEN 'handover'
       WHEN pmo_mar_j.commercial_owner = 'KAM'
         AND (jo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
