@@ -340,8 +340,9 @@ apr_rows AS (
 
   UNION ALL
 
-  -- LEG 1B: transfer_out — Mar cohort แต่ Apr commercial_owner ไม่ใช่ KAM
-  -- outlet หลุดออกจาก KAM pool ทั้งหมด
+  -- LEG 1B: Mar cohort ที่ไม่อยู่ใน Apr KAM ownership
+  -- silent (ไม่มี order ใน Apr) → core_nrr_churn (ยังอยู่ใน pool)
+  -- มี order แต่ commercial_owner ≠ KAM → transfer_out จริง
   SELECT
     '2026-04'              AS period_month,
     '2026-03'              AS base_month,
@@ -356,10 +357,13 @@ apr_rows AS (
     mc.base_staff_owner,
     mc.base_gmv,
     0                      AS curr_gmv,
-    'transfer_out'         AS movement_type
+    CASE
+      WHEN ao.outlet_id IS NULL THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                    AS movement_type
 
   FROM mar_cohort mc
-  -- outlet ไม่มีใน Apr KAM ownership เลย หรือ commercial_owner เปลี่ยนออกจาก KAM
+  LEFT JOIN apr_ownership ao ON mc.outlet_id = ao.outlet_id
   WHERE mc.outlet_id NOT IN (
     SELECT outlet_id FROM apr_ownership
     WHERE commercial_owner = 'KAM'
@@ -412,7 +416,8 @@ may_rows AS (
 
   UNION ALL
 
-  -- LEG 2B: transfer_out — Mar cohort ที่ May commercial_owner ไม่ใช่ KAM
+  -- LEG 2B: Mar cohort ที่ไม่อยู่ใน May KAM ownership
+  -- silent → core_nrr_churn, มี order แต่ ≠ KAM → transfer_out
   SELECT
     '2026-05'              AS period_month,
     '2026-03'              AS base_month,
@@ -427,9 +432,13 @@ may_rows AS (
     mc.base_staff_owner,
     mc.base_gmv,
     0                      AS curr_gmv,
-    'transfer_out'         AS movement_type
+    CASE
+      WHEN mo.outlet_id IS NULL THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                    AS movement_type
 
   FROM mar_cohort mc
+  LEFT JOIN may_ownership mo ON mc.outlet_id = mo.outlet_id
   WHERE mc.outlet_id NOT IN (
     SELECT outlet_id FROM may_ownership
     WHERE commercial_owner = 'KAM'
@@ -482,7 +491,8 @@ jun_rows AS (
 
   UNION ALL
 
-  -- LEG 3B: transfer_out — Mar cohort ที่ Jun commercial_owner ไม่ใช่ KAM
+  -- LEG 3B: Mar cohort ที่ไม่อยู่ใน Jun KAM ownership
+  -- silent → core_nrr_churn, มี order แต่ ≠ KAM → transfer_out
   SELECT
     '2026-06'              AS period_month,
     '2026-03'              AS base_month,
@@ -497,9 +507,13 @@ jun_rows AS (
     mc.base_staff_owner,
     mc.base_gmv,
     0                      AS curr_gmv,
-    'transfer_out'         AS movement_type
+    CASE
+      WHEN jo.outlet_id IS NULL THEN 'core_nrr_churn'
+      ELSE 'transfer_out'
+    END                    AS movement_type
 
   FROM mar_cohort mc
+  LEFT JOIN jun_ownership jo ON mc.outlet_id = jo.outlet_id
   WHERE mc.outlet_id NOT IN (
     SELECT outlet_id FROM jun_ownership
     WHERE commercial_owner = 'KAM'
