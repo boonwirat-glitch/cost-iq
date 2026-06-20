@@ -373,7 +373,20 @@ may_labels AS (
       ELSE NULL
     END AS from_portfolio,
 
-    mo.commercial_owner AS to_portfolio,
+    -- to_portfolio: มีค่าเฉพาะ transfer_in จาก cohort [5]
+    -- ถ้า fixed_label เป็น transfer_in และ base_portfolio != current → set to
+    -- อื่นๆ ทั้งหมด NULL
+    CASE
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = mo.commercial_owner
+        THEN al.to_portfolio
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio != mo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
+        THEN mo.commercial_owner
+      WHEN al.outlet_id IS NULL
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
+        THEN mo.commercial_owner
+      ELSE NULL
+    END AS to_portfolio,
 
     CASE
       WHEN al.outlet_id IS NOT NULL
@@ -582,8 +595,9 @@ jun_rows AS (
     COALESCE(jg.gmv, 0)                                          AS curr_gmv,
 
     CASE
-      -- inherit จาก apr_labels
-      WHEN al.outlet_id IS NOT NULL THEN
+      -- inherit จาก apr_labels เฉพาะเมื่อ portfolio ไม่เปลี่ยน
+      WHEN al.outlet_id IS NOT NULL
+        AND al.current_portfolio = jo.commercial_owner THEN
         CASE
           WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv,0) > 0 THEN 'core_nrr'
           WHEN al.fixed_label = 'core'      AND COALESCE(jg.gmv,0) = 0 THEN 'core_nrr_churn'
@@ -593,8 +607,9 @@ jun_rows AS (
           WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv,0) = 0 THEN 'transfer_in'
           ELSE al.fixed_label
         END
-      -- inherit จาก may_labels
-      WHEN ml.outlet_id IS NOT NULL THEN
+      -- inherit จาก may_labels เฉพาะเมื่อ portfolio ไม่เปลี่ยน
+      WHEN ml.outlet_id IS NOT NULL
+        AND ml.current_portfolio = jo.commercial_owner THEN
         CASE
           WHEN ml.fixed_label = 'core'      AND COALESCE(jg.gmv,0) > 0 THEN 'core_nrr'
           WHEN ml.fixed_label = 'core'      AND COALESCE(jg.gmv,0) = 0 THEN 'core_nrr_churn'
@@ -625,35 +640,84 @@ jun_rows AS (
       ELSE 'transfer_in'
     END AS movement_type,
 
-    COALESCE(al.from_portfolio, ml.from_portfolio,
-      CASE
-        WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
-          THEN mc.base_portfolio
-        WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
-          THEN pmo.commercial_owner
-        ELSE NULL
-      END
-    ) AS from_portfolio,
+    CASE
+      -- inherit Apr ถ้า portfolio ไม่เปลี่ยน
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = jo.commercial_owner
+        THEN al.from_portfolio
+      -- portfolio เปลี่ยนจาก Apr → from = Apr portfolio
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN al.current_portfolio
+      -- inherit May ถ้า portfolio ไม่เปลี่ยน
+      WHEN ml.outlet_id IS NOT NULL AND ml.current_portfolio = jo.commercial_owner
+        THEN ml.from_portfolio
+      -- portfolio เปลี่ยนจาก May → from = May portfolio
+      WHEN ml.outlet_id IS NOT NULL AND ml.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN ml.current_portfolio
+      -- outlet ใหม่ใน Jun
+      WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN mc.base_portfolio
+      WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
+        AND pmo.commercial_owner = jo.commercial_owner
+        THEN NULL
+      ELSE NULL
+    END AS from_portfolio,
 
-    jo.commercial_owner AS to_portfolio,
+    -- to_portfolio: NULL ถ้าไม่ใช่ transfer_in จาก cohort
+    CASE
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = jo.commercial_owner
+        THEN al.to_portfolio
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN jo.commercial_owner
+      WHEN al.outlet_id IS NULL AND ml.outlet_id IS NOT NULL
+        AND ml.current_portfolio = jo.commercial_owner
+        THEN ml.to_portfolio
+      WHEN al.outlet_id IS NULL AND ml.outlet_id IS NOT NULL
+        AND ml.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN jo.commercial_owner
+      WHEN al.outlet_id IS NULL AND ml.outlet_id IS NULL
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN jo.commercial_owner
+      ELSE NULL
+    END AS to_portfolio,
 
-    COALESCE(al.transfer_scope, ml.transfer_scope,
-      CASE
-        WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
-          THEN CASE
-            WHEN mc.base_portfolio IN ('KAM','PM','ADMIN')
-              AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
-            ELSE 'external'
-          END
-        WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
-          THEN CASE
-            WHEN pmo.commercial_owner IN ('KAM','PM','ADMIN')
-              AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
-            ELSE 'external'
-          END
-        ELSE NULL
-      END
-    ) AS transfer_scope
+    CASE
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = jo.commercial_owner
+        THEN al.transfer_scope
+      WHEN al.outlet_id IS NOT NULL AND al.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN CASE
+          WHEN al.current_portfolio IN ('KAM','PM','ADMIN')
+            AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
+          ELSE 'external'
+        END
+      WHEN ml.outlet_id IS NOT NULL AND ml.current_portfolio = jo.commercial_owner
+        THEN ml.transfer_scope
+      WHEN ml.outlet_id IS NOT NULL AND ml.current_portfolio != jo.commercial_owner
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN CASE
+          WHEN ml.current_portfolio IN ('KAM','PM','ADMIN')
+            AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
+          ELSE 'external'
+        END
+      WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN CASE
+          WHEN mc.base_portfolio IN ('KAM','PM','ADMIN')
+            AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
+          ELSE 'external'
+        END
+      WHEN mc.outlet_id IS NULL AND pmo.commercial_owner IS NOT NULL
+        AND mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
+        THEN CASE
+          WHEN pmo.commercial_owner IN ('KAM','PM','ADMIN')
+            AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'internal'
+          ELSE 'external'
+        END
+      ELSE NULL
+    END AS transfer_scope
 
   FROM jun_own jo
   LEFT JOIN apr_labels al           ON jo.outlet_id = al.outlet_id
