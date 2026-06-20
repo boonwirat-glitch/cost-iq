@@ -529,6 +529,11 @@ jun_rows AS (
 -- ── 12. Union all months ──────────────────────────────────────────────────────
 all_rows AS (
   SELECT * FROM apr_rows
+  UNION ALL
+  SELECT * FROM may_rows
+  UNION ALL
+  SELECT * FROM jun_rows
+)
 
 -- DIAG: transfer_in breakdown by pre_mar_commercial_owner
 SELECT
