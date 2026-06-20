@@ -294,9 +294,16 @@ apr_labels AS (
       WHEN mc.outlet_id IS NOT NULL
         THEN 'core'
 
-      -- [5] comeback: ไม่มี GMV Mar + pre-Mar owner = KAM (ไม่สน staff_owner)
+      -- [4.5] handover: new_user_exp_date = Mar → handover เสมอ
+      WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
+        THEN 'handover'
+
+      -- [5] comeback: ไม่มี GMV Mar + pre-Mar = KAM + ไม่มี new_user_exp_date ใน Q
       WHEN mc.outlet_id IS NULL
         AND pmo.commercial_owner = 'KAM'
+        AND (ao.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))
         THEN 'comeback'
 
       -- [6] transfer_in: เข้ามาจากนอก KAM pool
@@ -406,7 +413,11 @@ may_rows AS (
       -- outlet ใหม่ที่เข้ามาใน May (ไม่มีใน apr_labels)
       WHEN al.outlet_id IS NULL AND ofd_may.first_dollar_date >= '2026-04-01' THEN 'expansion'
       WHEN al.outlet_id IS NULL AND pmo_may.commercial_owner = 'SALE'         THEN 'new_sales'
-      WHEN al.outlet_id IS NULL AND pmo_may.commercial_owner = 'KAM'          THEN 'comeback'
+      WHEN al.outlet_id IS NULL AND FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03' THEN 'handover'
+      WHEN al.outlet_id IS NULL AND pmo_may.commercial_owner = 'KAM'
+        AND (mo.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))               THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
     END AS movement_type
@@ -481,7 +492,11 @@ jun_rows AS (
       -- outlet ใหม่ที่เข้ามาใน Jun (ไม่มีใน apr_labels)
       WHEN al.outlet_id IS NULL AND ofd_jun.first_dollar_date >= '2026-04-01' THEN 'expansion'
       WHEN al.outlet_id IS NULL AND pmo_jun.commercial_owner = 'SALE'         THEN 'new_sales'
-      WHEN al.outlet_id IS NULL AND pmo_jun.commercial_owner = 'KAM'          THEN 'comeback'
+      WHEN al.outlet_id IS NULL AND FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
+      WHEN al.outlet_id IS NULL AND pmo_jun.commercial_owner = 'KAM'
+        AND (jo.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))               THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
     END AS movement_type
