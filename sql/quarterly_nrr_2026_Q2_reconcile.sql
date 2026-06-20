@@ -243,8 +243,10 @@ apr_labels AS (
       WHEN mc.outlet_id IS NOT NULL
         THEN 'core'
 
-      -- [5] comeback: ไม่มี Mar GMV + pre-Mar = KAM
+      -- [5] comeback: ไม่มี Mar GMV + pre-Mar = KAM + ไม่เคยผ่าน Sales (ไม่มี new_user_exp_date)
       WHEN mc.outlet_id IS NULL AND pmo.commercial_owner = 'KAM'
+        AND (ao.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date) NOT IN ('2026-03','2026-04','2026-05','2026-06'))
         THEN 'comeback'
 
       -- [6] transfer_in: มาจากนอก KAM pool
@@ -430,3 +432,4 @@ ORDER BY
   c.period_month,
   c.movement_type,
   c.curr_gmv DESC
+
