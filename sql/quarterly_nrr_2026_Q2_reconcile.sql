@@ -143,14 +143,36 @@ jun_own AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
--- ── pre_mar_own: last order ก่อน Mar ทุก commercial_owner ────────────────────
-pre_mar_own AS (
+-- ── pre_period_own: last order ก่อนแต่ละเดือน ทุก commercial_owner ──────────
+pre_apr_own AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner
   FROM `freshket-rn.dwh.order` o
-  WHERE o.delivery_date < '2026-03-01'
+  WHERE o.delivery_date < '2026-04-01'
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+pre_may_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    TRIM(o.staff_owner)             AS staff_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date < '2026-05-01'
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+pre_jun_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    TRIM(o.staff_owner)             AS staff_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date < '2026-06-01'
     AND o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
@@ -219,7 +241,7 @@ apr_labels AS (
   FROM apr_own ao
   LEFT JOIN mar_cohort mc  ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo ON ao.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_apr_own pmo ON ao.outlet_id = pmo.outlet_id
   LEFT JOIN kam_list k_cur  ON TRIM(ao.staff_owner) = TRIM(k_cur.kam_name)
   WHERE ao.commercial_owner = 'KAM'
 ),
@@ -294,7 +316,7 @@ combined AS (
   LEFT JOIN apr_labels al ON mo.outlet_id = al.outlet_id
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_m ON mo.outlet_id = ofd_m.outlet_id
-  LEFT JOIN pre_mar_own pmo_m ON mo.outlet_id = pmo_m.outlet_id
+  LEFT JOIN pre_may_own pmo_m ON mo.outlet_id = pmo_m.outlet_id
   LEFT JOIN kam_list k_m ON TRIM(mo.staff_owner) = TRIM(k_m.kam_name)
   WHERE mo.commercial_owner = 'KAM'
 
@@ -345,7 +367,7 @@ combined AS (
   LEFT JOIN apr_labels al ON jo.outlet_id = al.outlet_id
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_j ON jo.outlet_id = ofd_j.outlet_id
-  LEFT JOIN pre_mar_own pmo_j ON jo.outlet_id = pmo_j.outlet_id
+  LEFT JOIN pre_jun_own pmo_j ON jo.outlet_id = pmo_j.outlet_id
   LEFT JOIN kam_list k_j ON TRIM(jo.staff_owner) = TRIM(k_j.kam_name)
   WHERE jo.commercial_owner = 'KAM'
 
