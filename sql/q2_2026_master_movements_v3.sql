@@ -620,8 +620,6 @@ jun_rows AS (
         THEN CASE WHEN COALESCE(jg.gmv,0)>0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner THEN 'transfer_in'
       WHEN mc.outlet_id IS NULL AND ofd.first_dollar_date < '2026-04-01'
-        AND pjun.commercial_owner NOT IN ('SALE')
-        AND pjun.outlet_id IS NOT NULL
         AND (jo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -677,7 +675,8 @@ jun_rows AS (
   LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
   LEFT JOIN pre_mar_own pmo         ON jo.outlet_id = pmo.outlet_id
   LEFT JOIN pre_jun_own pjun        ON jo.outlet_id = pjun.outlet_id
-  LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN jun_gmv jg                ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN mar_handover_outlets mho2 ON jo.outlet_id = mho2.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
