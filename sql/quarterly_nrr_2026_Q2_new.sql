@@ -284,8 +284,9 @@ apr_labels AS (
         THEN 'handover'
 
       -- [3] new_sales: รับจาก Sales ใน Apr/May/Jun
+      -- pmo IS NULL = ไม่มี order ก่อน Mar เลย + new_user_exp_date ใน Q = new_sales
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        AND pmo.commercial_owner = 'SALE'
+        AND (pmo.commercial_owner = 'SALE' OR pmo.outlet_id IS NULL)
         THEN 'new_sales'
 
       -- [4] core: Mar cohort + Q owner ยัง commercial_owner = KAM
@@ -404,7 +405,7 @@ may_rows AS (
       WHEN al.fixed_label = 'comeback'  AND COALESCE(mg.gmv, 0) = 0 THEN 'transfer_in'
       -- outlet ใหม่ที่เข้ามาใน May (ไม่มีใน apr_labels)
       WHEN al.outlet_id IS NULL AND ofd_may.first_dollar_date >= '2026-04-01' THEN 'expansion'
-      WHEN al.outlet_id IS NULL AND mo.commercial_owner = 'SALE'              THEN 'new_sales'
+      WHEN al.outlet_id IS NULL AND pmo_may.commercial_owner = 'SALE'         THEN 'new_sales'
       WHEN al.outlet_id IS NULL AND pmo_may.commercial_owner = 'KAM'          THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
@@ -479,7 +480,7 @@ jun_rows AS (
       WHEN al.fixed_label = 'comeback'  AND COALESCE(jg.gmv, 0) = 0 THEN 'transfer_in'
       -- outlet ใหม่ที่เข้ามาใน Jun (ไม่มีใน apr_labels)
       WHEN al.outlet_id IS NULL AND ofd_jun.first_dollar_date >= '2026-04-01' THEN 'expansion'
-      WHEN al.outlet_id IS NULL AND jo.commercial_owner = 'SALE'              THEN 'new_sales'
+      WHEN al.outlet_id IS NULL AND pmo_jun.commercial_owner = 'SALE'         THEN 'new_sales'
       WHEN al.outlet_id IS NULL AND pmo_jun.commercial_owner = 'KAM'          THEN 'comeback'
       WHEN al.outlet_id IS NULL THEN 'transfer_in'
       ELSE al.fixed_label
