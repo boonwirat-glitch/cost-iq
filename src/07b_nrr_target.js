@@ -62,9 +62,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     return null;
   }
   const _nrrGatePass = moSort(currentMonthLabel) > moSort(prevMonth);
-  console.log('%c[Sense NRR] gate','color:'+(_nrrGatePass?'var(--tk-ok-bright)':'#ff6b6b')+';font-weight:bold',
-    {scope:kamEmail||('TL:'+tlEmail), currentMonth:currentMonthLabel, prevMonth,
-     gate:_nrrGatePass?'✓ PASS':'✗ FAIL — NRR=null', daysElapsed, accounts:allAccounts.length});
   if (!_nrrGatePass) return null;
 
   const prevDays = getThaiMonthDays(prevMonth);
@@ -286,10 +283,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
     };
   }
 
-  console.log('%c[Sense NRR] cohort split','color:var(--tk-ok-bright)',
-    {scope:kamEmail||('TL:'+tlEmail), core:coreAccounts.length,
-     transfer_in:transferInAccounts.length, new_sales:newFromSalesAccounts.length,
-     prevMonth, currentMonth:currentMonthLabel, daysElapsed});
   // v298: outlet filters per group. Core EXCLUDES moved outlets (negative filter);
   // transfer_in / new_sales INCLUDE only their moved outlets (positive filter).
   const coreResult = _groupNRR(coreAccounts, null, movedOutlets);

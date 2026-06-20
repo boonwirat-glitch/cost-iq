@@ -1136,7 +1136,6 @@ function _autoRouteAfterLogin() {
           const _tx=_db.transaction('csv','readwrite');
           const _store=_tx.objectStore('csv');
           ['portview','history','sku_current','categories','outlets'].forEach(function(k){_store.delete(k);});
-          console.log('[Sense] IDB cleared for AD login (prevent Sales CSV bleed)');
         }catch(ex){}
       };
     }catch(ex){}
@@ -1542,7 +1541,6 @@ async function _pwaSilentSessionCheck(reason, graceMs){
   function printDiagnostics(){
     const s = status();
     try {
-      console.log('Freshket auth/session diagnostics:', s);
       console.table(s.wrappedFunctions.map(function(name){ return { wrapped:name }; }));
     } catch(e) {}
     return s;

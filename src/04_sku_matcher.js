@@ -650,7 +650,6 @@ function setAiProvider(p){
           const files = getFiles();
           let url = `${getBase()}/${files[tab] || tab + '.csv'}`;
           if(tab==='current_movements'){
-            console.log('%c[Sense DEBUG] current_movements fetch start','color:#ff0;background:#333',{url, useCache, cached:!!cached});
           }
           if(networkFirst) url = v212FreshUrl(url, tab);
           try{
@@ -674,12 +673,9 @@ function setAiProvider(p){
           }
         }
         if(spec.tab==='current_movements'){
-          console.log('%c[Sense DEBUG] current_movements ingest start','color:#ff0;background:#333',
-            {type:spec.type, textLen:text?text.length:0, source});
         }
         const ok = await ingestCSVText(spec.type, text, { timeoutMs: ingestTimeout(spec) });
         if(spec.tab==='current_movements'){
-          console.log('%c[Sense DEBUG] current_movements ingest result','color:#ff0;background:#333',{ok, tab});
         }
         if(ok){
           markLoaded(tab);
@@ -741,10 +737,6 @@ function setAiProvider(p){
     const criticalLoaded = opts.criticalLoaded || 0;
     const specs = getSpecs();
     const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
-    console.log('%c[Sense DEBUG] ENHANCEMENT keys','color:#ff0;background:#333',
-      {ENHANCEMENT:ENHANCEMENT.slice(), keys:keys.slice(), 
-       has_current_movements: ENHANCEMENT.indexOf('current_movements')>=0,
-       spec_current_movements: !!specs['current_movements']});
     if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
     record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
     baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
@@ -1683,7 +1675,6 @@ function setAiProvider(p){
 
   function printAuthDiagnostics(){
     const diag = authDiagnostics();
-    try{ console.log('Freshket auth/session diagnostics:', diag); }catch(e){}
     return diag;
   }
 
@@ -2798,9 +2789,7 @@ async function sgOrbTap(){
   _sgRunThinking();  // start animation; reveal timer is now data-driven (see below)
   if(!D.alts.length||!D.skus.length){
     // COLD PATH: data not in memory — load now, reveal immediately when done
-    console.log('[SenseGate] cold-load start | alts:'+D.alts.length+' skus:'+D.skus.length);
     if(typeof ensureSenseData==='function')await ensureSenseData(currentAccountId,{silent:true});
-    console.log('[SenseGate] cold-load done | alts:'+D.alts.length+' skus:'+D.skus.length);
     if(!D.alts.length||!D.skus.length){
       console.warn('[SenseGate] load failed — aborting');
       _sgSetState('standby');
@@ -2813,7 +2802,6 @@ async function sgOrbTap(){
     if(_sgRunning&&!senseActivated) _sgRevealScore();
   } else {
     // WARM PATH: data already in memory — wait minimum 1200ms so animation feels real, then reveal
-    console.log('[SenseGate] warm — data ready, scheduling reveal at 1200ms min | alts:'+D.alts.length+' skus:'+D.skus.length);
     const elapsed=Date.now()-_sgTapAt;
     const wait=Math.max(0,1200-elapsed);
     if(_sgRevealTimer){clearTimeout(_sgRevealTimer);_sgRevealTimer=null;}
@@ -2944,7 +2932,6 @@ function _sgRunThinking(){
   _sgRevealTimer=setTimeout(()=>{
     _sgRevealTimer=null;
     if(!D.alts.length||!D.skus.length){
-      console.log('[SenseGate] safety-net: data still not ready after 12s');
       _sgRevealPending=true;
       return;
     }

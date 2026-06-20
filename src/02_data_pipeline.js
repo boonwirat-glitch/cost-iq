@@ -671,10 +671,6 @@ function handleFileUpload(type,input){
       const _moS=m=>{const p=(m||'').split(' ');return(parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]);};
       const _sortedHM=Array.from(_histMonths).sort((a,b)=>_moS(a)-_moS(b));
       const _latestHM=_sortedHM[_sortedHM.length-1]||'—';
-      console.log('%c[Sense] history loaded','color:#4ddc97',
-        {accounts:count, months:_sortedHM.length, latest_month:_latestHM,
-         all_months:_sortedHM.join(', '),
-         note:_latestHM==='พ.ค. 2569'?'⚠️ May in history — NRR gate will FAIL if current=May':'✓'});
       // toast removed v205b — bulk ingest noise
       const b=document.getElementById('badge-bulk-data');if(b){b.textContent='✓ '+count+' ร้าน';b.className='dp-slot-badge ok';}
       // Smart Splash: history = 80% progress; signal ready if portview also loaded
@@ -695,11 +691,6 @@ function handleFileUpload(type,input){
       const _pvSample=portviewBulkData.length?portviewBulkData[0].kamEmail:'(none)';
       _senseLog('%c[v206d debug] portviewBulkData ready:','color:#00d070',portviewBulkData.length,'accounts | sample kamEmail:',_pvSample);
       const _pvNonZero=portviewBulkData.filter(a=>a.gmvToDate>0).length;
-      console.log('%c[Sense] portview loaded','color:#4ddc97',
-        {accounts:portviewBulkData.length, gmv_to_date_nonzero:_pvNonZero,
-         days_elapsed:(portviewBulkData[0]&&portviewBulkData[0].daysElapsed)||0,
-         days_in_month:(portviewBulkData[0]&&portviewBulkData[0].daysInMonth)||0,
-         warn:_pvNonZero===0?'⚠️ ALL gmv_to_date=0':'✓'});
       const b=document.getElementById('badge-portview-bulk');
       if(b){b.textContent=portviewBulkData.length?'✓ '+portviewBulkData.length+' ร้าน':'error';b.className='dp-slot-badge '+(portviewBulkData.length?'ok':'na');}
       const sl=document.getElementById('slot-portview-bulk');if(sl&&portviewBulkData.length)sl.style.borderColor='var(--g500)';
@@ -841,7 +832,6 @@ function handleFileUpload(type,input){
         bulkSkuOutletData[aid][itemId].push({outlet_id:outletId,outlet_name:outletName,last_month_orders:lastMoOrders,last_month_gmv:lastMoGmv,this_month_orders:thisMoOrders,this_month_gmv:thisMoGmv});
         rowCount++;
       });
-      console.log('[Q12B] sku_outlet loaded:',rowCount,'rows',Object.keys(bulkSkuOutletData).length,'accounts');
       if(rowCount===0){
         // v755f: rowCount=0 → น่าจะเป็น cache จาก 404 เก่า → clear cache แล้ว return false
         console.warn('[Q12B] outlet rowCount=0 — possible stale 404 cache, will retry next load');
@@ -942,9 +932,6 @@ function handleFileUpload(type,input){
         const sl2=document.getElementById('slot-current_movements');
         if(sl2)sl2.style.borderColor='var(--g500)';
         const _mvSummary=Object.entries(byMovementType).map(([t,r])=>t+'='+r.length).join(', ');
-        console.log('%c[Sense] movements loaded','color:#4ddc97',{total:rows.length, breakdown:_mvSummary,
-          transfer_in:(byMovementType.transfer_in||[]).length, new_sales:(byMovementType.new_sales||[]).length,
-          sales_to_kam:(byMovementType.sales_to_kam||[]).length});
         // v259: signal RenderBus so NRR cohort split re-classifies with movement data
         if(window.RenderBus) window.RenderBus.signal('current_movements');
         else try{if(typeof _scheduleRefreshAll==='function')_scheduleRefreshAll(200);}catch(e){}
@@ -984,8 +971,6 @@ function handleFileUpload(type,input){
         }
       });
       bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
-      console.log('%c[Sense] handover loaded','color:#4ddc97',{accounts:Object.keys(byAccountId).length,
-        kams:Object.keys(byKamName).length});
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
@@ -1350,7 +1335,6 @@ function _patchR2FilesForSales(){
       // Pre-mark handover: Sales never fetches it but gates check for it
       try{ _cloudLoadedTabs.add('handover'); }catch(_){}
       try{ if(window.DataRegistry) window.DataRegistry.markLoaded('handover'); }catch(_){}
-      console.log('%c[Sense] R2 routed for Sales (bulk)','color:#4ddc97',{portview:_salesR2Override['portview']});
       // Clear Sales-relevant IDB keys so KAM cached data never serves Sales
       try{
         const _SALES_IDB_KEYS=['portview','history','sku_current','categories','outlets'];
@@ -1361,7 +1345,6 @@ function _patchR2FilesForSales(){
             const _tx=_db.transaction('csv','readwrite');
             const _store=_tx.objectStore('csv');
             _SALES_IDB_KEYS.forEach(function(k){ _store.delete(k); });
-            console.log('%c[Sense] IDB cleared for Sales bulk (5 tabs)','color:#4ddc97');
           }catch(ex){}
         };
       }catch(ex){}
@@ -1655,7 +1638,6 @@ async function _fetchKamFile({url,type,tab}){
     const _t0=Date.now();
     const text=await _fetchTextWithTimeout(url,90000);
     if(!text){console.warn('[v202 bundle] empty response:',url);return false;}
-    console.log('%c[Sense] R2 fetch','color:#4ddc97',{tab, kb:Math.round(text.length/1024), url:url.split('/').pop()});
     const _kb=Math.round(text.length/1024);
     const _ms=Date.now()-_t0;
     _senseLog('%c[v206d bundle] R2 fetch OK:','color:#00d070',tab,_kb+'KB in '+_ms+'ms');
@@ -1679,12 +1661,10 @@ async function _fetchKamBundle(kamEmail){
     // ถ้ายังไม่ได้ mark = outlet ยังไม่โหลดจริงในรอบนี้
     if(!_kamOutletLoaded.has(safeKey)){
       const _outletUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
-      console.log('[v755k] bundle cached, outlet not yet loaded — fetching:',_outletUrl.split('/').pop());
       _fetchKamFile({url:_outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
         .then(ok=>{
           if(ok){
             _kamOutletLoaded.add(safeKey);
-            console.log('[v755k] outlet loaded for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
             setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
           } else {
             console.warn('[v755k] outlet fetch failed for',kamEmail);
@@ -1702,26 +1682,22 @@ async function _fetchKamBundle(kamEmail){
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', skusUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', altsUrl);
       _senseLog('%c[v206d bundle] fetching:', 'color:#00d070;font-weight:bold', outletUrl);
-      console.log('[v755i] bundle fetch start: outlet url=',outletUrl.split('/').pop());
       const[okSkus,okAlts,okOutlet]=await Promise.all([
         _fetchKamFile({url:skusUrl,type:'bulk-skus',tab:`bundle-skus-${safeKey}`}),
         _fetchKamFile({url:altsUrl,type:'bulk-alternatives',tab:`bundle-alts-${safeKey}`}),
         _fetchKamFile({url:outletUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`}),
       ]);
-      console.log('[v755i] bundle fetch result: okSkus=',okSkus,'okAlts=',okAlts,'okOutlet=',okOutlet,'accounts in bulkSkuOutletData=',Object.keys(bulkSkuOutletData).length);
       if(okSkus&&okAlts){
         _kamBundleLoaded.add(safeKey);
         if(okOutlet){
           _kamOutletLoaded.add(safeKey);
         } else {
           // v755k: outlet fetch failed in parallel — retry independently after bundle loaded
-          console.log('[v755k] outlet fetch failed in parallel, retrying independently for',kamEmail);
           const _retryUrl=`${R2_BASE}/sense_sku_outlet_${safeKey}.csv`;
           _fetchKamFile({url:_retryUrl,type:'bulk-sku-outlet',tab:`bundle-sku-outlet-v2-${safeKey}`})
             .then(ok2=>{
               if(ok2){
                 _kamOutletLoaded.add(safeKey);
-                console.log('[v755k] outlet retry ok for',kamEmail,'accounts:',Object.keys(bulkSkuOutletData).length);
                 setTimeout(()=>{try{if(typeof renderKamThisMonth==='function')renderKamThisMonth();}catch(e){}},50);
               } else {
                 console.warn('[v755k] outlet retry also failed for',kamEmail);
@@ -1760,13 +1736,11 @@ async function _fetchUpsellBundle(kamEmail){
   const p=(async()=>{
     try{
       const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
-      console.log('%c[Sense] upsell bundle fetch','color:#f0b000','→',kamEmail);
       window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
       const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       window._upsellIngestEmail = '';
       if(ok){
         _upsellBundleLoaded.add(safeKey);
-        console.log('%c[Sense] upsell bundle ✓','color:#4ddc97',kamEmail);
         // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
         // Root cause: _dataKey() uses portviewBulkData.length (unchanged after upsell loads),
         // so key === _lastCommKey → _commGatedRender early-returns even after _lastCommHtml cleared.
@@ -1836,7 +1810,6 @@ function _prefetchQnrrIfNeeded(){
     // Delay 2s after FOREGROUND done — don't compete with critical files
     setTimeout(function(){
       if(window.bulkQnrrData&&window.bulkQnrrData.loaded)return;
-      console.log('%c[Sense qnrr] background prefetch start','color:#4ddc97');
       _fetchQnrrBundle().catch(function(){});
     },2000);
   }catch(e){}
@@ -2117,16 +2090,6 @@ async function ensureSenseData(accountId, {silent=false}={}){
   if(!bulkSkusData[accountId])needed.push('skus');
   if(!bulkAltsReady&&!bulkAltsUnverified[accountId])needed.push('alternatives');
   // v202 debug: full state snapshot on every Sense Gate tap
-  console.log('%c[v202 debug] ensureSenseData entry:','color:#6cf',{
-    accountId, needed,
-    pvReady: portviewBulkData&&portviewBulkData.length>0,
-    pvCount: portviewBulkData?portviewBulkData.length:0,
-    bundleLoaded: [..._kamBundleLoaded],
-    inFlight: Object.keys(_kamBundleInFlight),
-    role: currentUserProfile&&currentUserProfile.role,
-    userEmail: currentUser&&currentUser.email
-  });
-  if(!needed.length){console.log('[v202 debug] ensureSenseData: data already in memory — instant');return true;}
   // v202: try per-KAM bundle first (~4MB) before falling back to bulk (~120MB)
   // Fix 2: if portviewBulkData not loaded yet, use currentUser.email for KAM role
   const _role=currentUserProfile&&currentUserProfile.role||'rep';
@@ -3194,7 +3157,6 @@ function _renderOverviewPaceAndStrip(){
     getState: function(){ return {lastRunAt: _lastRunAt, inFlight: !!_inFlight, timer: !!_timer}; }
   };
 
-  try{ console.log('[Sense v225] ResumeCoordinator installed — replaces 12 resume listeners'); }catch(e){}
 })(window);
 
 
@@ -3389,7 +3351,6 @@ function _renderOverviewPaceAndStrip(){
     }catch(e){}
   }
   function logLoaded(reason){
-    try{ console.log('[SenseDebug]', reason || 'status', status()); }catch(e){}
   }
 
   installWrappers();
@@ -3414,7 +3375,6 @@ function _renderOverviewPaceAndStrip(){
   try{ document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') setTimeout(syncCounter, 1200); }); }catch(e){}
   try{ global.addEventListener('pageshow', function(){ setTimeout(syncCounter, 1200); }); }catch(e){}
   try{ global.addEventListener('online', function(){ setTimeout(syncCounter, 600); }); }catch(e){}
-  try{ console.log('[SenseDebug] v212c installed', version()); }catch(e){}
 })(window);
 
 

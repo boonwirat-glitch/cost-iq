@@ -97,7 +97,6 @@
     var bnav = document.querySelector('.bnav');
     if (bnav) bnav.style.gridTemplateColumns = 'repeat(' + visibleCount + ', 1fr)';
 
-    console.log('[NavConfig] rendered:', role, visibleCount, 'tabs');
   }
 
   function updateSaveState(screen) {

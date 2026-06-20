@@ -405,12 +405,6 @@ function _commComputeHandoverRetention(kamEmail) {
     if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
     else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
 
-    console.log('%c[Sense Handover] retention','color:'+(tier>=2?'var(--tk-ok-bright)':'#aaa')+';font-weight:bold',
-      {kamEmail, accounts:handoverRows.length,
-       baseline_gmv:Math.round(baselineNorm), current_gmv:Math.round(perfNorm),
-       retention_pct:Math.round(retentionPct*10)/10+'%',
-       tier, payout,
-       detail:detail.map(d=>d.name+'  base='+d.baseline+'  curr='+d.current)});
     return {
       accounts:       handoverRows.length,
       baseline_gmv:   Math.round(baselineNorm),
@@ -573,15 +567,6 @@ function _commBuildKamPayout(kamEmail) {
 
     const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
-    console.log('%c[Sense Comm] ✓ KAM payout','color:#b794f4;font-weight:bold',
-      {kamEmail, nrr_pct:pct!==null?pct+'%':'null',
-       nrr_payout:Math.round(nrrPayout||0),
-       p1_comm:Math.round(upsellSku&&upsellSku.p1&&upsellSku.p1.comm||0),
-       p3_comm:Math.round(upsellSku&&upsellSku.p3&&upsellSku.p3.comm||0),
-       handover_payout:Math.round(handover&&handover.payout||0),
-       subtotal:Math.round(subtotal||0),
-       gate_cap:gate&&gate.cap_multiplier||1,
-       FINAL:finalPayout});
 
     return {
       period, kamEmail,
@@ -618,12 +603,6 @@ function _commBuildTlPayout(tlEmail) {
     const upsellMult = _commComputeTeamUpsellMult(tlEmail);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
-    console.log('%c[Sense Comm] ✓ TL payout','color:#b794f4;font-weight:bold',
-      {tlEmail, nrr_pct:pct!==null?pct+'%':'null',
-       nrr_payout:Math.round(nrrPayout||0),
-       upsell_mult:upsellMult.multiplier+'x (tier '+upsellMult.tier+')',
-       team_upsell_pct:(upsellMult.team_upsell_pct||0).toFixed(1)+'%',
-       FINAL:finalPayout});
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
              upsell_mult: upsellMult, final_payout: finalPayout };
   } catch(e) {
