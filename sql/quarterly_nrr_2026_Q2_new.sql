@@ -83,7 +83,13 @@ kam_list AS (
     STRUCT('Rinlaphat (Mild) Setthasiriwuti'      AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
     STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
     STRUCT('Treerak (May) Sangjua'                AS kam_name, 'treerak.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
-    STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email)
+    STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    -- KAM ลาออก — ยังคง tl_email เดิมเพื่อ attribute base_tl_email ให้ถูก
+    STRUCT('Nutkamol (Fang) Siladam'              AS kam_name, 'nutkamol.s@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Sojirat (May) Charoensuk'             AS kam_name, 'sojirat.c@freshket.co'       AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Supasuta (Snow) Wongwiwut'            AS kam_name, 'supasuta.w@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email),
+    STRUCT('Mongkonkrid (Max) Piyapongsak'        AS kam_name, 'mongkonkrid.p@freshket.co'   AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email),
+    STRUCT('Nitipat (Name) Suparattanasilp'       AS kam_name, 'nitipat.su@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email)
   ])
 ),
 
