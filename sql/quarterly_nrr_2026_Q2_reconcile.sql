@@ -178,6 +178,19 @@ pre_jun_own AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
+-- ── pre_mar_own: ใช้เฉพาะ handover/new_sales classification ────────────────
+pre_mar_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
+    TRIM(o.staff_owner)             AS staff_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date < '2026-03-01'
+    AND o.account_type IN ('SA','MC','Chain','Unknown')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+
 -- ── mar_cohort: filter KAM ตรงนี้เพราะเป็น business logic ───────────────────
 mar_cohort AS (
   SELECT
@@ -216,14 +229,14 @@ apr_labels AS (
         AND pmo.outlet_id IS NULL
         THEN 'expansion'
 
-      -- [2] handover: รับจาก Sales ใน Mar
+      -- [2] handover: รับจาก Sales ใน Mar — ใช้ pre_mar_own
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
-        AND pmo.commercial_owner = 'SALE'
+        AND pmo_mar.commercial_owner = 'SALE'
         THEN 'handover'
 
-      -- [3] new_sales: รับจาก Sales ใน Q (new_user_exp_date หรือ pre-Mar = SALE)
+      -- [3] new_sales: รับจาก Sales ใน Q — ใช้ pre_mar_own
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        AND (pmo.commercial_owner = 'SALE' OR pmo.outlet_id IS NULL)
+        AND (pmo_mar.commercial_owner = 'SALE' OR pmo_mar.outlet_id IS NULL)
         THEN 'new_sales'
 
       -- [4] core: Mar cohort + ยังอยู่ใน KAM pool
@@ -241,8 +254,9 @@ apr_labels AS (
   FROM apr_own ao
   LEFT JOIN mar_cohort mc  ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_apr_own pmo ON ao.outlet_id = pmo.outlet_id
-  LEFT JOIN kam_list k_cur  ON TRIM(ao.staff_owner) = TRIM(k_cur.kam_name)
+  LEFT JOIN pre_apr_own pmo     ON ao.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_mar_own pmo_mar ON ao.outlet_id = pmo_mar.outlet_id
+  LEFT JOIN kam_list k_cur      ON TRIM(ao.staff_owner) = TRIM(k_cur.kam_name)
   WHERE ao.commercial_owner = 'KAM'
 ),
 
