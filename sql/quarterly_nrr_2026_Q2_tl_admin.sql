@@ -311,7 +311,6 @@ apr_rows AS (
     END AS movement_type
 
   FROM apr_ownership ao
-  -- เฉพาะ outlet ที่ Apr order เป็น KAM
   JOIN params p ON ao.commercial_owner = 'KAM'
   LEFT JOIN kam_list k_per
     ON ao.commercial_owner = 'KAM'
@@ -319,6 +318,7 @@ apr_rows AS (
   LEFT JOIN mar_cohort mc           ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
   LEFT JOIN apr_gmv ag              ON ao.outlet_id = ag.outlet_id
+  LEFT JOIN current_kam_snapshot cks_a ON ao.outlet_id = cks_a.outlet_id
 
   UNION ALL
 
@@ -330,9 +330,9 @@ apr_rows AS (
     mc.account_id,
     mc.account_name,
     mc.account_type,
-    mc.base_kam_email        AS period_kam_email,
-    mc.base_kam_name         AS period_kam_name,
-    mc.base_tl_email         AS period_tl_email,
+    COALESCE(mc.base_kam_email, cks.current_kam_email) AS period_kam_email,
+    COALESCE(mc.base_kam_name, cks.current_kam_email) AS period_kam_name,
+    COALESCE(mc.base_tl_email, cks.current_tl_email)  AS period_tl_email,
     mc.base_kam_email,
     mc.base_tl_email,
     mc.base_kam_name,
@@ -390,9 +390,9 @@ may_rows AS (
     COALESCE(mc.account_id, mo.account_id)   AS account_id,
     COALESCE(mc.account_name, mo.account_name) AS account_name,
     COALESCE(mc.account_type, mo.account_type) AS account_type,
-    k_per.kam_email          AS period_kam_email,
-    k_per.kam_name           AS period_kam_name,
-    k_per.tl_email           AS period_tl_email,
+    COALESCE(k_per.kam_email, cks_m.current_kam_email) AS period_kam_email,
+    COALESCE(k_per.kam_name, cks_m.current_kam_email) AS period_kam_name,
+    COALESCE(k_per.tl_email, cks_m.current_tl_email)  AS period_tl_email,
     mc.base_kam_email,
     mc.base_tl_email,
     mc.base_kam_name,
@@ -437,6 +437,7 @@ may_rows AS (
   LEFT JOIN mar_cohort mc           ON mo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   LEFT JOIN may_gmv mg              ON mo.outlet_id = mg.outlet_id
+  LEFT JOIN current_kam_snapshot cks_m ON mo.outlet_id = cks_m.outlet_id
 
   UNION ALL
 
@@ -491,9 +492,9 @@ jun_rows AS (
     COALESCE(mc.account_id, jo.account_id)   AS account_id,
     COALESCE(mc.account_name, jo.account_name) AS account_name,
     COALESCE(mc.account_type, jo.account_type) AS account_type,
-    k_per.kam_email          AS period_kam_email,
-    k_per.kam_name           AS period_kam_name,
-    k_per.tl_email           AS period_tl_email,
+    COALESCE(k_per.kam_email, cks_j.current_kam_email) AS period_kam_email,
+    COALESCE(k_per.kam_name, cks_j.current_kam_email) AS period_kam_name,
+    COALESCE(k_per.tl_email, cks_j.current_tl_email)  AS period_tl_email,
     mc.base_kam_email,
     mc.base_tl_email,
     mc.base_kam_name,
@@ -538,6 +539,7 @@ jun_rows AS (
   LEFT JOIN mar_cohort mc           ON jo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
   LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN current_kam_snapshot cks_j ON jo.outlet_id = cks_j.outlet_id
 
   UNION ALL
 
