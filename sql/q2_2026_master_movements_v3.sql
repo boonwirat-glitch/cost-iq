@@ -191,6 +191,19 @@ pre_jun_own AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
+-- ── 6b. mar_handover_outlets: outlets ที่มี any order ใน Mar ที่ new_user_exp=Mar ─────────
+-- ใช้แทน mar_own.new_user_exp_date เพราะ last order ของ Mar อาจเป็น KAM (ไม่มี exp=Mar)
+-- แต่ SALE order ก่อนหน้าใน Mar อาจมี new_user_exp=Mar → ต้องจับจาก any order
+mar_handover_outlets AS (
+  SELECT DISTINCT CAST(o.user_id AS STRING) AS outlet_id
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
+    AND FORMAT_DATE('%Y-%m', DATE(o.new_user_exp_date)) = '2026-03'
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+),
+
 -- ── 7. mar_cohort: fixed denominator ทั้ง Q ──────────────────────────────────
 mar_cohort AS (
   SELECT
@@ -239,7 +252,9 @@ apr_labels AS (
       WHEN ofd.first_dollar_date >= '2026-04-01'
         AND ao.commercial_owner != 'SALE'
         THEN 'expansion'
-      -- [2] handover: new_user_exp_date=Mar
+      -- [2] handover: any Mar order มี new_user_exp=Mar (รวมกรณี last order เป็น KAM)
+      WHEN mho.outlet_id IS NOT NULL
+        THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
         THEN 'handover'
       -- [2b] handover fallback: ไม่มี exp_date + pre_apr=SALE
@@ -283,10 +298,11 @@ apr_labels AS (
       END ELSE NULL END AS transfer_scope
 
   FROM apr_own ao
-  LEFT JOIN mar_cohort mc           ON ao.outlet_id = mc.outlet_id
-  LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo         ON ao.outlet_id = pmo.outlet_id
-  LEFT JOIN pre_apr_own papr        ON ao.outlet_id = papr.outlet_id
+  LEFT JOIN mar_cohort mc              ON ao.outlet_id = mc.outlet_id
+  LEFT JOIN outlet_first_dollar ofd    ON ao.outlet_id = ofd.outlet_id
+  LEFT JOIN pre_mar_own pmo            ON ao.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_apr_own papr           ON ao.outlet_id = papr.outlet_id
+  LEFT JOIN mar_handover_outlets mho   ON ao.outlet_id = mho.outlet_id
   WHERE ao.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
@@ -312,7 +328,9 @@ may_labels AS (
       WHEN ofd.first_dollar_date >= '2026-04-01' AND mo.commercial_owner != 'SALE'
         AND pmay.outlet_id IS NULL
         THEN 'expansion'
-      -- [2] handover
+      -- [2] handover: any Mar order มี new_user_exp=Mar
+      WHEN mho.outlet_id IS NOT NULL
+        THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03'
         THEN 'handover'
       -- [2b] handover fallback
@@ -373,11 +391,12 @@ may_labels AS (
     END AS transfer_scope
 
   FROM may_own mo
-  LEFT JOIN apr_labels al           ON mo.outlet_id = al.outlet_id
-  LEFT JOIN mar_cohort mc           ON mo.outlet_id = mc.outlet_id
-  LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo         ON mo.outlet_id = pmo.outlet_id
-  LEFT JOIN pre_may_own pmay        ON mo.outlet_id = pmay.outlet_id
+  LEFT JOIN apr_labels al              ON mo.outlet_id = al.outlet_id
+  LEFT JOIN mar_cohort mc              ON mo.outlet_id = mc.outlet_id
+  LEFT JOIN outlet_first_dollar ofd    ON mo.outlet_id = ofd.outlet_id
+  LEFT JOIN pre_mar_own pmo            ON mo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_may_own pmay           ON mo.outlet_id = pmay.outlet_id
+  LEFT JOIN mar_handover_outlets mho   ON mo.outlet_id = mho.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
@@ -610,6 +629,7 @@ jun_rows AS (
       -- Jun-only outlets
       WHEN ofd.first_dollar_date >= '2026-04-01' AND jo.commercial_owner != 'SALE'
         AND pjun.outlet_id IS NULL THEN 'expansion'
+      WHEN mho2.outlet_id IS NOT NULL THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN jo.new_user_exp_date IS NULL AND pjun.commercial_owner = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
