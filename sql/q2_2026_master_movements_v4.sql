@@ -411,15 +411,10 @@ apr_rows AS (
     AND ao_same.commercial_owner = mc.base_portfolio
   LEFT JOIN apr_own ao_any ON mc.outlet_id = ao_any.outlet_id
   WHERE ao_same.outlet_id IS NULL
-    AND (ao_any.outlet_id IS NULL
-         OR ao_any.commercial_owner NOT IN ('KAM','PM','ADMIN')
-         OR ao_any.commercial_owner != mc.base_portfolio)
-  -- filter NULL movement (inter ที่ handle ใน LEG A แล้ว)
-  QUALIFY CASE
-    WHEN ao_any.outlet_id IS NULL THEN TRUE
-    WHEN ao_any.commercial_owner NOT IN ('KAM','PM','ADMIN') THEN TRUE
-    ELSE FALSE
-  END
+    AND (
+      ao_any.outlet_id IS NULL
+      OR ao_any.commercial_owner NOT IN ('KAM','PM','ADMIN')
+    )
 ),
 
 -- ── 11. MAY rows ──────────────────────────────────────────────────────────────
@@ -467,11 +462,10 @@ may_rows AS (
     AND mo_same.commercial_owner = mc.base_portfolio
   LEFT JOIN may_own mo_any ON mc.outlet_id = mo_any.outlet_id
   WHERE mo_same.outlet_id IS NULL
-  QUALIFY CASE
-    WHEN mo_any.outlet_id IS NULL THEN TRUE
-    WHEN mo_any.commercial_owner NOT IN ('KAM','PM','ADMIN') THEN TRUE
-    ELSE FALSE
-  END
+    AND (
+      mo_any.outlet_id IS NULL
+      OR mo_any.commercial_owner NOT IN ('KAM','PM','ADMIN')
+    )
 ),
 
 -- ── 12. JUNE rows ─────────────────────────────────────────────────────────────
@@ -578,11 +572,10 @@ jun_rows AS (
     AND jo_same.commercial_owner = mc.base_portfolio
   LEFT JOIN jun_own jo_any ON mc.outlet_id = jo_any.outlet_id
   WHERE jo_same.outlet_id IS NULL
-  QUALIFY CASE
-    WHEN jo_any.outlet_id IS NULL THEN TRUE
-    WHEN jo_any.commercial_owner NOT IN ('KAM','PM','ADMIN') THEN TRUE
-    ELSE FALSE
-  END
+    AND (
+      jo_any.outlet_id IS NULL
+      OR jo_any.commercial_owner NOT IN ('KAM','PM','ADMIN')
+    )
 ),
 
 -- ── 13. Union ─────────────────────────────────────────────────────────────────
