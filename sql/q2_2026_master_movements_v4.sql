@@ -432,7 +432,7 @@ apr_rows AS (
     al.current_portfolio, al.base_staff_owner,
     al.base_portfolio, al.base_staff_owner,
     al.first_dollar_date, al.new_user_exp_date, al.cohort_month,
-    al.base_gmv, 0, 'transfer_out',
+    al.base_gmv, 0.0, 'transfer_out',
     al.current_portfolio, al.current_portfolio, 'intra',
     al.base_staff_owner, al.current_staff_owner
 
@@ -450,7 +450,7 @@ apr_rows AS (
     al.current_portfolio, al.current_staff_owner,
     al.base_portfolio, al.base_staff_owner,
     al.first_dollar_date, al.new_user_exp_date, al.cohort_month,
-    al.base_gmv, 0, 'transfer_in',
+    al.base_gmv, 0.0, 'transfer_in',
     al.current_portfolio, al.current_portfolio, 'intra',
     al.base_staff_owner, al.current_staff_owner
 
@@ -469,7 +469,7 @@ apr_rows AS (
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, '2026-03' AS cohort_month,
-    mc.base_gmv, 0 AS curr_gmv,
+    mc.base_gmv, 0.0 AS curr_gmv,
     CASE
       WHEN ao_any.outlet_id IS NULL THEN 'core_nrr_churn'
       ELSE 'transfer_out'
@@ -519,7 +519,7 @@ may_rows AS (
     ml.current_portfolio, ml.base_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
     ml.first_dollar_date, ml.new_user_exp_date, ml.cohort_month,
-    ml.base_gmv, 0, 'transfer_out',
+    ml.base_gmv, 0.0, 'transfer_out',
     ml.current_portfolio, ml.current_portfolio, 'intra',
     ml.base_staff_owner, ml.current_staff_owner
   FROM may_labels ml
@@ -535,7 +535,7 @@ may_rows AS (
     ml.current_portfolio, ml.current_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
     ml.first_dollar_date, ml.new_user_exp_date, ml.cohort_month,
-    ml.base_gmv, 0, 'transfer_in',
+    ml.base_gmv, 0.0, 'transfer_in',
     ml.current_portfolio, ml.current_portfolio, 'intra',
     ml.base_staff_owner, ml.current_staff_owner
   FROM may_labels ml
@@ -552,7 +552,7 @@ may_rows AS (
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, '2026-03',
-    mc.base_gmv, 0,
+    mc.base_gmv, 0.0,
     CASE WHEN mo_any.outlet_id IS NULL THEN 'core_nrr_churn' ELSE 'transfer_out' END,
     CASE WHEN mo_any.outlet_id IS NOT NULL THEN mc.base_portfolio ELSE NULL END,
     mo_any.commercial_owner,
@@ -667,7 +667,7 @@ jun_rows AS (
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, '2026-03',
-    mc.base_gmv, 0,
+    mc.base_gmv, 0.0,
     CASE WHEN jo_any.outlet_id IS NULL THEN 'core_nrr_churn' ELSE 'transfer_out' END,
     CASE WHEN jo_any.outlet_id IS NOT NULL THEN mc.base_portfolio ELSE NULL END,
     jo_any.commercial_owner,
