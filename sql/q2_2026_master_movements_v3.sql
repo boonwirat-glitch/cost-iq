@@ -635,6 +635,13 @@ jun_rows AS (
         AND jo.commercial_owner = mo_last2.commercial_owner THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN jo.new_user_exp_date IS NULL AND pjun.commercial_owner = 'SALE' THEN 'handover'
+      -- [2c] handover fallback: มี Mar GMV (SALE) + Jun เปลี่ยนมา KAM/PM/ADMIN
+      WHEN pjun.commercial_owner = 'SALE'
+        AND mag2.outlet_id IS NOT NULL
+        AND (jo.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', jo.new_user_exp_date)
+                NOT IN ('2026-04','2026-05','2026-06'))
+        THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND (pmo.commercial_owner = 'SALE' OR pmo.outlet_id IS NULL) THEN 'new_sales'
       WHEN jo.new_user_exp_date IS NULL AND pjun.commercial_owner = 'SALE'
@@ -701,6 +708,7 @@ jun_rows AS (
   LEFT JOIN jun_gmv jg                ON jo.outlet_id = jg.outlet_id
   LEFT JOIN mar_handover_outlets mho2 ON jo.outlet_id = mho2.outlet_id
   LEFT JOIN mar_own mo_last2           ON jo.outlet_id = mo_last2.outlet_id
+  LEFT JOIN mar_any_gmv mag2           ON jo.outlet_id = mag2.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
