@@ -438,7 +438,7 @@ apr_rows AS (
   -- outlet ที่ core แต่ staff_owner เปลี่ยน → เพิ่ม transfer_out + transfer_in
   -- transfer_out row (from base_staff perspective)
   SELECT
-    '2026-04', al.outlet_id, al.account_id, al.account_name, al.account_type,
+    '2026-04', al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
     al.current_portfolio, al.base_staff_owner AS current_staff_owner,
     al.base_portfolio, al.base_staff_owner,
     al.first_dollar_date, al.new_user_exp_date, al.pre_mar_portfolio,
@@ -461,7 +461,7 @@ apr_rows AS (
 
   -- transfer_in row (from current_staff perspective)
   SELECT
-    '2026-04', al.outlet_id, al.account_id, al.account_name, al.account_type,
+    '2026-04', al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
     al.current_portfolio, al.current_staff_owner,
     al.base_portfolio, al.base_staff_owner,
     al.first_dollar_date, al.new_user_exp_date, al.pre_mar_portfolio,
