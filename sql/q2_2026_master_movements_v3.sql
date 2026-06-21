@@ -99,7 +99,7 @@ jun_gmv AS (
 -- ── 5. Ownership snapshots — last order per outlet per month ──────────────────
 mar_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.account_type,
+    o.account_name, o.res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
@@ -111,7 +111,7 @@ mar_own AS (
 ),
 apr_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.account_type,
+    o.account_name, o.res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
@@ -123,7 +123,7 @@ apr_own AS (
 ),
 may_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.account_type,
+    o.account_name, o.res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
@@ -135,7 +135,7 @@ may_own AS (
 ),
 jun_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.account_type,
+    o.account_name, o.res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     TRIM(o.staff_owner)             AS staff_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
@@ -207,7 +207,7 @@ mar_handover_outlets AS (
 -- ── 7. mar_cohort: fixed denominator ทั้ง Q ──────────────────────────────────
 mar_cohort AS (
   SELECT
-    mo.outlet_id, mo.account_id, mo.account_name, mo.account_type,
+    mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner  AS base_portfolio,
     mo.staff_owner       AS base_staff_owner,
     mo.new_user_exp_date,
@@ -237,7 +237,7 @@ mar_cohort AS (
 -- ── 9. apr_labels: lock classification Apr ────────────────────────────────────
 apr_labels AS (
   SELECT
-    ao.outlet_id, ao.account_id, ao.account_name, ao.account_type,
+    ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
     ao.commercial_owner  AS current_portfolio,
     ao.staff_owner       AS current_staff_owner,
     ao.new_user_exp_date,
@@ -252,8 +252,10 @@ apr_labels AS (
       WHEN ofd.first_dollar_date >= '2026-04-01'
         AND ao.commercial_owner != 'SALE'
         THEN 'expansion'
-      -- [2] handover: any Mar order มี new_user_exp=Mar (รวมกรณี last order เป็น KAM)
+      -- [2] handover: any Mar order มี new_user_exp=Mar
+      -- เช็คว่า current portfolio ตรงกับ last Mar owner (ป้องกัน SALE→PM→KAM ถูก classify ผิด)
       WHEN mho.outlet_id IS NOT NULL
+        AND ao.commercial_owner = mo_last.commercial_owner
         THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03'
         THEN 'handover'
@@ -303,13 +305,14 @@ apr_labels AS (
   LEFT JOIN pre_mar_own pmo            ON ao.outlet_id = pmo.outlet_id
   LEFT JOIN pre_apr_own papr           ON ao.outlet_id = papr.outlet_id
   LEFT JOIN mar_handover_outlets mho   ON ao.outlet_id = mho.outlet_id
+  LEFT JOIN mar_own mo_last            ON ao.outlet_id = mo_last.outlet_id
   WHERE ao.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
 -- ── 10. may_labels: lock classification May (Jun inherit) ─────────────────────
 may_labels AS (
   SELECT
-    mo.outlet_id, mo.account_id, mo.account_name, mo.account_type,
+    mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner  AS current_portfolio,
     mo.staff_owner       AS current_staff_owner,
     mo.new_user_exp_date,
@@ -328,8 +331,9 @@ may_labels AS (
       WHEN ofd.first_dollar_date >= '2026-04-01' AND mo.commercial_owner != 'SALE'
         AND pmay.outlet_id IS NULL
         THEN 'expansion'
-      -- [2] handover: any Mar order มี new_user_exp=Mar
+      -- [2] handover: any Mar order มี new_user_exp=Mar + portfolio ตรงกับ Mar last owner
       WHEN mho.outlet_id IS NOT NULL
+        AND mo.commercial_owner = mo_last.commercial_owner
         THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03'
         THEN 'handover'
@@ -397,6 +401,7 @@ may_labels AS (
   LEFT JOIN pre_mar_own pmo            ON mo.outlet_id = pmo.outlet_id
   LEFT JOIN pre_may_own pmay           ON mo.outlet_id = pmay.outlet_id
   LEFT JOIN mar_handover_outlets mho   ON mo.outlet_id = mho.outlet_id
+  LEFT JOIN mar_own mo_last            ON mo.outlet_id = mo_last.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
@@ -406,7 +411,7 @@ apr_rows AS (
   -- LEG A: outlets ที่มี Apr order (portfolio scope) — core movement row
   SELECT
     '2026-04' AS period_month,
-    al.outlet_id, al.account_id, al.account_name, al.account_type,
+    al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
     al.current_portfolio, al.current_staff_owner,
     al.base_portfolio, al.base_staff_owner,
     al.first_dollar_date, al.new_user_exp_date, al.pre_mar_portfolio,
@@ -479,7 +484,7 @@ apr_rows AS (
 
   -- LEG B: Mar cohort ที่ไม่มี Apr order ใน portfolio เดิม
   SELECT
-    '2026-04', mc.outlet_id, mc.account_id, mc.account_name, mc.account_type,
+    '2026-04', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio AS current_portfolio, mc.base_staff_owner AS current_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, NULL AS pre_mar_portfolio,
@@ -506,7 +511,7 @@ may_rows AS (
 
   -- LEG A: core movement
   SELECT
-    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.account_type,
+    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.res_name, ml.account_type,
     ml.current_portfolio, ml.current_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
     ml.first_dollar_date, ml.new_user_exp_date, ml.pre_mar_portfolio,
@@ -530,7 +535,7 @@ may_rows AS (
 
   -- LEG A-INTRA: intra staff transfer May
   SELECT
-    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.account_type,
+    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.res_name, ml.account_type,
     ml.current_portfolio, ml.base_staff_owner AS current_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
     ml.first_dollar_date, ml.new_user_exp_date, ml.pre_mar_portfolio,
@@ -546,7 +551,7 @@ may_rows AS (
   UNION ALL
 
   SELECT
-    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.account_type,
+    '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.res_name, ml.account_type,
     ml.current_portfolio, ml.current_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
     ml.first_dollar_date, ml.new_user_exp_date, ml.pre_mar_portfolio,
@@ -563,7 +568,7 @@ may_rows AS (
 
   -- LEG B: Mar cohort ที่ไม่มี May order ใน portfolio เดิม
   SELECT
-    '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.account_type,
+    '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, NULL,
@@ -592,9 +597,10 @@ jun_rows AS (
   SELECT
     '2026-06',
     jo.outlet_id,
-    COALESCE(al.account_id, ml.account_id, jo.account_id)       AS account_id,
-    COALESCE(al.account_name, ml.account_name, jo.account_name)  AS account_name,
-    COALESCE(al.account_type, ml.account_type, jo.account_type)  AS account_type,
+    COALESCE(al.account_id, ml.account_id, jo.account_id)          AS account_id,
+    COALESCE(al.account_name, ml.account_name, jo.account_name)    AS account_name,
+    COALESCE(al.res_name, ml.res_name, jo.res_name)                AS res_name,
+    COALESCE(al.account_type, ml.account_type, jo.account_type)    AS account_type,
     jo.commercial_owner AS current_portfolio,
     jo.staff_owner      AS current_staff_owner,
     COALESCE(al.base_portfolio, ml.base_portfolio, mc.base_portfolio)               AS base_portfolio,
@@ -629,7 +635,8 @@ jun_rows AS (
       -- Jun-only outlets
       WHEN ofd.first_dollar_date >= '2026-04-01' AND jo.commercial_owner != 'SALE'
         AND pjun.outlet_id IS NULL THEN 'expansion'
-      WHEN mho2.outlet_id IS NOT NULL THEN 'handover'
+      WHEN mho2.outlet_id IS NOT NULL
+        AND jo.commercial_owner = mo_last2.commercial_owner THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN jo.new_user_exp_date IS NULL AND pjun.commercial_owner = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
@@ -697,6 +704,7 @@ jun_rows AS (
   LEFT JOIN pre_jun_own pjun        ON jo.outlet_id = pjun.outlet_id
   LEFT JOIN jun_gmv jg                ON jo.outlet_id = jg.outlet_id
   LEFT JOIN mar_handover_outlets mho2 ON jo.outlet_id = mho2.outlet_id
+  LEFT JOIN mar_own mo_last2           ON jo.outlet_id = mo_last2.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
@@ -707,6 +715,7 @@ jun_rows AS (
     jo.outlet_id,
     COALESCE(al.account_id, ml.account_id, jo.account_id),
     COALESCE(al.account_name, ml.account_name, jo.account_name),
+    COALESCE(al.res_name, ml.res_name, jo.res_name),
     COALESCE(al.account_type, ml.account_type, jo.account_type),
     jo.commercial_owner,
     COALESCE(al.base_staff_owner, ml.base_staff_owner, mc.base_staff_owner) AS current_staff_owner,
@@ -741,6 +750,7 @@ jun_rows AS (
     jo.outlet_id,
     COALESCE(al.account_id, ml.account_id, jo.account_id),
     COALESCE(al.account_name, ml.account_name, jo.account_name),
+    COALESCE(al.res_name, ml.res_name, jo.res_name),
     COALESCE(al.account_type, ml.account_type, jo.account_type),
     jo.commercial_owner, jo.staff_owner,
     COALESCE(al.base_portfolio, ml.base_portfolio, mc.base_portfolio),
@@ -771,7 +781,7 @@ jun_rows AS (
 
   -- LEG B: Mar cohort ที่ไม่มี Jun order ใน portfolio เดิม
   SELECT
-    '2026-06', mc.outlet_id, mc.account_id, mc.account_name, mc.account_type,
+    '2026-06', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.new_user_exp_date, NULL,
@@ -812,6 +822,7 @@ SELECT
   r.outlet_id,
   r.account_id,
   r.account_name,
+  r.res_name,
   r.account_type,
   ROUND(r.curr_gmv, 0)  AS curr_gmv,
   ROUND(r.base_gmv, 0)  AS base_gmv,
