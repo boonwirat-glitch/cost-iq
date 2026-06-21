@@ -1,15 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- QNRR Q2 2026 — Movement Verification Table
--- join master_v3 + dwh.order history สำหรับ manual reconcile
+-- master_v3 + dwh.order history สำหรับ manual reconcile
 -- ════════════════════════════════════════════════════════════════════════
--- columns ที่กวาดตาดู:
---   movement_type          ← SQL classify ว่าอะไร
---   curr_gmv               ← ควรตรงกับ gmv_[period]26 จาก order จริง
---   owner_mar26→jun26      ← commercial_owner จาก order (เห็น transition)
---   staff_apr26_start/end  ← detect intra-month staff change
---   gmv_dec25→jun26        ← GMV timeline ย้อนหลัง 7 เดือน
--- ════════════════════════════════════════════════════════════════════════
-
 WITH
 
 -- ── 0. target outlets ────────────────────────────────────────────────────
@@ -29,7 +21,7 @@ target_outlets AS (
   ] AS id)
 ),
 
--- ── 1-13. master_v3 CTEs (embedded) ──────────────────────────────────────
+-- ── 1–13. master_v3 CTEs ─────────────────────────────────────────────────
 -- ── 1. Date anchors ──────────────────────────────────────────────────────────
 params AS (
   SELECT
@@ -799,54 +791,15 @@ jun_rows AS (
 ),
 
 -- ── 14. Union ─────────────────────────────────────────────────────────────────
-all_rows AS (
-  SELECT * FROM apr_rows
-  UNION ALL SELECT * FROM may_rows
-  UNION ALL SELECT * FROM jun_rows
-)
 
--- ── FINAL OUTPUT ──────────────────────────────────────────────────────────────
-SELECT
-  r.period_month,
-  r.movement_type,
-  r.transfer_scope,         -- 'intra' | 'inter' | 'external' | NULL
-  r.current_portfolio,
-  r.current_staff_owner,
-  r.base_portfolio,
-  r.base_staff_owner,
-  r.outlet_id,
-  r.account_id,
-  r.account_name,
-  r.res_name,
-  r.account_type,
-  ROUND(r.curr_gmv, 0)  AS curr_gmv,
-  ROUND(r.base_gmv, 0)  AS base_gmv,
-  p.base_days,
-  CASE r.period_month
-    WHEN '2026-04' THEN p.apr_days
-    WHEN '2026-05' THEN p.may_days
-    WHEN '2026-06' THEN p.jun_days
-  END AS curr_days,
-  r.first_dollar_date,
-  r.new_user_exp_date,
-  r.pre_mar_portfolio,
-  -- inter/external transfer columns
-  r.from_portfolio,
-  r.to_portfolio,
-  -- intra transfer columns (Dent→Pop)
-  r.from_staff_owner,
-  r.to_staff_owner
-
-FROM all_rows r
-CROSS JOIN params p,
-
--- ── 14. all_rows + filter to target outlets ───────────────────────────────
+-- ── 14. all_rows ──────────────────────────────────────────────────────────
 all_rows AS (
   SELECT * FROM apr_rows
   UNION ALL SELECT * FROM may_rows
   UNION ALL SELECT * FROM jun_rows
 ),
 
+-- ── 15. master filtered ───────────────────────────────────────────────────
 master AS (
   SELECT r.*
   FROM all_rows r
@@ -855,7 +808,7 @@ master AS (
     AND r.transfer_scope != 'intra'
 ),
 
--- ── 15. order history ─────────────────────────────────────────────────────
+-- ── 16. order history ─────────────────────────────────────────────────────
 monthly_raw AS (
   SELECT
     CAST(o.user_id AS STRING)                           AS outlet_id,
@@ -863,12 +816,10 @@ monthly_raw AS (
     UPPER(TRIM(o.commercial_owner))                     AS commercial_owner,
     TRIM(o.staff_owner)                                 AS staff_owner,
     o.gmv_ex_vat,
-    o.delivery_date,
     DATE(o.first_dollar_date)                           AS first_dollar_date,
     DATE(o.new_user_exp_date)                           AS new_user_exp_date,
     o.account_name,
-    o.res_name,
-    o.account_type
+    o.res_name
   FROM `freshket-rn.dwh.order` o
   WHERE CAST(o.user_id AS STRING) IN (SELECT outlet_id FROM target_outlets)
     AND o.delivery_date BETWEEN '2025-12-01'
