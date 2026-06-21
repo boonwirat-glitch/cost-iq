@@ -273,12 +273,10 @@ apr_labels AS (
       -- [5] transfer_in from cohort (inter-portfolio)
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != ao.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback: เคยเป็น B2B customer ก่อน Q + ไม่ใช่ SALE channel
-      -- pre_apr_own NOT SALE = เคยถูกดูแลโดย KAM/PM/ADMIN มาก่อน (consistent กับ validated SQL)
+      -- [6] comeback: ไม่มี Mar GMV + เคยซื้อก่อน Q
+      -- ไม่สน pre_period owner — new_user_exp ที่จบก่อน Q ไม่ใช่ handover/new_sales
       WHEN mc.outlet_id IS NULL
         AND ofd.first_dollar_date < '2026-04-01'
-        AND papr.commercial_owner NOT IN ('SALE')
-        AND papr.outlet_id IS NOT NULL
         AND (ao.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
@@ -355,11 +353,9 @@ may_labels AS (
       -- [5] transfer_in
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner
         THEN 'transfer_in'
-      -- [6] comeback: เคยเป็น B2B customer ก่อน Q + ไม่ใช่ SALE channel
+      -- [6] comeback: ไม่มี Mar GMV + เคยซื้อก่อน Q (ไม่สน pre_period owner)
       WHEN mc.outlet_id IS NULL
         AND ofd.first_dollar_date < '2026-04-01'
-        AND pmay.commercial_owner NOT IN ('SALE')
-        AND pmay.outlet_id IS NOT NULL
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
