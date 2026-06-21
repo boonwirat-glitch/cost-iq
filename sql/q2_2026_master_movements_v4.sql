@@ -16,7 +16,7 @@
 --   core_nrr       : Mar cohort + same portfolio + GMV > 0
 --   core_nrr_churn : Mar cohort + same portfolio + GMV = 0
 --   handover       : new_user_exp_date = Mar (หรือ fallback first_portfolio_order <= Mar)
---   new_sales      : new_user_exp_date = Apr/May/Jun (หรือ fallback first_portfolio_order ใน Q)
+--   new_sales      : new_user_exp_date = Apr/May/Jun (หรือ fallback pre_period=SALE)
 --   expansion      : first_dollar_date >= Apr 1
 --   comeback       : ไม่มี Mar GMV + first_dollar < Apr + กลับมาซื้อใน Q
 --   transfer_in    : รับโอนเข้า portfolio เดือนนั้น (รายเดือน)
@@ -591,7 +591,8 @@ jun_rows AS (
       CASE
         WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-06' THEN '2026-06'
         WHEN jo.new_user_exp_date IS NULL
-          AND COALESCE(ofp.first_portfolio_date) BETWEEN '2026-06-01' AND p.jun_end
+          AND pjun.commercial_owner = 'SALE'
+          AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
           THEN '2026-06'
         ELSE NULL
       END
@@ -614,12 +615,13 @@ jun_rows AS (
         AND jo.commercial_owner != 'SALE' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN jo.new_user_exp_date IS NULL
-        AND COALESCE(ofp.first_portfolio_date) <= '2026-03-31' THEN 'handover'
+        AND pjun.commercial_owner = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
       WHEN jo.new_user_exp_date IS NULL
-        AND COALESCE(ofp.first_portfolio_date) BETWEEN '2026-06-01' AND p.jun_end
-        AND jo.commercial_owner != 'SALE' THEN 'new_sales'
+        AND pjun.commercial_owner = 'SALE'
+        AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
+        THEN 'new_sales'
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio = jo.commercial_owner
         THEN CASE WHEN COALESCE(jg.gmv,0)>0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
@@ -654,9 +656,10 @@ jun_rows AS (
   LEFT JOIN apr_labels al                    ON jo.outlet_id = al.outlet_id
   LEFT JOIN may_labels ml                    ON jo.outlet_id = ml.outlet_id
   LEFT JOIN mar_cohort mc                    ON jo.outlet_id = mc.outlet_id
-  LEFT JOIN outlet_first_dollar ofd          ON jo.outlet_id = ofd.outlet_id
-  LEFT JOIN outlet_first_portfolio_order ofp ON jo.outlet_id = ofp.outlet_id
-  LEFT JOIN jun_gmv jg                       ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
+  LEFT JOIN pre_mar_own pmo         ON jo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_jun_own pjun        ON jo.outlet_id = pjun.outlet_id
+  LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
