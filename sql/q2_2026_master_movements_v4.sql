@@ -580,9 +580,9 @@ jun_rows AS (
 
 -- ── 13. Union ─────────────────────────────────────────────────────────────────
 all_rows AS (
-  SELECT * FROM apr_rows WHERE movement_type IS NOT NULL
-  UNION ALL SELECT * FROM may_rows WHERE movement_type IS NOT NULL
-  UNION ALL SELECT * FROM jun_rows WHERE movement_type IS NOT NULL
+  SELECT * FROM apr_rows
+  UNION ALL SELECT * FROM may_rows
+  UNION ALL SELECT * FROM jun_rows
 )
 
 -- ── FINAL OUTPUT ──────────────────────────────────────────────────────────────
