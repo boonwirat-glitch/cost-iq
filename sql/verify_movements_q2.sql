@@ -1,26 +1,26 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- QNRR Q2 2026 — Movement Verification Table
 -- master_v3 + dwh.order history สำหรับ manual reconcile
+-- ทุก movement type: core_nrr, handover, comeback, expansion, new_sales,
+--                    transfer_in/out inter, core_nrr_churn
 -- ════════════════════════════════════════════════════════════════════════
 WITH
 
 -- ── 0. target outlets ────────────────────────────────────────────────────
 target_outlets AS (
-  SELECT outlet_id FROM (
-    SELECT CAST(id AS STRING) AS outlet_id
-    FROM UNNEST(ARRAY<INT64>[
-      242420, 225572, 243763, 241729, 242622,
-      241311, 241417, 235555, 242111, 244799,
-      230550, 210507, 219412, 163833, 202124,
-      177740, 149073, 175814,
-      8265, 241840, 11824, 225152, 237164,
-      247381, 246822, 246880, 246469, 246866,
-      241389, 246653, 244116, 243255, 247624, 244651,
-      236896, 185691, 185690,
-      203893, 161173, 63298,
-      167918, 171090
-    ]) AS id
-  )
+  SELECT CAST(id AS STRING) AS outlet_id
+  FROM UNNEST(ARRAY<INT64>[
+    242420, 225572, 243763, 241729, 242622,
+    241311, 241417, 235555, 242111, 244799,
+    230550, 210507, 219412, 163833, 202124,
+    177740, 149073, 175814,
+    8265, 241840, 11824, 225152, 237164,
+    247381, 246822, 246880, 246469, 246866,
+    241389, 246653, 244116, 243255, 247624, 244651,
+    236896, 185691, 185690,
+    203893, 161173, 63298,
+    167918, 171090
+  ]) AS id
 ),
 
 -- ── 1–13. master_v3 CTEs ─────────────────────────────────────────────────
@@ -801,13 +801,12 @@ all_rows AS (
   UNION ALL SELECT * FROM jun_rows
 ),
 
--- ── 15. master filtered ───────────────────────────────────────────────────
+-- ── 15. master filtered — ทุก movement ไม่ filter transfer_scope ──────────
 master AS (
   SELECT r.*
   FROM all_rows r
   CROSS JOIN params p
   WHERE r.outlet_id IN (SELECT outlet_id FROM target_outlets)
-    AND r.transfer_scope != 'intra'
 ),
 
 -- ── 16. order history ─────────────────────────────────────────────────────
@@ -844,6 +843,8 @@ outlet_history AS (
     ROUND(SUM(CASE WHEN order_month='2026-04' THEN gmv_ex_vat END),0)  AS gmv_apr26,
     ROUND(SUM(CASE WHEN order_month='2026-05' THEN gmv_ex_vat END),0)  AS gmv_may26,
     ROUND(SUM(CASE WHEN order_month='2026-06' THEN gmv_ex_vat END),0)  AS gmv_jun26,
+    MAX(CASE WHEN order_month='2025-12' THEN commercial_owner END)      AS owner_dec25,
+    MAX(CASE WHEN order_month='2026-01' THEN commercial_owner END)      AS owner_jan26,
     MAX(CASE WHEN order_month='2026-02' THEN commercial_owner END)      AS owner_feb26,
     MAX(CASE WHEN order_month='2026-03' THEN commercial_owner END)      AS owner_mar26,
     MAX(CASE WHEN order_month='2026-04' THEN commercial_owner END)      AS owner_apr26,
@@ -892,6 +893,7 @@ staff_history AS (
 
 -- ── FINAL ────────────────────────────────────────────────────────────────
 SELECT
+  -- movement (จาก master_v3)
   m.period_month,
   m.movement_type,
   m.transfer_scope,
@@ -901,25 +903,37 @@ SELECT
   m.base_staff_owner,
   m.from_portfolio,
   m.to_portfolio,
+  m.from_staff_owner,
+  m.to_staff_owner,
   ROUND(m.curr_gmv, 0)        AS curr_gmv,
   ROUND(m.base_gmv, 0)        AS base_gmv,
+
+  -- outlet identity
   m.outlet_id,
-  h.account_name,
-  h.res_name,
+  COALESCE(h.account_name, m.account_name)  AS account_name,
+  COALESCE(h.res_name, m.res_name)          AS res_name,
   m.first_dollar_date,
   m.new_user_exp_date,
   m.pre_mar_portfolio,
+
+  -- commercial_owner timeline (จาก order จริง)
+  h.owner_dec25,
+  h.owner_jan26,
   h.owner_feb26,
   h.owner_mar26,
   h.owner_apr26,
   h.owner_may26,
   h.owner_jun26,
+
+  -- staff_owner timeline (จาก order จริง)
   s.staff_mar26,
   s.staff_apr26_start,
   s.staff_apr26_end,
   s.staff_may26_start,
   s.staff_may26_end,
   s.staff_jun26,
+
+  -- GMV timeline (จาก order จริง)
   h.gmv_dec25,
   h.gmv_jan26,
   h.gmv_feb26,
@@ -935,4 +949,14 @@ LEFT JOIN staff_history s   ON m.outlet_id = s.outlet_id
 ORDER BY
   m.outlet_id,
   m.period_month,
-  m.movement_type
+  CASE m.movement_type
+    WHEN 'core_nrr'       THEN 1
+    WHEN 'core_nrr_churn' THEN 2
+    WHEN 'handover'       THEN 3
+    WHEN 'new_sales'      THEN 4
+    WHEN 'expansion'      THEN 5
+    WHEN 'comeback'       THEN 6
+    WHEN 'transfer_in'    THEN 7
+    WHEN 'transfer_out'   THEN 8
+    ELSE 9
+  END
