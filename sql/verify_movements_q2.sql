@@ -2,14 +2,12 @@
 -- QNRR Q2 2026 — Movement Verification Table
 -- join master_v3 + dwh.order history สำหรับ manual reconcile
 -- ════════════════════════════════════════════════════════════════════════
--- columns ที่ต้องกวาดตาดู:
---   movement_type        ← SQL classify ว่าอะไร
---   owner_mar26→jun26    ← commercial_owner จริงในแต่ละเดือน (จาก order)
---   staff_apr26_start/end← detect intra-month staff change
---   gmv_dec25→jun26      ← GMV timeline ย้อนหลัง 7 เดือน
---   curr_gmv             ← GMV ที่ master บันทึก (ควรตรงกับ gmv_[period]26)
---   new_user_exp_date    ← ดู handover/new_sales
---   first_dollar_date    ← ดู expansion/comeback
+-- columns ที่กวาดตาดู:
+--   movement_type          ← SQL classify ว่าอะไร
+--   curr_gmv               ← ควรตรงกับ gmv_[period]26 จาก order จริง
+--   owner_mar26→jun26      ← commercial_owner จาก order (เห็น transition)
+--   staff_apr26_start/end  ← detect intra-month staff change
+--   gmv_dec25→jun26        ← GMV timeline ย้อนหลัง 7 เดือน
 -- ════════════════════════════════════════════════════════════════════════
 
 WITH
@@ -18,32 +16,20 @@ WITH
 target_outlets AS (
   SELECT CAST(id AS STRING) AS outlet_id
   FROM UNNEST([
-    -- Round 1: Handover KAM
     242420, 225572, 243763, 241729, 242622,
-    -- Handover PM/ADMIN
     241311, 241417, 235555, 242111, 244799,
-    -- Comeback KAM
     230550, 210507, 219412, 163833, 202124,
-    -- Comeback ADMIN
     177740, 149073, 175814,
-    -- Transfer inter
     8265, 241840, 11824, 225152, 237164,
-    -- Round 2: Expansion
     247381, 246822, 246880, 246469, 246866,
-    -- New sales
     241389, 246653, 244116, 243255, 247624, 244651,
-    -- Core NRR churn
     236896, 185691, 185690,
-    -- Round 3: Core NRR
     203893, 161173, 63298,
-    -- Intra transfer
     167918, 171090
   ] AS id)
 ),
 
--- ── 1. master_v3 (embedded) ───────────────────────────────────────────────
-WITH
-
+-- ── 1-13. master_v3 CTEs (embedded) ──────────────────────────────────────
 -- ── 1. Date anchors ──────────────────────────────────────────────────────────
 params AS (
   SELECT
@@ -854,6 +840,7 @@ SELECT
 FROM all_rows r
 CROSS JOIN params p,
 
+-- ── 14. all_rows + filter to target outlets ───────────────────────────────
 all_rows AS (
   SELECT * FROM apr_rows
   UNION ALL SELECT * FROM may_rows
@@ -865,10 +852,10 @@ master AS (
   FROM all_rows r
   CROSS JOIN params p
   WHERE r.outlet_id IN (SELECT outlet_id FROM target_outlets)
-    AND r.transfer_scope != 'intra'   -- intra ดูจาก staff_start/end แทน
+    AND r.transfer_scope != 'intra'
 ),
 
--- ── 2. order history: monthly ownership snapshot ──────────────────────────
+-- ── 15. order history ─────────────────────────────────────────────────────
 monthly_raw AS (
   SELECT
     CAST(o.user_id AS STRING)                           AS outlet_id,
@@ -893,42 +880,35 @@ monthly_raw AS (
 outlet_history AS (
   SELECT
     outlet_id,
-    MAX(account_name)                                   AS account_name,
-    MAX(res_name)                                       AS res_name,
-    MAX(account_type)                                   AS account_type,
-    MAX(first_dollar_date)                              AS first_dollar_date,
-    MAX(new_user_exp_date)                              AS new_user_exp_date,
-
-    -- GMV per month
-    ROUND(SUM(CASE WHEN order_month='2025-12' THEN gmv_ex_vat END),0) AS gmv_dec25,
-    ROUND(SUM(CASE WHEN order_month='2026-01' THEN gmv_ex_vat END),0) AS gmv_jan26,
-    ROUND(SUM(CASE WHEN order_month='2026-02' THEN gmv_ex_vat END),0) AS gmv_feb26,
-    ROUND(SUM(CASE WHEN order_month='2026-03' THEN gmv_ex_vat END),0) AS gmv_mar26,
-    ROUND(SUM(CASE WHEN order_month='2026-04' THEN gmv_ex_vat END),0) AS gmv_apr26,
-    ROUND(SUM(CASE WHEN order_month='2026-05' THEN gmv_ex_vat END),0) AS gmv_may26,
-    ROUND(SUM(CASE WHEN order_month='2026-06' THEN gmv_ex_vat END),0) AS gmv_jun26,
-
-    -- last commercial_owner per month
-    MAX(CASE WHEN order_month='2026-02' THEN commercial_owner END)    AS owner_feb26,
-    MAX(CASE WHEN order_month='2026-03' THEN commercial_owner END)    AS owner_mar26,
-    MAX(CASE WHEN order_month='2026-04' THEN commercial_owner END)    AS owner_apr26,
-    MAX(CASE WHEN order_month='2026-05' THEN commercial_owner END)    AS owner_may26,
-    MAX(CASE WHEN order_month='2026-06' THEN commercial_owner END)    AS owner_jun26
-
+    MAX(account_name)                                                   AS account_name,
+    MAX(res_name)                                                       AS res_name,
+    MAX(first_dollar_date)                                              AS first_dollar_date,
+    MAX(new_user_exp_date)                                              AS new_user_exp_date,
+    ROUND(SUM(CASE WHEN order_month='2025-12' THEN gmv_ex_vat END),0)  AS gmv_dec25,
+    ROUND(SUM(CASE WHEN order_month='2026-01' THEN gmv_ex_vat END),0)  AS gmv_jan26,
+    ROUND(SUM(CASE WHEN order_month='2026-02' THEN gmv_ex_vat END),0)  AS gmv_feb26,
+    ROUND(SUM(CASE WHEN order_month='2026-03' THEN gmv_ex_vat END),0)  AS gmv_mar26,
+    ROUND(SUM(CASE WHEN order_month='2026-04' THEN gmv_ex_vat END),0)  AS gmv_apr26,
+    ROUND(SUM(CASE WHEN order_month='2026-05' THEN gmv_ex_vat END),0)  AS gmv_may26,
+    ROUND(SUM(CASE WHEN order_month='2026-06' THEN gmv_ex_vat END),0)  AS gmv_jun26,
+    MAX(CASE WHEN order_month='2026-02' THEN commercial_owner END)      AS owner_feb26,
+    MAX(CASE WHEN order_month='2026-03' THEN commercial_owner END)      AS owner_mar26,
+    MAX(CASE WHEN order_month='2026-04' THEN commercial_owner END)      AS owner_apr26,
+    MAX(CASE WHEN order_month='2026-05' THEN commercial_owner END)      AS owner_may26,
+    MAX(CASE WHEN order_month='2026-06' THEN commercial_owner END)      AS owner_jun26
   FROM monthly_raw
   GROUP BY 1
 ),
 
--- last/first staff per month (ต้องแยก subquery เพราะ ORDER-sensitive)
 staff_history AS (
   SELECT
     outlet_id,
-    MAX(CASE WHEN order_month='2026-03' THEN last_staff END)   AS staff_mar26,
-    MAX(CASE WHEN order_month='2026-04' THEN first_staff END)  AS staff_apr26_start,
-    MAX(CASE WHEN order_month='2026-04' THEN last_staff END)   AS staff_apr26_end,
-    MAX(CASE WHEN order_month='2026-05' THEN first_staff END)  AS staff_may26_start,
-    MAX(CASE WHEN order_month='2026-05' THEN last_staff END)   AS staff_may26_end,
-    MAX(CASE WHEN order_month='2026-06' THEN last_staff END)   AS staff_jun26
+    MAX(CASE WHEN order_month='2026-03' THEN last_staff END)            AS staff_mar26,
+    MAX(CASE WHEN order_month='2026-04' THEN first_staff END)           AS staff_apr26_start,
+    MAX(CASE WHEN order_month='2026-04' THEN last_staff END)            AS staff_apr26_end,
+    MAX(CASE WHEN order_month='2026-05' THEN first_staff END)           AS staff_may26_start,
+    MAX(CASE WHEN order_month='2026-05' THEN last_staff END)            AS staff_may26_end,
+    MAX(CASE WHEN order_month='2026-06' THEN last_staff END)            AS staff_jun26
   FROM (
     SELECT
       CAST(o.user_id AS STRING)              AS outlet_id,
@@ -959,7 +939,6 @@ staff_history AS (
 
 -- ── FINAL ────────────────────────────────────────────────────────────────
 SELECT
-  -- movement (จาก master_v3)
   m.period_month,
   m.movement_type,
   m.transfer_scope,
@@ -969,33 +948,25 @@ SELECT
   m.base_staff_owner,
   m.from_portfolio,
   m.to_portfolio,
-  ROUND(m.curr_gmv, 0)    AS curr_gmv,
-  ROUND(m.base_gmv, 0)    AS base_gmv,
-
-  -- outlet identity
+  ROUND(m.curr_gmv, 0)        AS curr_gmv,
+  ROUND(m.base_gmv, 0)        AS base_gmv,
   m.outlet_id,
   h.account_name,
   h.res_name,
   m.first_dollar_date,
   m.new_user_exp_date,
   m.pre_mar_portfolio,
-
-  -- commercial_owner timeline (จาก order จริง)
   h.owner_feb26,
   h.owner_mar26,
   h.owner_apr26,
   h.owner_may26,
   h.owner_jun26,
-
-  -- staff_owner timeline (จาก order จริง)
   s.staff_mar26,
-  s.staff_apr26_start,    -- ต้นเดือน Apr
-  s.staff_apr26_end,      -- ปลายเดือน Apr (ถ้าต่างกัน = มี intra transfer)
+  s.staff_apr26_start,
+  s.staff_apr26_end,
   s.staff_may26_start,
   s.staff_may26_end,
   s.staff_jun26,
-
-  -- GMV timeline (จาก order จริง — เทียบกับ curr_gmv ด้านบน)
   h.gmv_dec25,
   h.gmv_jan26,
   h.gmv_feb26,
