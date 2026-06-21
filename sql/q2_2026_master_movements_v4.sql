@@ -481,7 +481,7 @@ apr_rows AS (
       WHEN ao_any.commercial_owner IN ('KAM','PM','ADMIN') THEN 'inter'
       ELSE 'external'
     END,
-    NULL AS from_staff_owner, NULL AS to_staff_owner
+    CAST(NULL AS STRING) AS from_staff_owner, CAST(NULL AS STRING) AS to_staff_owner
 
   FROM mar_cohort mc
   LEFT JOIN apr_own ao_same ON mc.outlet_id = ao_same.outlet_id
@@ -561,7 +561,7 @@ may_rows AS (
       WHEN mo_any.commercial_owner IN ('KAM','PM','ADMIN') THEN 'inter'
       ELSE 'external'
     END,
-    NULL, NULL
+    CAST(NULL AS STRING), CAST(NULL AS STRING)
 
   FROM mar_cohort mc
   LEFT JOIN may_own mo_same ON mc.outlet_id = mo_same.outlet_id
@@ -676,7 +676,7 @@ jun_rows AS (
       WHEN jo_any.commercial_owner IN ('KAM','PM','ADMIN') THEN 'inter'
       ELSE 'external'
     END,
-    NULL, NULL
+    CAST(NULL AS STRING), CAST(NULL AS STRING)
 
   FROM mar_cohort mc
   LEFT JOIN jun_own jo_same ON mc.outlet_id = jo_same.outlet_id
