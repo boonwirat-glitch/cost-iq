@@ -6,11 +6,14 @@
 -- หลักการ:
 --   1. base_gmv / curr_gmv = GMV ทุก order ของร้าน ไม่ filter commercial_owner
 --   2. Label lock — ทุก movement ยกเว้น transfer lock ตั้งแต่เดือนแรก
---   3. transfer_out curr_gmv = 0 เสมอ (ตัว adjust ไม่ใช่ GMV จริง)
+--   3. transfer_out curr_gmv = 0 เสมอ
 --   4. Ownership = last order ของแต่ละเดือน (last order wins)
 --   5. ห้ามใช้ dim.user_master
---   6. Handover/new_sales fallback: ดู pre_period_own = SALE เท่านั้น
---      ไม่ย้อนไปไกลกว่า last order ก่อน period — ไม่มีที่สิ้นสุด
+--   6. Handover vs new_sales fallback (ไม่มี new_user_exp_date):
+--      ดู pre_period_own = SALE (last order ก่อน period)
+--      แยกด้วย pre_mar_own:
+--        pre_period=SALE + pre_mar=SALE/NULL → handover (โอนมาก่อน/ใน Mar)
+--        pre_period=SALE + pre_mar≠SALE      → new_sales (โอนมาระหว่าง Q)
 -- ════════════════════════════════════════════════════════════════════════════
 
 WITH
@@ -122,10 +125,12 @@ jun_own AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
--- ── 5. Pre-period ownership — last order ก่อนแต่ละ period ────────────────────
--- ใช้ตรวจ handover/new_sales fallback: ถ้าไม่มี new_user_exp_date
--- → ดูแค่ว่า last order ก่อน period นั้น commercial_owner = SALE ไหม
--- ไม่ย้อนไปไกลกว่า 1 period — ไม่มีที่สิ้นสุด
+-- ── 5. Pre-period ownership ───────────────────────────────────────────────────
+-- ใช้ตรวจ handover/new_sales fallback เมื่อไม่มี new_user_exp_date
+-- ดูแค่ last order ก่อน period — ไม่ย้อนไกลกว่านี้
+-- แยก handover vs new_sales ด้วย pre_mar:
+--   pre_period=SALE + pre_mar=SALE/NULL → handover
+--   pre_period=SALE + pre_mar≠SALE      → new_sales (โอนมาระหว่าง Q)
 pre_mar_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id,
          UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
@@ -175,8 +180,6 @@ mar_handover_outlets AS (
 ),
 
 -- ── 7. Mar cohort — fixed denominator ────────────────────────────────────────
--- Ownership: last order Mar = KAM/PM/ADMIN, exclude handover (new_user_exp_date=Mar)
--- base_gmv: GMV ทุก order ใน Mar ไม่ filter portfolio
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner AS base_portfolio,
@@ -193,15 +196,9 @@ mar_cohort AS (
 ),
 
 -- ── 8. Apr labels — lock classification ──────────────────────────────────────
--- Priority [1]→[7]:
---   [1] expansion  : first_dollar >= Apr
---   [2] handover   : new_user_exp_date = Mar
---   [2b] handover  : ไม่มี exp_date + pre_apr = SALE (last order ก่อน Apr)
---   [3] new_sales  : new_user_exp_date ใน Q
---   [4] core       : mar_cohort + same portfolio
---   [5] transfer_in: mar_cohort + diff portfolio
---   [6] comeback   : ไม่อยู่ cohort + first_dollar < Apr
---   [7] transfer_in: ELSE
+-- Fallback [2b]: pre_apr=SALE → handover
+--   (ถ้าก่อน Apr เป็น SALE แสดงว่าโอนมาก่อนหรือใน Mar = handover)
+-- Fallback Apr ไม่มี [3b] เพราะ new_sales Apr ต้องมี exp_date=Apr เท่านั้น
 apr_labels AS (
   SELECT
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
@@ -218,7 +215,8 @@ apr_labels AS (
         AND ao.commercial_owner != 'SALE' THEN 'expansion'
       -- [2] handover: exp_date = Mar
       WHEN FORMAT_DATE('%Y-%m', ao.new_user_exp_date) = '2026-03' THEN 'handover'
-      -- [2b] handover fallback: ไม่มี exp_date + last order ก่อน Apr เป็น SALE
+      -- [2b] handover fallback: ไม่มี exp_date + pre_apr=SALE
+      --   (ก่อน Apr เป็น SALE = โอนมาก่อนหรือใน Mar)
       WHEN ao.new_user_exp_date IS NULL
         AND papr.commercial_owner = 'SALE' THEN 'handover'
       -- [3] new_sales: exp_date ใน Q
@@ -235,6 +233,7 @@ apr_labels AS (
              OR FORMAT_DATE('%Y-%m', ao.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
         THEN 'comeback'
+      -- [7] transfer_in: ELSE
       ELSE 'transfer_in'
     END AS fixed_label,
 
@@ -259,23 +258,26 @@ apr_labels AS (
     END AS cohort_month
 
   FROM apr_own ao
-  LEFT JOIN mar_cohort mc       ON ao.outlet_id = mc.outlet_id
+  LEFT JOIN mar_cohort mc           ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo     ON ao.outlet_id = pmo.outlet_id
-  LEFT JOIN pre_apr_own papr    ON ao.outlet_id = papr.outlet_id
+  LEFT JOIN pre_mar_own pmo         ON ao.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_apr_own papr        ON ao.outlet_id = papr.outlet_id
   WHERE ao.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
--- ── 9. May labels — inherit จาก Apr ถ้า portfolio ไม่เปลี่ยน ─────────────────
+-- ── 9. May labels ─────────────────────────────────────────────────────────────
+-- Fallback handover vs new_sales (ไม่มี exp_date):
+--   pmay=SALE + pmo=SALE/NULL → handover (โอนมาก่อนหรือใน Mar)
+--   pmay=SALE + pmo≠SALE      → new_sales (โอนมาระหว่าง Apr–May)
 may_labels AS (
   SELECT
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner AS current_portfolio,
     mo.staff_owner      AS current_staff_owner,
     mo.new_user_exp_date,
-    COALESCE(al.base_portfolio, mc.base_portfolio)   AS base_portfolio,
+    COALESCE(al.base_portfolio, mc.base_portfolio)     AS base_portfolio,
     COALESCE(al.base_staff_owner, mc.base_staff_owner) AS base_staff_owner,
-    COALESCE(al.base_gmv, mc.base_gmv, 0)            AS base_gmv,
+    COALESCE(al.base_gmv, mc.base_gmv, 0)              AS base_gmv,
     COALESCE(al.first_dollar_date, ofd.first_dollar_date) AS first_dollar_date,
     COALESCE(al.pre_mar_portfolio, pmo.commercial_owner)  AS pre_mar_portfolio,
 
@@ -283,28 +285,37 @@ may_labels AS (
       -- inherit Apr ถ้า portfolio ไม่เปลี่ยน
       WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = mo.commercial_owner
         THEN al.fixed_label
-      -- classify ใหม่ถ้า portfolio เปลี่ยนหรือ outlet ใหม่ใน May
+      -- [1] expansion
       WHEN COALESCE(ofd.first_dollar_date, al.first_dollar_date) >= '2026-04-01'
         AND mo.commercial_owner != 'SALE' THEN 'expansion'
+      -- [2] handover: exp_date = Mar
       WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-03' THEN 'handover'
-      -- [2b] handover fallback May: pre_may = SALE
-      WHEN mo.new_user_exp_date IS NULL
-        AND pmay.commercial_owner = 'SALE' THEN 'handover'
-      WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        THEN 'new_sales'
-      -- [3b] new_sales fallback May: pre_may = SALE แต่ pre_mar ≠ SALE (โอนมาใน May)
+      -- [2b] handover fallback: pmay=SALE + pmo=SALE/NULL (โอนมาก่อน/ใน Mar)
       WHEN mo.new_user_exp_date IS NULL
         AND pmay.commercial_owner = 'SALE'
-        AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
+        AND (pmo.commercial_owner = 'SALE' OR pmo.outlet_id IS NULL)
+        THEN 'handover'
+      -- [3] new_sales: exp_date ใน Q
+      WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
+      -- [3b] new_sales fallback: pmay=SALE + pmo≠SALE (โอนมาระหว่าง Apr–May)
+      WHEN mo.new_user_exp_date IS NULL
+        AND pmay.commercial_owner = 'SALE'
+        AND pmo.commercial_owner IS NOT NULL
+        AND pmo.commercial_owner != 'SALE'
+        THEN 'new_sales'
+      -- [4] core
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio = mo.commercial_owner THEN 'core'
+      -- [5] transfer_in
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != mo.commercial_owner THEN 'transfer_in'
+      -- [6] comeback
       WHEN mc.outlet_id IS NULL
         AND COALESCE(ofd.first_dollar_date, al.first_dollar_date) < '2026-04-01'
         AND (mo.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', mo.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))
         THEN 'comeback'
+      -- [7] transfer_in: ELSE
       ELSE 'transfer_in'
     END AS fixed_label,
 
@@ -337,24 +348,25 @@ may_labels AS (
         WHEN FORMAT_DATE('%Y-%m', mo.new_user_exp_date) = '2026-05' THEN '2026-05'
         WHEN mo.new_user_exp_date IS NULL
           AND pmay.commercial_owner = 'SALE'
-          AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
+          AND pmo.commercial_owner IS NOT NULL
+          AND pmo.commercial_owner != 'SALE'
           THEN '2026-05'
         ELSE NULL
       END
     ) AS cohort_month
 
   FROM may_own mo
-  LEFT JOIN apr_labels al       ON mo.outlet_id = al.outlet_id
-  LEFT JOIN mar_cohort mc       ON mo.outlet_id = mc.outlet_id
+  LEFT JOIN apr_labels al           ON mo.outlet_id = al.outlet_id
+  LEFT JOIN mar_cohort mc           ON mo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo     ON mo.outlet_id = pmo.outlet_id
-  LEFT JOIN pre_may_own pmay    ON mo.outlet_id = pmay.outlet_id
+  LEFT JOIN pre_mar_own pmo         ON mo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_may_own pmay        ON mo.outlet_id = pmay.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 ),
 
 -- ── 10. APRIL rows ────────────────────────────────────────────────────────────
 apr_rows AS (
-  -- LEG A: outlets ที่มี Apr order
+  -- LEG A
   SELECT
     '2026-04' AS period_month,
     al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
@@ -372,7 +384,7 @@ apr_rows AS (
 
   UNION ALL
 
-  -- LEG A-INTRA: staff เปลี่ยนมือในพอร์ตเดิม — transfer_out row
+  -- LEG A-INTRA: transfer_out (from base_staff)
   SELECT '2026-04', al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
     al.current_portfolio, al.base_staff_owner,
     al.base_portfolio, al.base_staff_owner,
@@ -388,7 +400,7 @@ apr_rows AS (
 
   UNION ALL
 
-  -- LEG A-INTRA: transfer_in row
+  -- LEG A-INTRA: transfer_in (from current_staff)
   SELECT '2026-04', al.outlet_id, al.account_id, al.account_name, al.res_name, al.account_type,
     al.current_portfolio, al.current_staff_owner,
     al.base_portfolio, al.base_staff_owner,
@@ -420,7 +432,7 @@ apr_rows AS (
   FROM mar_cohort mc
   LEFT JOIN apr_own ao_same ON mc.outlet_id = ao_same.outlet_id
     AND ao_same.commercial_owner = mc.base_portfolio
-  LEFT JOIN apr_own ao_any ON mc.outlet_id = ao_any.outlet_id
+  LEFT JOIN apr_own ao_any  ON mc.outlet_id = ao_any.outlet_id
   WHERE ao_same.outlet_id IS NULL
 ),
 
@@ -442,7 +454,7 @@ may_rows AS (
 
   UNION ALL
 
-  -- LEG A-INTRA May transfer_out
+  -- LEG A-INTRA May: transfer_out
   SELECT '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.res_name, ml.account_type,
     ml.current_portfolio, ml.base_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
@@ -458,7 +470,7 @@ may_rows AS (
 
   UNION ALL
 
-  -- LEG A-INTRA May transfer_in
+  -- LEG A-INTRA May: transfer_in
   SELECT '2026-05', ml.outlet_id, ml.account_id, ml.account_name, ml.res_name, ml.account_type,
     ml.current_portfolio, ml.current_staff_owner,
     ml.base_portfolio, ml.base_staff_owner,
@@ -490,11 +502,14 @@ may_rows AS (
   FROM mar_cohort mc
   LEFT JOIN may_own mo_same ON mc.outlet_id = mo_same.outlet_id
     AND mo_same.commercial_owner = mc.base_portfolio
-  LEFT JOIN may_own mo_any ON mc.outlet_id = mo_any.outlet_id
+  LEFT JOIN may_own mo_any  ON mc.outlet_id = mo_any.outlet_id
   WHERE mo_same.outlet_id IS NULL
 ),
 
 -- ── 12. JUNE rows ─────────────────────────────────────────────────────────────
+-- Fallback Jun-only (ไม่มี exp_date):
+--   pjun=SALE + pmo=SALE/NULL → handover
+--   pjun=SALE + pmo≠SALE      → new_sales
 jun_rows AS (
   -- LEG A
   SELECT
@@ -515,7 +530,8 @@ jun_rows AS (
         WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-06' THEN '2026-06'
         WHEN jo.new_user_exp_date IS NULL
           AND pjun.commercial_owner = 'SALE'
-          AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
+          AND pmo.commercial_owner IS NOT NULL
+          AND pmo.commercial_owner != 'SALE'
           THEN '2026-06'
         ELSE NULL
       END
@@ -524,30 +540,42 @@ jun_rows AS (
     COALESCE(jg.gmv, 0) AS curr_gmv,
 
     CASE
+      -- inherit Apr
       WHEN al.outlet_id IS NOT NULL AND al.current_portfolio = jo.commercial_owner THEN
         CASE WHEN al.fixed_label='core' AND COALESCE(jg.gmv,0)>0 THEN 'core_nrr'
              WHEN al.fixed_label='core' AND COALESCE(jg.gmv,0)=0 THEN 'core_nrr_churn'
              ELSE al.fixed_label END
+      -- inherit May
       WHEN ml.outlet_id IS NOT NULL AND ml.current_portfolio = jo.commercial_owner THEN
         CASE WHEN ml.fixed_label='core' AND COALESCE(jg.gmv,0)>0 THEN 'core_nrr'
              WHEN ml.fixed_label='core' AND COALESCE(jg.gmv,0)=0 THEN 'core_nrr_churn'
              ELSE ml.fixed_label END
-      -- Jun-only
+      -- Jun-only outlets
       WHEN COALESCE(ofd.first_dollar_date, al.first_dollar_date) >= '2026-04-01'
         AND jo.commercial_owner != 'SALE' THEN 'expansion'
+      -- [2] handover: exp_date = Mar
       WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) = '2026-03' THEN 'handover'
-      WHEN jo.new_user_exp_date IS NULL
-        AND pjun.commercial_owner = 'SALE' THEN 'handover'
-      WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        THEN 'new_sales'
+      -- [2b] handover fallback: pjun=SALE + pmo=SALE/NULL
       WHEN jo.new_user_exp_date IS NULL
         AND pjun.commercial_owner = 'SALE'
-        AND (pmo.commercial_owner IS NULL OR pmo.commercial_owner != 'SALE')
+        AND (pmo.commercial_owner = 'SALE' OR pmo.outlet_id IS NULL)
+        THEN 'handover'
+      -- [3] new_sales: exp_date ใน Q
+      WHEN FORMAT_DATE('%Y-%m', jo.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
+      -- [3b] new_sales fallback: pjun=SALE + pmo≠SALE
+      WHEN jo.new_user_exp_date IS NULL
+        AND pjun.commercial_owner = 'SALE'
+        AND pmo.commercial_owner IS NOT NULL
+        AND pmo.commercial_owner != 'SALE'
+        THEN 'new_sales'
+      -- [4] core
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio = jo.commercial_owner
         THEN CASE WHEN COALESCE(jg.gmv,0)>0 THEN 'core_nrr' ELSE 'core_nrr_churn' END
+      -- [5] transfer_in
       WHEN mc.outlet_id IS NOT NULL AND mc.base_portfolio != jo.commercial_owner
         THEN 'transfer_in'
+      -- [6] comeback
       WHEN mc.outlet_id IS NULL
         AND COALESCE(ofd.first_dollar_date) < '2026-04-01'
         AND (jo.new_user_exp_date IS NULL
@@ -569,19 +597,18 @@ jun_rows AS (
                    AND jo.commercial_owner IN ('KAM','PM','ADMIN') THEN 'inter'
              ELSE 'external' END
         ELSE NULL END) AS transfer_scope,
-
     CAST(NULL AS STRING) AS from_staff_owner,
     CAST(NULL AS STRING) AS to_staff_owner
 
   FROM jun_own jo
   CROSS JOIN params p
-  LEFT JOIN apr_labels al       ON jo.outlet_id = al.outlet_id
-  LEFT JOIN may_labels ml       ON jo.outlet_id = ml.outlet_id
-  LEFT JOIN mar_cohort mc       ON jo.outlet_id = mc.outlet_id
+  LEFT JOIN apr_labels al           ON jo.outlet_id = al.outlet_id
+  LEFT JOIN may_labels ml           ON jo.outlet_id = ml.outlet_id
+  LEFT JOIN mar_cohort mc           ON jo.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
-  LEFT JOIN pre_mar_own pmo     ON jo.outlet_id = pmo.outlet_id
-  LEFT JOIN pre_jun_own pjun    ON jo.outlet_id = pjun.outlet_id
-  LEFT JOIN jun_gmv jg          ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN pre_mar_own pmo         ON jo.outlet_id = pmo.outlet_id
+  LEFT JOIN pre_jun_own pjun        ON jo.outlet_id = pjun.outlet_id
+  LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
@@ -602,7 +629,7 @@ jun_rows AS (
   FROM mar_cohort mc
   LEFT JOIN jun_own jo_same ON mc.outlet_id = jo_same.outlet_id
     AND jo_same.commercial_owner = mc.base_portfolio
-  LEFT JOIN jun_own jo_any ON mc.outlet_id = jo_any.outlet_id
+  LEFT JOIN jun_own jo_any  ON mc.outlet_id = jo_any.outlet_id
   WHERE jo_same.outlet_id IS NULL
 ),
 
@@ -641,5 +668,5 @@ ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
 -- C2: COUNT(transfer_out from=A to=B) = COUNT(transfer_in from=A to=B) per period
 -- C3: intra out = intra in per staff pair per period
 -- C4: outlet 1 แถวต่อเดือน (excl transfer) → HAVING COUNT(*)>1 = 0 rows
--- C5: label lock → COUNT(DISTINCT movement_type excl transfer/core) per outlet = 1
+-- C5: label lock → COUNT(DISTINCT movement excl transfer/core) per outlet ≤ 1
 -- C6: mar_cohort ตรง dwh.order ทั้ง count และ base_gmv
