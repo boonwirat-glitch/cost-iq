@@ -232,11 +232,12 @@ apr_rows AS (
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
-      -- Scenario D: Mar GMV มี (SALE) + ไม่มี exp_date ใน Q + KAM รับใน Q
-      -- ถือเป็น new_sales fallback (รอยต่อ SALE→KAM ไม่มี exp_date formal)
+      -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
+      -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'new_sales'
@@ -313,11 +314,12 @@ may_rows AS (
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
-      -- Scenario D: Mar GMV มี (SALE) + ไม่มี exp_date ใน Q + KAM รับใน Q
-      -- ถือเป็น new_sales fallback (รอยต่อ SALE→KAM ไม่มี exp_date formal)
+      -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
+      -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'new_sales'
@@ -394,11 +396,12 @@ jun_rows AS (
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
-      -- Scenario D: Mar GMV มี (SALE) + ไม่มี exp_date ใน Q + KAM รับใน Q
-      -- ถือเป็น new_sales fallback (รอยต่อ SALE→KAM ไม่มี exp_date formal)
+      -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
+      -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
         AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'new_sales'
