@@ -230,8 +230,8 @@ pm_admin_mar_cohort AS (
     mo.commercial_owner IN ('PM','ADMIN')
     OR (
       mo.commercial_owner = 'SALE'
-      AND ofd.first_portfolio_date IS NOT NULL
-      AND ofd.first_portfolio_date < '2026-04-01'
+      AND ofd.first_kam_date IS NOT NULL
+      AND ofd.first_kam_date < '2026-04-01'
       AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('PM','ADMIN')
     )
   )
