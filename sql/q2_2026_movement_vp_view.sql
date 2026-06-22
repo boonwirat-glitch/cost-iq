@@ -179,7 +179,7 @@ apr_rows AS (
     COALESCE(mc.base_staff_owner, ao.staff_owner) AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
-    COALESCE(mc.base_gmv, 0) AS base_gmv,
+    COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(ag.gmv, 0) AS curr_gmv,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
@@ -211,6 +211,7 @@ apr_rows AS (
   LEFT JOIN outlet_first_dollar ofd ON ao.outlet_id = ofd.outlet_id
   LEFT JOIN outlet_exp_date oed     ON ao.outlet_id = oed.outlet_id
   LEFT JOIN apr_gmv ag              ON ao.outlet_id = ag.outlet_id
+  LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
   WHERE ao.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
@@ -242,7 +243,7 @@ may_rows AS (
     COALESCE(mc.base_staff_owner, mo.staff_owner),
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
-    COALESCE(mc.base_gmv, 0), COALESCE(mg.gmv, 0),
+    COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(mg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -273,6 +274,7 @@ may_rows AS (
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   LEFT JOIN outlet_exp_date oed     ON mo.outlet_id = oed.outlet_id
   LEFT JOIN may_gmv mg              ON mo.outlet_id = mg.outlet_id
+  LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
@@ -304,7 +306,7 @@ jun_rows AS (
     COALESCE(mc.base_staff_owner, jo.staff_owner),
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
-    COALESCE(mc.base_gmv, 0), COALESCE(jg.gmv, 0),
+    COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(jg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -335,6 +337,7 @@ jun_rows AS (
   LEFT JOIN outlet_first_dollar ofd ON jo.outlet_id = ofd.outlet_id
   LEFT JOIN outlet_exp_date oed     ON jo.outlet_id = oed.outlet_id
   LEFT JOIN jun_gmv jg              ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
   UNION ALL
