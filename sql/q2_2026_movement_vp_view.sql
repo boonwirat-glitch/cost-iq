@@ -183,11 +183,13 @@ apr_rows AS (
     COALESCE(ag.gmv, 0) AS curr_gmv,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -244,11 +246,13 @@ may_rows AS (
     COALESCE(mc.base_gmv, 0), COALESCE(mg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -305,11 +309,13 @@ jun_rows AS (
     COALESCE(mc.base_gmv, 0), COALESCE(jg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
-      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
