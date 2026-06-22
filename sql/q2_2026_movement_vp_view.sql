@@ -1,25 +1,25 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Movement VP View  (v5)
+-- Q2 2026 Movement VP View  (v6)
 -- sql/q2_2026_movement_vp_view.sql
 --
 -- Scope: VP / Freshket-wide (KAM + PM + ADMIN รวมกัน)
 --
 -- Classification priority (เหมือนกันทุกเดือน):
---   [1] core_nrr       : อยู่ใน mar_cohort (curr_gmv = ยอดจริง, 0 ถ้าไม่มี order)
---   [2] expansion      : first_dollar >= Apr + first_dollar_owner IN (KAM,PM,ADMIN)
---   [3] handover       : outlet_exp_date = March เท่านั้น
---   [4] new_sales      : outlet_exp_date ใน Apr/May/Jun
---   [5] comeback       : fd < Apr + ไม่มี exp_date ใน Q
---   [6] unclassified   : ELSE
+--   [1] core_nrr  : อยู่ใน mar_cohort (curr_gmv=0 ก็ยัง core_nrr)
+--   [2] expansion : first_portfolio_date >= Apr (first order ในมือ KAM/PM/ADMIN)
+--   [3] handover  : outlet_exp_date = March
+--   [4] new_sales : outlet_exp_date ใน Apr/May/Jun
+--             หรือ first_portfolio_date ใน Q (fallback ไม่มี exp_date)
+--   [5] comeback  : first_dollar_date < Apr + ไม่มี exp_date ใน Q
+--   [6] unclassified: ELSE
 --
--- การเปลี่ยนแปลงจาก v4:
---   - core_nrr_churn ถูกรวมเป็น core_nrr (curr_gmv=0) ไม่แยก movement type
---   - expansion เช็ค first_dollar_owner IN (KAM,PM,ADMIN) ด้วย
---   - outlet_exp_date ใช้ exp_date ของ Mar order เท่านั้น (ไม่ดึง future exp_date)
---   - base_portfolio/base_staff_owner ของ expansion ดึงจาก period own
+-- outlet_first_dollar เก็บ:
+--   first_dollar_date  = first order date ทุก owner (global)
+--   first_dollar_owner = commercial_owner ของ first KAM/PM/ADMIN order
+--   first_portfolio_date = first order date ที่ owner IN (KAM,PM,ADMIN)
 --
 -- curr_gmv = เฉพาะ order ที่ commercial_owner IN (KAM,PM,ADMIN)
--- base_gmv = GMV ทุก order ใน March ไม่ filter (denominator NRR)
+-- base_gmv = GMV ทุก order ใน March ไม่ filter
 -- ════════════════════════════════════════════════════════════════════════════
 
 WITH
@@ -34,15 +34,23 @@ params AS (
               DATE('2026-06-01'), DAY) + 1 AS jun_days
 ),
 
--- first_dollar: วันที่ + owner ของ order แรกสุดของ outlet
--- expansion = fd >= Apr + fd_owner IN (KAM,PM,ADMIN)
--- ถ้า fd อยู่กับ SALE → ไม่ใช่ expansion ของ portfolio
+-- outlet_first_dollar:
+--   first_dollar_date    = first order date (global, ทุก owner)
+--   first_portfolio_date = first order date ที่ owner IN (KAM,PM,ADMIN)
+--   first_dollar_owner   = owner ของ first_portfolio_date
+-- ใช้ first_portfolio_date ตัดสิน expansion/new_sales และ cohort_month
 outlet_first_dollar AS (
   SELECT
     CAST(o.user_id AS STRING) AS outlet_id,
-    DATE(MIN(o.delivery_date)) AS first_dollar_date,
-    ARRAY_AGG(UPPER(TRIM(o.commercial_owner)) ORDER BY o.delivery_date ASC LIMIT 1)[OFFSET(0)]
-      AS first_dollar_owner
+    MIN(DATE(o.delivery_date)) AS first_dollar_date,
+    MIN(CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
+             THEN DATE(o.delivery_date) END) AS first_portfolio_date,
+    ARRAY_AGG(
+      CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
+           THEN UPPER(TRIM(o.commercial_owner)) END
+      IGNORE NULLS
+      ORDER BY o.delivery_date ASC LIMIT 1
+    )[SAFE_OFFSET(0)] AS first_dollar_owner
   FROM `freshket-rn.dwh.order` o
   WHERE o.user_id IS NOT NULL
     AND o.gmv_ex_vat > 0
@@ -50,9 +58,8 @@ outlet_first_dollar AS (
   GROUP BY 1
 ),
 
--- outlet_exp_date: ดึง new_user_exp_date จาก Mar orders เท่านั้น
--- ป้องกัน future exp_date (Jul, Aug ฯลฯ) ปน
--- exp_date เป็น property ของ outlet ใช้ทั้งไตรมาส
+-- outlet_exp_date: exp_date ของ outlet — ดึงครั้งเดียวใช้ทั้งไตรมาส
+-- cap ที่วันนี้ ป้องกัน future exp_date ปน
 outlet_exp_date AS (
   SELECT
     CAST(o.user_id AS STRING) AS outlet_id,
@@ -103,8 +110,7 @@ jun_gmv AS (
 apr_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
     o.account_name, o.res_name, o.account_type,
-    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner) AS staff_owner
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST') AND o.user_id IS NOT NULL
@@ -113,8 +119,7 @@ apr_own AS (
 may_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
     o.account_name, o.res_name, o.account_type,
-    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner) AS staff_owner
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST') AND o.user_id IS NOT NULL
@@ -123,8 +128,7 @@ may_own AS (
 jun_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
     o.account_name, o.res_name, o.account_type,
-    UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
-    TRIM(o.staff_owner) AS staff_owner
+    UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST') AND o.user_id IS NOT NULL
@@ -140,7 +144,7 @@ mar_handover_outlets AS (
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner AS base_portfolio, mo.staff_owner AS base_staff_owner,
-    ofd.first_dollar_date, ofd.first_dollar_owner,
+    ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM (
     SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
@@ -158,31 +162,32 @@ mar_cohort AS (
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_handover_outlets)
 ),
 
+-- ── Classification (ใช้ร่วมกัน 3 เดือน) ──────────────────────────────────────
+-- [1] core_nrr        : mar_cohort
+-- [2] expansion       : first_portfolio_date >= Apr
+-- [3] handover        : exp_date = March
+-- [4] new_sales       : exp_date ใน Q หรือ first_portfolio_date ใน Q (fallback)
+-- [5] comeback        : first_dollar < Apr + ไม่มี exp_date ใน Q
+-- [6] unclassified    : ELSE
+
 apr_rows AS (
   SELECT
     '2026-04' AS period_month,
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
-    ao.commercial_owner AS current_portfolio,
-    ao.staff_owner AS current_staff_owner,
-    -- base_portfolio/staff: mar_cohort ถ้ามี ถ้าไม่มีใช้ current (expansion/handover/etc)
+    ao.commercial_owner AS current_portfolio, ao.staff_owner AS current_staff_owner,
     COALESCE(mc.base_portfolio, ao.commercial_owner) AS base_portfolio,
     COALESCE(mc.base_staff_owner, ao.staff_owner) AS base_staff_owner,
-    ofd.first_dollar_date, ofd.first_dollar_owner,
+    ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, 0) AS base_gmv,
     COALESCE(ag.gmv, 0) AS curr_gmv,
     CASE
-      -- [1] core_nrr: mar_cohort ทุกกรณี curr_gmv=0 ก็ยัง core_nrr
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      -- [2] expansion: fd >= Apr + fd_owner IN (KAM,PM,ADMIN)
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN 'expansion'
-      -- [3] handover: exp_date = March เท่านั้น
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
-      -- [4] new_sales: exp_date ใน Q
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
-      -- [5] comeback: fd < Apr + ไม่มี exp_date ใน Q
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -192,8 +197,8 @@ apr_rows AS (
     END AS movement_type,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN '2026-04'
+      WHEN ofd.first_portfolio_date >= '2026-04-01'
+        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN '2026-03'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -209,12 +214,11 @@ apr_rows AS (
 
   UNION ALL
 
-  -- LEG B: Mar cohort ที่ไม่มี Apr order ใน KAM/PM/ADMIN
   SELECT '2026-04',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_dollar_owner,
+    mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE WHEN ao_sale.outlet_id IS NOT NULL THEN 'transfer_out' ELSE 'core_nrr' END,
@@ -235,16 +239,16 @@ may_rows AS (
     mo.commercial_owner, mo.staff_owner,
     COALESCE(mc.base_portfolio, mo.commercial_owner),
     COALESCE(mc.base_staff_owner, mo.staff_owner),
-    ofd.first_dollar_date, ofd.first_dollar_owner,
+    ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, 0), COALESCE(mg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN 'expansion'
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -254,8 +258,8 @@ may_rows AS (
     END,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN '2026-04'
+      WHEN ofd.first_portfolio_date >= '2026-04-01'
+        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN '2026-03'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -275,7 +279,7 @@ may_rows AS (
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_dollar_owner,
+    mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE WHEN mo_sale.outlet_id IS NOT NULL THEN 'transfer_out' ELSE 'core_nrr' END,
@@ -296,16 +300,16 @@ jun_rows AS (
     jo.commercial_owner, jo.staff_owner,
     COALESCE(mc.base_portfolio, jo.commercial_owner),
     COALESCE(mc.base_staff_owner, jo.staff_owner),
-    ofd.first_dollar_date, ofd.first_dollar_owner,
+    ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, 0), COALESCE(jg.gmv, 0),
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN 'expansion'
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN 'new_sales'
+      WHEN ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -315,8 +319,8 @@ jun_rows AS (
     END,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_dollar_owner IN ('KAM','PM','ADMIN') THEN '2026-04'
+      WHEN ofd.first_portfolio_date >= '2026-04-01'
+        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN '2026-03'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -336,7 +340,7 @@ jun_rows AS (
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.base_portfolio, mc.base_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_dollar_owner,
+    mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE WHEN jo_sale.outlet_id IS NOT NULL THEN 'transfer_out' ELSE 'core_nrr' END,
@@ -372,6 +376,7 @@ SELECT
     WHEN '2026-06' THEN p.jun_days
   END AS curr_days,
   r.first_dollar_date,
+  r.first_portfolio_date,
   r.first_dollar_owner,
   r.new_user_exp_date
 FROM all_rows r
