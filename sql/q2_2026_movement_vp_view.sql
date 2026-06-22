@@ -176,9 +176,19 @@ mar_handover_outlets AS (
     AND po.outlet_id IS NULL
 ),
 
+-- mar_cohort: outlet ที่ "อยู่ในพอร์ต" ตอนสิ้นเดือน Mar
+-- เงื่อนไข:
+--   [A] Mar last order = KAM/PM/ADMIN (ดูแลอยู่ใน Mar ตรงๆ)
+--   [B] Mar last order = SALE แต่ first_portfolio_date < Apr
+--       (อยู่ในพอร์ตมาก่อนแล้ว SALE แค่สั่ง spot — ถือว่ายังอยู่ในพอร์ต)
+-- ทั้งสองเงื่อนไข: base_gmv > 0 + ไม่ใช่ handover outlet
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
-    mo.commercial_owner AS base_portfolio, mo.staff_owner AS base_staff_owner,
+    CASE
+      WHEN mo.commercial_owner IN ('KAM','PM','ADMIN') THEN mo.commercial_owner
+      ELSE ofd.first_dollar_owner  -- SALE spot case → ใช้ owner จาก first_portfolio
+    END AS base_portfolio,
+    mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM (
@@ -192,7 +202,14 @@ mar_cohort AS (
   ) mo
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
+  WHERE (
+    mo.commercial_owner IN ('KAM','PM','ADMIN')
+    OR (
+      mo.commercial_owner = 'SALE'
+      AND ofd.first_portfolio_date IS NOT NULL
+      AND ofd.first_portfolio_date < '2026-04-01'
+    )
+  )
     AND COALESCE(bg.gmv, 0) > 0
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_handover_outlets)
 ),
