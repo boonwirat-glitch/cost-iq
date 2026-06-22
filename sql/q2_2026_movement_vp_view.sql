@@ -51,21 +51,27 @@ apr_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
-    AND o.gmv_ex_vat > 0 AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.commercial_owner IN ('KAM','PM','ADMIN')
   GROUP BY 1
 ),
 may_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
-    AND o.gmv_ex_vat > 0 AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.commercial_owner IN ('KAM','PM','ADMIN')
   GROUP BY 1
 ),
 jun_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
-    AND o.gmv_ex_vat > 0 AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.commercial_owner IN ('KAM','PM','ADMIN')
   GROUP BY 1
 ),
 apr_own AS (
