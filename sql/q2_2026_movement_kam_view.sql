@@ -179,9 +179,14 @@ mar_handover_outlets AS (
 ),
 
 -- KAM mar_cohort: last Mar order = 'KAM' + base_gmv > 0 + ไม่ใช่ handover
+-- KAM mar_cohort: Mar last = 'KAM' หรือ SALE spot + first_kam_date < Apr
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
-    mo.commercial_owner AS base_portfolio, mo.staff_owner AS base_staff_owner,
+    CASE
+      WHEN mo.commercial_owner = 'KAM' THEN mo.commercial_owner
+      ELSE 'KAM'
+    END AS base_portfolio,
+    mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_kam_date,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM (
@@ -195,7 +200,14 @@ mar_cohort AS (
   ) mo
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  WHERE mo.commercial_owner = 'KAM'
+  WHERE (
+    mo.commercial_owner = 'KAM'
+    OR (
+      mo.commercial_owner = 'SALE'
+      AND ofd.first_kam_date IS NOT NULL
+      AND ofd.first_kam_date < '2026-04-01'
+    )
+  )
     AND COALESCE(bg.gmv, 0) > 0
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_handover_outlets)
 ),
@@ -227,8 +239,18 @@ apr_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'                          THEN 'new_sales'
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+      -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -266,12 +288,12 @@ apr_rows AS (
   SELECT
     '2026-04',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    'KAM', mc.base_staff_owner,
+    COALESCE(ao_port.commercial_owner, ao_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(ao_port.staff_owner, ao_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_kam_date,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
-    -- ย้ายไป PM/ADMIN = inter, ย้ายไป SALE = external, ไม่มี order = core_nrr churn
     CASE
       WHEN ao_port.commercial_owner IN ('PM','ADMIN') THEN 'transfer_out'
       WHEN ao_sale.outlet_id IS NOT NULL              THEN 'transfer_out'
@@ -285,13 +307,10 @@ apr_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN outlet_exp_date oed  ON mc.outlet_id = oed.outlet_id
-  -- มี KAM order ไหม
   LEFT JOIN apr_own ao_kam  ON mc.outlet_id = ao_kam.outlet_id
     AND ao_kam.commercial_owner = 'KAM'
-  -- ย้ายไป PM/ADMIN ไหม
   LEFT JOIN apr_own ao_port ON mc.outlet_id = ao_port.outlet_id
     AND ao_port.commercial_owner IN ('PM','ADMIN')
-  -- ย้ายไป SALE ไหม
   LEFT JOIN apr_own ao_sale ON mc.outlet_id = ao_sale.outlet_id
     AND ao_sale.commercial_owner = 'SALE'
   WHERE ao_kam.outlet_id IS NULL
@@ -323,8 +342,18 @@ may_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'                          THEN 'new_sales'
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+      -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -361,7 +390,8 @@ may_rows AS (
   SELECT
     '2026-05',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    'KAM', mc.base_staff_owner,
+    COALESCE(mo_port.commercial_owner, mo_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(mo_port.staff_owner, mo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_kam_date,
     oed.new_user_exp_date,
@@ -414,8 +444,18 @@ jun_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'                          THEN 'new_sales'
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+      -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND bg.gmv IS NOT NULL
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -452,7 +492,8 @@ jun_rows AS (
   SELECT
     '2026-06',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    'KAM', mc.base_staff_owner,
+    COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(jo_port.staff_owner, jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_kam_date,
     oed.new_user_exp_date,
