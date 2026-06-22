@@ -261,11 +261,10 @@ may_rows AS (
     END,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN ofd.first_portfolio_date >= '2026-04-01'
-        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
-      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN '2026-03'
-      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
+      WHEN oed.new_user_exp_date IS NOT NULL
         THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       ELSE NULL
     END,
     CAST(NULL AS STRING)
@@ -324,11 +323,10 @@ jun_rows AS (
     END,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN ofd.first_portfolio_date >= '2026-04-01'
-        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
-      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03' THEN '2026-03'
-      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
+      WHEN oed.new_user_exp_date IS NOT NULL
         THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       ELSE NULL
     END,
     CAST(NULL AS STRING)
