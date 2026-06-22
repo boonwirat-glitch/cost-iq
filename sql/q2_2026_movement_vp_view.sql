@@ -243,6 +243,7 @@ apr_rows AS (
     END AS cohort_month,
     CAST(NULL AS STRING) AS transfer_scope
   FROM apr_own ao
+  LEFT JOIN mar_cohort mc            ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd  ON ao.outlet_id = ofd.outlet_id
   LEFT JOIN outlet_exp_date oed      ON ao.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po     ON ao.outlet_id = po.outlet_id
