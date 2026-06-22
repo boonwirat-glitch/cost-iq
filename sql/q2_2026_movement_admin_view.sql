@@ -547,18 +547,10 @@ all_rows AS (
 )
 
 SELECT
-  r.period_month,
-  r.movement_type,
-  r.transfer_scope,
-  r.current_portfolio,
-  r.current_staff_owner,
-  r.base_portfolio,
-  r.base_staff_owner,
-  r.outlet_id,
-  r.account_id,
-  r.account_name,
-  r.res_name,
-  r.account_type,
+  r.period_month, r.movement_type, r.transfer_scope,
+  r.current_portfolio, r.current_staff_owner,
+  r.base_portfolio, r.base_staff_owner,
+  r.outlet_id, r.account_id, r.account_name, r.res_name, r.account_type,
   r.cohort_month,
   ROUND(r.curr_gmv, 0) AS curr_gmv,
   ROUND(r.base_gmv, 0) AS base_gmv,
@@ -569,8 +561,9 @@ SELECT
     WHEN '2026-06' THEN p.jun_days
   END AS curr_days,
   r.first_dollar_date,
-  r.first_admin_date,
+  r.first_admin_date AS first_portfolio_date,
+  r.first_dollar_owner,
   r.new_user_exp_date
 FROM all_rows r
 CROSS JOIN params p
-ORDER BY r.period_month, r.movement_type, r.curr_gmv DESC
+ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
