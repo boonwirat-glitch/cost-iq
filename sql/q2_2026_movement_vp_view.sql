@@ -43,10 +43,10 @@ outlet_first_dollar AS (
     MIN(DATE(o.delivery_date)) AS first_dollar_date,
     MIN(CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
              THEN DATE(o.delivery_date) END) AS first_portfolio_date,
+    -- first_dollar_owner = owner ของ first order จริงๆ (ทุก owner รวม SALE)
+    -- ถ้า first order เป็น SALE → expansion check ไม่ผ่าน → ตกไป new_sales
     ARRAY_AGG(
-      CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
-           THEN UPPER(TRIM(o.commercial_owner)) END
-      IGNORE NULLS
+      UPPER(TRIM(o.commercial_owner))
       ORDER BY o.delivery_date ASC LIMIT 1
     )[SAFE_OFFSET(0)] AS first_dollar_owner
   FROM `freshket-rn.dwh.order` o
@@ -214,7 +214,11 @@ apr_rows AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
@@ -239,7 +243,6 @@ apr_rows AS (
     END AS cohort_month,
     CAST(NULL AS STRING) AS transfer_scope
   FROM apr_own ao
-  LEFT JOIN mar_cohort mc            ON ao.outlet_id = mc.outlet_id
   LEFT JOIN outlet_first_dollar ofd  ON ao.outlet_id = ofd.outlet_id
   LEFT JOIN outlet_exp_date oed      ON ao.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po     ON ao.outlet_id = po.outlet_id
@@ -280,7 +283,11 @@ may_rows AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
@@ -346,7 +353,11 @@ jun_rows AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'expansion'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
+        AND (oed.new_user_exp_date IS NULL
+             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+                NOT IN ('2026-03','2026-04','2026-05','2026-06')) THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
