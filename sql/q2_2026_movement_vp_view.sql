@@ -153,20 +153,26 @@ jun_own AS (
 
 -- mar_handover_outlets: outlet ที่ exp_date = March AND prev_owner = SALE
 -- ถ้า prev_owner != SALE → ไม่ exclude ออกจาก mar_cohort (จะเป็น core_nrr แทน)
+-- mar_handover_outlets: exclude outlet ที่มี exp_date ใน Q (Mar/Apr/May/Jun) + prev = SALE
+-- ออกจาก mar_cohort → classify เป็น handover/new_sales แทน core_nrr
+-- ครอบ Q ทั้งหมด ไม่ใช่แค่ March
 mar_handover_outlets AS (
+  -- exp_date ใน Q + prev = SALE
   SELECT DISTINCT ofd.outlet_id
   FROM outlet_first_dollar ofd
   JOIN outlet_exp_date oed  ON ofd.outlet_id = oed.outlet_id
   JOIN outlet_prev_owner po ON ofd.outlet_id = po.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
+  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+        IN ('2026-03','2026-04','2026-05','2026-06')
     AND po.prev_owner = 'SALE'
   UNION DISTINCT
-  -- outlet ที่ไม่มี prev order เลย (first order อยู่ใน portfolio แล้ว) + exp_date = March
+  -- exp_date ใน Q + ไม่มี prev order (outlet ใหม่มาก)
   SELECT DISTINCT ofd.outlet_id
   FROM outlet_first_dollar ofd
   JOIN outlet_exp_date oed ON ofd.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po ON ofd.outlet_id = po.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
+  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+        IN ('2026-03','2026-04','2026-05','2026-06')
     AND po.outlet_id IS NULL
 ),
 
