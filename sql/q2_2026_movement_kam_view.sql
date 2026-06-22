@@ -249,6 +249,10 @@ apr_rows AS (
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
+      -- transfer_in: first_kam_date ใน Q + prev = PM/ADMIN (ย้ายข้ามพอร์ตมา)
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') IN ('PM','ADMIN')               THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
@@ -352,6 +356,10 @@ may_rows AS (
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
+      -- transfer_in: first_kam_date ใน Q + prev = PM/ADMIN (ย้ายข้ามพอร์ตมา)
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') IN ('PM','ADMIN')               THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
@@ -454,6 +462,10 @@ jun_rows AS (
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
+      -- transfer_in: first_kam_date ใน Q + prev = PM/ADMIN (ย้ายข้ามพอร์ตมา)
+      WHEN ofd.first_kam_date IS NOT NULL
+        AND ofd.first_kam_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') IN ('PM','ADMIN')               THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
