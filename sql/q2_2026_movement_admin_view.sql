@@ -187,7 +187,7 @@ mar_cohort AS (
       ELSE 'KAM'
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
-    ofd.first_dollar_date, ofd.first_admin_date,
+    ofd.first_dollar_date, ofd.first_admin_date, ofd.first_dollar_owner,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM (
     SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
@@ -248,7 +248,7 @@ apr_rows AS (
     'ADMIN' AS current_portfolio, ao.staff_owner AS current_staff_owner,
     COALESCE(mc.base_portfolio, 'KAM') AS base_portfolio,
     COALESCE(mc.base_staff_owner, ao.staff_owner) AS base_staff_owner,
-    ofd.first_dollar_date, ofd.first_admin_date,
+    ofd.first_dollar_date, ofd.first_admin_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(ag.gmv, 0) AS curr_gmv,
@@ -315,7 +315,7 @@ apr_rows AS (
     COALESCE(ao_port.commercial_owner, ao_sale.commercial_owner, 'KAM') AS current_portfolio,
     COALESCE(ao_port.staff_owner, ao_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_admin_date,
+    mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE
@@ -350,7 +350,7 @@ may_rows AS (
     'KAM', mo.staff_owner,
     COALESCE(mc.base_portfolio, 'KAM'),
     COALESCE(mc.base_staff_owner, mo.staff_owner),
-    ofd.first_dollar_date, ofd.first_admin_date,
+    ofd.first_dollar_date, ofd.first_admin_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(mg.gmv, 0),
     CASE
@@ -415,7 +415,7 @@ may_rows AS (
     COALESCE(mo_port.commercial_owner, mo_sale.commercial_owner, 'KAM') AS current_portfolio,
     COALESCE(mo_port.staff_owner, mo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_admin_date,
+    mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE
@@ -450,7 +450,7 @@ jun_rows AS (
     'KAM', jo.staff_owner,
     COALESCE(mc.base_portfolio, 'KAM'),
     COALESCE(mc.base_staff_owner, jo.staff_owner),
-    ofd.first_dollar_date, ofd.first_admin_date,
+    ofd.first_dollar_date, ofd.first_admin_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(jg.gmv, 0),
     CASE
@@ -515,7 +515,7 @@ jun_rows AS (
     COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'KAM') AS current_portfolio,
     COALESCE(jo_port.staff_owner, jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
-    mc.first_dollar_date, mc.first_admin_date,
+    mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
     CASE
