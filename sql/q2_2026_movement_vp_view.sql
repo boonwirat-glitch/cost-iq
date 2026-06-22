@@ -305,49 +305,6 @@ apr_rows AS (
   LEFT JOIN apr_own ao_sale ON mc.outlet_id = ao_sale.outlet_id
     AND ao_sale.commercial_owner NOT IN ('KAM','PM','ADMIN')
   WHERE ao_port.outlet_id IS NULL
-  UNION ALL
-
-  -- LEG C (Apr): exp_date ใน Q + ไม่มี KAM/PM/ADMIN order ใน Apr + ไม่ใช่ mar_cohort
-  -- → new_sales curr_gmv=0 (KAM ยังไม่ได้รับ order จริงในเดือนนี้)
-  SELECT
-    '2026-04',
-    oed_c.outlet_id,
-    COALESCE(ao_any.account_id, '') AS account_id,
-    COALESCE(ao_any.account_name, '') AS account_name,
-    COALESCE(ao_any.res_name, '') AS res_name,
-    COALESCE(ao_any.account_type, '') AS account_type,
-    COALESCE(po_c.prev_owner, 'SALE') AS current_portfolio,
-    CAST(NULL AS STRING) AS current_staff_owner,
-    COALESCE(po_c.prev_owner, 'SALE') AS base_portfolio,
-    CAST(NULL AS STRING) AS base_staff_owner,
-    ofd_c.first_dollar_date, ofd_c.first_portfolio_date, ofd_c.first_dollar_owner,
-    oed_c.new_user_exp_date,
-    0.0 AS base_gmv,
-    0.0 AS curr_gmv,
-    'new_sales' AS movement_type,
-    FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date) AS cohort_month,
-    CAST(NULL AS STRING) AS transfer_scope
-  FROM outlet_exp_date oed_c
-  JOIN outlet_first_dollar ofd_c ON oed_c.outlet_id = ofd_c.outlet_id
-  LEFT JOIN outlet_prev_owner po_c ON oed_c.outlet_id = po_c.outlet_id
-  LEFT JOIN (
-    SELECT CAST(o.user_id AS STRING) AS outlet_id,
-      CAST(o.account_id AS STRING) AS account_id,
-      o.account_name, o.res_name, o.account_type
-    FROM `freshket-rn.dwh.order` o CROSS JOIN params p
-    WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
-      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-      AND o.user_id IS NOT NULL
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
-  ) ao_any ON oed_c.outlet_id = ao_any.outlet_id
-  LEFT JOIN apr_own ao_port ON oed_c.outlet_id = ao_port.outlet_id
-    AND ao_port.commercial_owner IN ('KAM','PM','ADMIN')
-  LEFT JOIN mar_cohort mc_c ON oed_c.outlet_id = mc_c.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date)
-        IN ('2026-03','2026-04','2026-05','2026-06')
-    AND COALESCE(po_c.prev_owner, 'SALE') = 'SALE'
-    AND ao_port.outlet_id IS NULL
-    AND mc_c.outlet_id IS NULL
 ),
 
 may_rows AS (
@@ -430,48 +387,6 @@ may_rows AS (
   LEFT JOIN may_own mo_sale ON mc.outlet_id = mo_sale.outlet_id
     AND mo_sale.commercial_owner NOT IN ('KAM','PM','ADMIN')
   WHERE mo_port.outlet_id IS NULL
-  UNION ALL
-
-  -- LEG C (May): exp_date ใน Q + ไม่มี KAM/PM/ADMIN order ใน May + ไม่ใช่ mar_cohort
-  SELECT
-    '2026-05',
-    oed_c.outlet_id,
-    COALESCE(mo_any.account_id, '') AS account_id,
-    COALESCE(mo_any.account_name, '') AS account_name,
-    COALESCE(mo_any.res_name, '') AS res_name,
-    COALESCE(mo_any.account_type, '') AS account_type,
-    COALESCE(po_c.prev_owner, 'SALE') AS current_portfolio,
-    CAST(NULL AS STRING) AS current_staff_owner,
-    COALESCE(po_c.prev_owner, 'SALE') AS base_portfolio,
-    CAST(NULL AS STRING) AS base_staff_owner,
-    ofd_c.first_dollar_date, ofd_c.first_portfolio_date, ofd_c.first_dollar_owner,
-    oed_c.new_user_exp_date,
-    0.0 AS base_gmv,
-    0.0 AS curr_gmv,
-    'new_sales' AS movement_type,
-    FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date) AS cohort_month,
-    CAST(NULL AS STRING) AS transfer_scope
-  FROM outlet_exp_date oed_c
-  JOIN outlet_first_dollar ofd_c ON oed_c.outlet_id = ofd_c.outlet_id
-  LEFT JOIN outlet_prev_owner po_c ON oed_c.outlet_id = po_c.outlet_id
-  LEFT JOIN (
-    SELECT CAST(o.user_id AS STRING) AS outlet_id,
-      CAST(o.account_id AS STRING) AS account_id,
-      o.account_name, o.res_name, o.account_type
-    FROM `freshket-rn.dwh.order` o CROSS JOIN params p
-    WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
-      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-      AND o.user_id IS NOT NULL
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
-  ) mo_any ON oed_c.outlet_id = mo_any.outlet_id
-  LEFT JOIN may_own mo_port ON oed_c.outlet_id = mo_port.outlet_id
-    AND mo_port.commercial_owner IN ('KAM','PM','ADMIN')
-  LEFT JOIN mar_cohort mc_c ON oed_c.outlet_id = mc_c.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date)
-        IN ('2026-03','2026-04','2026-05','2026-06')
-    AND COALESCE(po_c.prev_owner, 'SALE') = 'SALE'
-    AND mo_port.outlet_id IS NULL
-    AND mc_c.outlet_id IS NULL
 ),
 
 jun_rows AS (
@@ -554,48 +469,6 @@ jun_rows AS (
   LEFT JOIN jun_own jo_sale ON mc.outlet_id = jo_sale.outlet_id
     AND jo_sale.commercial_owner NOT IN ('KAM','PM','ADMIN')
   WHERE jo_port.outlet_id IS NULL
-  UNION ALL
-
-  -- LEG C (Jun): exp_date ใน Q + ไม่มี KAM/PM/ADMIN order ใน Jun + ไม่ใช่ mar_cohort
-  SELECT
-    '2026-06',
-    oed_c.outlet_id,
-    COALESCE(jo_any.account_id, '') AS account_id,
-    COALESCE(jo_any.account_name, '') AS account_name,
-    COALESCE(jo_any.res_name, '') AS res_name,
-    COALESCE(jo_any.account_type, '') AS account_type,
-    COALESCE(po_c.prev_owner, 'SALE') AS current_portfolio,
-    CAST(NULL AS STRING) AS current_staff_owner,
-    COALESCE(po_c.prev_owner, 'SALE') AS base_portfolio,
-    CAST(NULL AS STRING) AS base_staff_owner,
-    ofd_c.first_dollar_date, ofd_c.first_portfolio_date, ofd_c.first_dollar_owner,
-    oed_c.new_user_exp_date,
-    0.0 AS base_gmv,
-    0.0 AS curr_gmv,
-    'new_sales' AS movement_type,
-    FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date) AS cohort_month,
-    CAST(NULL AS STRING) AS transfer_scope
-  FROM outlet_exp_date oed_c
-  JOIN outlet_first_dollar ofd_c ON oed_c.outlet_id = ofd_c.outlet_id
-  LEFT JOIN outlet_prev_owner po_c ON oed_c.outlet_id = po_c.outlet_id
-  LEFT JOIN (
-    SELECT CAST(o.user_id AS STRING) AS outlet_id,
-      CAST(o.account_id AS STRING) AS account_id,
-      o.account_name, o.res_name, o.account_type
-    FROM `freshket-rn.dwh.order` o CROSS JOIN params p
-    WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
-      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-      AND o.user_id IS NOT NULL
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
-  ) jo_any ON oed_c.outlet_id = jo_any.outlet_id
-  LEFT JOIN jun_own jo_port ON oed_c.outlet_id = jo_port.outlet_id
-    AND jo_port.commercial_owner IN ('KAM','PM','ADMIN')
-  LEFT JOIN mar_cohort mc_c ON oed_c.outlet_id = mc_c.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed_c.new_user_exp_date)
-        IN ('2026-03','2026-04','2026-05','2026-06')
-    AND COALESCE(po_c.prev_owner, 'SALE') = 'SALE'
-    AND jo_port.outlet_id IS NULL
-    AND mc_c.outlet_id IS NULL
 ),
 
 all_rows AS (
