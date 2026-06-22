@@ -230,8 +230,10 @@ apr_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -261,7 +263,8 @@ apr_rows AS (
 
   SELECT '2026-04',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    mc.base_portfolio, mc.base_staff_owner,
+    COALESCE(ao_sale.commercial_owner, mc.base_portfolio) AS current_portfolio,
+    COALESCE(ao_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
@@ -300,8 +303,10 @@ may_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -331,7 +336,8 @@ may_rows AS (
 
   SELECT '2026-05',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    mc.base_portfolio, mc.base_staff_owner,
+    COALESCE(mo_sale.commercial_owner, mc.base_portfolio) AS current_portfolio,
+    COALESCE(mo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
@@ -370,8 +376,10 @@ jun_rows AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
-        AND ofd.first_portfolio_date >= '2026-04-01' THEN 'new_sales'
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
+        AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
@@ -401,7 +409,8 @@ jun_rows AS (
 
   SELECT '2026-06',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    mc.base_portfolio, mc.base_staff_owner,
+    COALESCE(jo_sale.commercial_owner, mc.base_portfolio) AS current_portfolio,
+    COALESCE(jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_portfolio_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
