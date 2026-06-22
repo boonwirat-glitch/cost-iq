@@ -293,12 +293,7 @@ apr_rows AS (
     END AS cohort_month,
     -- transfer_in จาก portfolio อื่น
     CASE
-      WHEN mc.outlet_id IS NULL
-        AND EXISTS (
-          SELECT 1 FROM mar_cohort mc2
-          WHERE mc2.outlet_id = ao.outlet_id
-            AND mc2.base_portfolio != 'KAM'
-        ) THEN 'inter'
+      WHEN pamc.outlet_id IS NOT NULL THEN 'inter'
       ELSE NULL
     END AS transfer_scope
   FROM apr_own ao
@@ -398,12 +393,7 @@ may_rows AS (
       ELSE NULL
     END,
     CASE
-      WHEN mc.outlet_id IS NULL
-        AND EXISTS (
-          SELECT 1 FROM mar_cohort mc2
-          WHERE mc2.outlet_id = mo.outlet_id
-            AND mc2.base_portfolio != 'KAM'
-        ) THEN 'inter'
+      WHEN pamc.outlet_id IS NOT NULL THEN 'inter'
       ELSE NULL
     END
   FROM may_own mo
@@ -503,12 +493,7 @@ jun_rows AS (
       ELSE NULL
     END,
     CASE
-      WHEN mc.outlet_id IS NULL
-        AND EXISTS (
-          SELECT 1 FROM mar_cohort mc2
-          WHERE mc2.outlet_id = jo.outlet_id
-            AND mc2.base_portfolio != 'KAM'
-        ) THEN 'inter'
+      WHEN pamc.outlet_id IS NOT NULL THEN 'inter'
       ELSE NULL
     END
   FROM jun_own jo
