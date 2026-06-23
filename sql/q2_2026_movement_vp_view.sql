@@ -254,13 +254,11 @@ apr_rows AS (
       ELSE COALESCE(mc.base_portfolio, ao.commercial_owner)
     END AS base_portfolio,
     CASE
-    CASE
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
            IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                ELSE po.prev_owner END, 'SALE') = 'SALE' THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, ao.staff_owner)
-    END AS base_staff_owner,
     END AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
