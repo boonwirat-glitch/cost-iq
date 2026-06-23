@@ -265,19 +265,17 @@ apr_rows AS (
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
     ao.commercial_owner AS current_portfolio, ao.staff_owner AS current_staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
-         WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN 'SALE'
+         WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+             IN ('2026-03','2026-04','2026-05','2026-06')
+             AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+             THEN 'SALE'
          ELSE COALESCE(mc.base_portfolio, ao.commercial_owner)
     END AS base_portfolio,
     CASE
-      WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+          IN ('2026-03','2026-04','2026-05','2026-06')
+          AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+          THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, ao.staff_owner)
     END AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
@@ -399,19 +397,17 @@ may_rows AS (
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner, mo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
-         WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN 'SALE'
+         WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+             IN ('2026-03','2026-04','2026-05','2026-06')
+             AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+             THEN 'SALE'
          ELSE COALESCE(mc.base_portfolio, mo.commercial_owner)
     END,
     CASE
-      WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+          IN ('2026-03','2026-04','2026-05','2026-06')
+          AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+          THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, mo.staff_owner)
     END,
     ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
@@ -531,19 +527,17 @@ jun_rows AS (
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     jo.commercial_owner, jo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
-         WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN 'SALE'
+         WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+             IN ('2026-03','2026-04','2026-05','2026-06')
+             AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+             THEN 'SALE'
          ELSE COALESCE(mc.base_portfolio, jo.commercial_owner)
     END,
     CASE
-      WHEN ofd.first_kam_date IS NOT NULL
-        AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+          IN ('2026-03','2026-04','2026-05','2026-06')
+          AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
+          THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, jo.staff_owner)
     END,
     ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
