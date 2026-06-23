@@ -268,7 +268,9 @@ apr_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
@@ -371,7 +373,9 @@ may_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
@@ -473,7 +477,9 @@ jun_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'                        THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
       WHEN ofd.first_admin_date IS NOT NULL
         AND ofd.first_admin_date >= '2026-04-01'
