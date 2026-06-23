@@ -245,7 +245,7 @@ apr_rows AS (
   SELECT
     '2026-04' AS period_month,
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
-    'KAM' AS current_portfolio, ao.staff_owner AS current_staff_owner,
+    ao.commercial_owner AS current_portfolio, ao.staff_owner AS current_staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'KAM')
     END AS base_portfolio,
@@ -349,7 +349,7 @@ may_rows AS (
   SELECT
     '2026-05',
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
-    'KAM', mo.staff_owner,
+    mo.commercial_owner, mo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'KAM')
     END,
@@ -451,7 +451,7 @@ jun_rows AS (
   SELECT
     '2026-06',
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
-    'KAM', jo.staff_owner,
+    jo.commercial_owner, jo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'KAM')
     END,
