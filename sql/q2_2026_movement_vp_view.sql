@@ -223,13 +223,45 @@ mar_cohort AS (
 -- [5] comeback     : first_dollar < Apr + ไม่มี exp_date valid ใน Q
 -- [6] unclassified : ELSE
 
+-- mar_sale_owner: SALE staff ที่ดูแล outlet ใน March
+-- ใช้สำหรับ base_staff_owner ของ new_sales fallback
+mar_sale_owner AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    TRIM(o.staff_owner) AS sale_staff_owner,
+    UPPER(TRIM(o.commercial_owner)) AS sale_owner
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
+    AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY o.user_id ORDER BY o.delivery_date DESC
+  ) = 1
+),
+
 apr_rows AS (
   SELECT
     '2026-04' AS period_month,
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
     ao.commercial_owner AS current_portfolio, ao.staff_owner AS current_staff_owner,
-    COALESCE(mc.base_portfolio, ao.commercial_owner) AS base_portfolio,
-    COALESCE(mc.base_staff_owner, ao.staff_owner) AS base_staff_owner,
+    CASE
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06') THEN 'SALE'
+      ELSE COALESCE(mc.base_portfolio, ao.commercial_owner)
+    END AS base_portfolio,
+    CASE
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      ELSE COALESCE(mc.base_staff_owner, ao.staff_owner)
+    END AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
@@ -287,6 +319,7 @@ apr_rows AS (
   LEFT JOIN outlet_exp_date oed      ON ao.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po     ON ao.outlet_id = po.outlet_id
   LEFT JOIN apr_gmv ag               ON ao.outlet_id = ag.outlet_id
+  LEFT JOIN mar_sale_owner mso        ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
   WHERE ao.commercial_owner IN ('KAM','PM','ADMIN')
 
@@ -317,7 +350,14 @@ may_rows AS (
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner, mo.staff_owner,
     COALESCE(mc.base_portfolio, mo.commercial_owner),
-    COALESCE(mc.base_staff_owner, mo.staff_owner),
+    CASE
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      ELSE COALESCE(mc.base_staff_owner, mo.staff_owner)
+    END,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(mg.gmv, 0),
@@ -371,6 +411,7 @@ may_rows AS (
   LEFT JOIN outlet_exp_date oed      ON mo.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po     ON mo.outlet_id = po.outlet_id
   LEFT JOIN may_gmv mg               ON mo.outlet_id = mg.outlet_id
+  LEFT JOIN mar_sale_owner mso        ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
   WHERE mo.commercial_owner IN ('KAM','PM','ADMIN')
 
@@ -401,7 +442,14 @@ jun_rows AS (
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     jo.commercial_owner, jo.staff_owner,
     COALESCE(mc.base_portfolio, jo.commercial_owner),
-    COALESCE(mc.base_staff_owner, jo.staff_owner),
+    CASE
+      WHEN ofd.first_portfolio_date IS NOT NULL
+        AND ofd.first_portfolio_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06') THEN mso.sale_staff_owner
+      ELSE COALESCE(mc.base_staff_owner, jo.staff_owner)
+    END,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
     COALESCE(mc.base_gmv, bg.gmv, 0), COALESCE(jg.gmv, 0),
@@ -455,6 +503,7 @@ jun_rows AS (
   LEFT JOIN outlet_exp_date oed      ON jo.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po     ON jo.outlet_id = po.outlet_id
   LEFT JOIN jun_gmv jg               ON jo.outlet_id = jg.outlet_id
+  LEFT JOIN mar_sale_owner mso        ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
   WHERE jo.commercial_owner IN ('KAM','PM','ADMIN')
 
