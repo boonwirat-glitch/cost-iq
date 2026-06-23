@@ -314,7 +314,7 @@ apr_rows AS (
   SELECT
     '2026-04',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    COALESCE(ao_port.commercial_owner, ao_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(ao_port.commercial_owner, ao_sale.commercial_owner, 'PM') AS current_portfolio,
     COALESCE(ao_port.staff_owner, ao_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_pm_date, mc.first_dollar_owner,
@@ -416,7 +416,7 @@ may_rows AS (
   SELECT
     '2026-05',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    COALESCE(mo_port.commercial_owner, mo_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(mo_port.commercial_owner, mo_sale.commercial_owner, 'PM') AS current_portfolio,
     COALESCE(mo_port.staff_owner, mo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_pm_date, mc.first_dollar_owner,
@@ -518,7 +518,7 @@ jun_rows AS (
   SELECT
     '2026-06',
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
-    COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'KAM') AS current_portfolio,
+    COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'PM') AS current_portfolio,
     COALESCE(jo_port.staff_owner, jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
     'KAM', mc.base_staff_owner,
     mc.first_dollar_date, mc.first_pm_date, mc.first_dollar_owner,
