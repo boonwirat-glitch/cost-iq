@@ -245,7 +245,7 @@ apr_rows AS (
   SELECT
     '2026-04' AS period_month,
     ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
-    'ADMIN' AS current_portfolio, ao.staff_owner AS current_staff_owner,
+    ao.commercial_owner AS current_portfolio, ao.staff_owner AS current_staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'ADMIN')
     END AS base_portfolio,
