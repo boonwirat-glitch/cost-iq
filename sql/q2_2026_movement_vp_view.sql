@@ -248,7 +248,9 @@ apr_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
       -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
@@ -330,7 +332,9 @@ may_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
       -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
@@ -412,7 +416,9 @@ jun_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE' THEN 'new_sales'
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE' THEN 'new_sales'
+        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+            IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี + first_portfolio ใน Q + prev=SALE
       -- exp_date ก่อน Q หรือไม่มีเลย → new_sales fallback (รอยต่อ SALE→KAM)
       WHEN ofd.first_portfolio_date IS NOT NULL
