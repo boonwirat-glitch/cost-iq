@@ -271,10 +271,13 @@ apr_rows AS (
     END AS movement_type,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
-      WHEN oed.new_user_exp_date IS NOT NULL
-        THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      -- handover/new_sales ปกติ: exp_date อยู่ใน Q
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN ('2026-03','2026-04','2026-05','2026-06')
+           THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      -- new_sales fallback: exp_date ก่อน Q หรือไม่มี → ใช้ first_portfolio_date
       WHEN ofd.first_portfolio_date IS NOT NULL
-        THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
+           THEN FORMAT_DATE('%Y-%m', ofd.first_portfolio_date)
       ELSE NULL
     END AS cohort_month,
     CAST(NULL AS STRING) AS transfer_scope
