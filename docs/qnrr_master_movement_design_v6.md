@@ -211,8 +211,8 @@ PM/ADMIN ⚠️ รอ re-run หลัง latest fixes
 |---|---|
 | `sql/q2_2026_movement_vp_view.sql` | ✅ validated แต่ขาด sync v6 fixes |
 | `sql/q2_2026_movement_kam_view.sql` | ✅ ground truth validated |
-| `sql/q2_2026_movement_pm_view.sql` | ⚠️ rebuilt รอ validate |
-| `sql/q2_2026_movement_admin_view.sql` | ⚠️ rebuilt + EXISTS fix รอ validate |
+| `sql/q2_2026_movement_pm_view.sql` | ⚠️ reverted to `d2589aac9ffd` — stable แต่ขาด KAM v6 fixes |
+| `sql/q2_2026_movement_admin_view.sql` | ⚠️ reverted to `be45d29bbb65` — stable แต่ขาด KAM v6 fixes |
 | `sql/quarterly_nrr_2026_Q2_v5.sql` | ⚠️ ยังไม่ reconcile |
 
 ---
@@ -224,3 +224,18 @@ PM/ADMIN ⚠️ รอ re-run หลัง latest fixes
 3. C7/C8 cross-portfolio verify
 4. Rep-level view
 5. Reconcile กับ v5
+
+---
+
+## ⚠️ คำเตือนสำหรับ Session หน้า — PM/ADMIN Rebuild
+
+**ต้อง clone จาก KAM view เท่านั้น** — ห้าม patch ทีละจุด
+การ patch ทีละจุดทำให้ keyword เปลี่ยนไม่ครบ เช่น `'KAM'` หลงเหลืออยู่ใน PM/ADMIN view
+
+ขั้นตอน:
+1. Fetch KAM view ล่าสุด
+2. Replace KAM → PM/ADMIN, first_kam_date → first_pm/admin_date
+3. Replace pm_admin_mar_cohort → kam_admin/pm_mar_cohort
+4. Replace inter portfolio list
+5. Verify ไม่มี 'KAM' หลงเหลือใน non-filter lines
+6. Run → validate C1–C6 ก่อน merge
