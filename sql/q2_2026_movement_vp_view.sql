@@ -349,7 +349,7 @@ may_rows AS (
   SELECT '2026-05',
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.commercial_owner, mo.staff_owner,
-    COALESCE(mc.base_portfolio, mo.commercial_owner),
+    mc.base_portfolio,
     CASE
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
@@ -441,7 +441,7 @@ jun_rows AS (
   SELECT '2026-06',
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     jo.commercial_owner, jo.staff_owner,
-    COALESCE(mc.base_portfolio, jo.commercial_owner),
+    mc.base_portfolio,
     CASE
       WHEN ofd.first_portfolio_date IS NOT NULL
         AND ofd.first_portfolio_date >= '2026-04-01'
