@@ -181,7 +181,7 @@ mar_handover_outlets AS (
 -- KAM mar_cohort: last Mar order = 'KAM' + base_gmv > 0 + ไม่ใช่ handover
 -- KAM mar_cohort: Mar last = 'KAM' หรือ SALE spot + first_kam_date < Apr
 mar_cohort AS (
-  SELECT mo.outlet_id, mo.account_id, mo.cdp_account_name AS account_name, mo.cdp_res_name AS res_name, mo.account_type,
+  SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
       WHEN mo.commercial_owner = 'KAM' THEN mo.commercial_owner
       ELSE 'KAM'
@@ -244,7 +244,7 @@ apr_rows AS (
   -- LEG A: outlet มี order KAM ใน Apr
   SELECT
     '2026-04' AS period_month,
-    ao.outlet_id, ao.account_id, ao.cdp_account_name AS account_name, ao.cdp_res_name AS res_name, ao.account_type,
+    ao.outlet_id, ao.account_id, ao.account_name, ao.res_name, ao.account_type,
     'KAM' AS current_portfolio, ao.staff_owner AS current_staff_owner,
     COALESCE(mc.base_portfolio, 'KAM') AS base_portfolio,
     COALESCE(mc.base_staff_owner, ao.staff_owner) AS base_staff_owner,
@@ -346,7 +346,7 @@ may_rows AS (
   -- LEG A
   SELECT
     '2026-05',
-    mo.outlet_id, mo.account_id, mo.cdp_account_name AS account_name, mo.cdp_res_name AS res_name, mo.account_type,
+    mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     'KAM', mo.staff_owner,
     COALESCE(mc.base_portfolio, 'KAM'),
     COALESCE(mc.base_staff_owner, mo.staff_owner),
@@ -446,7 +446,7 @@ jun_rows AS (
   -- LEG A
   SELECT
     '2026-06',
-    jo.outlet_id, jo.account_id, jo.cdp_account_name AS account_name, jo.cdp_res_name AS res_name, jo.account_type,
+    jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     'KAM', jo.staff_owner,
     COALESCE(mc.base_portfolio, 'KAM'),
     COALESCE(mc.base_staff_owner, jo.staff_owner),
