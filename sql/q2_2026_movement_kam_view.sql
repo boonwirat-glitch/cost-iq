@@ -298,7 +298,7 @@ apr_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -311,6 +311,11 @@ apr_rows AS (
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       -- transfer_in: outlet อยู่ใน PM/ADMIN mar_cohort แต่ KAM รับใน Q
       WHEN pamc.outlet_id IS NOT NULL                                   THEN 'transfer_in'
+      -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
+      -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
@@ -421,7 +426,7 @@ may_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -434,6 +439,11 @@ may_rows AS (
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       -- transfer_in: outlet อยู่ใน PM/ADMIN mar_cohort แต่ KAM รับใน Q
       WHEN pamc.outlet_id IS NOT NULL                                   THEN 'transfer_in'
+      -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
+      -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
@@ -538,7 +548,7 @@ jun_rows AS (
         AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, '') = 'SALE'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -551,6 +561,11 @@ jun_rows AS (
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'new_sales'
       -- transfer_in: outlet อยู่ใน PM/ADMIN mar_cohort แต่ KAM รับใน Q
       WHEN pamc.outlet_id IS NOT NULL                                   THEN 'transfer_in'
+      -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
+      -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
+      WHEN ofd.first_dollar_date >= '2026-04-01'
+        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
