@@ -125,7 +125,7 @@ jun_gmv AS (
 ),
 apr_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.res_name, o.account_type,
+    o.cdp_account_name AS account_name, o.cdp_res_name AS res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
@@ -134,7 +134,7 @@ apr_own AS (
 ),
 may_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.res_name, o.account_type,
+    o.cdp_account_name AS account_name, o.cdp_res_name AS res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
@@ -143,7 +143,7 @@ may_own AS (
 ),
 jun_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-    o.account_name, o.res_name, o.account_type,
+    o.cdp_account_name AS account_name, o.cdp_res_name AS res_name, o.account_type,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
@@ -193,7 +193,7 @@ mar_cohort AS (
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM (
     SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
-      o.account_name, o.res_name, o.account_type,
+      o.cdp_account_name AS account_name, o.cdp_res_name AS res_name, o.account_type,
       UPPER(TRIM(o.commercial_owner)) AS commercial_owner, TRIM(o.staff_owner) AS staff_owner
     FROM `freshket-rn.dwh.order` o CROSS JOIN params p
     WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
