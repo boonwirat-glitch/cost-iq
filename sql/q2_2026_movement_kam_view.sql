@@ -350,7 +350,9 @@ may_rows AS (
     '2026-05',
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     'KAM', mo.staff_owner,
-    COALESCE(mc.base_portfolio, 'KAM'),
+    CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
+         ELSE COALESCE(mc.base_portfolio, 'KAM')
+    END,
     COALESCE(mc.base_staff_owner, mo.staff_owner),
     ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
@@ -450,7 +452,9 @@ jun_rows AS (
     '2026-06',
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     'KAM', jo.staff_owner,
-    COALESCE(mc.base_portfolio, 'KAM'),
+    CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
+         ELSE COALESCE(mc.base_portfolio, 'KAM')
+    END,
     COALESCE(mc.base_staff_owner, jo.staff_owner),
     ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
     oed.new_user_exp_date,
