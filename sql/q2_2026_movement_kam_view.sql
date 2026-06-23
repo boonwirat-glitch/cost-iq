@@ -404,7 +404,7 @@ may_rows AS (
         AND COALESCE(po.prev_owner, '') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06') THEN 'SALE'
-         ELSE mc.base_portfolio
+         ELSE COALESCE(mc.base_portfolio, mo.commercial_owner)
     END,
     CASE
       WHEN ofd.first_kam_date IS NOT NULL
@@ -531,7 +531,7 @@ jun_rows AS (
         AND COALESCE(po.prev_owner, '') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06') THEN 'SALE'
-         ELSE mc.base_portfolio
+         ELSE COALESCE(mc.base_portfolio, jo.commercial_owner)
     END,
     CASE
       WHEN ofd.first_kam_date IS NOT NULL
