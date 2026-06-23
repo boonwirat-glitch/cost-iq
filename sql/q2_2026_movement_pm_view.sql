@@ -376,13 +376,18 @@ apr_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN outlet_exp_date oed  ON mc.outlet_id = oed.outlet_id
-  LEFT JOIN apr_own ao_pm  ON mc.outlet_id = ao_pm.outlet_id
-    AND ao_pm.commercial_owner = 'KAM'
   LEFT JOIN apr_own ao_port ON mc.outlet_id = ao_port.outlet_id
     AND ao_port.commercial_owner IN ('KAM','ADMIN')
   LEFT JOIN apr_own ao_sale ON mc.outlet_id = ao_sale.outlet_id
     AND ao_sale.commercial_owner = 'SALE'
-  WHERE ao_pm.outlet_id IS NULL
+  WHERE NOT EXISTS (
+    SELECT 1 FROM `freshket-rn.dwh.order` o
+    CROSS JOIN params p
+    WHERE CAST(o.user_id AS STRING) = mc.outlet_id
+      AND DATE(o.delivery_date) BETWEEN p.apr_start AND p.apr_end
+      AND UPPER(TRIM(o.commercial_owner)) = 'PM'
+      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  )
 ),
 
 -- ── May rows ─────────────────────────────────────────────────────────────────
@@ -498,13 +503,18 @@ may_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN outlet_exp_date oed  ON mc.outlet_id = oed.outlet_id
-  LEFT JOIN may_own mo_pm  ON mc.outlet_id = mo_pm.outlet_id
-    AND mo_pm.commercial_owner = 'KAM'
   LEFT JOIN may_own mo_port ON mc.outlet_id = mo_port.outlet_id
     AND mo_port.commercial_owner IN ('KAM','ADMIN')
   LEFT JOIN may_own mo_sale ON mc.outlet_id = mo_sale.outlet_id
     AND mo_sale.commercial_owner = 'SALE'
-  WHERE mo_pm.outlet_id IS NULL
+  WHERE NOT EXISTS (
+    SELECT 1 FROM `freshket-rn.dwh.order` o
+    CROSS JOIN params p
+    WHERE CAST(o.user_id AS STRING) = mc.outlet_id
+      AND DATE(o.delivery_date) BETWEEN p.may_start AND p.may_end
+      AND UPPER(TRIM(o.commercial_owner)) = 'PM'
+      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  )
 ),
 
 -- ── Jun rows ─────────────────────────────────────────────────────────────────
@@ -620,13 +630,18 @@ jun_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN outlet_exp_date oed  ON mc.outlet_id = oed.outlet_id
-  LEFT JOIN jun_own jo_pm  ON mc.outlet_id = jo_pm.outlet_id
-    AND jo_pm.commercial_owner = 'KAM'
   LEFT JOIN jun_own jo_port ON mc.outlet_id = jo_port.outlet_id
     AND jo_port.commercial_owner IN ('KAM','ADMIN')
   LEFT JOIN jun_own jo_sale ON mc.outlet_id = jo_sale.outlet_id
     AND jo_sale.commercial_owner = 'SALE'
-  WHERE jo_pm.outlet_id IS NULL
+  WHERE NOT EXISTS (
+    SELECT 1 FROM `freshket-rn.dwh.order` o
+    CROSS JOIN params p
+    WHERE CAST(o.user_id AS STRING) = mc.outlet_id
+      AND DATE(o.delivery_date) BETWEEN p.jun_start AND p.jun_end
+      AND UPPER(TRIM(o.commercial_owner)) = 'PM'
+      AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  )
 ),
 
 all_rows AS (
