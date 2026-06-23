@@ -293,12 +293,12 @@ apr_rows AS (
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'handover'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -314,14 +314,14 @@ apr_rows AS (
       -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
       -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
-             OR COALESCE(po.prev_owner,'') != 'SALE')                   THEN 'comeback'
+             OR COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, '') != 'SALE')                   THEN 'comeback'
       ELSE 'unclassified'
     END AS movement_type,
     CASE
@@ -421,12 +421,12 @@ may_rows AS (
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'handover'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -442,14 +442,14 @@ may_rows AS (
       -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
       -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
-             OR COALESCE(po.prev_owner,'') != 'SALE')                   THEN 'comeback'
+             OR COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, '') != 'SALE')                   THEN 'comeback'
       ELSE 'unclassified'
     END,
     CASE
@@ -543,12 +543,12 @@ jun_rows AS (
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06'))        THEN 'expansion'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'handover'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'handover'
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date) IN ('2026-04','2026-05','2026-06')
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'                   THEN 'new_sales'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'                   THEN 'new_sales'
       WHEN ofd.first_kam_date IS NOT NULL
         AND ofd.first_kam_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
             IN ('2026-04','2026-05','2026-06')               THEN 'new_sales'
       -- Scenario D: Mar GMV มี (SALE spot) + first_kam ใน Q + prev=SALE + exp_date ก่อน Q
@@ -564,14 +564,14 @@ jun_rows AS (
       -- [6b] new_sales: first order ใน Q + fd_owner=SALE + ไม่มี exp_date
       -- outlet ใหม่ที่ SALE สร้างใน Q และโอนให้ portfolio (Foodium case)
       WHEN ofd.first_dollar_date >= '2026-04-01'
-        AND COALESCE(po.prev_owner, 'SALE') = 'SALE'
+        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, 'SALE') = 'SALE'
         AND oed.new_user_exp_date IS NULL                                THEN 'new_sales'
       WHEN ofd.first_dollar_date < '2026-04-01'
         AND bg.gmv IS NULL
         AND (oed.new_user_exp_date IS NULL
              OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
                 NOT IN ('2026-03','2026-04','2026-05','2026-06')
-             OR COALESCE(po.prev_owner,'') != 'SALE')                   THEN 'comeback'
+             OR COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE' ELSE po.prev_owner END, '') != 'SALE')                   THEN 'comeback'
       ELSE 'unclassified'
     END,
     CASE
