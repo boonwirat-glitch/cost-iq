@@ -184,7 +184,7 @@ mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
       WHEN mo.commercial_owner = 'PM' THEN mo.commercial_owner
-      ELSE 'KAM'
+      ELSE 'PM'
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_pm_date, ofd.first_dollar_owner,
@@ -349,7 +349,7 @@ may_rows AS (
   SELECT
     '2026-05',
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
-    'KAM', mo.staff_owner,
+    'PM', mo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'PM')
     END,
@@ -451,7 +451,7 @@ jun_rows AS (
   SELECT
     '2026-06',
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
-    'KAM', jo.staff_owner,
+    'PM', jo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'PM')
     END,
