@@ -184,7 +184,7 @@ mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
       WHEN mo.commercial_owner = 'ADMIN' THEN mo.commercial_owner
-      ELSE 'KAM'
+      ELSE 'ADMIN'
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_admin_date, ofd.first_dollar_owner,
@@ -318,7 +318,7 @@ apr_rows AS (
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     COALESCE(ao_port.commercial_owner, ao_sale.commercial_owner, 'ADMIN') AS current_portfolio,
     COALESCE(ao_port.staff_owner, ao_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
-    'KAM', mc.base_staff_owner,
+    mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
@@ -351,7 +351,7 @@ may_rows AS (
   SELECT
     '2026-05',
     mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
-    'KAM', mo.staff_owner,
+    mo.commercial_owner, mo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'ADMIN')
     END,
@@ -422,7 +422,7 @@ may_rows AS (
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     COALESCE(mo_port.commercial_owner, mo_sale.commercial_owner, 'ADMIN') AS current_portfolio,
     COALESCE(mo_port.staff_owner, mo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
-    'KAM', mc.base_staff_owner,
+    mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
@@ -455,7 +455,7 @@ jun_rows AS (
   SELECT
     '2026-06',
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
-    'KAM', jo.staff_owner,
+    jo.commercial_owner, jo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
          ELSE COALESCE(mc.base_portfolio, 'ADMIN')
     END,
@@ -526,7 +526,7 @@ jun_rows AS (
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'ADMIN') AS current_portfolio,
     COALESCE(jo_port.staff_owner, jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
-    'KAM', mc.base_staff_owner,
+    mc.base_portfolio, mc.base_staff_owner,
     mc.first_dollar_date, mc.first_admin_date, mc.first_dollar_owner,
     oed.new_user_exp_date,
     mc.base_gmv, 0.0,
