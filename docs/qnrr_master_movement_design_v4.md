@@ -1,3 +1,8 @@
+> ⚠️ **DEPRECATED** — ใช้ `docs/qnrr_master_movement_design_v7.md` แทน
+> ไฟล์นี้ล้าสมัย — สถานะ PM/ADMIN/VP ไม่ตรงกับความเป็นจริงแล้ว
+
+---
+
 # Master Movement Table — Design Spec v4
 **วันที่:** 2026-06-22 (อัปเดตรอบสาม — session VP view v13)
 **สถานะ:** Ground truth สมบูรณ์ — ใช้ไฟล์นี้เป็นอ้างอิงเดียว
