@@ -49,7 +49,7 @@ tl_map AS (
     STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'Ploy' AS tl_name),
     STRUCT('Treerak (May) Sangjua'                AS kam_name, 'Ploy' AS tl_name),
     STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'Ploy' AS tl_name),
-    STRUCT('Nutkamol (Fang) Siladam'              AS kam_name, 'Ploy' AS tl_name),
+    STRUCT('Nutkamol (Fang) Siladam'              AS kam_name, 'Name' AS tl_name),
     STRUCT('Sojirat (May) Charoensuk'             AS kam_name, 'Ploy' AS tl_name)
   ])
 ),
