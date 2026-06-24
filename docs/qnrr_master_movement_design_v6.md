@@ -1,3 +1,8 @@
+> ⚠️ **DEPRECATED** — ใช้ `docs/qnrr_master_movement_design_v7.md` แทน
+> ไฟล์นี้ล้าสมัย — สถานะ PM/ADMIN/VP ไม่ตรงกับความเป็นจริงแล้ว
+
+---
+
 # Master Movement Table — Design Spec v6
 **วันที่:** 2026-06-23 (อัปเดตรอบห้า — session portfolio views ตอนปลาย)
 **สถานะ:** KAM validated ✅ | PM/ADMIN rebuilt ⚠️ รอ validate | VP partial sync
