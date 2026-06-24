@@ -701,4 +701,4 @@ FROM all_rows r
 CROSS JOIN params p
 LEFT JOIN tl_map tl_base ON r.base_staff_owner    = tl_base.kam_name
 LEFT JOIN tl_map tl_curr ON r.current_staff_owner = tl_curr.kam_name
-ORDER BY r.period_month, r.base_tl, r.base_staff_owner, r.movement_type, r.curr_gmv DESC
+ORDER BY r.period_month, tl_base.tl_name, r.base_staff_owner, r.movement_type, r.curr_gmv DESC
