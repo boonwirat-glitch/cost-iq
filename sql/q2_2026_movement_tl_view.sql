@@ -680,9 +680,7 @@ all_rows AS (
 SELECT
   r.period_month, r.movement_type, r.transfer_scope,
   r.current_portfolio, r.current_staff_owner,
-  COALESCE(tl_curr.tl_name, 'unknown') AS current_tl,
   r.base_portfolio, r.base_staff_owner,
-  COALESCE(tl_base.tl_name, 'unknown') AS base_tl,
   r.outlet_id, r.account_id, r.account_name, r.res_name, r.account_type,
   r.cohort_month,
   ROUND(r.curr_gmv, 0) AS curr_gmv,
@@ -696,7 +694,9 @@ SELECT
   r.first_dollar_date,
   r.first_kam_date AS first_portfolio_date,
   r.first_dollar_owner,
-  r.new_user_exp_date
+  r.new_user_exp_date,
+  COALESCE(tl_base.tl_name, 'unknown') AS base_tl,
+  COALESCE(tl_curr.tl_name, 'unknown') AS current_tl
 FROM all_rows r
 CROSS JOIN params p
 LEFT JOIN tl_map tl_base ON r.base_staff_owner    = tl_base.kam_name
