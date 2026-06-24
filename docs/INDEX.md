@@ -10,6 +10,7 @@
 | ไฟล์ | เนื้อหา |
 |------|---------|
 | `docs/handoff-2026-06-14-v708.md` | **Latest Sense handoff** — v708 |
+| `docs/handoff-2026-06-24-all-views-complete.md` | **Latest QNRR handoff** — all 4 views validated |
 | `docs/handoff-2026-06-14-v701.md` | Sense v701 — teamview card fix, full architecture notes |
 | `docs/handoff/HANDOFF_v606_20260613.md` | Dashboard Phase 1–8 architecture |
 
@@ -90,6 +91,34 @@
 | `docs/skills_mockup_v3_tl.html` | TL Skills mockup reference |
 
 ---
+
+
+## 📊 QNRR Movement Views (SQL)
+
+### Master Spec
+| ไฟล์ | สถานะ | หมายเหตุ |
+|---|---|---|
+| `docs/qnrr_master_movement_design_v7.md` | ✅ **CURRENT** | Final locked logic — ใช้ไฟล์นี้เท่านั้น |
+| `docs/qnrr_master_movement_design_v3.md` | ~~DEPRECATED~~ | |
+| `docs/qnrr_master_movement_design_v4.md` | ~~DEPRECATED~~ | |
+| `docs/qnrr_master_movement_design_v5.md` | ~~DEPRECATED~~ | |
+| `docs/qnrr_master_movement_design_v6.md` | ~~DEPRECATED~~ | |
+
+### Latest Handoff
+| ไฟล์ | วันที่ | สถานะ |
+|---|---|---|
+| `docs/handoff-2026-06-24-all-views-complete.md` | 2026-06-24 | ✅ **CURRENT** — C1–C8 validated |
+| `docs/handoff-2026-06-23-portfolio-views.md` | 2026-06-23 | ~~SUPERSEDED~~ |
+| `docs/handoff-2026-06-22-vp-movement-v2.md` | 2026-06-22 | ~~SUPERSEDED~~ |
+
+### SQL Files (current state)
+| ไฟล์ | สถานะ |
+|---|---|
+| `sql/q2_2026_movement_kam_view.sql` | ✅ validated C1–C6 — ground truth |
+| `sql/q2_2026_movement_pm_view.sql` | ✅ validated C1–C6 |
+| `sql/q2_2026_movement_admin_view.sql` | ✅ validated C1–C6 |
+| `sql/q2_2026_movement_vp_view.sql` | ✅ validated C1–C8 |
+| `sql/quarterly_nrr_2026_Q2_v5.sql` | ⚠️ stable — ยังไม่ reconcile กับ portfolio views |
 
 ## 🗄 SQL & Database
 
