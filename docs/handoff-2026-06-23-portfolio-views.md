@@ -1,3 +1,8 @@
+> ⚠️ **SUPERSEDED** — ใช้ `docs/handoff-2026-06-24-all-views-complete.md` แทน
+> PM/ADMIN ได้ถูก rebuild + validate เรียบร้อยแล้วใน session 2026-06-24
+
+---
+
 # Handoff — 2026-06-23 — Portfolio Views (Final State)
 
 ## สถานะปัจจุบัน (ณ สิ้น session)
