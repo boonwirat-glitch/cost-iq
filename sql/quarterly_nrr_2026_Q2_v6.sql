@@ -207,23 +207,6 @@ jun_gmv AS (
   GROUP BY 1
 ),
 
--- ── 6. current_kam_snapshot ───────────────────────────────────────────────────
-current_kam_snapshot AS (
-  SELECT
-    CAST(um.res_id AS STRING) AS outlet_id,
-    k.kam_email               AS current_kam_email
-  FROM `freshket-rn.dim.user_master` um
-  JOIN kam_list k
-    ON LOWER(TRIM(um.staff_owner_email)) = LOWER(TRIM(k.kam_email))
-  WHERE um.commercial_owner = 'KAM'
-    AND um.account_type IN ('SA','MC','Chain','Unknown')
-    AND um.res_id IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY CAST(um.res_id AS STRING)
-    ORDER BY um.lasted_order_date DESC NULLS LAST
-  ) = 1
-),
-
 -- ── 7. Mar KAM cohort ─────────────────────────────────────────────────────────
 mar_cohort AS (
   SELECT
