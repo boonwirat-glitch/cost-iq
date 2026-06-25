@@ -222,8 +222,8 @@ mar_cohort AS (
     mo.account_type,
     mo.new_user_exp_date,
     ofd.first_dollar_date,
-    k.kam_email  AS base_kam_email,
-    k.kam_name   AS base_kam_name,
+    k.kam_email    AS base_kam_email,
+    mo.staff_owner AS base_kam_name,
     k.tl_email   AS base_tl_email,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM mar_ownership mo
