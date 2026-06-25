@@ -153,3 +153,54 @@ Oct25=188.2M · Nov25=204.4M · Dec25=235.7M · Jan26=214.9M · Feb26=195.1M · 
 
 ## Snapshot branch
 `snapshot/pre-pm-admin-clone-sql` — state ก่อน session นี้เริ่ม
+
+
+---
+
+## Session 2026-06-25 — Squad (TL) View
+
+### สิ่งที่ทำเสร็จ
+
+**KAM view — เพิ่ม staff_email_map (commit 044b31ee93)**
+
+Columns ที่เพิ่มต่อท้าย FINAL SELECT:
+- base_tl, current_tl (Name / Ploy / unknown)
+- tl_pivot: handover/new_sales ใช้ current_tl, movement อื่นใช้ base_tl, fallback current_tl
+- base_kam_email, base_tl_email, current_kam_email, current_tl_email
+
+Roster: 15 active KAM (มี email), Fang = Name (email null), May/Sojirat = Ploy (email null)
+
+**Reconcile ผ่าน:**
+- KAM view ก่อน/หลังเพิ่ม squad columns: GMV diff = 0 ทุก row
+- TL view vs KAM grouped by tl_pivot: ตรงทุก row
+
+---
+
+### Logic Squad filter
+
+- GMV ในมือ squad ตอนนี้: filter current_tl
+- NRR ของ squad: filter tl_pivot
+- Rep รายคน: filter base_kam_email หรือ current_kam_email
+
+---
+
+### Known Issues (Squad level)
+
+- outlet ที่ base_tl และ current_tl blank (~700k): Sales/Admin ไม่อยู่ใน roster — ยอมรับ
+- transfer_out base_tl = unknown (~120k): base_staff_owner เป็น Sales — by design
+
+---
+
+### Rep level — ยังไม่เสร็จ
+
+sql/quarterly_nrr_2026_Q2_v7.sql สร้างแล้ว แต่ยังไม่ validate ครบ
+
+ปัญหาที่เหลือ: outlet ของ Fang/May/Name ที่มี GMV ใน Q ถูก classify เป็น core_nrr_churn เพราะ current owner ไม่อยู่ใน roster ต้อง decide ก่อนทำต่อ
+
+Bug ที่แก้แล้วใน v7:
+- mar_cohort: LEFT JOIN แทน strict JOIN (KAM ลาออกไม่หลุด)
+- LEG C: ลบ dim.user_master, ใช้ core_nrr_churn ทั้งหมด
+- core/transfer detection: ใช้ base_kam_name แทน base_kam_email
+- kam_list: เพิ่ม Name(TL)/Max/Snow เป็น No Owner
+
+Snapshot: snapshot-2026-06-25-before-kam-email-merge
