@@ -475,7 +475,7 @@ may_rows AS (
    AND TRIM(mo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN apr_labels al
     ON mo.outlet_id = al.outlet_id
-   AND al.period_kam_email = k.kam_email
+   AND al.period_kam_name = k.kam_name
   LEFT JOIN may_gmv mg ON mo.outlet_id = mg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_may ON mo.outlet_id = ofd_may.outlet_id
 
@@ -575,7 +575,7 @@ jun_rows AS (
    AND TRIM(jo.staff_owner) = TRIM(k.kam_name)
   LEFT JOIN apr_labels al
     ON jo.outlet_id = al.outlet_id
-   AND al.period_kam_email = k.kam_email
+   AND al.period_kam_name = k.kam_name
   LEFT JOIN jun_gmv jg ON jo.outlet_id = jg.outlet_id
   LEFT JOIN outlet_first_dollar ofd_jun ON jo.outlet_id = ofd_jun.outlet_id
 
@@ -655,6 +655,7 @@ SELECT
   r.period_kam_name,
   r.period_tl_email,
   r.base_kam_email,
+  r.base_kam_name,
   r.base_tl_email,
   r.account_id,
   r.account_name,
