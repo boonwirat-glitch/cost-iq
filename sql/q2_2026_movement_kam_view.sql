@@ -1,5 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Movement — KAM Portfolio View  (v1)
+-- Q2 2026 Movement — KAM Portfolio View  (v2)
+-- เพิ่ม staff_email_map: base_kam_email, base_tl_email, base_tl, current_kam_email, current_tl_email, current_tl
+-- ใช้ได้ทุก scope: KAM rep / TL squad (Name,Ploy) / portfolio รวม
 -- sql/q2_2026_movement_kam_view.sql
 --
 -- Scope: KAM portfolio เท่านั้น (commercial_owner = 'KAM')
@@ -31,6 +33,28 @@
 -- ════════════════════════════════════════════════════════════════════════════
 
 WITH
+staff_email_map AS (
+  SELECT kam_name, kam_email, tl_email, tl_name FROM UNNEST([
+    STRUCT('Anusorn (Bookbig) Khamphasuk'         AS kam_name, 'anusorn.k@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Chaklid (Dent) Nimraor'               AS kam_name, 'chaklid.n@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Duangruedee (Ning) Bulalom'           AS kam_name, 'duangruedee.bu@freshket.co' AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Napat (To) Kaikaew'                   AS kam_name, 'napat.k@freshket.co'        AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Nuttawan (Kwang) Mahaporn'            AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon' AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Rinlaphat (Mild) Setthasiriwuti'      AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Nutkamol (Fang) Siladam'              AS kam_name, CAST(NULL AS STRING)         AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
+    STRUCT('Guntinun (Monet) Thanoochan'          AS kam_name, 'guntinun.t@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Intuon (Jane) Yanakit'                AS kam_name, 'intuon.y@freshket.co'       AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Natchita (Foam) Bunkong'              AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Niracha (Cream) Sangka'               AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Puttipong (Tape) Wanithaweewat'       AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Treerak (May) Sangjua'                AS kam_name, 'treerak.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Sojirat (May) Charoensuk'             AS kam_name, CAST(NULL AS STRING)         AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name)
+  ])
+),
+
 params AS (
   SELECT
     DATE('2026-03-01') AS base_start, DATE('2026-03-31') AS base_end, 31 AS base_days,
@@ -671,7 +695,15 @@ SELECT
   r.first_dollar_date,
   r.first_kam_date AS first_portfolio_date,
   r.first_dollar_owner,
-  r.new_user_exp_date
+  r.new_user_exp_date,
+  em_base.kam_email  AS base_kam_email,
+  em_base.tl_email   AS base_tl_email,
+  em_base.tl_name    AS base_tl,
+  em_curr.kam_email  AS current_kam_email,
+  em_curr.tl_email   AS current_tl_email,
+  em_curr.tl_name    AS current_tl
 FROM all_rows r
 CROSS JOIN params p
-ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
+LEFT JOIN staff_email_map em_base ON r.base_staff_owner    = em_base.kam_name
+LEFT JOIN staff_email_map em_curr ON r.current_staff_owner = em_curr.kam_name
+ORDER BY r.period_month, em_base.tl_name, r.base_staff_owner, r.movement_type, r.curr_gmv DESC
