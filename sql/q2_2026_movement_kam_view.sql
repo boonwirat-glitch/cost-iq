@@ -696,12 +696,16 @@ SELECT
   r.first_kam_date AS first_portfolio_date,
   r.first_dollar_owner,
   r.new_user_exp_date,
+  em_base.tl_name    AS base_tl,
+  em_curr.tl_name    AS current_tl,
+  COALESCE(
+    CASE WHEN r.movement_type IN ('handover','new_sales') THEN em_curr.tl_name ELSE em_base.tl_name END,
+    em_curr.tl_name
+  )                  AS tl_pivot,
   em_base.kam_email  AS base_kam_email,
   em_base.tl_email   AS base_tl_email,
-  em_base.tl_name    AS base_tl,
   em_curr.kam_email  AS current_kam_email,
-  em_curr.tl_email   AS current_tl_email,
-  em_curr.tl_name    AS current_tl
+  em_curr.tl_email   AS current_tl_email
 FROM all_rows r
 CROSS JOIN params p
 LEFT JOIN staff_email_map em_base ON r.base_staff_owner    = em_base.kam_name
