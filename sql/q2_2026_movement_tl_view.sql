@@ -206,7 +206,7 @@ mar_handover_outlets AS (
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
-      WHEN mUPPER(TRIM(o.commercial_owner)) = 'KAM' THEN mo.commercial_owner
+      WHEN UPPER(TRIM(mo.commercial_owner)) = 'KAM' THEN mo.commercial_owner
       ELSE 'KAM'
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
@@ -224,9 +224,9 @@ mar_cohort AS (
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE (
-    mUPPER(TRIM(o.commercial_owner)) = 'KAM'
+    UPPER(TRIM(mo.commercial_owner)) = 'KAM'
     OR (
-      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
+      UPPER(TRIM(mo.commercial_owner)) = 'SALE'
       AND ofd.first_kam_date IS NOT NULL
       AND ofd.first_kam_date < '2026-04-01'
     )
@@ -252,7 +252,7 @@ pm_admin_mar_cohort AS (
   WHERE (
     mo.commercial_owner IN ('PM','ADMIN')
     OR (
-      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
+      UPPER(TRIM(mo.commercial_owner)) = 'SALE'
       AND ofd.first_kam_date IS NOT NULL
       AND ofd.first_kam_date < '2026-04-01'
       AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('PM','ADMIN')
@@ -370,7 +370,7 @@ apr_rows AS (
   LEFT JOIN mar_sale_owner mso        ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
-  WHERE aUPPER(TRIM(o.commercial_owner)) = 'KAM'
+  WHERE UPPER(TRIM(ao.commercial_owner)) = 'KAM'
 
   UNION ALL
 
@@ -500,7 +500,7 @@ may_rows AS (
   LEFT JOIN mar_sale_owner mso        ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
-  WHERE mUPPER(TRIM(o.commercial_owner)) = 'KAM'
+  WHERE UPPER(TRIM(mo.commercial_owner)) = 'KAM'
 
   UNION ALL
 
@@ -630,7 +630,7 @@ jun_rows AS (
   LEFT JOIN mar_sale_owner mso        ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
-  WHERE jUPPER(TRIM(o.commercial_owner)) = 'KAM'
+  WHERE UPPER(TRIM(jo.commercial_owner)) = 'KAM'
 
   UNION ALL
 
