@@ -592,10 +592,10 @@ SELECT
     WHEN '2026-05' THEN p.may_days
     WHEN '2026-06' THEN p.jun_days
   END                               AS curr_days,
-  r.first_dollar_date,
-  r.first_kam_date                  AS first_portfolio_date,
-  r.first_dollar_owner,
-  r.new_user_exp_date,
+  ofd2.first_dollar_date,
+  ofd2.first_kam_date               AS first_portfolio_date,
+  ofd2.first_dollar_owner,
+  oed2.new_user_exp_date,
   -- rep-specific columns ต่อท้าย
   em_latest.tl_name                 AS latest_tl,
   em_base.tl_name                   AS base_tl,
@@ -611,6 +611,8 @@ CROSS JOIN params p
 JOIN latest_own lo                  ON r.outlet_id            = lo.outlet_id
 LEFT JOIN staff_email_map em_latest ON lo.latest_staff_owner  = em_latest.kam_name
 LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
+LEFT JOIN outlet_first_dollar ofd2  ON r.outlet_id            = ofd2.outlet_id
+LEFT JOIN outlet_exp_date oed2      ON r.outlet_id            = oed2.outlet_id
 -- filter เฉพาะ outlet ที่ latest owner เป็น KAM
 -- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
 WHERE lo.latest_commercial_owner = 'KAM'
