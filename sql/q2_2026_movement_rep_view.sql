@@ -220,7 +220,7 @@ mar_cohort AS (
   FROM mar_own mo
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  WHERE mo.commercial_owner = 'KAM'
+  WHERE mUPPER(TRIM(o.commercial_owner)) = 'KAM'
     AND COALESCE(bg.gmv, 0) > 0
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_handover_outlets)
 ),
@@ -244,7 +244,7 @@ pm_admin_mar_cohort AS (
   WHERE (
     mo.commercial_owner IN ('PM','ADMIN')
     OR (
-      mo.commercial_owner = 'SALE'
+      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
       AND ofd.first_kam_date IS NOT NULL
       AND ofd.first_kam_date < '2026-04-01'
       AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('PM','ADMIN')
@@ -269,12 +269,11 @@ apr_classified AS (
     COALESCE(mc.account_type, ao.account_type) AS account_type,
     ao.staff_owner AS period_staff_owner,
     CASE
-      WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                              ELSE po.prev_owner END, 'SALE') = 'SALE'
-        THEN 'SALE'
+        THEN mso.sale_staff_owner
       ELSE COALESCE(mc.mar_staff_owner, ao.staff_owner)
     END AS base_staff_owner,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
@@ -336,8 +335,9 @@ apr_classified AS (
   LEFT JOIN apr_gmv ag               ON ao.outlet_id = ag.outlet_id
   LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
+  LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
-  WHERE ao.commercial_owner = 'KAM'
+  WHERE aUPPER(TRIM(o.commercial_owner)) = 'KAM'
 
   UNION ALL
 
@@ -364,12 +364,11 @@ may_classified AS (
     COALESCE(mc.account_type, mo.account_type) AS account_type,
     mo.staff_owner AS period_staff_owner,
     CASE
-      WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                              ELSE po.prev_owner END, 'SALE') = 'SALE'
-        THEN 'SALE'
+        THEN mso.sale_staff_owner
       ELSE COALESCE(mc.mar_staff_owner, mo.staff_owner)
     END AS base_staff_owner,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
@@ -429,8 +428,9 @@ may_classified AS (
   LEFT JOIN may_gmv mg               ON mo.outlet_id = mg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
+  LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
-  WHERE mo.commercial_owner = 'KAM'
+  WHERE mUPPER(TRIM(o.commercial_owner)) = 'KAM'
 
   UNION ALL
 
@@ -453,12 +453,11 @@ jun_classified AS (
     COALESCE(mc.account_type, jo.account_type) AS account_type,
     jo.staff_owner AS period_staff_owner,
     CASE
-      WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                              ELSE po.prev_owner END, 'SALE') = 'SALE'
-        THEN 'SALE'
+        THEN mso.sale_staff_owner
       ELSE COALESCE(mc.mar_staff_owner, jo.staff_owner)
     END AS base_staff_owner,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
@@ -518,8 +517,9 @@ jun_classified AS (
   LEFT JOIN jun_gmv jg               ON jo.outlet_id = jg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
+  LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
-  WHERE jo.commercial_owner = 'KAM'
+  WHERE jUPPER(TRIM(o.commercial_owner)) = 'KAM'
 
   UNION ALL
 
@@ -624,3 +624,4 @@ ORDER BY
   lo.latest_staff_owner,
   r.movement_type,
   r.curr_gmv DESC
+
