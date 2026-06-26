@@ -236,6 +236,24 @@ mar_sale_owner AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
+-- ── 11b. PM/ADMIN staff ใน Mar ───────────────────────────────────────────────
+-- ใช้แสดง base_staff_owner ของ transfer_in จาก PM/ADMIN
+mar_pm_admin_staff AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    UPPER(TRIM(o.commercial_owner)) AS mar_portfolio,
+    TRIM(o.staff_owner)             AS mar_staff
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
+    AND UPPER(TRIM(o.commercial_owner)) IN ('PM','ADMIN')
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY o.user_id ORDER BY o.delivery_date DESC
+  ) = 1
+),
+
 -- ── 12. PM/ADMIN mar cohort ───────────────────────────────────────────────────
 pm_admin_mar_cohort AS (
   SELECT mo.outlet_id, mo.commercial_owner AS mar_portfolio
@@ -269,6 +287,8 @@ apr_classified AS (
     COALESCE(mc.account_type, ao.account_type) AS account_type,
     ao.staff_owner AS period_staff_owner,
     CASE
+      WHEN pamc.outlet_id IS NOT NULL
+        THEN mpas.mar_staff
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
@@ -292,6 +312,7 @@ apr_classified AS (
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
+    pamc.mar_portfolio AS mar_portfolio,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -336,6 +357,7 @@ apr_classified AS (
   LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_pm_admin_staff mpas  ON ao.outlet_id = mpas.outlet_id
   WHERE UPPER(TRIM(ao.commercial_owner)) = 'KAM'
 
   UNION ALL
@@ -348,6 +370,7 @@ apr_classified AS (
     mc.base_gmv, 0.0,
     mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE) AS new_user_exp_date,
     CAST(NULL AS STRING) AS first_dollar_owner, '2026-03' AS cohort_month, CAST(NULL AS STRING) AS transfer_scope,
+    CAST(NULL AS STRING) AS mar_portfolio,
     'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM apr_own)
@@ -363,6 +386,8 @@ may_classified AS (
     COALESCE(mc.account_type, mo.account_type) AS account_type,
     mo.staff_owner AS period_staff_owner,
     CASE
+      WHEN pamc.outlet_id IS NOT NULL
+        THEN mpas.mar_staff
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
@@ -384,6 +409,7 @@ may_classified AS (
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
+    pamc.mar_portfolio AS mar_portfolio,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -428,6 +454,7 @@ may_classified AS (
   LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_pm_admin_staff mpas  ON mo.outlet_id = mpas.outlet_id
   WHERE UPPER(TRIM(mo.commercial_owner)) = 'KAM'
 
   UNION ALL
@@ -436,7 +463,7 @@ may_classified AS (
     '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
     mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
-    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), 'core_nrr'
+    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM may_own)
 ),
@@ -451,6 +478,8 @@ jun_classified AS (
     COALESCE(mc.account_type, jo.account_type) AS account_type,
     jo.staff_owner AS period_staff_owner,
     CASE
+      WHEN pamc.outlet_id IS NOT NULL
+        THEN mpas.mar_staff
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN ('2026-03','2026-04','2026-05','2026-06')
            AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
@@ -472,6 +501,7 @@ jun_classified AS (
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
+    pamc.mar_portfolio AS mar_portfolio,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -516,6 +546,7 @@ jun_classified AS (
   LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_pm_admin_staff mpas  ON jo.outlet_id = mpas.outlet_id
   WHERE UPPER(TRIM(jo.commercial_owner)) = 'KAM'
 
   UNION ALL
@@ -524,7 +555,7 @@ jun_classified AS (
     '2026-06', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
     mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
-    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), 'core_nrr'
+    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jun_own)
 ),
@@ -552,6 +583,7 @@ transfer_out_rows AS (
     CAST(NULL AS STRING)            AS first_dollar_owner,
     '2026-03'                       AS cohort_month,
     CAST(NULL AS STRING)            AS transfer_scope,
+    CAST(NULL AS STRING)            AS mar_portfolio,
     'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
@@ -576,7 +608,7 @@ SELECT
   r.transfer_scope,
   lo.latest_commercial_owner        AS current_portfolio,
   r.period_staff_owner               AS current_staff_owner,
-  'KAM'                              AS base_portfolio,
+  COALESCE(r.mar_portfolio, 'KAM')  AS base_portfolio,
   r.base_staff_owner,
   r.outlet_id,
   r.account_id,
