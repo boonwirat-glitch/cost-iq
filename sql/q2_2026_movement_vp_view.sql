@@ -205,7 +205,7 @@ mar_cohort AS (
   WHERE (
     mo.commercial_owner IN ('KAM','PM','ADMIN')
     OR (
-      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
+      UPPER(TRIM(mo.commercial_owner)) = 'SALE'
       AND ofd.first_portfolio_date IS NOT NULL
       AND ofd.first_portfolio_date < '2026-04-01'
     )
