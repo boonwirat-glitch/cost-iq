@@ -205,7 +205,7 @@ mar_cohort AS (
   WHERE (
     mo.commercial_owner IN ('KAM','PM','ADMIN')
     OR (
-      mo.commercial_owner = 'SALE'
+      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
       AND ofd.first_portfolio_date IS NOT NULL
       AND ofd.first_portfolio_date < '2026-04-01'
     )
@@ -583,3 +583,4 @@ SELECT
 FROM all_rows r
 CROSS JOIN params p
 ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
+
