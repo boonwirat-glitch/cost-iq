@@ -375,7 +375,8 @@ apr_rows AS (
   FROM mar_cohort mc
   LEFT JOIN apr_own ao ON mc.outlet_id = ao.outlet_id
   -- เอาเฉพาะ outlet ที่ base_staff_owner ไม่ได้ถือใน Apr อีกแล้ว
-  WHERE NOT (ao.commercial_owner = 'KAM' AND ao.staff_owner = mc.base_staff_owner)
+  WHERE ao.outlet_id IS NULL  -- ไม่มี order ใน period → silent = core_nrr curr=0
+     OR NOT (ao.commercial_owner = 'KAM' AND ao.staff_owner = mc.base_staff_owner)
 ),
 
 -- ── 14. May ──────────────────────────────────────────────────────────────────
@@ -471,7 +472,8 @@ may_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN may_own mo ON mc.outlet_id = mo.outlet_id
-  WHERE NOT (mo.commercial_owner = 'KAM' AND mo.staff_owner = mc.base_staff_owner)
+  WHERE mo.outlet_id IS NULL
+     OR NOT (mo.commercial_owner = 'KAM' AND mo.staff_owner = mc.base_staff_owner)
 ),
 
 -- ── 15. Jun ──────────────────────────────────────────────────────────────────
@@ -567,7 +569,8 @@ jun_rows AS (
     END
   FROM mar_cohort mc
   LEFT JOIN jun_own jo ON mc.outlet_id = jo.outlet_id
-  WHERE NOT (jo.commercial_owner = 'KAM' AND jo.staff_owner = mc.base_staff_owner)
+  WHERE jo.outlet_id IS NULL
+     OR NOT (jo.commercial_owner = 'KAM' AND jo.staff_owner = mc.base_staff_owner)
 ),
 
 -- ── 16. Union ────────────────────────────────────────────────────────────────
