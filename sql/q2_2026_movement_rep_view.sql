@@ -541,17 +541,20 @@ transfer_out_rows AS (
   SELECT
     period_month,
     mc.outlet_id,
-    mc.account_id, mc.account_name, mc.res_name, mc.account_type,
+    mc.account_id,
+    mc.account_name,
+    mc.res_name,
+    mc.account_type,
     mc.mar_staff_owner              AS period_staff_owner,
     mc.mar_staff_owner              AS base_staff_owner,
     mc.base_gmv,
     0.0                             AS curr_gmv,
     mc.first_dollar_date,
     mc.first_kam_date,
-    NULL                            AS new_user_exp_date,
-    NULL                            AS first_dollar_owner,
+    CAST(NULL AS DATE)              AS new_user_exp_date,
+    CAST(NULL AS STRING)            AS first_dollar_owner,
     '2026-03'                       AS cohort_month,
-    NULL                            AS transfer_scope,
+    CAST(NULL AS STRING)            AS transfer_scope,
     'core_nrr_transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
