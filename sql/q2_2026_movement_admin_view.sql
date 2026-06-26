@@ -109,7 +109,7 @@ apr_gmv AS (
   WHERE o.delivery_date BETWEEN p.apr_start AND p.apr_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND o.commercial_owner = 'ADMIN'
+    AND UPPER(TRIM(o.commercial_owner)) = 'ADMIN'
   GROUP BY 1
 ),
 may_gmv AS (
@@ -118,7 +118,7 @@ may_gmv AS (
   WHERE o.delivery_date BETWEEN p.may_start AND p.may_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND o.commercial_owner = 'ADMIN'
+    AND UPPER(TRIM(o.commercial_owner)) = 'ADMIN'
   GROUP BY 1
 ),
 jun_gmv AS (
@@ -127,7 +127,7 @@ jun_gmv AS (
   WHERE o.delivery_date BETWEEN p.jun_start AND p.jun_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND o.commercial_owner = 'ADMIN'
+    AND UPPER(TRIM(o.commercial_owner)) = 'ADMIN'
   GROUP BY 1
 ),
 
@@ -183,7 +183,7 @@ mar_handover_outlets AS (
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
-      WHEN mo.commercial_owner = 'ADMIN' THEN mo.commercial_owner
+      WHEN mUPPER(TRIM(o.commercial_owner)) = 'ADMIN' THEN mo.commercial_owner
       ELSE 'ADMIN'
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
@@ -201,9 +201,9 @@ mar_cohort AS (
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE (
-    mo.commercial_owner = 'ADMIN'
+    mUPPER(TRIM(o.commercial_owner)) = 'ADMIN'
     OR (
-      mo.commercial_owner = 'SALE'
+      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
       AND ofd.first_admin_date IS NOT NULL
       AND ofd.first_admin_date < '2026-04-01'
     )
@@ -229,7 +229,7 @@ kam_pm_mar_cohort AS (
   WHERE (
     mo.commercial_owner IN ('KAM','PM')
     OR (
-      mo.commercial_owner = 'SALE'
+      mUPPER(TRIM(o.commercial_owner)) = 'SALE'
       AND ofd.first_admin_date IS NOT NULL
       AND ofd.first_admin_date < '2026-04-01'
       AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('KAM','PM')
@@ -347,7 +347,7 @@ apr_rows AS (
   LEFT JOIN mar_sale_owner mso        ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
   LEFT JOIN kam_pm_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
-  WHERE ao.commercial_owner = 'ADMIN'
+  WHERE aUPPER(TRIM(o.commercial_owner)) = 'ADMIN'
 
   UNION ALL
 
@@ -472,7 +472,7 @@ may_rows AS (
   LEFT JOIN mar_sale_owner mso        ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
   LEFT JOIN kam_pm_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
-  WHERE mo.commercial_owner = 'ADMIN'
+  WHERE mUPPER(TRIM(o.commercial_owner)) = 'ADMIN'
 
   UNION ALL
 
@@ -597,7 +597,7 @@ jun_rows AS (
   LEFT JOIN mar_sale_owner mso        ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
   LEFT JOIN kam_pm_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
-  WHERE jo.commercial_owner = 'ADMIN'
+  WHERE jUPPER(TRIM(o.commercial_owner)) = 'ADMIN'
 
   UNION ALL
 
@@ -660,3 +660,4 @@ SELECT
 FROM all_rows r
 CROSS JOIN params p
 ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
+
