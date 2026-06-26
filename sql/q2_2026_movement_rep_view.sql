@@ -335,7 +335,6 @@ apr_classified AS (
   LEFT JOIN apr_gmv ag               ON ao.outlet_id = ag.outlet_id
   LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
-  LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
   WHERE UPPER(TRIM(ao.commercial_owner)) = 'KAM'
 
@@ -428,7 +427,6 @@ may_classified AS (
   LEFT JOIN may_gmv mg               ON mo.outlet_id = mg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
-  LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
   WHERE UPPER(TRIM(mo.commercial_owner)) = 'KAM'
 
@@ -517,7 +515,6 @@ jun_classified AS (
   LEFT JOIN jun_gmv jg               ON jo.outlet_id = jg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
-  LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN pm_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
   WHERE UPPER(TRIM(jo.commercial_owner)) = 'KAM'
 
