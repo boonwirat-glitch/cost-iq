@@ -322,10 +322,10 @@ apr_classified AS (
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND oed.new_user_exp_date IS NULL                                    THEN 'new_sales'
-      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'core_nrr_transfer_in'
+      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
        AND bg.gmv IS NULL                                                   THEN 'comeback'
-      ELSE 'core_nrr_transfer_in'
+      ELSE 'transfer_in'
     END AS movement_type
   FROM apr_own ao
   LEFT JOIN mar_cohort mc            ON ao.outlet_id = mc.outlet_id
@@ -414,10 +414,10 @@ may_classified AS (
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND oed.new_user_exp_date IS NULL                                    THEN 'new_sales'
-      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'core_nrr_transfer_in'
+      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
        AND bg.gmv IS NULL                                                   THEN 'comeback'
-      ELSE 'core_nrr_transfer_in'
+      ELSE 'transfer_in'
     END AS movement_type
   FROM may_own mo
   LEFT JOIN mar_cohort mc            ON mo.outlet_id = mc.outlet_id
@@ -502,10 +502,10 @@ jun_classified AS (
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND oed.new_user_exp_date IS NULL                                    THEN 'new_sales'
-      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'core_nrr_transfer_in'
+      WHEN pamc.outlet_id IS NOT NULL                                       THEN 'transfer_in'
       WHEN ofd.first_dollar_date < '2026-04-01'
        AND bg.gmv IS NULL                                                   THEN 'comeback'
-      ELSE 'core_nrr_transfer_in'
+      ELSE 'transfer_in'
     END AS movement_type
   FROM jun_own jo
   LEFT JOIN mar_cohort mc            ON jo.outlet_id = mc.outlet_id
@@ -532,7 +532,7 @@ jun_classified AS (
 
 -- ── transfer_out_rows ─────────────────────────────────────────────────────────
 -- outlet ที่ Mar staff = KAM X แต่ latest_staff ≠ KAM X
--- ขึ้นใน output ของ KAM เดิม (Mar staff) เป็น core_nrr_transfer_out
+-- ขึ้นใน output ของ KAM เดิม (Mar staff) เป็น transfer_out
 -- curr_gmv = 0, base_gmv = Mar GMV → adjust denominator ของ KAM เดิม
 transfer_out_rows AS (
   SELECT
@@ -552,7 +552,7 @@ transfer_out_rows AS (
     CAST(NULL AS STRING)            AS first_dollar_owner,
     '2026-03'                       AS cohort_month,
     CAST(NULL AS STRING)            AS transfer_scope,
-    'core_nrr_transfer_out'         AS movement_type
+    'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
   CROSS JOIN UNNEST(['2026-04','2026-05','2026-06']) AS period_month
@@ -614,7 +614,7 @@ LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
 -- filter เฉพาะ outlet ที่ latest owner เป็น KAM
 -- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
 WHERE lo.latest_commercial_owner = 'KAM'
-   OR r.movement_type = 'core_nrr_transfer_out'
+   OR r.movement_type = 'transfer_out'
 
 ORDER BY
   r.period_month,
