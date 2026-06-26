@@ -282,6 +282,17 @@ apr_classified AS (
     ofd.first_dollar_date,
     ofd.first_kam_date,
     oed.new_user_exp_date,
+    ofd.first_dollar_owner,
+    CASE
+      WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN ('2026-03','2026-04','2026-05','2026-06')
+           THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      WHEN ofd.first_kam_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      ELSE NULL
+    END AS cohort_month,
+    CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -337,6 +348,7 @@ apr_classified AS (
     mc.mar_staff_owner AS base_staff_owner,
     mc.base_gmv, 0.0,
     mc.first_dollar_date, mc.first_kam_date, NULL AS new_user_exp_date,
+    NULL AS first_dollar_owner, '2026-03' AS cohort_month, NULL AS transfer_scope,
     'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM apr_own)
@@ -363,6 +375,17 @@ may_classified AS (
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(mg.gmv, 0)              AS curr_gmv,
     ofd.first_dollar_date, ofd.first_kam_date, oed.new_user_exp_date,
+    ofd.first_dollar_owner,
+    CASE
+      WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN ('2026-03','2026-04','2026-05','2026-06')
+           THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      WHEN ofd.first_kam_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      ELSE NULL
+    END AS cohort_month,
+    CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -414,7 +437,8 @@ may_classified AS (
   SELECT
     '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL, 'core_nrr'
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL,
+    NULL, '2026-03', NULL, 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM may_own)
 ),
@@ -440,6 +464,17 @@ jun_classified AS (
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(jg.gmv, 0)              AS curr_gmv,
     ofd.first_dollar_date, ofd.first_kam_date, oed.new_user_exp_date,
+    ofd.first_dollar_owner,
+    CASE
+      WHEN mc.outlet_id IS NOT NULL THEN '2026-03'
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN ('2026-03','2026-04','2026-05','2026-06')
+           THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+      WHEN ofd.first_kam_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      ELSE NULL
+    END AS cohort_month,
+    CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= '2026-04-01'
@@ -491,7 +526,8 @@ jun_classified AS (
   SELECT
     '2026-06', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL, 'core_nrr'
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL,
+    NULL, '2026-03', NULL, 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jun_own)
 ),
@@ -508,37 +544,38 @@ all_classified AS (
 SELECT
   r.period_month,
   r.movement_type,
-  -- KAM ที่ถือ outlet ล่าสุด (grain หลัก)
-  lo.latest_staff_owner,
-  lo.latest_commercial_owner,
-  -- KAM ที่ถือ outlet ใน Mar (base)
+  r.transfer_scope,
+  lo.latest_commercial_owner        AS current_portfolio,
+  r.period_staff_owner               AS current_staff_owner,
+  'KAM'                              AS base_portfolio,
   r.base_staff_owner,
-  -- KAM ที่ถือ outlet ใน period นั้น
-  r.period_staff_owner,
   r.outlet_id,
   r.account_id,
   r.account_name,
   r.res_name,
   r.account_type,
-  ROUND(r.base_gmv, 0)  AS base_gmv,
-  ROUND(r.curr_gmv, 0)  AS curr_gmv,
+  r.cohort_month,
+  ROUND(r.curr_gmv, 0)              AS curr_gmv,
+  ROUND(r.base_gmv, 0)              AS base_gmv,
   p.base_days,
   CASE r.period_month
     WHEN '2026-04' THEN p.apr_days
     WHEN '2026-05' THEN p.may_days
     WHEN '2026-06' THEN p.jun_days
-  END                   AS curr_days,
+  END                               AS curr_days,
   r.first_dollar_date,
-  r.first_kam_date      AS first_portfolio_date,
+  r.first_kam_date                  AS first_portfolio_date,
+  r.first_dollar_owner,
   r.new_user_exp_date,
-  -- Email/TL ของ latest_staff_owner
-  em_latest.kam_email   AS latest_kam_email,
-  em_latest.tl_email    AS latest_tl_email,
-  em_latest.tl_name     AS latest_tl,
-  -- Email/TL ของ base (Mar)
-  em_base.kam_email     AS base_kam_email,
-  em_base.tl_email      AS base_tl_email,
-  em_base.tl_name       AS base_tl
+  -- rep-specific columns ต่อท้าย
+  em_latest.tl_name                 AS latest_tl,
+  em_base.tl_name                   AS base_tl,
+  lo.latest_staff_owner,
+  lo.latest_commercial_owner,
+  em_latest.kam_email               AS latest_kam_email,
+  em_latest.tl_email                AS latest_tl_email,
+  em_base.kam_email                 AS base_kam_email,
+  em_base.tl_email                  AS base_tl_email
 
 FROM all_classified r
 CROSS JOIN params p
