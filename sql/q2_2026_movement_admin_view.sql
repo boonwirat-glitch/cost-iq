@@ -167,14 +167,16 @@ mar_handover_outlets AS (
   FROM outlet_first_dollar ofd
   JOIN outlet_exp_date oed  ON ofd.outlet_id = oed.outlet_id
   JOIN outlet_prev_owner po ON ofd.outlet_id = po.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
+  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+        IN ('2026-03','2026-04','2026-05','2026-06')
     AND po.prev_owner = 'SALE'
   UNION DISTINCT
   SELECT DISTINCT ofd.outlet_id
   FROM outlet_first_dollar ofd
   JOIN outlet_exp_date oed ON ofd.outlet_id = oed.outlet_id
   LEFT JOIN outlet_prev_owner po ON ofd.outlet_id = po.outlet_id
-  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date) = '2026-03'
+  WHERE FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+        IN ('2026-03','2026-04','2026-05','2026-06')
     AND po.outlet_id IS NULL
 ),
 
