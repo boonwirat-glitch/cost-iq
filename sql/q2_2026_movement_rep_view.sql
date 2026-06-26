@@ -557,7 +557,7 @@ transfer_out_rows AS (
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
   CROSS JOIN UNNEST(['2026-04','2026-05','2026-06']) AS period_month
   -- เฉพาะ outlet ที่ latest_staff ≠ Mar staff
-  WHERE lo.latest_staff_owner != mc.mar_staff_owner
+  WHERE lo.latest_commercial_owner != 'KAM'
 ),
 
 all_classified AS (
