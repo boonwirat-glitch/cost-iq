@@ -347,8 +347,8 @@ apr_classified AS (
     mc.mar_staff_owner AS period_staff_owner,
     mc.mar_staff_owner AS base_staff_owner,
     mc.base_gmv, 0.0,
-    mc.first_dollar_date, mc.first_kam_date, NULL AS new_user_exp_date,
-    NULL AS first_dollar_owner, '2026-03' AS cohort_month, NULL AS transfer_scope,
+    mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE) AS new_user_exp_date,
+    CAST(NULL AS STRING) AS first_dollar_owner, '2026-03' AS cohort_month, CAST(NULL AS STRING) AS transfer_scope,
     'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM apr_own)
@@ -437,8 +437,8 @@ may_classified AS (
   SELECT
     '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL,
-    NULL, '2026-03', NULL, 'core_nrr'
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
+    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM may_own)
 ),
@@ -526,8 +526,8 @@ jun_classified AS (
   SELECT
     '2026-06', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, NULL,
-    NULL, '2026-03', NULL, 'core_nrr'
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
+    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jun_own)
 ),
