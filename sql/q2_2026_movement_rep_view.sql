@@ -65,7 +65,13 @@ outlet_first_dollar AS (
              THEN DATE(o.delivery_date) END) AS first_kam_date,
     ARRAY_AGG(
       UPPER(TRIM(o.commercial_owner))
-      ORDER BY o.delivery_date ASC LIMIT 1
+        lo.latest_staff_owner,
+  lo.latest_commercial_owner,
+  em_latest.kam_email  AS latest_kam_email,
+  em_latest.tl_email   AS latest_tl_email,
+  em_latest.tl_name    AS latest_tl,
+
+ORDER BY o.delivery_date ASC LIMIT 1
     )[SAFE_OFFSET(0)] AS first_dollar_owner
   FROM `freshket-rn.dwh.order` o
   WHERE o.user_id IS NOT NULL
@@ -252,6 +258,22 @@ mar_sale_owner AS (
     AND UPPER(TRIM(o.commercial_owner)) = 'SALE'
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
     AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY o.user_id ORDER BY o.delivery_date DESC
+  ) = 1
+),
+
+
+-- ── 11b. Latest staff owner (ณ วันที่ดึงข้อมูล) ──────────────────────────────
+-- ใช้ filter ว่าตอนนี้ outlet อยู่กับใคร — ไม่ใช่รายเดือน
+latest_own AS (
+  SELECT
+    CAST(o.user_id AS STRING)       AS outlet_id,
+    TRIM(o.staff_owner)             AS latest_staff_owner,
+    UPPER(TRIM(o.commercial_owner)) AS latest_commercial_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.user_id IS NOT NULL
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY o.user_id ORDER BY o.delivery_date DESC
   ) = 1
@@ -618,6 +640,8 @@ FROM all_rows r
 CROSS JOIN params p
 LEFT JOIN staff_email_map em_base ON r.base_staff_owner    = em_base.kam_name
 LEFT JOIN staff_email_map em_curr ON r.current_staff_owner = em_curr.kam_name
+LEFT JOIN latest_own lo                   ON r.outlet_id            = lo.outlet_id
+LEFT JOIN staff_email_map em_latest       ON lo.latest_staff_owner  = em_latest.kam_name
 
 ORDER BY
   r.period_month,
