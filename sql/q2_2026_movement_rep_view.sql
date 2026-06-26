@@ -614,6 +614,7 @@ LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
 -- filter เฉพาะ outlet ที่ latest owner เป็น KAM
 -- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
 WHERE lo.latest_commercial_owner = 'KAM'
+   OR r.movement_type = 'core_nrr_transfer_out'
 
 ORDER BY
   r.period_month,
