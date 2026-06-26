@@ -65,13 +65,7 @@ outlet_first_dollar AS (
              THEN DATE(o.delivery_date) END) AS first_kam_date,
     ARRAY_AGG(
       UPPER(TRIM(o.commercial_owner))
-        lo.latest_staff_owner,
-  lo.latest_commercial_owner,
-  em_latest.kam_email  AS latest_kam_email,
-  em_latest.tl_email   AS latest_tl_email,
-  em_latest.tl_name    AS latest_tl,
-
-ORDER BY o.delivery_date ASC LIMIT 1
+      ORDER BY o.delivery_date ASC LIMIT 1
     )[SAFE_OFFSET(0)] AS first_dollar_owner
   FROM `freshket-rn.dwh.order` o
   WHERE o.user_id IS NOT NULL
@@ -634,7 +628,12 @@ SELECT
   em_base.kam_email    AS base_kam_email,
   em_base.tl_email     AS base_tl_email,
   em_curr.kam_email    AS current_kam_email,
-  em_curr.tl_email     AS current_tl_email
+  em_curr.tl_email     AS current_tl_email,
+  lo.latest_staff_owner,
+  lo.latest_commercial_owner,
+  em_latest.kam_email  AS latest_kam_email,
+  em_latest.tl_email   AS latest_tl_email,
+  em_latest.tl_name    AS latest_tl
 
 FROM all_rows r
 CROSS JOIN params p
