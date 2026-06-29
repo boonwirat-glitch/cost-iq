@@ -40,7 +40,7 @@ params AS (
     DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY) AS jun_end,
     DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY),
               DATE('2026-06-01'), DAY) + 1 AS jun_days
-),,
+),
 
 -- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
 -- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
@@ -49,7 +49,7 @@ user_account_type AS (
     CAST(res_id AS STRING) AS outlet_id,
     account_type
   FROM `freshket-rn.dim.user_master`
-)
+),
 
 -- first_dollar_date  = first order global (ทุก owner)
 -- first_pm_date     = first order ที่ commercial_owner = 'PM'
