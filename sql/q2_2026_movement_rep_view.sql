@@ -45,6 +45,15 @@ staff_email_map AS (
 
 -- ── 2. Date anchors ──────────────────────────────────────────────────────────
 params AS (
+
+-- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
+-- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
+user_account_type AS (
+  SELECT
+    CAST(res_id AS STRING) AS outlet_id,
+    account_type
+  FROM `freshket-rn.dim.user_master`
+),
   SELECT
     DATE('2026-03-01') AS base_start, DATE('2026-03-31') AS base_end, 31 AS base_days,
     DATE('2026-04-01') AS apr_start,  DATE('2026-04-30') AS apr_end,  30 AS apr_days,
@@ -614,7 +623,7 @@ SELECT
   r.account_id,
   r.account_name,
   r.res_name,
-  r.account_type,
+  COALESCE(um.account_type, r.account_type) AS account_type,
   r.cohort_month,
   ROUND(r.curr_gmv, 0)              AS curr_gmv,
   ROUND(r.base_gmv, 0)              AS base_gmv,
@@ -645,6 +654,7 @@ LEFT JOIN staff_email_map em_latest ON lo.latest_staff_owner  = em_latest.kam_na
 LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
 LEFT JOIN outlet_first_dollar ofd2  ON r.outlet_id            = ofd2.outlet_id
 LEFT JOIN outlet_exp_date oed2      ON r.outlet_id            = oed2.outlet_id
+LEFT JOIN user_account_type um       ON r.outlet_id            = um.outlet_id
 -- filter เฉพาะ outlet ที่ latest owner เป็น KAM
 -- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
 WHERE lo.latest_commercial_owner = 'KAM'
