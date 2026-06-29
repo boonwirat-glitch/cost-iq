@@ -32,6 +32,15 @@
 
 WITH
 params AS (
+
+-- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
+-- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
+user_account_type AS (
+  SELECT
+    CAST(res_id AS STRING) AS outlet_id,
+    account_type
+  FROM `freshket-rn.dim.user_master`
+),
   SELECT
     DATE('2026-03-01') AS base_start, DATE('2026-03-31') AS base_end, 31 AS base_days,
     DATE('2026-04-01') AS apr_start,  DATE('2026-04-30') AS apr_end,  30 AS apr_days,
@@ -645,7 +654,7 @@ SELECT
   r.period_month, r.movement_type, r.transfer_scope,
   r.current_portfolio, r.current_staff_owner,
   r.base_portfolio, r.base_staff_owner,
-  r.outlet_id, r.account_id, r.account_name, r.res_name, r.account_type,
+  r.outlet_id, r.account_id, r.account_name, r.res_name, COALESCE(um.account_type, r.account_type) AS account_type,
   r.cohort_month,
   ROUND(r.curr_gmv, 0) AS curr_gmv,
   ROUND(r.base_gmv, 0) AS base_gmv,
@@ -661,5 +670,6 @@ SELECT
   r.new_user_exp_date
 FROM all_rows r
 CROSS JOIN params p
+LEFT JOIN user_account_type um ON r.outlet_id = um.outlet_id
 ORDER BY r.period_month, r.current_portfolio, r.movement_type, r.curr_gmv DESC
 
