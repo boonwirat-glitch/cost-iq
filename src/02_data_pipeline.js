@@ -1768,7 +1768,7 @@ window._fetchUpsellBundle=_fetchUpsellBundle;
 // v753g: Fetch Quarter NRR — SINGLE FILE for all KAMs (~2.6MB)
 // File: sense_qnrr_2026q2.csv (no per-KAM split)
 // Quarter key: update each Q. IDB cache tab='qnrr' TTL=6h
-const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q2';
+const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q3';
 let _qnrrFetchPromise = null; // global dedup — only one fetch ever
 async function _fetchQnrrBundle(){
   // Already loaded in memory
