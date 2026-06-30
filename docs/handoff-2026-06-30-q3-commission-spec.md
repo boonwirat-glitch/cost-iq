@@ -357,7 +357,62 @@ ALTER TABLE nrr_policies
 
 ---
 
-## 8. Build Order (session ถัดไป)
+
+## 8. Safe Build Strategy — Preview Branch
+
+### ปัญหา: การ push ตรงบน main ทำให้ users เห็น broken state ระหว่าง build
+
+เช่น push JS เสร็จแล้วแต่ยังไม่มี `sense_qnrr_2026q3.csv` ใน R2 → QNRR sheet ขึ้น error ทันที
+
+### วิธีที่ถูกต้อง: Preview Branch + Cloudflare Pages
+
+Cloudflare Pages auto-deploy ทุก branch แยกกัน — production URL ไม่กระทบ
+
+```
+main branch           → freshket-sense.pages.dev          (production — users ใช้)
+preview/q3-build      → abc123.freshket-sense.pages.dev   (preview — ทดสอบคนเดียว)
+```
+
+**ขั้นตอน:**
+```
+1. สร้าง branch: preview/q3-commission-build จาก main
+2. build และ push ทุก step ลง branch นั้น (ไม่แตะ main)
+3. Cloudflare Pages auto-deploy → ได้ preview URL
+4. ทดสอบตาม Test Spec บน preview URL ด้วย real Supabase + R2 data
+5. ผ่านครบ → merge preview/q3-commission-build → main
+6. Production deploy อัตโนมัติ
+```
+
+**ข้อดีของ preview branch:**
+- Auth, R2 CSV, Supabase ทำงานครบเหมือน production (ใช้ resource เดียวกัน)
+- Users บน main ไม่เห็นอะไรตลอดกระบวนการ
+- ถ้า build พังสามารถ abandon branch ได้เลยโดยไม่กระทบอะไร
+
+### ลำดับ R2 Upload — สำคัญมาก
+
+ต้องอัปโหลด `sense_qnrr_2026q3.csv` ขึ้น R2 **ก่อน** push index.html เสมอ
+เพราะ R2 และ JS deploy เป็น independent steps — ถ้า JS ขึ้นก่อน CSV พร้อม จะ error ช่วงสั้นๆ
+
+```
+✅ ลำดับที่ถูก:
+   BigQuery export → upload R2 → push JS + index.html → merge main
+
+❌ ลำดับที่ผิด:
+   push JS + index.html → upload R2  (users เห็น error ระหว่างนั้น)
+```
+
+### ทดสอบ Local (optional)
+
+ถ้าต้องการดู UI เบื้องต้นก่อน push:
+```bash
+python3 build.py v850          # สร้าง dist/sense_v850.html
+open dist/sense_v850.html      # เปิดใน browser
+```
+ข้อจำกัด: Supabase auth และ R2 data ไม่ทำงานใน local — ใช้ดูแค่ layout/UI เท่านั้น ตัวเลขจริงต้องทดสอบผ่าน preview URL
+
+---
+
+## 9. Build Order (session ถัดไป)
 
 ```
 Step 1: Supabase migration (ALTER TABLE nrr_policies)
@@ -375,7 +430,7 @@ Step 11: ทดสอบตาม Test Spec
 
 ---
 
-## 9. Test Spec
+## 10. Test Spec
 
 | ID | สิ่งที่ทดสอบ | Input | Expected |
 |---|---|---|---|
@@ -396,7 +451,7 @@ Step 11: ทดสอบตาม Test Spec
 
 ---
 
-## 10. Known Constraints & Decisions
+## 11. Known Constraints & Decisions
 
 | ประเด็น | Decision |
 |---|---|
