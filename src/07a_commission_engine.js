@@ -546,16 +546,30 @@ function _commComputeTeamUpsellMult(tlEmail) {
 // Returns complete breakdown for one KAM
 function _commBuildKamPayout(kamEmail) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(kamEmail, null);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, kamEmail, null);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
+    const period  = _nrrExclusionCurrentPeriod();
+    const policy  = _nrrGovResolveForVisibleScope();
+    const isQ     = policy && policy.commission_mode === 'quarterly';
+    const baseMo  = isQ ? (policy.base_month || null) : null;
+
+    // ── NRR source ────────────────────────────────────────────────
+    // [quarterly] read from bulkQnrrData via _qnrrComputeForCommission (same source as QNRR sheet)
+    // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR (unchanged)
+    let raw, rawPct, governedPct, pct;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(kamEmail, 'kam');
+    } else {
+      raw = _tgtComputeKamNRR(kamEmail, null);
+    }
+    rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    governedPct = _nrrGovernedPct(raw, kamEmail, null);
+    pct         = governedPct !== null ? governedPct : rawPct;
+
+    const planCode  = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
     const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
 
-    // Upsell: try full bundle first, fall back to pre-computed team summary
-    // Team summary (bulkUpsellTeamData) is loaded as FOREGROUND — always available
+    // ── Upsell ────────────────────────────────────────────────────
+    // [quarterly] Expansion GMV comes from qnrrResult (bulkQnrrData), Upsell SKU uses pin window
+    // [monthly]   existing logic unchanged
     let upsellSku, upsellOutlet;
     const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
     // Q3C Team SQL keys by ka_owner (display name), not email — try both
@@ -586,12 +600,13 @@ function _commBuildKamPayout(kamEmail) {
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
       upsellOutlet = _commComputeUpsellOutlet(kamEmail);
-      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds);
+      // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
     }
-    const handover      = _commComputeHandoverRetention(kamEmail);
-    const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
+    const handover = _commComputeHandoverRetention(kamEmail); // MoM always — do not touch
+    const gate     = _commComputeGmvGate(kamEmail, pct);
 
-    const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
+    const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
 
     return {
@@ -604,7 +619,11 @@ function _commBuildKamPayout(kamEmail) {
       gate,
       subtotal,
       gate_cap: gate.cap_multiplier,
-      upsell_loading: upsellLoading, // v228-fix: true when upsell CSV not loaded in session
+      upsell_loading: upsellLoading,
+      commission_mode: isQ ? 'quarterly' : 'monthly',
+      base_month:      baseMo,
+      quarter_id:      isQ ? (policy.quarter_id || null) : null,
+      nrr_base_gmv:    isQ && raw ? Math.round(raw.baselinePrevGmv || 0) : null,
       final_payout: finalPayout
     };
   } catch(e) {
@@ -619,12 +638,21 @@ function _commBuildKamPayout(kamEmail) {
 function _commBuildTlPayout(tlEmail) {
   try {
     const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(null, tlEmail);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const policy = _nrrGovResolveForVisibleScope();
+    const isQ    = policy && policy.commission_mode === 'quarterly';
+
+    // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR
+    let raw;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(tlEmail, 'tl');
+    } else {
+      raw = _tgtComputeKamNRR(null, tlEmail);
+    }
+    const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
-    const nrrPayout = _commPayoutForPctByCode(planCode, 'tl', pct);
+    const pct         = governedPct !== null ? governedPct : rawPct;
+    const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
+    const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
     const upsellMult = _commComputeTeamUpsellMult(tlEmail);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
@@ -709,7 +737,7 @@ async function loadTargets(quarter) {
 
   try {
     const { data: policies, error: polErr } = await supa.from('nrr_policies')
-      .select('period_month,scope_type,scope_key,base_mode,base_month,status,updated_by,updated_at')
+      .select('period_month,scope_type,scope_key,base_mode,base_month,commission_mode,quarter_id,status,updated_by,updated_at')
       .in('period_month', months);
     if (polErr) throw new Error(polErr.message);
     (policies || []).forEach(p => {
@@ -1777,14 +1805,16 @@ async function saveCommissionPoliciesFromCockpit() {
   if (!rows.length) return;
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const payload = rows.map(p => ({
-    period_month: p.period_month,
-    scope_type: p.scope_type || 'all',
-    scope_key: p.scope_key || 'all',
-    base_mode: p.base_mode || 'rolling_mom',
-    base_month: p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
-    status: p.status || 'draft',
-    updated_by: actor,
-    updated_at: new Date().toISOString()
+    period_month:    p.period_month,
+    scope_type:      p.scope_type || 'all',
+    scope_key:       p.scope_key || 'all',
+    base_mode:       p.base_mode || 'rolling_mom',
+    base_month:      p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
+    commission_mode: p.commission_mode || 'monthly',   // 'monthly' | 'quarterly'
+    quarter_id:      p.commission_mode === 'quarterly' ? (p.quarter_id || null) : null,
+    status:          p.status || 'draft',
+    updated_by:      actor,
+    updated_at:      new Date().toISOString()
   }));
   const { error } = await supa.from('nrr_policies').upsert(payload, { onConflict:'period_month,scope_type,scope_key' });
   if (error) throw new Error(error.message);
