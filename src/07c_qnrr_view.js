@@ -234,6 +234,83 @@ function _qnrrCompute(kamEmail, scope) {
   };
 }
 window._qnrrCompute = _qnrrCompute;
+// ── _qnrrComputeForCommission (Q3 quarterly mode) ───────────────────────────────
+// Wraps _qnrrCompute() and reshapes output for _commBuildKamPayout / _commBuildTlPayout.
+// Source of truth: bulkQnrrData (sense_qnrr_2026q3.csv) — same as QNRR sheet.
+// Guarantees NRR% in commission = NRR% in QNRR sheet (T3).
+//
+// scope: 'kam' | 'tl' | 'admin'
+// currentPeriod: '2026-07' | '2026-08' | '2026-09' (lag-1 YYYY-MM)
+function _qnrrComputeForCommission(kamEmail, scope) {
+  try {
+    // Determine current billing period from lag-1 date (Day-1 lag, same as MoM engine)
+    var now    = new Date();
+    var lag1   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    var lagYM  = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
+
+    // Clamp to Q3 months — if lagged date is outside Q3, use last available Q3 month
+    var validQ = QNRR_CFG.q_months;  // ['2026-07','2026-08','2026-09']
+    var currentPeriod = validQ.includes(lagYM) ? lagYM : validQ[validQ.length - 1];
+
+    // Delegate to existing _qnrrCompute — no logic duplication
+    var result = _qnrrCompute(kamEmail, scope || 'kam');
+    if (!result || !result.by_month) {
+      console.warn('[QnrrComm] _qnrrCompute returned null for', kamEmail, scope);
+      return null;
+    }
+
+    var monthData = result.by_month[currentPeriod];
+    if (!monthData) {
+      // Period data not yet available (e.g. Sep not started) — use latest available
+      var availableMonths = validQ.filter(function(m) { return !!result.by_month[m]; });
+      if (!availableMonths.length) {
+        console.warn('[QnrrComm] no period data for', kamEmail, currentPeriod);
+        return null;
+      }
+      currentPeriod = availableMonths[availableMonths.length - 1];
+      monthData = result.by_month[currentPeriod];
+    }
+
+    var segs    = monthData.segments || {};
+    var outlets = monthData.outlets  || {};
+
+    // base_norm × 30 = normalized base GMV (Jun @ 30 days — locked for Q3)
+    var baseGmv = Math.round((result.base_norm || 0) * 30);
+
+    // Thai month label for base_month (มิ.ย. 2569) — shown in history detail
+    var baseMo  = QNRR_CFG.base_month;  // '2026-06'
+    var baseParts = baseMo.split('-');
+    var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var baseMoLabel = _THAI_MONTHS[parseInt(baseParts[1], 10) - 1] + ' ' + (parseInt(baseParts[0], 10) + 543);
+
+    console.log('%c[QnrrComm] compute','color:#60a5fa',
+      {kamEmail, scope, currentPeriod, nrr_pct: monthData.nrr_pct, baseGmv,
+       core: segs.core_nrr, expansion: segs.expansion, comeback: segs.comeback});
+
+    return {
+      // NRR fields matching _tgtComputeKamNRR() output shape (used by _commBuildKamPayout)
+      nrr:              (monthData.nrr_pct || 0) / 100,
+      baselinePrevGmv:  baseGmv,
+      cohortGmv:        segs.core_nrr   || 0,
+      expansionGmv:     segs.expansion  || 0,
+      comebackGmv:      segs.comeback   || 0,
+      cohortCount:      outlets.core_nrr || 0,
+      // Quarterly metadata — stored in breakdown snapshot
+      prevMonth:        baseMoLabel,           // 'มิ.ย. 2569' — fixed label for Q3
+      base_month:       baseMo,                // '2026-06'
+      quarter_id:       QNRR_CFG.quarter,      // '2026q3'
+      commission_mode:  'quarterly',
+      // Source info
+      currentPeriod:    currentPeriod,
+      by_month:         result.by_month
+    };
+  } catch (e) {
+    console.warn('[QnrrComm] _qnrrComputeForCommission error', e);
+    return null;
+  }
+}
+window._qnrrComputeForCommission = _qnrrComputeForCommission;
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // Freshket Sense — Quarter NRR Health Sheet (v775)
