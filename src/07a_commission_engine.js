@@ -149,13 +149,34 @@ function _commDaysInLabel(label) {
   } catch(e) { return 30; }
 }
 
+// ── Quarterly base month helper ─────────────────────────────────
+// Returns array of Thai month labels, counting back `count` months from baseMonthOverride.
+// If baseMonthOverride is null → rolling lag-1 anchor (Q2 / MoM behavior).
+function _commBaseMonthLabels(baseMonthOverride, count) {
+  if (!baseMonthOverride) {
+    // Rolling MoM: labels from lag-1 anchor (existing behavior)
+    return Array.from({length: count}, function(_, i) { return _commMonthLabelOffset(i + 1); });
+  }
+  // Quarterly: anchor is fixed base_month (e.g. '2026-06')
+  var parts = baseMonthOverride.split('-');
+  var yr = parseInt(parts[0], 10);
+  var mo = parseInt(parts[1], 10); // 1-based
+  var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return Array.from({length: count}, function(_, i) {
+    var d = new Date(yr, mo - 1 - i, 1); // mo-1 = 0-based, then subtract i months
+    return _THAI_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+  });
+}
+
 // ── Upsell SKU Engine ───────────────────────────────────────────
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
-function _commComputeUpsellSku(kamEmail, expansionIds) {
+function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
+  // baseMonthOverride (optional): '2026-06' for quarterly Q3 — pins P1/P3 3M lookback window.
+  //   null → rolling MoM (existing behavior unchanged)
   const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
@@ -174,7 +195,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
 
     const currLabel  = _commCurrentMonthLabel();
-    const baseLabel  = _commBaselineMonthLabel();
+    // [quarterly] anchor to fixed base_month; [monthly] rolling (unchanged)
+    const baseLabel  = baseMonthOverride
+      ? _commBaseMonthLabels(baseMonthOverride, 1)[0]
+      : _commBaselineMonthLabel();
     console.log('%c[Sense Upsell] compute','color:#f0b000',
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
@@ -241,8 +265,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
             // P3: คงเดิม — existing outlet ซื้อเพิ่มจาก max_baseline
             let maxBaseline = 0;
             let maxBaselineMonth = baseLabel;
-            for (let i = 1; i <= 3; i++) {
-              const lbl = _commMonthLabelOffset(i);
+            // [quarterly] pin 3M window to base_month; [monthly] rolling lag-1 (unchanged)
+            const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
+            for (let i = 0; i < _p3Labels.length; i++) {
+              const lbl = _p3Labels[i];
               const lRow = monthData[lbl];
               if (!lRow) continue;
               const d = _commDaysInLabel(lbl);
