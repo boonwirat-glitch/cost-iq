@@ -319,15 +319,40 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
 // ── Upsell Outlet Engine ────────────────────────────────────────
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
-function _commComputeUpsellOutlet(kamEmail) {
+function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
   // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
   // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
+  // v828: qnrrRaw (optional) = already-computed _qnrrComputeForCommission() result from the
+  // caller (_commBuildKamPayout) — when provided, use QNRR-sourced expansion data instead of
+  // _tgtComputeKamNRR (MoM). Was previously always MoM even when caller was in quarterly mode,
+  // meaning outlets got wrongly INCLUDED in P1/P3 instead of excluded (or vice versa).
   const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
-    const nrrResult = _tgtComputeKamNRR(kamEmail, null);
+
+    if (qnrrRaw) {
+      const monthData = qnrrRaw.by_month && qnrrRaw.currentPeriod ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
+      const rows = (monthData && monthData.rows) || [];
+      const expansionIds = new Set();
+      let expansionGmv = 0;
+      rows.forEach(r => {
+        if (r.movement_type === 'expansion') {
+          if (r.outlet_id) expansionIds.add(String(r.outlet_id));
+          expansionGmv += parseFloat(r.curr_gmv) || 0;
+        }
+      });
+      return {
+        outlet_gmv: expansionGmv,
+        commission: expansionGmv * rate,
+        expansion_gmv: expansionGmv,
+        expansion_outlets: [],
+        _expansionIds: expansionIds
+      };
+    }
+
+    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
+    const nrrResult = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     if (!nrrResult) return EMPTY;
 
     // Sum expansion GMV across all cohorts (core + transferIn + newFromSales)
@@ -600,7 +625,7 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellOutlet = _commComputeUpsellOutlet(kamEmail);
+      upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride);
       // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
       upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
     }
