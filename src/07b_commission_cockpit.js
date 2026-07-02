@@ -210,8 +210,14 @@ function _commBuildTeamPreviewGroups() {
     tlMap[tlEmail].kamRows.push(row);
     tlMap[tlEmail].kamTotal += Number(row.payout || 0);
   });
+  const _policyForTeamNrr = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQTeamNrr = _policyForTeamNrr && _policyForTeamNrr.commission_mode === 'quarterly';
   Object.values(tlMap).forEach(t => {
-    const raw = t.tlEmail === 'unassigned' ? null : _tgtComputeKamNRR(null, t.tlEmail);
+    // v828: quarterly mode reads Team NRR from QNRR source so it matches the commission total shown below it
+    const raw = t.tlEmail === 'unassigned' ? null
+      : (_isQTeamNrr && typeof window._qnrrComputeForCommission === 'function')
+        ? window._qnrrComputeForCommission(t.tlEmail, 'tl')
+        : _tgtComputeKamNRR(null, t.tlEmail);
     const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
     t.teamNrr = pct;
     t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
