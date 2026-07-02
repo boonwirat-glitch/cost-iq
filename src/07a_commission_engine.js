@@ -385,6 +385,54 @@ function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   }
 }
 
+// ── Quarterly drill-down helper (shared) ─────────────────────────────────
+// v828: returns a _tgtComputeKamNRR-shaped result { cohortDetail, expansionDetail,
+// comebackDetail, cohortCount, cohortGmv, expansionGmv, comebackGmv } built from
+// bulkQnrrData instead of MoM bulkHistoryData — used by every drill-down sheet in
+// 07b_cds.js so "click for detail" always matches the quarterly total shown above it.
+// Returns null if not in quarterly mode or QNRR data unavailable (caller should then
+// fall back to its own existing _tgtComputeKamNRR(email,null) call).
+function _commQnrrDrillResult(email, scope) {
+  try {
+    const policy = _nrrGovResolveForVisibleScope();
+    if (!policy || policy.commission_mode !== 'quarterly') return null;
+    if (typeof window._qnrrComputeForCommission !== 'function') return null;
+    const qr = window._qnrrComputeForCommission(email, scope || 'kam');
+    if (!qr || !qr.by_month || !qr.currentPeriod) return null;
+    const monthData = qr.by_month[qr.currentPeriod];
+    const rows = (monthData && monthData.rows) || [];
+
+    function groupByAccount(movementType) {
+      const byAcct = {};
+      rows.filter(r => r.movement_type === movementType).forEach(r => {
+        const aid = r.account_id || r.account_name;
+        if (!byAcct[aid]) byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [], prevTotal: 0, currTotal: 0 };
+        const prev = Math.round(r.base_gmv || 0), curr = Math.round(r.curr_gmv || 0);
+        byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name, prevGmv: prev, currGmv: curr,
+          delta: prev > 0 ? Math.round((curr - prev) / prev * 100) : null });
+        byAcct[aid].prevTotal += prev; byAcct[aid].currTotal += curr;
+      });
+      return Object.values(byAcct);
+    }
+
+    const cohortDetail    = groupByAccount('core_nrr');
+    const expansionDetail = groupByAccount('expansion');
+    const comebackDetail  = groupByAccount('comeback');
+    const sumCurr = arr => arr.reduce((s,g)=>s+g.currTotal,0);
+    const sumCnt  = arr => arr.reduce((s,g)=>s+g.outlets.length,0);
+
+    return {
+      nrr: qr.nrr, cohortCount: sumCnt(cohortDetail), cohortGmv: sumCurr(cohortDetail),
+      baselinePrevGmv: qr.baselinePrevGmv,
+      comebackGmv: sumCurr(comebackDetail), comebackCount: sumCnt(comebackDetail),
+      expansionGmv: sumCurr(expansionDetail), expansionCount: sumCnt(expansionDetail),
+      cohortDetail, comebackDetail, expansionDetail,
+      transferIn: null, newFromSales: null // quarterly mode doesn't split these separately
+    };
+  } catch(e) { console.warn('[CommEngine] _commQnrrDrillResult error', e); return null; }
+}
+window._commQnrrDrillResult = _commQnrrDrillResult;
+
 // ── Handover Retention Engine ───────────────────────────────────
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
 // Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail[] }
