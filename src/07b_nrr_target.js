@@ -810,10 +810,20 @@ async function renderPortviewTargetBar() {
     catch(e){ return typeof bulkOutletsData !== 'undefined' && bulkOutletsData && Object.keys(bulkOutletsData).length > 0; }
   })();
 
+  // v828: quarterly mode reads this bar's NRR from QNRR source so it matches commission payout
+  const _policyForBar = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQBar = _policyForBar && _policyForBar.commission_mode === 'quarterly';
+  function _nrrBarSource(kamE, tlE) {
+    if (_isQBar && typeof window._qnrrComputeForCommission === 'function') {
+      const r = window._qnrrComputeForCommission(kamE || tlE, kamE ? 'kam' : (tlE ? 'tl' : 'admin'));
+      if (r) return r;
+    }
+    return _tgtComputeKamNRR(kamE, tlE);
+  }
   const nrrResult = _outletsReady
     ? (_repDetail
-        ? _tgtComputeKamNRR(_repEmail, null)
-        : (_showAll ? _tgtComputeKamNRR(null, null) : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null)))
+        ? _nrrBarSource(_repEmail, null)
+        : (_showAll ? _nrrBarSource(null, null) : _nrrBarSource(isTL ? null : email, isTL ? email : null)))
     : null;
   let nrrPct=null, cohortGmv=0, cbGmv=0, exGmv=0;
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
