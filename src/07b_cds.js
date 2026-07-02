@@ -740,7 +740,7 @@
     // If cohort sheet available + NRR data computable → use rich design
     if(email&&typeof _tgtComputeKamNRR==='function'&&typeof _tgtShowCohortSheet==='function'){
       var nrrResult=null;
-      try{ nrrResult=_tgtComputeKamNRR(email,null); }catch(e){}
+      try{ nrrResult=(typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(email,'kam'))||_tgtComputeKamNRR(email,null); }catch(e){}
       if(nrrResult){
         window._ncsLastNrrResult=nrrResult;
         // Label: prefer portview display name
@@ -817,7 +817,7 @@
     function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000000)return'\u0e3f'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
-    var nrrResult=typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null;
+    var nrrResult=(typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||(typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null);
     var rate=Number(String(cfg.outRate||'1.5'))/100||0.015;
 
     var allAccounts=[];
@@ -1734,7 +1734,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   var nrr = null;
   try {
     if (st.email && typeof _tgtComputeKamNRR === 'function') {
-      nrr = _tgtComputeKamNRR(st.email, null);
+      nrr = (typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||_tgtComputeKamNRR(st.email, null);
     }
   } catch(e) {}
 
@@ -1939,7 +1939,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   try {
     if (st.email && typeof _tgtComputeKamNRR === 'function') {
       window._ncsLastNrrResult = window._ncsLastNrrResult || null;
-      nr = _tgtComputeKamNRR(st.email, null);
+      nr = (typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||_tgtComputeKamNRR(st.email, null);
       window._ncsLastNrrResult = nr;
       window._ncsKamLabel = (st.kamName || st.email || '').split('@')[0];
     }
