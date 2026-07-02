@@ -623,17 +623,21 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
 function _commBuildKamPayout(kamEmail, periodOverride) {
   try {
     const period  = periodOverride || _nrrExclusionCurrentPeriod();
-    const policy  = _nrrGovResolveForVisibleScope();
+    // v829: resolve policy for the PERIOD BEING COMPUTED, not always "today" — matters when
+    // retroactively locking/auto-computing a past month whose quarter/mode may differ from
+    // whatever quarter is active right now (e.g. locking July from within Q4/October).
+    const policy  = periodOverride ? _nrrGovGet(periodOverride, 'all', 'all') : _nrrGovResolveForVisibleScope();
     const isQ     = policy && policy.commission_mode === 'quarterly';
     const baseMo  = isQ ? (policy.base_month || null) : null;
 
     // ── NRR source ────────────────────────────────────────────────
     // [quarterly] read from bulkQnrrData via _qnrrComputeForCommission (same source as QNRR sheet)
+    //             periodOverride threads through as asOfPeriod for retroactive lock
     // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR — periodOverride threads through
     //             as asOfPeriod for frozen historical-month NRR (retroactive lock / auto-compute)
     let raw, rawPct, governedPct, pct;
     if (isQ && typeof window._qnrrComputeForCommission === 'function') {
-      raw = window._qnrrComputeForCommission(kamEmail, 'kam');
+      raw = window._qnrrComputeForCommission(kamEmail, 'kam', periodOverride);
     } else {
       raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     }
@@ -715,14 +719,15 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
 function _commBuildTlPayout(tlEmail, periodOverride) {
   try {
     const period = periodOverride || _nrrExclusionCurrentPeriod();
-    const policy = _nrrGovResolveForVisibleScope();
+    // v829: resolve policy for the period being computed, not always "today" (see _commBuildKamPayout)
+    const policy = periodOverride ? _nrrGovGet(periodOverride, 'all', 'all') : _nrrGovResolveForVisibleScope();
     const isQ    = policy && policy.commission_mode === 'quarterly';
 
     // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR,
     // periodOverride threads through as asOfPeriod for frozen historical-month NRR
     let raw;
     if (isQ && typeof window._qnrrComputeForCommission === 'function') {
-      raw = window._qnrrComputeForCommission(tlEmail, 'tl');
+      raw = window._qnrrComputeForCommission(tlEmail, 'tl', periodOverride);
     } else {
       raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
     }
