@@ -544,21 +544,22 @@ function _commComputeTeamUpsellMult(tlEmail) {
 
 // ── KAM Full Payout Builder ─────────────────────────────────────
 // Returns complete breakdown for one KAM
-function _commBuildKamPayout(kamEmail) {
+function _commBuildKamPayout(kamEmail, periodOverride) {
   try {
-    const period  = _nrrExclusionCurrentPeriod();
+    const period  = periodOverride || _nrrExclusionCurrentPeriod();
     const policy  = _nrrGovResolveForVisibleScope();
     const isQ     = policy && policy.commission_mode === 'quarterly';
     const baseMo  = isQ ? (policy.base_month || null) : null;
 
     // ── NRR source ────────────────────────────────────────────────
     // [quarterly] read from bulkQnrrData via _qnrrComputeForCommission (same source as QNRR sheet)
-    // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR (unchanged)
+    // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR — periodOverride threads through
+    //             as asOfPeriod for frozen historical-month NRR (retroactive lock / auto-compute)
     let raw, rawPct, governedPct, pct;
     if (isQ && typeof window._qnrrComputeForCommission === 'function') {
       raw = window._qnrrComputeForCommission(kamEmail, 'kam');
     } else {
-      raw = _tgtComputeKamNRR(kamEmail, null);
+      raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     }
     rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     governedPct = _nrrGovernedPct(raw, kamEmail, null);
@@ -635,18 +636,19 @@ function _commBuildKamPayout(kamEmail) {
 }
 
 // ── TL Full Payout Builder ──────────────────────────────────────
-function _commBuildTlPayout(tlEmail) {
+function _commBuildTlPayout(tlEmail, periodOverride) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
+    const period = periodOverride || _nrrExclusionCurrentPeriod();
     const policy = _nrrGovResolveForVisibleScope();
     const isQ    = policy && policy.commission_mode === 'quarterly';
 
-    // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR
+    // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR,
+    // periodOverride threads through as asOfPeriod for frozen historical-month NRR
     let raw;
     if (isQ && typeof window._qnrrComputeForCommission === 'function') {
       raw = window._qnrrComputeForCommission(tlEmail, 'tl');
     } else {
-      raw = _tgtComputeKamNRR(null, tlEmail);
+      raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
     }
     const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
@@ -1941,8 +1943,8 @@ function _commGetTlListFromPortview() {
 // v225-comm: Extended snapshot rows with full component breakdown
 // payout_amount = final_payout (NRR + Upsell + Handover) × GMV Gate
 // breakdown jsonb includes config_snapshot for audit immutability
-function _commBuildSnapshotRows() {
-  const period = _nrrExclusionCurrentPeriod();
+function _commBuildSnapshotRows(periodOverride) {
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const rows = [];
@@ -1953,7 +1955,8 @@ function _commBuildSnapshotRows() {
   const tls = role === 'admin' ? _commGetTlListFromPortview() : [{ email: visibleTlEmail, name: (currentUserProfile && currentUserProfile.full_name) || visibleTlEmail }];
 
   tls.filter(t => t.email).forEach(tl => {
-    const tlPayout = _commBuildTlPayout(tl.email);
+    // v826: thread periodOverride so retroactive/auto-compute freezes the correct historical month
+    const tlPayout = _commBuildTlPayout(tl.email, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
@@ -1985,7 +1988,7 @@ function _commBuildSnapshotRows() {
   groups.forEach(g => {
     if (!g.kamEmail) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
-    const kamPayout = _commBuildKamPayout(g.kamEmail);
+    const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'kam',
@@ -2429,7 +2432,9 @@ function exportCommissionSnapshotCsv(periodOverride) {
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
-  const rows = _commBuildSnapshotRows();
+  // v826: thread periodOverride through — previously always computed live/current data
+  // and just relabeled it, which is why retroactive Compute produced wrong numbers.
+  const rows = _commBuildSnapshotRows(periodOverride);
   if (!rows.length) {
     if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ compute', '!');
     return false;
@@ -2440,8 +2445,9 @@ async function computeCommissionDraft(periodOverride) {
       ...r,
       period_month: period,
       snapshot_status: 'draft',
-      breakdown: r.breakdown || {},
-      lock_note: periodOverride ? 'retroactive' : 'manual',
+      // note: retroactive/manual tag stored inside breakdown jsonb —
+      // commission_payout_snapshots has no top-level column for it (was causing 400 error)
+      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor
@@ -2454,7 +2460,12 @@ async function computeCommissionDraft(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('Compute สำเร็จ — ตรวจก่อนกด Lock', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: renderCommissionLockTab() targets #tgt-sheet-body (KAM/TL personal scorecard sheet),
+    // NOT #commission-cockpit-body where the Cockpit's Lock/Retroactive section actually lives.
+    // Re-render whichever surface is currently open so the just-saved draft becomes visible.
+    const _cockpitOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpen && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommDraft] saved ${payload.length} draft rows for ${period}`);
     return true;
   } catch (e) {
@@ -2506,7 +2517,10 @@ async function lockCommissionSnapshot(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('🔒 Lock commission สำเร็จ', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: same #tgt-sheet-body vs #commission-cockpit-body mismatch as computeCommissionDraft above.
+    const _cockpitOpenLock = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpenLock && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommLock] locked ${payload.length} rows for ${period}`);
   } catch (e) {
     console.error('[CommLock] failed:', e);
