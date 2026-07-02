@@ -2261,7 +2261,13 @@ function _getCachedKamPayout(kamEmail) {
   // Bug: fast-path uses bulkUpsellTeamData but key only tracked bulkUpsellData.loaded
   // → cache hit after upsell_team loads → stale result (NRR only, no upsell) returned forever.
   const _utN = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
-  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN;
+  // v829-fix: same class of bug for quarterly mode — bulkQnrrData loads via a 2s-delayed
+  // background prefetch, arriving AFTER this cache may already be warm from a MoM fallback
+  // computed at first render. Without qnrrLoaded/commission_mode in the key, the cache never
+  // invalidates once QNRR data lands, or when Admin toggles Monthly↔Quarterly in the Cockpit.
+  const _qnrrLoaded = typeof bulkQnrrData!=='undefined'&&bulkQnrrData&&bulkQnrrData.loaded?'q':'';
+  const _commMode = (typeof _nrrGovResolveForVisibleScope==='function' && _nrrGovResolveForVisibleScope()?.commission_mode) || 'monthly';
+  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN + '|' + _qnrrLoaded + '|' + _commMode;
   if (_kamPayoutCacheKey !== cacheKey) {
     Object.keys(_kamPayoutCache).forEach(k => delete _kamPayoutCache[k]);
     _kamPayoutCacheKey = cacheKey;
