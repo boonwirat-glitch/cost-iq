@@ -1,4 +1,4 @@
-<!-- Freshket Sense q3-retroactive-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense q3-cache-baseline-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'q3-retroactive-fix',
+      version: 'q3-cache-baseline-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -30203,7 +30203,13 @@ function _getCachedKamPayout(kamEmail) {
   // Bug: fast-path uses bulkUpsellTeamData but key only tracked bulkUpsellData.loaded
   // → cache hit after upsell_team loads → stale result (NRR only, no upsell) returned forever.
   const _utN = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
-  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN;
+  // v829-fix: same class of bug for quarterly mode — bulkQnrrData loads via a 2s-delayed
+  // background prefetch, arriving AFTER this cache may already be warm from a MoM fallback
+  // computed at first render. Without qnrrLoaded/commission_mode in the key, the cache never
+  // invalidates once QNRR data lands, or when Admin toggles Monthly↔Quarterly in the Cockpit.
+  const _qnrrLoaded = typeof bulkQnrrData!=='undefined'&&bulkQnrrData&&bulkQnrrData.loaded?'q':'';
+  const _commMode = (typeof _nrrGovResolveForVisibleScope==='function' && _nrrGovResolveForVisibleScope()?.commission_mode) || 'monthly';
+  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN + '|' + _qnrrLoaded + '|' + _commMode;
   if (_kamPayoutCacheKey !== cacheKey) {
     Object.keys(_kamPayoutCache).forEach(k => delete _kamPayoutCache[k]);
     _kamPayoutCacheKey = cacheKey;
@@ -40079,8 +40085,21 @@ async function renderPortviewTargetBar() {
     </div>` : '';
 
   // ── Baseline formula section ──────────────────────────────────
-  let baselineSection = '';
-  if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+let baselineSection = '';
+  // v829: quarterly mode — baseline IS the fixed base month itself (e.g. มิ.ย. 2569),
+  // no 3-month averaging needed or accurate. Simpler AND matches the actual NRR% math
+  // above (which already uses nrrResult.baselinePrevGmv from QNRR, not a 3mo avg).
+  if (_isQBar && nrrResult && nrrResult.baselinePrevGmv > 0) {
+    const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const _baseMoLbl = (_policyForBar && _policyForBar.base_month)
+      ? (() => { const p=_policyForBar.base_month.split('-'); return _mo2[parseInt(p[1],10)-1]+' '+(parseInt(p[0],10)+543); })()
+      : 'เดือนฐาน';
+    baselineSection = `<div class="tgt-det-section">
+      <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">Fixed base ตลอดไตรมาส (ไม่เลื่อน)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานคงที่ทั้ง Q</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
+    </div>`;
+  } else if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const _ms2 = m => { const p=(m||'').split(' '); return (parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]); };
     const allM2 = new Set();
@@ -40115,6 +40134,7 @@ async function renderPortviewTargetBar() {
     }
   }
 
+  
   // ── Movement rows (v198) ─────────────────────────────────────
   const fmtK = v => v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+Math.round(v);
   const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'var(--tk-ok-bright)':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
