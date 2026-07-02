@@ -890,8 +890,21 @@ async function renderPortviewTargetBar() {
     </div>` : '';
 
   // ── Baseline formula section ──────────────────────────────────
-  let baselineSection = '';
-  if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+let baselineSection = '';
+  // v829: quarterly mode — baseline IS the fixed base month itself (e.g. มิ.ย. 2569),
+  // no 3-month averaging needed or accurate. Simpler AND matches the actual NRR% math
+  // above (which already uses nrrResult.baselinePrevGmv from QNRR, not a 3mo avg).
+  if (_isQBar && nrrResult && nrrResult.baselinePrevGmv > 0) {
+    const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const _baseMoLbl = (_policyForBar && _policyForBar.base_month)
+      ? (() => { const p=_policyForBar.base_month.split('-'); return _mo2[parseInt(p[1],10)-1]+' '+(parseInt(p[0],10)+543); })()
+      : 'เดือนฐาน';
+    baselineSection = `<div class="tgt-det-section">
+      <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">Fixed base ตลอดไตรมาส (ไม่เลื่อน)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานคงที่ทั้ง Q</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
+    </div>`;
+  } else if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const _ms2 = m => { const p=(m||'').split(' '); return (parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]); };
     const allM2 = new Set();
@@ -926,6 +939,7 @@ async function renderPortviewTargetBar() {
     }
   }
 
+  
   // ── Movement rows (v198) ─────────────────────────────────────
   const fmtK = v => v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+Math.round(v);
   const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'var(--tk-ok-bright)':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
