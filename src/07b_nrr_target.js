@@ -1,5 +1,5 @@
 // SECTION:NRR_COMPUTE
-function _tgtComputeKamNRR(kamEmail, tlEmail) {
+function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   if (typeof bulkHistoryData === 'undefined' || !bulkHistoryData) return null;
   let allAccounts = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
     .filter(a => {
@@ -29,32 +29,56 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
   allAccounts.forEach(a => (bulkHistoryData[a.id]||[]).forEach(h => { if(h.m) allMonths.add(h.m); }));
   const sortedMonths = Array.from(allMonths).sort((a,b) => moSort(a)-moSort(b));
   if (!sortedMonths.length) return null;
-  const prevMonth = sortedMonths[sortedMonths.length - 1];
-
-  // daysElapsed + currentMonthLabel from bulkCurrentMonthData
-  let currentMonthLabel = '';
-  let daysElapsed = 0;
-  const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
-  if (hasCM) {
-    for (const a of allAccounts) {
-      const cm = bulkCurrentMonthData[a.id];
-      if (cm && cm.month_label && cm.days_elapsed > 0) {
-        currentMonthLabel = cm.month_label;
-        daysElapsed = cm.days_elapsed;
-        break;
+  let prevMonth, currentMonthLabel, daysElapsed;
+  // v826: _isFrozen = true when asOfPeriod is given — compute NRR for a CLOSED historical
+  // month (e.g. '2026-06') by comparing two FULL, already-closed months (May vs June),
+  // instead of the default live mode (closed month vs today's partial MTD).
+  // Used by Retroactive Lock and the auto-compute-at-start-of-month feature — without this,
+  // "locking June" a few days into July would compare June's cohort against July's first
+  // 1-3 days of GMV, producing near-zero NRR for everyone.
+  const _isFrozen = !!asOfPeriod;
+  if (_isFrozen) {
+    const _parts = asOfPeriod.split('-');
+    const asYr = parseInt(_parts[0], 10);
+    const asMo = parseInt(_parts[1], 10); // 1-12
+    const _sampleYr = parseInt((sortedMonths[0]||'').split(' ')[1]||'0');
+    const _yrOffset = _sampleYr > 2500 ? 543 : 0; // detect Thai (2567+) vs CE year format
+    currentMonthLabel = mo[asMo-1] + ' ' + (asYr + _yrOffset);
+    const _prevD = new Date(asYr, asMo-2, 1); // asMo-2 (0-based) = one month before asMo
+    prevMonth = mo[_prevD.getMonth()] + ' ' + (_prevD.getFullYear() + _yrOffset);
+    daysElapsed = getThaiMonthDays(currentMonthLabel);
+    if (!sortedMonths.includes(currentMonthLabel) && !sortedMonths.includes(prevMonth)) {
+      console.warn('%c[Sense NRR] ⚠️ asOfPeriod outside loaded history window','color:#f08000',
+        {asOfPeriod, currentMonthLabel, prevMonth, sortedMonths});
+      return null;
+    }
+  } else {
+    prevMonth = sortedMonths[sortedMonths.length - 1];
+    // daysElapsed + currentMonthLabel from bulkCurrentMonthData
+    currentMonthLabel = '';
+    daysElapsed = 0;
+    const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
+    if (hasCM) {
+      for (const a of allAccounts) {
+        const cm = bulkCurrentMonthData[a.id];
+        if (cm && cm.month_label && cm.days_elapsed > 0) {
+          currentMonthLabel = cm.month_label;
+          daysElapsed = cm.days_elapsed;
+          break;
+        }
       }
     }
-  }
-  // Fallback: compute currentMonthLabel from today's date (match history year format)
-  if (!daysElapsed && allAccounts.length) {
-    daysElapsed = allAccounts.find(a => a.daysElapsed > 0)?.daysElapsed || 0;
-    if (daysElapsed && !currentMonthLabel) {
-      const _nd = new Date();
-      const _moN = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      // Detect year format from history data (CE ~2024 vs Thai ~2567)
-      const _sampleYr = parseInt((Array.from(allMonths)[0]||'').split(' ')[1]||'0');
-      const _yr = _sampleYr > 2500 ? _nd.getFullYear() + 543 : _nd.getFullYear();
-      currentMonthLabel = _moN[_nd.getMonth()] + ' ' + _yr;
+    // Fallback: compute currentMonthLabel from today's date (match history year format)
+    if (!daysElapsed && allAccounts.length) {
+      daysElapsed = allAccounts.find(a => a.daysElapsed > 0)?.daysElapsed || 0;
+      if (daysElapsed && !currentMonthLabel) {
+        const _nd = new Date();
+        const _moN = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        // Detect year format from history data (CE ~2024 vs Thai ~2567)
+        const _sampleYr2 = parseInt((Array.from(allMonths)[0]||'').split(' ')[1]||'0');
+        const _yr = _sampleYr2 > 2500 ? _nd.getFullYear() + 543 : _nd.getFullYear();
+        currentMonthLabel = _moN[_nd.getMonth()] + ' ' + _yr;
+      }
     }
   }
   if (!currentMonthLabel || !daysElapsed) {
@@ -198,9 +222,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail) {
           outletToAcct[a.id]={acctId:a.id,acctName};
           outletName[a.id]=acctName;
         }
-        const cm=hasCM?bulkCurrentMonthData[a.id]:null;
-        if(cm&&cm.gmv_to_date>0){
-          currGmvByOutlet[a.id]=cm.gmv_to_date;
+        // v826: frozen mode reads "current" month GMV from bulkHistoryData (both months
+        // are closed/historical); live mode reads MTD from bulkCurrentMonthData as before.
+        let _currVal = 0;
+        if (_isFrozen) {
+          const _currRow = hist.find(h => h.m === currentMonthLabel);
+          _currVal = _currRow ? (_currRow.gmv || _currRow.s || 0) : 0;
+        } else {
+          const cm = hasCM ? bulkCurrentMonthData[a.id] : null;
+          _currVal = (cm && cm.gmv_to_date > 0) ? cm.gmv_to_date : 0;
+        }
+        if(_currVal>0){
+          currGmvByOutlet[a.id]=_currVal;
           if(!outletToAcct[a.id])outletToAcct[a.id]={acctId:a.id,acctName};
           if(!outletName[a.id])outletName[a.id]=acctName;
         }
