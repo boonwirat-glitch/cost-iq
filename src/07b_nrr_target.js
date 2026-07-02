@@ -1241,6 +1241,26 @@ setTimeout(async function _tgtInitCheck() {
   // FIX: loadTargets() fires immediately when role is ready → _tgtLoaded=true quickly
   // → commission strip re-renders. NRR bar still waits for portview GMV data.
   await loadTargets(_tgtCurrentQuarter());
+  // v826: Auto-draft-compute for last month's commission at start of new month.
+  // Reuses the SAME client-side computeCommissionDraft() — no server/BigQuery needed.
+  // Fires once (guarded by "draft/final already exists?") when an Admin opens the app
+  // during the grace window (day 1-3) and last month has not been locked yet.
+  // Saves as DRAFT only — Admin still reviews and clicks Lock manually (by design).
+  try {
+    if (typeof isAdminRole === 'function' ? isAdminRole(role) : role === 'admin') {
+      const eom = (typeof _commEomStatus === 'function') ? _commEomStatus() : null;
+      if (eom && eom.showGraceBanner) {
+        const alreadyHasSnapshot = (_commissionSnapshots || []).some(r => r.period_month === eom.prevPeriod);
+        if (!alreadyHasSnapshot && typeof computeCommissionDraft === 'function') {
+          computeCommissionDraft(eom.prevPeriod).then(function(ok) {
+            if (ok && typeof showToast === 'function') {
+              showToast('Auto-compute ค่าคอมฯ ' + eom.prevPeriod + ' เสร็จแล้ว — ตรวจและกด Lock ที่ Commission Cockpit', 'ok');
+            }
+          }).catch(function(){});
+        }
+      }
+    }
+  } catch(e) {}
   // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
   // v761: also call _commGatedRender with key reset — _tgtLoadedFromDB now true so
