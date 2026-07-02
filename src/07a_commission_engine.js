@@ -518,10 +518,12 @@ function _commComputeTeamUpsellMult(tlEmail) {
 
 // ── KAM Full Payout Builder ─────────────────────────────────────
 // Returns complete breakdown for one KAM
-function _commBuildKamPayout(kamEmail) {
+function _commBuildKamPayout(kamEmail, periodOverride) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(kamEmail, null);
+    const period = periodOverride || _nrrExclusionCurrentPeriod();
+    // v826: pass periodOverride through as asOfPeriod so retroactive/auto-compute
+    // freezes NRR against the correct historical month pair, not live MTD.
+    const raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, kamEmail, null);
     const pct = governedPct !== null ? governedPct : rawPct;
@@ -590,10 +592,10 @@ function _commBuildKamPayout(kamEmail) {
 }
 
 // ── TL Full Payout Builder ──────────────────────────────────────
-function _commBuildTlPayout(tlEmail) {
+function _commBuildTlPayout(tlEmail, periodOverride) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(null, tlEmail);
+    const period = periodOverride || _nrrExclusionCurrentPeriod();
+    const raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
     const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
     const pct = governedPct !== null ? governedPct : rawPct;
@@ -1885,8 +1887,8 @@ function _commGetTlListFromPortview() {
 // v225-comm: Extended snapshot rows with full component breakdown
 // payout_amount = final_payout (NRR + Upsell + Handover) × GMV Gate
 // breakdown jsonb includes config_snapshot for audit immutability
-function _commBuildSnapshotRows() {
-  const period = _nrrExclusionCurrentPeriod();
+function _commBuildSnapshotRows(periodOverride) {
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const rows = [];
@@ -1897,7 +1899,8 @@ function _commBuildSnapshotRows() {
   const tls = role === 'admin' ? _commGetTlListFromPortview() : [{ email: visibleTlEmail, name: (currentUserProfile && currentUserProfile.full_name) || visibleTlEmail }];
 
   tls.filter(t => t.email).forEach(tl => {
-    const tlPayout = _commBuildTlPayout(tl.email);
+    // v826: thread periodOverride so retroactive/auto-compute freezes the correct historical month
+    const tlPayout = _commBuildTlPayout(tl.email, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
@@ -1929,7 +1932,7 @@ function _commBuildSnapshotRows() {
   groups.forEach(g => {
     if (!g.kamEmail) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
-    const kamPayout = _commBuildKamPayout(g.kamEmail);
+    const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'kam',
@@ -2373,7 +2376,9 @@ function exportCommissionSnapshotCsv(periodOverride) {
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
-  const rows = _commBuildSnapshotRows();
+  // v826: thread periodOverride through — previously always computed live/current data
+  // and just relabeled it, which is why retroactive Compute produced wrong numbers.
+  const rows = _commBuildSnapshotRows(periodOverride);
   if (!rows.length) {
     if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ compute', '!');
     return false;
