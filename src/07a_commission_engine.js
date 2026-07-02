@@ -1567,6 +1567,13 @@ function _tgtGetVisibleTeamNrrResult() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const tlMatch = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []).some(a => a.tlEmail === email);
   const showAll = role === 'admin' && !tlMatch;
+  // v828: Team Governance Card's NRR% — use QNRR when quarterly, else MoM as before
+  const policy = _nrrGovResolveForVisibleScope();
+  if (policy && policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+    const scopeEmail = showAll ? null : email;
+    const r = window._qnrrComputeForCommission(scopeEmail || email, showAll ? 'admin' : 'tl');
+    if (r) return r;
+  }
   return _tgtComputeKamNRR(null, showAll ? null : email);
 }
 function _tgtRenderTeamGovCard() {
@@ -1597,7 +1604,7 @@ function _tgtRenderTeamGovCard() {
     if (isTLRole(role)) {
       const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
       const _um2 = typeof _commComputeTeamUpsellMult==='function' && (typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0)
-        ? _commComputeTeamUpsellMult(_govEm2) : null;
+        ? _commComputeTeamUpsellMult(_govEm2, policy && policy.commission_mode === 'quarterly') : null;
       if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
     }
   } catch(e) {}
@@ -1613,7 +1620,7 @@ function _tgtRenderTeamGovCard() {
       const _govEmail = isTLRole(role)
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
-      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
+      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail, policy && policy.commission_mode === 'quarterly') : null;
       if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
@@ -1999,7 +2006,11 @@ function _nrrGovernanceForVisibleTeam() {
   return { raw, rawPct, governedPct, excludedBase: exclBase };
 }
 function _nrrGovernanceForKam(kamEmail) {
-  const raw = _tgtComputeKamNRR(kamEmail, null);
+  // v828: use QNRR source in quarterly mode so exclusion/threshold checks match commission total
+  const _policy = _nrrGovResolveForVisibleScope();
+  const raw = (_policy && _policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function')
+    ? window._qnrrComputeForCommission(kamEmail, 'kam')
+    : _tgtComputeKamNRR(kamEmail, null);
   const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
   const governedPct = _nrrGovernedPct(raw, kamEmail, null);
   const exclBase = _nrrExclusionBaseImpact(kamEmail, null);
