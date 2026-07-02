@@ -12,14 +12,19 @@
 WITH
 dates AS (
   SELECT
-    -- v826-q3: baseline_mo + lookback_start PINNED to Q3 fixed base (มิ.ย. 2026) — was
-    -- CURRENT_DATE()-relative, which silently dropped เม.ย. from the lookback window once
-    -- this SQL is re-run in ส.ค./ก.ย. (rolling 3-month window drifts away from the quarter's
-    -- fixed base). current_mo stays dynamic — it's re-run once per month during Q3 and each
-    -- run correctly needs THAT month's own transactions (ก.ค./ส.ค./ก.ย.).
-    DATE('2026-06-01')                                                                       AS baseline_mo,
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)                              AS current_mo,
-    DATE('2026-04-01')                                                                        AS lookback_start
+    -- v827-auto: baseline_mo + lookback_start AUTO-DERIVE from current_mo's own quarter —
+    -- no manual date edit needed each new quarter (Q3→Q4→Q1... all self-adjust).
+    -- current_mo = the month being reported (day-1 lag, e.g. run Aug-1 → reports Jul).
+    -- baseline_mo = 1 month before the START of current_mo's quarter
+    --   (Jul/Aug/Sep all → Jun; Oct/Nov/Dec all → Sep; etc.)
+    -- lookback_start = 2 months before baseline_mo, giving a fixed 3-month pool
+    --   (baseline_mo, baseline_mo-1, baseline_mo-2) that stays constant across the whole quarter,
+    --   matching the app's _commBaseMonthLabels(base_month, 3) window.
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)                                       AS current_mo,
+    DATE_SUB(DATE_TRUNC(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), QUARTER),
+             INTERVAL 1 MONTH)                                                                        AS baseline_mo,
+    DATE_SUB(DATE_SUB(DATE_TRUNC(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), QUARTER),
+             INTERVAL 1 MONTH), INTERVAL 2 MONTH)                                                     AS lookback_start
 ),
 
 -- Active KAM whitelist
