@@ -1,4 +1,4 @@
-<!-- Freshket Sense v823: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v824: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v823',
+      version: 'v824',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -36861,8 +36861,9 @@ async function computeCommissionDraft(periodOverride) {
       ...r,
       period_month: period,
       snapshot_status: 'draft',
-      breakdown: r.breakdown || {},
-      lock_note: periodOverride ? 'retroactive' : 'manual',
+      // note: retroactive/manual tag stored inside breakdown jsonb —
+      // commission_payout_snapshots has no top-level column for it (was causing 400 error)
+      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor
