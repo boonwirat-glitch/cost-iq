@@ -2029,8 +2029,33 @@ function _commBuildSnapshotRows(periodOverride) {
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
         account_count: g.total || ((g.accounts || []).length),
         // v247e: NRR detail for reconcile — cohort + expansion outlet breakdown
-        nrr_cohort_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[] } catch(e){return []} })(),
-        expansion_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex; } catch(e){return []} })(),
+        // v828: quarterly mode reads cohort detail from bulkQnrrData rows (grouped by
+        // account) instead of _tgtComputeKamNRR — was silently showing MoM detail that
+        // didn't reconcile with the quarterly total shown just above.
+        nrr_cohort_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            const _byAcct = {};
+            _rows.filter(r => r.movement_type === 'core_nrr').forEach(r => {
+              const aid = r.account_id || r.account_name;
+              if (!_byAcct[aid]) _byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [] };
+              _byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name,
+                prevGmv: Math.round(r.base_gmv||0), currGmv: Math.round(r.curr_gmv||0) });
+            });
+            return Object.values(_byAcct);
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[]
+        } catch(e){return []} })(),
+        expansion_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            return _rows.filter(r => r.movement_type === 'expansion')
+              .map(r => ({ outletId: r.outlet_id, outletName: r.account_name, gmv: Math.round(r.curr_gmv||0) }));
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex;
+        } catch(e){return []} })(),
         lock_trigger: 'manual',
         csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
