@@ -2381,7 +2381,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -2413,7 +2413,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -2446,7 +2446,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
