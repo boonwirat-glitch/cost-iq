@@ -1123,35 +1123,54 @@ function handleFileUpload(type,input){
       try{
         const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
         const byKamEmail={},byTlEmail={},allRows=[];
+        // v827: rewritten to match ACTUAL q3_2026_movement_rep_view.sql SELECT column
+        // order (29 cols) — previous parser was written for an old 16-col draft schema
+        // that never matched the real SQL, silently reading wrong values at every position
+        // past col 0. Grouping key is latest_kam_email/latest_tl_email (not a nonexistent
+        // "period_kam_email") because rep_view's grain attributes every period_month row
+        // to whoever holds the outlet TODAY — see qnrr_master_movement_design_v8.md.
         lines.forEach(l=>{
           const p=parseCSVRow(l);
-          if(!p[0]||!p[2])return;
+          if(!p[0]||!p[1])return;
           const row={
-            period_month:    (p[0]||'').trim(),
-            base_month:      (p[1]||'').trim(),
-            movement_type:   (p[2]||'').trim(),
-            period_kam_email:(p[3]||'').trim(),
-            period_kam_name: (p[4]||'').trim(),
-            period_tl_email: (p[5]||'').trim(),
-            base_kam_email:  (p[6]||'').trim(),
-            base_tl_email:   (p[7]||'').trim(),
-            account_id:      (p[8]||'').trim(),
-            account_name:    (p[9]||'').trim(),
-            account_type:    (p[10]||'').trim(),
-            outlet_id:       (p[11]||'').trim(),
-            base_gmv:        parseFloat(p[12])||0,
-            curr_gmv:        parseFloat(p[13])||0,
-            base_days:       parseInt(p[14])||31,
-            curr_days:       parseInt(p[15])||30
+            period_month:          (p[0]||'').trim(),
+            movement_type:         (p[1]||'').trim(),
+            transfer_scope:        (p[2]||'').trim(),
+            current_portfolio:     (p[3]||'').trim(),
+            current_staff_owner:   (p[4]||'').trim(),
+            base_portfolio:        (p[5]||'').trim(),
+            base_staff_owner:      (p[6]||'').trim(),
+            outlet_id:             (p[7]||'').trim(),
+            account_id:            (p[8]||'').trim(),
+            account_name:          (p[9]||'').trim(),
+            res_name:              (p[10]||'').trim(),
+            account_type:          (p[11]||'').trim(),
+            cohort_month:          (p[12]||'').trim(),
+            curr_gmv:              parseFloat(p[13])||0,
+            base_gmv:              parseFloat(p[14])||0,
+            base_days:             parseInt(p[15])||31,
+            curr_days:             parseInt(p[16])||30,
+            first_dollar_date:     (p[17]||'').trim(),
+            first_portfolio_date:  (p[18]||'').trim(),
+            first_dollar_owner:    (p[19]||'').trim(),
+            new_user_exp_date:     (p[20]||'').trim(),
+            latest_tl:             (p[21]||'').trim(),
+            base_tl:               (p[22]||'').trim(),
+            latest_staff_owner:    (p[23]||'').trim(),
+            latest_commercial_owner:(p[24]||'').trim(),
+            latest_kam_email:      (p[25]||'').trim(),
+            latest_tl_email:       (p[26]||'').trim(),
+            base_kam_email:        (p[27]||'').trim(),
+            base_tl_email:         (p[28]||'').trim()
           };
           allRows.push(row);
-          if(row.period_kam_email){
-            if(!byKamEmail[row.period_kam_email])byKamEmail[row.period_kam_email]=[];
-            byKamEmail[row.period_kam_email].push(row);
+          if(row.latest_kam_email){
+            if(!byKamEmail[row.latest_kam_email])byKamEmail[row.latest_kam_email]=[];
+            byKamEmail[row.latest_kam_email].push(row);
           }
-          if(row.period_tl_email){
-            if(!byTlEmail[row.period_tl_email])byTlEmail[row.period_tl_email]=[];
-            byTlEmail[row.period_tl_email].push(row);
+          if(row.latest_tl_email){
+            if(!byTlEmail[row.latest_tl_email])byTlEmail[row.latest_tl_email]=[];
+            byTlEmail[row.latest_tl_email].push(row);
           }
         });
         window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
