@@ -2384,8 +2384,9 @@ async function computeCommissionDraft(periodOverride) {
       ...r,
       period_month: period,
       snapshot_status: 'draft',
-      breakdown: r.breakdown || {},
-      lock_note: periodOverride ? 'retroactive' : 'manual',
+      // note: retroactive/manual tag stored inside breakdown jsonb —
+      // commission_payout_snapshots has no top-level column for it (was causing 400 error)
+      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor
