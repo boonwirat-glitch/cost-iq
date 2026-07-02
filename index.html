@@ -1,4 +1,4 @@
-<!-- Freshket Sense v820: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v827-q3: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v820',
+      version: 'v827-q3',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12389,7 +12389,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- Collapsible: summary cards + AI button + search -->
 <div class="pv-collapsible expanded" id="pv-collapsible">
 <!-- Summary stats -->
-<div id="portview-pace-bar" style="display:none;margin-bottom:12px" onclick="_qnrrOpen()" title="ดูสุขภาพพอร์ต Q2"></div>
+<div id="portview-pace-bar" style="display:none;margin-bottom:12px" onclick="_qnrrOpen()" title="ดูสุขภาพพอร์ต Q3"></div>
 <div class="pv-commission-strip-slot" id="pv-commission-strip"></div>
 <div class="portview-summary-row" id="portview-summary-row"></div>
 <!-- AI Insight button -->
@@ -16454,7 +16454,7 @@ window._fetchUpsellBundle=_fetchUpsellBundle;
 // v753g: Fetch Quarter NRR — SINGLE FILE for all KAMs (~2.6MB)
 // File: sense_qnrr_2026q2.csv (no per-KAM split)
 // Quarter key: update each Q. IDB cache tab='qnrr' TTL=6h
-const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q2';
+const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q3';
 let _qnrrFetchPromise = null; // global dedup — only one fetch ever
 async function _fetchQnrrBundle(){
   // Already loaded in memory
@@ -34626,13 +34626,34 @@ function _commDaysInLabel(label) {
   } catch(e) { return 30; }
 }
 
+// ── Quarterly base month helper ─────────────────────────────────
+// Returns array of Thai month labels, counting back `count` months from baseMonthOverride.
+// If baseMonthOverride is null → rolling lag-1 anchor (Q2 / MoM behavior).
+function _commBaseMonthLabels(baseMonthOverride, count) {
+  if (!baseMonthOverride) {
+    // Rolling MoM: labels from lag-1 anchor (existing behavior)
+    return Array.from({length: count}, function(_, i) { return _commMonthLabelOffset(i + 1); });
+  }
+  // Quarterly: anchor is fixed base_month (e.g. '2026-06')
+  var parts = baseMonthOverride.split('-');
+  var yr = parseInt(parts[0], 10);
+  var mo = parseInt(parts[1], 10); // 1-based
+  var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return Array.from({length: count}, function(_, i) {
+    var d = new Date(yr, mo - 1 - i, 1); // mo-1 = 0-based, then subtract i months
+    return _THAI_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+  });
+}
+
 // ── Upsell SKU Engine ───────────────────────────────────────────
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
-function _commComputeUpsellSku(kamEmail, expansionIds) {
+function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
+  // baseMonthOverride (optional): '2026-06' for quarterly Q3 — pins P1/P3 3M lookback window.
+  //   null → rolling MoM (existing behavior unchanged)
   const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
@@ -34651,7 +34672,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
 
     const currLabel  = _commCurrentMonthLabel();
-    const baseLabel  = _commBaselineMonthLabel();
+    // [quarterly] anchor to fixed base_month; [monthly] rolling (unchanged)
+    const baseLabel  = baseMonthOverride
+      ? _commBaseMonthLabels(baseMonthOverride, 1)[0]
+      : _commBaselineMonthLabel();
     console.log('%c[Sense Upsell] compute','color:#f0b000',
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
@@ -34718,8 +34742,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
             // P3: คงเดิม — existing outlet ซื้อเพิ่มจาก max_baseline
             let maxBaseline = 0;
             let maxBaselineMonth = baseLabel;
-            for (let i = 1; i <= 3; i++) {
-              const lbl = _commMonthLabelOffset(i);
+            // [quarterly] pin 3M window to base_month; [monthly] rolling lag-1 (unchanged)
+            const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
+            for (let i = 0; i < _p3Labels.length; i++) {
+              const lbl = _p3Labels[i];
               const lRow = monthData[lbl];
               if (!lRow) continue;
               const d = _commDaysInLabel(lbl);
@@ -34995,18 +35021,33 @@ function _commComputeTeamUpsellMult(tlEmail) {
 
 // ── KAM Full Payout Builder ─────────────────────────────────────
 // Returns complete breakdown for one KAM
-function _commBuildKamPayout(kamEmail) {
+function _commBuildKamPayout(kamEmail, periodOverride) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(kamEmail, null);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, kamEmail, null);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
+    const period  = periodOverride || _nrrExclusionCurrentPeriod();
+    const policy  = _nrrGovResolveForVisibleScope();
+    const isQ     = policy && policy.commission_mode === 'quarterly';
+    const baseMo  = isQ ? (policy.base_month || null) : null;
+
+    // ── NRR source ────────────────────────────────────────────────
+    // [quarterly] read from bulkQnrrData via _qnrrComputeForCommission (same source as QNRR sheet)
+    // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR — periodOverride threads through
+    //             as asOfPeriod for frozen historical-month NRR (retroactive lock / auto-compute)
+    let raw, rawPct, governedPct, pct;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(kamEmail, 'kam');
+    } else {
+      raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
+    }
+    rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    governedPct = _nrrGovernedPct(raw, kamEmail, null);
+    pct         = governedPct !== null ? governedPct : rawPct;
+
+    const planCode  = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
     const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
 
-    // Upsell: try full bundle first, fall back to pre-computed team summary
-    // Team summary (bulkUpsellTeamData) is loaded as FOREGROUND — always available
+    // ── Upsell ────────────────────────────────────────────────────
+    // [quarterly] Expansion GMV comes from qnrrResult (bulkQnrrData), Upsell SKU uses pin window
+    // [monthly]   existing logic unchanged
     let upsellSku, upsellOutlet;
     const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
     // Q3C Team SQL keys by ka_owner (display name), not email — try both
@@ -35037,12 +35078,13 @@ function _commBuildKamPayout(kamEmail) {
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
       upsellOutlet = _commComputeUpsellOutlet(kamEmail);
-      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds);
+      // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
     }
-    const handover      = _commComputeHandoverRetention(kamEmail);
-    const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
+    const handover = _commComputeHandoverRetention(kamEmail); // MoM always — do not touch
+    const gate     = _commComputeGmvGate(kamEmail, pct);
 
-    const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
+    const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
 
     return {
@@ -35055,7 +35097,11 @@ function _commBuildKamPayout(kamEmail) {
       gate,
       subtotal,
       gate_cap: gate.cap_multiplier,
-      upsell_loading: upsellLoading, // v228-fix: true when upsell CSV not loaded in session
+      upsell_loading: upsellLoading,
+      commission_mode: isQ ? 'quarterly' : 'monthly',
+      base_month:      baseMo,
+      quarter_id:      isQ ? (policy.quarter_id || null) : null,
+      nrr_base_gmv:    isQ && raw ? Math.round(raw.baselinePrevGmv || 0) : null,
       final_payout: finalPayout
     };
   } catch(e) {
@@ -35067,15 +35113,25 @@ function _commBuildKamPayout(kamEmail) {
 }
 
 // ── TL Full Payout Builder ──────────────────────────────────────
-function _commBuildTlPayout(tlEmail) {
+function _commBuildTlPayout(tlEmail, periodOverride) {
   try {
-    const period = _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(null, tlEmail);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const period = periodOverride || _nrrExclusionCurrentPeriod();
+    const policy = _nrrGovResolveForVisibleScope();
+    const isQ    = policy && policy.commission_mode === 'quarterly';
+
+    // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR,
+    // periodOverride threads through as asOfPeriod for frozen historical-month NRR
+    let raw;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(tlEmail, 'tl');
+    } else {
+      raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
+    }
+    const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
-    const nrrPayout = _commPayoutForPctByCode(planCode, 'tl', pct);
+    const pct         = governedPct !== null ? governedPct : rawPct;
+    const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
+    const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
     const upsellMult = _commComputeTeamUpsellMult(tlEmail);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
@@ -35160,7 +35216,7 @@ async function loadTargets(quarter) {
 
   try {
     const { data: policies, error: polErr } = await supa.from('nrr_policies')
-      .select('period_month,scope_type,scope_key,base_mode,base_month,status,updated_by,updated_at')
+      .select('period_month,scope_type,scope_key,base_mode,base_month,commission_mode,quarter_id,status,updated_by,updated_at')
       .in('period_month', months);
     if (polErr) throw new Error(polErr.message);
     (policies || []).forEach(p => {
@@ -36228,14 +36284,16 @@ async function saveCommissionPoliciesFromCockpit() {
   if (!rows.length) return;
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const payload = rows.map(p => ({
-    period_month: p.period_month,
-    scope_type: p.scope_type || 'all',
-    scope_key: p.scope_key || 'all',
-    base_mode: p.base_mode || 'rolling_mom',
-    base_month: p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
-    status: p.status || 'draft',
-    updated_by: actor,
-    updated_at: new Date().toISOString()
+    period_month:    p.period_month,
+    scope_type:      p.scope_type || 'all',
+    scope_key:       p.scope_key || 'all',
+    base_mode:       p.base_mode || 'rolling_mom',
+    base_month:      p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
+    commission_mode: p.commission_mode || 'monthly',   // 'monthly' | 'quarterly'
+    quarter_id:      p.commission_mode === 'quarterly' ? (p.quarter_id || null) : null,
+    status:          p.status || 'draft',
+    updated_by:      actor,
+    updated_at:      new Date().toISOString()
   }));
   const { error } = await supa.from('nrr_policies').upsert(payload, { onConflict:'period_month,scope_type,scope_key' });
   if (error) throw new Error(error.message);
@@ -36362,8 +36420,8 @@ function _commGetTlListFromPortview() {
 // v225-comm: Extended snapshot rows with full component breakdown
 // payout_amount = final_payout (NRR + Upsell + Handover) × GMV Gate
 // breakdown jsonb includes config_snapshot for audit immutability
-function _commBuildSnapshotRows() {
-  const period = _nrrExclusionCurrentPeriod();
+function _commBuildSnapshotRows(periodOverride) {
+  const period = periodOverride || _nrrExclusionCurrentPeriod();
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const rows = [];
@@ -36374,7 +36432,8 @@ function _commBuildSnapshotRows() {
   const tls = role === 'admin' ? _commGetTlListFromPortview() : [{ email: visibleTlEmail, name: (currentUserProfile && currentUserProfile.full_name) || visibleTlEmail }];
 
   tls.filter(t => t.email).forEach(tl => {
-    const tlPayout = _commBuildTlPayout(tl.email);
+    // v826: thread periodOverride so retroactive/auto-compute freezes the correct historical month
+    const tlPayout = _commBuildTlPayout(tl.email, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
@@ -36406,7 +36465,7 @@ function _commBuildSnapshotRows() {
   groups.forEach(g => {
     if (!g.kamEmail) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
-    const kamPayout = _commBuildKamPayout(g.kamEmail);
+    const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
     rows.push({
       period_month: period,
       beneficiary_role: 'kam',
@@ -36850,7 +36909,9 @@ function exportCommissionSnapshotCsv(periodOverride) {
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
-  const rows = _commBuildSnapshotRows();
+  // v826: thread periodOverride through — previously always computed live/current data
+  // and just relabeled it, which is why retroactive Compute produced wrong numbers.
+  const rows = _commBuildSnapshotRows(periodOverride);
   if (!rows.length) {
     if (typeof showToast === 'function') showToast('ไม่มีข้อมูลสำหรับ compute', '!');
     return false;
@@ -36861,8 +36922,9 @@ async function computeCommissionDraft(periodOverride) {
       ...r,
       period_month: period,
       snapshot_status: 'draft',
-      breakdown: r.breakdown || {},
-      lock_note: periodOverride ? 'retroactive' : 'manual',
+      // note: retroactive/manual tag stored inside breakdown jsonb —
+      // commission_payout_snapshots has no top-level column for it (was causing 400 error)
+      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor
@@ -36875,7 +36937,12 @@ async function computeCommissionDraft(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('Compute สำเร็จ — ตรวจก่อนกด Lock', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: renderCommissionLockTab() targets #tgt-sheet-body (KAM/TL personal scorecard sheet),
+    // NOT #commission-cockpit-body where the Cockpit's Lock/Retroactive section actually lives.
+    // Re-render whichever surface is currently open so the just-saved draft becomes visible.
+    const _cockpitOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpen && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommDraft] saved ${payload.length} draft rows for ${period}`);
     return true;
   } catch (e) {
@@ -36927,7 +36994,10 @@ async function lockCommissionSnapshot(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('🔒 Lock commission สำเร็จ', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: same #tgt-sheet-body vs #commission-cockpit-body mismatch as computeCommissionDraft above.
+    const _cockpitOpenLock = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpenLock && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommLock] locked ${payload.length} rows for ${period}`);
   } catch (e) {
     console.error('[CommLock] failed:', e);
@@ -37470,7 +37540,47 @@ function renderCommPolicyStep(body) {
           <div class="comm-field"><label>Scope</label><input class="comm-input" value="All teams" disabled></div>
         </div>
       </div>`;
-    }).join('')}`;
+
+    <div class="comm-card" style="margin-top:12px;border:1.5px solid rgba(255,210,80,.18);background:rgba(255,200,60,.04)">
+      <div class="comm-card-top">
+        <div>
+          <div class="comm-name" style="color:#f0c040">Commission Mode — Q3 2026</div>
+          <div class="comm-meta">NRR + Expansion + Upsell P1/P3 ใช้ base ไหน &middot; Handover ใช้ MoM เสมอ</div>
+        </div>
+        <span class="comm-badge" style="background:rgba(255,200,60,.15);color:#f0c040">ก.ค.&ndash;ก.ย.</span>
+      </div>
+      <div class="comm-grid2" style="margin-top:10px">
+        <div class="comm-field" style="grid-column:1/-1">
+          <label>Mode</label>
+          <div style="display:flex;gap:16px;margin-top:6px;align-items:center">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+              <input type="radio" name="comm_mode_q3" value="monthly"
+                ${(_nrrGovGetQuarterlyMode()||'monthly')==='monthly'?'checked':''}
+                onchange="onNrrPolicyChangeMode('monthly')">
+              Monthly (Rolling MoM)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+              <input type="radio" name="comm_mode_q3" value="quarterly"
+                ${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'checked':''}
+                onchange="onNrrPolicyChangeMode('quarterly')">
+              Quarterly (Fixed Base มิ.ย.)
+            </label>
+          </div>
+        </div>
+        <div class="comm-field">
+          <label>NRR &amp; Expansion</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.55)">${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'vs มิ.ย. 2569 (fixed ตลอด Q3)':'Rolling vs เดือนก่อน'}</div>
+        </div>
+        <div class="comm-field">
+          <label>Upsell P1/P3</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.55)">${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'3M lookback จาก มิ.ย. (pin ตลอด Q3)':'Rolling 3M'}</div>
+        </div>
+        <div class="comm-field" style="grid-column:1/-1">
+          <label>Handover</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.30)">&#128274; Monthly เสมอ — ไม่ขึ้นกับ mode (by design)</div>
+        </div>
+      </div>
+    </div>`;
 }
 function renderCommAssignmentStep(body) {
   const period = _nrrExclusionCurrentPeriod();
@@ -37976,6 +38086,7 @@ function renderCommLockStep(body) {
         <div><div class="comm-hero-title">5. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
         <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(summary.total)}</div></div>
       </div>
+      <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
       <div class="comm-kpis">
         <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:(model.teamPct!==null?model.teamPct+'%':'—')}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
         <div class="comm-kpi ${summary.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.tlPayout)}</div><div class="comm-kpi-sub">${summary.tlRows.length} TL rows</div></div>
@@ -37984,7 +38095,6 @@ function renderCommLockStep(body) {
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?'ยังมี exclusion pending ' + pending + ' รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ':'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
       <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
     </div>
-    <div class="comm-lock-subtabs" style="margin:8px 0 4px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive</button></div>
     <div id="comm-lock-detail-body">
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
@@ -38626,6 +38736,40 @@ function onNrrPolicyChange(periodMonth, field, value) {
     _commUpdateSaveButtonState();
   }
 }
+
+// ── Quarterly mode helpers ─────────────────────────────────────────────
+// Get current commission_mode from all visible periods' policies
+function _nrrGovGetQuarterlyMode() {
+  // Read from published/pending policies — any period with commission_mode='quarterly' wins
+  const allPolicies = Object.values(_nrrGovPolicies || {});
+  const allPending  = Object.values(_nrrGovPending  || {});
+  const combined    = [...allPending, ...allPolicies];
+  const q = combined.find(function(p) { return p && p.commission_mode === 'quarterly'; });
+  if (q) return 'quarterly';
+  const m = combined.find(function(p) { return p && p.commission_mode === 'monthly'; });
+  return m ? 'monthly' : 'monthly'; // default monthly
+}
+
+// Called from Quarterly Mode UI radio button change
+function onNrrPolicyChangeMode(mode) {
+  // Apply commission_mode to all visible period policies
+  const now = new Date();
+  const q   = _tgtActiveQuarter || _tgtCurrentQuarter();
+  const months = _tgtQuarterMonths(q);
+  months.forEach(function(m) {
+    const key     = _nrrGovKey(m, 'all', 'all');
+    const current = _nrrGovGetPending(m, 'all', 'all');
+    _nrrGovPending[key] = {
+      ...current,
+      commission_mode: mode,
+      quarter_id: mode === 'quarterly' ? '2026-Q3' : null
+    };
+  });
+  _commMarkChanged();
+  const commOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+  if (commOpen) renderCommissionCockpit(); else renderNrrPolicyTab();
+}
+window.onNrrPolicyChangeMode = onNrrPolicyChangeMode;
 
 function _tgtRefreshAllocBar() {
   const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
@@ -43152,6 +43296,7 @@ window._commOpenHistoryDetail = function(period) {
     +'<div style="text-align:right">'
     +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tk-ok-glow);font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px">NRR</div>'
     +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+'</div>'
+    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
     +'</div>'
     +'</div>';
 
@@ -43173,6 +43318,11 @@ window._commOpenHistoryDetail = function(period) {
     // NRR row
     var nrrSub = 'NRR '+( focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—' );
     if (nrrOutletCount) nrrSub += ' · '+nrrOutletCount+' outlets';
+    // [quarterly] show base_month pin label; [monthly] show rolling label
+    var _baseModeLbl = bd.commission_mode === 'quarterly'
+      ? 'vs มิ.ย. 2569 (Q3 fixed)'
+      : (bd.prevMonth ? 'vs ' + bd.prevMonth + ' (rolling)' : '');
+    if (_baseModeLbl) nrrSub += ' · ' + _baseModeLbl;
     bodyHtml += srcRow('NRR (รักษาฐาน)', nrrSub, moneyFull(bd.nrr_payout||0), 'var(--tk-ok-bright)');
 
     // P1
@@ -51738,14 +51888,14 @@ window._skCardRipple           = _skCardRipple;
 // Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
 // Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
 var QNRR_CFG = {
-  quarter:    '2026q2',
-  base_month: '2026-03',
-  q_months:   ['2026-04','2026-05','2026-06'],
+  quarter:    '2026q3',
+  base_month: '2026-06',
+  q_months:   ['2026-07','2026-08','2026-09'],
   months_th:  {
-    '2026-03':'มี.ค.','2026-04':'เม.ย.',
-    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
+    '2026-06':'มิ.ย.','2026-07':'ก.ค.',
+    '2026-08':'ส.ค.', '2026-09':'ก.ย.'
   },
-  csv_file:   'sense_qnrr_2026q2.csv'
+  csv_file:   'sense_qnrr_2026q3.csv'
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -51970,6 +52120,83 @@ function _qnrrCompute(kamEmail, scope) {
   };
 }
 window._qnrrCompute = _qnrrCompute;
+// ── _qnrrComputeForCommission (Q3 quarterly mode) ───────────────────────────────
+// Wraps _qnrrCompute() and reshapes output for _commBuildKamPayout / _commBuildTlPayout.
+// Source of truth: bulkQnrrData (sense_qnrr_2026q3.csv) — same as QNRR sheet.
+// Guarantees NRR% in commission = NRR% in QNRR sheet (T3).
+//
+// scope: 'kam' | 'tl' | 'admin'
+// currentPeriod: '2026-07' | '2026-08' | '2026-09' (lag-1 YYYY-MM)
+function _qnrrComputeForCommission(kamEmail, scope) {
+  try {
+    // Determine current billing period from lag-1 date (Day-1 lag, same as MoM engine)
+    var now    = new Date();
+    var lag1   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    var lagYM  = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
+
+    // Clamp to Q3 months — if lagged date is outside Q3, use last available Q3 month
+    var validQ = QNRR_CFG.q_months;  // ['2026-07','2026-08','2026-09']
+    var currentPeriod = validQ.includes(lagYM) ? lagYM : validQ[validQ.length - 1];
+
+    // Delegate to existing _qnrrCompute — no logic duplication
+    var result = _qnrrCompute(kamEmail, scope || 'kam');
+    if (!result || !result.by_month) {
+      console.warn('[QnrrComm] _qnrrCompute returned null for', kamEmail, scope);
+      return null;
+    }
+
+    var monthData = result.by_month[currentPeriod];
+    if (!monthData) {
+      // Period data not yet available (e.g. Sep not started) — use latest available
+      var availableMonths = validQ.filter(function(m) { return !!result.by_month[m]; });
+      if (!availableMonths.length) {
+        console.warn('[QnrrComm] no period data for', kamEmail, currentPeriod);
+        return null;
+      }
+      currentPeriod = availableMonths[availableMonths.length - 1];
+      monthData = result.by_month[currentPeriod];
+    }
+
+    var segs    = monthData.segments || {};
+    var outlets = monthData.outlets  || {};
+
+    // base_norm × 30 = normalized base GMV (Jun @ 30 days — locked for Q3)
+    var baseGmv = Math.round((result.base_norm || 0) * 30);
+
+    // Thai month label for base_month (มิ.ย. 2569) — shown in history detail
+    var baseMo  = QNRR_CFG.base_month;  // '2026-06'
+    var baseParts = baseMo.split('-');
+    var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var baseMoLabel = _THAI_MONTHS[parseInt(baseParts[1], 10) - 1] + ' ' + (parseInt(baseParts[0], 10) + 543);
+
+    console.log('%c[QnrrComm] compute','color:#60a5fa',
+      {kamEmail, scope, currentPeriod, nrr_pct: monthData.nrr_pct, baseGmv,
+       core: segs.core_nrr, expansion: segs.expansion, comeback: segs.comeback});
+
+    return {
+      // NRR fields matching _tgtComputeKamNRR() output shape (used by _commBuildKamPayout)
+      nrr:              (monthData.nrr_pct || 0) / 100,
+      baselinePrevGmv:  baseGmv,
+      cohortGmv:        segs.core_nrr   || 0,
+      expansionGmv:     segs.expansion  || 0,
+      comebackGmv:      segs.comeback   || 0,
+      cohortCount:      outlets.core_nrr || 0,
+      // Quarterly metadata — stored in breakdown snapshot
+      prevMonth:        baseMoLabel,           // 'มิ.ย. 2569' — fixed label for Q3
+      base_month:       baseMo,                // '2026-06'
+      quarter_id:       QNRR_CFG.quarter,      // '2026q3'
+      commission_mode:  'quarterly',
+      // Source info
+      currentPeriod:    currentPeriod,
+      by_month:         result.by_month
+    };
+  } catch (e) {
+    console.warn('[QnrrComm] _qnrrComputeForCommission error', e);
+    return null;
+  }
+}
+window._qnrrComputeForCommission = _qnrrComputeForCommission;
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // Freshket Sense — Quarter NRR Health Sheet (v775)
@@ -51985,14 +52212,14 @@ window._qnrrCompute = _qnrrCompute;
 // Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
 // Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
 var QNRR_CFG = {
-  quarter:    '2026q2',
-  base_month: '2026-03',
-  q_months:   ['2026-04','2026-05','2026-06'],
+  quarter:    '2026q3',
+  base_month: '2026-06',
+  q_months:   ['2026-07','2026-08','2026-09'],
   months_th:  {
-    '2026-03':'มี.ค.','2026-04':'เม.ย.',
-    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
+    '2026-06':'มิ.ย.','2026-07':'ก.ค.',
+    '2026-08':'ส.ค.', '2026-09':'ก.ย.'
   },
-  csv_file:   'sense_qnrr_2026q2.csv'
+  csv_file:   'sense_qnrr_2026q3.csv'
 };
 // ─────────────────────────────────────────────────────────────────────────────
 var MONTHS_TH = QNRR_CFG.months_th;
@@ -53383,12 +53610,12 @@ window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
 <!-- QNRR HEALTH SHEET — Quarter NRR Portfolio Health (v780) -->
 <div class="qnrr-overlay" id="qnrr-overlay" onclick="_qnrrClose()"></div>
-<div class="qnrr-sheet" id="qnrr-sheet" role="dialog" aria-label="สุขภาพพอร์ต Q2">
+<div class="qnrr-sheet" id="qnrr-sheet" role="dialog" aria-label="สุขภาพพอร์ต Q3">
   <div class="qnrr-handle-row" id="qnrr-handle"><div class="qnrr-handle-pill"></div></div>
   <!-- Zone A: Hero -->
   <div class="qnrr-head" id="qnrr-head">
     <div class="qnrr-title-row">
-      <div class="qnrr-eyebrow" style="margin-bottom:0">Portfolio Health · Q2 2026</div>
+      <div class="qnrr-eyebrow" style="margin-bottom:0">Portfolio Health · Q3 2026</div>
       <button class="qnrr-scope-chip" id="qnrr-scope-btn" onclick="_qnrrCycleScope()" style="display:none">
         <span id="qnrr-scope-lbl">KAM</span><span class="qnrr-scope-arr">▾</span>
       </button>
