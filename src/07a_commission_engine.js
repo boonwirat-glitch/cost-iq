@@ -2399,7 +2399,12 @@ async function computeCommissionDraft(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('Compute สำเร็จ — ตรวจก่อนกด Lock', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: renderCommissionLockTab() targets #tgt-sheet-body (KAM/TL personal scorecard sheet),
+    // NOT #commission-cockpit-body where the Cockpit's Lock/Retroactive section actually lives.
+    // Re-render whichever surface is currently open so the just-saved draft becomes visible.
+    const _cockpitOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpen && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommDraft] saved ${payload.length} draft rows for ${period}`);
     return true;
   } catch (e) {
@@ -2451,7 +2456,10 @@ async function lockCommissionSnapshot(periodOverride) {
     const others = (_commissionSnapshots || []).filter(r => r.period_month !== period);
     _commissionSnapshots = [...others, ...(data || payload)];
     if (typeof showToast === 'function') showToast('🔒 Lock commission สำเร็จ', 'ok');
-    if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
+    // fix: same #tgt-sheet-body vs #commission-cockpit-body mismatch as computeCommissionDraft above.
+    const _cockpitOpenLock = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+    if (_cockpitOpenLock && typeof renderCommissionCockpit === 'function') renderCommissionCockpit();
+    else if (typeof renderCommissionLockTab === 'function') renderCommissionLockTab();
     console.log(`[CommLock] locked ${payload.length} rows for ${period}`);
   } catch (e) {
     console.error('[CommLock] failed:', e);
