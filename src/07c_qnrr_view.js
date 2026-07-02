@@ -241,16 +241,23 @@ window._qnrrCompute = _qnrrCompute;
 //
 // scope: 'kam' | 'tl' | 'admin'
 // currentPeriod: '2026-07' | '2026-08' | '2026-09' (lag-1 YYYY-MM)
-function _qnrrComputeForCommission(kamEmail, scope) {
+function _qnrrComputeForCommission(kamEmail, scope, asOfPeriod) {
   try {
-    // Determine current billing period from lag-1 date (Day-1 lag, same as MoM engine)
-    var now    = new Date();
-    var lag1   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    var lagYM  = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
-
-    // Clamp to Q3 months — if lagged date is outside Q3, use last available Q3 month
     var validQ = QNRR_CFG.q_months;  // ['2026-07','2026-08','2026-09']
-    var currentPeriod = validQ.includes(lagYM) ? lagYM : validQ[validQ.length - 1];
+    var currentPeriod;
+    if (asOfPeriod && validQ.includes(asOfPeriod)) {
+      // v829: explicit period requested (Retroactive Lock / auto-compute-at-month-start) —
+      // use it directly instead of "today". bulkQnrrData already has rows for all 3 quarter
+      // months at once, so no extra fetch is needed — just pick a different by_month key.
+      currentPeriod = asOfPeriod;
+    } else {
+      // Determine current billing period from lag-1 date (Day-1 lag, same as MoM engine)
+      var now    = new Date();
+      var lag1   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      var lagYM  = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
+      // Clamp to Q3 months — if lagged date is outside Q3, use last available Q3 month
+      currentPeriod = validQ.includes(lagYM) ? lagYM : validQ[validQ.length - 1];
+    }
 
     // Delegate to existing _qnrrCompute — no logic duplication
     var result = _qnrrCompute(kamEmail, scope || 'kam');
