@@ -552,7 +552,7 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail) {
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     const kamEmails = Array.from(new Set(
@@ -578,7 +578,10 @@ function _commComputeTeamUpsellMult(tlEmail) {
         const upsell = _commComputeUpsellSku(ke);
         teamUpsellGmv += upsell.tl_upsell_base;
       }
-      const raw = _tgtComputeKamNRR(ke, null);
+      // v828: quarterly mode sums each KAM's fixed-base GMV from QNRR, not MoM rolling base
+      const raw = isQuarterly && typeof window._qnrrComputeForCommission === 'function'
+        ? window._qnrrComputeForCommission(ke, 'kam')
+        : _tgtComputeKamNRR(ke, null);
       teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
     });
 
@@ -729,7 +732,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
     const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail);
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
