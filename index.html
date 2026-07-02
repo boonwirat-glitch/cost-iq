@@ -1,4 +1,4 @@
-<!-- Freshket Sense q3-parser-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense q3-all-16-fixed: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'q3-parser-fix',
+      version: 'q3-all-16-fixed',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -30323,7 +30323,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -30355,7 +30355,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -30388,7 +30388,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=(function(){try{var _p=_nrrGovResolveForVisibleScope();if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)return window._qnrrComputeForCommission(g.kamEmail,'kam')||_tgtComputeKamNRR(g.kamEmail,null);}catch(e){}return _tgtComputeKamNRR(g.kamEmail, null);})();
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
@@ -34815,15 +34815,40 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
 // ── Upsell Outlet Engine ────────────────────────────────────────
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
-function _commComputeUpsellOutlet(kamEmail) {
+function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
   // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
   // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
+  // v828: qnrrRaw (optional) = already-computed _qnrrComputeForCommission() result from the
+  // caller (_commBuildKamPayout) — when provided, use QNRR-sourced expansion data instead of
+  // _tgtComputeKamNRR (MoM). Was previously always MoM even when caller was in quarterly mode,
+  // meaning outlets got wrongly INCLUDED in P1/P3 instead of excluded (or vice versa).
   const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
-    const nrrResult = _tgtComputeKamNRR(kamEmail, null);
+
+    if (qnrrRaw) {
+      const monthData = qnrrRaw.by_month && qnrrRaw.currentPeriod ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
+      const rows = (monthData && monthData.rows) || [];
+      const expansionIds = new Set();
+      let expansionGmv = 0;
+      rows.forEach(r => {
+        if (r.movement_type === 'expansion') {
+          if (r.outlet_id) expansionIds.add(String(r.outlet_id));
+          expansionGmv += parseFloat(r.curr_gmv) || 0;
+        }
+      });
+      return {
+        outlet_gmv: expansionGmv,
+        commission: expansionGmv * rate,
+        expansion_gmv: expansionGmv,
+        expansion_outlets: [],
+        _expansionIds: expansionIds
+      };
+    }
+
+    if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
+    const nrrResult = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     if (!nrrResult) return EMPTY;
 
     // Sum expansion GMV across all cohorts (core + transferIn + newFromSales)
@@ -34855,6 +34880,54 @@ function _commComputeUpsellOutlet(kamEmail) {
     return EMPTY;
   }
 }
+
+// ── Quarterly drill-down helper (shared) ─────────────────────────────────
+// v828: returns a _tgtComputeKamNRR-shaped result { cohortDetail, expansionDetail,
+// comebackDetail, cohortCount, cohortGmv, expansionGmv, comebackGmv } built from
+// bulkQnrrData instead of MoM bulkHistoryData — used by every drill-down sheet in
+// 07b_cds.js so "click for detail" always matches the quarterly total shown above it.
+// Returns null if not in quarterly mode or QNRR data unavailable (caller should then
+// fall back to its own existing _tgtComputeKamNRR(email,null) call).
+function _commQnrrDrillResult(email, scope) {
+  try {
+    const policy = _nrrGovResolveForVisibleScope();
+    if (!policy || policy.commission_mode !== 'quarterly') return null;
+    if (typeof window._qnrrComputeForCommission !== 'function') return null;
+    const qr = window._qnrrComputeForCommission(email, scope || 'kam');
+    if (!qr || !qr.by_month || !qr.currentPeriod) return null;
+    const monthData = qr.by_month[qr.currentPeriod];
+    const rows = (monthData && monthData.rows) || [];
+
+    function groupByAccount(movementType) {
+      const byAcct = {};
+      rows.filter(r => r.movement_type === movementType).forEach(r => {
+        const aid = r.account_id || r.account_name;
+        if (!byAcct[aid]) byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [], prevTotal: 0, currTotal: 0 };
+        const prev = Math.round(r.base_gmv || 0), curr = Math.round(r.curr_gmv || 0);
+        byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name, prevGmv: prev, currGmv: curr,
+          delta: prev > 0 ? Math.round((curr - prev) / prev * 100) : null });
+        byAcct[aid].prevTotal += prev; byAcct[aid].currTotal += curr;
+      });
+      return Object.values(byAcct);
+    }
+
+    const cohortDetail    = groupByAccount('core_nrr');
+    const expansionDetail = groupByAccount('expansion');
+    const comebackDetail  = groupByAccount('comeback');
+    const sumCurr = arr => arr.reduce((s,g)=>s+g.currTotal,0);
+    const sumCnt  = arr => arr.reduce((s,g)=>s+g.outlets.length,0);
+
+    return {
+      nrr: qr.nrr, cohortCount: sumCnt(cohortDetail), cohortGmv: sumCurr(cohortDetail),
+      baselinePrevGmv: qr.baselinePrevGmv,
+      comebackGmv: sumCurr(comebackDetail), comebackCount: sumCnt(comebackDetail),
+      expansionGmv: sumCurr(expansionDetail), expansionCount: sumCnt(expansionDetail),
+      cohortDetail, comebackDetail, expansionDetail,
+      transferIn: null, newFromSales: null // quarterly mode doesn't split these separately
+    };
+  } catch(e) { console.warn('[CommEngine] _commQnrrDrillResult error', e); return null; }
+}
+window._commQnrrDrillResult = _commQnrrDrillResult;
 
 // ── Handover Retention Engine ───────────────────────────────────
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
@@ -34975,7 +35048,7 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail) {
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     const kamEmails = Array.from(new Set(
@@ -35001,7 +35074,10 @@ function _commComputeTeamUpsellMult(tlEmail) {
         const upsell = _commComputeUpsellSku(ke);
         teamUpsellGmv += upsell.tl_upsell_base;
       }
-      const raw = _tgtComputeKamNRR(ke, null);
+      // v828: quarterly mode sums each KAM's fixed-base GMV from QNRR, not MoM rolling base
+      const raw = isQuarterly && typeof window._qnrrComputeForCommission === 'function'
+        ? window._qnrrComputeForCommission(ke, 'kam')
+        : _tgtComputeKamNRR(ke, null);
       teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
     });
 
@@ -35096,7 +35172,7 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellOutlet = _commComputeUpsellOutlet(kamEmail);
+      upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride);
       // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
       upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
     }
@@ -35152,7 +35228,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
     const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail);
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
@@ -35987,6 +36063,13 @@ function _tgtGetVisibleTeamNrrResult() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const tlMatch = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []).some(a => a.tlEmail === email);
   const showAll = role === 'admin' && !tlMatch;
+  // v828: Team Governance Card's NRR% — use QNRR when quarterly, else MoM as before
+  const policy = _nrrGovResolveForVisibleScope();
+  if (policy && policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+    const scopeEmail = showAll ? null : email;
+    const r = window._qnrrComputeForCommission(scopeEmail || email, showAll ? 'admin' : 'tl');
+    if (r) return r;
+  }
   return _tgtComputeKamNRR(null, showAll ? null : email);
 }
 function _tgtRenderTeamGovCard() {
@@ -36017,7 +36100,7 @@ function _tgtRenderTeamGovCard() {
     if (isTLRole(role)) {
       const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
       const _um2 = typeof _commComputeTeamUpsellMult==='function' && (typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0)
-        ? _commComputeTeamUpsellMult(_govEm2) : null;
+        ? _commComputeTeamUpsellMult(_govEm2, policy && policy.commission_mode === 'quarterly') : null;
       if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
     }
   } catch(e) {}
@@ -36033,7 +36116,7 @@ function _tgtRenderTeamGovCard() {
       const _govEmail = isTLRole(role)
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
-      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
+      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail, policy && policy.commission_mode === 'quarterly') : null;
       if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
@@ -36419,7 +36502,11 @@ function _nrrGovernanceForVisibleTeam() {
   return { raw, rawPct, governedPct, excludedBase: exclBase };
 }
 function _nrrGovernanceForKam(kamEmail) {
-  const raw = _tgtComputeKamNRR(kamEmail, null);
+  // v828: use QNRR source in quarterly mode so exclusion/threshold checks match commission total
+  const _policy = _nrrGovResolveForVisibleScope();
+  const raw = (_policy && _policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function')
+    ? window._qnrrComputeForCommission(kamEmail, 'kam')
+    : _tgtComputeKamNRR(kamEmail, null);
   const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
   const governedPct = _nrrGovernedPct(raw, kamEmail, null);
   const exclBase = _nrrExclusionBaseImpact(kamEmail, null);
@@ -36525,8 +36612,33 @@ function _commBuildSnapshotRows(periodOverride) {
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
         account_count: g.total || ((g.accounts || []).length),
         // v247e: NRR detail for reconcile — cohort + expansion outlet breakdown
-        nrr_cohort_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[] } catch(e){return []} })(),
-        expansion_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex; } catch(e){return []} })(),
+        // v828: quarterly mode reads cohort detail from bulkQnrrData rows (grouped by
+        // account) instead of _tgtComputeKamNRR — was silently showing MoM detail that
+        // didn't reconcile with the quarterly total shown just above.
+        nrr_cohort_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            const _byAcct = {};
+            _rows.filter(r => r.movement_type === 'core_nrr').forEach(r => {
+              const aid = r.account_id || r.account_name;
+              if (!_byAcct[aid]) _byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [] };
+              _byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name,
+                prevGmv: Math.round(r.base_gmv||0), currGmv: Math.round(r.curr_gmv||0) });
+            });
+            return Object.values(_byAcct);
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[]
+        } catch(e){return []} })(),
+        expansion_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            return _rows.filter(r => r.movement_type === 'expansion')
+              .map(r => ({ outletId: r.outlet_id, outletName: r.account_name, gmv: Math.round(r.curr_gmv||0) }));
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex;
+        } catch(e){return []} })(),
         lock_trigger: 'manual',
         csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
@@ -37479,8 +37591,14 @@ function _commBuildTeamPreviewGroups() {
     tlMap[tlEmail].kamRows.push(row);
     tlMap[tlEmail].kamTotal += Number(row.payout || 0);
   });
+  const _policyForTeamNrr = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQTeamNrr = _policyForTeamNrr && _policyForTeamNrr.commission_mode === 'quarterly';
   Object.values(tlMap).forEach(t => {
-    const raw = t.tlEmail === 'unassigned' ? null : _tgtComputeKamNRR(null, t.tlEmail);
+    // v828: quarterly mode reads Team NRR from QNRR source so it matches the commission total shown below it
+    const raw = t.tlEmail === 'unassigned' ? null
+      : (_isQTeamNrr && typeof window._qnrrComputeForCommission === 'function')
+        ? window._qnrrComputeForCommission(t.tlEmail, 'tl')
+        : _tgtComputeKamNRR(null, t.tlEmail);
     const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
     t.teamNrr = pct;
     t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
@@ -39876,10 +39994,20 @@ async function renderPortviewTargetBar() {
     catch(e){ return typeof bulkOutletsData !== 'undefined' && bulkOutletsData && Object.keys(bulkOutletsData).length > 0; }
   })();
 
+  // v828: quarterly mode reads this bar's NRR from QNRR source so it matches commission payout
+  const _policyForBar = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQBar = _policyForBar && _policyForBar.commission_mode === 'quarterly';
+  function _nrrBarSource(kamE, tlE) {
+    if (_isQBar && typeof window._qnrrComputeForCommission === 'function') {
+      const r = window._qnrrComputeForCommission(kamE || tlE, kamE ? 'kam' : (tlE ? 'tl' : 'admin'));
+      if (r) return r;
+    }
+    return _tgtComputeKamNRR(kamE, tlE);
+  }
   const nrrResult = _outletsReady
     ? (_repDetail
-        ? _tgtComputeKamNRR(_repEmail, null)
-        : (_showAll ? _tgtComputeKamNRR(null, null) : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null)))
+        ? _nrrBarSource(_repEmail, null)
+        : (_showAll ? _nrrBarSource(null, null) : _nrrBarSource(isTL ? null : email, isTL ? email : null)))
     : null;
   let nrrPct=null, cohortGmv=0, cbGmv=0, exGmv=0;
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
@@ -41176,7 +41304,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // If cohort sheet available + NRR data computable → use rich design
     if(email&&typeof _tgtComputeKamNRR==='function'&&typeof _tgtShowCohortSheet==='function'){
       var nrrResult=null;
-      try{ nrrResult=_tgtComputeKamNRR(email,null); }catch(e){}
+      try{ nrrResult=(typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(email,'kam'))||_tgtComputeKamNRR(email,null); }catch(e){}
       if(nrrResult){
         window._ncsLastNrrResult=nrrResult;
         // Label: prefer portview display name
@@ -41253,7 +41381,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     function mon(n){n=Number(n||0);if(!n)return'\u0e3f0';if(n>=1000000)return'\u0e3f'+(n/1000000).toFixed(1)+'M';if(n>=1000)return'\u0e3f'+(n/1000).toFixed(0)+'K';return'\u0e3f'+Math.round(n).toLocaleString('en-US');}
     function es(s){return String(s||'').replace(/[&<>'"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
 
-    var nrrResult=typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null;
+    var nrrResult=(typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||(typeof _tgtComputeKamNRR==='function'?_tgtComputeKamNRR(st.email,null):null);
     var rate=Number(String(cfg.outRate||'1.5'))/100||0.015;
 
     var allAccounts=[];
@@ -42170,7 +42298,7 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   var nrr = null;
   try {
     if (st.email && typeof _tgtComputeKamNRR === 'function') {
-      nrr = _tgtComputeKamNRR(st.email, null);
+      nrr = (typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||_tgtComputeKamNRR(st.email, null);
     }
   } catch(e) {}
 
@@ -42375,7 +42503,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   try {
     if (st.email && typeof _tgtComputeKamNRR === 'function') {
       window._ncsLastNrrResult = window._ncsLastNrrResult || null;
-      nr = _tgtComputeKamNRR(st.email, null);
+      nr = (typeof _commQnrrDrillResult==='function'&&_commQnrrDrillResult(st.email,'kam'))||_tgtComputeKamNRR(st.email, null);
       window._ncsLastNrrResult = nr;
       window._ncsKamLabel = (st.kamName || st.email || '').split('@')[0];
     }
