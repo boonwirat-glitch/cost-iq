@@ -36,7 +36,7 @@ function _qnrrCompute(kamEmail, scope) {
   var myTlEmail = '';
   var kamRows = (qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
   if (kamRows.length) {
-    myTlEmail = (kamRows.find(function(r){return r.period_tl_email;}) || {}).period_tl_email || '';
+    myTlEmail = (kamRows.find(function(r){return r.latest_tl_email;}) || {}).latest_tl_email || ''; // v827-fix
   }
   // v817: TL/Admin login ตรงๆ — email ของตัวเองอาจอยู่ใน byTlEmail โดยตรง
   if (!myTlEmail && qd.byTlEmail && qd.byTlEmail[kamEmail]) {
@@ -57,10 +57,10 @@ function _qnrrCompute(kamEmail, scope) {
   if (!allRows || !allRows.length) return null;
 
   function _rowInScope(r) {
-    if (scope === 'kam')   return r.period_kam_email === kamEmail;
-    if (scope === 'tl')    return myTlEmail ? r.period_tl_email === myTlEmail : true;
+    if (scope === 'kam')   return r.latest_kam_email === kamEmail; // v827-fix
+    if (scope === 'tl')    return myTlEmail ? r.latest_tl_email === myTlEmail : true;
     if (scope === 'admin') return true;
-    return r.period_kam_email === kamEmail;
+    return r.latest_kam_email === kamEmail;
   }
 
   function _effectiveMovement(r) {
@@ -69,7 +69,7 @@ function _qnrrCompute(kamEmail, scope) {
     // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
     // transfer_in/out ข้าม squad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
     var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
-    var sameTlPeriod = r.period_tl_email === myTlEmail;
+    var sameTlPeriod = r.latest_tl_email === myTlEmail; // v827-fix
     var sameTeam     = sameTlBase && sameTlPeriod;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
