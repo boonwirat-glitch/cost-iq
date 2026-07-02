@@ -1,4 +1,4 @@
-<!-- Freshket Sense v822: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v823: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v822',
+      version: 'v823',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -42577,70 +42577,12 @@ window._cdsCopyTSV = function() {
       return '<div class="comm-lock-row"><div class="comm-role-dot '+esc(benRole(r.beneficiary_role))+'">'+esc(roleLabelForRow(r.beneficiary_role))+'</div><div><div class="comm-person-name">'+esc(name)+'</div><div class="comm-person-sub">'+esc(rule)+' · Raw '+(r.raw_nrr_pct??'—')+'% → NRR ที่ใช้คิด '+(r.governed_nrr_pct??'—')+'%</div></div><div class="comm-row-money '+(Number(r.payout_amount||0)>0?'hit':'')+' '+(isLocked()?'locked':'')+'">'+money(r.payout_amount)+'</div></div>';
     }).join('');
   }
-  window.renderCommLockStep=function(body){
-    var per=period();
-    var locked=isLocked(per);
-    var rows=rowsForDisplay({period:per, preferLocked:true});
-    var summary=summaryFromRows(rows);
-    var teams=teamGroupsFromRows(rows);
-    var pending=(typeof _nrrExclusions!=='undefined'?(_nrrExclusions||[]):[]).filter(function(r){return r.status==='submitted'||r.status==='pending';}).length;
-    var ready=rows.length>0 && pending===0;
-    var sourceCopy=locked ? 'ล็อกแล้ว: ใช้ frozen snapshot สำหรับ preview / scorecard / CSV' : 'Live preview: ยังไม่ lock snapshot ตัวเลขจะตาม rule และ assignment ล่าสุด';
-    body.innerHTML='<div class="comm-hero">'
-      +'<div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div><div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">'+money(summary.total)+'</div></div></div>'
-      +'<div class="comm-lock-state-row"><div><div class="comm-lock-state-main">'+esc(sourceCopy)+'</div><div class="comm-lock-state-sub">'+(locked?'การแก้ rule/assignment หลังจากนี้จะไม่เปลี่ยน snapshot ที่ lock ไว้ จนกว่า Admin จะ re-lock':'เมื่อ lock แล้ว snapshot จะ freeze แยกจาก rule/assignment ปัจจุบัน')+'</div></div><span class="comm-lock-pill '+(locked?'locked':'live')+'"><span class="dot"></span>'+(locked?'LOCKED':'LIVE')+'</span></div>'
-      +'<div class="comm-kpis"><div class="comm-kpi '+(summary.teamCount?'hit':'miss')+'"><div class="comm-kpi-lbl">Teams</div><div class="comm-kpi-val">'+summary.teamCount+'</div><div class="comm-kpi-sub">TL groups in '+(locked?'snapshot':'preview')+'</div></div><div class="comm-kpi '+(summary.tlPayout>0?'hit payout-hit':'miss')+'"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">'+money(summary.tlPayout)+'</div><div class="comm-kpi-sub">'+summary.tlRows.length+' TL rows</div></div><div class="comm-kpi '+(summary.kamPayout>0?'hit payout-hit':'miss')+'"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">'+money(summary.kamPayout)+'</div><div class="comm-kpi-sub">'+summary.hitKams+'/'+summary.kamCount+' KAM hit payout</div></div></div>'
-      +'<div class="comm-readiness-bar '+(ready?'ready':'warn')+'"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">'+(ready?(locked?'Snapshot locked แล้ว · export จะใช้ frozen rows ชุดนี้':'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว'):(pending?'ยังมี exclusion pending '+pending+' รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ':'ยังไม่มีข้อมูล payout ให้ lock'))+'</div></div>'
-      +'<div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">'+(locked?'Re-lock / revise snapshot':'Lock snapshot')+'</button></div>'
-      +(locked?'<div class="comm-lock-actions-note">ถ้าต้อง revise ให้กด Re-lock หลังตรวจ live data แล้วเท่านั้น</div>':'')
-      +'</div>'
-      +'<div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>'+(locked?'Locked rows':'Live rows')+' grouped by team</em></div>'
-      +(teams.length?teams.map(function(t){return '<div class="comm-card comm-team-card comm-preview-team-card"><div class="comm-preview-tl-band"><div class="comm-preview-tl-left"><div class="comm-team-eyebrow">TEAM LEAD</div><div class="comm-name">'+esc(t.tlName||t.tlEmail)+'</div><div class="comm-meta">'+esc(t.tlEmail||'')+' · Team NRR '+(t.teamNrr!=null?t.teamNrr+'%':'—')+'</div><div class="comm-rule-chip">TL rule · '+esc(t.tlPlanName||'-')+'</div></div><div class="comm-preview-tl-money"><span>Total payout</span><strong>'+money(t.total)+'</strong><em>TL '+money(t.tlPayout)+'</em></div></div><div class="comm-kam-subhead"><span>KAM payout in this team</span><em>'+t.kamRows.filter(function(k){return k.payout>0;}).length+'/'+t.kamRows.length+' hit payout</em></div>'+t.kamRows.slice(0,5).map(function(k){return '<div class="comm-person-row comm-kam-payout-row '+(k.payout>0?'hit':'')+'"><div><div class="comm-person-name">'+esc(k.kamName||k.kamEmail)+'</div><div class="comm-person-sub">NRR '+(k.pct!=null?k.pct+'%':'—')+' · Rule: '+esc(k.planName||'-')+'</div></div><div class="comm-person-payout '+(k.payout>0?'comm-row-money hit':'comm-row-money')+'">'+money(k.payout)+'</div></div>';}).join('')+(t.kamRows.length>5?'<div class="comm-meta comm-more-note">+'+(t.kamRows.length-5)+' more KAM in CSV/export</div>':'')+'</div>';}).join(''):'<div class="comm-empty">ยังไม่มีทีมให้ preview</div>')
-      +'<div class="comm-section-title">Snapshot rows</div><div class="comm-lock-list">'+(rows.length?renderRowsList(rows):'<div class="comm-empty">ยังไม่มีข้อมูลสำหรับ snapshot</div>')+'</div>';
-  };
-  try{ renderCommLockStep=window.renderCommLockStep; }catch(e){}
-
-  window.exportCommissionSnapshotCsv=function(){
-    if(!guardAdmin('Export commission snapshot')) return;
-    var rows=rowsForDisplay({preferLocked:true});
-    if(!rows.length){ toast('ยังไม่มีข้อมูล snapshot ให้ export','!'); return; }
-    try{
-      var csv=(typeof _commSnapshotCsv==='function') ? _commSnapshotCsv(rows) : JSON.stringify(rows,null,2);
-      var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a');
-      a.href=url; a.download='freshket_commission_'+(isLocked()?'locked':'preview')+'_'+period()+'.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }catch(e){ console.error('[v211a] export failed', e); toast('Export ไม่สำเร็จ: '+(e.message||''),'!'); }
-  };
-  try{ exportCommissionSnapshotCsv=window.exportCommissionSnapshotCsv; }catch(e){}
-
-  window.lockCommissionSnapshot=async function(){
-    if(!guardAdmin('Lock commission snapshot')) return;
-    var per=period(); var locked=isLocked(per);
-    if(locked && !confirm('เดือนนี้มี locked snapshot อยู่แล้ว ต้องการ re-lock เพื่อ revise ตัวเลขหรือไม่?')) return;
-    var rows=liveRows();
-    if(!rows.length){ toast('ไม่มีข้อมูลสำหรับ lock','!'); return; }
-    var invalid=rows.filter(function(r){ return !r.period_month || !r.beneficiary_role || !r.beneficiary_email; });
-    if(invalid.length){ toast('Lock ไม่สำเร็จ: snapshot rows ไม่ครบ '+invalid.length+' แถว','!'); console.warn('[v211a] invalid snapshot rows', invalid); return; }
-    var pending=(typeof _nrrExclusions!=='undefined'?(_nrrExclusions||[]):[]).filter(function(r){return r.status==='submitted'||r.status==='pending';}).length;
-    if(pending>0 && !confirm('ยังมี exclusion pending '+pending+' รายการ ต้องการ lock ต่อเลยหรือไม่?')) return;
-    var actor=(currentUserProfile&&currentUserProfile.email)||'';
-    try{
-      var lockedAt=new Date().toISOString();
-      var payload=rows.map(function(r){
-        var bd=Object.assign({}, asObj(r.breakdown), { locked_source:'v211a_live_rows', locked_rule_name:asObj(r.breakdown).rule_name||'' });
-        return Object.assign({}, r, { period_month:per, beneficiary_role:benRole(r.beneficiary_role), beneficiary_email:low(r.beneficiary_email), team_lead_email:low(r.team_lead_email)||null, payout_amount:Number(r.payout_amount||0), snapshot_status:'final', breakdown:bd, updated_at:lockedAt, updated_by:actor, created_by:r.created_by||actor, locked_at:lockedAt, locked_by:actor });
-      });
-      var res=await supa.from('commission_payout_snapshots').upsert(payload,{onConflict:'period_month,beneficiary_role,beneficiary_email'}).select('*');
-      if(res.error) throw new Error(res.error.message);
-      _commissionSnapshots=res.data||payload;
-      if(typeof _tgtActiveQuarter!=='undefined' && _tgtActiveQuarter && typeof _tgtQuarterCache!=='undefined') delete _tgtQuarterCache[_tgtActiveQuarter];
-      toast(locked?'Re-lock snapshot สำเร็จ':'Lock commission snapshot สำเร็จ','ok');
-      try{ renderCommissionCockpit(); }catch(e){ try{ renderCommLockStep(document.getElementById('commission-cockpit-body')); }catch(_e){} }
-      try{ renderTeamviewSummary(); renderTeamviewKamList(); }catch(e){}
-      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-    }catch(e){ console.error('[v211a] lock failed', e); toast('Lock ไม่สำเร็จ: '+(e.message||''),'!'); }
-  };
-  try{ lockCommissionSnapshot=window.lockCommissionSnapshot; }catch(e){}
-
+  // ── [REMOVED v211a override] renderCommLockStep / exportCommissionSnapshotCsv / lockCommissionSnapshot ──
+  // These 3 functions used to be redefined here, silently overriding the versions in
+  // 07a_commission_engine.js (lockCommissionSnapshot w/ draft->final + periodOverride) and
+  // 07b_commission_cockpit.js (renderCommLockStep w/ Retroactive subtab, Q3 quarterly mode).
+  // Removed 2026-07-02: this override made the Retroactive Lock feature completely invisible
+  // and broke retroactive period support in lockCommissionSnapshot, regardless of any deploy/cache state.
   var oldKamState=null;
   try{ oldKamState=window._commBuildKamSelfState || _commBuildKamSelfState; }catch(e){}
   if(typeof oldKamState==='function'){
