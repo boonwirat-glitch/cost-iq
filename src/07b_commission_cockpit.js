@@ -296,7 +296,7 @@ function renderCommPolicyStep(body) {
           <div class="comm-field"><label>Scope</label><input class="comm-input" value="All teams" disabled></div>
         </div>
       </div>`;
-
+    }).join('')}
     <div class="comm-card" style="margin-top:12px;border:1.5px solid rgba(255,210,80,.18);background:rgba(255,200,60,.04)">
       <div class="comm-card-top">
         <div>
