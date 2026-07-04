@@ -64,6 +64,15 @@ function _qnrrCompute(kamEmail, scope) {
   }
 
   function _effectiveMovement(r) {
+    // v830-fix: raw CSV never contains movement_type='core_nrr_churn' as a literal value
+    // (confirmed against actual rep_view export) -- the UI's Churn sub-row expects this
+    // category but nothing ever produced it, so Churn always rendered as "--" regardless
+    // of real data. Reclassify here: a core_nrr row with curr_gmv=0 IS a churned outlet
+    // (was in the retained cohort, dropped to zero this period) -- matches the same
+    // curr_gmv===0 split logic validated against real rep_kam export data.
+    if (r.movement_type === 'core_nrr' && (parseFloat(r.curr_gmv) || 0) === 0) {
+      return 'core_nrr_churn';
+    }
     if (scope === 'kam') return r.movement_type;
     // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
     // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
