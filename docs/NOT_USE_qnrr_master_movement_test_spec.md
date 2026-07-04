@@ -1,0 +1,21 @@
+> ⚠️ **NOT USE — SUPERSEDED**
+> เอกสารนี้ล้าสมัยแล้ว ใช้ `docs/Q3_NRR_COMMISSION_SPEC.md` และ `docs/Q3_NRR_COMMISSION_HANDOFF.md` แทน (เอกสารรวมล่าสุด อัปเดต 2026-07-04)
+> เก็บไว้เป็นประวัติการพัฒนาเท่านั้น ห้ามอ้างอิงเพื่อทำงานต่อ
+
+---
+
+# QNRR Master Movement Test Spec — DEPRECATED
+
+**วันที่:** 2026-06-21
+**สถานะ:** Deprecated — logic ใน test spec นี้ไม่ตรงกับ ground truth
+
+ให้ใช้ `docs/qnrr_master_movement_design_v3.md` แทน
+
+ข้อที่ไม่ถูกต้องใน spec เก่านี้:
+- base_gmv filter commercial_owner ผิด
+- handover fallback default ผิด
+- expansion GMV=0 flip เป็น transfer_in ผิด
+- label re-classify ระหว่างเดือน ผิด
+- comeback check pre-Mar KAM คนนี้ ผิด (master level ไม่สน)
+
+Reconcile ground truth ที่ถูกต้องอยู่ใน design spec ข้อ Check 1–6
