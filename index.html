@@ -1,4 +1,4 @@
-<!-- Freshket Sense q3-cache-baseline-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense q3-churn-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'q3-cache-baseline-fix',
+      version: 'q3-churn-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -37688,7 +37688,7 @@ function renderCommPolicyStep(body) {
           <div class="comm-field"><label>Scope</label><input class="comm-input" value="All teams" disabled></div>
         </div>
       </div>`;
-
+    }).join('')}
     <div class="comm-card" style="margin-top:12px;border:1.5px solid rgba(255,210,80,.18);background:rgba(255,200,60,.04)">
       <div class="comm-card-top">
         <div>
@@ -52122,6 +52122,15 @@ function _qnrrCompute(kamEmail, scope) {
   }
 
   function _effectiveMovement(r) {
+    // v830-fix: raw CSV never contains movement_type='core_nrr_churn' as a literal value
+    // (confirmed against actual rep_view export) -- the UI's Churn sub-row expects this
+    // category but nothing ever produced it, so Churn always rendered as "--" regardless
+    // of real data. Reclassify here: a core_nrr row with curr_gmv=0 IS a churned outlet
+    // (was in the retained cohort, dropped to zero this period) -- matches the same
+    // curr_gmv===0 split logic validated against real rep_kam export data.
+    if (r.movement_type === 'core_nrr' && (parseFloat(r.curr_gmv) || 0) === 0) {
+      return 'core_nrr_churn';
+    }
     if (scope === 'kam') return r.movement_type;
     // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
     // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
