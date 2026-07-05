@@ -457,6 +457,7 @@ jul_rows AS (
       AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
       AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
   )
+  AND v_m1_days > 0  -- v6-fix: skip silent-outlet fallback if month 1 hasn't started yet
 ),
 
 -- ── May rows ─────────────────────────────────────────────────────────────────
@@ -587,6 +588,7 @@ aug_rows AS (
       AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
       AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
   )
+  AND v_m2_days > 0  -- v6-fix: skip silent-outlet fallback if month 2 hasn't started yet
 ),
 
 -- ── Jun rows ─────────────────────────────────────────────────────────────────
@@ -686,8 +688,10 @@ sep_rows AS (
   UNION ALL
 
   -- LEG B
+  -- v6-fix: was v_base_str, same bug class as LEG A -- this block is Sep data
+  -- (transfer_out detection for the 3rd quarter month), must use v_m3_str.
   SELECT
-    v_base_str,
+    v_m3_str,
     mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     COALESCE(jo_port.commercial_owner, jo_sale.commercial_owner, 'KAM') AS current_portfolio,
     COALESCE(jo_port.staff_owner, jo_sale.staff_owner, mc.base_staff_owner) AS current_staff_owner,
@@ -720,6 +724,7 @@ sep_rows AS (
       AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
       AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
   )
+  AND v_m3_days > 0  -- v6-fix: skip silent-outlet fallback if month 3 hasn't started yet
 ),
 
 all_rows AS (
