@@ -338,20 +338,10 @@ window._qnrrComputeForCommission = _qnrrComputeForCommission;
 (function(){
 'use strict';
 
-// ── QNRR Quarter Config — แก้แค่ที่นี่ทุก quarter ──────────────────────────
-// Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
-// Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
-var QNRR_CFG = {
-  quarter:    '2026q3',
-  base_month: '2026-06',
-  q_months:   ['2026-07','2026-08','2026-09'],
-  months_th:  {
-    '2026-06':'มิ.ย.','2026-07':'ก.ค.',
-    '2026-08':'ส.ค.', '2026-09':'ก.ย.'
-  },
-  csv_file:   'sense_qnrr_2026q3.csv'
-};
-// ─────────────────────────────────────────────────────────────────────────────
+// v6-fix: removed duplicate QNRR_CFG declaration that used to be here (was byte-for-byte
+// identical to the one at the top of this file) -- having two copies meant a future
+// session could update one when adding a new quarter's months_th entry and forget the
+// other, silently going out of sync. QNRR_CFG is already declared once, above.
 var MONTHS_TH = QNRR_CFG.months_th;
 var Q_MONTHS  = QNRR_CFG.q_months;
 var BASE_MONTH= QNRR_CFG.base_month;
