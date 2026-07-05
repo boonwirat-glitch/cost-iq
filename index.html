@@ -1,4 +1,4 @@
-<!-- Freshket Sense v833-lock-guard-qnrr-shimmer-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v834-guard-and-cleanup-fixes: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v833-lock-guard-qnrr-shimmer-fix',
+      version: 'v834-guard-and-cleanup-fixes',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -36680,7 +36680,7 @@ function _commBuildSnapshotRows(periodOverride) {
           upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
           upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
           upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
-          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
+          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',5000), // v6-fix: was 2500, drifted from the real gate check (line ~210) and confirmed Supabase value (5000)
           upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
           gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
           gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',90),
@@ -52474,20 +52474,10 @@ window._qnrrComputeForCommission = _qnrrComputeForCommission;
 (function(){
 'use strict';
 
-// ── QNRR Quarter Config — แก้แค่ที่นี่ทุก quarter ──────────────────────────
-// Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
-// Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
-var QNRR_CFG = {
-  quarter:    '2026q3',
-  base_month: '2026-06',
-  q_months:   ['2026-07','2026-08','2026-09'],
-  months_th:  {
-    '2026-06':'มิ.ย.','2026-07':'ก.ค.',
-    '2026-08':'ส.ค.', '2026-09':'ก.ย.'
-  },
-  csv_file:   'sense_qnrr_2026q3.csv'
-};
-// ─────────────────────────────────────────────────────────────────────────────
+// v6-fix: removed duplicate QNRR_CFG declaration that used to be here (was byte-for-byte
+// identical to the one at the top of this file) -- having two copies meant a future
+// session could update one when adding a new quarter's months_th entry and forget the
+// other, silently going out of sync. QNRR_CFG is already declared once, above.
 var MONTHS_TH = QNRR_CFG.months_th;
 var Q_MONTHS  = QNRR_CFG.q_months;
 var BASE_MONTH= QNRR_CFG.base_month;
