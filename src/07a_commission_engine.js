@@ -2156,7 +2156,7 @@ function _commBuildSnapshotRows(periodOverride) {
           upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
           upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
           upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
-          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
+          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',5000), // v6-fix: was 2500, drifted from the real gate check (line ~210) and confirmed Supabase value (5000)
           upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
           gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
           gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',90),
