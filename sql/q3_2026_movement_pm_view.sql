@@ -570,8 +570,11 @@ aug_rows AS (
 sep_rows AS (
 
   -- LEG A
+  -- v6-fix: was v_base_str (mislabels Sep data as base month, same bug class as
+  -- rep_view.sql's original jun_classified bug). This CTE sources FROM sep_own/sep_gmv
+  -- (the 3rd quarter month), so it must use v_m3_str to match.
   SELECT
-    v_base_str,
+    v_m3_str,
     jo.outlet_id, jo.account_id, jo.account_name, jo.res_name, jo.account_type,
     jo.commercial_owner, jo.staff_owner,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN pamc.mar_portfolio
