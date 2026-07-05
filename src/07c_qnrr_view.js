@@ -1003,7 +1003,7 @@ function _qnrrRenderBreakdown(){
       html += '<tr class="bk-subrow">' +
         '<td><div class="qnrr-bk-mv-cell">' +
           '<div class="qnrr-bk-dot" style="background:' + hovColor + '"></div>' +
-          '<span class="qnrr-bk-mv-name">└ cohort มี.ค.</span>' +
+          '<span class="qnrr-bk-mv-name">└ cohort ' + (QNRR_CFG.months_th[BASE_MONTH] || BASE_MONTH) + '</span>' +
         '</div></td>';
       ALL_MONTHS.forEach(function(m){
         if (m === BASE_MONTH) {
@@ -1497,7 +1497,10 @@ function _qnrrRenderList(){
   // header row ครอบทั้ง list — align กับ table colgroup (auto + 4×42px)
   // ใช้ div+grid ไม่ใช้ table เพราะ account name col width เปลี่ยนตาม screen
   var partialJun = _data.by_month[_lastMonth] && _data.by_month[_lastMonth].is_partial;
-  var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
+  var listMoHdrs = [QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month]
+    .concat(QNRR_CFG.q_months.map(function(m, i){
+      return (QNRR_CFG.months_th[m] || m) + (i === QNRR_CFG.q_months.length-1 && partialJun ? '~' : '');
+    }));
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
     '<div class="qnrr-list-mo-hdr-name"></div>' +
