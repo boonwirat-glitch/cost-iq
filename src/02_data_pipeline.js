@@ -1174,6 +1174,16 @@ function handleFileUpload(type,input){
           }
         });
         window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
+        // v6-fix: trigger commission strip re-render now that QNRR data is available.
+        // Root cause: _commBuildKamSelfState() calls _qnrrComputeForCommission() which
+        // returns null while bulkQnrrData isn't loaded yet -> tier lookup fails to match
+        // null -> silently resolves to a confident "฿0" instead of a loading state, and
+        // nothing was re-triggering a re-render once QNRR data actually arrived (unlike
+        // the equivalent bulkUpsellData.loaded path a few lines below, which already does
+        // this correctly). Mirrors that same pattern here.
+        try{ if(typeof window._qnrrSelfStripTimeout!=='undefined' && window._qnrrSelfStripTimeout) clearTimeout(window._qnrrSelfStripTimeout); }catch(e){}
+        try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
         console.log('%c[Sense qnrr] loaded','color:#4ddc97',{
           total:allRows.length,
           kams:Object.keys(byKamEmail).length,
@@ -1794,6 +1804,18 @@ async function _fetchQnrrBundle(){
   if(window.bulkQnrrData && window.bulkQnrrData.loaded)return true;
   // Deduplicate concurrent calls
   if(_qnrrFetchPromise)return _qnrrFetchPromise;
+  // v6-fix: safety valve — if QNRR never loads (network error, file not uploaded yet),
+  // force-release the commission strip's loading gate after 15s so it doesn't shimmer
+  // forever. Mirrors the existing QC-06 pattern used for the upsell bundle above.
+  try{
+    if(window._qnrrSelfStripTimeout) clearTimeout(window._qnrrSelfStripTimeout);
+    window._qnrrForceRelease = false;
+    window._qnrrSelfStripTimeout = setTimeout(function(){
+      window._qnrrForceRelease = true;
+      try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
+      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+    }, 15000);
+  }catch(e){}
   _qnrrFetchPromise=(async()=>{
     try{
       const url=`${R2_BASE}/sense_qnrr_${_QNRR_QUARTER}.csv`;
