@@ -10,6 +10,13 @@
 -- Output columns (unchanged):
 --   kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base
 -- ══════════════════════════════════════════════════════════════
+-- v6: P3 min incremental was hardcoded 5000, not synced with Commission Cockpit
+-- (this SQL runs in BigQuery, which cannot read Supabase target_settings live —
+-- unlike the app's JS calculation path, which does read it live). Real Cockpit
+-- value confirmed via Supabase query on 2026-07-05 = 8000.
+-- 🔴 BEFORE RUNNING THIS SCRIPT: open Commission Cockpit → "สินค้าใหม่ + ยอดเติบโต"
+--    → check "P3 min incremental" value → update the DECLARE below if it changed.
+DECLARE v_p3_min_incremental FLOAT64 DEFAULT 8000;
 
 WITH
 dates AS (
@@ -259,12 +266,15 @@ commission_items AS (
       WHEN c.outlet_type = 'existing' AND bg.group_key IS NULL THEN 1
       ELSE 0
     END AS is_p1,
-    -- P3: existing outlet, group_key in baseline, existing_gmv > 150% of max_bl
+    -- P3: existing outlet, group_key in baseline, existing_gmv > 200% of max_bl (2.00x)
+    -- v6: threshold was hardcoded 5000, but Commission Cockpit's real value is 8000
+    -- (target_settings.upsell_sku_params.p3_min_incremental). Now reads v_p3_min_incremental
+    -- declared at top of script -- 🔴 CHECK COCKPIT BEFORE RUNNING, UPDATE THAT DECLARE IF CHANGED.
     CASE
       WHEN c.outlet_type = 'existing'
         AND bg.group_key IS NOT NULL
         AND c.existing_gmv > COALESCE(mb.max_bl, 0) * 2.00
-        AND c.existing_gmv - COALESCE(mb.max_bl, 0) >= 5000
+        AND c.existing_gmv - COALESCE(mb.max_bl, 0) >= v_p3_min_incremental
       THEN 1 ELSE 0
     END AS is_p3
   FROM current_agg c
