@@ -65,7 +65,7 @@ SET v_m2_start   = DATE_ADD(v_m1_start, INTERVAL 1 MONTH);
 SET v_m1_end     = DATE_SUB(v_m2_start, INTERVAL 1 DAY);
 SET v_m3_start   = DATE_ADD(v_m1_start, INTERVAL 2 MONTH);
 SET v_m2_end     = DATE_SUB(v_m3_start, INTERVAL 1 DAY);
-SET v_m3_end     = DATE_ADD(v_m3_start, INTERVAL 1 MONTH - 1 DAY);
+SET v_m3_end     = DATE_SUB(DATE_ADD(v_m3_start, INTERVAL 1 MONTH), INTERVAL 1 DAY);
 -- v830: days-elapsed clamped per-month so the export is correct whenever it's run during
 -- the quarter (start/mid/end) -- was previously hardcoded to always treat m3 as the only
 -- MTD month, which broke completely (inverted date range, zero rows) when run early in
