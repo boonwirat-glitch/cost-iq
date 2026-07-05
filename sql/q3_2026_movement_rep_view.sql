@@ -93,9 +93,6 @@ params AS (
     v_m1_start   AS jul_start,  v_m1_end   AS jul_end,  v_m1_days   AS jul_days,
     v_m2_start   AS aug_start,  v_m2_end   AS aug_end,  v_m2_days   AS aug_days,
     v_m3_start   AS sep_start,  v_m3_end   AS sep_end,  v_m3_days   AS sep_days
-), INTERVAL 1 DAY) AS sep_end,
-    DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY),
-              v_m3_start, DAY) + 1 AS sep_days
 ),
 
 -- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
