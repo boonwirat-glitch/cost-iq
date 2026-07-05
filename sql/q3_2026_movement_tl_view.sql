@@ -436,7 +436,7 @@ jul_rows AS (
       WHEN ao_sale.outlet_id IS NOT NULL              THEN 'transfer_out'
       ELSE 'core_nrr'
     END,
-    '2026-03',
+    v_base_str,
     CASE
       WHEN ao_port.commercial_owner IN ('PM','ADMIN') THEN 'inter'
       WHEN ao_sale.outlet_id IS NOT NULL              THEN 'external'
@@ -566,7 +566,7 @@ aug_rows AS (
       WHEN mo_sale.outlet_id IS NOT NULL              THEN 'transfer_out'
       ELSE 'core_nrr'
     END,
-    '2026-03',
+    v_base_str,
     CASE
       WHEN mo_port.commercial_owner IN ('PM','ADMIN') THEN 'inter'
       WHEN mo_sale.outlet_id IS NOT NULL              THEN 'external'
@@ -696,7 +696,7 @@ sep_rows AS (
       WHEN jo_sale.outlet_id IS NOT NULL              THEN 'transfer_out'
       ELSE 'core_nrr'
     END,
-    '2026-03',
+    v_base_str,
     CASE
       WHEN jo_port.commercial_owner IN ('PM','ADMIN') THEN 'inter'
       WHEN jo_sale.outlet_id IS NOT NULL              THEN 'external'
