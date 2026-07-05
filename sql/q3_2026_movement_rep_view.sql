@@ -522,6 +522,7 @@ may_classified AS (
     CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM aug_own)
+    AND v_m2_days > 0  -- v831: skip silent-outlet fallback if this month hasn't started yet (avoids fabricating 100% churn for a future month with no real data)
 ),
 
 jun_classified AS (
@@ -614,6 +615,7 @@ jun_classified AS (
     CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM sep_own)
+    AND v_m3_days > 0  -- v831: same guard for the 3rd quarter month
 ),
 
 
