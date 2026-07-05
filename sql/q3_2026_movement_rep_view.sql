@@ -526,7 +526,7 @@ may_classified AS (
 
 jun_classified AS (
   SELECT
-    v_base_str,
+    v_m3_str,
     jo.outlet_id,
     COALESCE(mc.account_id, jo.account_id)     AS account_id,
     COALESCE(mc.account_name, jo.account_name) AS account_name,
@@ -608,7 +608,7 @@ jun_classified AS (
   UNION ALL
 
   SELECT
-    v_base_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
+    v_m3_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
     mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
     CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
