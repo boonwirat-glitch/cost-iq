@@ -1,6 +1,9 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q2 2026 Movement — KAM Rep View (v3)
--- sql/q2_2026_movement_rep_view.sql
+-- Q3 2026 Movement — KAM Rep View (v3)
+-- sql/q3_2026_movement_rep_view.sql
+-- (header was stale "Q2" — file was evolved from the Q2 version but the comment
+--  was never updated; does not affect results since v828-auto derives the actual
+--  quarter from CURRENT_DATE regardless of what this header says)
 --
 -- Goal: ดู performance ของ KAM แต่ละคน วัดจาก outlet ที่ถืออยู่ล่าสุด
 --
@@ -430,6 +433,9 @@ apr_classified AS (
     'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jul_own)
+    AND v_m1_days > 0  -- v6-fix: same guard as v831 (months 2,3) — skip silent-outlet
+                       -- fallback if month 1 hasn't started yet (avoids fabricating
+                       -- 100% churn if this ever runs right at the start of a quarter)
 ),
 
 may_classified AS (
