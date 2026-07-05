@@ -2221,6 +2221,20 @@ function _commBuildKamSelfState() {
   const email = isViewingKamPortfolio ? portviewRepEmail : selfEmail;
   if (!isViewingKamPortfolio && (isTLRole(role) || isAdminRole(role))) return null;
   if (!email) return null;
+  // v6-fix: guard against QNRR not loaded yet (quarterly mode). Without this,
+  // _qnrrComputeForCommission() returns null while bulkQnrrData isn't ready, the null
+  // pct fails to match any tier in _commPayoutForPctByCode(), and the function silently
+  // resolves to payout=0 — showing a confident-looking "฿0 NRR" instead of a loading
+  // state. Mirrors the existing bulkQnrrData.loaded guard already used in
+  // 07c_qnrr_view.js:606. Force-releases after 15s (see _fetchQnrrBundle) so this can
+  // never shimmer forever if QNRR genuinely fails to load.
+  const _qPolicy = typeof _nrrGovResolveForVisibleScope === 'function' ? _nrrGovResolveForVisibleScope() : null;
+  const _isQuarterly = _qPolicy && _qPolicy.commission_mode === 'quarterly';
+  const _qnrrReady = typeof window.bulkQnrrData !== 'undefined' && window.bulkQnrrData && window.bulkQnrrData.loaded;
+  const _qnrrForceReleased = typeof window._qnrrForceRelease !== 'undefined' && window._qnrrForceRelease;
+  if (_isQuarterly && !_qnrrReady && !_qnrrForceReleased) {
+    return { role, email, loading: true };
+  }
   const period = _nrrExclusionCurrentPeriod();
   const pct = _commKamNrrPct(email);
   const planCode = _commGetAssignmentPlan(period, 'kam', email, 'kam');
@@ -2256,6 +2270,20 @@ function _commBuildKamSelfState() {
 function _commBuildKamSelfCard() {
   const st = _commBuildKamSelfState();
   if (!st) return '';
+  if (st.loading) {
+    return `<div class="pv-comm-strip">
+    <div class="pv-comm-left">
+      <div class="pv-comm-top">
+        <div class="pv-comm-eyebrow">ค่าคอมฯ เดือนนี้</div>
+      </div>
+      <div class="pv-comm-copyline"><span class="skel" style="display:inline-block;width:130px;height:12px;border-radius:4px;vertical-align:middle"></span></div>
+      <div class="pv-comm-next"><span class="skel" style="display:inline-block;width:90px;height:11px;border-radius:4px;vertical-align:middle"></span></div>
+    </div>
+    <div class="pv-comm-right">
+      <div class="pv-comm-main"><span class="skel" style="display:inline-block;width:56px;height:20px;border-radius:4px;vertical-align:middle"></span></div>
+    </div>
+  </div>`;
+  }
   const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
@@ -2549,6 +2577,28 @@ function exportCommissionSnapshotCsv(periodOverride) {
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
+  // v6-fix: guard against silently overwriting an already-locked (final) snapshot.
+  // Root cause: this function previously unconditionally upserted fresh draft rows over
+  // ANY existing row (including 'final') for the same period+role+email key -- no check,
+  // no warning. Clicking "Compute" again on an already-locked period would silently
+  // demote it back to 'draft' with freshly-computed (possibly different) numbers, with
+  // no way to know it happened. Same confirm() pattern already used below in
+  // lockCommissionSnapshot() for the pending-exclusion check.
+  const _lockedRows = (_commissionSnapshots || []).filter(r =>
+    r.period_month === period && r.snapshot_status === 'final'
+  );
+  let _overwroteLock = false;
+  if (_lockedRows.length) {
+    const _lockedTotal = _lockedRows.reduce((sum, r) => sum + Number(r.payout_amount || r.final_payout || 0), 0);
+    const _confirmMsg = `⚠️ เดือน ${period} ถูก Lock แล้ว ${_lockedRows.length} รายการ (รวม ${typeof _commFmtPayout === 'function' ? _commFmtPayout(_lockedTotal) : '฿' + Math.round(_lockedTotal).toLocaleString('en-US')})\n\nComp ใหม่จะ Unlock และเขียนทับตัวเลขที่ lock ไว้ทั้งหมด ไม่สามารถย้อนกลับได้ ต้องการดำเนินการต่อหรือไม่?`;
+    if (!confirm(_confirmMsg)) {
+      if (typeof showToast === 'function') showToast('ยกเลิก — ข้อมูลที่ lock ไว้ไม่ถูกแตะต้อง', '!');
+      console.warn(`[CommDraft] user declined overwrite of ${_lockedRows.length} locked rows for ${period}`);
+      return false;
+    }
+    _overwroteLock = true;
+    console.warn(`[CommDraft] user confirmed overwrite of ${_lockedRows.length} locked rows for ${period}`);
+  }
   // v826: thread periodOverride through — previously always computed live/current data
   // and just relabeled it, which is why retroactive Compute produced wrong numbers.
   const rows = _commBuildSnapshotRows(periodOverride);
@@ -2564,7 +2614,13 @@ async function computeCommissionDraft(periodOverride) {
       snapshot_status: 'draft',
       // note: retroactive/manual tag stored inside breakdown jsonb —
       // commission_payout_snapshots has no top-level column for it (was causing 400 error)
-      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
+      breakdown: {
+        ...(r.breakdown || {}),
+        lock_note: periodOverride ? 'retroactive' : 'manual',
+        // v6-fix: audit trail for lock-overwrite events, so a review of breakdown jsonb
+        // shows exactly when/who/what got unlocked-and-recomputed, not just a silent gap.
+        ...(_overwroteLock ? { unlock_overwrite_at: new Date().toISOString(), unlock_overwrite_by: actor } : {})
+      },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor
