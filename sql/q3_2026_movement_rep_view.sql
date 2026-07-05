@@ -50,12 +50,19 @@ SET v_base_end   = DATE_SUB(v_m1_start, INTERVAL 1 DAY);
 SET v_base_days  = DATE_DIFF(v_base_end, v_base_start, DAY) + 1;
 SET v_m2_start   = DATE_ADD(v_m1_start, INTERVAL 1 MONTH);
 SET v_m1_end     = DATE_SUB(v_m2_start, INTERVAL 1 DAY);
-SET v_m1_days    = DATE_DIFF(v_m1_end, v_m1_start, DAY) + 1;
 SET v_m3_start   = DATE_ADD(v_m1_start, INTERVAL 2 MONTH);
 SET v_m2_end     = DATE_SUB(v_m3_start, INTERVAL 1 DAY);
-SET v_m2_days    = DATE_DIFF(v_m2_end, v_m2_start, DAY) + 1;
-SET v_m3_end     = DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY);
-SET v_m3_days    = DATE_DIFF(v_m3_end, v_m3_start, DAY) + 1;
+SET v_m3_end     = DATE_ADD(v_m3_start, INTERVAL 1 MONTH - 1 DAY);
+-- v830: days-elapsed clamped per-month so the export is correct whenever it's run during
+-- the quarter (start/mid/end) -- was previously hardcoded to always treat m3 as the only
+-- MTD month, which broke completely (inverted date range, zero rows) when run early in
+-- the quarter instead of at quarter-end.
+SET v_m1_days = LEAST(DATE_DIFF(v_m1_end, v_m1_start, DAY) + 1,
+                 GREATEST(DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), v_m1_start, DAY) + 1, 0));
+SET v_m2_days = LEAST(DATE_DIFF(v_m2_end, v_m2_start, DAY) + 1,
+                 GREATEST(DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), v_m2_start, DAY) + 1, 0));
+SET v_m3_days = LEAST(DATE_DIFF(v_m3_end, v_m3_start, DAY) + 1,
+                 GREATEST(DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), v_m3_start, DAY) + 1, 0));
 SET v_base_str   = FORMAT_DATE('%Y-%m', v_base_start);
 SET v_m1_str     = FORMAT_DATE('%Y-%m', v_m1_start);
 SET v_m2_str     = FORMAT_DATE('%Y-%m', v_m2_start);
@@ -413,12 +420,12 @@ apr_classified AS (
 
   -- Silent outlets (ไม่มี order ใน Apr)
   SELECT
-    '2026-04', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
+    v_m1_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner AS period_staff_owner,
     mc.mar_staff_owner AS base_staff_owner,
     mc.base_gmv, 0.0,
     mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE) AS new_user_exp_date,
-    CAST(NULL AS STRING) AS first_dollar_owner, '2026-03' AS cohort_month, CAST(NULL AS STRING) AS transfer_scope,
+    CAST(NULL AS STRING) AS first_dollar_owner, v_base_str AS cohort_month, CAST(NULL AS STRING) AS transfer_scope,
     CAST(NULL AS STRING) AS mar_portfolio,
     'core_nrr'
   FROM mar_cohort mc
@@ -509,10 +516,10 @@ may_classified AS (
   UNION ALL
 
   SELECT
-    '2026-05', mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
+    v_m2_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
     mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
-    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
+    CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM aug_own)
 ),
@@ -604,7 +611,7 @@ jun_classified AS (
     v_base_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
     mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
-    CAST(NULL AS STRING), '2026-03', CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
+    CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM sep_own)
 ),
@@ -630,13 +637,13 @@ transfer_out_rows AS (
     mc.first_kam_date,
     CAST(NULL AS DATE)              AS new_user_exp_date,
     CAST(NULL AS STRING)            AS first_dollar_owner,
-    '2026-03'                       AS cohort_month,
+    v_base_str                      AS cohort_month,
     CAST(NULL AS STRING)            AS transfer_scope,
     CAST(NULL AS STRING)            AS mar_portfolio,
     'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
-  CROSS JOIN UNNEST(['2026-04','2026-05',v_base_str]) AS period_month
+  CROSS JOIN UNNEST([v_m1_str, v_m2_str, v_base_str]) AS period_month
   -- เฉพาะ outlet ที่ latest_staff ≠ Mar staff
   WHERE lo.latest_commercial_owner != 'KAM'
 ),
