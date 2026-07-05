@@ -165,3 +165,16 @@ key (text), value (text = JSON string), updated_by, updated_at
 ```
 
 **Grouping key สำหรับ byKamEmail/byTlEmail:** ใช้ `latest_kam_email`/`latest_tl_email` (ไม่ใช่ "period_kam_email" ที่ไม่มีอยู่จริง) — เพราะ grain ของ rep_view คือ "แปะ owner ปัจจุบันบนทุกแถวย้อนหลัง"
+
+
+---
+
+## 7. Session 2 Addendum (2026-07-05) — ยืนยันจากการทดสอบจริง
+
+**ไม่ต้องมีแถว `period_month=2026-06` (เดือนฐาน) แยกในข้อมูลเลย — by design**
+
+`_qnrrCompute()` (07c_qnrr_view.js) reconstruct ยอดฐานจาก **`base_gmv` column ของเดือนแรกสุดที่มีข้อมูลจริง** (`months[0]` หลัง sort) ไม่ได้มองหา row ที่ label ตรงกับ `QNRR_CFG.base_month` เลย — ทุกจุดใน UI ที่ต้องโชว์แถบ "เดือนฐาน" (`BASE_MONTH`) ใช้ค่าที่คำนวณสำเร็จรูปไว้แล้ว (`cohort_outlets`, `base_gmv_original`, `handover_base_norm`) ไม่เคยทำ `by_month[BASE_MONTH]` lookup ตรงๆ
+
+**ผลกระทบต่อ SQL:** CTE ที่ควรแทนเดือนที่ 3 ของไตรมาส (เช่น `jun_classified` ใน `rep_view.sql`) **ต้อง label เป็น `v_m3_str` เสมอ ไม่ใช่ `v_base_str`** แม้จะรู้สึกว่าชื่อ CTE (jun) ตรงกับชื่อเดือนฐาน (มิ.ย.) ก็ตาม — ให้ยึดตาม **data source จริง** (`FROM sep_own`/`sep_gmv` = เดือนที่ 3 = v_m3_str) ไม่ใช่ยึดตามชื่อ CTE
+
+**Silent-outlets fallback ต้อง guard ด้วย `v_mX_days > 0`** — ถ้าเดือนนั้นยังไม่เริ่มจริง (ไม่มี order เลย) ต้องไม่ generate แถวเลย (ปล่อยว่าง) แทนที่จะให้ทุก outlet กลายเป็น "churn 100%" ปลอม
