@@ -91,7 +91,13 @@ function _qnrrCompute(kamEmail, scope) {
       // PM/ADMIN/SALE-involving transfers should ALSO be neutralized at this scope
       // is a business call, not addressed here -- this fix only covers the reported
       // KAM<->KAM case.)
-      var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM');
+      // v6-fix3: strengthened the check with a second signal. Per the rep_view SQL
+      // design, transfer_scope is only tagged 'inter' (PM/ADMIN involved) or
+      // 'external' (SALE involved) when the move crosses a real portfolio-TYPE
+      // boundary -- for a pure KAM<->KAM reassignment it's blank/falsy. Checking
+      // BOTH signals (portfolio fields AND transfer_scope) hedges against either one
+      // alone being an incomplete signal for this specific row shape.
+      var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM') || !r.transfer_scope;
       if (isPureKamMove && r.movement_type === 'transfer_out') return null;
       if (isPureKamMove && r.movement_type === 'transfer_in')  return 'core_nrr';
       return r.movement_type;
@@ -109,7 +115,7 @@ function _qnrrCompute(kamEmail, scope) {
     // this squad, not an internal KAM<->KAM reshuffle, so it must NOT be neutralized.
     // Require both sides to already be 'KAM' portfolio type before treating it as
     // same-squad noise.
-    var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM');
+    var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM') || !r.transfer_scope;
     var sameTeam     = sameTlBase && sameTlPeriod && isPureKamMove;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
