@@ -74,9 +74,31 @@ function _qnrrCompute(kamEmail, scope) {
       return 'core_nrr_churn';
     }
     if (scope === 'kam') return r.movement_type;
+    // v6-fix: "org-wide, no portfolio boundary" applies in TWO cases, not just
+    // scope==='admin' -- when Admin views the "ทีม" (Team) dropdown without being
+    // personally a TL of any squad, the code path taken is scope==='tl' with
+    // myTlEmail==='' (see allRows selection above), which resolves to the exact same
+    // all-rows, no-boundary view as scope==='admin'. Missing this second path was
+    // why the reported bug reproduced from the "ทีม" toggle specifically.
+    var isOrgWideView = (scope === 'admin') || (scope === 'tl' && !myTlEmail);
+    if (isOrgWideView) {
+      // At this scope there is no portfolio boundary between individual KAMs -- if
+      // an outlet just moves from one KAM to another (both sides still 'KAM'
+      // portfolio type), the org never lost it, so it should read as core_nrr here
+      // regardless of squad. Moves involving PM/ADMIN/SALE are a genuine portfolio-
+      // TYPE change, not just a KAM reassignment, so those stay visible as transfer
+      // -- more meaningful signal at VP level. (Flagged separately: whether
+      // PM/ADMIN/SALE-involving transfers should ALSO be neutralized at this scope
+      // is a business call, not addressed here -- this fix only covers the reported
+      // KAM<->KAM case.)
+      var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM');
+      if (isPureKamMove && r.movement_type === 'transfer_out') return null;
+      if (isPureKamMove && r.movement_type === 'transfer_in')  return 'core_nrr';
+      return r.movement_type;
+    }
     // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
     // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
-    // transfer_in/out ข้าม squad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
+    // transfer_in/out ข้ามsquad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
     var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
     var sameTlPeriod = r.latest_tl_email === myTlEmail; // v827-fix
     var sameTeam     = sameTlBase && sameTlPeriod;
@@ -688,7 +710,7 @@ function _qnrrRenderChart(){
   // column uniformly -- must stay uniform across columns or bars stop being visually comparable
   // (a column with a shorter chart-area would render the same ฿ value as a taller bar than a
   // column with a taller chart-area, breaking the whole point of a bar chart).
-  var chartH  = 112; // inner bar area height (bars-row 178px - top 44px - label 22px)
+  var chartH  = 142; // v6-uxfix4: was 112 -- bars-row grew 178->208px (+30) for more breathing room around tall ghost-bar projections, chartH raised by the same amount
 
   // ref-line removed — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
   if (refLines) refLines.innerHTML = '';
