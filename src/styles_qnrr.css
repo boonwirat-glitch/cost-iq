@@ -204,7 +204,10 @@
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
   overflow: hidden;
-  height: 178px; /* top-wrap 44px + chart-area flex:1 + label ~22px */
+  /* v6-uxfix4: was 178px -- gave more breathing room for tall ghost-bar projections
+     per Bucci feedback, on top of the buffer widened in v839. chartH in JS raised by
+     the same +30px so bars stay at the correct proportional scale. */
+  height: 208px;
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
