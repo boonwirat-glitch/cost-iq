@@ -2,14 +2,14 @@
 // Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
 // Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
 var QNRR_CFG = {
-  quarter:    '2026q2',
-  base_month: '2026-03',
-  q_months:   ['2026-04','2026-05','2026-06'],
+  quarter:    '2026q3',
+  base_month: '2026-06',
+  q_months:   ['2026-07','2026-08','2026-09'],
   months_th:  {
-    '2026-03':'มี.ค.','2026-04':'เม.ย.',
-    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
+    '2026-06':'มิ.ย.','2026-07':'ก.ค.',
+    '2026-08':'ส.ค.', '2026-09':'ก.ย.'
   },
-  csv_file:   'sense_qnrr_2026q2.csv'
+  csv_file:   'sense_qnrr_2026q3.csv'
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ function _qnrrCompute(kamEmail, scope) {
   var myTlEmail = '';
   var kamRows = (qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
   if (kamRows.length) {
-    myTlEmail = (kamRows.find(function(r){return r.period_tl_email;}) || {}).period_tl_email || '';
+    myTlEmail = (kamRows.find(function(r){return r.latest_tl_email;}) || {}).latest_tl_email || ''; // v827-fix
   }
   // v817: TL/Admin login ตรงๆ — email ของตัวเองอาจอยู่ใน byTlEmail โดยตรง
   if (!myTlEmail && qd.byTlEmail && qd.byTlEmail[kamEmail]) {
@@ -57,19 +57,28 @@ function _qnrrCompute(kamEmail, scope) {
   if (!allRows || !allRows.length) return null;
 
   function _rowInScope(r) {
-    if (scope === 'kam')   return r.period_kam_email === kamEmail;
-    if (scope === 'tl')    return myTlEmail ? r.period_tl_email === myTlEmail : true;
+    if (scope === 'kam')   return r.latest_kam_email === kamEmail; // v827-fix
+    if (scope === 'tl')    return myTlEmail ? r.latest_tl_email === myTlEmail : true;
     if (scope === 'admin') return true;
-    return r.period_kam_email === kamEmail;
+    return r.latest_kam_email === kamEmail;
   }
 
   function _effectiveMovement(r) {
+    // v830-fix: raw CSV never contains movement_type='core_nrr_churn' as a literal value
+    // (confirmed against actual rep_view export) -- the UI's Churn sub-row expects this
+    // category but nothing ever produced it, so Churn always rendered as "--" regardless
+    // of real data. Reclassify here: a core_nrr row with curr_gmv=0 IS a churned outlet
+    // (was in the retained cohort, dropped to zero this period) -- matches the same
+    // curr_gmv===0 split logic validated against real rep_kam export data.
+    if (r.movement_type === 'core_nrr' && (parseFloat(r.curr_gmv) || 0) === 0) {
+      return 'core_nrr_churn';
+    }
     if (scope === 'kam') return r.movement_type;
     // v814: ใช้ base_tl_email แทน base_kam_email ในการ detect same-squad transfer
     // transfer_in/out ระหว่าง KAM ใน squad เดียวกัน → ไม่นับ (neutralize)
     // transfer_in/out ข้าม squad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
     var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
-    var sameTlPeriod = r.period_tl_email === myTlEmail;
+    var sameTlPeriod = r.latest_tl_email === myTlEmail; // v827-fix
     var sameTeam     = sameTlBase && sameTlPeriod;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
@@ -234,6 +243,90 @@ function _qnrrCompute(kamEmail, scope) {
   };
 }
 window._qnrrCompute = _qnrrCompute;
+// ── _qnrrComputeForCommission (Q3 quarterly mode) ───────────────────────────────
+// Wraps _qnrrCompute() and reshapes output for _commBuildKamPayout / _commBuildTlPayout.
+// Source of truth: bulkQnrrData (sense_qnrr_2026q3.csv) — same as QNRR sheet.
+// Guarantees NRR% in commission = NRR% in QNRR sheet (T3).
+//
+// scope: 'kam' | 'tl' | 'admin'
+// currentPeriod: '2026-07' | '2026-08' | '2026-09' (lag-1 YYYY-MM)
+function _qnrrComputeForCommission(kamEmail, scope, asOfPeriod) {
+  try {
+    var validQ = QNRR_CFG.q_months;  // ['2026-07','2026-08','2026-09']
+    var currentPeriod;
+    if (asOfPeriod && validQ.includes(asOfPeriod)) {
+      // v829: explicit period requested (Retroactive Lock / auto-compute-at-month-start) —
+      // use it directly instead of "today". bulkQnrrData already has rows for all 3 quarter
+      // months at once, so no extra fetch is needed — just pick a different by_month key.
+      currentPeriod = asOfPeriod;
+    } else {
+      // Determine current billing period from lag-1 date (Day-1 lag, same as MoM engine)
+      var now    = new Date();
+      var lag1   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      var lagYM  = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
+      // Clamp to Q3 months — if lagged date is outside Q3, use last available Q3 month
+      currentPeriod = validQ.includes(lagYM) ? lagYM : validQ[validQ.length - 1];
+    }
+
+    // Delegate to existing _qnrrCompute — no logic duplication
+    var result = _qnrrCompute(kamEmail, scope || 'kam');
+    if (!result || !result.by_month) {
+      console.warn('[QnrrComm] _qnrrCompute returned null for', kamEmail, scope);
+      return null;
+    }
+
+    var monthData = result.by_month[currentPeriod];
+    if (!monthData) {
+      // Period data not yet available (e.g. Sep not started) — use latest available
+      var availableMonths = validQ.filter(function(m) { return !!result.by_month[m]; });
+      if (!availableMonths.length) {
+        console.warn('[QnrrComm] no period data for', kamEmail, currentPeriod);
+        return null;
+      }
+      currentPeriod = availableMonths[availableMonths.length - 1];
+      monthData = result.by_month[currentPeriod];
+    }
+
+    var segs    = monthData.segments || {};
+    var outlets = monthData.outlets  || {};
+
+    // base_norm × 30 = normalized base GMV (Jun @ 30 days — locked for Q3)
+    var baseGmv = Math.round((result.base_norm || 0) * 30);
+
+    // Thai month label for base_month (มิ.ย. 2569) — shown in history detail
+    var baseMo  = QNRR_CFG.base_month;  // '2026-06'
+    var baseParts = baseMo.split('-');
+    var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var baseMoLabel = _THAI_MONTHS[parseInt(baseParts[1], 10) - 1] + ' ' + (parseInt(baseParts[0], 10) + 543);
+
+    console.log('%c[QnrrComm] compute','color:#60a5fa',
+      {kamEmail, scope, currentPeriod, nrr_pct: monthData.nrr_pct, baseGmv,
+       core: segs.core_nrr, expansion: segs.expansion, comeback: segs.comeback});
+
+    return {
+      // NRR fields matching _tgtComputeKamNRR() output shape (used by _commBuildKamPayout)
+      nrr:              (monthData.nrr_pct || 0) / 100,
+      baselinePrevGmv:  baseGmv,
+      cohortGmv:        segs.core_nrr   || 0,
+      expansionGmv:     segs.expansion  || 0,
+      comebackGmv:      segs.comeback   || 0,
+      cohortCount:      outlets.core_nrr || 0,
+      // Quarterly metadata — stored in breakdown snapshot
+      prevMonth:        baseMoLabel,           // 'มิ.ย. 2569' — fixed label for Q3
+      base_month:       baseMo,                // '2026-06'
+      quarter_id:       QNRR_CFG.quarter,      // '2026q3'
+      commission_mode:  'quarterly',
+      // Source info
+      currentPeriod:    currentPeriod,
+      by_month:         result.by_month
+    };
+  } catch (e) {
+    console.warn('[QnrrComm] _qnrrComputeForCommission error', e);
+    return null;
+  }
+}
+window._qnrrComputeForCommission = _qnrrComputeForCommission;
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // Freshket Sense — Quarter NRR Health Sheet (v775)
@@ -245,20 +338,10 @@ window._qnrrCompute = _qnrrCompute;
 (function(){
 'use strict';
 
-// ── QNRR Quarter Config — แก้แค่ที่นี่ทุก quarter ──────────────────────────
-// Q2 2026: base=มี.ค., period=เม.ย.–มิ.ย.
-// Q3 2026: base_month='2026-06', q_months=['2026-07','2026-08','2026-09'], etc.
-var QNRR_CFG = {
-  quarter:    '2026q2',
-  base_month: '2026-03',
-  q_months:   ['2026-04','2026-05','2026-06'],
-  months_th:  {
-    '2026-03':'มี.ค.','2026-04':'เม.ย.',
-    '2026-05':'พ.ค.', '2026-06':'มิ.ย.'
-  },
-  csv_file:   'sense_qnrr_2026q2.csv'
-};
-// ─────────────────────────────────────────────────────────────────────────────
+// v6-fix: removed duplicate QNRR_CFG declaration that used to be here (was byte-for-byte
+// identical to the one at the top of this file) -- having two copies meant a future
+// session could update one when adding a new quarter's months_th entry and forget the
+// other, silently going out of sync. QNRR_CFG is already declared once, above.
 var MONTHS_TH = QNRR_CFG.months_th;
 var Q_MONTHS  = QNRR_CFG.q_months;
 var BASE_MONTH= QNRR_CFG.base_month;
@@ -910,7 +993,7 @@ function _qnrrRenderBreakdown(){
       html += '<tr class="bk-subrow">' +
         '<td><div class="qnrr-bk-mv-cell">' +
           '<div class="qnrr-bk-dot" style="background:' + hovColor + '"></div>' +
-          '<span class="qnrr-bk-mv-name">└ cohort มี.ค.</span>' +
+          '<span class="qnrr-bk-mv-name">└ cohort ' + (QNRR_CFG.months_th[BASE_MONTH] || BASE_MONTH) + '</span>' +
         '</div></td>';
       ALL_MONTHS.forEach(function(m){
         if (m === BASE_MONTH) {
@@ -1404,7 +1487,10 @@ function _qnrrRenderList(){
   // header row ครอบทั้ง list — align กับ table colgroup (auto + 4×42px)
   // ใช้ div+grid ไม่ใช้ table เพราะ account name col width เปลี่ยนตาม screen
   var partialJun = _data.by_month[_lastMonth] && _data.by_month[_lastMonth].is_partial;
-  var listMoHdrs = ['มี.ค.','เม.ย.','พ.ค.','มิ.ย.' + (partialJun ? '~' : '')];
+  var listMoHdrs = [QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month]
+    .concat(QNRR_CFG.q_months.map(function(m, i){
+      return (QNRR_CFG.months_th[m] || m) + (i === QNRR_CFG.q_months.length-1 && partialJun ? '~' : '');
+    }));
   // header: sticky เหนือ account list — column-align grid มี 4 fixed cols = COL_W px ทางขวา
   var headerHtml = '<div class="qnrr-list-mo-hdr">' +
     '<div class="qnrr-list-mo-hdr-name"></div>' +

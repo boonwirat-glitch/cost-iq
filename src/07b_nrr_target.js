@@ -838,6 +838,16 @@ async function renderPortviewTargetBar() {
   // bulkOutletsData = {accountId: months} — empty {} if KAM has no outlet accounts.
   // Object.keys({}).length === 0 → _outletsReady always false → shimmer never resolves.
   // Correct: use _cloudLoadedTabs.has('outlets') (set after ingest, cleared during ETag refresh).
+  // v828: quarterly mode reads this bar's NRR from QNRR source so it matches commission payout
+  const _policyForBar = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQBar = _policyForBar && _policyForBar.commission_mode === 'quarterly';
+  function _nrrBarSource(kamE, tlE) {
+    if (_isQBar && typeof window._qnrrComputeForCommission === 'function') {
+      const r = window._qnrrComputeForCommission(kamE || tlE, kamE ? 'kam' : (tlE ? 'tl' : 'admin'));
+      if (r) return r;
+    }
+    return _tgtComputeKamNRR(kamE, tlE);
+  }
   const _outletsReady = (function(){
     try{ return typeof _cloudLoadedTabs !== 'undefined' && _cloudLoadedTabs.has('outlets'); }
     catch(e){ return typeof bulkOutletsData !== 'undefined' && bulkOutletsData && Object.keys(bulkOutletsData).length > 0; }
@@ -845,8 +855,8 @@ async function renderPortviewTargetBar() {
 
   const nrrResult = _outletsReady
     ? (_repDetail
-        ? _tgtComputeKamNRR(_repEmail, null)
-        : (_showAll ? _tgtComputeKamNRR(null, null) : _tgtComputeKamNRR(isTL ? null : email, isTL ? email : null)))
+        ? _nrrBarSource(_repEmail, null)
+        : (_showAll ? _nrrBarSource(null, null) : _nrrBarSource(isTL ? null : email, isTL ? email : null)))
     : null;
   let nrrPct=null, cohortGmv=0, cbGmv=0, exGmv=0;
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
@@ -914,7 +924,20 @@ async function renderPortviewTargetBar() {
 
   // ── Baseline formula section ──────────────────────────────────
   let baselineSection = '';
-  if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+  // v829: quarterly mode — baseline IS the fixed base month itself (e.g. มิ.ย. 2569),
+  // no 3-month averaging needed or accurate. Simpler AND matches the actual NRR% math
+  // above (which already uses nrrResult.baselinePrevGmv from QNRR, not a 3mo avg).
+  if (_isQBar && nrrResult && nrrResult.baselinePrevGmv > 0) {
+    const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const _baseMoLbl = (_policyForBar && _policyForBar.base_month)
+      ? (() => { const p=_policyForBar.base_month.split('-'); return _mo2[parseInt(p[1],10)-1]+' '+(parseInt(p[0],10)+543); })()
+      : 'เดือนฐาน';
+    baselineSection = `<div class="tgt-det-section">
+      <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">Fixed base ตลอดไตรมาส (ไม่เลื่อน)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานคงที่ทั้ง Q</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
+    </div>`;
+  } else if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const _ms2 = m => { const p=(m||'').split(' '); return (parseInt(p[1]||0)*12)+_mo2.indexOf(p[0]); };
     const allM2 = new Set();

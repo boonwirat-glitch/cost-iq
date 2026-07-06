@@ -210,8 +210,14 @@ function _commBuildTeamPreviewGroups() {
     tlMap[tlEmail].kamRows.push(row);
     tlMap[tlEmail].kamTotal += Number(row.payout || 0);
   });
+  const _policyForTeamNrr = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
+  const _isQTeamNrr = _policyForTeamNrr && _policyForTeamNrr.commission_mode === 'quarterly';
   Object.values(tlMap).forEach(t => {
-    const raw = t.tlEmail === 'unassigned' ? null : _tgtComputeKamNRR(null, t.tlEmail);
+    // v828: quarterly mode reads Team NRR from QNRR source so it matches the commission total shown below it
+    const raw = t.tlEmail === 'unassigned' ? null
+      : (_isQTeamNrr && typeof window._qnrrComputeForCommission === 'function')
+        ? window._qnrrComputeForCommission(t.tlEmail, 'tl')
+        : _tgtComputeKamNRR(null, t.tlEmail);
     const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
     t.teamNrr = pct;
     t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
@@ -290,7 +296,47 @@ function renderCommPolicyStep(body) {
           <div class="comm-field"><label>Scope</label><input class="comm-input" value="All teams" disabled></div>
         </div>
       </div>`;
-    }).join('')}`;
+    }).join('')}
+    <div class="comm-card" style="margin-top:12px;border:1.5px solid rgba(255,210,80,.18);background:rgba(255,200,60,.04)">
+      <div class="comm-card-top">
+        <div>
+          <div class="comm-name" style="color:#f0c040">Commission Mode — Q3 2026</div>
+          <div class="comm-meta">NRR + Expansion + Upsell P1/P3 ใช้ base ไหน &middot; Handover ใช้ MoM เสมอ</div>
+        </div>
+        <span class="comm-badge" style="background:rgba(255,200,60,.15);color:#f0c040">ก.ค.&ndash;ก.ย.</span>
+      </div>
+      <div class="comm-grid2" style="margin-top:10px">
+        <div class="comm-field" style="grid-column:1/-1">
+          <label>Mode</label>
+          <div style="display:flex;gap:16px;margin-top:6px;align-items:center">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+              <input type="radio" name="comm_mode_q3" value="monthly"
+                ${(_nrrGovGetQuarterlyMode()||'monthly')==='monthly'?'checked':''}
+                onchange="onNrrPolicyChangeMode('monthly')">
+              Monthly (Rolling MoM)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+              <input type="radio" name="comm_mode_q3" value="quarterly"
+                ${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'checked':''}
+                onchange="onNrrPolicyChangeMode('quarterly')">
+              Quarterly (Fixed Base มิ.ย.)
+            </label>
+          </div>
+        </div>
+        <div class="comm-field">
+          <label>NRR &amp; Expansion</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.55)">${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'vs มิ.ย. 2569 (fixed ตลอด Q3)':'Rolling vs เดือนก่อน'}</div>
+        </div>
+        <div class="comm-field">
+          <label>Upsell P1/P3</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.55)">${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'3M lookback จาก มิ.ย. (pin ตลอด Q3)':'Rolling 3M'}</div>
+        </div>
+        <div class="comm-field" style="grid-column:1/-1">
+          <label>Handover</label>
+          <div class="comm-input" style="color:rgba(255,255,255,.30)">&#128274; Monthly เสมอ — ไม่ขึ้นกับ mode (by design)</div>
+        </div>
+      </div>
+    </div>`;
 }
 function renderCommAssignmentStep(body) {
   const period = _nrrExclusionCurrentPeriod();
@@ -1446,6 +1492,40 @@ function onNrrPolicyChange(periodMonth, field, value) {
     _commUpdateSaveButtonState();
   }
 }
+
+// ── Quarterly mode helpers ─────────────────────────────────────────────
+// Get current commission_mode from all visible periods' policies
+function _nrrGovGetQuarterlyMode() {
+  // Read from published/pending policies — any period with commission_mode='quarterly' wins
+  const allPolicies = Object.values(_nrrGovPolicies || {});
+  const allPending  = Object.values(_nrrGovPending  || {});
+  const combined    = [...allPending, ...allPolicies];
+  const q = combined.find(function(p) { return p && p.commission_mode === 'quarterly'; });
+  if (q) return 'quarterly';
+  const m = combined.find(function(p) { return p && p.commission_mode === 'monthly'; });
+  return m ? 'monthly' : 'monthly'; // default monthly
+}
+
+// Called from Quarterly Mode UI radio button change
+function onNrrPolicyChangeMode(mode) {
+  // Apply commission_mode to all visible period policies
+  const now = new Date();
+  const q   = _tgtActiveQuarter || _tgtCurrentQuarter();
+  const months = _tgtQuarterMonths(q);
+  months.forEach(function(m) {
+    const key     = _nrrGovKey(m, 'all', 'all');
+    const current = _nrrGovGetPending(m, 'all', 'all');
+    _nrrGovPending[key] = {
+      ...current,
+      commission_mode: mode,
+      quarter_id: mode === 'quarterly' ? '2026-Q3' : null
+    };
+  });
+  _commMarkChanged();
+  const commOpen = document.getElementById('commission-cockpit-overlay')?.classList.contains('open');
+  if (commOpen) renderCommissionCockpit(); else renderNrrPolicyTab();
+}
+window.onNrrPolicyChangeMode = onNrrPolicyChangeMode;
 
 function _tgtRefreshAllocBar() {
   const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
