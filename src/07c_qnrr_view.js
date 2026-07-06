@@ -1527,6 +1527,20 @@ function _qnrrRenderList(){
     toutChip.style.display = 'none'; // hidden until count > 0
     filterBar.appendChild(toutChip);
   }
+  // v6-fix: transfer_in chip was never added anywhere (static HTML or injected) --
+  // only transfer_out got this treatment in v776. Chart view has always shown
+  // Transfer in correctly (via _qnrrRenderBreakdown), but the list view had no way
+  // to filter down to it since the chip itself didn't exist.
+  if (filterBar && !filterBar.querySelector('[data-mv="transfer_in"]')) {
+    var tinChip = document.createElement('button');
+    tinChip.className = 'qnrr-chip qnrr-tin-chip';
+    tinChip.setAttribute('data-mv', 'transfer_in');
+    tinChip.setAttribute('data-orig-label', 'Transfer in');
+    tinChip.setAttribute('onclick', "_qnrrListFilter('transfer_in',this)");
+    tinChip.textContent = 'Transfer in';
+    tinChip.style.display = 'none'; // hidden until count > 0
+    filterBar.appendChild(tinChip);
+  }
 
   document.querySelectorAll('.qnrr-list-filter-bar .qnrr-chip').forEach(function(btn){
     var onclick = btn.getAttribute('onclick') || '';
