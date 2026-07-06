@@ -1,4 +1,4 @@
-<!-- Freshket Sense v838-ghost-bar-visibility-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v839-ghost-bar-seam-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v838-ghost-bar-visibility-fix',
+      version: 'v839-ghost-bar-seam-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6669,6 +6669,12 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   display: flex; flex-direction: column-reverse;
   transition: filter .15s;
   animation: qnrrBarRise .46s cubic-bezier(.4,0,.2,1) both;
+}
+/* v6-uxfix3: when a ghost sits on top, square off the bar's top corners so the two
+   read as one continuous shape (solid becoming dashed) instead of two separate boxes
+   with a visible notch where the bar's rounded top met the ghost's square bottom. */
+.qnrr-bar-body-has-ghost {
+  border-radius: 0 0 3px 3px;
 }
 .qnrr-bar-col:nth-child(1) .qnrr-bar-body { animation-delay: .00s; }
 .qnrr-bar-col:nth-child(2) .qnrr-bar-body { animation-delay: .07s; }
@@ -52940,7 +52946,7 @@ function _qnrrRenderChart(){
     // clipped by .qnrr-bar-chart-area's overflow:hidden with a hard edge -- looked like a
     // rendering bug, especially early in the month when a run-rate projected from very few
     // days of data can spike far above every other bar).
-    var maxGapH      = Math.max(0, chartH - barH - 4); // 4px headroom from the very top
+    var maxGapH      = Math.max(0, chartH - barH - 10); // v6-uxfix3: was 4px — measured live in browser: hardcoded chartH (112) vs actual rendered .qnrr-bar-chart-area height (109.5px) differ by 2.5px, eating most of the old 4px buffer down to 1.5px real headroom. Widened so small CSS drift like this can't reopen the crop.
     var isGhostClipped = isPartialMonth && rawGapH > maxGapH;
     var gapH         = isPartialMonth ? Math.min(rawGapH, maxGapH) : 0;
 
@@ -53037,7 +53043,12 @@ function _qnrrRenderChart(){
           ghostHtml = '<div class="qnrr-ghost-line' + (isLowConf ? ' qnrr-ghost-top-lowconf' : '') + '" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(runRate) + '"></div>';
         }
       }
-      bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
+      // v6-uxfix3: when a ghost extension sits on top, square off the bar's top corners
+      // (via CSS class below) so the two read as one continuous shape instead of two
+      // separate floating boxes with a visible seam where the bar's rounded top met
+      // the ghost's square bottom.
+      var barBodyCls = 'qnrr-bar-body' + (ghostHtml ? ' qnrr-bar-body-has-ghost' : '');
+      bodyHtml = ghostHtml + '<div class="' + barBodyCls + '" style="height:' + barH + 'px">' + segsHtml + '</div>';
     }
 
     var onclickStr = isBase ? '' : 'onclick="_qnrrSelBar(\'' + m + '\')"';
