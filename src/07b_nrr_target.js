@@ -337,17 +337,17 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   if (cm && cm.byMovementType && cm.byMovementType['transfer_out']) {
     const allToRows = cm.byMovementType['transfer_out'] || [];
     if (kamEmail) {
-      // v6-fix: when kamEmail doesn't correspond to any real owned account (allAccounts
-      // empty -- e.g. an Admin/VP whose own login email isn't a real KAM, viewing "my
-      // portfolio" which doesn't actually exist), the name-fallback below degrades to
-      // `r.kamName === ''` or matches whatever kamName happens to be first in an empty
-      // array's .find() result -- either way it can accidentally attribute a COMPLETELY
-      // UNRELATED KAM's transfer-out row to this view. Confirmed live: an Admin's own
-      // "การเคลื่อนไหวพอร์ต" card was showing a specific KAM-to-KAM transfer (Anusorn to
-      // Siriprapa) that had nothing to do with the Admin's own login. No real owned
-      // portfolio here means no real transfer-out to attribute to it.
+      // v6-fix6: dropped the name-based OR-fallback entirely. It was meant as a backup
+      // for rows missing r.kamEmail, but it's fundamentally unsafe -- it can match
+      // ANY identity whose portviewBulkData happens to contain even one row with a
+      // kamName that coincidentally equals some unrelated transfer-out row's kamName
+      // (confirmed live: boonwirat.t@freshket.co, a true Admin, had allAccounts.length>0
+      // for unrelated reasons, and the fallback matched a completely different KAM's
+      // transfer this way). A direct, unambiguous email match is the only safe check --
+      // if a row is missing kamEmail on the CSV side, that's a data-quality issue to fix
+      // at the source, not something to paper over with a name guess here.
       transferOutList = _hasRealOwnAccounts
-        ? allToRows.filter(r => r.kamEmail === kamEmail || r.kamName === (allAccounts.find(a=>a.kamName)?.kamName||''))
+        ? allToRows.filter(r => r.kamEmail === kamEmail)
         : [];
     } else if (tlEmail) {
       const teamKamNames = new Set(allAccounts.map(a => a.kamName).filter(Boolean));
