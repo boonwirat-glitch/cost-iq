@@ -25,14 +25,14 @@
 
 | # | Test case | เกณฑ์ผ่าน | สถานะล่าสุด | หลักฐาน |
 |---|---|---|---|---|
-| D1 | Movement classification 11 ประเภทตรง priority order (v8 design) | สุ่ม outlet 20 ร้านต่อ movement type เทียบ manual trace | ✅ (ยืนยัน rep_view) | HANDOFF §7 |
-| D2 | `unclassified` ต้อง = 0 แถวเสมอ | `SELECT COUNT(*) WHERE movement_type NOT IN (known list)` = 0 | ⬜ ยังไม่ได้รันตรวจหลัง fix รอบ Session 3 | — |
-| D3 | Guard เดือนที่ยังไม่เริ่ม (`v_mX_days > 0`) ครบทุกเดือน ทั้ง rep_view + 4 ไฟล์ reporting | ไม่มี fake churn 100% สำหรับเดือนที่ 0 order | ✅ แก้แล้วทั้ง 5 ไฟล์ | HANDOFF #6 item 6-7 |
+| D1 | Movement classification 11 ประเภทตรง priority order (v8 design) | สุ่ม outlet 20 ร้านต่อ movement type เทียบ manual trace | ✅ (ยืนยัน rep_view) + **ยืนยันเพิ่ม 2026-07-06** จากไฟล์จริง 3 ไฟล์: ไม่มี GMV ติดลบเลยสักแถว, ไม่มี outlet ซ้ำ period เดียวกัน (rep/pm/admin) | HANDOFF §7 |
+| D2 | `unclassified` ต้อง = 0 แถวเสมอ | `SELECT COUNT(*) WHERE movement_type NOT IN (known list)` = 0 | ✅ **ยืนยันจากไฟล์จริง 2026-07-06** — เช็ค `unclassified` count = 0 ทั้ง 3 ไฟล์ (rep_view 2,917 แถว, pm_view 772 แถว, admin_view 2,281 แถว) — ยังขาด kam_view.csv, tl_view.csv | — |
+| D3 | Guard เดือนที่ยังไม่เริ่ม (`v_mX_days > 0`) ครบทุกเดือน ทั้ง rep_view + 4 ไฟล์ reporting | ไม่มี fake churn 100% สำหรับเดือนที่ 0 order | ✅ แก้แล้วทั้ง 5 ไฟล์ + **ยืนยันจากข้อมูลจริง 2026-07-06**: rep/pm/admin_view มีแค่ `period_month=2026-07` เท่านั้น ไม่มีแถว 2026-08/09 หลุดมาก่อนเวลา (วันนี้ 6 ก.ค. เดือน ส.ค./ก.ย. ยังไม่เริ่ม) |
 | D4 | บั๊ก #6 (LEG A + LEG B, `v_base_str`→`v_m3_str`) แก้ครบทุก occurrence | grep + manual read ทั้ง 5 ไฟล์ ไม่มี `v_base_str` หลงเหลือในบริบทเดือนที่ 3 | ✅ แก้ครบ Session 3 | HANDOFF §6.1, §6.6 |
 | D5 | CSV export 29 คอลัมน์ตรง `rep_view` SELECT เป๊ะ (ลำดับ+ชื่อ) | Diff schema กับ parser ใน `02_data_pipeline.js` | ✅ ยืนยันจาก `sense_qnrr_2026q3.csv` จริง 2,916 แถว | HANDOFF §7 |
 | D6 | GMV รวมของแต่ละ movement type reconcile กับ ground truth GMV รายเดือน (ล็อคไว้ใน memory) | ผลรวม curr_gmv ทุก movement + ผลรวม No-Owner ต้องเท่า ground truth เดือนนั้น (Jul/Aug/Sep 2026 เมื่อมีข้อมูล) | ⬜ ยังทำไม่ได้ — Jul 2026 ยังไม่จบเดือน (MTD only) | — |
 | D7 | 11 ร้าน "Admin Freshket" (฿337,112) ไม่มี KAM/TL owner | ไม่ใช่ bug — เป็น ops task รอ reassign | ⬜ Ops task ค้าง | HANDOFF §6.2-A |
-| D8 (ใหม่) | L-4: 4 ไฟล์ reporting variant มีบั๊กเดียวกับ rep_view ไหม (D2-D4 ต้องรันซ้ำกับ 4 ไฟล์นี้ด้วย เพราะตอนนี้เป็น "เก็บไว้ maintain ต่อ" ไม่ใช่ dead code) | รัน D2-D4 กับ `kam/pm/admin/tl_view.sql` ทั้ง 4 | ✅ Verify จากโค้ดจริง 2026-07-06 ทั้ง 4 ไฟล์: LEG A+B ใช้ `v_m3_str` ถูกต้อง (ไม่ใช่ `v_base_str`), `ELSE 'unclassified'` branch ครบ, `v_m3_days > 0` guard ครบ — เพิ่ม header comment สถานะ "maintained reporting variant" ครบทั้ง 4 ไฟล์แล้ว (⚠️ ยังขาด: รัน query จริงบน BigQuery เพื่อยืนยัน unclassified count จริง = 0 — ต้องมี BigQuery access) |
+| D8 (ใหม่) | L-4: 4 ไฟล์ reporting variant มีบั๊กเดียวกับ rep_view ไหม (D2-D4 ต้องรันซ้ำกับ 4 ไฟล์นี้ด้วย เพราะตอนนี้เป็น "เก็บไว้ maintain ต่อ" ไม่ใช่ dead code) | รัน D2-D4 กับ `kam/pm/admin/tl_view.sql` ทั้ง 4 | ✅ Code-read ผ่านครบ 4 ไฟล์ (2026-07-06) + **ยืนยันด้วยข้อมูลจริงแล้ว 2/4**: `pm_view.csv` (772 แถว) และ `admin_view.csv` (2,281 แถว) unclassified=0 จริง, ไม่มี GMV ติดลบ, ไม่มี outlet ซ้ำ — ยังขาด `kam_view.csv`, `tl_view.csv` |
 
 ---
 
