@@ -1,4 +1,4 @@
-<!-- Freshket Sense v843-mom-transfer-attribution-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v844-list-transfer-in-chip: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v843-mom-transfer-attribution-fix',
+      version: 'v844-list-transfer-in-chip',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -53764,6 +53764,20 @@ function _qnrrRenderList(){
     toutChip.textContent = 'Transfer out';
     toutChip.style.display = 'none'; // hidden until count > 0
     filterBar.appendChild(toutChip);
+  }
+  // v6-fix: transfer_in chip was never added anywhere (static HTML or injected) --
+  // only transfer_out got this treatment in v776. Chart view has always shown
+  // Transfer in correctly (via _qnrrRenderBreakdown), but the list view had no way
+  // to filter down to it since the chip itself didn't exist.
+  if (filterBar && !filterBar.querySelector('[data-mv="transfer_in"]')) {
+    var tinChip = document.createElement('button');
+    tinChip.className = 'qnrr-chip qnrr-tin-chip';
+    tinChip.setAttribute('data-mv', 'transfer_in');
+    tinChip.setAttribute('data-orig-label', 'Transfer in');
+    tinChip.setAttribute('onclick', "_qnrrListFilter('transfer_in',this)");
+    tinChip.textContent = 'Transfer in';
+    tinChip.style.display = 'none'; // hidden until count > 0
+    filterBar.appendChild(tinChip);
   }
 
   document.querySelectorAll('.qnrr-list-filter-bar .qnrr-chip').forEach(function(btn){
