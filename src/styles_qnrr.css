@@ -307,9 +307,13 @@
 .qnrr-ghost-top {
   position: absolute; left: 0; right: 0;
   border-radius: 4px 4px 0 0; pointer-events: none; z-index: 3;
-  border: 1.5px dashed rgba(188,215,255,.40);
+  /* v6-uxfix2: was rgba(...,.40) — combined with the pulse animation's low point
+     (was opacity:.45) this multiplied down to an effective ~18% visibility, invisible
+     against the dark background. Confirmed via live DOM inspect: element rendered at
+     the correct height/position (no more overflow) but was simply too faint to see. */
+  border: 1.5px dashed rgba(188,215,255,.70);
   border-bottom: none;
-  background: rgba(188,215,255,.04);
+  background: rgba(188,215,255,.10);
   animation: qnrrGhostPulse 3s ease-in-out infinite;
 }
 /* v6-uxfix: when the real projection is taller than the chart area allows, fade the
@@ -327,7 +331,11 @@
 /* v6-uxfix: early-month projections (<7 days of data) are noisy — dim + tighter dash
    to visually signal "still settling", separate from a normal-confidence projection */
 .qnrr-ghost-top-lowconf {
-  opacity: .55; border-style: dotted;
+  /* v6-uxfix2: was opacity:.55 — had ZERO effect because the pulse animation targets
+     the same `opacity` property and always wins for the duration of its cycle. Use
+     border-color (untouched by the animation) to signal "uncertain" instead — amber
+     tint instead of the default blue, still fully visible, just a different color. */
+  border-color: rgba(240,192,64,.65); border-style: dotted;
 }
 /* run-rate ≈ actual: thin line at projection level */
 .qnrr-ghost-line {
@@ -336,7 +344,9 @@
   pointer-events: none; z-index: 3;
   animation: qnrrGhostPulse 3s ease-in-out infinite;
 }
-@keyframes qnrrGhostPulse { 0%,100%{opacity:.45} 50%{opacity:.90} }
+/* v6-uxfix2: floor was .45 — too low once multiplied against the border's own alpha.
+   Raised so the "breathing" effect stays subtle but never disappears. */
+@keyframes qnrrGhostPulse { 0%,100%{opacity:.75} 50%{opacity:1} }
 /* bar bottom label */
 .qnrr-bar-lbl {
   font-size: 10px; font-weight: 700;
