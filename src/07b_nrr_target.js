@@ -353,7 +353,16 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
       const teamKamNames = new Set(allAccounts.map(a => a.kamName).filter(Boolean));
       transferOutList = allToRows.filter(r => teamKamNames.has(r.kamName));
     } else {
-      transferOutList = allToRows;
+      // v6-fix7: this branch (no kamEmail, no tlEmail = true org-wide/VP view) had NO
+      // concept of portfolio boundaries at all -- it showed every transfer_out row
+      // unfiltered, including pure KAM<->KAM reassignments that never actually left
+      // the company (confirmed live: Napat->Siriprapa, both ownerFromType/ownerToType
+      // ='KAM', showing up on a true Admin's own summary). This mirrors the same
+      // business rule already applied in the QNRR system (07c_qnrr_view.js v840) --
+      // at true VP scope there's no portfolio boundary between individual KAMs, so a
+      // pure KAM<->KAM move should be invisible here. Moves involving PM/ADMIN/SALE
+      // are a genuine portfolio-TYPE change and stay visible.
+      transferOutList = allToRows.filter(r => !(r.ownerFromType === 'KAM' && r.ownerToType === 'KAM'));
     }
     // map Q11 fields → Q10-compatible shape for downstream rendering
     // v293: keep ownerToType + ownerToName for breakdown display
