@@ -182,8 +182,44 @@ function _qnrrCompute(kamEmail, scope) {
       account_name: t.account_name, period_month: t.period_month });
   });
 
-  var base_norm = base_norm_original - transfer_out_base_norm;
-  var base_gmv  = base_gmv_original  - transfer_out_base_gmv;
+  // ── Find all transfer_in outlets across entire Q (symmetric with transfer_out) ──
+  // v6-fix4: per Bucci decision 2026-07-06 — transfer_in must count toward NRR the
+  // same way transfer_out does. Before this: an outlet transferring OUT got its base
+  // GMV removed from the denominator (fair — not the portfolio's fault), but an
+  // outlet transferring IN was never added to either side of the ratio at all — it
+  // only showed in the separate "Transfer in" display bucket and in Total GMV. That
+  // meant a portfolio receiving a large transferred-in account got zero accountability
+  // for it for the rest of the quarter: its performance never touched core NRR%,
+  // which is what drives commission/pace tracking. This mirrors transfer_out exactly
+  // (same quarter-level, non-month-specific treatment) rather than introducing a new
+  // inconsistency.
+  var coreTransferInSet = {}; // outlet_id → {gmv, gmv_norm, account_name, period_month}
+  scopedRows.forEach(function(r){
+    var mv = _effectiveMovement(r);
+    if (mv === 'transfer_in' && !coreTransferInSet[r.outlet_id]) {
+      var b_gmv  = parseFloat(r.base_gmv) || 0;
+      var b_days = parseFloat(r.base_days) || 31;
+      coreTransferInSet[r.outlet_id] = {
+        gmv:          b_gmv,
+        gmv_norm:     b_gmv / b_days,   // unit: GMV/day (same as base_norm_original)
+        account_name: r.account_name || '',
+        period_month: r.period_month
+      };
+    }
+  });
+  var transfer_in_base_norm = 0;
+  var transfer_in_base_gmv  = 0;
+  var transfer_in_outlets   = [];
+  Object.keys(coreTransferInSet).forEach(function(oid){
+    var t = coreTransferInSet[oid];
+    transfer_in_base_norm += t.gmv_norm;
+    transfer_in_base_gmv  += t.gmv;
+    transfer_in_outlets.push({ outlet_id: oid, gmv_norm: t.gmv_norm,
+      account_name: t.account_name, period_month: t.period_month });
+  });
+
+  var base_norm = base_norm_original - transfer_out_base_norm + transfer_in_base_norm;
+  var base_gmv  = base_gmv_original  - transfer_out_base_gmv  + transfer_in_base_gmv;
   var cohort_outlets = Object.keys(baseMap).length; // แสดง original cohort count
 
   // handover base: Mar GMV ของ handover outlets (แสดงใน Mar bar แต่ไม่นับใน NRR denom)
@@ -224,7 +260,7 @@ function _qnrrCompute(kamEmail, scope) {
         core_nrr_base_sum += (parseFloat(r.base_gmv) || 0) / base_d * 30;
       }
 
-      if ((mv === 'core_nrr' || mv === 'core_nrr_churn') && r.base_gmv > 0) {
+      if ((mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days = r.curr_days || 30;
@@ -274,6 +310,8 @@ function _qnrrCompute(kamEmail, scope) {
     base_norm_original:     base_norm_original,      // v776: ฐานก่อนหัก transfer_out
     transfer_out_base_norm: transfer_out_base_norm,  // v776: จำนวนที่ถูกหัก
     transfer_out_outlets:   transfer_out_outlets,    // v776: รายการ outlet ที่ถูกหัก
+    transfer_in_base_norm:  transfer_in_base_norm,   // v6-fix4: จำนวนที่ถูกบวกเข้า (สมมาตรกับ transfer_out)
+    transfer_in_outlets:    transfer_in_outlets,     // v6-fix4: รายการ outlet ที่ถูกบวกเข้า
     handover_base_norm:     handover_base_norm,
     cohort_outlets:         cohort_outlets,
     by_month:               by_month
@@ -767,7 +805,8 @@ function _qnrrRenderChart(){
     var topHtml = '';
     if (isBase) {
       // v776: ถ้ามี core transfer_out → แสดงฐานที่ปรับแล้ว + indicator
-      var hasTout = (_data.transfer_out_base_norm || 0) > 0;
+      // v6-fix4: also trigger on transfer_in now that it adjusts base_norm too
+      var hasTout = (_data.transfer_out_base_norm || 0) > 0 || (_data.transfer_in_base_norm || 0) > 0;
       var adjBase = Math.round(_data.base_norm * 30);
       var baseLabel = hasTout
         ? _fmtM(adjBase) + '<span class="qnrr-base-adj-tag">adj</span>'
@@ -922,26 +961,32 @@ function _qnrrRenderBreakdown(){
   });
 
   // v776: dispBase = adjusted base (หัก core transfer_out แล้ว)
+  // v6-fix4: also add transfer_in now that it's part of the adjustment
   var dispBase = _data.base_norm > 0 ? Math.round(_data.base_norm * 30) : _data.base_gmv;
-  var hasToutAdj = (_data.transfer_out_base_norm || 0) > 0;
+  var hasToutAdj = (_data.transfer_out_base_norm || 0) > 0 || (_data.transfer_in_base_norm || 0) > 0;
 
   // colgroup: fixed width ป้องกัน partial month column ถ่าง
   var colgroup = '<colgroup><col style="width:100px">' +
     ALL_MONTHS.map(function(){ return '<col style="width:58px">'; }).join('') +
     '</colgroup>';
 
-  // ── Base adjustment note row (แสดงเมื่อมี core transfer_out ถูกหักจากฐาน) ──
+  // ── Base adjustment note row (แสดงเมื่อมี core transfer_out/in ปรับฐาน) ──
   var adjNoteHtml = '';
   if (hasToutAdj) {
     var toutOuts = (_data.transfer_out_outlets || []).length;
+    var tinOuts  = (_data.transfer_in_outlets  || []).length;
     var origBase = Math.round(_data.base_norm_original * 30);
-    var adjAmt   = Math.round(_data.transfer_out_base_norm * 30);
+    var adjAmt   = Math.round((_data.transfer_out_base_norm || 0) * 30);
+    var addAmt   = Math.round((_data.transfer_in_base_norm  || 0) * 30);
+    var parts = [];
+    if (toutOuts > 0) parts.push('หัก ' + toutOuts + ' outlet ย้ายออก: −' + _fmtM(adjAmt));
+    if (tinOuts  > 0) parts.push('บวก ' + tinOuts + ' outlet ย้ายเข้า: +' + _fmtM(addAmt));
     adjNoteHtml = '<tr class="bk-base-adj-row">' +
       '<td colspan="' + (ALL_MONTHS.length + 1) + '">' +
         '<div class="qnrr-base-adj-note">' +
           '<span class="qnrr-base-adj-icon"></span>' +
           'ฐานปรับจาก ' + _fmtM(origBase) + ' → ' + _fmtM(dispBase) +
-          ' (หัก ' + toutOuts + ' outlet core ที่ transfer ออกใน Q: −' + _fmtM(adjAmt) + ')' +
+          ' (' + parts.join(', ') + ')' +
         '</div>' +
       '</td>' +
     '</tr>';
