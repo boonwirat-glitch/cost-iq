@@ -1,4 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════════════
+-- STATUS (L-4, decided 2026-07-06 by Bucci): KEEP as maintained reporting variant.
+-- NOT consumed by the app (app reads sql/q3_2026_movement_rep_view.sql only —
+-- see docs/Q3_NRR_COMMISSION_SPEC.md section 2). This file is scoped reporting
+-- for portfolio-level analysis and must be kept in sync with rep_view bugfixes
+-- going forward — now in test rotation, see docs/Q3_NRR_TEST_SPEC.md test D8.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- Q2 2026 Movement — PM Portfolio View  (v1)
 -- sql/q2_2026_movement_pm_view.sql
 --
