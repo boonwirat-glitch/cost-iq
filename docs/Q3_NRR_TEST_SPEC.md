@@ -59,7 +59,7 @@
 
 | # | Test case | เกณฑ์ผ่าน | สถานะล่าสุด |
 |---|---|---|---|
-| G1 | Lock-guard ป้องกันเขียนทับ snapshot ที่ lock แล้ว | กด Compute/Lock ซ้ำบน row ที่ lock แล้ว ต้องมี `confirm()` เตือนก่อนเขียนทับ + audit trail ใน breakdown jsonb | ⬜ โค้ดพร้อมแล้ว (Session 3 fix #1) แต่ **ยังไม่เคยกดทดสอบจริงในแอป** |
+| G1 | Lock-guard ป้องกันเขียนทับ snapshot ที่ lock แล้ว | กด Compute/Lock ซ้ำบน row ที่ lock แล้ว ต้องมี `confirm()` เตือนก่อนเขียนทับ + audit trail ใน breakdown jsonb | ✅ **Waived 2026-07-06 by Bucci** — ไม่ major พอที่จะบล็อก merge, โค้ด guard พร้อมแล้ว (Session 3 fix #1) ถือว่าเพียงพอโดยไม่ต้อง browser-verify |
 | G2 | Audit trail default ถูกต้อง (`p1_min_gmv` = 5000 ไม่ใช่ 2500) | ตรวจ jsonb breakdown ของ payout ที่เพิ่งคำนวณ | ✅ แก้แล้ว Session 3 item #8 |
 | G3 | Config drift BigQuery ↔ Supabase — ไม่มี auto-sync (structural risk) | มี checklist/reminder ให้ manual sync ทุกครั้งที่แก้ business rule constant | ⬜ ยังไม่มี process ป้องกัน แนะนำเพิ่ม script ตรวจ drift อัตโนมัติ (ดู §9 Recommendation) |
 | G4 | Retroactive lock ข้ามไตรมาสจริง | ทดสอบ lock เดือน มิ.ย. (Q2, monthly mode) หลังเข้า Q3 (quarterly mode) แล้ว ไม่กระทบกัน | ⬜ ยังไม่ได้ทดสอบ (อยู่ในรายการ F ของ HANDOFF §7) |
