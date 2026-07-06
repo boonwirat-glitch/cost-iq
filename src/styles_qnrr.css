@@ -267,6 +267,12 @@
   transition: filter .15s;
   animation: qnrrBarRise .46s cubic-bezier(.4,0,.2,1) both;
 }
+/* v6-uxfix3: when a ghost sits on top, square off the bar's top corners so the two
+   read as one continuous shape (solid becoming dashed) instead of two separate boxes
+   with a visible notch where the bar's rounded top met the ghost's square bottom. */
+.qnrr-bar-body-has-ghost {
+  border-radius: 0 0 3px 3px;
+}
 .qnrr-bar-col:nth-child(1) .qnrr-bar-body { animation-delay: .00s; }
 .qnrr-bar-col:nth-child(2) .qnrr-bar-body { animation-delay: .07s; }
 .qnrr-bar-col:nth-child(3) .qnrr-bar-body { animation-delay: .14s; }
