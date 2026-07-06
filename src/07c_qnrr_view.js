@@ -683,7 +683,12 @@ function _qnrrRenderChart(){
     }
   });
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
-  var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
+  // v6-uxfix: top-wrap grew 32->44px to fit an always-visible run-rate line (was tooltip-only,
+  // invisible on mobile where title= doesn't work). chartH shrinks by the same 12px for EVERY
+  // column uniformly -- must stay uniform across columns or bars stop being visually comparable
+  // (a column with a shorter chart-area would render the same ฿ value as a taller bar than a
+  // column with a taller chart-area, breaking the whole point of a bar chart).
+  var chartH  = 112; // inner bar area height (bars-row 178px - top 44px - label 22px)
 
   // ref-line removed — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
   if (refLines) refLines.innerHTML = '';
@@ -704,6 +709,23 @@ function _qnrrRenderChart(){
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
+    // v6-uxfix: compute partial-month ghost/run-rate numbers ONCE here, shared by both
+    // topHtml (always-visible run-rate line, added below) and bodyHtml (the ghost bar
+    // element itself) -- previously this was computed twice in two different shapes,
+    // which was exactly how the top label and the ghost bar could disagree.
+    var isPartialMonth  = !isBase && bm && bm.is_partial && bm.curr_days > 0;
+    var runRate      = isPartialMonth ? bm.total_gmv : 0; // normalized ÷curr_days×30
+    var isLowConf    = isPartialMonth && bm.curr_days < 7; // <1 week of data — projection is noisy
+    var projH        = isPartialMonth ? Math.max(6, Math.round(runRate / maxGmv * chartH)) : 0;
+    var rawGapH      = isPartialMonth ? (projH - barH) : 0; // pixels above actual bar, uncapped
+    // Cap so the ghost never overflows past the chart area's top edge (was getting silently
+    // clipped by .qnrr-bar-chart-area's overflow:hidden with a hard edge -- looked like a
+    // rendering bug, especially early in the month when a run-rate projected from very few
+    // days of data can spike far above every other bar).
+    var maxGapH      = Math.max(0, chartH - barH - 4); // 4px headroom from the very top
+    var isGhostClipped = isPartialMonth && rawGapH > maxGapH;
+    var gapH         = isPartialMonth ? Math.min(rawGapH, maxGapH) : 0;
+
     // Top label: GMV only (NRR% removed — lives in hero zone now)
     var topHtml = '';
     if (isBase) {
@@ -721,9 +743,15 @@ function _qnrrRenderChart(){
       if (bm.is_partial) {
         // Partial month: show days on bar header, days info also in ghost bar tooltip
         var rawTotal = rawTotals[m] || bm.total_gmv;
+        // v6-uxfix: run-rate number now always visible here (not tooltip-only — title=
+        // does not show on tap for most mobile browsers, so it was effectively invisible
+        // on mobile even before the overflow bug). Low-confidence (<7 days) gets a dimmer
+        // treatment instead of extra text, to keep the line compact.
+        var runrateLbl = '<div class="qnrr-bar-runrate-label' + (isLowConf ? ' low-conf' : '') + '">run-rate ≈' + _fmtM(runRate) + '</div>';
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
+          runrateLbl +
           '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
             bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
@@ -774,18 +802,21 @@ function _qnrrRenderChart(){
       });
       // Partial month ghost — dashed outline only ABOVE the actual bar
       var ghostHtml = '';
-      if (bm.is_partial && bm.curr_days > 0) {
-        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
-        var gapH  = projH - barH; // pixels above actual bar
+      if (isPartialMonth) {
         if (gapH > 3) {
-          // ghost-top: dashed box floating above actual bar, sized to just the gap
-          var runRate = bm.total_gmv; // normalized ÷curr_days×30
-          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)';
-          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
-        } else if (gapH <= 3) {
+          // ghost-top: dashed box floating above actual bar, capped to never overflow
+          // the chart area (see maxGapH above). When the real projection is taller than
+          // the cap, fade the top edge + small indicator instead of a hard cut, so it
+          // reads as "continues beyond, see number above" rather than a rendering glitch.
+          var confNote = isLowConf ? ' — ข้อมูลแค่ ' + bm.curr_days + ' วัน ยังไม่นิ่ง' : '';
+          var clipNote = isGhostClipped ? ' (ย่อสัดส่วนเพื่อให้พอดีกราฟ)' : '';
+          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)' + confNote + clipNote;
+          var ghostCls = 'qnrr-ghost-top' + (isGhostClipped ? ' qnrr-ghost-top-clipped' : '') + (isLowConf ? ' qnrr-ghost-top-lowconf' : '');
+          ghostHtml = '<div class="' + ghostCls + '" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
+        } else if (gapH <= 3 && rawGapH > -3) {
           // run-rate ≈ actual (overperformance or same) — show thin line at run-rate level
-          var lineBottom = Math.max(barH, projH);
-          ghostHtml = '<div class="qnrr-ghost-line" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(bm.total_gmv) + '"></div>';
+          var lineBottom = Math.min(Math.max(barH, projH), chartH - 2);
+          ghostHtml = '<div class="qnrr-ghost-line' + (isLowConf ? ' qnrr-ghost-top-lowconf' : '') + '" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(runRate) + '"></div>';
         }
       }
       bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
