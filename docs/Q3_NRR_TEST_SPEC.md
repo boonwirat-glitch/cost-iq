@@ -124,7 +124,7 @@
 | # | เรื่อง | มติ | Action |
 |---|---|---|---|
 | M-1 | ELSE fallback ไม่ตรงกัน (`rep_view`='transfer_in' vs อีก 4 ไฟล์='unclassified') | **Open item — ไม่แก้ตอนนี้** | บันทึกใน PR description ว่าเป็น known inconsistency ที่ตั้งใจไม่แตะ ไม่ใช่ลืมแก้ |
-| C-3 | Fast/slow path (TL/Admin เห็น P1/P3 ต่างจาก KAM เจ้าของพอร์ต) | **Open item — ไม่แก้ตอนนี้** | เลขตรงกันวันนี้เพราะ threshold บังเอิญเท่ากัน (8000=8000) — เสี่ยงกลับมาไม่ตรงถ้ามีใครแก้ threshold ฝั่งเดียว ต้อง monitor |
+| C-3 | Fast/slow path (TL/Admin เห็น P1/P3 ต่างจาก KAM เจ้าของพอร์ต) | **แก้ไขมติ 2026-07-06: ยอมรับ design ปัจจุบัน ไม่ต้องทำ architecture fix** — (1) ฝั่ง team/TL (fast path, SQL) hardcode เฉพาะ `v_p3_min_incremental` ได้ ต้อง manual sync กับ Cockpit ทุกครั้งก่อนรัน (มี comment เตือนในโค้ดอยู่แล้ว) (2) ฝั่ง rep/KAM เจ้าของพอร์ต (slow path, `_commComputeUpsellSku`) **ต้อง proper ดึงจาก Cockpit config เสมอ — verify แล้ว 2026-07-06 ว่าโค้ดปัจจุบันเรียก `_commGetConfig()` ทุกค่า (p1_rate/p3_rate/p3_threshold_pct/p3_min_incremental/p1_min_gmv) อ่านจาก `_tgtSettings` (Supabase live) จริง ไม่ hardcode** | ✅ **ปิดเป็น resolved-by-design** — ไม่ต้องแก้โค้ดเพิ่ม เหลือแค่ต้องมั่นใจว่า `_tgtSettings` โหลดสำเร็จจริงตอน runtime (ดู C5/C6/C8 — ถ้าโหลด config ล้มเหลว จะ fallback ไปใช้ default ที่ผิดจากของจริง เหมือนที่ spec doc เคยเข้าใจผิด) |
 | M-3 | Same-squad transfer neutralization | **ตัดสินใจแล้ว: KAM เห็น transfer_out เต็มจำนวน** | ต้อง verify โค้ดจริง (test case G5) ก่อน merge — ถ้าโค้ดปัจจุบันไม่ตรงมติ ต้องแก้ |
 | L-4 | ชะตากรรม 4 ไฟล์ SQL ไม่ได้ใช้งาน | **ตัดสินใจแล้ว: เก็บไว้เป็น reporting variant** | เพิ่มเข้า test rotation หมวด 1 (D8) ทุกรอบที่แก้ rep_view ต่อจากนี้ + คอมเมนต์หัวไฟล์ระบุสถานะให้ชัด |
 
@@ -139,3 +139,42 @@
 จาก §6.4 ของ HANDOFF ที่พบว่า spec doc ผิด 3/4 ค่าเพราะไม่ได้ query สดตอนเขียน แนะนำเพิ่ม:
 - Script เล็กๆ ที่ query `target_settings` ทุกตัวที่ใช้ในเอกสารนี้ (C5, C6, C8) แล้ว diff กับค่าที่ hardcode ไว้ในโค้ด — รันก่อน merge ทุกครั้งที่แตะ commission logic
 - เขียนวันที่ query ล่าสุดกำกับทุกครั้งที่อ้างค่า config ใน doc ไหนก็ตาม (ไม่ใช่แค่เขียนว่า "ยืนยันแล้ว" เฉยๆ)
+
+---
+
+## 11. Completion Roadmap — ลำดับงานเพื่อปิดจบและ merge (วางแผน 2026-07-06)
+
+เรียงตามความเสี่ยงเงินจริง ไม่ใช่ตามความง่าย — ทำ Phase ที่กระทบเงินสุดก่อนเสมอ
+
+### Phase 1 — 🔴 ความเสี่ยงเงินสูงสุด: verify C5/C6/C8 (ยังไม่เริ่ม เพราะไม่มี Supabase access ในเครื่องมือปัจจุบัน — ดู blocker ท้ายตาราง)
+| Step | รายละเอียด |
+|---|---|
+| 1.1 | Query `target_settings` สดสำหรับ `upsell_outlet_params`, `upsell_sku_params`, `gmv_gate_params` |
+| 1.2 | Trace โค้ดจุดที่โหลด `_tgtSettings` (บรรทัด ~812 `07a_commission_engine.js`) ว่ารันก่อน `_commGetConfig()` ถูกเรียกใช้จริงเสมอ ไม่มี race condition |
+| 1.3 | เปิด browser จริง console.log `_tgtSettings` ตอน KAM/TL login แล้วเทียบกับค่าจาก 1.1 เป๊ะๆ |
+| 1.4 | ถ้าไม่ตรง → หา root cause (โหลดไม่ทัน/parse ผิด/key ผิด) แล้วแก้ |
+
+**Blocker:** เครื่องมือตอนนี้ต่อ Supabase (`menslbnyyvpxiyvjywcm.supabase.co`) ไม่ได้โดยตรง (ไม่อยู่ใน allowed network domains และไม่มี Supabase connector โหลดในเซสชันนี้) — ต้องเลือกทางใดทางหนึ่ง: (ก) Bucci รัน query แล้ววาง output ให้ หรือ (ข) ให้ผมใช้ claude-in-chrome เปิด Supabase dashboard ที่ Bucci login ไว้แล้วรัน SELECT ให้ (read-only)
+
+### Phase 2 — G5: verify/fix M-3 (KAM เห็น transfer_out เต็มจำนวน)
+Code-read `_commBuildKamPayout` + SQL base_portfolio/base_staff_owner logic (v8 design) หาว่ามี neutralization logic ที่ KAM scope หลงเหลืออยู่ไหม ถ้ามีต้องเอาออก
+
+### Phase 3 — D8: regression 4 ไฟล์ reporting variant (L-4)
+รัน D2 (unclassified=0), D3 (guard เดือน), D4 (LEG A+B fix) ซ้ำกับ `kam/pm/admin/tl_view.sql` ทั้ง 4 ไฟล์ + เพิ่ม comment หัวไฟล์ระบุสถานะ "maintained reporting variant"
+
+### Phase 4 — Deploy + browser-verify 10 จุดที่แก้ใน Session 3 (ยังไม่เคย verify จริง)
+G1 (lock-guard), U1/U2 (loading shimmer + re-render + timeout), P1 (summary/detail consistency ฿85 vs ฿10,085 case)
+
+### Phase 5 — ที่เหลือที่ยังไม่ตรวจ
+C3 (normalize ÷days×30), C4 (handover MoM isolation), C9 (TL multiplier boundary), C10 (rounding), R1-R3 (regression), U4 (MTD badge), U5 (% input reproduce)
+
+### Phase 6 — Non-blocking แต่ต้องตัดสินใจ/ดำเนินการคู่ขนาน
+M-1 (คงเป็น open item, บันทึกใน PR), P2 churn label (รอถาม Bucci), D7/B7 11 ร้าน Admin Freshket (ops task)
+
+### Phase 7 — Merge Gate final check
+รัน checklist §0 ครบ → Bucci sign-off → merge `preview/q3-commission-build` → `main`
+
+### Phase 8 — Post-merge monitoring (ทำไม่ได้ก่อนต้น ส.ค.)
+F1-F3 (full quarter close), G3 recommendation (config-drift check script)
+
+
