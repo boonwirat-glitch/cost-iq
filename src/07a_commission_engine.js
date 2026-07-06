@@ -50,6 +50,7 @@
 let _tgtCache = {};           // { "2026-06|kam|ning@f.co": 3200000, ... }
 let _tgtSettings = {};        // { nrr_threshold: 98 }
 let _tgtLoaded = false;
+let _tgtSettingsLoadFailed = false; // v835-fix: true if target_settings query threw — signals _tgtSettings may be running on stale hardcoded defaults, not live Cockpit config
 let _tgtActiveTab = 'team';
 let _tgtActiveQuarter = null; // "2026-Q3"
 let _tgtPendingEdits = {};    // { "2026-06|kam|ning@f.co": 3200000 }
@@ -149,13 +150,34 @@ function _commDaysInLabel(label) {
   } catch(e) { return 30; }
 }
 
+// ── Quarterly base month helper ─────────────────────────────────
+// Returns array of Thai month labels, counting back `count` months from baseMonthOverride.
+// If baseMonthOverride is null → rolling lag-1 anchor (Q2 / MoM behavior).
+function _commBaseMonthLabels(baseMonthOverride, count) {
+  if (!baseMonthOverride) {
+    // Rolling MoM: labels from lag-1 anchor (existing behavior)
+    return Array.from({length: count}, function(_, i) { return _commMonthLabelOffset(i + 1); });
+  }
+  // Quarterly: anchor is fixed base_month (e.g. '2026-06')
+  var parts = baseMonthOverride.split('-');
+  var yr = parseInt(parts[0], 10);
+  var mo = parseInt(parts[1], 10); // 1-based
+  var _THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return Array.from({length: count}, function(_, i) {
+    var d = new Date(yr, mo - 1 - i, 1); // mo-1 = 0-based, then subtract i months
+    return _THAI_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+  });
+}
+
 // ── Upsell SKU Engine ───────────────────────────────────────────
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
-function _commComputeUpsellSku(kamEmail, expansionIds) {
+function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
+  // baseMonthOverride (optional): '2026-06' for quarterly Q3 — pins P1/P3 3M lookback window.
+  //   null → rolling MoM (existing behavior unchanged)
   const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
@@ -174,15 +196,18 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
     const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
 
     const currLabel  = _commCurrentMonthLabel();
-    const baseLabel  = _commBaselineMonthLabel();
+    // [quarterly] anchor to fixed base_month; [monthly] rolling (unchanged)
+    const baseLabel  = baseMonthOverride
+      ? _commBaseMonthLabels(baseMonthOverride, 1)[0]
+      : _commBaselineMonthLabel();
     console.log('%c[Sense Upsell] compute','color:#f0b000',
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
     // Config (admin-configurable, with spec defaults)
-    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
-    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.03);
+    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01 (changed 2026-06-11, default never updated)
+    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01
     const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
-    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 5000);
+    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
     const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
     // MTD mode — commission on actual amounts, no projection
@@ -241,8 +266,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
             // P3: คงเดิม — existing outlet ซื้อเพิ่มจาก max_baseline
             let maxBaseline = 0;
             let maxBaselineMonth = baseLabel;
-            for (let i = 1; i <= 3; i++) {
-              const lbl = _commMonthLabelOffset(i);
+            // [quarterly] pin 3M window to base_month; [monthly] rolling lag-1 (unchanged)
+            const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
+            for (let i = 0; i < _p3Labels.length; i++) {
+              const lbl = _p3Labels[i];
               const lRow = monthData[lbl];
               if (!lRow) continue;
               const d = _commDaysInLabel(lbl);
@@ -293,15 +320,40 @@ function _commComputeUpsellSku(kamEmail, expansionIds) {
 // ── Upsell Outlet Engine ────────────────────────────────────────
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
-function _commComputeUpsellOutlet(kamEmail) {
+function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
   // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
   // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
+  // v828: qnrrRaw (optional) = already-computed _qnrrComputeForCommission() result from the
+  // caller (_commBuildKamPayout) — when provided, use QNRR-sourced expansion data instead of
+  // _tgtComputeKamNRR (MoM). Was previously always MoM even when caller was in quarterly mode,
+  // meaning outlets got wrongly INCLUDED in P1/P3 instead of excluded (or vice versa).
   const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
+    const rate = _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
+
+    if (qnrrRaw) {
+      const monthData = qnrrRaw.by_month && qnrrRaw.currentPeriod ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
+      const rows = (monthData && monthData.rows) || [];
+      const expansionIds = new Set();
+      let expansionGmv = 0;
+      rows.forEach(r => {
+        if (r.movement_type === 'expansion') {
+          if (r.outlet_id) expansionIds.add(String(r.outlet_id));
+          expansionGmv += parseFloat(r.curr_gmv) || 0;
+        }
+      });
+      return {
+        outlet_gmv: expansionGmv,
+        commission: expansionGmv * rate,
+        expansion_gmv: expansionGmv,
+        expansion_outlets: [],
+        _expansionIds: expansionIds
+      };
+    }
+
     if (typeof _tgtComputeKamNRR !== 'function') return EMPTY;
-    const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
-    const nrrResult = _tgtComputeKamNRR(kamEmail, null);
+    const nrrResult = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     if (!nrrResult) return EMPTY;
 
     // Sum expansion GMV across all cohorts (core + transferIn + newFromSales)
@@ -333,6 +385,54 @@ function _commComputeUpsellOutlet(kamEmail) {
     return EMPTY;
   }
 }
+
+// ── Quarterly drill-down helper (shared) ─────────────────────────────────
+// v828: returns a _tgtComputeKamNRR-shaped result { cohortDetail, expansionDetail,
+// comebackDetail, cohortCount, cohortGmv, expansionGmv, comebackGmv } built from
+// bulkQnrrData instead of MoM bulkHistoryData — used by every drill-down sheet in
+// 07b_cds.js so "click for detail" always matches the quarterly total shown above it.
+// Returns null if not in quarterly mode or QNRR data unavailable (caller should then
+// fall back to its own existing _tgtComputeKamNRR(email,null) call).
+function _commQnrrDrillResult(email, scope) {
+  try {
+    const policy = _nrrGovResolveForVisibleScope();
+    if (!policy || policy.commission_mode !== 'quarterly') return null;
+    if (typeof window._qnrrComputeForCommission !== 'function') return null;
+    const qr = window._qnrrComputeForCommission(email, scope || 'kam');
+    if (!qr || !qr.by_month || !qr.currentPeriod) return null;
+    const monthData = qr.by_month[qr.currentPeriod];
+    const rows = (monthData && monthData.rows) || [];
+
+    function groupByAccount(movementType) {
+      const byAcct = {};
+      rows.filter(r => r.movement_type === movementType).forEach(r => {
+        const aid = r.account_id || r.account_name;
+        if (!byAcct[aid]) byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [], prevTotal: 0, currTotal: 0 };
+        const prev = Math.round(r.base_gmv || 0), curr = Math.round(r.curr_gmv || 0);
+        byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name, prevGmv: prev, currGmv: curr,
+          delta: prev > 0 ? Math.round((curr - prev) / prev * 100) : null });
+        byAcct[aid].prevTotal += prev; byAcct[aid].currTotal += curr;
+      });
+      return Object.values(byAcct);
+    }
+
+    const cohortDetail    = groupByAccount('core_nrr');
+    const expansionDetail = groupByAccount('expansion');
+    const comebackDetail  = groupByAccount('comeback');
+    const sumCurr = arr => arr.reduce((s,g)=>s+g.currTotal,0);
+    const sumCnt  = arr => arr.reduce((s,g)=>s+g.outlets.length,0);
+
+    return {
+      nrr: qr.nrr, cohortCount: sumCnt(cohortDetail), cohortGmv: sumCurr(cohortDetail),
+      baselinePrevGmv: qr.baselinePrevGmv,
+      comebackGmv: sumCurr(comebackDetail), comebackCount: sumCnt(comebackDetail),
+      expansionGmv: sumCurr(expansionDetail), expansionCount: sumCnt(expansionDetail),
+      cohortDetail, comebackDetail, expansionDetail,
+      transferIn: null, newFromSales: null // quarterly mode doesn't split these separately
+    };
+  } catch(e) { console.warn('[CommEngine] _commQnrrDrillResult error', e); return null; }
+}
+window._commQnrrDrillResult = _commQnrrDrillResult;
 
 // ── Handover Retention Engine ───────────────────────────────────
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
@@ -425,10 +525,10 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
   // Gate based on NRR% — same metric already computed in _commBuildKamPayout
   // nrrPct passed in directly (no need to recompute GMV separately)
   try {
-    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 95); // NRR% threshold
-    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 90);
-    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.70);
-    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0.35);
+    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 98); // v835-fix: default was 95, live Supabase = 98 — NRR% threshold
+    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
+    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
+    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
 
     if (nrrPct === null || nrrPct === undefined) {
       return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
@@ -453,7 +553,7 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail) {
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     const kamEmails = Array.from(new Set(
@@ -479,7 +579,10 @@ function _commComputeTeamUpsellMult(tlEmail) {
         const upsell = _commComputeUpsellSku(ke);
         teamUpsellGmv += upsell.tl_upsell_base;
       }
-      const raw = _tgtComputeKamNRR(ke, null);
+      // v828: quarterly mode sums each KAM's fixed-base GMV from QNRR, not MoM rolling base
+      const raw = isQuarterly && typeof window._qnrrComputeForCommission === 'function'
+        ? window._qnrrComputeForCommission(ke, 'kam')
+        : _tgtComputeKamNRR(ke, null);
       teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
     });
 
@@ -520,18 +623,35 @@ function _commComputeTeamUpsellMult(tlEmail) {
 // Returns complete breakdown for one KAM
 function _commBuildKamPayout(kamEmail, periodOverride) {
   try {
-    const period = periodOverride || _nrrExclusionCurrentPeriod();
-    // v826: pass periodOverride through as asOfPeriod so retroactive/auto-compute
-    // freezes NRR against the correct historical month pair, not live MTD.
-    const raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, kamEmail, null);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
+    const period  = periodOverride || _nrrExclusionCurrentPeriod();
+    // v829: resolve policy for the PERIOD BEING COMPUTED, not always "today" — matters when
+    // retroactively locking/auto-computing a past month whose quarter/mode may differ from
+    // whatever quarter is active right now (e.g. locking July from within Q4/October).
+    const policy  = periodOverride ? _nrrGovGet(periodOverride, 'all', 'all') : _nrrGovResolveForVisibleScope();
+    const isQ     = policy && policy.commission_mode === 'quarterly';
+    const baseMo  = isQ ? (policy.base_month || null) : null;
+
+    // ── NRR source ────────────────────────────────────────────────
+    // [quarterly] read from bulkQnrrData via _qnrrComputeForCommission (same source as QNRR sheet)
+    //             periodOverride threads through as asOfPeriod for retroactive lock
+    // [monthly]   read from bulkHistoryData via _tgtComputeKamNRR — periodOverride threads through
+    //             as asOfPeriod for frozen historical-month NRR (retroactive lock / auto-compute)
+    let raw, rawPct, governedPct, pct;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(kamEmail, 'kam', periodOverride);
+    } else {
+      raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
+    }
+    rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    governedPct = _nrrGovernedPct(raw, kamEmail, null);
+    pct         = governedPct !== null ? governedPct : rawPct;
+
+    const planCode  = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
     const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
 
-    // Upsell: try full bundle first, fall back to pre-computed team summary
-    // Team summary (bulkUpsellTeamData) is loaded as FOREGROUND — always available
+    // ── Upsell ────────────────────────────────────────────────────
+    // [quarterly] Expansion GMV comes from qnrrResult (bulkQnrrData), Upsell SKU uses pin window
+    // [monthly]   existing logic unchanged
     let upsellSku, upsellOutlet;
     const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
     // Q3C Team SQL keys by ka_owner (display name), not email — try both
@@ -544,9 +664,9 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       // Fast path: use pre-computed totals from team summary (sense_upsell_team.csv)
       // v230fix2: return full p1/p3 sub-objects matching _commComputeUpsellSku structure
       // so _commBuildSnapshotRows can safely access .p1.gmv / .p3.gmv_incremental
-      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.03);
-      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.03);
-      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.015);
+      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
+      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
+      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
       const p1Comm  = _teamRow.p1_gmv   * p1Rate;
       const p3Comm  = _teamRow.p3_incr  * p3Rate;
       const outComm = _teamRow.outlet_gmv * outRate;
@@ -561,13 +681,14 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellOutlet = _commComputeUpsellOutlet(kamEmail);
-      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds);
+      upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride);
+      // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
     }
-    const handover      = _commComputeHandoverRetention(kamEmail);
-    const gate          = _commComputeGmvGate(kamEmail, pct); // pct = NRR% already computed
+    const handover = _commComputeHandoverRetention(kamEmail); // MoM always — do not touch
+    const gate     = _commComputeGmvGate(kamEmail, pct);
 
-    const subtotal = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
+    const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
 
     return {
@@ -580,7 +701,11 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       gate,
       subtotal,
       gate_cap: gate.cap_multiplier,
-      upsell_loading: upsellLoading, // v228-fix: true when upsell CSV not loaded in session
+      upsell_loading: upsellLoading,
+      commission_mode: isQ ? 'quarterly' : 'monthly',
+      base_month:      baseMo,
+      quarter_id:      isQ ? (policy.quarter_id || null) : null,
+      nrr_base_gmv:    isQ && raw ? Math.round(raw.baselinePrevGmv || 0) : null,
       final_payout: finalPayout
     };
   } catch(e) {
@@ -595,14 +720,25 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
 function _commBuildTlPayout(tlEmail, periodOverride) {
   try {
     const period = periodOverride || _nrrExclusionCurrentPeriod();
-    const raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
-    const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-    const governedPct = _nrrGovernedPct(raw, null, tlEmail);
-    const pct = governedPct !== null ? governedPct : rawPct;
-    const planCode = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
-    const nrrPayout = _commPayoutForPctByCode(planCode, 'tl', pct);
+    // v829: resolve policy for the period being computed, not always "today" (see _commBuildKamPayout)
+    const policy = periodOverride ? _nrrGovGet(periodOverride, 'all', 'all') : _nrrGovResolveForVisibleScope();
+    const isQ    = policy && policy.commission_mode === 'quarterly';
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail);
+    // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR,
+    // periodOverride threads through as asOfPeriod for frozen historical-month NRR
+    let raw;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(tlEmail, 'tl', periodOverride);
+    } else {
+      raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
+    }
+    const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const governedPct = _nrrGovernedPct(raw, null, tlEmail);
+    const pct         = governedPct !== null ? governedPct : rawPct;
+    const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
+    const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
+
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
@@ -638,11 +774,14 @@ async function loadTargets(quarter) {
     _nrrExclusions = JSON.parse(JSON.stringify(hit.nrrExclusions || []));
     _commissionSnapshots = JSON.parse(JSON.stringify(hit.commissionSnapshots || []));
     _tgtLoaded = true;
+    _tgtSettingsLoadFailed = false; // v835-fix: cache only ever holds successful settings loads now (see bottom of function)
+    window._tgtSettingsLoadFailed = false;
     return;
   }
 
   _tgtCache = {};
   _tgtSettings = { nrr_threshold: 98 };
+  _tgtSettingsLoadFailed = false; // v835-fix: reset each fresh load attempt
   _nrrGovPolicies = {};
   _commRuleConfig = { plans:{}, rules:{}, tiers:{} };
   _nrrExclusions = [];
@@ -680,12 +819,13 @@ async function loadTargets(quarter) {
       _tgtSettings[s.key] = s.value;
     });
   } catch (e) {
-    console.warn('[Target] settings load failed:', e.message);
+    _tgtSettingsLoadFailed = true;
+    console.error('[Target] 🔴 target_settings load failed — commission math will run on hardcoded JS defaults, NOT live Cockpit config:', e.message);
   }
 
   try {
     const { data: policies, error: polErr } = await supa.from('nrr_policies')
-      .select('period_month,scope_type,scope_key,base_mode,base_month,status,updated_by,updated_at')
+      .select('period_month,scope_type,scope_key,base_mode,base_month,commission_mode,quarter_id,status,updated_by,updated_at')
       .in('period_month', months);
     if (polErr) throw new Error(polErr.message);
     (policies || []).forEach(p => {
@@ -795,26 +935,36 @@ async function loadTargets(quarter) {
     _commRuleConfig = { plans: {}, rules: {}, tiers: {}, assignments: [] };
   }
 
-  _tgtQuarterCache[quarter] = {
-    cache: { ..._tgtCache },
-    settings: { ..._tgtSettings },
-    nrrPolicies: { ..._nrrGovPolicies },
-    commRules: JSON.parse(JSON.stringify(_commRuleConfig || {})),
-    nrrExclusions: JSON.parse(JSON.stringify(_nrrExclusions || [])),
-    commissionSnapshots: JSON.parse(JSON.stringify(_commissionSnapshots || [])),
-    ts: Date.now()
-  };
+  // v835-fix: never cache a quarter's state if target_settings failed to load —
+  // caching it would serve stale/wrong defaults to every call within _TGT_CACHE_TTL
+  // even after Supabase recovers. A failed load always re-fetches next call instead.
+  if (!_tgtSettingsLoadFailed) {
+    _tgtQuarterCache[quarter] = {
+      cache: { ..._tgtCache },
+      settings: { ..._tgtSettings },
+      nrrPolicies: { ..._nrrGovPolicies },
+      commRules: JSON.parse(JSON.stringify(_commRuleConfig || {})),
+      nrrExclusions: JSON.parse(JSON.stringify(_nrrExclusions || [])),
+      commissionSnapshots: JSON.parse(JSON.stringify(_commissionSnapshots || [])),
+      ts: Date.now()
+    };
+  }
   _tgtLoaded = true;
-  window._tgtLoadedFromDB = true; // v754e: flag ว่าข้อมูลมาจาก Supabase จริง ไม่ใช่ localStorage cache
+  window._tgtSettingsLoadFailed = _tgtSettingsLoadFailed; // v835-fix: UI can check this to warn "commission config may be stale"
+  window._tgtLoadedFromDB = !_tgtSettingsLoadFailed; // v835-fix: was unconditionally true even when settings load failed — now reflects reality
   // v224e: persist to localStorage — next session reads this instantly (no Supabase cold-start flash)
-  try{
-    localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
-      cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
-      commRules:JSON.parse(JSON.stringify(_commRuleConfig||{})),
-      nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions||[])),
-      commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots||[]))
-    }}));
-  }catch(e){}
+  // v835-fix: skip persisting if settings load failed — a bad localStorage cache would poison
+  // the NEXT session's cold-start too, extending the blast radius beyond just this session
+  if (!_tgtSettingsLoadFailed) {
+    try{
+      localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
+        cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
+        commRules:JSON.parse(JSON.stringify(_commRuleConfig||{})),
+        nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions||[])),
+        commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots||[]))
+      }}));
+    }catch(e){}
+  }
 }
 
 function _tgtGet(period, level, email) {
@@ -1437,6 +1587,13 @@ function _tgtGetVisibleTeamNrrResult() {
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const tlMatch = (typeof portviewBulkData !== 'undefined' ? (portviewBulkData || []) : []).some(a => a.tlEmail === email);
   const showAll = role === 'admin' && !tlMatch;
+  // v828: Team Governance Card's NRR% — use QNRR when quarterly, else MoM as before
+  const policy = _nrrGovResolveForVisibleScope();
+  if (policy && policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+    const scopeEmail = showAll ? null : email;
+    const r = window._qnrrComputeForCommission(scopeEmail || email, showAll ? 'admin' : 'tl');
+    if (r) return r;
+  }
   return _tgtComputeKamNRR(null, showAll ? null : email);
 }
 function _tgtRenderTeamGovCard() {
@@ -1467,7 +1624,7 @@ function _tgtRenderTeamGovCard() {
     if (isTLRole(role)) {
       const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
       const _um2 = typeof _commComputeTeamUpsellMult==='function' && (typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0)
-        ? _commComputeTeamUpsellMult(_govEm2) : null;
+        ? _commComputeTeamUpsellMult(_govEm2, policy && policy.commission_mode === 'quarterly') : null;
       if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
     }
   } catch(e) {}
@@ -1483,7 +1640,7 @@ function _tgtRenderTeamGovCard() {
       const _govEmail = isTLRole(role)
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
-      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail) : null;
+      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail, policy && policy.commission_mode === 'quarterly') : null;
       if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
@@ -1753,14 +1910,16 @@ async function saveCommissionPoliciesFromCockpit() {
   if (!rows.length) return;
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const payload = rows.map(p => ({
-    period_month: p.period_month,
-    scope_type: p.scope_type || 'all',
-    scope_key: p.scope_key || 'all',
-    base_mode: p.base_mode || 'rolling_mom',
-    base_month: p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
-    status: p.status || 'draft',
-    updated_by: actor,
-    updated_at: new Date().toISOString()
+    period_month:    p.period_month,
+    scope_type:      p.scope_type || 'all',
+    scope_key:       p.scope_key || 'all',
+    base_mode:       p.base_mode || 'rolling_mom',
+    base_month:      p.base_mode === 'fixed_month' ? (p.base_month || _nrrGovPrevMonth(p.period_month)) : _nrrGovPrevMonth(p.period_month),
+    commission_mode: p.commission_mode || 'monthly',   // 'monthly' | 'quarterly'
+    quarter_id:      p.commission_mode === 'quarterly' ? (p.quarter_id || null) : null,
+    status:          p.status || 'draft',
+    updated_by:      actor,
+    updated_at:      new Date().toISOString()
   }));
   const { error } = await supa.from('nrr_policies').upsert(payload, { onConflict:'period_month,scope_type,scope_key' });
   if (error) throw new Error(error.message);
@@ -1867,7 +2026,11 @@ function _nrrGovernanceForVisibleTeam() {
   return { raw, rawPct, governedPct, excludedBase: exclBase };
 }
 function _nrrGovernanceForKam(kamEmail) {
-  const raw = _tgtComputeKamNRR(kamEmail, null);
+  // v828: use QNRR source in quarterly mode so exclusion/threshold checks match commission total
+  const _policy = _nrrGovResolveForVisibleScope();
+  const raw = (_policy && _policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function')
+    ? window._qnrrComputeForCommission(kamEmail, 'kam')
+    : _tgtComputeKamNRR(kamEmail, null);
   const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
   const governedPct = _nrrGovernedPct(raw, kamEmail, null);
   const exclBase = _nrrExclusionBaseImpact(kamEmail, null);
@@ -1973,22 +2136,47 @@ function _commBuildSnapshotRows(periodOverride) {
         excluded_base_gmv: _nrrExclusionBaseImpact(g.kamEmail, null),
         account_count: g.total || ((g.accounts || []).length),
         // v247e: NRR detail for reconcile — cohort + expansion outlet breakdown
-        nrr_cohort_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[] } catch(e){return []} })(),
-        expansion_detail: (() => { try { const _r=_tgtComputeKamNRR(g.kamEmail,null); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex; } catch(e){return []} })(),
+        // v828: quarterly mode reads cohort detail from bulkQnrrData rows (grouped by
+        // account) instead of _tgtComputeKamNRR — was silently showing MoM detail that
+        // didn't reconcile with the quarterly total shown just above.
+        nrr_cohort_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            const _byAcct = {};
+            _rows.filter(r => r.movement_type === 'core_nrr').forEach(r => {
+              const aid = r.account_id || r.account_name;
+              if (!_byAcct[aid]) _byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [] };
+              _byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name,
+                prevGmv: Math.round(r.base_gmv||0), currGmv: Math.round(r.curr_gmv||0) });
+            });
+            return Object.values(_byAcct);
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); return _r&&_r.cohortDetail?_r.cohortDetail.map(a=>({acctId:a.acctId,acctName:a.acctName,outlets:(a.outlets||[]).map(o=>({outletId:o.outletId,outletName:o.outletName,prevGmv:Math.round(o.prevGmv||0),currGmv:Math.round(o.currGmv||0)}))})):[]
+        } catch(e){return []} })(),
+        expansion_detail: (() => { try {
+          if (kamPayout.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function') {
+            const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
+            const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
+            return _rows.filter(r => r.movement_type === 'expansion')
+              .map(r => ({ outletId: r.outlet_id, outletName: r.account_name, gmv: Math.round(r.curr_gmv||0) }));
+          }
+          const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex;
+        } catch(e){return []} })(),
         lock_trigger: 'manual',
         csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
         config_snapshot: {
-          upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
-          upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
+          upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.01),   // v835-fix: was 0.03
+          upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.01),   // v835-fix: was 0.03
           upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
-          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
-          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',2500),
-          upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
-          gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
-          gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',90),
-          gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.70),
-          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0.35)
+          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',8000), // v835-fix: was 5000
+          upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',5000), // v6-fix: was 2500, drifted from the real gate check (line ~210) and confirmed Supabase value (5000)
+          upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.005),  // v835-fix: was 0.015
+          gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',98),   // v835-fix: was 95
+          gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',95),   // v835-fix: was 90
+          gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.3),        // v835-fix: was 0.70
+          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0)           // v835-fix: was 0.35
         }
       },
       created_by: actor,
@@ -2048,6 +2236,20 @@ function _commBuildKamSelfState() {
   const email = isViewingKamPortfolio ? portviewRepEmail : selfEmail;
   if (!isViewingKamPortfolio && (isTLRole(role) || isAdminRole(role))) return null;
   if (!email) return null;
+  // v6-fix: guard against QNRR not loaded yet (quarterly mode). Without this,
+  // _qnrrComputeForCommission() returns null while bulkQnrrData isn't ready, the null
+  // pct fails to match any tier in _commPayoutForPctByCode(), and the function silently
+  // resolves to payout=0 — showing a confident-looking "฿0 NRR" instead of a loading
+  // state. Mirrors the existing bulkQnrrData.loaded guard already used in
+  // 07c_qnrr_view.js:606. Force-releases after 15s (see _fetchQnrrBundle) so this can
+  // never shimmer forever if QNRR genuinely fails to load.
+  const _qPolicy = typeof _nrrGovResolveForVisibleScope === 'function' ? _nrrGovResolveForVisibleScope() : null;
+  const _isQuarterly = _qPolicy && _qPolicy.commission_mode === 'quarterly';
+  const _qnrrReady = typeof window.bulkQnrrData !== 'undefined' && window.bulkQnrrData && window.bulkQnrrData.loaded;
+  const _qnrrForceReleased = typeof window._qnrrForceRelease !== 'undefined' && window._qnrrForceRelease;
+  if (_isQuarterly && !_qnrrReady && !_qnrrForceReleased) {
+    return { role, email, loading: true };
+  }
   const period = _nrrExclusionCurrentPeriod();
   const pct = _commKamNrrPct(email);
   const planCode = _commGetAssignmentPlan(period, 'kam', email, 'kam');
@@ -2083,6 +2285,20 @@ function _commBuildKamSelfState() {
 function _commBuildKamSelfCard() {
   const st = _commBuildKamSelfState();
   if (!st) return '';
+  if (st.loading) {
+    return `<div class="pv-comm-strip">
+    <div class="pv-comm-left">
+      <div class="pv-comm-top">
+        <div class="pv-comm-eyebrow">ค่าคอมฯ เดือนนี้</div>
+      </div>
+      <div class="pv-comm-copyline"><span class="skel" style="display:inline-block;width:130px;height:12px;border-radius:4px;vertical-align:middle"></span></div>
+      <div class="pv-comm-next"><span class="skel" style="display:inline-block;width:90px;height:11px;border-radius:4px;vertical-align:middle"></span></div>
+    </div>
+    <div class="pv-comm-right">
+      <div class="pv-comm-main"><span class="skel" style="display:inline-block;width:56px;height:20px;border-radius:4px;vertical-align:middle"></span></div>
+    </div>
+  </div>`;
+  }
   const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
@@ -2376,6 +2592,28 @@ function exportCommissionSnapshotCsv(periodOverride) {
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
+  // v6-fix: guard against silently overwriting an already-locked (final) snapshot.
+  // Root cause: this function previously unconditionally upserted fresh draft rows over
+  // ANY existing row (including 'final') for the same period+role+email key -- no check,
+  // no warning. Clicking "Compute" again on an already-locked period would silently
+  // demote it back to 'draft' with freshly-computed (possibly different) numbers, with
+  // no way to know it happened. Same confirm() pattern already used below in
+  // lockCommissionSnapshot() for the pending-exclusion check.
+  const _lockedRows = (_commissionSnapshots || []).filter(r =>
+    r.period_month === period && r.snapshot_status === 'final'
+  );
+  let _overwroteLock = false;
+  if (_lockedRows.length) {
+    const _lockedTotal = _lockedRows.reduce((sum, r) => sum + Number(r.payout_amount || r.final_payout || 0), 0);
+    const _confirmMsg = `⚠️ เดือน ${period} ถูก Lock แล้ว ${_lockedRows.length} รายการ (รวม ${typeof _commFmtPayout === 'function' ? _commFmtPayout(_lockedTotal) : '฿' + Math.round(_lockedTotal).toLocaleString('en-US')})\n\nComp ใหม่จะ Unlock และเขียนทับตัวเลขที่ lock ไว้ทั้งหมด ไม่สามารถย้อนกลับได้ ต้องการดำเนินการต่อหรือไม่?`;
+    if (!confirm(_confirmMsg)) {
+      if (typeof showToast === 'function') showToast('ยกเลิก — ข้อมูลที่ lock ไว้ไม่ถูกแตะต้อง', '!');
+      console.warn(`[CommDraft] user declined overwrite of ${_lockedRows.length} locked rows for ${period}`);
+      return false;
+    }
+    _overwroteLock = true;
+    console.warn(`[CommDraft] user confirmed overwrite of ${_lockedRows.length} locked rows for ${period}`);
+  }
   // v826: thread periodOverride through — previously always computed live/current data
   // and just relabeled it, which is why retroactive Compute produced wrong numbers.
   const rows = _commBuildSnapshotRows(periodOverride);
@@ -2391,7 +2629,13 @@ async function computeCommissionDraft(periodOverride) {
       snapshot_status: 'draft',
       // note: retroactive/manual tag stored inside breakdown jsonb —
       // commission_payout_snapshots has no top-level column for it (was causing 400 error)
-      breakdown: { ...(r.breakdown || {}), lock_note: periodOverride ? 'retroactive' : 'manual' },
+      breakdown: {
+        ...(r.breakdown || {}),
+        lock_note: periodOverride ? 'retroactive' : 'manual',
+        // v6-fix: audit trail for lock-overwrite events, so a review of breakdown jsonb
+        // shows exactly when/who/what got unlocked-and-recomputed, not just a silent gap.
+        ...(_overwroteLock ? { unlock_overwrite_at: new Date().toISOString(), unlock_overwrite_by: actor } : {})
+      },
       updated_at: new Date().toISOString(),
       updated_by: actor,
       created_by: r.created_by || actor

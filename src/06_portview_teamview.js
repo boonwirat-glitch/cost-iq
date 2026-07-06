@@ -2254,22 +2254,60 @@ function renderTeamviewKamList(){
 }
 
 // v226-qc: per-render cache for _commBuildKamPayout (called up to 3× per KAM card)
-const _kamPayoutCache = {};
-let _kamPayoutCacheKey = '';
-function _getCachedKamPayout(kamEmail) {
+// v6-perf-fix: cache-key logic extracted into shared helper so the NRR cache below
+// (added same fix) invalidates in lockstep with the payout cache — both depend on
+// the exact same underlying state (period, upsell/qnrr load status, commission mode).
+function _kamRenderCacheKey() {
   // v232-fix: include bulkUpsellTeamData size in key.
   // Bug: fast-path uses bulkUpsellTeamData but key only tracked bulkUpsellData.loaded
   // → cache hit after upsell_team loads → stale result (NRR only, no upsell) returned forever.
   const _utN = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData?Object.keys(bulkUpsellTeamData).length:0;
-  const cacheKey = (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN;
+  // v829-fix: same class of bug for quarterly mode — bulkQnrrData loads via a 2s-delayed
+  // background prefetch, arriving AFTER this cache may already be warm from a MoM fallback
+  // computed at first render. Without qnrrLoaded/commission_mode in the key, the cache never
+  // invalidates once QNRR data lands, or when Admin toggles Monthly↔Quarterly in the Cockpit.
+  const _qnrrLoaded = typeof bulkQnrrData!=='undefined'&&bulkQnrrData&&bulkQnrrData.loaded?'q':'';
+  const _commMode = (typeof _nrrGovResolveForVisibleScope==='function' && _nrrGovResolveForVisibleScope()?.commission_mode) || 'monthly';
+  return (typeof _nrrExclusionCurrentPeriod==='function'?_nrrExclusionCurrentPeriod():'') + '|' + (typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded?'u':'') + '|t' + _utN + '|' + _qnrrLoaded + '|' + _commMode;
+}
+const _kamPayoutCache = {};
+const _kamNrrCache = {};
+let _kamPayoutCacheKey = '';
+function _invalidateKamRenderCachesIfNeeded() {
+  const cacheKey = _kamRenderCacheKey();
   if (_kamPayoutCacheKey !== cacheKey) {
     Object.keys(_kamPayoutCache).forEach(k => delete _kamPayoutCache[k]);
+    Object.keys(_kamNrrCache).forEach(k => delete _kamNrrCache[k]);
     _kamPayoutCacheKey = cacheKey;
   }
+}
+function _getCachedKamPayout(kamEmail) {
+  _invalidateKamRenderCachesIfNeeded();
   if (!_kamPayoutCache[kamEmail]) {
     _kamPayoutCache[kamEmail] = typeof _commBuildKamPayout==='function' ? _commBuildKamPayout(kamEmail) : null;
   }
   return _kamPayoutCache[kamEmail];
+}
+// v6-perf-fix: the NRR% shown on team/portfolio cards used to call _qnrrComputeForCommission()
+// fresh on EVERY render pass for EVERY KAM row (full baseMap/coreTransferOutSet rebuild +
+// a console.log each time — see 07c_qnrr_view.js), even though _getCachedKamPayout() right
+// next to it already caches the equivalent (heavier) full payout computation. With a team of
+// several KAMs re-rendering repeatedly during initial load (each bulk dataset arriving async
+// triggers a full list re-render), this blocked the main thread redundantly on every pass.
+// Piggybacks on the same invalidation as the payout cache since both depend on identical state.
+function _getCachedKamNrr(kamEmail) {
+  _invalidateKamRenderCachesIfNeeded();
+  if (!(kamEmail in _kamNrrCache)) {
+    _kamNrrCache[kamEmail] = (function(){
+      try{
+        var _p=_nrrGovResolveForVisibleScope();
+        if(_p&&_p.commission_mode==='quarterly'&&window._qnrrComputeForCommission)
+          return window._qnrrComputeForCommission(kamEmail,'kam')||_tgtComputeKamNRR(kamEmail,null);
+      }catch(e){}
+      return _tgtComputeKamNRR(kamEmail, null);
+    })();
+  }
+  return _kamNrrCache[kamEmail];
 }
 
 async function __legacyRenderTeamviewKamListFallbackAsync(){
@@ -2381,7 +2419,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=_getCachedKamNrr(g.kamEmail);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -2413,7 +2451,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=_getCachedKamNrr(g.kamEmail);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
@@ -2446,7 +2484,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const _nrr=_tgtComputeKamNRR(g.kamEmail, null);
+    const _nrr=_getCachedKamNrr(g.kamEmail);
     const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
