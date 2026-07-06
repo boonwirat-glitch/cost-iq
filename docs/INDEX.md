@@ -1,5 +1,5 @@
 # Freshket Commercial OS — Docs Index
-`docs/INDEX.md` · อัปเดต 2026-06-14
+`docs/INDEX.md` · อัปเดต 2026-07-06
 
 > **สำหรับ AI session ใหม่:** อ่านไฟล์นี้ก่อนทุกครั้ง แล้วเปิดเฉพาะไฟล์ที่เกี่ยวข้องกับงาน
 
@@ -9,12 +9,23 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
-| `docs/handoff-2026-06-14-v708.md` | **Latest Sense handoff** — v708 |
-| `docs/handoff-2026-06-24-all-views-complete.md` | **Latest QNRR handoff** — all 4 views validated |
+| `docs/handoff-2026-07-06-v847-q3-merge-complete.md` | **Latest Sense handoff — v847** — Q3 quarterly commission merge เข้า main สำเร็จ + แก้บั๊ก transfer/NRR/ghost-bar 8 จุด |
+| `docs/handoff-2026-06-14-v708.md` | Sense v708 (ก่อนหน้า Q3 work) |
+| `docs/handoff-2026-06-24-all-views-complete.md` | Latest QNRR handoff — all 4 views validated (ก่อน Q3 quarterly) |
 | `docs/handoff-2026-06-14-v701.md` | Sense v701 — teamview card fix, full architecture notes |
 | `docs/handoff/HANDOFF_v606_20260613.md` | Dashboard Phase 1–8 architecture |
 
+### Q3 2026 Quarterly Commission (superseded, เก็บไว้อ่านประกอบ)
+| ไฟล์ | สถานะ |
+|---|---|
+| `docs/Q3_NRR_COMMISSION_HANDOFF.md` | Session 1-3 บน preview branch — ประวัติ ไม่ใช่สถานะปัจจุบัน |
+| `docs/Q3_NRR_TEST_SPEC.md` | Test spec ตอน merge — ไฟล์อ้างอิงเก่า บาง branch reference ล้าสมัยแล้ว |
+| `docs/MAIN_VS_PREVIEW_MERGE_ANALYSIS.md` | Gap analysis ที่ใช้วางแผน merge — งานเสร็จแล้ว |
+| `docs/Q3_NRR_COMMISSION_SPEC.md` | Product spec ต้นฉบับ |
+
 ---
+
+
 
 ## 📱 Sense Mobile (index.html)
 
