@@ -1,3 +1,8 @@
+> ⚠️ **SUPERSEDED 2026-07-06** — เอกสารนี้เป็นประวัติ Session 1-3 ตอนงานยังอยู่บน `preview/q3-commission-build`
+> งานถูก merge เข้า `main` เรียบร้อยแล้ว พร้อมแก้บั๊กเพิ่มอีกหลายจุด — **อ่าน `docs/handoff-2026-07-06-v847-q3-merge-complete.md` แทนสำหรับสถานะปัจจุบัน**
+
+---
+
 # Q3 2026 Quarterly Commission — HANDOFF
 
 **อัปเดตล่าสุด:** 2026-07-05 (Session 3 — test spec, hardcode audit, live data + browser testing, 10 fixes pushed)
