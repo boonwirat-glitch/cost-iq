@@ -101,7 +101,16 @@ function _qnrrCompute(kamEmail, scope) {
     // transfer_in/out ข้ามsquad หรือมาจาก non-KAM (PM/AD/Admin) → นับตามปกติ
     var sameTlBase   = r.base_tl_email && r.base_tl_email === myTlEmail;
     var sameTlPeriod = r.latest_tl_email === myTlEmail; // v827-fix
-    var sameTeam     = sameTlBase && sameTlPeriod;
+    // v6-fix2: same bug class as the v840 admin-scope fix, different code path.
+    // base_tl_email/latest_tl_email are org-chart TL attribution, set independently
+    // of portfolio TYPE -- an outlet moving from ADMIN bucket to a KAM on this exact
+    // squad can have base_tl_email===latest_tl_email===myTlEmail even though nothing
+    // was previously KAM-managed here at all. That's a genuine new-coverage gain for
+    // this squad, not an internal KAM<->KAM reshuffle, so it must NOT be neutralized.
+    // Require both sides to already be 'KAM' portfolio type before treating it as
+    // same-squad noise.
+    var isPureKamMove = (r.base_portfolio === 'KAM' && r.current_portfolio === 'KAM');
+    var sameTeam     = sameTlBase && sameTlPeriod && isPureKamMove;
     if (sameTeam && r.movement_type === 'transfer_out') return null;
     if (sameTeam && r.movement_type === 'transfer_in')  return 'core_nrr';
     return r.movement_type;
