@@ -31,8 +31,8 @@
 | D4 | บั๊ก #6 (LEG A + LEG B, `v_base_str`→`v_m3_str`) แก้ครบทุก occurrence | grep + manual read ทั้ง 5 ไฟล์ ไม่มี `v_base_str` หลงเหลือในบริบทเดือนที่ 3 | ✅ แก้ครบ Session 3 | HANDOFF §6.1, §6.6 |
 | D5 | CSV export 29 คอลัมน์ตรง `rep_view` SELECT เป๊ะ (ลำดับ+ชื่อ) | Diff schema กับ parser ใน `02_data_pipeline.js` | ✅ ยืนยันจาก `sense_qnrr_2026q3.csv` จริง 2,916 แถว | HANDOFF §7 |
 | D6 | GMV รวมของแต่ละ movement type reconcile กับ ground truth GMV รายเดือน (ล็อคไว้ใน memory) | ผลรวม curr_gmv ทุก movement + ผลรวม No-Owner ต้องเท่า ground truth เดือนนั้น (Jul/Aug/Sep 2026 เมื่อมีข้อมูล) | ⬜ ยังทำไม่ได้ — Jul 2026 ยังไม่จบเดือน (MTD only) | — |
-| D7 | 11 ร้าน "Admin Freshket" (฿337,112) ไม่มี KAM/TL owner | ไม่ใช่ bug — เป็น ops task รอ reassign | ⬜ Ops task ค้าง | HANDOFF §6.2-A |
-| D8 (ใหม่) | L-4: 4 ไฟล์ reporting variant มีบั๊กเดียวกับ rep_view ไหม (D2-D4 ต้องรันซ้ำกับ 4 ไฟล์นี้ด้วย เพราะตอนนี้เป็น "เก็บไว้ maintain ต่อ" ไม่ใช่ dead code) | รัน D2-D4 กับ `kam/pm/admin/tl_view.sql` ทั้ง 4 | ✅ Code-read ผ่านครบ 4 ไฟล์ (2026-07-06) + **ยืนยันด้วยข้อมูลจริงแล้ว 2/4**: `pm_view.csv` (772 แถว) และ `admin_view.csv` (2,281 แถว) unclassified=0 จริง, ไม่มี GMV ติดลบ, ไม่มี outlet ซ้ำ — ยังขาด `kam_view.csv`, `tl_view.csv` |
+| D7 | 11 ร้าน commercial_owner=KAM แต่ staff_owner="Admin Freshket" (฿337,112) | ไม่ใช่ bug — เป็นเรื่อง Commercial Ops ล้วนๆ | ✅ **ปิดถาวร 2026-07-06** — Bucci ตัดสินใจแล้วหลายรอบ ไม่ต้องหยิบกลับมาถามอีก | HANDOFF §6.2-A |
+| D8 (ใหม่) | L-4 (แก้มติ): เฉพาะ 2 ไฟล์ที่ยัง active (`pm_view`, `admin_view`) ต้องไม่มีบั๊กเดียวกับ rep_view — `kam_view`/`tl_view` ไม่ต้องทดสอบอีกต่อไป (retired เป็น NOT_USE_) | รัน D2-D4 กับ `pm_view.sql`/`admin_view.sql` เท่านั้น | ✅ **ปิดสมบูรณ์ 2026-07-06** — code-read ผ่าน + ยืนยันด้วยข้อมูลจริง: `pm_view.csv` (772 แถว), `admin_view.csv` (2,281 แถว) unclassified=0, ไม่มี GMV ติดลบ, ไม่มี outlet ซ้ำ |
 
 ---
 
@@ -96,7 +96,7 @@
 | # | Test case | เกณฑ์ผ่าน | สถานะล่าสุด |
 |---|---|---|---|
 | P1 | Summary card ตรงกับ detail sheet เสมอ | บั๊กเดิม: การ์ดโชว์ ฿85 แต่ detail โชว์ ฿10,085 — ต้อง verify ไม่เกิดซ้ำหลัง fix U1/U2 | ⬜ รอ verify คู่กับ U1 |
-| P2 | Churn % แบบนับหัวร้าน vs ถ่วง GMV ต้องแสดงคู่กันหรือมี label ชัดเจน | กรณี `anusorn.k`: นับหัว 57.9% แต่ถ่วง GMV จริง 14.2% — ต้องไม่ทำให้ผู้ใช้เข้าใจผิดว่า churn รุนแรง | ⬜ ยังไม่ตัดสินใจว่าจะใส่ warning label (HANDOFF §6.2-B) — **แนะนำเป็นเรื่องที่ 5 ที่ควรถาม Bucci เพิ่ม** |
+| P2 | Churn % แบบนับหัวร้าน vs ถ่วง GMV ต้องแสดงคู่กันหรือมี label ชัดเจน | กรณี `anusorn.k`: นับหัว 57.9% แต่ถ่วง GMV จริง 14.2% | ✅ **ปิดแล้ว 2026-07-06** — Bucci ดู churn แบบถ่วง GMV เสมอ ไม่สนใจแบบนับหัว ไม่ต้องใส่ warning label |
 
 ---
 
@@ -127,11 +127,10 @@
 | M-1 | ELSE fallback ไม่ตรงกัน (`rep_view`='transfer_in' vs อีก 4 ไฟล์='unclassified') | **Open item — ไม่แก้ตอนนี้** | บันทึกใน PR description ว่าเป็น known inconsistency ที่ตั้งใจไม่แตะ ไม่ใช่ลืมแก้ |
 | C-3 | Fast/slow path (TL/Admin เห็น P1/P3 ต่างจาก KAM เจ้าของพอร์ต) | **แก้ไขมติ 2026-07-06: ยอมรับ design ปัจจุบัน ไม่ต้องทำ architecture fix** — (1) ฝั่ง team/TL (fast path, SQL) hardcode เฉพาะ `v_p3_min_incremental` ได้ ต้อง manual sync กับ Cockpit ทุกครั้งก่อนรัน (มี comment เตือนในโค้ดอยู่แล้ว) (2) ฝั่ง rep/KAM เจ้าของพอร์ต (slow path, `_commComputeUpsellSku`) **ต้อง proper ดึงจาก Cockpit config เสมอ — verify แล้ว 2026-07-06 ว่าโค้ดปัจจุบันเรียก `_commGetConfig()` ทุกค่า (p1_rate/p3_rate/p3_threshold_pct/p3_min_incremental/p1_min_gmv) อ่านจาก `_tgtSettings` (Supabase live) จริง ไม่ hardcode** | ✅ **ปิดเป็น resolved-by-design** — ไม่ต้องแก้โค้ดเพิ่ม เหลือแค่ต้องมั่นใจว่า `_tgtSettings` โหลดสำเร็จจริงตอน runtime (ดู C5/C6/C8 — ถ้าโหลด config ล้มเหลว จะ fallback ไปใช้ default ที่ผิดจากของจริง เหมือนที่ spec doc เคยเข้าใจผิด) |
 | M-3 | Same-squad transfer neutralization | **ตัดสินใจแล้ว: KAM เห็น transfer_out เต็มจำนวน** | ✅ **ปิดแล้ว** — verify โค้ดจริง (G5) 2026-07-06 ยืนยันโค้ดปัจจุบันตรงมติอยู่แล้ว ไม่ต้องแก้ |
-| L-4 | ชะตากรรม 4 ไฟล์ SQL ไม่ได้ใช้งาน | **ตัดสินใจแล้ว: เก็บไว้เป็น reporting variant** | ✅ **ปิดแล้ว** — D8 regression ผ่านครบ 4 ไฟล์ + comment หัวไฟล์ push แล้ว 2026-07-06 |
+| L-4 | ชะตากรรม 4 ไฟล์ SQL ไม่ได้ใช้งาน | **แก้ไขมติ 2026-07-06: เก็บจริงแค่ 2/4 — `pm_view`/`admin_view` เท่านั้น** เพราะ `kam_view`/`tl_view` ข้อมูลซ้ำกับ `rep_view` แต่ให้รายละเอียดน้อยกว่า (TL rollup ทำฝั่ง client จาก rep_view อยู่แล้วใน `_qnrrCompute()`) | ✅ **ปิดแล้ว** — เปลี่ยนชื่อ `q3_2026_movement_{kam,tl}_view.sql` → `NOT_USE_` prefix แล้ว (ไม่ maintain/ไม่ test ต่อ), `pm_view`/`admin_view` ยังเป็นไฟล์ active เหมือนเดิม |
 
-### ยังไม่ได้ถาม (แนะนำคุยต่อ)
-- **P2 churn label:** ควรใส่ warning เตือนไหมเมื่อ churn แบบนับหัวกับถ่วง GMV ต่างกันมาก (เช่น >2 เท่า)
-- **B7 (11 ร้าน Admin Freshket):** ต้องการให้ผมช่วย query หา owner ที่เหมาะสมจาก order history ก่อนส่งให้ ops ตัดสินใจไหม หรือปล่อยเป็น ops task ล้วนๆ
+### ทุกเรื่องปิดหมดแล้ว (อัปเดต 2026-07-06)
+P2 และ D7 ปิดแล้วทั้งคู่ (ดูตารางด้านบน) — ไม่มี open item เชิงธุรกิจเหลือ นอกจาก M-1 กับ C-3 ที่ตั้งใจปล่อยเป็น known limitation
 
 ---
 
@@ -168,7 +167,7 @@ G1 (lock-guard), U1/U2 (loading shimmer + re-render + timeout), P1 (summary/deta
 **ที่เหลือ (ต้องมี browser จริง):** R1-R3 (regression), U4 (MTD badge), U5 (% input reproduce)
 
 ### Phase 6 — Non-blocking แต่ต้องตัดสินใจ/ดำเนินการคู่ขนาน
-M-1 (คงเป็น open item, บันทึกใน PR), P2 churn label (รอถาม Bucci), D7/B7 11 ร้าน Admin Freshket (ops task)
+M-1 (คงเป็น open item, บันทึกใน PR) — เหลือแค่เรื่องเดียว, P2/D7 ปิดแล้ว
 
 ### Phase 7 — Merge Gate final check
 รัน checklist §0 ครบ → Bucci sign-off → merge `preview/q3-commission-build` → `main`
