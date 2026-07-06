@@ -7,6 +7,15 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
       if (tlEmail)  return a.tlEmail  === tlEmail;
       return true;
     });
+  // v6-fix5: capture this BEFORE the v_stab1 fallback below can overwrite allAccounts.
+  // Root cause of the v843 fix not actually working: v_stab1 populates allAccounts with
+  // EVERY account in bulkHistoryData (the whole org, not just this kamEmail) whenever the
+  // real per-KAM filter above comes up empty -- which is exactly what happens for a non-KAM
+  // identity like Admin/VP. That made `allAccounts.length > 0` true even for Admin, so the
+  // v843 guard never triggered and the buggy transferOutList fallback (matching an arbitrary
+  // KAM name) kept firing. This flag reflects reality: does this kamEmail actually own any
+  // real accounts, independent of the stability fallback.
+  const _hasRealOwnAccounts = allAccounts.length > 0;
   // v_stab1: portviewBulkData can be briefly empty during token refresh.
   // If allAccounts is empty but we have a kamEmail and history data, build a minimal account list
   // from bulkHistoryData keys so NRR+Expansion+Comeback still compute correctly.
@@ -337,7 +346,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
       // "การเคลื่อนไหวพอร์ต" card was showing a specific KAM-to-KAM transfer (Anusorn to
       // Siriprapa) that had nothing to do with the Admin's own login. No real owned
       // portfolio here means no real transfer-out to attribute to it.
-      transferOutList = allAccounts.length > 0
+      transferOutList = _hasRealOwnAccounts
         ? allToRows.filter(r => r.kamEmail === kamEmail || r.kamName === (allAccounts.find(a=>a.kamName)?.kamName||''))
         : [];
     } else if (tlEmail) {
