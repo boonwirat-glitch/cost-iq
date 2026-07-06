@@ -1,4 +1,4 @@
-<!-- Freshket Sense v836-merge-main-plus-q3: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v837-ghost-bar-fix: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1175,7 +1175,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v836-merge-main-plus-q3',
+      version: 'v837-ghost-bar-fix',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -6607,7 +6607,7 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
   overflow: hidden;
-  height: 178px; /* top-wrap 32px + chart-area flex:1 + label ~22px */
+  height: 178px; /* top-wrap 44px + chart-area flex:1 + label ~22px */
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
@@ -6624,15 +6624,19 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   border-bottom: 2px solid rgba(188,215,255,.45);
   padding-bottom: 2px;
 }
-/* top label area — fixed 32px, GMV only */
+/* top label area — v6-uxfix: was fixed 32px, grew to 44px to fit an always-visible
+   run-rate line for the partial (current) month — see .qnrr-bar-runrate-label below.
+   Applied uniformly to ALL columns (not just the partial one) so every column's
+   chart-area shrinks by the same amount and bars stay comparable in scale; empty
+   columns just have blank space above their 2 lines (justify-content:flex-end below). */
 .qnrr-bar-top-wrap {
-  height: 32px; flex-shrink: 0;
+  height: 44px; flex-shrink: 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-end;
   width: 100%; padding-bottom: 3px;
 }
-/* partial bar: 3-line top-wrap (MTD + run-rate + days) */
-/* height set in appended block below */
+/* v6-uxfix: partial-month top-wrap now genuinely has 3 lines (mtd, run-rate, days) —
+   see .qnrr-bar-top-wrap height change above and .qnrr-bar-runrate-label below */
 .qnrr-bar-top-label {
   font-size: 11px; font-weight: 800;
   font-family: var(--tk-font-mono); letter-spacing: -.01em;
@@ -6643,6 +6647,17 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   font-size: 9px; font-weight: 700;
   font-family: var(--tk-font-mono); color: rgba(188,215,255,.80);
   text-align: center; width: 100%; white-space: nowrap;
+}
+/* v6-uxfix: always-visible run-rate line for the partial (current) month — previously
+   this number only existed in a title= tooltip, which does not show on tap on most
+   mobile browsers, so it was effectively invisible there even before the overflow bug. */
+.qnrr-bar-runrate-label {
+  font-size: 8px; font-weight: 600;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.50);
+  text-align: center; width: 100%; white-space: nowrap;
+}
+.qnrr-bar-runrate-label.low-conf {
+  color: rgba(188,215,255,.32); font-style: italic;
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
@@ -6699,6 +6714,23 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   border-bottom: none;
   background: rgba(188,215,255,.04);
   animation: qnrrGhostPulse 3s ease-in-out infinite;
+}
+/* v6-uxfix: when the real projection is taller than the chart area allows, fade the
+   top edge to transparent instead of a hard cut (which read as a rendering glitch) —
+   plus a small "⋯" marker so it's clear there's more beyond what's drawn. The actual
+   number is always visible in .qnrr-bar-runrate-label above, not hidden by this. */
+.qnrr-ghost-top-clipped {
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.55) 10px, black 20px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.55) 10px, black 20px);
+}
+.qnrr-ghost-top-clipped::after {
+  content: '⋯'; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; line-height: 1; color: rgba(188,215,255,.55);
+}
+/* v6-uxfix: early-month projections (<7 days of data) are noisy — dim + tighter dash
+   to visually signal "still settling", separate from a normal-confidence projection */
+.qnrr-ghost-top-lowconf {
+  opacity: .55; border-style: dotted;
 }
 /* run-rate ≈ actual: thin line at projection level */
 .qnrr-ghost-line {
@@ -7278,8 +7310,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-size: 8px; font-weight: 600;
 }
 
-/* partial top-wrap: same height as normal (32px) — extra info is in tooltip */
-</style>
+/* (superseded by v6-uxfix top-wrap height change above — partial top-wrap is now 44px like every other column, not 32px) */</style>
 <style id="restaurant-module-css">
 /* ============================================================
    FRESHKET SENSE — RESTAURANT / SWIPE MODE STYLES
@@ -52860,7 +52891,12 @@ function _qnrrRenderChart(){
     }
   });
   var maxGmv = Math.max.apply(null, allGmvs) || 1;
-  var chartH  = 124; // inner bar area height (bars-row 178px - top 32px - label 22px)
+  // v6-uxfix: top-wrap grew 32->44px to fit an always-visible run-rate line (was tooltip-only,
+  // invisible on mobile where title= doesn't work). chartH shrinks by the same 12px for EVERY
+  // column uniformly -- must stay uniform across columns or bars stop being visually comparable
+  // (a column with a shorter chart-area would render the same ฿ value as a taller bar than a
+  // column with a taller chart-area, breaking the whole point of a bar chart).
+  var chartH  = 112; // inner bar area height (bars-row 178px - top 44px - label 22px)
 
   // ref-line removed — ฐาน แสดงใน hero zone แล้ว ไม่ต้องซ้ำ
   if (refLines) refLines.innerHTML = '';
@@ -52881,6 +52917,23 @@ function _qnrrRenderChart(){
     var isActive = (!isBase && m === _selBar);
     var isLast   = (m === Q_MONTHS[Q_MONTHS.length - 1]);
 
+    // v6-uxfix: compute partial-month ghost/run-rate numbers ONCE here, shared by both
+    // topHtml (always-visible run-rate line, added below) and bodyHtml (the ghost bar
+    // element itself) -- previously this was computed twice in two different shapes,
+    // which was exactly how the top label and the ghost bar could disagree.
+    var isPartialMonth  = !isBase && bm && bm.is_partial && bm.curr_days > 0;
+    var runRate      = isPartialMonth ? bm.total_gmv : 0; // normalized ÷curr_days×30
+    var isLowConf    = isPartialMonth && bm.curr_days < 7; // <1 week of data — projection is noisy
+    var projH        = isPartialMonth ? Math.max(6, Math.round(runRate / maxGmv * chartH)) : 0;
+    var rawGapH      = isPartialMonth ? (projH - barH) : 0; // pixels above actual bar, uncapped
+    // Cap so the ghost never overflows past the chart area's top edge (was getting silently
+    // clipped by .qnrr-bar-chart-area's overflow:hidden with a hard edge -- looked like a
+    // rendering bug, especially early in the month when a run-rate projected from very few
+    // days of data can spike far above every other bar).
+    var maxGapH      = Math.max(0, chartH - barH - 4); // 4px headroom from the very top
+    var isGhostClipped = isPartialMonth && rawGapH > maxGapH;
+    var gapH         = isPartialMonth ? Math.min(rawGapH, maxGapH) : 0;
+
     // Top label: GMV only (NRR% removed — lives in hero zone now)
     var topHtml = '';
     if (isBase) {
@@ -52898,9 +52951,15 @@ function _qnrrRenderChart(){
       if (bm.is_partial) {
         // Partial month: show days on bar header, days info also in ghost bar tooltip
         var rawTotal = rawTotals[m] || bm.total_gmv;
+        // v6-uxfix: run-rate number now always visible here (not tooltip-only — title=
+        // does not show on tap for most mobile browsers, so it was effectively invisible
+        // on mobile even before the overflow bug). Low-confidence (<7 days) gets a dimmer
+        // treatment instead of extra text, to keep the line compact.
+        var runrateLbl = '<div class="qnrr-bar-runrate-label' + (isLowConf ? ' low-conf' : '') + '">run-rate ≈' + _fmtM(runRate) + '</div>';
         topHtml =
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
+          runrateLbl +
           '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
             bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
@@ -52951,18 +53010,21 @@ function _qnrrRenderChart(){
       });
       // Partial month ghost — dashed outline only ABOVE the actual bar
       var ghostHtml = '';
-      if (bm.is_partial && bm.curr_days > 0) {
-        var projH = Math.max(6, Math.round(bm.total_gmv / maxGmv * chartH));
-        var gapH  = projH - barH; // pixels above actual bar
+      if (isPartialMonth) {
         if (gapH > 3) {
-          // ghost-top: dashed box floating above actual bar, sized to just the gap
-          var runRate = bm.total_gmv; // normalized ÷curr_days×30
-          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)';
-          ghostHtml = '<div class="qnrr-ghost-top" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
-        } else if (gapH <= 3) {
+          // ghost-top: dashed box floating above actual bar, capped to never overflow
+          // the chart area (see maxGapH above). When the real projection is taller than
+          // the cap, fade the top edge + small indicator instead of a hard cut, so it
+          // reads as "continues beyond, see number above" rather than a rendering glitch.
+          var confNote = isLowConf ? ' — ข้อมูลแค่ ' + bm.curr_days + ' วัน ยังไม่นิ่ง' : '';
+          var clipNote = isGhostClipped ? ' (ย่อสัดส่วนเพื่อให้พอดีกราฟ)' : '';
+          var tooltipTxt = 'Run-rate: ' + _fmtM(runRate) + ' (' + bm.curr_days + '/' + bm.days_in_month + 'd ÷' + bm.curr_days + 'd×30)' + confNote + clipNote;
+          var ghostCls = 'qnrr-ghost-top' + (isGhostClipped ? ' qnrr-ghost-top-clipped' : '') + (isLowConf ? ' qnrr-ghost-top-lowconf' : '');
+          ghostHtml = '<div class="' + ghostCls + '" style="height:' + gapH + 'px;bottom:' + barH + 'px" title="' + tooltipTxt + '"></div>';
+        } else if (gapH <= 3 && rawGapH > -3) {
           // run-rate ≈ actual (overperformance or same) — show thin line at run-rate level
-          var lineBottom = Math.max(barH, projH);
-          ghostHtml = '<div class="qnrr-ghost-line" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(bm.total_gmv) + '"></div>';
+          var lineBottom = Math.min(Math.max(barH, projH), chartH - 2);
+          ghostHtml = '<div class="qnrr-ghost-line' + (isLowConf ? ' qnrr-ghost-top-lowconf' : '') + '" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(runRate) + '"></div>';
         }
       }
       bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
