@@ -44,14 +44,14 @@
 | C2 | Churn/Up/Down split ผ่าน `curr_gmv` check ใน `_effectiveMovement()` | KAM ที่มี outlet `curr_gmv=0` ต้อง reclassify เป็น `core_nrr_churn` ไม่ค้างเป็น `core_nrr` เฉยๆ | ✅ แก้แล้ว บั๊ก #8 |
 | C3 | Normalize `÷days_in_period×30` ก่อนเทียบทุกครั้ง ไม่เอา raw บาทลบกันข้ามเดือน day-count ต่างกัน | สุ่มเช็ค 5 เดือนที่ day count ต่าง (28/30/31) | ⬜ ยังไม่ได้สุ่มตรวจเฉพาะจุดนี้ |
 | C4 | Handover/new_sales ยังเป็น MoM 100% ไม่ถูกแตะโดย quarterly mode | `_commComputeHandoverRetention()` ไม่อ่าน `nrr_policies.commission_mode` เลย | ⬜ ต้อง code-read ยืนยัน ไม่ใช่แค่เชื่อ spec doc (บทเรียน §6.4) |
-| C5 | Expansion rate ใช้ค่า **live จาก Supabase** ไม่ hardcode/ไม่อ้างจาก spec doc ที่เคยผิด | Query `target_settings.upsell_outlet_params.rate` สดแล้วเทียบกับที่โค้ดใช้จริง | 🔴 spec doc อ้าง 0.015 แต่ค่าจริง 0.005 (HANDOFF §6.4) — **ต้อง re-verify ว่าโค้ดอ่านค่าไหนอยู่จริง** |
-| C6 | Upsell P1/P3 rate/threshold/min GMV ใช้ค่า live Supabase | เช่นเดียวกับ C5 — `p1_rate`/`p3_rate` จริง = 0.01 ไม่ใช่ 0.03 ตาม spec doc | 🔴 ต้อง re-verify โค้ดจริง |
+| C5 | Expansion rate ใช้ค่า **live จาก Supabase** ไม่ hardcode/ไม่อ้างจาก spec doc ที่เคยผิด | Query `target_settings.upsell_outlet_params.rate` สดแล้วเทียบกับที่โค้ดใช้จริง | ✅ **Live value ยืนยันแล้ว = 0.005** (Bucci query 2026-07-06) — default fallback แก้จาก 0.015→0.005 แล้ว, deploy v835 |
+| C6 | Upsell P1/P3 rate/threshold/min GMV ใช้ค่า live Supabase | เช่นเดียวกับ C5 — `p1_rate`/`p3_rate` จริง = 0.01 ไม่ใช่ 0.03 ตาม spec doc | ✅ **Live value ยืนยันแล้ว = 0.01/0.01/8000** — default fallback แก้ครบ (p1_rate, p3_rate, p3_min_incremental), deploy v835 |
 | C7 | P3 min incremental = 8000 ตรงทั้ง Cockpit และ SQL | `q3c_upsell_team_summary_v4.sql` hardcode 8000 ตรงแล้ว | ✅ แก้แล้ว Session 3 item #3 |
-| C8 | GMV Gate cap tier ใช้ค่า live (`cap_1` จริง = 0.3 ไม่ใช่ 0.70 ตาม spec doc) | Query `target_settings.gmv_gate_params` สดเทียบกับโค้ด | 🔴 ต้อง re-verify — นี่กระทบเงินโดยตรงมากที่สุดในทุกจุด (cap ต่างกัน 2.3 เท่า) |
+| C8 | GMV Gate cap tier ใช้ค่า live (`cap_1` จริง = 0.3 ไม่ใช่ 0.70 ตาม spec doc) | Query `target_settings.gmv_gate_params` สดเทียบกับโค้ด | ✅ **Live value ยืนยันแล้ว = threshold 98/95, cap 0.3/0** — default fallback แก้ครบ 4 ค่า, deploy v835 |
 | C9 | TL Upsell Multiplier tier boundary (B8, ค้างจาก HANDOFF §7) | ทดสอบค่า % upsell ที่ tier boundary พอดี (2%, 3%, 4%, 5%) ไม่ปัดผิด tier | ⬜ ยังไม่ได้ตรวจ |
 | C10 | Rounding (B9, ค้างจาก HANDOFF §7) | `ROUND(subtotal × gate.cap_multiplier)` ปัดถูกทิศทาง ไม่มี off-by-1-satang | ⬜ ยังไม่ได้ตรวจ |
 
-**หมายเหตุสำคัญ C5/C6/C8:** นี่คือ 3 จุดที่ spec doc เคยผิดมาก่อน (HANDOFF §6.4) และเป็น 3 จุดที่กระทบเงินจริงมากที่สุด ถ้ายังไม่มีใคร verify ว่าโค้ดตอนนี้อ่านค่าไหนอยู่จริง **ไม่ควรอนุมัติ merge เด็ดขาด** ไม่ว่า test case อื่นจะผ่านหมดแค่ไหน
+**หมายเหตุสำคัญ C5/C6/C8 (อัปเดต 2026-07-06):** แก้แล้วที่ต้นตอ ไม่ใช่แค่ default — พบว่า `loadTargets()` มี fail-silent bug คู่ขนาน: ถ้า query `target_settings` พัง ระบบตั้ง `_tgtLoaded=true` แบบไม่มีเงื่อนไข และ**cache สถานะที่พังนั้นไว้ใช้ต่อ**จนกว่า TTL หมดอายุ (รวมถึง persist ลง localStorage ข้าม session ด้วย) แก้ทั้ง 3 ชั้นพร้อมกันใน commit เดียว (v835): (1) default fallback ตรงกับ Supabase ปัจจุบันแล้ว (2) เพิ่ม `window._tgtSettingsLoadFailed` + `console.error` ให้เห็นชัดตอนโหลดพัง (3) ไม่ cache/persist state ที่โหลดพัง — **ยังไม่เคย verify ผ่าน browser จริงหลัง deploy** ต้องทดสอบตามกฎ "ทดสอบ commission UI ทุก tab หลัง deploy ก่อนไปต่อ"
 
 ---
 
@@ -64,6 +64,7 @@
 | G3 | Config drift BigQuery ↔ Supabase — ไม่มี auto-sync (structural risk) | มี checklist/reminder ให้ manual sync ทุกครั้งที่แก้ business rule constant | ⬜ ยังไม่มี process ป้องกัน แนะนำเพิ่ม script ตรวจ drift อัตโนมัติ (ดู §9 Recommendation) |
 | G4 | Retroactive lock ข้ามไตรมาสจริง | ทดสอบ lock เดือน มิ.ย. (Q2, monthly mode) หลังเข้า Q3 (quarterly mode) แล้ว ไม่กระทบกัน | ⬜ ยังไม่ได้ทดสอบ (อยู่ในรายการ F ของ HANDOFF §7) |
 | G5 (ใหม่ จาก M-3) | Same-squad transfer — KAM เห็น `transfer_out` เต็มจำนวน (ไม่ neutralize ที่ KAM scope) | Code-read `_commBuildKamPayout` / SQL ว่าปัจจุบันไม่มี neutralization logic ที่ KAM scope จริง ถ้ามีอยู่ต้องเอาออก | ⬜ **ต้อง verify ก่อน merge — มติแล้วว่าต้องเห็นเต็มจำนวน แต่ยังไม่ยืนยันว่าโค้ดปัจจุบันทำแบบนี้อยู่** |
+| G6 (ใหม่) | Fail-loud บน target_settings load failure | จำลอง network fail (DevTools throttle→offline ตอนโหลด) แล้วเช็คว่า `window._tgtSettingsLoadFailed===true`, มี `console.error` สีแดงใน console, และไม่มี state ที่พังถูก cache ต่อ (โหลดใหม่ครั้งถัดไปต้อง retry ไม่ใช่ใช้ค่าที่พังซ้ำ) | ⬜ Code พร้อมแล้ว (deploy v835) ยังไม่เคย verify จริงในเบราว์เซอร์ |
 
 ---
 
