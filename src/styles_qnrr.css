@@ -204,7 +204,7 @@
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
   overflow: hidden;
-  height: 178px; /* top-wrap 32px + chart-area flex:1 + label ~22px */
+  height: 178px; /* top-wrap 44px + chart-area flex:1 + label ~22px */
   position: relative; z-index: 3;
 }
 .qnrr-bar-col {
@@ -221,15 +221,19 @@
   border-bottom: 2px solid rgba(188,215,255,.45);
   padding-bottom: 2px;
 }
-/* top label area — fixed 32px, GMV only */
+/* top label area — v6-uxfix: was fixed 32px, grew to 44px to fit an always-visible
+   run-rate line for the partial (current) month — see .qnrr-bar-runrate-label below.
+   Applied uniformly to ALL columns (not just the partial one) so every column's
+   chart-area shrinks by the same amount and bars stay comparable in scale; empty
+   columns just have blank space above their 2 lines (justify-content:flex-end below). */
 .qnrr-bar-top-wrap {
-  height: 32px; flex-shrink: 0;
+  height: 44px; flex-shrink: 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-end;
   width: 100%; padding-bottom: 3px;
 }
-/* partial bar: 3-line top-wrap (MTD + run-rate + days) */
-/* height set in appended block below */
+/* v6-uxfix: partial-month top-wrap now genuinely has 3 lines (mtd, run-rate, days) —
+   see .qnrr-bar-top-wrap height change above and .qnrr-bar-runrate-label below */
 .qnrr-bar-top-label {
   font-size: 11px; font-weight: 800;
   font-family: var(--tk-font-mono); letter-spacing: -.01em;
@@ -240,6 +244,17 @@
   font-size: 9px; font-weight: 700;
   font-family: var(--tk-font-mono); color: rgba(188,215,255,.80);
   text-align: center; width: 100%; white-space: nowrap;
+}
+/* v6-uxfix: always-visible run-rate line for the partial (current) month — previously
+   this number only existed in a title= tooltip, which does not show on tap on most
+   mobile browsers, so it was effectively invisible there even before the overflow bug. */
+.qnrr-bar-runrate-label {
+  font-size: 8px; font-weight: 600;
+  font-family: var(--tk-font-mono); color: rgba(188,215,255,.50);
+  text-align: center; width: 100%; white-space: nowrap;
+}
+.qnrr-bar-runrate-label.low-conf {
+  color: rgba(188,215,255,.32); font-style: italic;
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
@@ -296,6 +311,23 @@
   border-bottom: none;
   background: rgba(188,215,255,.04);
   animation: qnrrGhostPulse 3s ease-in-out infinite;
+}
+/* v6-uxfix: when the real projection is taller than the chart area allows, fade the
+   top edge to transparent instead of a hard cut (which read as a rendering glitch) —
+   plus a small "⋯" marker so it's clear there's more beyond what's drawn. The actual
+   number is always visible in .qnrr-bar-runrate-label above, not hidden by this. */
+.qnrr-ghost-top-clipped {
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.55) 10px, black 20px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.55) 10px, black 20px);
+}
+.qnrr-ghost-top-clipped::after {
+  content: '⋯'; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; line-height: 1; color: rgba(188,215,255,.55);
+}
+/* v6-uxfix: early-month projections (<7 days of data) are noisy — dim + tighter dash
+   to visually signal "still settling", separate from a normal-confidence projection */
+.qnrr-ghost-top-lowconf {
+  opacity: .55; border-style: dotted;
 }
 /* run-rate ≈ actual: thin line at projection level */
 .qnrr-ghost-line {
@@ -875,4 +907,4 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-size: 8px; font-weight: 600;
 }
 
-/* partial top-wrap: same height as normal (32px) — extra info is in tooltip */
+/* (superseded by v6-uxfix top-wrap height change above — partial top-wrap is now 44px like every other column, not 32px) */
