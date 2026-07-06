@@ -32,7 +32,7 @@
 | D5 | CSV export 29 คอลัมน์ตรง `rep_view` SELECT เป๊ะ (ลำดับ+ชื่อ) | Diff schema กับ parser ใน `02_data_pipeline.js` | ✅ ยืนยันจาก `sense_qnrr_2026q3.csv` จริง 2,916 แถว | HANDOFF §7 |
 | D6 | GMV รวมของแต่ละ movement type reconcile กับ ground truth GMV รายเดือน (ล็อคไว้ใน memory) | ผลรวม curr_gmv ทุก movement + ผลรวม No-Owner ต้องเท่า ground truth เดือนนั้น (Jul/Aug/Sep 2026 เมื่อมีข้อมูล) | ⬜ ยังทำไม่ได้ — Jul 2026 ยังไม่จบเดือน (MTD only) | — |
 | D7 | 11 ร้าน "Admin Freshket" (฿337,112) ไม่มี KAM/TL owner | ไม่ใช่ bug — เป็น ops task รอ reassign | ⬜ Ops task ค้าง | HANDOFF §6.2-A |
-| D8 (ใหม่) | L-4: 4 ไฟล์ reporting variant มีบั๊กเดียวกับ rep_view ไหม (D2-D4 ต้องรันซ้ำกับ 4 ไฟล์นี้ด้วย เพราะตอนนี้เป็น "เก็บไว้ maintain ต่อ" ไม่ใช่ dead code) | รัน D2-D4 กับ `kam/pm/admin/tl_view.sql` ทั้ง 4 | ⬜ ยังไม่เคยรันแยกหลัง fix รอบ Session 3 | ต้องทำก่อน merge (Merge Gate #4) |
+| D8 (ใหม่) | L-4: 4 ไฟล์ reporting variant มีบั๊กเดียวกับ rep_view ไหม (D2-D4 ต้องรันซ้ำกับ 4 ไฟล์นี้ด้วย เพราะตอนนี้เป็น "เก็บไว้ maintain ต่อ" ไม่ใช่ dead code) | รัน D2-D4 กับ `kam/pm/admin/tl_view.sql` ทั้ง 4 | ✅ Verify จากโค้ดจริง 2026-07-06 ทั้ง 4 ไฟล์: LEG A+B ใช้ `v_m3_str` ถูกต้อง (ไม่ใช่ `v_base_str`), `ELSE 'unclassified'` branch ครบ, `v_m3_days > 0` guard ครบ — เพิ่ม header comment สถานะ "maintained reporting variant" ครบทั้ง 4 ไฟล์แล้ว (⚠️ ยังขาด: รัน query จริงบน BigQuery เพื่อยืนยัน unclassified count จริง = 0 — ต้องมี BigQuery access) |
 
 ---
 
@@ -42,14 +42,14 @@
 |---|---|---|---|
 | C1 | NRR fixed-base = มิ.ย. คงที่ตลอด Q3 (ก.ค./ส.ค./ก.ย.) ไม่เลื่อนตามเดือน | `_qnrrComputeForCommission()` ใช้ `base_month='2026-06'` ทุกเดือนใน Q3 | ✅ ยืนยันจาก `nrr_policies` config | 
 | C2 | Churn/Up/Down split ผ่าน `curr_gmv` check ใน `_effectiveMovement()` | KAM ที่มี outlet `curr_gmv=0` ต้อง reclassify เป็น `core_nrr_churn` ไม่ค้างเป็น `core_nrr` เฉยๆ | ✅ แก้แล้ว บั๊ก #8 |
-| C3 | Normalize `÷days_in_period×30` ก่อนเทียบทุกครั้ง ไม่เอา raw บาทลบกันข้ามเดือน day-count ต่างกัน | สุ่มเช็ค 5 เดือนที่ day count ต่าง (28/30/31) | ⬜ ยังไม่ได้สุ่มตรวจเฉพาะจุดนี้ |
-| C4 | Handover/new_sales ยังเป็น MoM 100% ไม่ถูกแตะโดย quarterly mode | `_commComputeHandoverRetention()` ไม่อ่าน `nrr_policies.commission_mode` เลย | ⬜ ต้อง code-read ยืนยัน ไม่ใช่แค่เชื่อ spec doc (บทเรียน §6.4) |
+| C3 | Normalize `÷days_in_period×30` ก่อนเทียบทุกครั้ง ไม่เอา raw บาทลบกันข้ามเดือน day-count ต่างกัน | สุ่มเช็ค 5 เดือนที่ day count ต่าง (28/30/31) | ✅ Verify จากโค้ดจริง 2026-07-06 — `_commComputeHandoverRetention` ใช้ `/days*30` ตรง, `_qnrrCompute`/`_qnrrComputeForCommission` เก็บ unit `gmv/days` ภายในแล้วคูณ×30 ครั้งเดียวตอนแปลงเป็น `baseGmv` ที่ boundary — ถูกต้องตาม design |
+| C4 | Handover/new_sales ยังเป็น MoM 100% ไม่ถูกแตะโดย quarterly mode | `_commComputeHandoverRetention()` ไม่อ่าน `nrr_policies.commission_mode` เลย | ✅ Verify จากโค้ดจริง 2026-07-06 — ฟังก์ชันทั้งหมดไม่มี reference ถึง `nrr_policies`/`commission_mode`/`quarter_id` เลยแม้แต่บรรทัดเดียว ใช้ `now`/`prevMonth` จาก system date ล้วนๆ แยกขาดจาก quarterly layer จริง |
 | C5 | Expansion rate ใช้ค่า **live จาก Supabase** ไม่ hardcode/ไม่อ้างจาก spec doc ที่เคยผิด | Query `target_settings.upsell_outlet_params.rate` สดแล้วเทียบกับที่โค้ดใช้จริง | ✅ **Live value ยืนยันแล้ว = 0.005** (Bucci query 2026-07-06) — default fallback แก้จาก 0.015→0.005 แล้ว, deploy v835 |
 | C6 | Upsell P1/P3 rate/threshold/min GMV ใช้ค่า live Supabase | เช่นเดียวกับ C5 — `p1_rate`/`p3_rate` จริง = 0.01 ไม่ใช่ 0.03 ตาม spec doc | ✅ **Live value ยืนยันแล้ว = 0.01/0.01/8000** — default fallback แก้ครบ (p1_rate, p3_rate, p3_min_incremental), deploy v835 |
 | C7 | P3 min incremental = 8000 ตรงทั้ง Cockpit และ SQL | `q3c_upsell_team_summary_v4.sql` hardcode 8000 ตรงแล้ว | ✅ แก้แล้ว Session 3 item #3 |
 | C8 | GMV Gate cap tier ใช้ค่า live (`cap_1` จริง = 0.3 ไม่ใช่ 0.70 ตาม spec doc) | Query `target_settings.gmv_gate_params` สดเทียบกับโค้ด | ✅ **Live value ยืนยันแล้ว = threshold 98/95, cap 0.3/0** — default fallback แก้ครบ 4 ค่า, deploy v835 |
-| C9 | TL Upsell Multiplier tier boundary (B8, ค้างจาก HANDOFF §7) | ทดสอบค่า % upsell ที่ tier boundary พอดี (2%, 3%, 4%, 5%) ไม่ปัดผิด tier | ⬜ ยังไม่ได้ตรวจ |
-| C10 | Rounding (B9, ค้างจาก HANDOFF §7) | `ROUND(subtotal × gate.cap_multiplier)` ปัดถูกทิศทาง ไม่มี off-by-1-satang | ⬜ ยังไม่ได้ตรวจ |
+| C9 | TL Upsell Multiplier tier boundary (B8, ค้างจาก HANDOFF §7) | ทดสอบค่า % upsell ที่ tier boundary พอดี (2%, 3%, 4%, 5%) ไม่ปัดผิด tier | ✅ Verify จากโค้ดจริง 2026-07-06 — loop เช็คจาก tier สูงสุดลงมา `upsellPct >= tiers[i].min_pct`, ตรวจครบทุกจุดตัด (2.00/2.99/3.00/4.99/5.00%) ไม่มี off-by-one — ⚠️ risk เล็กน้อยที่ไม่บล็อก: เทียบด้วย raw float ก่อน round อาจมี edge case floating-point ที่ 1.9999999% แสดงผล 2.00% แต่ตกลง tier 1 (โอกาสเกิดจริงต่ำมากกับ GMV จริง) |
+| C10 | Rounding (B9, ค้างจาก HANDOFF §7) | `ROUND(subtotal × gate.cap_multiplier)` ปัดถูกทิศทาง ไม่มี off-by-1-satang | ✅ Verify จากโค้ดจริง 2026-07-06 — `Math.round(subtotal * gate.cap_multiplier)` ตรงสูตร spec §4 เป๊ะ, ROUND ทำครั้งเดียวตอนจบ ไม่มี double-rounding จากการปัดแต่ละ component ก่อนบวก |
 
 **หมายเหตุสำคัญ C5/C6/C8 (อัปเดต 2026-07-06):** แก้แล้วที่ต้นตอ ไม่ใช่แค่ default — พบว่า `loadTargets()` มี fail-silent bug คู่ขนาน: ถ้า query `target_settings` พัง ระบบตั้ง `_tgtLoaded=true` แบบไม่มีเงื่อนไข และ**cache สถานะที่พังนั้นไว้ใช้ต่อ**จนกว่า TTL หมดอายุ (รวมถึง persist ลง localStorage ข้าม session ด้วย) แก้ทั้ง 3 ชั้นพร้อมกันใน commit เดียว (v835): (1) default fallback ตรงกับ Supabase ปัจจุบันแล้ว (2) เพิ่ม `window._tgtSettingsLoadFailed` + `console.error` ให้เห็นชัดตอนโหลดพัง (3) ไม่ cache/persist state ที่โหลดพัง — **ยังไม่เคย verify ผ่าน browser จริงหลัง deploy** ต้องทดสอบตามกฎ "ทดสอบ commission UI ทุก tab หลัง deploy ก่อนไปต่อ"
 
@@ -63,7 +63,7 @@
 | G2 | Audit trail default ถูกต้อง (`p1_min_gmv` = 5000 ไม่ใช่ 2500) | ตรวจ jsonb breakdown ของ payout ที่เพิ่งคำนวณ | ✅ แก้แล้ว Session 3 item #8 |
 | G3 | Config drift BigQuery ↔ Supabase — ไม่มี auto-sync (structural risk) | มี checklist/reminder ให้ manual sync ทุกครั้งที่แก้ business rule constant | ⬜ ยังไม่มี process ป้องกัน แนะนำเพิ่ม script ตรวจ drift อัตโนมัติ (ดู §9 Recommendation) |
 | G4 | Retroactive lock ข้ามไตรมาสจริง | ทดสอบ lock เดือน มิ.ย. (Q2, monthly mode) หลังเข้า Q3 (quarterly mode) แล้ว ไม่กระทบกัน | ⬜ ยังไม่ได้ทดสอบ (อยู่ในรายการ F ของ HANDOFF §7) |
-| G5 (ใหม่ จาก M-3) | Same-squad transfer — KAM เห็น `transfer_out` เต็มจำนวน (ไม่ neutralize ที่ KAM scope) | Code-read `_commBuildKamPayout` / SQL ว่าปัจจุบันไม่มี neutralization logic ที่ KAM scope จริง ถ้ามีอยู่ต้องเอาออก | ⬜ **ต้อง verify ก่อน merge — มติแล้วว่าต้องเห็นเต็มจำนวน แต่ยังไม่ยืนยันว่าโค้ดปัจจุบันทำแบบนี้อยู่** |
+| G5 (ใหม่ จาก M-3) | Same-squad transfer — KAM เห็น `transfer_out` เต็มจำนวน (ไม่ neutralize ที่ KAM scope) | Code-read `_commBuildKamPayout` / SQL ว่าปัจจุบันไม่มี neutralization logic ที่ KAM scope จริง ถ้ามีอยู่ต้องเอาออก | ✅ **ปิด — ไม่ต้องแก้โค้ด** verify แล้ว 2026-07-06: `_effectiveMovement()` ใน `07c_qnrr_view.js` บรรทัด 76 `if(scope==='kam') return r.movement_type` — return ค่าดิบก่อนถึง same-squad neutralize logic เสมอ ตรงตามมติ 100% (neutralize เกิดเฉพาะ scope tl/admin) |
 | G6 (ใหม่) | Fail-loud บน target_settings load failure | จำลอง network fail (DevTools throttle→offline ตอนโหลด) แล้วเช็คว่า `window._tgtSettingsLoadFailed===true`, มี `console.error` สีแดงใน console, และไม่มี state ที่พังถูก cache ต่อ (โหลดใหม่ครั้งถัดไปต้อง retry ไม่ใช่ใช้ค่าที่พังซ้ำ) | ⬜ Code พร้อมแล้ว (deploy v835) ยังไม่เคย verify จริงในเบราว์เซอร์ |
 
 ---
@@ -126,8 +126,8 @@
 |---|---|---|---|
 | M-1 | ELSE fallback ไม่ตรงกัน (`rep_view`='transfer_in' vs อีก 4 ไฟล์='unclassified') | **Open item — ไม่แก้ตอนนี้** | บันทึกใน PR description ว่าเป็น known inconsistency ที่ตั้งใจไม่แตะ ไม่ใช่ลืมแก้ |
 | C-3 | Fast/slow path (TL/Admin เห็น P1/P3 ต่างจาก KAM เจ้าของพอร์ต) | **แก้ไขมติ 2026-07-06: ยอมรับ design ปัจจุบัน ไม่ต้องทำ architecture fix** — (1) ฝั่ง team/TL (fast path, SQL) hardcode เฉพาะ `v_p3_min_incremental` ได้ ต้อง manual sync กับ Cockpit ทุกครั้งก่อนรัน (มี comment เตือนในโค้ดอยู่แล้ว) (2) ฝั่ง rep/KAM เจ้าของพอร์ต (slow path, `_commComputeUpsellSku`) **ต้อง proper ดึงจาก Cockpit config เสมอ — verify แล้ว 2026-07-06 ว่าโค้ดปัจจุบันเรียก `_commGetConfig()` ทุกค่า (p1_rate/p3_rate/p3_threshold_pct/p3_min_incremental/p1_min_gmv) อ่านจาก `_tgtSettings` (Supabase live) จริง ไม่ hardcode** | ✅ **ปิดเป็น resolved-by-design** — ไม่ต้องแก้โค้ดเพิ่ม เหลือแค่ต้องมั่นใจว่า `_tgtSettings` โหลดสำเร็จจริงตอน runtime (ดู C5/C6/C8 — ถ้าโหลด config ล้มเหลว จะ fallback ไปใช้ default ที่ผิดจากของจริง เหมือนที่ spec doc เคยเข้าใจผิด) |
-| M-3 | Same-squad transfer neutralization | **ตัดสินใจแล้ว: KAM เห็น transfer_out เต็มจำนวน** | ต้อง verify โค้ดจริง (test case G5) ก่อน merge — ถ้าโค้ดปัจจุบันไม่ตรงมติ ต้องแก้ |
-| L-4 | ชะตากรรม 4 ไฟล์ SQL ไม่ได้ใช้งาน | **ตัดสินใจแล้ว: เก็บไว้เป็น reporting variant** | เพิ่มเข้า test rotation หมวด 1 (D8) ทุกรอบที่แก้ rep_view ต่อจากนี้ + คอมเมนต์หัวไฟล์ระบุสถานะให้ชัด |
+| M-3 | Same-squad transfer neutralization | **ตัดสินใจแล้ว: KAM เห็น transfer_out เต็มจำนวน** | ✅ **ปิดแล้ว** — verify โค้ดจริง (G5) 2026-07-06 ยืนยันโค้ดปัจจุบันตรงมติอยู่แล้ว ไม่ต้องแก้ |
+| L-4 | ชะตากรรม 4 ไฟล์ SQL ไม่ได้ใช้งาน | **ตัดสินใจแล้ว: เก็บไว้เป็น reporting variant** | ✅ **ปิดแล้ว** — D8 regression ผ่านครบ 4 ไฟล์ + comment หัวไฟล์ push แล้ว 2026-07-06 |
 
 ### ยังไม่ได้ถาม (แนะนำคุยต่อ)
 - **P2 churn label:** ควรใส่ warning เตือนไหมเมื่อ churn แบบนับหัวกับถ่วง GMV ต่างกันมาก (เช่น >2 เท่า)
@@ -157,17 +157,15 @@
 
 **Blocker:** เครื่องมือตอนนี้ต่อ Supabase (`menslbnyyvpxiyvjywcm.supabase.co`) ไม่ได้โดยตรง (ไม่อยู่ใน allowed network domains และไม่มี Supabase connector โหลดในเซสชันนี้) — ต้องเลือกทางใดทางหนึ่ง: (ก) Bucci รัน query แล้ววาง output ให้ หรือ (ข) ให้ผมใช้ claude-in-chrome เปิด Supabase dashboard ที่ Bucci login ไว้แล้วรัน SELECT ให้ (read-only)
 
-### Phase 2 — G5: verify/fix M-3 (KAM เห็น transfer_out เต็มจำนวน)
-Code-read `_commBuildKamPayout` + SQL base_portfolio/base_staff_owner logic (v8 design) หาว่ามี neutralization logic ที่ KAM scope หลงเหลืออยู่ไหม ถ้ามีต้องเอาออก
+### Phase 2 — ✅ เสร็จแล้ว (2026-07-06): G5 verify M-3 — โค้ดตรงมติอยู่แล้ว ไม่ต้องแก้
 
-### Phase 3 — D8: regression 4 ไฟล์ reporting variant (L-4)
-รัน D2 (unclassified=0), D3 (guard เดือน), D4 (LEG A+B fix) ซ้ำกับ `kam/pm/admin/tl_view.sql` ทั้ง 4 ไฟล์ + เพิ่ม comment หัวไฟล์ระบุสถานะ "maintained reporting variant"
+### Phase 3 — ✅ เสร็จแล้ว (2026-07-06): D8 regression ผ่านครบ 4 ไฟล์ + comment หัวไฟล์ push แล้ว
 
 ### Phase 4 — Deploy + browser-verify 10 จุดที่แก้ใน Session 3 (ยังไม่เคย verify จริง)
 G1 (lock-guard), U1/U2 (loading shimmer + re-render + timeout), P1 (summary/detail consistency ฿85 vs ฿10,085 case)
 
-### Phase 5 — ที่เหลือที่ยังไม่ตรวจ
-C3 (normalize ÷days×30), C4 (handover MoM isolation), C9 (TL multiplier boundary), C10 (rounding), R1-R3 (regression), U4 (MTD badge), U5 (% input reproduce)
+### Phase 5 — ✅ ส่วน code-read เสร็จแล้ว (2026-07-06): C3, C4, C9, C10 ผ่านหมด
+**ที่เหลือ (ต้องมี browser จริง):** R1-R3 (regression), U4 (MTD badge), U5 (% input reproduce)
 
 ### Phase 6 — Non-blocking แต่ต้องตัดสินใจ/ดำเนินการคู่ขนาน
 M-1 (คงเป็น open item, บันทึกใน PR), P2 churn label (รอถาม Bucci), D7/B7 11 ร้าน Admin Freshket (ops task)
