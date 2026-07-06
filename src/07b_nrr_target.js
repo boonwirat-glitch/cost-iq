@@ -328,7 +328,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   if (cm && cm.byMovementType && cm.byMovementType['transfer_out']) {
     const allToRows = cm.byMovementType['transfer_out'] || [];
     if (kamEmail) {
-      transferOutList = allToRows.filter(r => r.kamEmail === kamEmail || r.kamName === (allAccounts.find(a=>a.kamName)?.kamName||''));
+      // v6-fix: when kamEmail doesn't correspond to any real owned account (allAccounts
+      // empty -- e.g. an Admin/VP whose own login email isn't a real KAM, viewing "my
+      // portfolio" which doesn't actually exist), the name-fallback below degrades to
+      // `r.kamName === ''` or matches whatever kamName happens to be first in an empty
+      // array's .find() result -- either way it can accidentally attribute a COMPLETELY
+      // UNRELATED KAM's transfer-out row to this view. Confirmed live: an Admin's own
+      // "การเคลื่อนไหวพอร์ต" card was showing a specific KAM-to-KAM transfer (Anusorn to
+      // Siriprapa) that had nothing to do with the Admin's own login. No real owned
+      // portfolio here means no real transfer-out to attribute to it.
+      transferOutList = allAccounts.length > 0
+        ? allToRows.filter(r => r.kamEmail === kamEmail || r.kamName === (allAccounts.find(a=>a.kamName)?.kamName||''))
+        : [];
     } else if (tlEmail) {
       const teamKamNames = new Set(allAccounts.map(a => a.kamName).filter(Boolean));
       transferOutList = allToRows.filter(r => teamKamNames.has(r.kamName));
