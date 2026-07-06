@@ -1,3 +1,8 @@
+> ⚠️ **SUPERSEDED 2026-07-06** — เอกสารนี้เป็นประวัติ Session 1-3 ตอนงานยังอยู่บน `preview/q3-commission-build`
+> งานถูก merge เข้า `main` เรียบร้อยแล้ว พร้อมแก้บั๊กเพิ่มอีกหลายจุด — **อ่าน `docs/handoff-2026-07-06-v847-q3-merge-complete.md` แทนสำหรับสถานะปัจจุบัน**
+
+---
+
 # Q3 2026 Quarterly NRR — Test Spec & Product Spec (Merge Gate)
 
 **สร้างเมื่อ:** 2026-07-06
