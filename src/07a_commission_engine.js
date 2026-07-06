@@ -50,6 +50,7 @@
 let _tgtCache = {};           // { "2026-06|kam|ning@f.co": 3200000, ... }
 let _tgtSettings = {};        // { nrr_threshold: 98 }
 let _tgtLoaded = false;
+let _tgtSettingsLoadFailed = false; // v835-fix: true if target_settings query threw — signals _tgtSettings may be running on stale hardcoded defaults, not live Cockpit config
 let _tgtActiveTab = 'team';
 let _tgtActiveQuarter = null; // "2026-Q3"
 let _tgtPendingEdits = {};    // { "2026-06|kam|ning@f.co": 3200000 }
@@ -203,10 +204,10 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
 
     // Config (admin-configurable, with spec defaults)
-    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.03);
-    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.03);
+    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01 (changed 2026-06-11, default never updated)
+    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01
     const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
-    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 5000);
+    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
     const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
     // MTD mode — commission on actual amounts, no projection
@@ -329,7 +330,7 @@ function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   // meaning outlets got wrongly INCLUDED in P1/P3 instead of excluded (or vice versa).
   const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    const rate = _commGetConfig('upsell_outlet', 'rate', 0.015);
+    const rate = _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
 
     if (qnrrRaw) {
       const monthData = qnrrRaw.by_month && qnrrRaw.currentPeriod ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
@@ -524,10 +525,10 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
   // Gate based on NRR% — same metric already computed in _commBuildKamPayout
   // nrrPct passed in directly (no need to recompute GMV separately)
   try {
-    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 95); // NRR% threshold
-    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 90);
-    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.70);
-    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0.35);
+    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 98); // v835-fix: default was 95, live Supabase = 98 — NRR% threshold
+    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
+    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
+    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
 
     if (nrrPct === null || nrrPct === undefined) {
       return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
@@ -663,9 +664,9 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       // Fast path: use pre-computed totals from team summary (sense_upsell_team.csv)
       // v230fix2: return full p1/p3 sub-objects matching _commComputeUpsellSku structure
       // so _commBuildSnapshotRows can safely access .p1.gmv / .p3.gmv_incremental
-      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.03);
-      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.03);
-      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.015);
+      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
+      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
+      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
       const p1Comm  = _teamRow.p1_gmv   * p1Rate;
       const p3Comm  = _teamRow.p3_incr  * p3Rate;
       const outComm = _teamRow.outlet_gmv * outRate;
@@ -773,11 +774,14 @@ async function loadTargets(quarter) {
     _nrrExclusions = JSON.parse(JSON.stringify(hit.nrrExclusions || []));
     _commissionSnapshots = JSON.parse(JSON.stringify(hit.commissionSnapshots || []));
     _tgtLoaded = true;
+    _tgtSettingsLoadFailed = false; // v835-fix: cache only ever holds successful settings loads now (see bottom of function)
+    window._tgtSettingsLoadFailed = false;
     return;
   }
 
   _tgtCache = {};
   _tgtSettings = { nrr_threshold: 98 };
+  _tgtSettingsLoadFailed = false; // v835-fix: reset each fresh load attempt
   _nrrGovPolicies = {};
   _commRuleConfig = { plans:{}, rules:{}, tiers:{} };
   _nrrExclusions = [];
@@ -815,7 +819,8 @@ async function loadTargets(quarter) {
       _tgtSettings[s.key] = s.value;
     });
   } catch (e) {
-    console.warn('[Target] settings load failed:', e.message);
+    _tgtSettingsLoadFailed = true;
+    console.error('[Target] 🔴 target_settings load failed — commission math will run on hardcoded JS defaults, NOT live Cockpit config:', e.message);
   }
 
   try {
@@ -930,26 +935,36 @@ async function loadTargets(quarter) {
     _commRuleConfig = { plans: {}, rules: {}, tiers: {}, assignments: [] };
   }
 
-  _tgtQuarterCache[quarter] = {
-    cache: { ..._tgtCache },
-    settings: { ..._tgtSettings },
-    nrrPolicies: { ..._nrrGovPolicies },
-    commRules: JSON.parse(JSON.stringify(_commRuleConfig || {})),
-    nrrExclusions: JSON.parse(JSON.stringify(_nrrExclusions || [])),
-    commissionSnapshots: JSON.parse(JSON.stringify(_commissionSnapshots || [])),
-    ts: Date.now()
-  };
+  // v835-fix: never cache a quarter's state if target_settings failed to load —
+  // caching it would serve stale/wrong defaults to every call within _TGT_CACHE_TTL
+  // even after Supabase recovers. A failed load always re-fetches next call instead.
+  if (!_tgtSettingsLoadFailed) {
+    _tgtQuarterCache[quarter] = {
+      cache: { ..._tgtCache },
+      settings: { ..._tgtSettings },
+      nrrPolicies: { ..._nrrGovPolicies },
+      commRules: JSON.parse(JSON.stringify(_commRuleConfig || {})),
+      nrrExclusions: JSON.parse(JSON.stringify(_nrrExclusions || [])),
+      commissionSnapshots: JSON.parse(JSON.stringify(_commissionSnapshots || [])),
+      ts: Date.now()
+    };
+  }
   _tgtLoaded = true;
-  window._tgtLoadedFromDB = true; // v754e: flag ว่าข้อมูลมาจาก Supabase จริง ไม่ใช่ localStorage cache
+  window._tgtSettingsLoadFailed = _tgtSettingsLoadFailed; // v835-fix: UI can check this to warn "commission config may be stale"
+  window._tgtLoadedFromDB = !_tgtSettingsLoadFailed; // v835-fix: was unconditionally true even when settings load failed — now reflects reality
   // v224e: persist to localStorage — next session reads this instantly (no Supabase cold-start flash)
-  try{
-    localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
-      cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
-      commRules:JSON.parse(JSON.stringify(_commRuleConfig||{})),
-      nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions||[])),
-      commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots||[]))
-    }}));
-  }catch(e){}
+  // v835-fix: skip persisting if settings load failed — a bad localStorage cache would poison
+  // the NEXT session's cold-start too, extending the blast radius beyond just this session
+  if (!_tgtSettingsLoadFailed) {
+    try{
+      localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
+        cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
+        commRules:JSON.parse(JSON.stringify(_commRuleConfig||{})),
+        nrrExclusions:JSON.parse(JSON.stringify(_nrrExclusions||[])),
+        commissionSnapshots:JSON.parse(JSON.stringify(_commissionSnapshots||[]))
+      }}));
+    }catch(e){}
+  }
 }
 
 function _tgtGet(period, level, email) {
@@ -2152,16 +2167,16 @@ function _commBuildSnapshotRows(periodOverride) {
         csv_data_as_of: new Date().toISOString(),
         // Config snapshot — freeze param values at time of snapshot for audit
         config_snapshot: {
-          upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.03),
-          upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.03),
+          upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.01),   // v835-fix: was 0.03
+          upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.01),   // v835-fix: was 0.03
           upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
-          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',5000),
+          upsell_sku_p3_min_incremental:_commGetConfig('upsell_sku','p3_min_incremental',8000), // v835-fix: was 5000
           upsell_sku_p1_min_gmv:        _commGetConfig('upsell_sku','p1_min_gmv',5000), // v6-fix: was 2500, drifted from the real gate check (line ~210) and confirmed Supabase value (5000)
-          upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.015),
-          gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',95),
-          gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',90),
-          gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.70),
-          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0.35)
+          upsell_outlet_rate:           _commGetConfig('upsell_outlet','rate',0.005),  // v835-fix: was 0.015
+          gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',98),   // v835-fix: was 95
+          gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',95),   // v835-fix: was 90
+          gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.3),        // v835-fix: was 0.70
+          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0)           // v835-fix: was 0.35
         }
       },
       created_by: actor,
