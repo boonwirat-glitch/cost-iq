@@ -722,7 +722,7 @@ function _qnrrRenderChart(){
     // clipped by .qnrr-bar-chart-area's overflow:hidden with a hard edge -- looked like a
     // rendering bug, especially early in the month when a run-rate projected from very few
     // days of data can spike far above every other bar).
-    var maxGapH      = Math.max(0, chartH - barH - 4); // 4px headroom from the very top
+    var maxGapH      = Math.max(0, chartH - barH - 10); // v6-uxfix3: was 4px — measured live in browser: hardcoded chartH (112) vs actual rendered .qnrr-bar-chart-area height (109.5px) differ by 2.5px, eating most of the old 4px buffer down to 1.5px real headroom. Widened so small CSS drift like this can't reopen the crop.
     var isGhostClipped = isPartialMonth && rawGapH > maxGapH;
     var gapH         = isPartialMonth ? Math.min(rawGapH, maxGapH) : 0;
 
@@ -819,7 +819,12 @@ function _qnrrRenderChart(){
           ghostHtml = '<div class="qnrr-ghost-line' + (isLowConf ? ' qnrr-ghost-top-lowconf' : '') + '" style="bottom:' + lineBottom + 'px" title="Run-rate ≈ actual: ' + _fmtM(runRate) + '"></div>';
         }
       }
-      bodyHtml = ghostHtml + '<div class="qnrr-bar-body" style="height:' + barH + 'px">' + segsHtml + '</div>';
+      // v6-uxfix3: when a ghost extension sits on top, square off the bar's top corners
+      // (via CSS class below) so the two read as one continuous shape instead of two
+      // separate floating boxes with a visible seam where the bar's rounded top met
+      // the ghost's square bottom.
+      var barBodyCls = 'qnrr-bar-body' + (ghostHtml ? ' qnrr-bar-body-has-ghost' : '');
+      bodyHtml = ghostHtml + '<div class="' + barBodyCls + '" style="height:' + barH + 'px">' + segsHtml + '</div>';
     }
 
     var onclickStr = isBase ? '' : 'onclick="_qnrrSelBar(\'' + m + '\')"';
