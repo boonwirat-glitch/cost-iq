@@ -29,7 +29,18 @@ var QNRR_CFG = {
 // ══════════════════════════════════════════════════════════════════════════════
 function _qnrrCompute(kamEmail, scope) {
   scope = scope || 'kam';
-  if (!kamEmail) return null;
+  // v850-fix: kamEmail is genuinely optional for 'tl'/'admin' org-wide scope -- allRows
+  // selection and _rowInScope() below both already branch away from kamEmail for those
+  // scopes (admin: allRows=qd.allRows, _rowInScope=true unconditionally; tl-with-no-
+  // myTlEmail: same org-wide fallback). Only 'kam' scope actually needs a real email
+  // (used to filter r.latest_kam_email === kamEmail). The old unconditional guard here
+  // silently returned null every time the Admin "ทีม" org-wide toggle called this with
+  // kamEmail=null, scope='admin' -- portview bar (_nrrBarSource(null,null) for _showAll)
+  // then fell back to the legacy MoM calc while the QNRR panel (which happens to pass
+  // the viewer's own email even in admin scope) computed correctly. That's the source
+  // of the 107% (portview, wrong) vs 105% (QNRR panel, correct) mismatch Bucci found
+  // live on the Admin org-wide view (2026-07-07).
+  if (scope === 'kam' && !kamEmail) return null;
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded) return null;
 
