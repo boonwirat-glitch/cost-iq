@@ -111,8 +111,12 @@ outlet_first_dollar AS (
     -- ผ่าน SALE หลุดจาก portfolio ที่แท้จริงไปเป็น SALE/AM (ดู mar_cohort ด้านล่าง)
     ARRAY_AGG(
       UPPER(TRIM(o.commercial_owner))
-      ORDER BY CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
-                    THEN DATE(o.delivery_date) END ASC NULLS LAST
+      -- BigQuery ไม่รองรับ "ASC NULLS LAST" ใน aggregate ORDER BY เลยดัน non-KAM/PM/ADMIN
+      -- ไปท้ายแถวด้วย flag ตัวแรกแทน แล้วค่อย sort ตามวันที่จริงในกลุ่มที่ match
+      ORDER BY
+        CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN') THEN 0 ELSE 1 END ASC,
+        CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
+             THEN DATE(o.delivery_date) END ASC
       LIMIT 1
     )[SAFE_OFFSET(0)] AS first_portfolio_owner,
     -- first_dollar_owner = owner ของ first order จริงๆ (ทุก owner รวม SALE)
