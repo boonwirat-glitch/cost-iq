@@ -164,6 +164,27 @@ outlet_prev_owner AS (
   ) = 1
 ),
 
+-- outlet_latest_portfolio_owner: v851-fix2 — เจ้าของ KAM/PM/ADMIN ล่าสุดจริงๆ
+-- ณ หรือก่อน base month (ไม่ใช่ assignment แรกสุดในชีวิต) ใช้แทน first_portfolio_owner
+-- ใน mar_cohort's SALE-spot-case fallback เพราะพบว่า outlet บางร้านเคยย้ายพอร์ต
+-- (เช่น เริ่มเป็น KAM ปี 2024 ย้ายไป PM ปี 2025) — first_portfolio_owner จะได้ค่า
+-- แรกสุด (KAM) ซึ่งเป็นพอร์ตเก่าที่ไม่ตรงกับที่ pm_view/admin_view ยืนยันว่าปัจจุบันคือ PM
+outlet_latest_portfolio_owner AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    ARRAY_AGG(
+      UPPER(TRIM(o.commercial_owner))
+      ORDER BY o.delivery_date DESC LIMIT 1
+    )[SAFE_OFFSET(0)] AS latest_portfolio_owner
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
+  WHERE o.user_id IS NOT NULL
+    AND o.delivery_date <= p.base_end
+    AND UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  GROUP BY 1
+),
+
 base_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
@@ -263,10 +284,11 @@ mar_cohort AS (
     CASE
       WHEN mo.commercial_owner IN ('KAM','PM','ADMIN') THEN mo.commercial_owner
       -- v851-fix: เดิมใช้ ofd.first_dollar_owner (owner ของออเดอร์แรกสุดในชีวิตร้าน
-      -- มักเป็น SALE/AM) ผิด ที่ถูกต้องคือ first_portfolio_owner (owner ตอนถูก
-      -- onboard เข้า KAM/PM/ADMIN ครั้งแรก) — บั๊กเดิมทำให้ร้านที่ order ล่าสุดใน
-      -- base month ผ่าน SALE หลุดจาก PM/ADMIN ไปเป็น SALE/AM ในภาพรวม (vp_view)
-      ELSE ofd.first_portfolio_owner
+      -- มักเป็น SALE/AM) ผิด — v851-fix2: first_portfolio_owner (assignment แรกสุด)
+      -- ก็ยังผิดถ้า outlet เคยย้ายพอร์ต เลยเปลี่ยนมาใช้ latest_portfolio_owner
+      -- (เจ้าของ KAM/PM/ADMIN ล่าสุดจริง ณ/ก่อน base month) ซึ่งตรงกับที่
+      -- pm_view/admin_view/rep_view ยืนยันว่าใครเป็นเจ้าของปัจจุบันจริงๆ
+      ELSE COALESCE(lpo.latest_portfolio_owner, ofd.first_portfolio_owner)
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
@@ -282,6 +304,7 @@ mar_cohort AS (
   ) mo
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
+  LEFT JOIN outlet_latest_portfolio_owner lpo ON mo.outlet_id = lpo.outlet_id
   WHERE (
     mo.commercial_owner IN ('KAM','PM','ADMIN')
     OR (
