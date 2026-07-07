@@ -2320,6 +2320,17 @@ async function _preloadFromIndexedDB(){
       }catch(e){}
     });
     await Promise.all(tasks);
+    // v849-fix: if 'qnrr' specifically missed IDB (not cached yet, or >6h TTL expired),
+    // proactively trigger its own fetch here instead of leaving it to a consumer to
+    // notice later. _prefetchQnrrIfNeeded() already has its own role-gate + 2s delay
+    // + dedup, so this is safe to call unconditionally. Root cause: IDB-FAST below only
+    // requires the 3 CRITICAL tabs, so it can activate and skip loadFromCloudflareR2()
+    // (which is where _prefetchQnrrIfNeeded() normally gets called) while 'qnrr' stays
+    // silently unloaded forever. See _qnrrEnsureLoaded() in 07c_qnrr_view.js for the
+    // consumer-side safety net that also covers this.
+    if (!_isSalesPreload && !_cloudLoadedTabs.has('qnrr')) {
+      try { if (typeof _prefetchQnrrIfNeeded === 'function') _prefetchQnrrIfNeeded(); } catch (e) {}
+    }
     var _criticalGate=_isSalesPreload?1:3;
     if(criticalLoaded>=_criticalGate){
       window._idbPreloaded=true;

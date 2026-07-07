@@ -334,6 +334,48 @@ function _qnrrCompute(kamEmail, scope) {
   };
 }
 window._qnrrCompute = _qnrrCompute;
+
+// ── _qnrrEnsureLoaded — self-heal for IDB-FAST path skipping qnrr (v849-fix) ────
+// Root cause (found 2026-07-07, Bucci): _preloadFromIndexedDB() (02_data_pipeline.js)
+// has no fallback fetch for the 'qnrr' tab specifically when it's missing/expired in
+// IndexedDB. The IDB-FAST boot path only requires the 3 CRITICAL tabs (portview/
+// history/handover) to activate -- it can fire successfully while 'qnrr' silently
+// stays unloaded forever, because _prefetchQnrrIfNeeded() only lives inside the full
+// loadFromCloudflareR2() flow, which IDB-FAST skips entirely. Symptom observed live:
+// portview bar and commission cockpit silently fell back to stale/wrong numbers
+// (legacy MoM calc, or a confident-looking ฿0) with zero visible error, and no
+// browser reload fixed it because the same IDB-FAST race reproduced identically
+// every time. Same bug CLASS as the v231-fix already applied for upsell_team
+// (06_portview_teamview.js:2330) -- this is the same fix pattern applied to qnrr.
+// Called from _qnrrComputeForCommission() below so every consumer (portview bar,
+// commission strip/cockpit, team governance card) self-heals from one place.
+function _qnrrEnsureLoaded() {
+  if (window.bulkQnrrData && window.bulkQnrrData.loaded) return;
+  if (window._qnrrSelfHealInFlight) return;
+  if (typeof window._fetchQnrrBundle !== 'function') return;
+  window._qnrrSelfHealInFlight = true;
+  window._fetchQnrrBundle().finally(function () {
+    window._qnrrSelfHealInFlight = false;
+    if (!window.bulkQnrrData || !window.bulkQnrrData.loaded) return; // genuinely failed -- existing 15s force-release in _fetchQnrrBundle still applies, leave as-is
+    // Broad re-render so every consumer picks up the freshly-loaded data without
+    // requiring a manual page reload.
+    try {
+      var _bar = document.getElementById('tgt-portview-bar');
+      if (_bar) _bar._lastRenderMs = 0; // bypass anti-flicker debounce for this authoritative repaint
+      if (typeof renderPortviewTargetBar === 'function') renderPortviewTargetBar();
+    } catch (e) {}
+    try { if (typeof window._commRenderKamSelfStrip === 'function') window._commRenderKamSelfStrip(); } catch (e) {}
+    try { if (typeof window._commGatedRender === 'function') window._commGatedRender(); } catch (e) {}
+    try { if (typeof _qnrrRender === 'function') _qnrrRender(); } catch (e) {}
+    try {
+      if (document.getElementById('scr-teamview')?.classList.contains('on') && typeof renderTeamviewKamList === 'function') {
+        renderTeamviewKamList();
+      }
+    } catch (e) {}
+  });
+}
+window._qnrrEnsureLoaded = _qnrrEnsureLoaded;
+
 // ── _qnrrComputeForCommission (Q3 quarterly mode) ───────────────────────────────
 // Wraps _qnrrCompute() and reshapes output for _commBuildKamPayout / _commBuildTlPayout.
 // Source of truth: bulkQnrrData (sense_qnrr_2026q3.csv) — same as QNRR sheet.
@@ -343,6 +385,11 @@ window._qnrrCompute = _qnrrCompute;
 // currentPeriod: '2026-07' | '2026-08' | '2026-09' (lag-1 YYYY-MM)
 function _qnrrComputeForCommission(kamEmail, scope, asOfPeriod) {
   try {
+    // v849-fix: kick the self-heal check on every call -- cheap no-op once loaded
+    // or already in flight, but guarantees a fetch eventually fires even if the
+    // IDB-FAST boot path skipped it (see _qnrrEnsureLoaded comment above).
+    _qnrrEnsureLoaded();
+
     var validQ = QNRR_CFG.q_months;  // ['2026-07','2026-08','2026-09']
     var currentPeriod;
     if (asOfPeriod && validQ.includes(asOfPeriod)) {
@@ -684,7 +731,11 @@ function _qnrrRender(){
     ? portviewRepEmail
     : ((currentUserProfile && currentUserProfile.email) || '');
   var scope = SCOPE_MAP[_scopeIdx] || 'kam';
-  if (!window.bulkQnrrData || !window.bulkQnrrData.loaded) { _qnrrShowSkeleton(); return; }
+  if (!window.bulkQnrrData || !window.bulkQnrrData.loaded) {
+    _qnrrShowSkeleton();
+    _qnrrEnsureLoaded(); // v849-fix: actively trigger fetch instead of passively waiting on skeleton
+    return;
+  }
 
   _data = null;
   try { _data = _qnrrCompute(email, scope); } catch(e) { console.warn('[qnrr]', e); }
