@@ -267,6 +267,22 @@ function _qnrrCompute(kamEmail, scope) {
           nrr_curr_norm += curr_days > 0 ? r.curr_gmv / curr_days : 0;
         }
       }
+
+      // v848: comeback GMV now counts toward the NRR numerator (Bucci decision 2026-07-07).
+      // Comeback outlets have base_gmv=0 by definition (they churned before the base month),
+      // so they were never in baseMap and never touch the denominator -- no base_gmv>0 gate
+      // needed/possible here. This is intentionally ASYMMETRIC with transfer_in (which adds
+      // to both numerator AND denominator, v845): comeback is pure upside added only to the
+      // numerator against an unchanged base. Example: base 10M (core 10M + comeback 0M since
+      // inactive in base month) -> Sep core 9.5M + comeback 0.5M -> numerator 9.5+0.5=10M ->
+      // NRR = 10M/10M = 100%.
+      if (mv === 'comeback') {
+        if (!seenOutlets[r.outlet_id]) {
+          seenOutlets[r.outlet_id] = true;
+          var curr_days_cb = r.curr_days || 30;
+          nrr_curr_norm += curr_days_cb > 0 ? r.curr_gmv / curr_days_cb : 0;
+        }
+      }
     });
 
     // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive)
