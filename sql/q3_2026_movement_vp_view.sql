@@ -96,13 +96,25 @@ user_account_type AS (
 -- outlet_first_dollar:
 --   first_dollar_date    = first order date (global, ทุก owner)
 --   first_portfolio_date = first order date ที่ owner IN (KAM,PM,ADMIN)
---   first_dollar_owner   = owner ของ first_portfolio_date
+--   first_portfolio_owner = owner (KAM/PM/ADMIN) ณ first_portfolio_date
+--   first_dollar_owner   = owner ของ first order จริงๆ (ทุก owner รวม SALE) — คนละความหมายกับ first_portfolio_owner
 outlet_first_dollar AS (
   SELECT
     CAST(o.user_id AS STRING) AS outlet_id,
     MIN(DATE(o.delivery_date)) AS first_dollar_date,
     MIN(CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
              THEN DATE(o.delivery_date) END) AS first_portfolio_date,
+    -- v851-fix: first_portfolio_owner = ซึ่ง portfolio (KAM/PM/ADMIN) ที่ outlet ถูก
+    -- onboard เข้ามาครั้งแรก (owner ของออเดอร์ที่ตรงกับ first_portfolio_date) —
+    -- เพิ่มเพราะ mar_cohort เคยใช้ first_dollar_owner (owner ของออเดอร์แรกสุดในชีวิต
+    -- ร้าน ซึ่งมักเป็น SALE/AM) แทนคำถามนี้ผิด ทำให้ร้านที่ order ล่าสุดใน base month
+    -- ผ่าน SALE หลุดจาก portfolio ที่แท้จริงไปเป็น SALE/AM (ดู mar_cohort ด้านล่าง)
+    ARRAY_AGG(
+      UPPER(TRIM(o.commercial_owner))
+      ORDER BY CASE WHEN UPPER(TRIM(o.commercial_owner)) IN ('KAM','PM','ADMIN')
+                    THEN DATE(o.delivery_date) END ASC NULLS LAST
+      LIMIT 1
+    )[SAFE_OFFSET(0)] AS first_portfolio_owner,
     -- first_dollar_owner = owner ของ first order จริงๆ (ทุก owner รวม SALE)
     -- ถ้า first order เป็น SALE → expansion check ไม่ผ่าน → ตกไป new_sales
     ARRAY_AGG(
@@ -246,7 +258,11 @@ mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     CASE
       WHEN mo.commercial_owner IN ('KAM','PM','ADMIN') THEN mo.commercial_owner
-      ELSE ofd.first_dollar_owner  -- SALE spot case → ใช้ owner จาก first_portfolio
+      -- v851-fix: เดิมใช้ ofd.first_dollar_owner (owner ของออเดอร์แรกสุดในชีวิตร้าน
+      -- มักเป็น SALE/AM) ผิด ที่ถูกต้องคือ first_portfolio_owner (owner ตอนถูก
+      -- onboard เข้า KAM/PM/ADMIN ครั้งแรก) — บั๊กเดิมทำให้ร้านที่ order ล่าสุดใน
+      -- base month ผ่าน SALE หลุดจาก PM/ADMIN ไปเป็น SALE/AM ในภาพรวม (vp_view)
+      ELSE ofd.first_portfolio_owner
     END AS base_portfolio,
     mo.staff_owner AS base_staff_owner,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
