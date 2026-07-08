@@ -1,0 +1,89 @@
+/* ── nrr_tokens.css — "Fresh Canvas" design tokens ─────────────────────
+   Adopted verbatim from the user-supplied Fresh Canvas spec, as the
+   deliberately distinct visual language for this one page. This page is
+   its own standalone HTML document (own build_nrr.py output) so there is
+   no shared-document collision risk with design/tokens.css used by Sense
+   and /dashboard — plain token names are used as written in the spec,
+   not namespaced, to stay a direct, easily-audited match against it. */
+
+:root {
+  /* Neutral / Ink — v6: raised the contrast/size floor. ink2 is now the
+     level for anything that's still real content (row meta, satellite
+     labels) — ink3 is reserved for pure decoration (timestamps, disabled
+     state) and must never be the only signal on content a human needs to
+     read. See DESIGN-SYSTEM-V2 for the full rationale. */
+  --bg: #ffffff;
+  --fill: #f5f6f4;
+  --fill-deep: #eceeea;
+  --ink: #161a16;
+  --ink2: #4a524a;
+  --ink3: #8a9088;
+  --ink-deep: #1d4849;
+  --line: rgba(22, 26, 22, 0.08);
+
+  /* Green — v6: split into a surface/glyph role (Cabbage, brighter, used for
+     fills/glyphs/lines/chart strokes/washes) and a text/ink role (Raw
+     Papaya, deep enough to stay legible as text at any size — Cabbage on
+     white fails WCAG AA for small text). Same pattern the momentum signal
+     already used (glyph color vs ink color), now applied to the brand
+     accent. --green/--green-deep/--green-soft keep their old names so every
+     existing call site (tags, thresholds, chart core segment) picks up the
+     new hues for free. */
+  --green: #00ce7c;        /* Cabbage — fills, glyphs, active states, chart strokes */
+  --green-deep: #008065;   /* Raw Papaya — text/ink role: hero %, positive deltas, tag text */
+  --green-soft: rgba(0, 206, 124, 0.10);
+
+  /* Sun/Amber → v6: "insight" role — the color of narration (verdict
+     sentences, takeaway highlights), distinct from data itself. */
+  --sun: #c99a12;
+  --sun-deep: #a67f0e;
+  --sun-soft: #fff6d6;
+  --peach: #fb8b5b;
+
+  /* v6: "attention" role — needs-a-decision, not necessarily bad (that's
+     coral's job) but wants a human to look (e.g. a churned outlet with no
+     note yet). */
+  --attention: #d9631f;
+  --attention-soft: #fdebdd;
+
+  /* Coral — negative values / disadvantaged comparison only */
+  --coral: #e0533a;
+  --coral-soft: #fdece7;
+
+  /* Movement categorical palette (v4) — a SEPARATE system from the status
+     colors above (green/sun/coral thresholds). Research-grounded rules:
+     gains live in the green family, losses in the coral family, portfolio
+     plumbing gets neutral cool hues, and sun/amber is RESERVED for
+     threshold-warning status — never used as a category color. Saturation
+     is deliberately tiered (green > teal > violet > slate) so the stack
+     reads ordered, not rainbow. */
+  --mv-green-lt: #58bb8a;        /* expansion — tint of the green anchor */
+  --mv-green-lt-soft: #e7f5ee;
+  --mv-teal: #1295a8;            /* comeback — returning tide */
+  --mv-teal-soft: #e2f3f5;
+  --mv-violet: #7b6bc9;          /* transfer_in — administrative move */
+  --mv-violet-soft: #eeebf9;
+  --mv-slate: #7d8ca3;           /* handover — quiet background info */
+  --mv-slate-soft: #eef1f5;
+  --mv-clay: #b0442b;            /* transfer_out — coral family, earthier */
+  --mv-clay-soft: #f6e7e2;
+
+  /* Radii */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+
+  /* Spacing (feel-based, not strict grid) */
+  --sp-1: 10px;
+  --sp-2: 12px;
+  --sp-3: 14px;
+  --sp-4: 16px;
+  --sp-5: 18px;
+  --sp-6: 20px;
+  --sp-7: 22px;
+
+  /* Fonts — loaded via Google Fonts <link> in shell_nrr.html */
+  --font-ui: 'Anuphan', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-num: 'Space Grotesk', var(--font-ui);
+}

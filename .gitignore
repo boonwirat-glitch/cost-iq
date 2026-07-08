@@ -1,0 +1,5 @@
+# Dev-only local preview server (referenced by ~/.claude launch config, not part of the app)
+_preview_server.cjs
+
+# OS noise
+.DS_Store

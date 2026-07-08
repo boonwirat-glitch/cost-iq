@@ -1,2 +1,4 @@
 /dashboard    /dashboard.html    200
 /dashboard/*  /dashboard.html    200
+/nrr          /nrr.html          200
+/nrr/*        /nrr.html          200

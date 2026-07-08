@@ -1,0 +1,136 @@
+/* ── nrr_base.css — typography, 3-tier surfaces, buttons, chips ────────
+   Desktop adaptation of the Fresh Canvas mobile spec (section 10):
+   - font sizes +2px vs the mobile scale, ratios between levels preserved
+   - hover states added to .panel/.fill and buttons (mobile has none)
+   - top bar instead of bottom nav; no bottom-sheet grab handles here */
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+#nrr-app { display: none; }
+
+/* ── Typography — v6 graduated scale (Display/H1/H2/Body-strong/Body/
+   Meta/Micro), no gap large enough to feel like two different apps.
+   --green is the surface/glyph role (Cabbage) — never used as text color
+   here; --green-deep (Raw Papaya) is the text-safe variant. ─────────── */
+.eyebrow {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--green-deep);
+}
+.h1 { font-size: 29px; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; margin: 0; }
+.h2 { font-size: 22px; font-weight: 700; line-height: 1.35; margin: 0; }
+.t-strong { font-size: 16px; font-weight: 600; color: var(--ink); }
+.sub { font-size: 15px; font-weight: 400; line-height: 1.65; color: var(--ink2); margin: 0; }
+/* meta = real content that must be readable (row subtitles, counts) —
+   13px minimum, ink2, never the faint/tiny ink3+11px combo that reads as
+   illegible-by-design. micro = pure decoration only (timestamps, disabled
+   state, placeholder copy) — the one level allowed to be skimmed past. */
+.meta { font-size: 13px; font-weight: 500; color: var(--ink2); }
+.micro { font-size: 13px; font-weight: 400; color: var(--ink3); }
+.num {
+  font-family: var(--font-num); font-weight: 700; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.nrr-pop { animation: nrrPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes nrrPop { 0% { transform: scale(1); } 50% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+/* ── Surface system — 3 tiers, do not mix ─────────────────────────── */
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  transition: box-shadow 150ms ease;
+}
+.panel.hoverable:hover { box-shadow: 0 2px 10px rgba(16, 21, 16, 0.06); }
+
+.fill {
+  background: var(--fill);
+  border-radius: var(--r-md);
+  transition: background 150ms ease;
+}
+.fill.hoverable:hover { background: var(--fill-deep); }
+
+.float {
+  background: var(--bg);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(16, 21, 16, 0.04);
+  box-shadow: 0 6px 20px rgba(16, 21, 16, 0.10), 0 24px 56px rgba(16, 21, 16, 0.14);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.btn-primary {
+  padding: 12px 20px; border: none; border-radius: 18px;
+  background: var(--green-deep); color: #fff; /* Papaya, not Cabbage — white text needs the deep variant for contrast */
+  font-family: var(--font-ui); font-size: 15px; font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0, 128, 101, 0.28);
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.05); }
+.btn-primary:active { transform: scale(0.97); }
+/* v7 mockup-parity: secondary actions are quiet border pills (iOS filter-
+   trigger language), not gray filled blocks — gray fills were the single
+   biggest contributor to the "boxes everywhere" look. */
+.btn-secondary {
+  padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--ink2);
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 600;
+  transition: border-color 150ms ease, color 150ms ease, transform 150ms ease;
+  cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--ink3); color: var(--ink); }
+.btn-secondary:active { transform: scale(0.97); }
+
+/* ── Chip / tag ───────────────────────────────────────────────────── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.tag.green { background: var(--green-soft); color: var(--green-deep); }
+.tag.coral { background: var(--coral-soft); color: var(--coral); }
+.tag.sun   { background: var(--sun-soft); color: var(--sun-deep); }
+.tag.muted { background: var(--fill); color: var(--ink2); }
+.tag.attention { background: var(--attention-soft); color: var(--attention); } /* v6: "needs a look" — e.g. churn with no note yet */
+
+/* v6: insight — the color of narration (verdict sentences, takeaway
+   highlights), distinct from data itself. */
+.nrr-insight { color: var(--sun-deep); font-weight: 700; }
+.nrr-highlight { background: linear-gradient(transparent 55%, var(--sun-soft) 55%); padding: 0 2px; font-weight: 600; color: var(--ink); }
+
+/* ── Segmented control — v7 mockup-parity: transparent track with a
+   hairline border, pill radius; active = Cabbage fill + dark-jalapeno
+   text (the ink-deep pairing keeps AA contrast on the bright green).
+   Used by both the top subnav and the movement portfolio switcher. ── */
+.seg {
+  display: inline-flex; background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px;
+}
+.seg button, .seg a {
+  border: none; background: transparent; padding: 7px 16px; border-radius: 999px;
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; color: var(--ink2);
+  cursor: pointer; text-decoration: none;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.seg button.on, .seg a.on { background: var(--green); color: var(--ink-deep); font-weight: 700; }
+.seg button:not(.on):hover, .seg a:not(.on):hover { color: var(--ink); }
+
+/* ── Auth overlay (kept minimal, matches app tone) ───────────────── */
+#nrr-auth-overlay {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); z-index: 500;
+}
+.nrr-auth-card { width: 340px; display: flex; flex-direction: column; gap: 12px; }
+.nrr-auth-card input {
+  width: 100%; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--line);
+  font-family: var(--font-ui); font-size: 14px; background: var(--fill);
+}
+#nrr-auth-error {
+  display: none; background: var(--coral-soft); color: var(--coral);
+  border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px;
+}
