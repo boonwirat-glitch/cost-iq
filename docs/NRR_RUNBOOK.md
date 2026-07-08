@@ -67,12 +67,12 @@ SQL v827-auto) + fallback 404 ไปไตรมาสก่อน + banner "ร
   Ploiiy มิ.ย. = 1.5×) — `/nrr` แสดง ⓘ กำกับอยู่แล้ว แต่ควรแก้ที่ต้นทางเมื่อสะดวก
 - **เดือนที่ยังไม่ Compute**: `/nrr` แสดง ESTIMATE (pace-based) ชัดเจน — เป็น by design
   ไม่ใช่บั๊ก; ตัวเลขจริงโผล่เมื่อ admin กด Compute/Lock เท่านั้น
-- **⚠️ Sense ยังนับฐาน transfer_in ซ้ำ (แก้ฝั่ง /nrr แล้ว nrr_v10, 2026-07-08)**:
-  ร้านที่ transfer_in ใน**เดือนแรกของไตรมาส**ถูกนับฐานซ้ำ 2 ครั้งใน `_qnrrCompute`
-  (เข้า baseMap + symmetric adjustment) — /nrr แก้แล้ว แต่ `src/07c_qnrr_view.js`
-  (Sense) ยังมีบั๊กอยู่ → Sense จะโชว์ NRR ต่ำกว่าจริงสำหรับ scope ที่มี month-1
-  transfer_in (เช่น Tape ก.ค. 2026: Sense 92% vs /nrr 99% — **/nrr คือเลขที่ถูก**)
-  จนกว่าจะแก้ 07c + rebuild Sense แล้วลบ divergence note ใน `nrr_logic.js` header
+- **✅ ฐาน transfer_in เคยถูกนับซ้ำ — แก้แล้วทั้งสองแอป (nrr_v10 + Sense v852, 2026-07-08)**:
+  ร้านที่ transfer_in ใน**เดือนแรกของไตรมาส**เคยถูกนับฐานซ้ำ 2 ครั้งใน `_qnrrCompute`
+  (เข้า baseMap + symmetric adjustment) ทำให้ NRR ต่ำกว่าจริง (เช่น Tape ก.ค. 2026:
+  92% → ที่ถูกคือ 99%) — แก้แล้วทั้ง `src/nrr/nrr_logic.js` และ `src/07c_qnrr_view.js`
+  ด้วยเงื่อนไขเดียวกัน (`_effectiveMovement(r) !== 'transfer_in'` ที่ baseMap build)
+  ตัวเลขสองแอปตรงกัน 100% ถ้าอนาคตมีใคร "sync" สองไฟล์นี้ ต้องคงเงื่อนไขนี้ไว้ทั้งคู่
   — รายละเอียด+ตารางเทียบทุกระดับ: `docs/handoff-2026-07-08-nrr-transfer-in-fix.md`
 
 ## 5. Deploy / Rollback

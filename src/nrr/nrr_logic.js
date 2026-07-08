@@ -11,18 +11,14 @@
 // parsing or in how this file is called — re-diff against
 // src/07c_qnrr_view.js before changing anything in _qnrrCompute itself.
 //
-// ⚠️ ONE INTENTIONAL DIVERGENCE from 07c (2026-07-08): baseMap construction
-// here additionally excludes rows whose _effectiveMovement is 'transfer_in'.
-// Without that, a transfer_in landing in the FIRST period month of the
-// quarter gets its base_gmv counted TWICE — once via baseMap, once via the
-// symmetric transfer_in adjustment below — inflating the base and deflating
-// NRR% (found via the 2026-07 PM→KAM bulk move: 44 outlets, ฿2.34M base
-// double-counted org-wide; Tape/Puttipong showed 92% instead of the correct
-// 99%). The v776 design comment in 07c itself states transfer_in outlets are
-// "ไม่อยู่ใน baseMap" — this fix restores that stated invariant. 07c still
-// carries the bug until the same one-line fix is applied there; until then
-// Sense and /nrr will disagree for any scope containing a month-1 transfer_in.
-// When 07c is fixed, this divergence note should be removed.
+// NOTE (2026-07-08, nrr_v10 + Sense v852): baseMap construction excludes rows
+// whose _effectiveMovement is 'transfer_in' — without this, a transfer_in
+// landing in the FIRST period month of the quarter had its base_gmv counted
+// TWICE (once via baseMap, once via the symmetric transfer_in adjustment),
+// inflating the base and deflating NRR% (2026-07 PM→KAM bulk move: 44
+// outlets, ฿2.34M double-counted; Tape showed 92% instead of 99%). The same
+// fix is applied in src/07c_qnrr_view.js (v852) — both engines are in sync.
+// Details: docs/handoff-2026-07-08-nrr-transfer-in-fix.md
 //
 // Consumes window.bulkQnrrData, built by nrr_data.js in the exact same shape
 // Sense itself builds it in (src/02_data_pipeline.js, bulk-qnrr-single

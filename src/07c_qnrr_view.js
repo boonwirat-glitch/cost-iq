@@ -149,7 +149,18 @@ function _qnrrCompute(kamEmail, scope) {
   var baseMonthRows = scopedRows.filter(function(r){ return r.period_month === months[0]; });
   baseMonthRows.forEach(function(r){
     // exclude handover outlets — KAM ไม่ได้ดูแลจริงๆ ใน base month
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
+    // v852: exclude transfer_in ด้วย — base_gmv ของแถว transfer_in คือฐานภายใต้
+    // เจ้าของเดิม (PM/ADMIN/KAM อื่น) และถูกบวกเข้า base_norm ครั้งเดียวอยู่แล้ว
+    // โดย symmetric transfer_in adjustment ด้านล่าง ถ้า transfer เกิดในเดือนแรก
+    // ของไตรมาส แถวนั้นจะอยู่ใน baseMonthRows พอดีและเคยหลุดเข้า baseMap
+    // → ฐานถูกนับซ้ำ 2 ครั้ง (เจอจริง ก.ค. 2026: PM→KAM 44 ร้าน ฐาน ฿2.34M
+    // นับซ้ำทั้ง org, Tape โชว์ 92% แทนที่จะเป็น 99%) ตรงกับ invariant v776
+    // ในหัวไฟล์ที่ระบุว่าร้าน transfer_in "ไม่อยู่ใน baseMap" อยู่แล้ว
+    // ใช้ _effectiveMovement (ไม่ใช่ raw movement_type) เพื่อให้การย้าย KAM↔KAM
+    // ทีมเดียวกันที่ tl/admin scope (ซึ่ง reclassify เป็น core_nrr) ยังอยู่ใน
+    // baseMap ถูกต้อง — ร้านนั้นเป็นของ scope นั้นตั้งแต่เดือนฐานจริงๆ
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
+        && _effectiveMovement(r) !== 'transfer_in') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
     }
   });
