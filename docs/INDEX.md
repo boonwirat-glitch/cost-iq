@@ -1,5 +1,5 @@
 # Freshket Commercial OS — Docs Index
-`docs/INDEX.md` · อัปเดต 2026-07-06
+`docs/INDEX.md` · อัปเดต 2026-07-08
 
 > **สำหรับ AI session ใหม่:** อ่านไฟล์นี้ก่อนทุกครั้ง แล้วเปิดเฉพาะไฟล์ที่เกี่ยวข้องกับงาน
 
@@ -9,6 +9,9 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
+| `docs/handoff-2026-07-08-nrr-golive.md` | **Latest — /nrr go-live (nrr_v9)** — Commission V1/V2/V2.1 ครบ, sw.js v851 whitelist fix, รอ real-login gate ก่อน merge main |
+| `docs/NRR_ARCHITECTURE.md` | /nrr โครงสร้างโค้ด + hard rules + วิธี build ฟีเจอร์เพิ่ม |
+| `docs/NRR_RUNBOOK.md` | /nrr ops: daily/monthly/quarterly rollover + deploy/rollback |
 | `docs/handoff-2026-07-06-v847-q3-merge-complete.md` | **Latest Sense handoff — v847** — Q3 quarterly commission merge เข้า main สำเร็จ + แก้บั๊ก transfer/NRR/ghost-bar 8 จุด |
 | `docs/handoff-2026-06-14-v708.md` | Sense v708 (ก่อนหน้า Q3 work) |
 | `docs/handoff-2026-06-24-all-views-complete.md` | Latest QNRR handoff — all 4 views validated (ก่อน Q3 quarterly) |

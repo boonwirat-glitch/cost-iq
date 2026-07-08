@@ -1,0 +1,372 @@
+// ── nrr_data.js — R2 CSV fetch + parse for /nrr ──────────────────────────
+// parseCSVRow ported verbatim from src/02_data_pipeline.js (repo-wide
+// convention — no external CSV library anywhere in this codebase).
+// The bulkQnrrData shape built here matches EXACTLY what Sense's own
+// bulk-qnrr-single handler builds (src/02_data_pipeline.js:1120-1176),
+// including the 29-column order, so nrr_logic.js's ported _qnrrCompute
+// works unmodified against it.
+
+var R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+
+window.bulkQnrrData = { loaded: false };
+
+function parseCSVRow(row) {
+  var fields = []; var cur = ''; var inQ = false;
+  for (var i = 0; i < row.length; i++) {
+    var c = row[i];
+    if (inQ) {
+      if (c === '"' && row[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') { inQ = false; }
+      else { cur += c; }
+    } else {
+      if (c === '"') { inQ = true; }
+      else if (c === ',') { fields.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
+function _nrrParseQnrrCsv(text) {
+  var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
+  var byKamEmail = {}, byTlEmail = {}, allRows = [];
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0] || !p[1]) return;
+    var row = {
+      period_month:            (p[0] || '').trim(),
+      movement_type:           (p[1] || '').trim(),
+      transfer_scope:          (p[2] || '').trim(),
+      current_portfolio:       (p[3] || '').trim(),
+      current_staff_owner:     (p[4] || '').trim(),
+      base_portfolio:          (p[5] || '').trim(),
+      base_staff_owner:        (p[6] || '').trim(),
+      outlet_id:               (p[7] || '').trim(),
+      account_id:              (p[8] || '').trim(),
+      account_name:            (p[9] || '').trim(),
+      res_name:                (p[10] || '').trim(),
+      account_type:            (p[11] || '').trim(),
+      cohort_month:            (p[12] || '').trim(),
+      curr_gmv:                parseFloat(p[13]) || 0,
+      base_gmv:                parseFloat(p[14]) || 0,
+      base_days:               parseInt(p[15], 10) || 31,
+      curr_days:               parseInt(p[16], 10) || 30,
+      first_dollar_date:       (p[17] || '').trim(),
+      first_portfolio_date:    (p[18] || '').trim(),
+      first_dollar_owner:      (p[19] || '').trim(),
+      new_user_exp_date:       (p[20] || '').trim(),
+      latest_tl:               (p[21] || '').trim(),
+      base_tl:                 (p[22] || '').trim(),
+      latest_staff_owner:      (p[23] || '').trim(),
+      latest_commercial_owner: (p[24] || '').trim(),
+      latest_kam_email:        (p[25] || '').trim(),
+      latest_tl_email:         (p[26] || '').trim(),
+      base_kam_email:          (p[27] || '').trim(),
+      base_tl_email:           (p[28] || '').trim()
+    };
+    allRows.push(row);
+    // Blank latest_kam_email/latest_tl_email rows (a handful exist in real
+    // data) are intentionally left out of the per-person indices but still
+    // land in allRows — org/admin-scope aggregation must never depend on a
+    // per-person key being present (see docs on the v840-class bug).
+    if (row.latest_kam_email) {
+      if (!byKamEmail[row.latest_kam_email]) byKamEmail[row.latest_kam_email] = [];
+      byKamEmail[row.latest_kam_email].push(row);
+    }
+    if (row.latest_tl_email) {
+      if (!byTlEmail[row.latest_tl_email]) byTlEmail[row.latest_tl_email] = [];
+      byTlEmail[row.latest_tl_email].push(row);
+    }
+  });
+  return { byKamEmail: byKamEmail, byTlEmail: byTlEmail, allRows: allRows };
+}
+
+async function nrrFetchQnrrCsv(force) {
+  if (window.bulkQnrrData && window.bulkQnrrData.loaded && !force) return window.bulkQnrrData;
+  var url = R2_BASE + '/' + QNRR_CFG.csv_file + '?cb=' + Date.now();
+  var lastErr = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var parsed = _nrrParseQnrrCsv(text);
+      window.bulkQnrrData = {
+        byKamEmail: parsed.byKamEmail,
+        byTlEmail: parsed.byTlEmail,
+        allRows: parsed.allRows,
+        loaded: true,
+        loadedAt: Date.now()
+      };
+      return window.bulkQnrrData;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) await new Promise(function (r) { setTimeout(r, 800 * (attempt + 1)); });
+    }
+  }
+  console.warn('[nrr] failed to load ' + QNRR_CFG.csv_file, lastErr);
+  throw lastErr;
+}
+window.nrrFetchQnrrCsv = nrrFetchQnrrCsv;
+
+// List of distinct TLs present in the data (email + display name), sorted
+// by display name — drives the cross-team comparison table (admin only).
+function nrrListTeams() {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return [];
+  var seen = {};
+  var out = [];
+  (qd.allRows || []).forEach(function (r) {
+    var email = r.latest_tl_email;
+    if (!email || seen[email]) return;
+    seen[email] = true;
+    out.push({ email: email, name: r.latest_tl || email });
+  });
+  out.sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+  return out;
+}
+window.nrrListTeams = nrrListTeams;
+
+// List of distinct KAMs within a team (by latest_tl_email), for the
+// Team -> KAM drill-down.
+function nrrListKamsForTeam(tlEmail) {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return [];
+  var seen = {};
+  var out = [];
+  (qd.byTlEmail[tlEmail] || []).forEach(function (r) {
+    var email = r.latest_kam_email;
+    if (!email || seen[email]) return;
+    seen[email] = true;
+    out.push({ email: email, name: r.latest_staff_owner || email });
+  });
+  out.sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+  return out;
+}
+window.nrrListKamsForTeam = nrrListKamsForTeam;
+
+// ── PM / Admin portfolio views ───────────────────────────────────────────
+// pm_view.csv / admin_view.csv come from DIFFERENT SQL sources
+// (sql/q3_2026_movement_pm_view.sql, .../admin_view.sql) with a SMALLER
+// 21-column schema — no latest_kam_email/latest_tl_email/latest_tl/base_tl
+// at all, because PM/Admin portfolios have no per-KAM/TL ownership concept.
+// PM rows are ~99% staff-attributed by NAME (no email); Admin rows are ~99%
+// blank. Neither can be grouped by person reliably, so both are grouped by
+// account_type (SA/MC vs Chain) instead — see nrrAccountBucket() below.
+window.bulkPmData = { loaded: false };
+window.bulkAdminData = { loaded: false };
+
+function _nrrParsePortfolioCsv(text) {
+  var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
+  var allRows = [];
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0] || !p[1]) return;
+    allRows.push({
+      period_month:         (p[0] || '').trim(),
+      movement_type:        (p[1] || '').trim(),
+      transfer_scope:       (p[2] || '').trim(),
+      current_portfolio:    (p[3] || '').trim(),
+      current_staff_owner:  (p[4] || '').trim(),
+      base_portfolio:       (p[5] || '').trim(),
+      base_staff_owner:     (p[6] || '').trim(),
+      outlet_id:            (p[7] || '').trim(),
+      account_id:           (p[8] || '').trim(),
+      account_name:         (p[9] || '').trim(),
+      res_name:             (p[10] || '').trim(),
+      account_type:         (p[11] || '').trim(),
+      cohort_month:         (p[12] || '').trim(),
+      curr_gmv:             parseFloat(p[13]) || 0,
+      base_gmv:             parseFloat(p[14]) || 0,
+      base_days:            parseInt(p[15], 10) || 31,
+      curr_days:            parseInt(p[16], 10) || 30,
+      first_dollar_date:    (p[17] || '').trim(),
+      first_portfolio_date: (p[18] || '').trim(),
+      first_dollar_owner:   (p[19] || '').trim(),
+      new_user_exp_date:    (p[20] || '').trim()
+    });
+  });
+  return allRows;
+}
+
+// Shared fetch for both portfolio-view files. Returns {allRows, loaded}
+// or {allRows:[], loaded:false, notFound:true} on 404 — callers must show
+// an explicit "PM/Admin data not available yet" state, never fail silently
+// (this file is genuinely not uploaded to R2 as of first implementation —
+// confirmed 404 when checked directly).
+async function _nrrFetchPortfolioCsv(filename) {
+  var url = R2_BASE + '/' + filename + '?cb=' + Date.now();
+  try {
+    var res = await fetch(url);
+    if (res.status === 404) return { allRows: [], loaded: false, notFound: true };
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    return { allRows: _nrrParsePortfolioCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load ' + filename, e);
+    return { allRows: [], loaded: false, error: e.message };
+  }
+}
+
+async function nrrFetchPmCsv(force) {
+  if (window.bulkPmData.loaded && !force) return window.bulkPmData;
+  window.bulkPmData = await _nrrFetchPortfolioCsv('pm_view.csv');
+  return window.bulkPmData;
+}
+window.nrrFetchPmCsv = nrrFetchPmCsv;
+
+async function nrrFetchAdminCsv(force) {
+  if (window.bulkAdminData.loaded && !force) return window.bulkAdminData;
+  window.bulkAdminData = await _nrrFetchPortfolioCsv('admin_view.csv');
+  return window.bulkAdminData;
+}
+window.nrrFetchAdminCsv = nrrFetchAdminCsv;
+
+// VP view — ALL THREE portfolios pooled (KAM+PM+ADMIN as one book). Same
+// 21-col schema as pm/admin views; produced by sql/q3_2026_movement_vp_view.sql.
+// 404-graceful like the others: until vp_view.csv is uploaded to R2 the
+// hero falls back to the KAM headline and the ภาพรวม switcher option hides.
+window.bulkVpData = { loaded: false };
+
+async function nrrFetchVpCsv(force) {
+  if (window.bulkVpData.loaded && !force) return window.bulkVpData;
+  window.bulkVpData = await _nrrFetchPortfolioCsv('vp_view.csv');
+  return window.bulkVpData;
+}
+window.nrrFetchVpCsv = nrrFetchVpCsv;
+
+// Single place that maps account_type -> the 2 buckets the business cares
+// about ('Unknown' and any unexpected value fall into 'other', confirmed
+// ~1 stray row in real pm_view.csv).
+function nrrAccountBucket(row) {
+  var t = (row.account_type || '').trim();
+  if (t === 'Chain') return 'chain';
+  if (t === 'SA' || t === 'MC') return 'sa_mc';
+  return 'other';
+}
+window.nrrAccountBucket = nrrAccountBucket;
+
+// ── Commission V2 — per-KAM upsell bundle (lazy, on-demand) ─────────────
+// Mirrors src/02_data_pipeline.js's per-KAM bundle handler exactly: same
+// R2_BASE, same safe-key derivation, same "no kam_email column" format
+// (that column only exists in the ALL-KAMs bulk file, not the per-KAM one —
+// confirmed by reading the real parser, not assumed from the SQL header
+// comment, which describes the bulk file's 7 cols, not this 6-col one).
+var nrrUpsellBundleCache = {}; // { [email]: {data, baselineGroups, loaded} }
+var nrrUpsellBundleInFlight = {};
+
+function _nrrKamSafeKey(email) {
+  return (email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
+
+var _TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+                  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+function nrrThMonthLabel(d) { return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543); }
+
+// Rolling, "today"-relative 3-month window — matches 02_data_pipeline.js's
+// _p1BaselineLabels exactly (lag-1 anchor, months 1/2/3 back from there).
+// NOTE: this is deliberately NOT the quarterly-pinned base_month window —
+// P1's "has this outlet ever bought this group" check floats with today's
+// date in the real system too; only P3's baseline magnitude is quarter-pinned
+// (see nrrP3WindowLabels). Faithfully replicating both, not "fixing" either.
+function nrrP1BaselineLabels() {
+  var lag = new Date(); lag.setDate(lag.getDate() - 1);
+  var set = {};
+  [1, 2, 3].forEach(function (i) {
+    var d = new Date(lag.getFullYear(), lag.getMonth() - i, 1);
+    set[nrrThMonthLabel(d)] = true;
+  });
+  return set;
+}
+
+function nrrCommCurrentMonthLabel() {
+  var lag = new Date(); lag.setDate(lag.getDate() - 1);
+  return nrrThMonthLabel(lag);
+}
+
+// Quarterly-pinned window: labels for baseMonthIso ('2026-06') and the
+// (count-1) months before it — matches 07a_commission_engine.js's
+// _commBaseMonthLabels(baseMonthOverride, count) exactly.
+function nrrP3WindowLabels(baseMonthIso, count) {
+  var parts = baseMonthIso.split('-');
+  var yr = parseInt(parts[0], 10), mo = parseInt(parts[1], 10); // mo is 1-based
+  var out = [];
+  for (var i = 0; i < count; i++) {
+    var d = new Date(yr, mo - 1 - i, 1);
+    out.push(nrrThMonthLabel(d));
+  }
+  return out;
+}
+window.nrrP3WindowLabels = nrrP3WindowLabels;
+window.nrrCommCurrentMonthLabel = nrrCommCurrentMonthLabel;
+
+function nrrDaysInLabel(label) {
+  try {
+    var parts = label.split(' ');
+    var mIdx = _TH_MONTHS.indexOf(parts[0]);
+    var year = parseInt(parts[1], 10) - 543;
+    if (mIdx < 0 || !year) return 30;
+    return new Date(year, mIdx + 1, 0).getDate();
+  } catch (e) { return 30; }
+}
+window.nrrDaysInLabel = nrrDaysInLabel;
+
+async function nrrFetchUpsellBundle(kamEmail) {
+  if (nrrUpsellBundleCache[kamEmail] && nrrUpsellBundleCache[kamEmail].loaded) return nrrUpsellBundleCache[kamEmail];
+  if (nrrUpsellBundleInFlight[kamEmail]) return nrrUpsellBundleInFlight[kamEmail];
+  var safeKey = _nrrKamSafeKey(kamEmail);
+  var url = R2_BASE + '/sense_upsell_' + safeKey + '.csv?cb=' + Date.now();
+  var p = (async function () {
+    try {
+      var res = await fetch(url);
+      if (res.status === 404) return { data: {}, baselineGroups: {}, loaded: false, notFound: true };
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+      if (lines.length && /account_id/i.test(lines[0])) lines = lines.slice(1);
+
+      var p1Labels = nrrP1BaselineLabels();
+      var currLabel = nrrCommCurrentMonthLabel();
+      var data = {};             // accountId -> outletId -> groupKey -> monthLabel -> {existingGmv,totalGmv}
+      var baselineGroups = {};   // accountId -> outletId -> Set-like object of groupKey -> true
+
+      lines.forEach(function (l) {
+        // Per-KAM bundle has NO kam_email column: account_id, outlet_id,
+        // month_label, group_key, existing_gmv, total_gmv (6 cols).
+        var p = parseCSVRow(l);
+        var accountId = (p[0] || '').trim();
+        var outletId = (p[1] || '').trim();
+        var monthLabel = (p[2] || '').trim();
+        var groupKey = (p[3] || '').trim();
+        var existingGmv = parseFloat(p[4]) || 0;
+        var totalGmv = parseFloat(p[5]) || 0;
+        if (!accountId || !outletId || !monthLabel || !groupKey) return;
+
+        if (!data[accountId]) data[accountId] = {};
+        if (!data[accountId][outletId]) data[accountId][outletId] = {};
+        if (!data[accountId][outletId][groupKey]) data[accountId][outletId][groupKey] = {};
+        data[accountId][outletId][groupKey][monthLabel] = { existingGmv: existingGmv, totalGmv: totalGmv };
+
+        if (monthLabel !== currLabel && totalGmv > 0 && p1Labels[monthLabel]) {
+          if (!baselineGroups[accountId]) baselineGroups[accountId] = {};
+          if (!baselineGroups[accountId][outletId]) baselineGroups[accountId][outletId] = {};
+          baselineGroups[accountId][outletId][groupKey] = true;
+        }
+      });
+
+      var bundle = { data: data, baselineGroups: baselineGroups, loaded: true, loadedAt: Date.now() };
+      nrrUpsellBundleCache[kamEmail] = bundle;
+      return bundle;
+    } catch (e) {
+      console.warn('[nrr] failed to load upsell bundle for ' + kamEmail, e);
+      return { data: {}, baselineGroups: {}, loaded: false, error: e.message };
+    } finally {
+      delete nrrUpsellBundleInFlight[kamEmail];
+    }
+  })();
+  nrrUpsellBundleInFlight[kamEmail] = p;
+  return p;
+}
+window.nrrFetchUpsellBundle = nrrFetchUpsellBundle;

@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v850';
+const CACHE_NAME = 'sense-v851';
 const APP_URL = '/index.html';
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
@@ -74,8 +74,16 @@ self.addEventListener('activate', event => {
 });
 
 // ── Fetch: handle navigation requests only ───────────────────────────────────
+// v851: intercept ONLY the Sense app shell ('/' and '/index.html'). Before
+// this, EVERY navigation (including /nrr and /dashboard) was answered with
+// the cached index.html — so any browser that had ever opened Sense would
+// get the Sense shell when navigating to sibling pages. Whitelisting the
+// shell frees /nrr, /dashboard, and any future sibling page to load from
+// the network on their own release cadence, untouched by this cache.
 self.addEventListener('fetch', event => {
   if (event.request.mode !== 'navigate') return;
+  const path = new URL(event.request.url).pathname;
+  if (path !== '/' && path !== '/index.html') return; // sibling pages → network
 
   event.respondWith(handleNavigate());
 });
