@@ -17,6 +17,7 @@ bundler). Modules (inject order matters — dependencies before dependents):
   nrr_logic.js       ported _qnrrCompute (source of truth: src/07c_qnrr_view.js)
   nrr_data.js        R2 CSV fetch/parse, builds window.bulkQnrrData
   nrr_core.js        Supabase auth, role gate (tl/admin only), fmt helpers, CountUp
+  nrr_router.js      hash router (#/ dashboard · #/portfolio · #/account) + role guards
   nrr_aggregate.js   org/team/KAM/outlet rollups on top of nrr_logic
   nrr_commission.js  reads commission_payout_snapshots (no re-derivation)
   nrr_notes.js       outlet notes (nrr_outlet_notes table — requires manual DB migration, degrades gracefully if missing)
@@ -38,6 +39,7 @@ nrr_components_css = read('src/nrr/nrr_components.css')
 nrr_logic        = read('src/nrr/nrr_logic.js')
 nrr_data         = read('src/nrr/nrr_data.js')
 nrr_core         = read('src/nrr/nrr_core.js')
+nrr_router       = read('src/nrr/nrr_router.js')
 nrr_aggregate    = read('src/nrr/nrr_aggregate.js')
 nrr_commission   = read('src/nrr/nrr_commission.js')
 nrr_notes        = read('src/nrr/nrr_notes.js')
@@ -51,6 +53,7 @@ SLOTS = [
     ('<!-- INJECT_LOGIC -->',          nrr_logic,           'script'),
     ('<!-- INJECT_DATA -->',           nrr_data,            'script'),
     ('<!-- INJECT_CORE -->',           nrr_core,            'script'),
+    ('<!-- INJECT_ROUTER -->',         nrr_router,          'script'),
     ('<!-- INJECT_AGGREGATE -->',      nrr_aggregate,       'script'),
     ('<!-- INJECT_COMMISSION -->',     nrr_commission,      'script'),
     ('<!-- INJECT_NOTES -->',          nrr_notes,           'script'),

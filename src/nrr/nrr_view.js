@@ -60,7 +60,36 @@ async function nrrInitApp() {
     nrrCommSelectedPeriod = e.target.value;
     nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
   });
+
+  // ── Router wiring — see nrr_router.js ──
+  nrrRouterRegister('dashboard', function () {
+    // Dashboard DOM stays rendered by nrrRenderAll(); nothing to re-render
+    // on route entry. Re-arm the scrollspy in case sections re-appeared.
+    nrrInitScrollspy();
+  });
+  nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
+  nrrRouterRegister('account', nrrRenderAccountView);
+
   await nrrRefresh(false);
+  nrrHandleRoute();
+}
+
+// ── Portfolio layer views (Phase A: placeholders — real build in Phase B/C) ──
+function nrrRenderPortfolioLayerView(route) {
+  var body = document.getElementById('nrr-portfolio-body');
+  if (!body) return;
+  body.innerHTML =
+    '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
+    '<div class="sub" style="margin-top:6px">มุมมองร้านในมือราย KAM (pace, churn signals, drill-down ราย SKU) — เร็วๆ นี้</div>' +
+    '<div class="micro" style="margin-top:12px"><a href="#/" style="color:var(--green-deep)">← กลับ Dashboard</a></div>';
+}
+function nrrRenderAccountView(route) {
+  var body = document.getElementById('nrr-account-body');
+  if (!body) return;
+  body.innerHTML =
+    '<div class="nrr-panel-head"><div class="h2">Account</div></div>' +
+    '<div class="sub" style="margin-top:6px">หน้าเจาะลึกรายร้าน — เร็วๆ นี้</div>' +
+    '<div class="micro" style="margin-top:12px"><a href="#/portfolio" style="color:var(--green-deep)">← กลับ Portfolio</a></div>';
 }
 window.nrrInitApp = nrrInitApp;
 
@@ -90,18 +119,25 @@ function nrrShellHtml() {
     '    <div class="eyebrow">NRR ไตรมาส · ' + nrrEsc(QNRR_CFG.quarter.toUpperCase()) + '</div>' +
     '    <div class="nrr-masthead-h">Portfolio Notebook</div>' +
     '  </div>' +
+    '  <div class="nrr-masthead-nav">' +
+    '  <nav class="seg nrr-appnav" id="nrr-appnav">' +
+    '    <a href="#/" data-view="dashboard" class="on">Dashboard</a>' +
+    '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
+    '  </nav>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
     '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
     '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
     '    <a href="#nrr-sec-pm" data-sec="nrr-sec-pm">PM</a>' +
     '    <a href="#nrr-sec-admin" data-sec="nrr-sec-admin">Admin</a>' +
     '  </nav>' +
+    '  </div>' +
     '  <div class="nrr-masthead-actions">' +
     '    <span class="meta nrr-month-capsule" id="nrr-month-capsule">—</span>' +
     '    <span class="micro" id="nrr-sync-status">—</span>' +
     '    <button class="btn-secondary" id="nrr-refresh-btn">รีเฟรช</button>' +
     '  </div>' +
     '</div>' +
+    '<div class="nrr-view" id="nrr-view-dashboard">' +
     '<div class="nrr-page">' +
     '  <div class="nrr-section" id="nrr-sec-pulse" style="animation-delay:.02s"><div class="nrr-panel-body" id="nrr-pulse-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-teams" style="animation-delay:.06s"><div class="nrr-takeaway micro" id="nrr-teams-takeaway"></div><div class="nrr-team-cards" id="nrr-team-cards"></div></div>' +
@@ -129,6 +165,13 @@ function nrrShellHtml() {
     '    <b>%NRR</b> = GMV เดือนปัจจุบัน (normalize เป็น 30 วัน) ของร้านค้าที่ยัง active หรือกลับมาซื้อ หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' (ปรับด้วย transfer เข้า/ออก) · ตัวเลขที่มี <span class="nrr-rr-proj">~</span> คือ run-rate คาดการณ์จาก MTD ÷ วันที่ผ่านมา × 30 · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time' +
     '  </div></div>' +
     '</div>' +
+    '</div>' +
+    '<div class="nrr-view" id="nrr-view-portfolio" hidden><div class="nrr-page">' +
+    '  <div class="nrr-section"><div class="nrr-panel-body" id="nrr-portfolio-body"></div></div>' +
+    '</div></div>' +
+    '<div class="nrr-view" id="nrr-view-account" hidden><div class="nrr-page">' +
+    '  <div class="nrr-section"><div class="nrr-panel-body" id="nrr-account-body"></div></div>' +
+    '</div></div>' +
     '<div id="nrr-slideover-backdrop"></div>' +
     '<div class="float" id="nrr-slideover">' +
     '  <div class="nrr-slideover-head"><div><div class="nrr-sh-title" id="nrr-slideover-title">ร้านค้า</div><div class="meta" id="nrr-slideover-sub"></div></div><button class="nrr-sh-close" id="nrr-slideover-close">✕</button></div>' +
@@ -653,13 +696,44 @@ function nrrRenderCommissionSection() {
     '</div>';
 }
 
+// Pace-based estimate for one beneficiary for one quarter month — the SAME
+// math as the per-row fallback in nrrCommissionRowsHtml, extracted so the
+// hero and the trend bars sum the exact same numbers the rows display.
+// Returns null when the month has no GMV data yet (future months) so
+// callers can render "pending" instead of a fake zero.
+function nrrCommEstimateFor(email, kind, month) {
+  var result = kind === 'tl' ? nrrTeamResult(email) : nrrKamResult(email);
+  if (!result || !result.by_month || !result.by_month[month]) return null;
+  var triple = nrrMonthTriple(result, month);
+  if (!triple || !(triple.base > 0)) return null;
+  return nrrEstimateCommission([{ totalGMV: triple.run_rate, baseline: triple.base }]);
+}
+
 function nrrCommissionHeroHtml(isAdmin, period) {
   if (isAdmin) {
-    var orgEmails = nrrListTeams().map(function (t) { return t.email; });
-    var sums = nrrSumLatestPayouts(orgEmails);
-    return '<div class="ds-hero"><div class="ds-hero-eyebrow">Commission · องค์กร</div>' +
-      '<div class="ds-hero-number">' + nrrFmtGMV(sums.total) + '</div>' +
-      '<div class="ds-hero-sub">snapshot ' + sums.found + '/' + orgEmails.length + ' ทีม · payout เดือนล่าสุดที่ lock แล้ว</div></div>';
+    var teams = nrrListTeams();
+    var total = 0, snapCount = 0, estCount = 0, statuses = [];
+    teams.forEach(function (t) {
+      var snap = nrrLatestSnapshotFor(t.email);
+      if (snap) {
+        total += Number(snap.payout_amount || 0);
+        snapCount++;
+        statuses.push(snap.snapshot_status);
+      } else {
+        var est = nrrCommEstimateFor(t.email, 'tl', period);
+        if (est) { total += est.est; estCount++; }
+      }
+    });
+    var stamp;
+    if (estCount > 0) stamp = nrrCommStampHtml('estimate');
+    else if (statuses.length && statuses.every(function (s) { return s === 'final'; })) stamp = nrrCommStampHtml('final');
+    else stamp = nrrCommStampHtml(statuses[0] || 'draft');
+    var sub = estCount > 0
+      ? 'snapshot ' + snapCount + '/' + teams.length + ' ทีม · รวมค่าประมาณ pace-based ' + estCount + ' ทีม (' + nrrEsc(QNRR_CFG.months_th[period] || period) + ')'
+      : 'snapshot ' + snapCount + '/' + teams.length + ' ทีม · payout เดือนล่าสุดที่ lock แล้ว';
+    return '<div class="ds-hero"><div class="ds-hero-eyebrow">Commission · องค์กร ' + stamp + '</div>' +
+      '<div class="ds-hero-number">' + nrrFmtGMV(total) + '</div>' +
+      '<div class="ds-hero-sub">' + sub + '</div></div>';
   }
 
   var mySnap = nrrLatestSnapshotFor(nrrProfile.email);
@@ -690,18 +764,26 @@ function nrrCommissionHeroHtml(isAdmin, period) {
 function nrrCommissionTrendHtml(isAdmin) {
   var trendEmails = isAdmin ? nrrListTeams().map(function (t) { return t.email; }) : [nrrProfile.email];
   var bars = QNRR_CFG.q_months.map(function (m) {
-    var v = 0; var has = false;
+    var v = 0; var has = false; var estUsed = false;
     trendEmails.forEach(function (email) {
       var row = nrrSnapshotsForEmailAcrossMonths(email)[m];
-      if (row && row.payout_amount != null) { v += Number(row.payout_amount) || 0; has = true; }
+      if (row && row.payout_amount != null) {
+        v += Number(row.payout_amount) || 0; has = true;
+      } else {
+        // No snapshot for this beneficiary+month → pace-based estimate.
+        // Future months return null (no GMV rows yet) and stay pending.
+        var est = nrrCommEstimateFor(email, 'tl', m);
+        if (est) { v += est.est; has = true; estUsed = true; }
+      }
     });
-    return { month: m, v: v, has: has };
+    return { month: m, v: v, has: has, est: estUsed };
   });
   var maxV = Math.max.apply(null, [1].concat(bars.map(function (b) { return b.v; })));
   var barsHtml = bars.map(function (b) {
     var h = b.has ? Math.max(8, Math.round(b.v / maxV * 100)) : 8;
-    var label = (QNRR_CFG.months_th[b.month] || b.month) + ': ' + (b.has ? nrrFmtGMV(b.v) : 'ยังไม่มี snapshot');
-    return '<div class="ds-spark-bar' + (b.has ? ' active' : '') + '" style="height:' + h + '%" title="' + nrrEsc(label) + '"></div>';
+    var label = (QNRR_CFG.months_th[b.month] || b.month) + ': ' +
+      (b.has ? (b.est ? '~' : '') + nrrFmtGMV(b.v) + (b.est ? ' (ประมาณการ)' : '') : 'ยังไม่มี snapshot');
+    return '<div class="ds-spark-bar' + (b.has ? (b.est ? ' est' : ' active') : '') + '" style="height:' + h + '%" title="' + nrrEsc(label) + '"></div>';
   }).join('');
   var labelsHtml = bars.map(function (b) {
     return '<span>' + nrrEsc((QNRR_CFG.months_th[b.month] || b.month).split(' ')[0]) + '</span>';

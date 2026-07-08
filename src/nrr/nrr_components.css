@@ -21,6 +21,26 @@
 .nrr-subnav { }
 .nrr-month-capsule { white-space: nowrap; }
 
+/* App-level nav (Dashboard · Portfolio) + in-page scrollspy subnav sit
+   together; the router hides the subnav outside the dashboard view. */
+.nrr-masthead-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nrr-appnav a { font-weight: 700; }
+
+/* Router views — siblings toggled with [hidden]; !important beats any
+   display rule a child layout class might set later. */
+.nrr-view[hidden] { display: none !important; }
+
+/* First responsive pass — the portfolio layer is rep-facing (mobile-first
+   users); the dashboard stays desktop-first. Masthead must not overflow. */
+@media (max-width: 640px) {
+  .nrr-masthead { padding: 12px 16px; gap: 10px; }
+  .nrr-masthead-h { font-size: 18px; }
+  .nrr-masthead-actions { gap: 8px; }
+  .nrr-masthead-actions #nrr-sync-status { display: none; }
+  .nrr-page { padding: 0 16px 80px; }
+  .nrr-section { padding: 28px 0; }
+}
+
 /* fade-up entrance + section rhythm: whitespace + hairline, not boxes */
 .nrr-section {
   opacity: 0; transform: translateY(20px);
@@ -356,6 +376,11 @@
 .nrr-comm-ds .ds-spark { display: flex; align-items: flex-end; gap: 12px; height: 56px; margin-top: 10px; max-width: 340px; }
 .nrr-comm-ds .ds-spark-bar { flex: 1; min-height: 6px; border-radius: 6px 6px 3px 3px; background: var(--fill-deep); }
 .nrr-comm-ds .ds-spark-bar.active { background: var(--green); }
+/* estimate bar — sun hatch, matching the ESTIMATE stamp's "ยังไม่ใช่เงินจริง" language */
+.nrr-comm-ds .ds-spark-bar.est {
+  background: repeating-linear-gradient(135deg, var(--sun-soft), var(--sun-soft) 4px, rgba(166, 127, 14, 0.35) 4px, rgba(166, 127, 14, 0.35) 6px);
+  border: 1px solid var(--sun-deep);
+}
 .nrr-comm-ds .ds-spark-labels { display: flex; gap: 12px; margin-top: 6px; max-width: 340px; }
 .nrr-comm-ds .ds-spark-labels span { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink3); }
 
