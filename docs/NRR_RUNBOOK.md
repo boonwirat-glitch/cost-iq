@@ -6,6 +6,26 @@
 
 ---
 
+## ⚠️ 0. `_redirects` ต้องว่างเปล่า — ห้ามเพิ่ม rule กลับเข้าไป
+
+**พบ 2026-07-08:** `/dashboard` และ `/nrr` เคยเข้าไม่ได้เลยบน production (`freshket-sense.pages.dev`)
+— ทุก request ขึ้น `HTTP 308` redirect กลับไปที่ path เดิมของตัวเอง (วนลูป) ทั้งที่ deploy
+สำเร็จปกติทุกอย่าง สืบจนหมดแล้ว (Zero Trust — ไม่เคยตั้งค่า, Zone Redirect Rules — ไม่มี
+custom domain เลยใช้ไม่ได้ตั้งแต่ต้น, Bulk Redirects — 0 lists, Pages Functions/`_worker.js` —
+ไม่มีในโค้ด) สาเหตุจริงคือ **rule ที่เขียนเองใน `_redirects`**
+(`/dashboard → /dashboard.html status 200` และ `/nrr → /nrr.html status 200`)
+**ชนกับกลไก "clean URL" อัตโนมัติของ Cloudflare Pages เอง** (ที่เสิร์ฟ `name.html` ให้ `/name`
+โดยอัตโนมัติอยู่แล้วโดยไม่ต้องมี rule เลย) จนเกิด loop
+
+**แก้แล้วโดยลบเนื้อหา `_redirects` ทิ้งทั้งหมด** (ปล่อยให้ Cloudflare จัดการ clean-URL เอง) —
+ยืนยันแล้วว่า `/dashboard` และ `/nrr` ใช้ content ถูกต้อง (ไม่ fallback ไปหน้า Sense ผิดๆ)
+
+**ถ้าจะเพิ่มหน้าใหม่ในอนาคต (`/xyz`) ไม่ต้องเขียน `_redirects` rule เลย** — แค่ตั้งชื่อไฟล์
+`xyz.html` ที่ repo root แล้ว Cloudflare จะเสิร์ฟให้ตอนเข้า `/xyz` เองอัตโนมัติ — **ห้ามเขียน
+`_redirects` rule แบบ `/xyz → /xyz.html status 200` อีก จะกลับไป loop เหมือนเดิม**
+
+---
+
 ## 1. Daily — ไม่มีงานใหม่
 
 CSV ทุกไฟล์รีเฟรชผ่านกระบวนการอัปโหลด R2 เดิมที่ Sense ใช้อยู่ (external/manual,
