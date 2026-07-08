@@ -9,7 +9,8 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
-| `docs/handoff-2026-07-08-nrr-golive.md` | **Latest — /nrr go-live (nrr_v9)** — Commission V1/V2/V2.1 ครบ, sw.js v851 whitelist fix, รอ real-login gate ก่อน merge main |
+| `docs/handoff-2026-07-08-nrr-transfer-in-fix.md` | **Latest — nrr_v10** — แก้บั๊กนับฐาน transfer_in ซ้ำ (Tape 92%→99%, org 105%→107%) ⚠️ Sense 07c ยังมีบั๊ก รอแก้ตาม |
+| `docs/handoff-2026-07-08-nrr-golive.md` | /nrr go-live (nrr_v9) — Commission V1/V2/V2.1 ครบ, sw.js v851 whitelist fix, `_redirects` 308-loop fix |
 | `docs/NRR_ARCHITECTURE.md` | /nrr โครงสร้างโค้ด + hard rules + วิธี build ฟีเจอร์เพิ่ม |
 | `docs/NRR_RUNBOOK.md` | /nrr ops: daily/monthly/quarterly rollover + deploy/rollback |
 | `docs/handoff-2026-07-06-v847-q3-merge-complete.md` | **Latest Sense handoff — v847** — Q3 quarterly commission merge เข้า main สำเร็จ + แก้บั๊ก transfer/NRR/ghost-bar 8 จุด |

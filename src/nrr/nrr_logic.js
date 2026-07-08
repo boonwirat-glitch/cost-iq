@@ -11,6 +11,19 @@
 // parsing or in how this file is called — re-diff against
 // src/07c_qnrr_view.js before changing anything in _qnrrCompute itself.
 //
+// ⚠️ ONE INTENTIONAL DIVERGENCE from 07c (2026-07-08): baseMap construction
+// here additionally excludes rows whose _effectiveMovement is 'transfer_in'.
+// Without that, a transfer_in landing in the FIRST period month of the
+// quarter gets its base_gmv counted TWICE — once via baseMap, once via the
+// symmetric transfer_in adjustment below — inflating the base and deflating
+// NRR% (found via the 2026-07 PM→KAM bulk move: 44 outlets, ฿2.34M base
+// double-counted org-wide; Tape/Puttipong showed 92% instead of the correct
+// 99%). The v776 design comment in 07c itself states transfer_in outlets are
+// "ไม่อยู่ใน baseMap" — this fix restores that stated invariant. 07c still
+// carries the bug until the same one-line fix is applied there; until then
+// Sense and /nrr will disagree for any scope containing a month-1 transfer_in.
+// When 07c is fixed, this divergence note should be removed.
+//
 // Consumes window.bulkQnrrData, built by nrr_data.js in the exact same shape
 // Sense itself builds it in (src/02_data_pipeline.js, bulk-qnrr-single
 // handler): { byKamEmail:{email:[row]}, byTlEmail:{email:[row]}, allRows:[],
@@ -118,7 +131,13 @@ function _qnrrCompute(kamEmail, scope) {
   var baseMap = {};
   var baseMonthRows = scopedRows.filter(function (r) { return r.period_month === months[0]; });
   baseMonthRows.forEach(function (r) {
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
+    // transfer_in excluded (like handover): its base_gmv belongs to the
+    // PREVIOUS owner and is added exactly once by the symmetric transfer_in
+    // adjustment below. Effective (not raw) movement, so a same-team
+    // KAM↔KAM move reclassified to core_nrr at tl/admin scope stays in the
+    // base — it was this scope's outlet in the base month already.
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
+        && _effectiveMovement(r) !== 'transfer_in') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
     }
   });
@@ -332,7 +351,11 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
 
   var baseMap = {};
   bucketRows.filter(function (r) { return r.period_month === baseMonth; }).forEach(function (r) {
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover') {
+    // Same month-1 transfer_in exclusion as _qnrrCompute's baseMap (see the
+    // divergence note in the file header) — pm_view.csv carries inbound
+    // transfer_in rows too, so the pool base double-counts identically.
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
+        && effMv(r) !== 'transfer_in') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
     }
   });
