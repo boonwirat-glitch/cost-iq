@@ -31,8 +31,10 @@ async function nrrInitApp() {
     nrrHandleNoteSaveClick(e);
     var retryBtn = e.target.closest('.nrr-comm-retry-upsell-btn');
     if (retryBtn && nrrCommDrawerState) {
-      var target = document.getElementById('nrr-comm-drawer-upsell-body');
-      if (target) target.innerHTML = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
+      ['nrr-comm-drawer-p1-body', 'nrr-comm-drawer-p3-body'].forEach(function (id) {
+        var t = document.getElementById(id);
+        if (t) t.innerHTML = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
+      });
       delete nrrUpsellBundleCache[retryBtn.dataset.email];
       var snap = nrrLatestSnapshotFor(nrrCommDrawerState.kamEmail);
       var bd = snap && snap.breakdown ? snap.breakdown : null;
@@ -783,30 +785,46 @@ function nrrCommNextStepHtml(tierTable, pct) {
 // (nrrCommEstimateReceiptSteps) — one visual language regardless of lock
 // status, which is the point of this redesign.
 // Compact tier indicator for summary rows (main list + KAM-in-team list) —
-// chip + thin progress bar, no next-step prose (that's drawer-only detail).
+// v16: progress bar ONLY. The hit/bonus/miss chip lives exclusively in the
+// drawer's tier block: a row already carries %NRR in the page's threshold
+// color, so a chip repeating the same state on every row was pure noise
+// (the "everything shouts at once" problem the user flagged).
 function nrrCommTierMiniHtml(role, email, period, pct) {
   if (pct == null) return '';
   var t = nrrCommTierTable(role, email, period, pct);
-  return '<span class="nrr-comm-tier-mini" style="flex:none;margin-top:2px">' + nrrCommTierChipHtml(t) + nrrCommProgressHtml(t, pct) + '</span>';
+  return '<span class="nrr-comm-tier-mini" style="flex:none;margin-top:2px">' + nrrCommProgressHtml(t, pct) + '</span>';
 }
 
+// ── Receipt renderer — one line per formula term, four fixed columns:
+// [chevron 16px][operator 20px][label, left][amount, right]. The operator
+// (+/×/=) is its own column so labels start at the same x on every line
+// (v16 — fixes the v15 bug where flex space-between floated labels to the
+// center). Lines with a drillKey AND matching content in sectionsByKey
+// render as <details>; that includes 'multiply' lines (TL's team-upsell
+// multiplier expands to the per-KAM contributions that produced it).
+function _nrrReceiptCells(op, labelHtml, valueHtml, hasChevron) {
+  return '<span class="nrr-rcpt-chev">' + (hasChevron ? '›' : '') + '</span>' +
+    '<span class="nrr-rcpt-op">' + op + '</span>' +
+    '<span class="nrr-rcpt-label">' + labelHtml + '</span>' +
+    '<span class="nrr-rcpt-amt num">' + valueHtml + '</span>';
+}
 function nrrCommReceiptHtml(steps, sectionsByKey) {
   sectionsByKey = sectionsByKey || {};
   var rowsHtml = steps.map(function (s) {
-    if (s.kind === 'multiply') {
-      return '<div class="nrr-comm-receipt-line op"><span>× ' + nrrEsc(s.label) + '</span><span class="num">×' + Number(s.factor).toFixed(2) + '</span></div>';
-    }
-    if (s.kind === 'subtotal') {
-      return '<div class="nrr-comm-receipt-rule"></div><div class="nrr-comm-receipt-line subtotal"><span>' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
-    }
-    if (s.kind === 'total') {
-      return '<div class="nrr-comm-receipt-rule total"></div><div class="nrr-comm-receipt-line total"><span>' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
-    }
+    var op = s.kind === 'multiply' ? '×' : (s.first || s.kind === 'subtotal' || s.kind === 'total') ? '' : '+';
+    var metaHtml = s.meta ? ' <span class="nrr-rcpt-meta">' + nrrEsc(s.meta) + '</span>' : '';
+    var valueHtml = s.kind === 'multiply' ? '×' + Number(s.factor).toFixed(2) : nrrFmtGMVExact(s.amount);
     var body = s.drillKey ? sectionsByKey[s.drillKey] : null;
+    var lineCls = s.kind === 'multiply' ? ' op' : s.kind === 'subtotal' ? ' subtotal' : s.kind === 'total' ? ' total' : '';
+    var rule = s.kind === 'subtotal' ? '<div class="nrr-comm-receipt-rule"></div>'
+      : s.kind === 'total' ? '<div class="nrr-comm-receipt-rule total"></div>' : '';
     if (body) {
-      return '<details class="nrr-comm-receipt-line expandable"><summary><span>+ ' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></summary><div class="nrr-comm-receipt-detail">' + body + '</div></details>';
+      return rule + '<details class="nrr-comm-receipt-line expandable' + lineCls + '"><summary>' +
+        _nrrReceiptCells(op, nrrEsc(s.label) + metaHtml, valueHtml, true) +
+        '</summary><div class="nrr-comm-receipt-detail">' + body + '</div></details>';
     }
-    return '<div class="nrr-comm-receipt-line"><span>+ ' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
+    return rule + '<div class="nrr-comm-receipt-line' + lineCls + '">' +
+      _nrrReceiptCells(op, nrrEsc(s.label) + metaHtml, valueHtml, false) + '</div>';
   }).join('');
   return '<div class="nrr-comm-receipt">' + rowsHtml + '</div>';
 }
@@ -894,36 +912,70 @@ function nrrCommissionTrendHtml(isAdmin) {
     '<div class="ds-spark-labels">' + labelsHtml + '</div></div>';
 }
 
+// STAMP FREQUENCY RULE (v16, twin of the full table's exception-based
+// stamps): when every row in a set shares one lock status, say it ONCE at
+// the section header; a per-row stamp appears only on rows that DIFFER.
+// Returns { uniform: status|null, headerStamp, rowStamp(status) }.
+function nrrCommStatusPlan(statuses) {
+  var uniform = statuses.length && statuses.every(function (s) { return s === statuses[0]; }) ? statuses[0] : null;
+  return {
+    uniform: uniform,
+    headerStamp: uniform ? ' ' + nrrCommStampHtml(uniform, true) : '',
+    rowStamp: function (status) { return uniform ? '' : ' ' + nrrCommStampHtml(status, true); }
+  };
+}
+
+// Drill body for the TL multiplier line — which KAM's upsell pushed the
+// team multiplier (tl_upsell_base per KAM from sense_upsell_team.csv).
+function nrrCommTeamMultDrillHtml(tlEmail) {
+  var kams = nrrListKamsForTeam(tlEmail);
+  if (!kams.length || !nrrUpsellTeamCache.loaded) return null;
+  var rows = kams.map(function (k) {
+    var row = nrrUpsellTeamCache.byEmail[(k.email || '').toLowerCase()];
+    return { name: k.name, base: row ? row.tl_upsell_base : 0 };
+  }).sort(function (a, b) { return b.base - a.base; });
+  return rows.map(function (r) {
+    return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(r.name) + '</span>' +
+      '<span class="ds-row-meta">' + nrrFmtGMVExact(r.base) + '</span></div>';
+  }).join('');
+}
+
 function nrrCommissionRowsHtml(isAdmin, rows, period) {
-  var rowsHtml = rows.map(function (r) {
+  // Pass 1 — resolve each row's data so the stamp plan can see all statuses.
+  var resolved = rows.map(function (r) {
     var snap = nrrLatestSnapshotFor(r.email);
-    var nrrPct, payoutAmt, metaLabel, bd, isEstRow, stampHtml;
     if (snap) {
-      nrrPct = snap.governed_nrr_pct != null ? snap.governed_nrr_pct : snap.raw_nrr_pct;
-      payoutAmt = Number(snap.payout_amount || 0);
-      metaLabel = QNRR_CFG.months_th[snap.period_month] || snap.period_month;
-      bd = snap.breakdown || null;
-      isEstRow = false;
-      stampHtml = nrrCommStampHtml(snap.snapshot_status, true);
-    } else {
-      var result = r.kind === 'tl' ? nrrTeamResult(r.email) : nrrKamResult(r.email);
-      var bm = result && period ? result.by_month[period] : null;
-      nrrPct = bm ? bm.nrr_pct : null;
-      var est = nrrCommEstimateFor(r.email, r.kind, period);
-      payoutAmt = est ? est.est : 0;
-      metaLabel = QNRR_CFG.months_th[period] || period;
-      bd = null;
-      isEstRow = true;
-      r._estNote = est ? est.note : null;
-      stampHtml = nrrCommStampHtml('estimate', true);
+      return { r: r, snap: snap, status: snap.snapshot_status,
+        nrrPct: snap.governed_nrr_pct != null ? snap.governed_nrr_pct : snap.raw_nrr_pct,
+        payoutAmt: Number(snap.payout_amount || 0),
+        metaLabel: QNRR_CFG.months_th[snap.period_month] || snap.period_month,
+        bd: snap.breakdown || null, est: null };
     }
-    var detailHtml = bd
-      ? nrrCommissionBreakdownDetailHtml(bd)
-      : '<div class="ds-stat-row"><span class="ds-stat-label">ประมาณการ: ' + nrrEsc(r._estNote || 'ยังไม่มีข้อมูลเพียงพอ') + '</span></div>';
-    // Admin sees team rows — expand to the KAMs inside that team so a TL's
-    // number is explainable without switching accounts (user ask 2026-07-09).
-    if (r.kind === 'tl' && isAdmin) {
-      detailHtml += nrrCommissionTeamKamsHtml(r.email, period);
+    var result = r.kind === 'tl' ? nrrTeamResult(r.email) : nrrKamResult(r.email);
+    var bm = result && period ? result.by_month[period] : null;
+    var est = nrrCommEstimateFor(r.email, r.kind, period);
+    return { r: r, snap: null, status: 'estimate',
+      nrrPct: bm ? bm.nrr_pct : null, payoutAmt: est ? est.est : 0,
+      metaLabel: QNRR_CFG.months_th[period] || period, bd: null, est: est };
+  });
+  var plan = nrrCommStatusPlan(resolved.map(function (x) { return x.status; }));
+
+  var rowsHtml = resolved.map(function (x) {
+    var r = x.r;
+    var detailHtml;
+    if (r.kind === 'tl') {
+      // TL detail = the TL receipt (same visual language as the KAM drawer),
+      // multiplier line expands to per-KAM upsell contributions.
+      var steps = x.bd ? nrrCommSnapshotReceiptSteps(x.bd) : nrrCommEstimateReceiptSteps(x.est);
+      var multBody = nrrCommTeamMultDrillHtml(r.email);
+      detailHtml = steps.length
+        ? nrrCommReceiptHtml(steps, multBody ? { mult: multBody } : {})
+        : '<div class="ds-stat-row"><span class="ds-stat-label">ยังไม่มีข้อมูลเพียงพอ</span></div>';
+      if (isAdmin) detailHtml += nrrCommissionTeamKamsHtml(r.email, period);
+    } else {
+      detailHtml = x.bd
+        ? nrrCommissionBreakdownDetailHtml(x.bd)
+        : '<div class="ds-stat-row"><span class="ds-stat-label">ประมาณการ: ' + nrrEsc(x.est ? x.est.note : 'ยังไม่มีข้อมูลเพียงพอ') + '</span></div>';
     }
     // V2: click-through to the full outlet-level drill-down drawer — only
     // meaningful for KAM rows (that's what has upsell/handover/outlet detail).
@@ -935,17 +987,17 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       '<span class="ds-chev">›</span>' +
       '<span style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px">' +
       '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
-      '<span class="ds-row-meta" style="flex:none">' + (nrrPct != null ? nrrPct + '% NRR' : '— NRR') + ' · ' + nrrEsc(metaLabel) + ' ' + stampHtml + '</span>' +
-      nrrCommTierMiniHtml(r.kind, r.email, period, nrrPct) +
+      '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + (x.nrrPct != null ? x.nrrPct + '%' : '—') + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
+      nrrCommTierMiniHtml(r.kind, r.email, period, x.nrrPct) +
       '</span>' +
-      '<span class="ds-row-value" style="color:' + (isEstRow ? 'var(--sun-deep)' : 'var(--green-deep)') + '">' + nrrFmtGMVExact(payoutAmt) + '</span>' +
+      '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
       '</summary>' +
       '<div class="ds-row-detail">' + detailHtml + drillLink + '</div>' +
       '</details>';
   }).join('');
 
   return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">' +
-    (isAdmin ? 'รายทีม' : 'รายบุคคล (KAM)') + '</span></div>' + rowsHtml + '</div>';
+    (isAdmin ? 'รายทีม' : 'รายบุคคล (KAM)') + plan.headerStamp + '</span></div>' + rowsHtml + '</div>';
 }
 
 // Per-KAM rows nested inside an admin team row — same snapshot-first,
@@ -954,30 +1006,30 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
 function nrrCommissionTeamKamsHtml(tlEmail, period) {
   var kams = nrrListKamsForTeam(tlEmail);
   if (!kams.length) return '';
-  var rows = kams.map(function (k) {
+  var resolved = kams.map(function (k) {
     var snap = nrrLatestSnapshotFor(k.email);
-    var amt, stamp, pct;
     if (snap) {
-      amt = Number(snap.payout_amount || 0);
-      stamp = nrrCommStampHtml(snap.snapshot_status, true);
-      pct = snap.governed_nrr_pct != null ? snap.governed_nrr_pct : snap.raw_nrr_pct;
-    } else {
-      var est = nrrCommEstimateFor(k.email, 'kam', period);
-      amt = est ? est.est : 0;
-      stamp = nrrCommStampHtml('estimate', true);
-      pct = est ? est.pct : null;
+      return { k: k, status: snap.snapshot_status, amt: Number(snap.payout_amount || 0), snap: snap,
+        pct: snap.governed_nrr_pct != null ? snap.governed_nrr_pct : snap.raw_nrr_pct };
     }
+    var est = nrrCommEstimateFor(k.email, 'kam', period);
+    return { k: k, status: 'estimate', amt: est ? est.est : 0, snap: null, pct: est ? est.pct : null };
+  });
+  var plan = nrrCommStatusPlan(resolved.map(function (x) { return x.status; }));
+  var rows = resolved.map(function (x) {
     return '<div class="nrr-comm-kam-row">' +
       '<span style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
-      '<span class="ds-stat-label">' + nrrEsc(k.name) + (pct != null ? ' · ' + pct + '%' : '') + ' ' + stamp + '</span>' +
-      nrrCommTierMiniHtml('kam', k.email, period, pct) +
+      '<span class="ds-stat-label">' + nrrEsc(x.k.name) +
+      (x.pct != null ? ' · <span class="num" style="color:' + nrrThresholdColorVar(x.pct) + '">' + x.pct + '%</span>' : '') +
+      plan.rowStamp(x.status) + '</span>' +
+      nrrCommTierMiniHtml('kam', x.k.email, period, x.pct) +
       '</span>' +
       '<span class="nrr-comm-kam-row-right">' +
-      '<span class="num">' + nrrFmtGMVExact(amt) + '</span>' +
-      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(k.email) + '" data-name="' + nrrEsc(k.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียด →</button>' +
+      '<span class="num" style="color:' + (x.snap ? 'var(--ink)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.amt) + '</span>' +
+      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(x.k.email) + '" data-name="' + nrrEsc(x.k.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียด →</button>' +
       '</span></div>';
   }).join('');
-  return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม</span></div>' + rows;
+  return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม' + plan.headerStamp + '</span></div>' + rows;
 }
 
 // Parses commission_payout_snapshots.breakdown (jsonb) into label/value
@@ -1258,29 +1310,25 @@ function nrrRenderCommissionDrawerBody(kamEmail, period) {
     '<div class="nrr-comm-next-step">' + nrrEsc(nrrCommNextStepHtml(tierTable, pct)) + '</div>' +
     '</div>' : '';
 
-  // The receipt — one line per formula term, each optionally expandable
-  // into its account-level list. Locked and unlocked periods use the same
-  // renderer against two different (but shape-identical) step sources.
+  // The receipt — one line per formula term (NRR / P1 / P3 / Expansion /
+  // Gate / Handover — never a missing term), each expandable into its own
+  // account/group list. Locked and unlocked periods use the same renderer
+  // against two shape-identical step sources.
   var steps = bd ? nrrCommSnapshotReceiptSteps(bd) : nrrCommEstimateReceiptSteps(est);
   var outletsForKam = nrrOutletsForKam(kamEmail, period);
   var nrrOutlets = outletsForKam.filter(function (o) { return ['core_nrr', 'comeback', 'transfer_in'].indexOf(o.movement) > -1; });
   var expOutlets = outletsForKam.filter(function (o) { return o.movement === 'expansion'; });
   var handoverDetail = (bd && bd.handover && bd.handover.detail) || (est && est.handover && est.handover.detail) || [];
+  var skel = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
+  var p1p3Note = '<div class="nrr-rcpt-note">นับเฉพาะร้านนอกกลุ่ม Expansion — ร้านขยายได้ 0.5% ในบรรทัด Expansion</div>';
   var sectionsByKey = {
     nrr: nrrCommOutletListHtml(nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้'),
-    upsell: '<div id="nrr-comm-drawer-upsell-body"><div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div></div>',
+    p1: p1p3Note + '<div id="nrr-comm-drawer-p1-body">' + skel + '</div>',
+    p3: p1p3Note + '<div id="nrr-comm-drawer-p3-body">' + skel + '</div>',
+    expansion: nrrCommOutletListHtml(expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้', 0.005),
     handover: nrrCommHandoverListHtml(handoverDetail)
   };
-  // Expansion isn't a receipt line of its own (it's part of the "Upsell"
-  // sum) but still deserves its own drill list — append it after the
-  // upsell line's account content once that async fetch resolves too, so
-  // for now nest it directly under the upsell key's skeleton via a second
-  // block rendered alongside.
-  var receiptHtml = nrrCommReceiptHtml(steps, sectionsByKey);
-  var expansionHtml = '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Expansion · 0.5%</span><span class="ds-section-count">' + expOutlets.length + '</span></div>' +
-    nrrCommOutletListHtml(expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้', 0.005) + '</div>';
-
-  el.innerHTML = heroHtml + tierHtml + receiptHtml + expansionHtml;
+  el.innerHTML = heroHtml + tierHtml + nrrCommReceiptHtml(steps, sectionsByKey);
 
   var expansionOutletIds = new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); }));
   nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd);
@@ -1291,16 +1339,21 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd) {
     // Stale-guard: user may have closed/reopened the drawer for a different KAM
     // (or a different period) while this fetch was in flight.
     if (!nrrCommDrawerState || nrrCommDrawerState.kamEmail !== kamEmail) return;
-    var target = document.getElementById('nrr-comm-drawer-upsell-body');
-    if (!target) return;
+    var p1Target = document.getElementById('nrr-comm-drawer-p1-body');
+    var p3Target = document.getElementById('nrr-comm-drawer-p3-body');
+    if (!p1Target && !p3Target) return;
     if (!bundle.loaded) {
-      target.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div>' +
+      var failHtml = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div>' +
         '<div class="ds-empty-desc">ไม่สามารถโหลดข้อมูล upsell ได้ในขณะนี้</div>' +
         '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-retry-upsell-btn" data-email="' + nrrEsc(kamEmail) + '">ลองใหม่</button></div>';
+      if (p1Target) p1Target.innerHTML = failHtml;
+      if (p3Target) p3Target.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div></div>';
       return;
     }
     var upsell = nrrComputeUpsellSku(expansionOutletIds, bundle, QNRR_CFG.base_month);
-    target.innerHTML = nrrCommUpsellListHtml(upsell, bd);
+    var lists = nrrCommUpsellListsHtml(upsell, bd);
+    if (p1Target) p1Target.innerHTML = lists.p1;
+    if (p3Target) p3Target.innerHTML = lists.p3;
   });
 }
 
@@ -1345,7 +1398,9 @@ function nrrCommHandoverListHtml(detail) {
   }).join('');
 }
 
-function nrrCommUpsellListHtml(upsell, bd) {
+// Group lists for the two upsell receipt lines — {p1, p3} html, filled
+// into their own drill targets once the per-KAM CSV resolves.
+function nrrCommUpsellListsHtml(upsell, bd) {
   var p1 = upsell.p1.groups, p3 = upsell.p3.groups;
   var p1Html = p1.length
     ? p1.map(function (g) {
@@ -1369,12 +1424,9 @@ function nrrCommUpsellListHtml(upsell, bd) {
   var reconHtml = '';
   var snapTotal = bd && bd.upsell_sku && bd.upsell_sku.total_commission != null ? Number(bd.upsell_sku.total_commission) : null;
   if (snapTotal != null && Math.abs(upsell.total_comm - snapTotal) > 1) {
-    reconHtml = '<div class="nrr-comm-recon-note">ผลรวมด้านล่างคำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
+    reconHtml = '<div class="nrr-comm-recon-note">ผลรวมนี้คำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
-
-  return '<div class="micro" style="margin-bottom:4px">P1 · สินค้าใหม่ในร้าน</div>' + p1Html +
-    '<div class="micro" style="margin:12px 0 4px">P3 · สินค้าเดิมโตขึ้น</div>' + p3Html +
-    reconHtml;
+  return { p1: p1Html + reconHtml, p3: p3Html };
 }
 
 // ── Scrollspy sub-nav ────────────────────────────────────────────────────

@@ -240,16 +240,26 @@ window.nrrCommTierTable = nrrCommTierTable;
 // for lines with no account list, e.g. the NRR tier line itself).
 function nrrCommEstimateReceiptSteps(est) {
   if (!est) return [];
-  var steps = [{ kind: 'add', label: 'NRR (' + est.pct + '%)', amount: est.nrr_payout, drillKey: 'nrr' }];
+  var steps = [{ kind: 'add', first: true, label: 'NRR (' + est.pct + '%)', amount: est.nrr_payout, drillKey: 'nrr' }];
   if (est.kind === 'kam') {
-    if (est.upsell_comm) steps.push({ kind: 'add', label: 'Upsell P1 + P3 + Outlet', amount: est.upsell_comm, drillKey: 'upsell' });
+    // v16: every component of the real formula gets its OWN line — always,
+    // even at ฿0 — so the receipt never has a missing term and "why is
+    // expansion separate from upsell" stops being a question (they're
+    // visible siblings). Handover included at ฿0 too ("ไม่มีเดือนนี้").
+    // A receipt must ADD UP exactly on screen: the last component absorbs
+    // the per-line rounding remainder so Σ(lines) === subtotal to the baht.
+    var p1r = est.p1_comm || 0, p3r = est.p3_comm || 0;
+    var outR = (est.upsell_comm || 0) - p1r - p3r;
+    steps.push({ kind: 'add', label: 'Upsell P1 · สินค้าใหม่', amount: p1r, drillKey: 'p1' });
+    steps.push({ kind: 'add', label: 'Upsell P3 · สินค้าโต', amount: p3r, drillKey: 'p3' });
+    steps.push({ kind: 'add', label: 'Expansion · ร้านขยาย 0.5%', amount: outR, drillKey: 'expansion' });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) });
-    steps.push({ kind: 'multiply', label: 'NRR Gate', factor: est.gate_cap });
-    if (est.handover && est.handover.payout) {
-      steps.push({ kind: 'add', label: 'Handover · retention bonus', amount: est.handover.payout, drillKey: 'handover' });
-    }
+    steps.push({ kind: 'multiply', label: 'NRR Gate (' + est.pct + '% ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
+    steps.push({ kind: 'add', label: 'Handover · retention', amount: (est.handover && est.handover.payout) || 0,
+      meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + est.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
+      drillKey: est.handover && est.handover.detail && est.handover.detail.length ? 'handover' : null });
   } else {
-    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: est.multiplier });
+    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม (' + (est.upsell_pct != null ? est.upsell_pct.toFixed(1) : '0.0') + '% ของฐาน)', factor: est.multiplier, drillKey: 'mult' });
   }
   steps.push({ kind: 'total', label: 'รวมค่าคอมฯ', amount: est.est });
   return steps;
@@ -263,18 +273,27 @@ window.nrrCommEstimateReceiptSteps = nrrCommEstimateReceiptSteps;
 // periods — the whole point of this redesign is that both look the same.
 function nrrCommSnapshotReceiptSteps(bd) {
   if (!bd) return [];
-  var steps = [{ kind: 'add', label: 'NRR (' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];
+  var steps = [{ kind: 'add', first: true, label: 'NRR (' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];
   if (bd.type === 'kam_full') {
-    var upsell = (bd.upsell_sku && bd.upsell_sku.total_commission || 0) + (bd.upsell_outlet && bd.upsell_outlet.commission || 0);
-    if (upsell) steps.push({ kind: 'add', label: 'Upsell P1 + P3 + Outlet', amount: upsell, drillKey: 'upsell' });
+    var sku = bd.upsell_sku || {};
+    var upsell = ((sku.p1 && sku.p1.comm) || 0) + ((sku.p3 && sku.p3.comm) || 0) + ((bd.upsell_outlet && bd.upsell_outlet.commission) || 0);
+    // Same add-up-exactly rule as the estimate steps: round P1/P3, the
+    // Expansion line absorbs the remainder so Σ(lines) === subtotal.
+    var p1Comm = Math.round((sku.p1 && sku.p1.comm) || 0);
+    var p3Comm = Math.round((sku.p3 && sku.p3.comm) || 0);
+    var outletComm = Math.round(upsell) - p1Comm - p3Comm;
+    steps.push({ kind: 'add', label: 'Upsell P1 · สินค้าใหม่', amount: p1Comm, drillKey: 'p1' });
+    steps.push({ kind: 'add', label: 'Upsell P3 · สินค้าโต', amount: p3Comm, drillKey: 'p3' });
+    steps.push({ kind: 'add', label: 'Expansion · ร้านขยาย 0.5%', amount: outletComm, drillKey: 'expansion' });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell });
-    steps.push({ kind: 'multiply', label: 'NRR Gate', factor: bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1 });
-    if (bd.handover && bd.handover.payout) {
-      steps.push({ kind: 'add', label: 'Handover · retention bonus', amount: bd.handover.payout, drillKey: 'handover' });
-    }
+    var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
+    steps.push({ kind: 'multiply', label: 'NRR Gate' + (bd.nrr_pct != null ? ' (' + bd.nrr_pct + '%)' : ''), factor: gcap });
+    steps.push({ kind: 'add', label: 'Handover · retention', amount: (bd.handover && bd.handover.payout) || 0,
+      meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + bd.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
+      drillKey: bd.handover && bd.handover.detail && bd.handover.detail.length ? 'handover' : null });
   } else {
     var mult = bd.upsell_mult;
-    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: typeof mult === 'object' ? mult.multiplier : parseFloat(mult) || 1 });
+    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: typeof mult === 'object' ? mult.multiplier : parseFloat(mult) || 1, drillKey: 'mult' });
   }
   steps.push({ kind: 'total', label: 'รวมค่าคอมฯ', amount: bd.final_payout != null ? bd.final_payout : 0 });
   return steps;
@@ -425,11 +444,18 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   var p1Rate = nrrCommRateGet('upsell_sku', 'p1_rate', 0.01);
   var p3Rate = nrrCommRateGet('upsell_sku', 'p3_rate', 0.01);
   var outRate = nrrCommRateGet('upsell_outlet', 'rate', 0.005);
-  var upsellComm = row.p1_gmv * p1Rate + row.p3_incremental * p3Rate + row.outlet_gmv * outRate;
+  // Components kept separate (v16) — the receipt renders one line per
+  // component; only the arithmetic below combines them.
+  var p1Comm = row.p1_gmv * p1Rate;
+  var p3Comm = row.p3_incremental * p3Rate;
+  var outletComm = row.outlet_gmv * outRate;
+  var upsellComm = p1Comm + p3Comm + outletComm;
   // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate).
-  // Per the real engine, the gate multiplies (nrr_payout + upsell); handover
-  // is a SEPARATE flat bonus outside the gate (_commBuildKamPayout adds
-  // handover.payout to final_payout un-multiplied) — mirrored here.
+  // Per the real engine, the gate multiplies (nrr_payout + upsell incl.
+  // expansion outlet comm); handover is a SEPARATE flat bonus outside the
+  // gate (_commBuildKamPayout adds handover.payout un-multiplied) —
+  // verified against locked June rows: Dent (0+6596+707)×0.7=5112,
+  // Pop 17229×1+5000=22229.
   var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
   var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
   var cap = 1.0;
@@ -437,8 +463,10 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   else if (pct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
   var handover = nrrComputeHandoverForKam(kamEmail, period);
   return {
-    kind: 'kam', pct: pct, nrr_payout: nrrPayout, upsell_comm: Math.round(upsellComm),
-    gate_cap: cap, handover: handover,
+    kind: 'kam', pct: pct, nrr_payout: nrrPayout,
+    p1_comm: Math.round(p1Comm), p3_comm: Math.round(p3Comm), outlet_comm: Math.round(outletComm),
+    upsell_comm: Math.round(upsellComm),
+    gate_threshold: t1, gate_cap: cap, handover: handover,
     est: Math.round((nrrPayout + upsellComm) * cap) + handover.payout,
     note: '(NRR ฿' + nrrPayout.toLocaleString('en-US') + ' + upsell ฿' + Math.round(upsellComm).toLocaleString('en-US') + ')' +
       (cap < 1 ? ' × gate ' + cap + 'x' : '') +

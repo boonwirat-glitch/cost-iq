@@ -462,34 +462,39 @@
 .nrr-comm-ds .nrr-comm-tier-mini .nrr-comm-tier-chip { font-size: 10.5px; padding: 2px 8px; }
 
 /* ── Receipt — the running-total "why is my number this" statement.
-   Vertical, not tabular: reads top-to-bottom like an invoice, each line
-   a formula term (add/multiply/subtotal/total). Expandable lines use the
-   native <details> idiom already established elsewhere in /nrr
-   (.nrr-acct-group) for interaction consistency. ── */
-.nrr-comm-ds .nrr-comm-receipt { margin: 4px 0 20px; }
-.nrr-comm-ds .nrr-comm-receipt-line {
-  display: flex; align-items: center; justify-content: space-between;
+   v16 layout: FOUR fixed columns on every line —
+     [chevron 16px][operator 20px][label · flex 1, LEFT][amount · right]
+   — the operator (+/×) is its own column so labels start at the same x on
+   every line (fixes the v15 bug where flex space-between floated labels
+   toward the center). Line hierarchy is carried by weight/color at
+   >=13.5px real-content sizes, never by shrinking text. Expandable lines
+   use the native <details> idiom (.nrr-acct-group precedent). ── */
+.nrr-comm-ds .nrr-comm-receipt { margin: 4px 0 20px; max-width: 560px; }
+.nrr-comm-ds .nrr-comm-receipt-line,
+.nrr-comm-ds details.nrr-comm-receipt-line > summary {
+  display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) auto;
+  align-items: baseline; gap: 2px;
   padding: 8px 0; font-size: 14px; color: var(--ink);
 }
-.nrr-comm-ds .nrr-comm-receipt-line .num { font-weight: 700; }
-.nrr-comm-ds .nrr-comm-receipt-line.op { color: var(--ink2); font-size: 13px; }
+.nrr-comm-ds .nrr-rcpt-chev { color: var(--ink3); transition: transform 0.15s ease; transform-origin: 40% 50%; }
+.nrr-comm-ds .nrr-rcpt-op { color: var(--ink2); font-family: var(--font-num); font-weight: 700; }
+.nrr-comm-ds .nrr-rcpt-label { min-width: 0; }
+.nrr-comm-ds .nrr-rcpt-meta { color: var(--ink2); font-size: 13px; margin-left: 6px; }
+.nrr-comm-ds .nrr-rcpt-amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.nrr-comm-ds .nrr-comm-receipt-line.op,
+.nrr-comm-ds details.nrr-comm-receipt-line.op > summary { color: var(--ink2); }
 .nrr-comm-ds .nrr-comm-receipt-line.subtotal { color: var(--ink2); font-size: 13.5px; }
 .nrr-comm-ds .nrr-comm-receipt-line.total { font-size: 17px; font-weight: 700; color: var(--green-deep); padding-top: 10px; }
 .nrr-comm-ds .nrr-comm-receipt-rule { border-top: 1px solid var(--line); margin-top: 4px; }
 .nrr-comm-ds .nrr-comm-receipt-rule.total { border-top: 1.5px solid var(--ink); margin-top: 8px; }
-/* Expandable receipt lines: reuse <details>/<summary> — summary IS the line row. */
-.nrr-comm-ds details.nrr-comm-receipt-line { display: block; padding: 0; cursor: default; }
-.nrr-comm-ds details.nrr-comm-receipt-line > summary {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 0; font-size: 14px; color: var(--ink); cursor: pointer; list-style: none;
-}
+.nrr-comm-ds details.nrr-comm-receipt-line { display: block; padding: 0; }
+.nrr-comm-ds details.nrr-comm-receipt-line > summary { cursor: pointer; list-style: none; }
 .nrr-comm-ds details.nrr-comm-receipt-line > summary::-webkit-details-marker { display: none; }
-.nrr-comm-ds details.nrr-comm-receipt-line > summary::before {
-  content: '›'; display: inline-block; margin-right: 6px; color: var(--ink3);
-  transition: transform 0.15s ease;
-}
-.nrr-comm-ds details.nrr-comm-receipt-line[open] > summary::before { transform: rotate(90deg); }
-.nrr-comm-ds .nrr-comm-receipt-detail { padding: 2px 0 12px 20px; border-left: 2px solid var(--line); margin-left: 4px; }
+.nrr-comm-ds details.nrr-comm-receipt-line[open] > summary .nrr-rcpt-chev { transform: rotate(90deg); }
+.nrr-comm-ds .nrr-comm-receipt-detail { padding: 2px 0 12px 36px; border-left: 2px solid var(--line); margin-left: 7px; }
+/* One-line rule note inside a drill (e.g. "P1/P3 นับเฉพาะร้านนอกกลุ่ม
+   Expansion") — real content, so .meta treatment (13px ink2), not micro. */
+.nrr-comm-ds .nrr-rcpt-note { font-size: 13px; color: var(--ink2); padding: 4px 0 8px; }
 
 /* ── ghost button (drill-down link) — pill, page chip language ── */
 .nrr-comm-ds .ds-btn {
