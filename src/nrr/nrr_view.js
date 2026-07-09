@@ -100,7 +100,7 @@ async function nrrRefresh(force) {
     await nrrFetchQnrrCsv(force);
     await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force)]);
     await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates(),
-                       nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv()]);
+                       nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv(), nrrFetchHandoverCsv()]);
     nrrRenderAll();
     if (status) status.textContent = 'อัปเดตล่าสุด ' + new Date(window.bulkQnrrData.loadedAt).toLocaleString('th-TH');
   } catch (e) {
@@ -243,6 +243,11 @@ function nrrRenderPulse(result) {
     eyebrowLabel = 'องค์กร · ทุก PORTFOLIO (KAM+PM+ADMIN)';
   } else if (isAdmin) {
     fallbackNote = '<div class="micro" style="margin-top:8px">ภาพรวมรวมทุก portfolio ยังไม่พร้อม (vp_view.csv) — ตัวเลขใหญ่คือ KAM portfolio</div>';
+  }
+  if (isAdmin) {
+    fallbackNote += nrrStaleCsvBannerHtml(window.bulkVpData, 'vp_view.csv') +
+      nrrStaleCsvBannerHtml(window.bulkPmData, 'pm_view.csv (PM %NRR ด้านล่างนี้)') +
+      nrrStaleCsvBannerHtml(window.bulkAdminData, 'admin_view.csv (Admin %NRR ด้านล่างนี้)');
   }
 
   var bm = heroResult && period ? heroResult.by_month[period] : null;
@@ -586,10 +591,22 @@ function nrrBuildCopySummary() {
 // movement switcher covers those views. Each tile keeps its %NRR + triple
 // and gains a "ดู movement →" button that pre-switches the central section
 // and scrolls there. One chart component, one source of truth on screen.
+// Shared banner for a portfolio CSV whose data predates the current
+// quarter — see the isStale flag set in _nrrFetchPortfolioCsv (nrr_data.js).
+function nrrStaleCsvBannerHtml(bulkData, filename) {
+  if (!bulkData || !bulkData.isStale) return '';
+  var monthList = (bulkData.months || []).map(function (m) { return QNRR_CFG.months_th[m] || m; }).join(', ');
+  return '<div class="nrr-stale-banner">⚠️ ' + nrrEsc(filename) + ' มีข้อมูลเดือน ' + nrrEsc(monthList) +
+    ' — ไม่ใช่ไตรมาสปัจจุบัน (' + nrrEsc(QNRR_CFG.q_months.map(function (m) { return QNRR_CFG.months_th[m] || m; }).join(', ')) + ') ' +
+    'ตัวเลขด้านล่างเป็นข้อมูลไตรมาสก่อนที่ยังไม่ได้ re-run/upload ใหม่</div>';
+}
+
 function nrrRenderPortfolioSection(kind) {
   var body = document.getElementById('nrr-' + kind + '-body');
   var isAdmin = nrrProfile.role === 'admin';
   var label = kind === 'pm' ? 'PM' : 'Admin';
+  var bucketData = kind === 'pm' ? window.bulkPmData : window.bulkAdminData;
+  var staleBanner = nrrStaleCsvBannerHtml(bucketData, kind === 'pm' ? 'pm_view.csv' : 'admin_view.csv');
   var bucketResult = kind === 'pm' ? nrrPmResult() : nrrAdminResult();
 
   var myBucket = isAdmin ? null : nrrBucketForTl(nrrProfile.email);
@@ -618,6 +635,7 @@ function nrrRenderPortfolioSection(kind) {
 
   body.innerHTML =
     '<div class="nrr-panel-head"><div class="h2">' + label + ' Portfolio — แยกตาม Account Type</div></div>' +
+    staleBanner +
     '<div class="nrr-kpi-grid" style="grid-template-columns:repeat(' + buckets.length + ',1fr)">' + tilesHtml + '</div>';
 
   body.querySelectorAll('[data-mv-jump]').forEach(function (btn) {
@@ -737,7 +755,7 @@ function nrrCommissionHeroHtml(isAdmin, period) {
       ? 'snapshot ' + snapCount + '/' + teams.length + ' ทีม · รวมค่าประมาณ pace-based ' + estCount + ' ทีม (' + nrrEsc(QNRR_CFG.months_th[period] || period) + ')'
       : 'snapshot ' + snapCount + '/' + teams.length + ' ทีม · payout เดือนล่าสุดที่ lock แล้ว';
     return '<div class="ds-hero"><div class="ds-hero-eyebrow">Commission · องค์กร ' + stamp + '</div>' +
-      '<div class="ds-hero-number">' + nrrFmtGMV(total) + '</div>' +
+      '<div class="ds-hero-number">' + nrrFmtGMVExact(total) + '</div>' +
       '<div class="ds-hero-sub">' + sub + '</div></div>';
   }
 
@@ -748,12 +766,12 @@ function nrrCommissionHeroHtml(isAdmin, period) {
   var amountHtml, subHtml;
   if (showEst) {
     var est = nrrCommEstimateFor(nrrProfile.email, 'tl', period);
-    amountHtml = nrrFmtGMV(est ? est.est : 0);
+    amountHtml = nrrFmtGMVExact(est ? est.est : 0);
     subHtml = est
       ? ('NRR ' + est.pct + '% → ' + est.note)
       : 'ไม่มีข้อมูลเพียงพอสำหรับประมาณการ';
   } else {
-    amountHtml = nrrFmtGMV(Number(mySnap.payout_amount || 0));
+    amountHtml = nrrFmtGMVExact(Number(mySnap.payout_amount || 0));
     // status itself is now the stamp in the eyebrow — sub only carries the date
     subHtml = mySnap.updated_at
       ? 'อัปเดต ' + new Date(mySnap.updated_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
@@ -786,7 +804,7 @@ function nrrCommissionTrendHtml(isAdmin) {
   var barsHtml = bars.map(function (b) {
     var h = b.has ? Math.max(8, Math.round(b.v / maxV * 100)) : 8;
     var label = (QNRR_CFG.months_th[b.month] || b.month) + ': ' +
-      (b.has ? (b.est ? '~' : '') + nrrFmtGMV(b.v) + (b.est ? ' (ประมาณการ)' : '') : 'ยังไม่มี snapshot');
+      (b.has ? (b.est ? '~' : '') + nrrFmtGMVExact(b.v) + (b.est ? ' (ประมาณการ)' : '') : 'ยังไม่มี snapshot');
     return '<div class="ds-spark-bar' + (b.has ? (b.est ? ' est' : ' active') : '') + '" style="height:' + h + '%" title="' + nrrEsc(label) + '"></div>';
   }).join('');
   var labelsHtml = bars.map(function (b) {
@@ -840,7 +858,7 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
       '<span class="ds-row-meta" style="flex:none">' + (nrrPct != null ? nrrPct + '% NRR' : '— NRR') + ' · ' + nrrEsc(metaLabel) + ' ' + stampHtml + '</span>' +
       '</span>' +
-      '<span class="ds-row-value" style="color:' + (isEstRow ? 'var(--sun-deep)' : 'var(--green-deep)') + '">' + nrrFmtGMV(payoutAmt) + '</span>' +
+      '<span class="ds-row-value" style="color:' + (isEstRow ? 'var(--sun-deep)' : 'var(--green-deep)') + '">' + nrrFmtGMVExact(payoutAmt) + '</span>' +
       '</summary>' +
       '<div class="ds-row-detail">' + detailHtml + drillLink + '</div>' +
       '</details>';
@@ -869,11 +887,11 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
       stamp = nrrCommStampHtml('estimate', true);
       pct = est ? est.pct : null;
     }
-    return '<div class="ds-stat-row">' +
+    return '<div class="nrr-comm-kam-row">' +
       '<span class="ds-stat-label">' + nrrEsc(k.name) + (pct != null ? ' · ' + pct + '%' : '') + ' ' + stamp + '</span>' +
-      '<span class="ds-stat-value" style="display:flex;gap:10px;align-items:center">' +
-      '<span class="num">' + nrrFmtGMV(amt) + '</span>' +
-      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" style="padding:2px 8px;font-size:12px" data-email="' + nrrEsc(k.email) + '" data-name="' + nrrEsc(k.name) + '" data-period="' + nrrEsc(period) + '">ดูร้าน →</button>' +
+      '<span class="nrr-comm-kam-row-right">' +
+      '<span class="num">' + nrrFmtGMVExact(amt) + '</span>' +
+      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(k.email) + '" data-name="' + nrrEsc(k.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียด →</button>' +
       '</span></div>';
   }).join('');
   return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม</span></div>' + rows;
@@ -889,19 +907,19 @@ function nrrCommissionBreakdownDetailHtml(bd) {
     lines.push('<div class="ds-stat-row"><span class="ds-stat-label">' + nrrEsc(label) + '</span><span class="ds-stat-value">' + val + '</span></div>');
   }
   if (bd.type === 'tl_full') {
-    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMV(bd.nrr_payout) : null);
+    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMVExact(bd.nrr_payout) : null);
     line('Upsell multiplier', bd.upsell_mult != null && !isNaN(parseFloat(bd.upsell_mult)) ? parseFloat(bd.upsell_mult).toFixed(2) + '×' : null);
-    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMV(bd.excluded_base_gmv) : null);
-    line('Final payout', bd.final_payout != null ? nrrFmtGMV(bd.final_payout) : null);
+    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMVExact(bd.excluded_base_gmv) : null);
+    line('Final payout', bd.final_payout != null ? nrrFmtGMVExact(bd.final_payout) : null);
   } else if (bd.type === 'kam_full') {
-    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMV(bd.nrr_payout) : null);
-    line('Upsell P1+P3', bd.upsell_sku && bd.upsell_sku.total_commission != null ? nrrFmtGMV(bd.upsell_sku.total_commission) : null);
-    line('Outlet commission', bd.upsell_outlet && bd.upsell_outlet.commission != null ? nrrFmtGMV(bd.upsell_outlet.commission) : null);
-    line('Handover', bd.handover && bd.handover.payout != null ? nrrFmtGMV(bd.handover.payout) : null);
-    line('Components subtotal', bd.components_subtotal != null ? nrrFmtGMV(bd.components_subtotal) : null);
+    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMVExact(bd.nrr_payout) : null);
+    line('Upsell P1+P3', bd.upsell_sku && bd.upsell_sku.total_commission != null ? nrrFmtGMVExact(bd.upsell_sku.total_commission) : null);
+    line('Outlet commission', bd.upsell_outlet && bd.upsell_outlet.commission != null ? nrrFmtGMVExact(bd.upsell_outlet.commission) : null);
+    line('Handover', bd.handover && bd.handover.payout != null ? nrrFmtGMVExact(bd.handover.payout) : null);
+    line('Components subtotal', bd.components_subtotal != null ? nrrFmtGMVExact(bd.components_subtotal) : null);
     line('GMV Gate', bd.gmv_gate && bd.gmv_gate.cap_multiplier != null ? Number(bd.gmv_gate.cap_multiplier).toFixed(2) + '×' : null);
-    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMV(bd.excluded_base_gmv) : null);
-    line('Final payout', bd.final_payout != null ? nrrFmtGMV(bd.final_payout) : null);
+    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMVExact(bd.excluded_base_gmv) : null);
+    line('Final payout', bd.final_payout != null ? nrrFmtGMVExact(bd.final_payout) : null);
   }
   return lines.length ? lines.join('') : '<div class="ds-stat-row"><span class="ds-stat-label">ไม่มีรายละเอียดใน breakdown นี้</span></div>';
 }
@@ -922,8 +940,8 @@ function nrrCommissionFootnoteHtml() {
   var cap2 = nrrCommRateGet('gmv_gate', 'cap_2', 0);
   return '<div class="micro" style="line-height:1.6;margin-top:4px">' +
     'อัตรา/เกณฑ์ปัจจุบันจาก target_settings (ค่าล่าสุด ไม่ใช่ config_snapshot ที่ freeze ไว้ตอน compute แต่ละรายการ): ' +
-    'P1 ' + (p1Rate * 100).toFixed(1) + '% (ขั้นต่ำ ' + nrrFmtGMV(p1MinGmv) + ') · ' +
-    'P3 ' + (p3Rate * 100).toFixed(1) + '% (>' + p3Thresh + '× baseline, ขั้นต่ำ ' + nrrFmtGMV(p3MinIncr) + ') · ' +
+    'P1 ' + (p1Rate * 100).toFixed(1) + '% (ขั้นต่ำ ' + nrrFmtGMVExact(p1MinGmv) + ') · ' +
+    'P3 ' + (p3Rate * 100).toFixed(1) + '% (>' + p3Thresh + '× baseline, ขั้นต่ำ ' + nrrFmtGMVExact(p3MinIncr) + ') · ' +
     'Outlet ' + (outRate * 100).toFixed(2) + '% · ' +
     'Gate: ≥' + gate1 + '%=1.0× · ' + gate2 + '-' + gate1 + '%=' + cap1 + '× · <' + gate2 + '%=' + cap2 + '×' +
     '</div>';
@@ -1016,20 +1034,20 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
     var nrrPay = Number(bd.nrr_payout || 0);
     if (!isNaN(mult) && nrrPay > 0 && Math.abs(nrrPay * mult - finalPayout) > 1) {
       var effective = finalPayout / nrrPay;
-      multHtml += ' <span class="nrr-comm-note-dot" title="ค่าที่จ่ายจริงสะท้อนตัวคูณ ' + effective.toFixed(2) + '× (' + nrrFmtGMV(nrrPay) + ' × ' + effective.toFixed(2) + ' = ' + nrrFmtGMV(finalPayout) + ') — ตัวเลข ' + mult.toFixed(0) + ' ที่บันทึกไว้น่าจะเป็นเลข tier จากไฟล์ Excel ที่ backfill ไม่ใช่ตัวคูณ">ⓘ</span>';
+      multHtml += ' <span class="nrr-comm-note-dot" title="ค่าที่จ่ายจริงสะท้อนตัวคูณ ' + effective.toFixed(2) + '× (' + nrrFmtGMVExact(nrrPay) + ' × ' + effective.toFixed(2) + ' = ' + nrrFmtGMVExact(finalPayout) + ') — ตัวเลข ' + mult.toFixed(0) + ' ที่บันทึกไว้น่าจะเป็นเลข tier จากไฟล์ Excel ที่ backfill ไม่ใช่ตัวคูณ">ⓘ</span>';
     }
     var rowStamp = (!allFinal && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr><td>' + nrrEsc(bd.team_lead_name || r.beneficiary_email) + rowStamp + '</td>' +
       '<td>' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + '</td>' +
-      '<td>' + nrrFmtGMV(bd.nrr_payout || 0) + '</td>' +
-      '<td>' + nrrFmtGMV(upsellGmv) + '</td>' +
+      '<td>' + nrrFmtGMVExact(bd.nrr_payout || 0) + '</td>' +
+      '<td>' + nrrFmtGMVExact(upsellGmv) + '</td>' +
       '<td>' + multHtml + '</td>' +
-      '<td class="nrr-comm-final">' + nrrFmtGMV(finalPayout) + '</td></tr>';
+      '<td class="nrr-comm-final">' + nrrFmtGMVExact(finalPayout) + '</td></tr>';
   }).join('');
   var totalHtml = '<tr class="nrr-comm-total-row"><td>GRAND TOTAL</td><td></td>' +
-    '<td>' + nrrFmtGMV(t.nrrPayout) + '</td><td>' + nrrFmtGMV(t.upsellGmv) + '</td><td></td>' +
-    '<td>' + nrrFmtGMV(t.finalPayout) + '</td></tr>';
+    '<td>' + nrrFmtGMVExact(t.nrrPayout) + '</td><td>' + nrrFmtGMVExact(t.upsellGmv) + '</td><td></td>' +
+    '<td>' + nrrFmtGMVExact(t.finalPayout) + '</td></tr>';
   return '<div class="ds-section-hd"><span class="ds-eyebrow">รายทีม (Team Lead)</span></div>' +
     '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
     '<th>Team Lead</th><th>NRR %</th><th>NRR Payout</th><th>Upsell GMV (P1+P3)</th><th>Upsell ×</th><th>Final Payout</th>' +
@@ -1045,7 +1063,7 @@ function _nrrCommMoneyCell(comm, metaText) {
   var c = Number(comm || 0);
   var commHtml = c === 0
     ? '<span class="nrr-comm-zero">฿0</span>'
-    : '<b>' + nrrFmtGMV(c) + '</b>';
+    : '<b>' + nrrFmtGMVExact(c) + '</b>';
   var metaHtml = metaText ? '<div class="nrr-comm-cell-meta">' + metaText + '</div>' : '';
   return '<td>' + commHtml + metaHtml + '</td>';
 }
@@ -1081,21 +1099,21 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
       '<td>' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
       _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + ho.retention_pct + '%' : null) +
-      _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMV(outlet.outlet_gmv) : null) +
-      _nrrCommMoneyCell(p1.comm, p1.gmv ? 'จาก ' + nrrFmtGMV(p1.gmv) : null) +
-      _nrrCommMoneyCell(p3.comm, p3.gmv_incremental ? 'จาก ' + nrrFmtGMV(p3.gmv_incremental) : null) +
+      _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMVExact(outlet.outlet_gmv) : null) +
+      _nrrCommMoneyCell(p1.comm, p1.gmv ? 'จาก ' + nrrFmtGMVExact(p1.gmv) : null) +
+      _nrrCommMoneyCell(p3.comm, p3.gmv_incremental ? 'จาก ' + nrrFmtGMVExact(p3.gmv_incremental) : null) +
       _nrrCommMoneyCell(sku.total_commission, null) +
       '<td><span class="' + gateCls + '">' + (gate.cap_multiplier != null ? Number(gate.cap_multiplier).toFixed(2) + '×' : '—') + '</span></td>' +
-      '<td class="nrr-comm-final">' + nrrFmtGMV(finalPayout) + '</td></tr>';
+      '<td class="nrr-comm-final">' + nrrFmtGMVExact(finalPayout) + '</td></tr>';
   }).join('');
   var totalHtml = '<tr class="nrr-comm-total-row"><td>GRAND TOTAL</td><td></td>' +
-    '<td>' + nrrFmtGMV(t.nrrPayout) + '</td>' +
-    '<td>' + nrrFmtGMV(t.hoPayout) + '</td>' +
-    '<td>' + nrrFmtGMV(t.expPayout) + '</td>' +
-    '<td>' + nrrFmtGMV(t.p1Comm) + '</td>' +
-    '<td>' + nrrFmtGMV(t.p3Comm) + '</td>' +
-    '<td>' + nrrFmtGMV(t.upsell) + '</td><td></td>' +
-    '<td class="nrr-comm-final">' + nrrFmtGMV(t.finalPayout) + '</td></tr>';
+    '<td>' + nrrFmtGMVExact(t.nrrPayout) + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.hoPayout) + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.expPayout) + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.p1Comm) + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.p3Comm) + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.upsell) + '</td><td></td>' +
+    '<td class="nrr-comm-final">' + nrrFmtGMVExact(t.finalPayout) + '</td></tr>';
   return '<div class="ds-section-hd" style="margin-top:24px"><span class="ds-eyebrow">รายบุคคล (KAM)</span></div>' +
     '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
     '<th>KAM</th><th>NRR %</th><th>NRR</th><th>Handover</th><th>Expansion</th>' +
@@ -1134,24 +1152,42 @@ function nrrRenderCommissionDrawerBody(kamEmail, period) {
   var result = nrrKamResult(kamEmail);
   var bm = result && period && result.by_month ? result.by_month[period] : null;
   var rows = bm ? (bm.rows || []) : [];
+  var livePct = bm ? bm.nrr_pct : null;
+  var est = snap ? null : nrrEstimateKamCommission(kamEmail, period, livePct);
 
-  var heroAmt = snap ? Number(snap.payout_amount || 0) : 0;
-  var heroSub = bd
-    ? ('NRR ' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ' · NRR payout ' + nrrFmtGMV(bd.nrr_payout || 0))
-    : 'ยังไม่มี snapshot ที่ล็อกสำหรับงวดนี้ — รายการด้านล่างเป็นข้อมูลสนับสนุนเท่าที่มี';
+  var heroAmt = snap ? Number(snap.payout_amount || 0) : (est ? est.est : 0);
+  var heroSub;
+  if (bd) {
+    heroSub = 'NRR ' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ' · NRR payout ' + nrrFmtGMVExact(bd.nrr_payout || 0);
+  } else if (est) {
+    heroSub = 'NRR ' + est.pct + '% → ' + est.note + ' — ยังไม่ล็อก ตัวเลขนี้เป็นค่าประมาณจาก rate ปัจจุบัน';
+  } else {
+    heroSub = 'ยังไม่มีข้อมูล %NRR สำหรับงวดนี้';
+  }
+  // Gate line — always worth surfacing on its own (not buried in the note),
+  // it's the multiplier most likely to surprise someone reconciling pay.
+  var gateCap = bd && bd.gmv_gate ? bd.gmv_gate.cap_multiplier : (est ? est.gate_cap : null);
+  var gateHtml = gateCap != null
+    ? '<div class="ds-stat-row"><span class="ds-stat-label">NRR Gate</span><span class="ds-stat-value' + (gateCap < 1 ? '' : '') + '" style="color:' + (gateCap < 1 ? 'var(--coral)' : 'var(--green-deep)') + '">× ' + gateCap + '</span></div>'
+    : '';
   var heroHtml = '<div class="ds-hero"><div class="ds-hero-eyebrow">Final payout ' +
     (snap ? nrrCommStampHtml(snap.snapshot_status) : nrrCommStampHtml('estimate')) + '</div>' +
-    '<div class="ds-hero-number">' + nrrFmtGMV(heroAmt) + '</div>' +
-    '<div class="ds-hero-sub">' + heroSub + '</div></div>';
+    '<div class="ds-hero-number">' + nrrFmtGMVExact(heroAmt) + '</div>' +
+    '<div class="ds-hero-sub">' + heroSub + '</div>' + gateHtml + '</div>';
 
   var nrrOutlets = rows.filter(function (r) { return ['core_nrr', 'comeback', 'transfer_in'].indexOf(r.movement_type) > -1; });
   var expOutlets = rows.filter(function (r) { return r.movement_type === 'expansion'; });
-  var handoverDetail = (bd && bd.handover && bd.handover.detail) || [];
+  // Handover: prefer the locked snapshot's frozen detail when present (what
+  // was actually paid); otherwise compute live from portview_handover.csv
+  // (nrrEstimateKamCommission already ran this — reuse it, don't refetch).
+  var handoverDetail = (bd && bd.handover && bd.handover.detail) ||
+    (est && est.handover && est.handover.detail) || [];
+  var handoverPayout = bd && bd.handover ? bd.handover.payout : (est && est.handover ? est.handover.payout : 0);
 
   el.innerHTML = heroHtml +
     nrrCommDrawerOutletSectionHtml('NRR', nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้') +
     nrrCommDrawerOutletSectionHtml('Expansion · 0.5%', expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้') +
-    nrrCommDrawerHandoverSectionHtml(handoverDetail) +
+    nrrCommDrawerHandoverSectionHtml(handoverDetail, handoverPayout) +
     '<div class="nrr-comm-drawer-section" id="nrr-comm-drawer-upsell">' +
     '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span></div>' +
     '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>' +
@@ -1192,23 +1228,24 @@ function nrrCommDrawerOutletSectionHtml(title, outlets, emptyText) {
       var segCls = r.account_type === 'Chain' ? 'ds-seg-ch' : r.account_type === 'SA' ? 'ds-seg-sa' : r.account_type === 'MC' ? 'ds-seg-mc' : '';
       var segChip = segCls ? '<span class="' + segCls + '">' + nrrEsc(r.account_type) + '</span>' : '';
       return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(r.account_name || r.outlet_id) + '</span>' + segChip +
-        '<span class="ds-row-value">' + nrrFmtGMV(r.curr_gmv || 0) + '</span></div>';
+        '<span class="ds-row-value">' + nrrFmtGMVExact(r.curr_gmv || 0) + '</span></div>';
     }).join('');
   return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">' + nrrEsc(title) + '</span><span class="ds-section-count">' + count + '</span></div>' + rowsHtml + '</div>';
 }
 
-function nrrCommDrawerHandoverSectionHtml(detail) {
+function nrrCommDrawerHandoverSectionHtml(detail, payout) {
+  var countHtml = '<span class="ds-section-count">' + (detail ? detail.length : 0) +
+    (payout ? ' · ' + nrrFmtGMVExact(payout) : '') + '</span>';
   if (!detail || !detail.length) {
-    return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover</span><span class="ds-section-count">0</span></div>' +
+    return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover</span>' + countHtml + '</div>' +
       '<div class="ds-empty"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div></div>';
   }
   var rowsHtml = detail.map(function (d) {
     var pct = d.baseline > 0 ? Math.round(d.current / d.baseline * 100) : 0;
     return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(d.name || d.account_id) + '</span>' +
-      '<span class="ds-row-meta">' + nrrFmtGMV(d.baseline || 0) + ' → ' + nrrFmtGMV(d.current || 0) + ' (' + pct + '%)</span>' +
-      '<span class="ds-row-value">' + nrrEsc(d.transfer_month || '') + '</span></div>';
+      '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + pct + '%) · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
   }).join('');
-  return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover</span><span class="ds-section-count">' + detail.length + '</span></div>' + rowsHtml + '</div>';
+  return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover · retention bonus</span>' + countHtml + '</div>' + rowsHtml + '</div>';
 }
 
 function nrrCommDrawerUpsellSectionHtml(upsell, bd) {
@@ -1216,15 +1253,15 @@ function nrrCommDrawerUpsellSectionHtml(upsell, bd) {
   var p1Html = p1.length
     ? p1.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
-          '<span class="ds-row-meta">' + nrrFmtGMV(g.total_gmv) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMV(g.commission) + '</span></div>';
+          '<span class="ds-row-meta">' + nrrFmtGMVExact(g.total_gmv) + '</span>' +
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าใหม่ (P1) เดือนนี้</div></div>';
   var p3Html = p3.length
     ? p3.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
-          '<span class="ds-row-meta">' + nrrFmtGMV(g.max_baseline) + ' → ' + nrrFmtGMV(g.existing_curr) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMV(g.commission) + '</span></div>';
+          '<span class="ds-row-meta">' + nrrFmtGMVExact(g.max_baseline) + ' → ' + nrrFmtGMVExact(g.existing_curr) + '</span>' +
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าที่เติบโต (P3) เดือนนี้</div></div>';
 
@@ -1235,7 +1272,7 @@ function nrrCommDrawerUpsellSectionHtml(upsell, bd) {
   var reconHtml = '';
   var snapTotal = bd && bd.upsell_sku && bd.upsell_sku.total_commission != null ? Number(bd.upsell_sku.total_commission) : null;
   if (snapTotal != null && Math.abs(upsell.total_comm - snapTotal) > 1) {
-    reconHtml = '<div class="nrr-comm-recon-note">ผลรวมด้านล่างคำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMV(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
+    reconHtml = '<div class="nrr-comm-recon-note">ผลรวมด้านล่างคำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
 
   return '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span><span class="ds-section-count">' + (p1.length + p3.length) + '</span></div>' +

@@ -1,7 +1,18 @@
 -- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️ CORRECTION (2026-07-09): the line below ("NOT consumed by the app") is
+-- WRONG for /nrr — src/nrr/nrr_data.js's nrrFetchAdminCsv() fetches
+-- admin_view.csv (this query's output) DIRECTLY and drives /nrr's Admin
+-- Portfolio section + the org pulse's "Admin" satellite %. It was stale by
+-- a full quarter (held Apr/May/Jun rows three months into Q3) because this
+-- comment reads as "safe to skip re-running" — it is NOT. Re-run this query
+-- and re-upload admin_view.csv to R2 every quarter, same cadence as
+-- pm_view.csv/vp_view.csv. /nrr now shows a banner if the uploaded file's
+-- period_month doesn't match the live quarter (see nrrStaleCsvBannerHtml,
+-- src/nrr/nrr_view.js) — but the fix is uploading fresh data, not the banner.
+--
 -- STATUS (L-4, decided 2026-07-06 by Bucci): KEEP as maintained reporting variant.
--- NOT consumed by the app (app reads sql/q3_2026_movement_rep_view.sql only —
--- see docs/Q3_NRR_COMMISSION_SPEC.md section 2). This file is scoped reporting
+-- Sense's main app (rep-facing) reads sql/q3_2026_movement_rep_view.sql only —
+-- see docs/Q3_NRR_COMMISSION_SPEC.md section 2. This file is scoped reporting
 -- for portfolio-level analysis and must be kept in sync with rep_view bugfixes
 -- going forward — now in test rotation, see docs/Q3_NRR_TEST_SPEC.md test D8.
 -- ════════════════════════════════════════════════════════════════════════════

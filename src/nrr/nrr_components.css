@@ -47,6 +47,16 @@
    display rule a child layout class might set later. */
 .nrr-view[hidden] { display: none !important; }
 
+/* Data-staleness banner — a portfolio CSV (pm/admin/vp_view.csv) holding a
+   past quarter's rows, silently mislabeled as current (2026-07-09 finding:
+   admin_view.csv sat 3 months stale while pm/vp_view.csv were current).
+   Loud on purpose — this is a "don't trust the number above" signal. */
+.nrr-stale-banner {
+  background: var(--coral-soft); border: 1px solid var(--coral);
+  border-radius: var(--r-sm); padding: 10px 14px; margin: 10px 0;
+  font-size: 13px; color: var(--ink); line-height: 1.5;
+}
+
 /* First responsive pass — the portfolio layer is rep-facing (mobile-first
    users); the dashboard stays desktop-first. Masthead must not overflow. */
 @media (max-width: 640px) {
@@ -413,6 +423,18 @@
 /* ── stat rows (breakdown label/value) ── */
 .nrr-comm-ds .ds-stat-row { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); gap: 16px; max-width: 420px; }
 .nrr-comm-ds .ds-stat-row:last-child { border-bottom: none; }
+
+/* Nested KAM list (team row -> KAM rows) and the drawer's outlet/upsell/
+   handover section rows use the FULL available width — .ds-stat-row's
+   420px cap is right for a single label:value stat, wrong for a list row
+   that also carries a drill-through button (was reading squeezed/mobile
+   inside a 1020px-wide page, user flagged 2026-07-09). */
+.nrr-comm-ds .nrr-comm-kam-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--line); gap: 16px;
+}
+.nrr-comm-ds .nrr-comm-kam-row:last-child { border-bottom: none; }
+.nrr-comm-ds .nrr-comm-kam-row-right { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
 .nrr-comm-ds .ds-stat-label { font-size: 13.5px; color: var(--ink2); }
 .nrr-comm-ds .ds-stat-value { font-family: var(--font-num); font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 

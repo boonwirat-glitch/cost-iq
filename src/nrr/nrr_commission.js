@@ -264,6 +264,80 @@ function nrrEstimateTlCommission(tlEmail, period, pct) {
 }
 window.nrrEstimateTlCommission = nrrEstimateTlCommission;
 
+// ── Handover retention — live drill-down for the drawer ─────────────────
+// portview_handover.csv is org-wide (all KAMs, one row per handed-over
+// account) — fetched once, filtered per-KAM client-side. Mirrors
+// _commComputeHandoverRetention's shape/columns exactly (07a_commission_
+// engine.js:440) but period-relative (transfer_month = the month BEFORE
+// the period being viewed) instead of relative to real "today", since
+// /nrr's drawer can be opened for any period, not just the live one.
+var nrrHandoverCsvCache = { rows: [], loaded: false };
+async function nrrFetchHandoverCsv() {
+  if (nrrHandoverCsvCache.loaded) return nrrHandoverCsvCache;
+  try {
+    var resp = await fetch(R2_BASE + '/portview_handover.csv?cb=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var lines = (await resp.text()).split('\n').filter(function (l) { return l.trim(); });
+    var header = parseCSVRow(lines[0]);
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+      var c = parseCSVRow(lines[i]), o = {};
+      header.forEach(function (h, idx) { o[h] = c[idx]; });
+      rows.push(o);
+    }
+    nrrHandoverCsvCache = { rows: rows, loaded: true };
+  } catch (e) {
+    console.warn('[nrr] portview_handover.csv fetch failed', e);
+    nrrHandoverCsvCache = { rows: [], loaded: false, error: e.message };
+  }
+  return nrrHandoverCsvCache;
+}
+window.nrrFetchHandoverCsv = nrrFetchHandoverCsv;
+
+function _nrrPrevMonthOf(period) {
+  var p = (period || '').split('-');
+  if (p.length !== 2) return '';
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1 - 1, 1); // -1 for 0-index, -1 for prev month
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail }
+// detail: [{ name, account_id, baseline, current, transfer_month }]
+function nrrComputeHandoverForKam(kamEmail, period) {
+  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [] };
+  var qd = window.bulkQnrrData;
+  var kamRows = (qd && qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
+  var kamName = kamRows.length ? (kamRows[0].latest_staff_owner || '') : '';
+  if (!kamName || !nrrHandoverCsvCache.loaded) return EMPTY;
+
+  var prevMonth = _nrrPrevMonthOf(period);
+  var rows = nrrHandoverCsvCache.rows.filter(function (r) {
+    return (r.new_kam_name || '').trim() === kamName &&
+      (r.prev_owner || '').toUpperCase() === 'SALE' &&
+      (r.transfer_month || '') === prevMonth;
+  });
+  if (!rows.length) return EMPTY;
+
+  var baselineNorm = 0, perfNorm = 0, baselineGmv = 0, currentGmv = 0;
+  var detail = rows.map(function (r) {
+    var b = parseFloat(r.baseline_gmv) || 0, p = parseFloat(r.perf_gmv) || 0;
+    var bd = parseFloat(r.baseline_days_in_month) || 30, pd = parseFloat(r.perf_days_in_month) || 30;
+    baselineNorm += b / bd * 30; perfNorm += p / pd * 30;
+    baselineGmv += b; currentGmv += p;
+    return { name: r.account_name || r.account_id, account_id: r.account_id, baseline: b, current: p, transfer_month: r.transfer_month };
+  });
+  var retentionPct = baselineNorm > 0 ? Math.round(perfNorm / baselineNorm * 100) : 0;
+
+  var t2Pct = nrrCommRateGet('handover', 'tier2_pct', 100);
+  var t3Pct = nrrCommRateGet('handover', 'tier3_pct', 120);
+  var t2Pay = nrrCommRateGet('handover', 'tier2_payout', 2500);
+  var t3Bonus = nrrCommRateGet('handover', 'tier3_bonus', 2500);
+  var payout = retentionPct >= t3Pct ? t2Pay + t3Bonus : retentionPct >= t2Pct ? t2Pay : 0;
+
+  return { accounts: rows.length, baseline_gmv: baselineGmv, current_gmv: currentGmv, retention_pct: retentionPct, payout: payout, detail: detail };
+}
+window.nrrComputeHandoverForKam = nrrComputeHandoverForKam;
+
 function nrrEstimateKamCommission(kamEmail, period, pct) {
   if (pct == null) return null;
   var nrrPayout = nrrCommTierPayout('kam', kamEmail, period, pct);
@@ -272,17 +346,23 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   var p3Rate = nrrCommRateGet('upsell_sku', 'p3_rate', 0.01);
   var outRate = nrrCommRateGet('upsell_outlet', 'rate', 0.005);
   var upsellComm = row.p1_gmv * p1Rate + row.p3_incremental * p3Rate + row.outlet_gmv * outRate;
-  // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate)
+  // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate).
+  // Per the real engine, the gate multiplies (nrr_payout + upsell); handover
+  // is a SEPARATE flat bonus outside the gate (_commBuildKamPayout adds
+  // handover.payout to final_payout un-multiplied) — mirrored here.
   var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
   var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
   var cap = 1.0;
   if (pct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
   else if (pct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
+  var handover = nrrComputeHandoverForKam(kamEmail, period);
   return {
-    kind: 'kam', pct: pct, nrr_payout: nrrPayout, upsell_comm: Math.round(upsellComm), gate_cap: cap,
-    est: Math.round((nrrPayout + upsellComm) * cap),
+    kind: 'kam', pct: pct, nrr_payout: nrrPayout, upsell_comm: Math.round(upsellComm),
+    gate_cap: cap, handover: handover,
+    est: Math.round((nrrPayout + upsellComm) * cap) + handover.payout,
     note: '(NRR ฿' + nrrPayout.toLocaleString('en-US') + ' + upsell ฿' + Math.round(upsellComm).toLocaleString('en-US') + ')' +
-      (cap < 1 ? ' × gate ' + cap + 'x' : '') + ' · ยังไม่รวม handover'
+      (cap < 1 ? ' × gate ' + cap + 'x' : '') +
+      (handover.payout ? ' + handover ฿' + handover.payout.toLocaleString('en-US') : '')
   };
 }
 window.nrrEstimateKamCommission = nrrEstimateKamCommission;

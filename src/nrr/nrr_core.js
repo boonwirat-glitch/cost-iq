@@ -125,6 +125,18 @@ function nrrFmtGMV(v) {
 }
 window.nrrFmtGMV = nrrFmtGMV;
 
+// Exact-baht formatter — for commission payouts specifically (user ask
+// 2026-07-09: "50,123" not "50K"). Movement/GMV figures elsewhere in the
+// app stay abbreviated via nrrFmtGMV — commission is a payroll number
+// teams reconcile against payslips, where nrrFmtGMV's rounding is
+// actively unhelpful.
+function nrrFmtGMVExact(v) {
+  if (v == null || isNaN(v)) return '—';
+  var neg = v < 0;
+  return (neg ? '-' : '') + '฿' + Math.round(Math.abs(v)).toLocaleString('en-US');
+}
+window.nrrFmtGMVExact = nrrFmtGMVExact;
+
 function nrrFmtPct(v) { return v != null ? v + '%' : '—'; }
 window.nrrFmtPct = nrrFmtPct;
 
