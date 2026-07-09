@@ -16,10 +16,11 @@ Mirrors build_dashboard.py exactly (same string-concat pattern, no
 bundler). Modules (inject order matters — dependencies before dependents):
   nrr_logic.js       ported _qnrrCompute (source of truth: src/07c_qnrr_view.js)
   nrr_data.js        R2 CSV fetch/parse, builds window.bulkQnrrData
-  nrr_core.js        Supabase auth, role gate (tl/admin only), fmt helpers, CountUp
+  nrr_core.js        Supabase auth, role gate (tl/admin/rep), fmt helpers, CountUp
   nrr_router.js      hash router (#/ dashboard · #/portfolio · #/account) + role guards
   nrr_aggregate.js   org/team/KAM/outlet rollups on top of nrr_logic
   nrr_commission.js  reads commission_payout_snapshots (no re-derivation)
+  nrr_portfolio.js   Portfolio layer pace/filter logic over window.bulkPortviewData (Phase B)
   nrr_notes.js       outlet notes (nrr_outlet_notes table — requires manual DB migration, degrades gracefully if missing)
   nrr_components.js  render helpers (stat tiles, movement chart, tags)
   nrr_view.js        page controller — wires fetch -> compute -> render
@@ -42,6 +43,7 @@ nrr_core         = read('src/nrr/nrr_core.js')
 nrr_router       = read('src/nrr/nrr_router.js')
 nrr_aggregate    = read('src/nrr/nrr_aggregate.js')
 nrr_commission   = read('src/nrr/nrr_commission.js')
+nrr_portfolio    = read('src/nrr/nrr_portfolio.js')
 nrr_notes        = read('src/nrr/nrr_notes.js')
 nrr_components_js= read('src/nrr/nrr_components.js')
 nrr_view         = read('src/nrr/nrr_view.js')
@@ -56,6 +58,7 @@ SLOTS = [
     ('<!-- INJECT_ROUTER -->',         nrr_router,          'script'),
     ('<!-- INJECT_AGGREGATE -->',      nrr_aggregate,       'script'),
     ('<!-- INJECT_COMMISSION -->',     nrr_commission,      'script'),
+    ('<!-- INJECT_PORTFOLIO -->',      nrr_portfolio,       'script'),
     ('<!-- INJECT_NOTES -->',          nrr_notes,           'script'),
     ('<!-- INJECT_COMPONENTS_JS -->',  nrr_components_js,   'script'),
     ('<!-- INJECT_VIEW -->',           nrr_view,            'script'),

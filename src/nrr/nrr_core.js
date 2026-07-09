@@ -1,14 +1,17 @@
 // ── nrr_core.js — auth, role gate, format helpers, CountUp ───────────────
 // Auth pattern ported from src/dashboard/dash_core.js (same Supabase
 // project, same profiles table). Role gate is intentionally narrower than
-// /dashboard's: only 'tl' and 'admin' get in, because _qnrrCompute's scope
+// /dashboard's: only 'tl'/'admin'/'rep' get in, because _qnrrCompute's scope
 // logic (nrr_logic.js) only defines real behavior for scope 'kam'/'tl'/
 // 'admin' — sales_tl/ad_tl have no defined NRR-scope semantics in the
 // actual business logic, so letting them in would show meaningless numbers.
+// 'rep' (added Phase B, 2026-07-09) maps to scope 'kam' — reps only ever
+// see the Portfolio layer (nrr_router.js's guard confines them there),
+// never the tl/admin dashboard.
 
 var SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
 var SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
-var NRR_ALLOWED_ROLES = ['tl', 'admin', 'team_lead', 'team lead'];
+var NRR_ALLOWED_ROLES = ['tl', 'admin', 'team_lead', 'team lead', 'rep'];
 
 var supa = null;
 var nrrProfile = null;
@@ -50,7 +53,7 @@ async function nrrOnSessionReady(session) {
 
     if (!NRR_ALLOWED_ROLES.includes(role)) {
       await supa.auth.signOut();
-      nrrShowAuthError('บัญชีนี้ไม่มีสิทธิ์เข้าใช้หน้านี้ — สำหรับ Team Lead และ Admin เท่านั้น');
+      nrrShowAuthError('บัญชีนี้ไม่มีสิทธิ์เข้าใช้หน้านี้');
       return;
     }
 

@@ -61,6 +61,9 @@ async function nrrInitApp() {
     nrrCommSelectedPeriod = e.target.value;
     nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
   });
+  document.getElementById('nrr-portfolio-body').addEventListener('click', nrrHandlePortfolioClick);
+  document.getElementById('nrr-portfolio-body').addEventListener('input', nrrHandlePortfolioInput);
+  document.getElementById('nrr-portfolio-body').addEventListener('change', nrrHandlePortfolioChange);
 
   // ── Router wiring — see nrr_router.js ──
   nrrRouterRegister('dashboard', function () {
@@ -75,14 +78,274 @@ async function nrrInitApp() {
   nrrHandleRoute();
 }
 
-// ── Portfolio layer views (Phase A: placeholders — real build in Phase B/C) ──
+// ── Portfolio layer view (Phase B, 2026-07-09) ───────────────────────────
+// rep: own portfolio only. tl: own team, with a KAM switcher. admin: every
+// KAM, switcher grouped by team. All three render the SAME two blocks —
+// self-summary (commission receipt, reused verbatim from the drawer) +
+// account card list (portview.csv) — "ภาษาเดียวกัน" across every role.
+var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn: false, danger: false }, skuFilter: false };
+
+// { email, name } list this profile is allowed to switch between — also
+// what nrr_router.js's TL guard checks against, so "what the switcher
+// offers" and "what the URL guard allows" never drift apart.
+function nrrPortfolioSwitcherList() {
+  if (nrrProfile.role === 'admin') {
+    var out = [];
+    nrrListTeams().forEach(function (t) {
+      nrrListKamsForTeam(t.email).forEach(function (k) { out.push({ email: k.email, name: k.name, team: t.name }); });
+    });
+    return out;
+  }
+  if (nrrProfile.role === 'tl') return nrrListKamsForTeam(nrrProfile.email).map(function (k) { return { email: k.email, name: k.name, team: nrrProfile.name }; });
+  return [];
+}
+
+function nrrPortfolioSwitcherHtml(list, selectedEmail) {
+  if (nrrProfile.role === 'rep' || !list.length) return '';
+  var optionsHtml;
+  if (nrrProfile.role === 'admin') {
+    var byTeam = {};
+    list.forEach(function (k) { (byTeam[k.team] = byTeam[k.team] || []).push(k); });
+    optionsHtml = Object.keys(byTeam).sort(function (a, b) { return a.localeCompare(b, 'th'); }).map(function (team) {
+      return '<optgroup label="' + nrrEsc(team) + '">' + byTeam[team].map(function (k) {
+        return '<option value="' + nrrEsc(k.email) + '"' + (k.email === selectedEmail ? ' selected' : '') + '>' + nrrEsc(k.name) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+  } else {
+    optionsHtml = list.map(function (k) {
+      return '<option value="' + nrrEsc(k.email) + '"' + (k.email === selectedEmail ? ' selected' : '') + '>' + nrrEsc(k.name) + '</option>';
+    }).join('');
+  }
+  return '<select class="nrr-search" id="nrr-port-kam-select" style="cursor:pointer">' + optionsHtml + '</select>';
+}
+
+// Plain-language status word alongside pace% (Sense pattern, ported from
+// 06_portview_teamview.js's _statusLabel — never rely on color alone).
+function nrrPaceStatusWord(pace) {
+  if (pace.pct == null) return { text: 'ไม่มีฐานเทียบ', color: 'var(--ink3)' };
+  if (pace.cls === 'great' || pace.cls === 'safe') return { text: 'ตามเป้า', color: 'var(--green-deep)' };
+  if (pace.cls === 'warn') return { text: 'เฝ้าดู', color: 'var(--sun-deep)' };
+  return { text: 'น่าเป็นห่วง', color: 'var(--coral)' };
+}
+
+// churned_sku_count/last_month_sku_count reframed POSITIVE (round 2,
+// 2026-07-09) — "SKU ที่กลับมาสั่งซ้ำ" (last_month_sku_count - churned)
+// out of last month's SKU base, not "SKU ที่หลุด." Same early-month-bias
+// caveat as before (portview compares last month's orders against THIS
+// month's MTD, so early in the month a lot of normal-cadence SKUs haven't
+// re-ordered yet) — framing it as "ordered" instead of "churned" and
+// escalating color only when the reorder rate is actually LOW (inverted
+// from round 1: high ratio = good = quiet, low ratio = bad = coral) reads
+// far less alarmist while showing the exact same underlying numbers.
+function nrrSkuGapSeverity(row) {
+  var m = row.last_month_sku_count || 0;
+  if (m <= 0) return null;
+  var ordered = Math.max(0, m - (row.churned_sku_count || 0));
+  var ratio = ordered / m;
+  var cls = ratio >= 0.75 ? 'quiet' : ratio >= 0.5 ? 'warn' : 'danger';
+  return { ordered: ordered, m: m, cls: cls };
+}
+
+function nrrAcctRowHtml(item) {
+  var r = item.row, pace = item.pace;
+  var color = pace.pct == null ? 'var(--ink3)' : nrrThresholdColorVar(pace.pct);
+  var status = nrrPaceStatusWord(pace);
+  var gap = nrrSkuGapSeverity(r);
+  var gapHtml = gap
+    ? '<span class="nrr-acct-flag ' + gap.cls + '">สั่งแล้ว ' + gap.ordered + '/' + gap.m + ' SKU</span>' : '';
+  var missingHtml = r.missing_cat_count > 0
+    ? '<span class="nrr-acct-flag">ไม่มีหมวด ' + r.missing_cat_count + '</span>' : '';
+  return '<div class="nrr-acct-row" style="border-left-color:' + color + '">' +
+    '<div class="nrr-acct-row-left">' +
+    '<div class="nrr-acct-row-name">' + nrrEsc(r.account_name || r.account_id) + '</div>' +
+    '<div class="nrr-acct-row-meta"><span class="num">' + nrrFmtGMV(r.runrate_gmv) + '</span><span class="micro">run-rate</span>' +
+    '<span class="micro">/ ' + (pace.pct != null ? nrrFmtGMV(pace.baseline_gmv) : '—') + ' เดือนฐาน</span>' +
+    '<span class="micro">· ดูแล ' + (r.days_with_current_kam || 0) + ' วัน</span></div>' +
+    (gapHtml || missingHtml ? '<div class="nrr-acct-row-flags">' + gapHtml + missingHtml + '</div>' : '') +
+    '</div>' +
+    '<div class="nrr-acct-row-right">' +
+    '<span class="num nrr-acct-row-pace" style="color:' + color + '">' + pace.label + '</span>' +
+    '<span class="nrr-acct-row-status" style="color:' + status.color + '">' + nrrEsc(status.text) + '</span>' +
+    nrrAcctSparklineHtml(r, pace) +
+    '</div>' +
+    '</div>';
+}
+
+// Portfolio-level risk summary — Sense's ON TRACK/MONITOR/AT RISK boxes
+// (06_portview_teamview.js:1580-1700), ported as a count+value stat strip.
+// Round 3 (2026-07-09): the tiles ARE the pace filter now — click one or
+// more to narrow the list to those buckets (multi-select, OR'd); none
+// selected = show everything. Replaces the old separate "ทั้งหมด"/"ต่ำกว่า
+// pace" chips, which were redundant with what these tiles already show.
+function nrrPortfolioRiskSummaryHtml(kamEmail) {
+  var b = nrrPortfolioRiskSummary(kamEmail);
+  var anySelected = nrrPortfolioState.paceFilter.ok || nrrPortfolioState.paceFilter.warn || nrrPortfolioState.paceFilter.danger;
+  function tile(key, color, label, count, value, sign) {
+    var selected = nrrPortfolioState.paceFilter[key];
+    return '<div class="nrr-risk-tile ' + key + (selected ? ' selected' : '') + '" data-risk-filter="' + key + '">' +
+      '<div class="nrr-risk-tile-label" style="color:' + color + '">' + nrrEsc(label) + ' <span class="num">' + count + ' ร้าน</span></div>' +
+      '<div class="num nrr-risk-tile-value" style="color:' + color + '">' + sign + nrrFmtGMV(value) + '</div>' +
+      '</div>';
+  }
+  return '<div class="nrr-risk-strip' + (anySelected ? ' has-selection' : '') + '" id="nrr-port-risk-strip">' +
+    tile('ok', 'var(--green-deep)', 'ตามเป้า', b.ok.count, b.ok.value, '+') +
+    tile('warn', 'var(--sun-deep)', 'เฝ้าดู', b.warn.count, b.warn.value, '-') +
+    tile('danger', 'var(--coral)', 'น่าเป็นห่วง', b.danger.count, b.danger.value, '-') +
+    '</div>';
+}
+
+// Filters/sorts this KAM's accounts against the current search+filter
+// state. Split from the shell (below) so typing in the search box only
+// repaints the grid, not the input itself (which would drop focus/cursor
+// position).
+function nrrPortfolioAcctGridHtml(email) {
+  var pf = nrrPortfolioState.paceFilter;
+  var anyPaceSelected = pf.ok || pf.warn || pf.danger;
+  var filtered = nrrPortfolioRowsFor(email).filter(function (item) {
+    if (anyPaceSelected) {
+      var bucket = (item.pace.cls === 'great' || item.pace.cls === 'safe') ? 'ok' : (item.pace.cls === 'warn' ? 'warn' : (item.pace.cls === 'danger' ? 'danger' : null));
+      if (!bucket || !pf[bucket]) return false;
+    }
+    if (nrrPortfolioState.skuFilter) {
+      var gap = nrrSkuGapSeverity(item.row);
+      if (!gap || gap.cls === 'quiet') return false;
+    }
+    if (nrrPortfolioState.search && item.row.account_name.toLowerCase().indexOf(nrrPortfolioState.search) === -1) return false;
+    return true;
+  });
+  return filtered.length
+    ? '<div class="nrr-acct-list">' + filtered.map(nrrAcctRowHtml).join('') + '</div>'
+    : '<div class="ds-empty"><div class="ds-empty-title">ไม่พบร้านที่ตรงกับตัวกรอง</div></div>';
+}
+
+function nrrPortfolioAcctListHtml(email) {
+  var all = nrrPortfolioRowsFor(email);
+  var skuChip = '<button type="button" class="nrr-chip' + (nrrPortfolioState.skuFilter ? ' on' : '') + '" data-port-filter="churn">สั่งซ้ำต่ำ</button>';
+  return '<div class="nrr-panel-head" style="margin-top:8px"><div class="h2" style="font-size:18px">ร้านในมือ (' + all.length + ')</div></div>' +
+    nrrPortfolioRiskSummaryHtml(email) +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;margin-top:14px">' +
+    '<input class="nrr-search" id="nrr-port-search" placeholder="ค้นหาร้าน..." value="' + nrrEsc(nrrPortfolioState.search) + '">' +
+    '</div>' +
+    '<div class="nrr-chip-row" id="nrr-port-chips">' + skuChip + '</div>' +
+    '<div id="nrr-port-acct-grid">' + nrrPortfolioAcctGridHtml(email) + '</div>';
+}
+
+// NRR/GMV hero — this is the primary "how am I doing" answer for the page
+// (round 2, 2026-07-09: promoted above the commission section, which used
+// to lead — money is a downstream consequence of this number, not the
+// headline). Reuses nrrMonthTriple/nrrTripleHtml exactly as the dashboard
+// does elsewhere in this app — one convention, no new component.
+function nrrPortfolioPulseHtml(email, period) {
+  var result = nrrKamResult(email);
+  var bm = result && period ? result.by_month[period] : null;
+  var pct = bm ? bm.nrr_pct : null;
+  var triple = nrrMonthTriple(result, period);
+  return '<div class="nrr-port-pulse">' +
+    '<div class="eyebrow">%NRR · ' + nrrEsc(QNRR_CFG.months_th[period] || period) + '</div>' +
+    '<div class="num nrr-port-pulse-pct" style="color:' + (pct != null ? nrrThresholdColorVar(pct) : 'var(--ink3)') + '">' + (pct != null ? pct + '%' : '—') + '</div>' +
+    nrrTripleHtml('lg', triple) +
+    '</div>';
+}
+
+function nrrRenderPortfolioBody() {
+  var body = document.getElementById('nrr-portfolio-body');
+  if (!body) return;
+  var email = nrrPortfolioState.email;
+  if (!email) {
+    body.innerHTML = '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
+      '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีมให้เลือกดู</div></div>';
+    return;
+  }
+  var list = nrrPortfolioSwitcherList();
+  var switcherHtml = nrrPortfolioSwitcherHtml(list, email);
+  var kamName = (list.find(function (k) { return k.email === email; }) || {}).name || email;
+
+  var period = nrrCurrentPeriod(nrrKamResult(email));
+  var pulseHtml = period ? nrrPortfolioPulseHtml(email, period) : '';
+  var summaryHtml;
+  if (period) {
+    var bundle = nrrCommReceiptBundle(email, period, 'nrr-port-p1-body', 'nrr-port-p3-body');
+    summaryHtml = '<div class="nrr-comm-ds">' + bundle.html + '</div>';
+  } else {
+    bundle = null;
+    summaryHtml = '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูล %NRR ของเดือนนี้</div></div>';
+  }
+
+  body.innerHTML =
+    '<div class="nrr-panel-head">' +
+    '<div><div class="eyebrow">Portfolio' + (nrrProfile.role !== 'rep' ? ' · ' + nrrEsc(kamName) : '') + '</div><div class="h2">' + (nrrProfile.role === 'rep' ? 'ของฉัน' : nrrEsc(kamName)) + '</div></div>' +
+    switcherHtml +
+    '</div>' +
+    pulseHtml +
+    '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ค่าคอมมิชชั่น</div></div>' +
+    summaryHtml +
+    nrrPortfolioAcctListHtml(email);
+
+  if (period && bundle) {
+    nrrLoadCommissionUpsellSection(email, bundle.expansionOutletIds, bundle.bd, 'nrr-port-p1-body', 'nrr-port-p3-body',
+      function (e) { return nrrPortfolioState.email === e; });
+  }
+}
+
 function nrrRenderPortfolioLayerView(route) {
   var body = document.getElementById('nrr-portfolio-body');
   if (!body) return;
-  body.innerHTML =
-    '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
-    '<div class="sub" style="margin-top:6px">มุมมองร้านในมือราย KAM (pace, churn signals, drill-down ราย SKU) — เร็วๆ นี้</div>' +
-    '<div class="micro" style="margin-top:12px"><a href="#/" style="color:var(--green-deep)">← กลับ Dashboard</a></div>';
+  body.innerHTML = '<div class="ds-skel" style="height:120px"></div>';
+  Promise.all([nrrFetchPortviewCsv(), nrrFetchBulkHistoryCsv()]).then(function () {
+    var email = route.param || nrrProfile.email;
+    if (nrrProfile.role !== 'rep' && !route.param) {
+      var list = nrrPortfolioSwitcherList();
+      email = list.length ? list[0].email : null;
+    }
+    nrrPortfolioState.email = email;
+    nrrRenderPortfolioBody();
+  });
+}
+
+// Delegated interaction handlers — bound once in nrrInitApp to the
+// persistent #nrr-portfolio-body container (the router re-renders its
+// innerHTML on every route change, so listeners must live on the parent).
+function nrrHandlePortfolioClick(e) {
+  var riskTile = e.target.closest('[data-risk-filter]');
+  if (riskTile) {
+    var key = riskTile.dataset.riskFilter;
+    nrrPortfolioState.paceFilter[key] = !nrrPortfolioState.paceFilter[key];
+    var stripEl = document.getElementById('nrr-port-risk-strip');
+    if (stripEl) stripEl.outerHTML = nrrPortfolioRiskSummaryHtml(nrrPortfolioState.email);
+    var gridEl0 = document.getElementById('nrr-port-acct-grid');
+    if (gridEl0) gridEl0.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
+    return;
+  }
+  var chip = e.target.closest('[data-port-filter]');
+  if (chip) {
+    nrrPortfolioState.skuFilter = !nrrPortfolioState.skuFilter;
+    chip.classList.toggle('on', nrrPortfolioState.skuFilter);
+    var gridEl = document.getElementById('nrr-port-acct-grid');
+    if (gridEl) gridEl.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
+    return;
+  }
+  var retryBtn = e.target.closest('.nrr-comm-retry-upsell-btn');
+  if (retryBtn && nrrPortfolioState.email === retryBtn.dataset.email) {
+    ['nrr-port-p1-body', 'nrr-port-p3-body'].forEach(function (id) {
+      var t = document.getElementById(id);
+      if (t) t.innerHTML = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
+    });
+    delete nrrUpsellBundleCache[retryBtn.dataset.email];
+    var period = nrrCurrentPeriod(nrrKamResult(retryBtn.dataset.email));
+    var bundle = nrrCommReceiptBundle(retryBtn.dataset.email, period, 'nrr-port-p1-body', 'nrr-port-p3-body');
+    nrrLoadCommissionUpsellSection(retryBtn.dataset.email, bundle.expansionOutletIds, bundle.bd, 'nrr-port-p1-body', 'nrr-port-p3-body',
+      function (e2) { return nrrPortfolioState.email === e2; });
+  }
+}
+function nrrHandlePortfolioInput(e) {
+  if (e.target.id !== 'nrr-port-search') return;
+  nrrPortfolioState.search = e.target.value.trim().toLowerCase();
+  var gridEl = document.getElementById('nrr-port-acct-grid');
+  if (gridEl) gridEl.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
+}
+function nrrHandlePortfolioChange(e) {
+  if (e.target.id !== 'nrr-port-kam-select') return;
+  nrrNavigate('#/portfolio/' + encodeURIComponent(e.target.value));
 }
 function nrrRenderAccountView(route) {
   var body = document.getElementById('nrr-account-body');
@@ -1278,10 +1541,14 @@ function nrrOpenCommissionDrawer(kamEmail, kamName, period) {
 }
 window.nrrOpenCommissionDrawer = nrrOpenCommissionDrawer;
 
-function nrrRenderCommissionDrawerBody(kamEmail, period) {
-  var el = document.getElementById('nrr-comm-drawer-body');
-  if (!el) return;
-
+// Assembles the hero+tier+receipt HTML for one KAM/period — the exact same
+// bundle the drawer and the Portfolio self-summary (Phase B) both render,
+// so a rep's own view and a TL/Admin's drill-down of that same person are
+// pixel-for-pixel identical (the whole point of Phase A's "reuse, don't
+// reimplement" design). p1ElId/p3ElId let each caller give the async upsell
+// section its own DOM ids (drawer vs. portfolio body render at the same
+// time in different callers, so they can't share one hardcoded id).
+function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
   var snap = nrrLatestSnapshotFor(kamEmail);
   var bd = snap && snap.breakdown ? snap.breakdown : null;
   var result = nrrKamResult(kamEmail);
@@ -1323,24 +1590,39 @@ function nrrRenderCommissionDrawerBody(kamEmail, period) {
   var p1p3Note = '<div class="nrr-rcpt-note">นับเฉพาะร้านนอกกลุ่ม Expansion — ร้านขยายได้ 0.5% ในบรรทัด Expansion</div>';
   var sectionsByKey = {
     nrr: nrrCommOutletListHtml(nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้'),
-    p1: p1p3Note + '<div id="nrr-comm-drawer-p1-body">' + skel + '</div>',
-    p3: p1p3Note + '<div id="nrr-comm-drawer-p3-body">' + skel + '</div>',
+    p1: p1p3Note + '<div id="' + p1ElId + '">' + skel + '</div>',
+    p3: p1p3Note + '<div id="' + p3ElId + '">' + skel + '</div>',
     expansion: nrrCommOutletListHtml(expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้', 0.005),
     handover: nrrCommHandoverListHtml(handoverDetail)
   };
-  el.innerHTML = heroHtml + tierHtml + nrrCommReceiptHtml(steps, sectionsByKey);
-
   var expansionOutletIds = new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); }));
-  nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd);
+  return {
+    html: heroHtml + tierHtml + nrrCommReceiptHtml(steps, sectionsByKey),
+    expansionOutletIds: expansionOutletIds,
+    bd: bd
+  };
 }
 
-function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd) {
+function nrrRenderCommissionDrawerBody(kamEmail, period) {
+  var el = document.getElementById('nrr-comm-drawer-body');
+  if (!el) return;
+  var bundle = nrrCommReceiptBundle(kamEmail, period, 'nrr-comm-drawer-p1-body', 'nrr-comm-drawer-p3-body');
+  el.innerHTML = bundle.html;
+  nrrLoadCommissionUpsellSection(kamEmail, bundle.expansionOutletIds, bundle.bd);
+}
+
+// guardFn(email) -> bool: is this fetch still relevant to render? Defaults
+// to the drawer's own stale-guard (nrrCommDrawerState) — callers rendering
+// somewhere other than the drawer (Portfolio, Phase B) pass their own ids
+// + guard so a KAM switch mid-fetch can't paint the wrong person's numbers.
+function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd, p1ElId, p3ElId, guardFn) {
+  p1ElId = p1ElId || 'nrr-comm-drawer-p1-body';
+  p3ElId = p3ElId || 'nrr-comm-drawer-p3-body';
+  guardFn = guardFn || function (email) { return nrrCommDrawerState && nrrCommDrawerState.kamEmail === email; };
   nrrFetchUpsellBundle(kamEmail).then(function (bundle) {
-    // Stale-guard: user may have closed/reopened the drawer for a different KAM
-    // (or a different period) while this fetch was in flight.
-    if (!nrrCommDrawerState || nrrCommDrawerState.kamEmail !== kamEmail) return;
-    var p1Target = document.getElementById('nrr-comm-drawer-p1-body');
-    var p3Target = document.getElementById('nrr-comm-drawer-p3-body');
+    if (!guardFn(kamEmail)) return;
+    var p1Target = document.getElementById(p1ElId);
+    var p3Target = document.getElementById(p3ElId);
     if (!p1Target && !p3Target) return;
     if (!bundle.loaded) {
       var failHtml = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div>' +

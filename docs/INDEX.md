@@ -9,7 +9,8 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
-| `docs/handoff-2026-07-09-nrr-v16-polish.md` | **Latest — nrr_v16** — visual hierarchy polish: exception-based stamps (16→3 pills/จอ), ใบเสร็จครบ 8 บรรทัด (P1/P3/Expansion แยก + Handover เสมอ) บวกลงตัวเป๊ะ, TL receipt + multiplier drill, alignment 4 คอลัมน์ |
+| `docs/handoff-2026-07-09-nrr-v17-phase-b-portfolio.md` | **Latest — nrr_v17 (Phase B)** — เปิด role rep เข้า /nrr ได้จริง + หน้า Portfolio (self-summary + รายการร้าน list แนวตั้ง + risk-summary filter multi-select + sparkline 6 เดือน) — baseline pace ยืนกับเดือนฐานไตรมาสเดียวกับ %NRR (ไม่ rolling แบบ Sense) |
+| `docs/handoff-2026-07-09-nrr-v16-polish.md` | nrr_v16 — visual hierarchy polish: exception-based stamps (16→3 pills/จอ), ใบเสร็จครบ 8 บรรทัด (P1/P3/Expansion แยก + Handover เสมอ) บวกลงตัวเป๊ะ, TL receipt + multiplier drill, alignment 4 คอลัมน์ |
 | `docs/handoff-2026-07-09-nrr-v15-commission-redesign.md` | nrr_v15 — Commission UX redesign: ใบเสร็จเดินบัญชี (receipt) แทนตารางแบน + tier chip/progress/next-step + แก้บั๊ก ฿0 ใน NRR list + แยก GMV vs commission จริงต่อร้าน |
 | `docs/handoff-2026-07-09-nrr-v14-fixes.md` | nrr_v14 — เลขคอมมิชชั่นเต็ม, breakdown เต็มความกว้าง, drill-down ครบ NRR/expansion/handover/P1/P3/gate, stale-CSV banner (พบ admin_view.csv ค้าง Q2) |
 | `docs/handoff-2026-07-09-nrr-v13-fixes.md` | nrr_v13 — estimator ใหม่บน tier จริง (เลิก %GMV เก่า), เงินแสดงตามจริงของเดือน (⚠️ convention ใหม่ %NRR เท่านั้นที่ normalize), admin เห็น KAM รายคน, appnav แท็บขีดเส้นใต้ |

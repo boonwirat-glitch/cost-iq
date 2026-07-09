@@ -36,7 +36,12 @@ function nrrParseHash() {
 //    ownership (rep opening someone else's account) is enforced by the
 //    account view itself once it has portview data (Phase C) — the router
 //    can't know account→KAM mapping before that data loads.
-//  - tl/admin: everything.
+//  - tl: dashboard (own team) + portfolio, but only KAMs in their own team
+//    (Phase B, 2026-07-09) — without this a TL could open
+//    #/portfolio/<kamEmail> for a KAM outside their team by editing the
+//    URL directly; the KAM-switcher UI only ever *offers* their own team,
+//    it doesn't enforce it, so the guard has to be here too.
+//  - admin: everything.
 function nrrRouteGuard(route) {
   var p = window.nrrProfile;
   if (!p) return route;
@@ -45,6 +50,11 @@ function nrrRouteGuard(route) {
     if (route.view === 'portfolio' && route.param && route.param !== p.email) {
       return { view: 'portfolio', param: null, redirect: true };
     }
+  }
+  if (p.role === 'tl' && route.view === 'portfolio' && route.param) {
+    var ownTeam = (typeof nrrListKamsForTeam === 'function' ? nrrListKamsForTeam(p.email) : []);
+    var inTeam = ownTeam.some(function (k) { return k.email === route.param; });
+    if (!inTeam) return { view: 'portfolio', param: null, redirect: true };
   }
   return route;
 }

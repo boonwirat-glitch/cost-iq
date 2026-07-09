@@ -379,3 +379,110 @@ async function nrrFetchUpsellBundle(kamEmail) {
   return p;
 }
 window.nrrFetchUpsellBundle = nrrFetchUpsellBundle;
+
+// ── Portfolio layer (Phase B) — portview.csv ─────────────────────────────
+// One row per account, precomputed pace/churn/missing-category signals —
+// confirmed against the real file in R2 (2026-07-09), 20 columns. Fetched
+// once, lazily, the first time any role opens the Portfolio layer (NOT part
+// of nrrRefresh()'s dashboard fetch group — different concern, different
+// audience: every role visits Portfolio, only tl/admin visit the dashboard).
+window.bulkPortviewData = { loaded: false };
+
+function _nrrParsePortviewCsv(text) {
+  var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
+  var byKamEmail = {}, allRows = [];
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var row = {
+      account_id:            (p[0] || '').trim(),
+      account_name:          (p[1] || '').trim(),
+      last_month_gmv:        parseFloat(p[2]) || 0,
+      gmv_to_date:           parseFloat(p[3]) || 0,
+      days_elapsed:          parseInt(p[4], 10) || 0,
+      days_in_month:         parseInt(p[5], 10) || 30,
+      runrate_gmv:           parseFloat(p[6]) || 0,
+      account_type:          (p[7] || '').trim(),
+      churned_sku_count:     parseInt(p[8], 10) || 0,
+      churned_gmv:           parseFloat(p[9]) || 0,
+      top_churned_names:     (p[10] || '').trim(),
+      missing_cat_count:     parseInt(p[11], 10) || 0,
+      missing_cats:          (p[12] || '').trim(),
+      last_month_sku_count:  parseInt(p[13], 10) || 0,
+      cur_sku_count:         parseInt(p[14], 10) || 0,
+      orders_to_date:        parseInt(p[15], 10) || 0,
+      kam_name:              (p[16] || '').trim(),
+      kam_email:             (p[17] || '').trim(),
+      tl_email:              (p[18] || '').trim(),
+      days_with_current_kam: parseInt(p[19], 10) || 0
+    };
+    allRows.push(row);
+    if (row.kam_email) {
+      if (!byKamEmail[row.kam_email]) byKamEmail[row.kam_email] = [];
+      byKamEmail[row.kam_email].push(row);
+    }
+  });
+  return { byKamEmail: byKamEmail, allRows: allRows };
+}
+
+async function nrrFetchPortviewCsv(force) {
+  if (window.bulkPortviewData.loaded && !force) return window.bulkPortviewData;
+  try {
+    var res = await fetch(R2_BASE + '/portview.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkPortviewData = { allRows: [], byKamEmail: {}, loaded: false, notFound: true }; return window.bulkPortviewData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    var parsed = _nrrParsePortviewCsv(text);
+    window.bulkPortviewData = { allRows: parsed.allRows, byKamEmail: parsed.byKamEmail, loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load portview.csv', e);
+    window.bulkPortviewData = { allRows: [], byKamEmail: {}, loaded: false, error: e.message };
+  }
+  return window.bulkPortviewData;
+}
+window.nrrFetchPortviewCsv = nrrFetchPortviewCsv;
+
+// ── Portfolio layer round 2 — bulk_history.csv ───────────────────────────
+// account_id, account_name, month_label, gmv, orders — one row per
+// account per month (confirmed against the real file in R2, 585KB).
+// Fetched lazily alongside portview.csv on first Portfolio visit. Two
+// uses: (1) the quarter-base-month lookup nrrPaceSignal needs (see
+// nrr_portfolio.js — /nrr intentionally anchors account-level pace to the
+// SAME fixed base_month %NRR uses, not Sense's rolling 3-month average),
+// (2) the per-account 6-month sparkline.
+window.bulkHistoryData = { loaded: false };
+
+function _nrrParseBulkHistoryCsv(text) {
+  var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
+  var byAccountId = {};
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var row = {
+      account_id:   (p[0] || '').trim(),
+      account_name: (p[1] || '').trim(),
+      month_label:  (p[2] || '').trim(),
+      gmv:          parseFloat(p[3]) || 0,
+      orders:       parseInt(p[4], 10) || 0
+    };
+    if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
+    byAccountId[row.account_id].push(row);
+  });
+  return byAccountId;
+}
+
+async function nrrFetchBulkHistoryCsv(force) {
+  if (window.bulkHistoryData.loaded && !force) return window.bulkHistoryData;
+  try {
+    var res = await fetch(R2_BASE + '/bulk_history.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkHistoryData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkHistoryData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkHistoryData = { byAccountId: _nrrParseBulkHistoryCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load bulk_history.csv', e);
+    window.bulkHistoryData = { byAccountId: {}, loaded: false, error: e.message };
+  }
+  return window.bulkHistoryData;
+}
+window.nrrFetchBulkHistoryCsv = nrrFetchBulkHistoryCsv;
