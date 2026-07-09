@@ -76,9 +76,12 @@ function nrrHandleRoute() {
     a.classList.toggle('on', a.dataset.view === navFamily);
   });
 
-  // The scrollspy subnav only makes sense inside the dashboard's long scroll.
+  // The scrollspy subnav (and its divider) only make sense inside the
+  // dashboard's long scroll.
   var subnav = document.getElementById('nrr-subnav');
   if (subnav) subnav.style.display = route.view === 'dashboard' ? '' : 'none';
+  var navDiv = document.querySelector('.nrr-appnav-div');
+  if (navDiv) navDiv.style.display = route.view === 'dashboard' ? '' : 'none';
 
   nrrCurrentRoute = route;
   var fn = nrrRoutes[route.view];

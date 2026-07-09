@@ -22,18 +22,60 @@ function nrrCurrentPeriod(result) {
 }
 window.nrrCurrentPeriod = nrrCurrentPeriod;
 
+// ── Actual-month display convention (2026-07-09, user decision) ─────────
+// The compute engine (nrr_logic.js, frozen twin of Sense's 07c) normalizes
+// everything to 30-day figures. The teams however read performance in
+// ACTUAL calendar-month baht, so every displayed amount is converted:
+//   value_actual = day-rate × days-in-that-month
+// Closed months → exact actuals; the open month → full-month projection
+// from the MTD run-rate. ONLY money display changes — %NRR stays the
+// engine's 30-day-normalized ratio (the fair cross-month comparator).
+function nrrDaysIn(month) {
+  var p = (month || '').split('-');
+  return p.length === 2 ? new Date(parseInt(p[0], 10), parseInt(p[1], 10), 0).getDate() : 30;
+}
+window.nrrDaysIn = nrrDaysIn;
+function nrrBaseDays() { return nrrDaysIn(QNRR_CFG.base_month); }
+window.nrrBaseDays = nrrBaseDays;
+
+// Scales one engine result's ×30 display fields (segments, total_gmv,
+// handover/core base sums, contraction) to actual-month values, in place,
+// exactly once. Applied at every result-producing entry point below so
+// every consumer (charts, tables, triples, composition bar) stays
+// internally consistent without touching the frozen engine.
+function _nrrActualizeResult(result) {
+  if (!result || result._actualized) return result;
+  var bScale = nrrBaseDays() / 30;
+  result.handover_base_norm = (result.handover_base_norm || 0) * bScale;
+  Object.keys(result.by_month || {}).forEach(function (m) {
+    var bm = result.by_month[m];
+    var scale = (bm.days_in_month || nrrDaysIn(m)) / 30;
+    Object.keys(bm.segments || {}).forEach(function (mv) {
+      // churn/transfer_out segments carry BASE-month GMV ("ฐานที่หาย") —
+      // their actual value belongs to the base month's calendar, not the
+      // current month's.
+      bm.segments[mv] *= (mv === 'core_nrr_churn' || mv === 'transfer_out') ? bScale : scale;
+    });
+    bm.total_gmv = (bm.total_gmv || 0) * scale; // excludes churn/transfer_out by construction
+    if (bm.core_nrr_base != null) bm.core_nrr_base *= bScale;
+    if (bm.contraction != null) bm.contraction = (bm.segments.core_nrr || 0) - (bm.core_nrr_base || 0);
+  });
+  result._actualized = true;
+  return result;
+}
+
 function nrrOrgResult() {
-  return _qnrrCompute(null, 'admin');
+  return _nrrActualizeResult(_qnrrCompute(null, 'admin'));
 }
 window.nrrOrgResult = nrrOrgResult;
 
 function nrrTeamResult(tlEmail) {
-  return _qnrrCompute(tlEmail, 'tl');
+  return _nrrActualizeResult(_qnrrCompute(tlEmail, 'tl'));
 }
 window.nrrTeamResult = nrrTeamResult;
 
 function nrrKamResult(kamEmail) {
-  return _qnrrCompute(kamEmail, 'kam');
+  return _nrrActualizeResult(_qnrrCompute(kamEmail, 'kam'));
 }
 window.nrrKamResult = nrrKamResult;
 
@@ -58,7 +100,7 @@ function nrrTeamComparison() {
       tl_email: t.email,
       tl_name: t.name,
       nrr_pct: bm ? bm.nrr_pct : null,
-      base_gmv: result ? Math.round(result.base_norm * 30) : 0,
+      base_gmv: result ? Math.round(result.base_norm * nrrBaseDays()) : 0,
       outlet_count: outletCount,
       delta_vs_org: (bm && bm.nrr_pct != null && orgPct != null) ? bm.nrr_pct - orgPct : null,
       period: period,
@@ -112,7 +154,7 @@ function nrrKamRowsForTeam(tlEmail, period) {
       kam_email: k.email,
       kam_name: k.name,
       nrr_pct: bm ? bm.nrr_pct : null,
-      base_gmv: kamResult ? Math.round(kamResult.base_norm * 30) : 0,
+      base_gmv: kamResult ? Math.round(kamResult.base_norm * nrrBaseDays()) : 0,
       outlet_count: outlets.length,
       period: kamPeriod,
       outlets: outlets
@@ -163,7 +205,7 @@ function nrrMonthTriple(result, month) {
     mtd += parseFloat(r.curr_gmv) || 0;
   });
   return {
-    base: Math.round(result.base_norm * 30),
+    base: Math.round(result.base_norm * nrrBaseDays()),
     mtd: Math.round(mtd),
     run_rate: Math.round(bm.total_gmv || 0),
     curr_days: bm.curr_days,
@@ -244,7 +286,7 @@ function nrrGroupOutletsByAccount(outlets) {
     groups[key].total_base_gmv += o.row.base_gmv || 0;
     var gd = parseFloat(o.row.curr_days) || 30;
     groups[key].curr_days = gd;
-    groups[key].total_run_rate += gd > 0 ? (o.row.curr_gmv || 0) / gd * 30 : 0;
+    groups[key].total_run_rate += gd > 0 ? (o.row.curr_gmv || 0) / gd * nrrDaysIn(o.row.period_month) : 0;
   });
   return Object.values(groups).sort(function (a, b) { return b.total_curr_gmv - a.total_curr_gmv; });
 }
@@ -273,9 +315,9 @@ function nrrPmResult() {
   var pd = window.bulkPmData;
   if (!pd || !pd.loaded) return null;
   return {
-    chain: nrrComputeBucket(pd.allRows, 'chain'),
-    sa_mc: nrrComputeBucket(pd.allRows, 'sa_mc'),
-    other: nrrComputeBucket(pd.allRows, 'other')
+    chain: _nrrActualizeResult(nrrComputeBucket(pd.allRows, 'chain')),
+    sa_mc: _nrrActualizeResult(nrrComputeBucket(pd.allRows, 'sa_mc')),
+    other: _nrrActualizeResult(nrrComputeBucket(pd.allRows, 'other'))
   };
 }
 window.nrrPmResult = nrrPmResult;
@@ -284,9 +326,9 @@ function nrrAdminResult() {
   var ad = window.bulkAdminData;
   if (!ad || !ad.loaded) return null;
   return {
-    chain: nrrComputeBucket(ad.allRows, 'chain'),
-    sa_mc: nrrComputeBucket(ad.allRows, 'sa_mc'),
-    other: nrrComputeBucket(ad.allRows, 'other')
+    chain: _nrrActualizeResult(nrrComputeBucket(ad.allRows, 'chain')),
+    sa_mc: _nrrActualizeResult(nrrComputeBucket(ad.allRows, 'sa_mc')),
+    other: _nrrActualizeResult(nrrComputeBucket(ad.allRows, 'other'))
   };
 }
 window.nrrAdminResult = nrrAdminResult;
@@ -296,7 +338,7 @@ window.nrrAdminResult = nrrAdminResult;
 function nrrVpResult() {
   var vd = window.bulkVpData;
   if (!vd || !vd.loaded || !vd.allRows.length) return null;
-  return nrrComputeRowsPool(vd.allRows, 'vp');
+  return _nrrActualizeResult(nrrComputeRowsPool(vd.allRows, 'vp'));
 }
 window.nrrVpResult = nrrVpResult;
 
@@ -321,7 +363,7 @@ function nrrHandoverCohorts(result) {
       .map(function (r) { return { row: r, movement: 'handover' }; });
     var gmv = outlets.reduce(function (s, o) {
       var d = parseFloat(o.row.curr_days) || 30;
-      return s + (d > 0 ? (parseFloat(o.row.curr_gmv) || 0) / d * 30 : 0);
+      return s + (d > 0 ? (parseFloat(o.row.curr_gmv) || 0) / d * nrrDaysIn(o.row.period_month) : 0);
     }, 0);
     model.handover.by_month[month] = { gmv: gmv, outlets: outlets };
   });
@@ -345,7 +387,7 @@ function nrrHandoverCohorts(result) {
       }).map(function (r) { return { row: r, movement: 'new_sales' }; });
       var gmv = outlets.reduce(function (s, o) {
         var d = parseFloat(o.row.curr_days) || 30;
-        return s + (d > 0 ? (parseFloat(o.row.curr_gmv) || 0) / d * 30 : 0);
+        return s + (d > 0 ? (parseFloat(o.row.curr_gmv) || 0) / d * nrrDaysIn(o.row.period_month) : 0);
       }, 0);
       cohort.by_month[month] = { gmv: gmv, outlets: outlets };
     });
@@ -362,7 +404,7 @@ function nrrTotalPortfolio() {
   var kam = nrrOrgResult();
   var kamPeriod = nrrCurrentPeriod(kam);
   var kamPct = kam && kamPeriod ? kam.by_month[kamPeriod].nrr_pct : null;
-  var kamGmv = kam ? Math.round(kam.base_norm * 30) : 0;
+  var kamGmv = kam ? Math.round(kam.base_norm * nrrBaseDays()) : 0;
 
   var pm = nrrPmResult();
   var pmPct = _nrrBlendedBucketPct(pm);
@@ -407,7 +449,7 @@ function _nrrBlendedBucketGmv(bucketResult) {
   var total = 0;
   buckets.forEach(function (b) {
     var r = bucketResult[b];
-    if (r) total += Math.round(r.base_norm * 30);
+    if (r) total += Math.round(r.base_norm * nrrBaseDays());
   });
   return total;
 }

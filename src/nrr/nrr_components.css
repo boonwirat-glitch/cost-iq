@@ -22,9 +22,26 @@
 .nrr-month-capsule { white-space: nowrap; }
 
 /* App-level nav (Dashboard · Portfolio) + in-page scrollspy subnav sit
-   together; the router hides the subnav outside the dashboard view. */
-.nrr-masthead-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.nrr-appnav a { font-weight: 700; }
+   together; the router hides the subnav outside the dashboard view.
+   DESIGN LANGUAGE SPLIT (2026-07-09): the appnav answers "คุณอยู่หน้าไหน" —
+   text tabs with a Cabbage underline (place). The .seg pills answer
+   "มองผ่านเลนส์ไหน" — filters/toggles within a page. Never style one as
+   the other; the two must read as different kinds of control at a glance. */
+.nrr-masthead-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.nrr-appnav { display: flex; align-items: center; gap: 22px; }
+.nrr-appnav a {
+  position: relative; text-decoration: none;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--ink3); padding: 6px 2px 9px;
+  transition: color 0.15s ease;
+}
+.nrr-appnav a:hover { color: var(--ink2); }
+.nrr-appnav a.on { color: var(--ink); }
+.nrr-appnav a.on::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px; border-radius: 2px; background: var(--green);
+}
+.nrr-appnav-div { width: 1px; height: 22px; background: var(--line); }
 
 /* Router views — siblings toggled with [hidden]; !important beats any
    display rule a child layout class might set later. */

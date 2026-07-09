@@ -140,7 +140,7 @@ function nrrOutletRowHtml(o, opts) {
   }
   var numbersHtml;
   if (opts.negative) {
-    var lost = Math.round((parseFloat(r.base_gmv) || 0) / (parseFloat(r.base_days) || 31) * 30);
+    var lost = Math.round((parseFloat(r.base_gmv) || 0) / (parseFloat(r.base_days) || 31) * nrrBaseDays());
     numbersHtml = '<div class="num nrr-lost">−' + nrrFmtGMV(lost) + '</div><div class="nrr-triple-sub">ฐานที่หาย</div>';
   } else {
     var currD = parseFloat(r.curr_days) || 30;
@@ -148,8 +148,8 @@ function nrrOutletRowHtml(o, opts) {
     numbersHtml = nrrTripleHtml('sm', {
       base: Math.round(parseFloat(r.base_gmv) || 0),
       mtd: Math.round(mtd),
-      run_rate: Math.round(currD > 0 ? mtd / currD * 30 : 0),
-      curr_days: currD, days_in_month: 30,
+      run_rate: Math.round(currD > 0 ? mtd / currD * nrrDaysIn(r.period_month) : 0),
+      curr_days: currD, days_in_month: nrrDaysIn(r.period_month),
       is_partial: true
     }, { signal: true });
   }
@@ -326,8 +326,8 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return;
   }
 
-  var baseAdjusted = Math.round(result.base_norm * 30);
-  var baseOriginal = Math.round((result.base_norm_original || result.base_norm) * 30);
+  var baseAdjusted = Math.round(result.base_norm * nrrBaseDays());
+  var baseOriginal = Math.round((result.base_norm_original || result.base_norm) * nrrBaseDays());
   var handoverBase = Math.round(result.handover_base_norm || 0);
   var hasAdjustment = (result.transfer_out_base_norm || 0) > 0 || (result.transfer_in_base_norm || 0) > 0;
 
@@ -445,8 +445,8 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
   var adjNote = '';
   if (hasAdjustment) {
     adjNote = '<div class="micro" style="margin-top:8px">ฐานปรับจาก ' + nrrFmtGMV(baseOriginal) + ' → ' + nrrFmtGMV(baseAdjusted) +
-      (result.transfer_out_base_norm > 0 ? ' (หัก ' + result.transfer_out_outlets.length + ' outlet ย้ายออก −' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * 30)) + ')' : '') +
-      (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * 30)) + ')' : '') +
+      (result.transfer_out_base_norm > 0 ? ' (หัก ' + result.transfer_out_outlets.length + ' outlet ย้ายออก −' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * nrrBaseDays())) + ')' : '') +
+      (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ')' : '') +
       '</div>';
   }
   tableEl.innerHTML = '<table class="nrr-table nrr-mv-table"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + totalRow + '</tbody></table>' + adjNote;
@@ -543,7 +543,7 @@ function nrrCompositionBarHtml(result, period) {
     return '<span class="nrr-compo-k"><i style="background:' + _nrrCompoColor(x.key) + '"></i>' + nrrEsc(x.label) +
       ' <b class="num">' + (neg ? '−' : '') + nrrFmtGMV(x.v) + '</b></span>';
   }).join('');
-  var baseLabel = nrrFmtGMV(Math.round((result.base_norm || 0) * 30));
+  var baseLabel = nrrFmtGMV(Math.round((result.base_norm || 0) * nrrBaseDays()));
   return '<div class="nrr-compo">' +
     '<div class="nrr-compo-lbl">องค์ประกอบของฐาน ' + baseLabel + '</div>' +
     '<div class="nrr-compo-bar">' + barHtml + '</div>' +

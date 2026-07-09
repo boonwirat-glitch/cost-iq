@@ -112,33 +112,180 @@ function nrrCommRateGet(metricCode, paramName, fallback) {
 }
 window.nrrCommRateGet = nrrCommRateGet;
 
-// ── Pace-based estimate for periods with no locked snapshot yet ─────────
-// Ported from src/dashboard/dash_commission.js's estimateTLCommission() /
-// _getSalesTLBrackets() — same bracket table, same math. Deliberately reads
-// GMV/baseline from /nrr's own already-loaded aggregates (nrrMonthTriple)
-// rather than adding a parallel data fetch. This is a guess for UNLOCKED
-// periods only — it must never be confused with a real snapshot payout.
-function nrrTLBrackets() {
-  return [
-    { min: 0,   max: 84,  rate: 0,     label: '< 85%' },
-    { min: 85,  max: 89,  rate: .0055, label: '85–90%' },
-    { min: 90,  max: 94,  rate: .007,  label: '90–95%' },
-    { min: 95,  max: 99,  rate: .008,  label: '95–100%' },
-    { min: 100, max: 119, rate: .010,  label: '100–120%' },
-    { min: 120, max: 999, rate: .012,  label: '≥ 120%' }
-  ];
-}
-window.nrrTLBrackets = nrrTLBrackets;
+// ── Estimate engine v2 (2026-07-09) — mirrors the REAL payout structure ──
+// The v1 estimator (ported from the retired TL dashboard) was a
+// %-of-team-GMV scheme from an older Sales-TL plan — against today's
+// fixed-amount tier plans it produced absurd numbers (฿834K for a TL whose
+// real payout tops out at ฿50K×mult). v2 replicates what the Cockpit's
+// engine actually does at Compute time, from the same live sources:
+//
+//   TL : NRR tier payout (commission_rule_tiers, e.g. 0/8K/12K/30K/50K)
+//        × team upsell multiplier (tl_upsell_mult_params tiers on
+//          team upsell GMV ÷ team base GMV, from sense_upsell_team.csv)
+//   KAM: NRR tier payout (0/5K/10K)
+//        + P1/P3 SKU comm + outlet comm (rates × sense_upsell_team.csv GMVs)
+//        × NRR gate cap (gmv_gate_params: <95%→0, 95–98%→cap_1, ≥98%→1)
+//        — handover retention NOT estimated (needs per-account handover
+//          data); flagged in the returned note.
+//
+// Still a clearly-labeled ESTIMATE for unlocked periods only — %NRR is the
+// MTD run-rate, upsell GMVs refresh on the team CSV's cadence.
 
-function nrrEstimateCommission(rows) {
-  var total = rows.reduce(function (s, g) { return s + (g.totalGMV || 0); }, 0);
-  var baseline = rows.reduce(function (s, g) { return s + (g.baseline || 0); }, 0);
-  var pace = baseline > 0 ? Math.round(total / baseline * 100) : 0;
-  var brackets = nrrTLBrackets();
-  var bracket = brackets.filter(function (b) { return pace >= b.min && pace <= b.max; })[0] || brackets[0];
-  return { pace: pace, total: total, baseline: baseline, bracket: bracket, est: Math.round(total * bracket.rate) };
+// Plan tier tables + per-period assignments (4 small tables, fetched once).
+var nrrCommPlansCache = { tiersByPlan: {}, assignments: {}, loaded: false };
+async function nrrFetchCommissionPlans() {
+  if (nrrCommPlansCache.loaded) return nrrCommPlansCache;
+  try {
+    var res = await Promise.all([
+      supa.from('commission_plans').select('id,plan_code,beneficiary_role,status'),
+      supa.from('commission_rules').select('id,plan_id,metric_code,active'),
+      supa.from('commission_rule_tiers').select('rule_id,tier_order,min_value,max_value,payout_value'),
+      supa.from('commission_plan_assignments').select('period_month,assignment_scope,assignee_key,plan_code')
+    ]);
+    var plans = res[0].data || [], rules = res[1].data || [];
+    var tiers = res[2].data || [], assigns = res[3].data || [];
+    var planById = {};
+    plans.forEach(function (p) { planById[p.id] = p; });
+    var tiersByPlan = {};
+    rules.forEach(function (r) {
+      if (r.metric_code !== 'nrr' || r.active === false) return;
+      var plan = planById[r.plan_id];
+      if (!plan) return;
+      tiersByPlan[plan.plan_code] = tiers
+        .filter(function (t) { return t.rule_id === r.id; })
+        .sort(function (a, b) { return (a.tier_order || 0) - (b.tier_order || 0); });
+    });
+    var assignments = {};
+    assigns.forEach(function (a) {
+      assignments[a.period_month + '|' + a.assignment_scope + '|' + a.assignee_key] = a.plan_code;
+    });
+    nrrCommPlansCache = { tiersByPlan: tiersByPlan, assignments: assignments, loaded: true };
+  } catch (e) {
+    console.warn('[nrr] commission plans fetch failed', e);
+    nrrCommPlansCache = { tiersByPlan: {}, assignments: {}, loaded: false, error: e.message };
+  }
+  return nrrCommPlansCache;
 }
-window.nrrEstimateCommission = nrrEstimateCommission;
+window.nrrFetchCommissionPlans = nrrFetchCommissionPlans;
+
+// Engine's hardcoded fallback tiers (_commDefaultTiers) — used only if the
+// plan tables can't be fetched, so the estimate degrades to STD not to 0.
+function nrrCommDefaultTiers(role) {
+  return role === 'tl'
+    ? [{ min_value: null, max_value: 98.5, payout_value: 0 },
+       { min_value: 98.5, max_value: 99,   payout_value: 0 },
+       { min_value: 99,   max_value: 100,  payout_value: 8000 },
+       { min_value: 100,  max_value: 102,  payout_value: 12000 },
+       { min_value: 102,  max_value: 104,  payout_value: 30000 },
+       { min_value: 104,  max_value: null, payout_value: 50000 }]
+    : [{ min_value: null, max_value: 100,  payout_value: 0 },
+       { min_value: 100,  max_value: 103,  payout_value: 5000 },
+       { min_value: 103,  max_value: null, payout_value: 10000 }];
+}
+
+// Tier match — same open-interval convention as _commMatchTierByCode:
+// pct >= min (null = open) && pct < max (null = open).
+function nrrCommTierPayout(role, email, period, pct) {
+  if (pct == null || isNaN(pct)) return 0;
+  var std = role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
+  var code = nrrCommPlansCache.assignments[period + '|' + role + '|' + email] || std;
+  var tiers = nrrCommPlansCache.tiersByPlan[code] || nrrCommPlansCache.tiersByPlan[std];
+  if (!tiers || !tiers.length) tiers = nrrCommDefaultTiers(role);
+  for (var i = 0; i < tiers.length; i++) {
+    var t = tiers[i];
+    var minOk = t.min_value == null || t.min_value === '' || pct >= Number(t.min_value);
+    var maxOk = t.max_value == null || t.max_value === '' || pct < Number(t.max_value);
+    if (minOk && maxOk) return Number(t.payout_value || 0);
+  }
+  return 0;
+}
+window.nrrCommTierPayout = nrrCommTierPayout;
+
+// sense_upsell_team.csv — per-KAM quarter-to-date upsell GMV totals
+// (kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base). ~100KB.
+var nrrUpsellTeamCache = { byEmail: {}, loaded: false };
+async function nrrFetchUpsellTeamCsv() {
+  if (nrrUpsellTeamCache.loaded) return nrrUpsellTeamCache;
+  try {
+    var resp = await fetch(R2_BASE + '/sense_upsell_team.csv?cb=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var lines = (await resp.text()).split('\n').filter(function (l) { return l.trim(); });
+    var byEmail = {};
+    for (var i = 1; i < lines.length; i++) {
+      var c = parseCSVRow(lines[i]);
+      byEmail[(c[0] || '').trim().toLowerCase()] = {
+        p1_gmv: parseFloat(c[1]) || 0, p3_incremental: parseFloat(c[2]) || 0,
+        outlet_gmv: parseFloat(c[3]) || 0, tl_upsell_base: parseFloat(c[4]) || 0
+      };
+    }
+    nrrUpsellTeamCache = { byEmail: byEmail, loaded: true };
+  } catch (e) {
+    console.warn('[nrr] sense_upsell_team.csv fetch failed', e);
+    nrrUpsellTeamCache = { byEmail: {}, loaded: false, error: e.message };
+  }
+  return nrrUpsellTeamCache;
+}
+window.nrrFetchUpsellTeamCsv = nrrFetchUpsellTeamCsv;
+
+// Multiplier tiers from live target_settings (tl_upsell_mult_params),
+// engine-default fallback baked in.
+function nrrCommTeamMultiplier(upsellPct) {
+  var raw = nrrCommRatesCache && nrrCommRatesCache.byKey ? nrrCommRatesCache.byKey.tl_upsell_mult_params : null;
+  var tiers = raw && raw.tiers ? raw.tiers : [
+    { min_pct: 0, max_pct: 1.99, multiplier: 1.00 }, { min_pct: 2, max_pct: 2.99, multiplier: 1.20 },
+    { min_pct: 3, max_pct: 3.99, multiplier: 1.35 }, { min_pct: 4, max_pct: 4.99, multiplier: 1.50 },
+    { min_pct: 5, max_pct: null, multiplier: 1.80 }];
+  var mult = 1.0;
+  tiers.forEach(function (t) {
+    if (upsellPct >= (t.min_pct || 0) && (t.max_pct == null || upsellPct <= t.max_pct)) mult = t.multiplier;
+  });
+  return mult;
+}
+
+// pct: governed %NRR for the beneficiary (run-rate for the open month).
+function nrrEstimateTlCommission(tlEmail, period, pct) {
+  if (pct == null) return null;
+  var nrrPayout = nrrCommTierPayout('tl', tlEmail, period, pct);
+  var teamUpsell = 0, teamBase = 0;
+  (typeof nrrListKamsForTeam === 'function' ? nrrListKamsForTeam(tlEmail) : []).forEach(function (k) {
+    var row = nrrUpsellTeamCache.byEmail[(k.email || '').toLowerCase()];
+    if (row) teamUpsell += row.tl_upsell_base;
+    var kr = nrrKamResult(k.email);
+    if (kr) teamBase += kr.base_gmv || 0;
+  });
+  var upsellPct = teamBase > 0 ? teamUpsell / teamBase * 100 : 0;
+  var mult = nrrCommTeamMultiplier(upsellPct);
+  return {
+    kind: 'tl', pct: pct, nrr_payout: nrrPayout,
+    upsell_pct: upsellPct, multiplier: mult,
+    est: Math.round(nrrPayout * mult),
+    note: 'NRR tier ฿' + nrrPayout.toLocaleString('en-US') + ' × ' + mult + 'x (upsell ทีม ' + upsellPct.toFixed(1) + '%)'
+  };
+}
+window.nrrEstimateTlCommission = nrrEstimateTlCommission;
+
+function nrrEstimateKamCommission(kamEmail, period, pct) {
+  if (pct == null) return null;
+  var nrrPayout = nrrCommTierPayout('kam', kamEmail, period, pct);
+  var row = nrrUpsellTeamCache.byEmail[(kamEmail || '').toLowerCase()] || { p1_gmv: 0, p3_incremental: 0, outlet_gmv: 0 };
+  var p1Rate = nrrCommRateGet('upsell_sku', 'p1_rate', 0.01);
+  var p3Rate = nrrCommRateGet('upsell_sku', 'p3_rate', 0.01);
+  var outRate = nrrCommRateGet('upsell_outlet', 'rate', 0.005);
+  var upsellComm = row.p1_gmv * p1Rate + row.p3_incremental * p3Rate + row.outlet_gmv * outRate;
+  // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate)
+  var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
+  var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
+  var cap = 1.0;
+  if (pct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
+  else if (pct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
+  return {
+    kind: 'kam', pct: pct, nrr_payout: nrrPayout, upsell_comm: Math.round(upsellComm), gate_cap: cap,
+    est: Math.round((nrrPayout + upsellComm) * cap),
+    note: '(NRR ฿' + nrrPayout.toLocaleString('en-US') + ' + upsell ฿' + Math.round(upsellComm).toLocaleString('en-US') + ')' +
+      (cap < 1 ? ' × gate ' + cap + 'x' : '') + ' · ยังไม่รวม handover'
+  };
+}
+window.nrrEstimateKamCommission = nrrEstimateKamCommission;
 
 // ── Commission V2 — P1/P3 upsell classification ──────────────────────────
 // Verbatim port of _commComputeUpsellSku() (07a_commission_engine.js:176-318)

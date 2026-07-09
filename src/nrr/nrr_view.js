@@ -99,7 +99,8 @@ async function nrrRefresh(force) {
   try {
     await nrrFetchQnrrCsv(force);
     await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force)]);
-    await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates()]);
+    await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates(),
+                       nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv()]);
     nrrRenderAll();
     if (status) status.textContent = 'อัปเดตล่าสุด ' + new Date(window.bulkQnrrData.loadedAt).toLocaleString('th-TH');
   } catch (e) {
@@ -120,10 +121,11 @@ function nrrShellHtml() {
     '    <div class="nrr-masthead-h">Portfolio Notebook</div>' +
     '  </div>' +
     '  <div class="nrr-masthead-nav">' +
-    '  <nav class="seg nrr-appnav" id="nrr-appnav">' +
+    '  <nav class="nrr-appnav" id="nrr-appnav">' +
     '    <a href="#/" data-view="dashboard" class="on">Dashboard</a>' +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
     '  </nav>' +
+    '  <span class="nrr-appnav-div"></span>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
     '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
     '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
@@ -162,7 +164,7 @@ function nrrShellHtml() {
     '  <div class="nrr-section" id="nrr-sec-admin" style="animation-delay:.22s"><div class="nrr-panel-body" id="nrr-admin-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-commission" style="animation-delay:.26s"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-footnote" style="animation-delay:.30s"><div class="nrr-panel-body nrr-footnote">' +
-    '    <b>%NRR</b> = GMV เดือนปัจจุบัน (normalize เป็น 30 วัน) ของร้านค้าที่ยัง active หรือกลับมาซื้อ หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' (ปรับด้วย transfer เข้า/ออก) · ตัวเลขที่มี <span class="nrr-rr-proj">~</span> คือ run-rate คาดการณ์จาก MTD ÷ วันที่ผ่านมา × 30 · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time' +
+    '    <b>%NRR</b> = GMV เดือนปัจจุบัน หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' ของร้านค้าที่ยัง active หรือกลับมาซื้อ (ปรับด้วย transfer เข้า/ออก) — เฉพาะ %NRR normalize เป็น 30 วันทั้งสองฝั่งเพื่อเทียบข้ามเดือนอย่างยุติธรรม · <b>ตัวเลขเงินทุกจุด</b>แสดงเป็นยอดจริงตามจำนวนวันของเดือนนั้น: เดือนที่จบแล้ว = ยอดจริง, เดือนที่ยังไม่จบ (มี <span class="nrr-rr-proj">~</span>) = คาดการณ์เต็มเดือนจาก MTD ÷ วันที่ผ่านมา × จำนวนวันของเดือน · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time' +
     '  </div></div>' +
     '</div>' +
     '</div>' +
@@ -696,17 +698,20 @@ function nrrRenderCommissionSection() {
     '</div>';
 }
 
-// Pace-based estimate for one beneficiary for one quarter month — the SAME
-// math as the per-row fallback in nrrCommissionRowsHtml, extracted so the
-// hero and the trend bars sum the exact same numbers the rows display.
-// Returns null when the month has no GMV data yet (future months) so
-// callers can render "pending" instead of a fake zero.
+// Tier-based estimate for one beneficiary for one quarter month — the SAME
+// path everywhere (hero, trend bars, rows), so the hero always equals the
+// sum of its rows. Returns null when the month has no GMV data yet (future
+// months) so callers can render "pending" instead of a fake zero.
+// Uses the estimate engine v2 in nrr_commission.js (real plan tiers ×
+// multiplier/gate), NOT the retired %-of-GMV scheme.
 function nrrCommEstimateFor(email, kind, month) {
   var result = kind === 'tl' ? nrrTeamResult(email) : nrrKamResult(email);
   if (!result || !result.by_month || !result.by_month[month]) return null;
-  var triple = nrrMonthTriple(result, month);
-  if (!triple || !(triple.base > 0)) return null;
-  return nrrEstimateCommission([{ totalGMV: triple.run_rate, baseline: triple.base }]);
+  var pct = result.by_month[month].nrr_pct;
+  if (pct == null) return null;
+  return kind === 'tl'
+    ? nrrEstimateTlCommission(email, month, pct)
+    : nrrEstimateKamCommission(email, month, pct);
 }
 
 function nrrCommissionHeroHtml(isAdmin, period) {
@@ -742,11 +747,10 @@ function nrrCommissionHeroHtml(isAdmin, period) {
   var estBadge = showEst ? nrrCommStampHtml('estimate') : nrrCommStampHtml(mySnap.snapshot_status);
   var amountHtml, subHtml;
   if (showEst) {
-    var triple = nrrMonthTriple(nrrTeamResult(nrrProfile.email), period);
-    var est = triple ? nrrEstimateCommission([{ totalGMV: triple.run_rate, baseline: triple.base }]) : null;
+    var est = nrrCommEstimateFor(nrrProfile.email, 'tl', period);
     amountHtml = nrrFmtGMV(est ? est.est : 0);
     subHtml = est
-      ? ('Pace ' + est.pace + '% × ' + (est.bracket.rate * 100).toFixed(2) + '% × ' + nrrFmtGMV(est.total))
+      ? ('NRR ' + est.pct + '% → ' + est.note)
       : 'ไม่มีข้อมูลเพียงพอสำหรับประมาณการ';
   } else {
     amountHtml = nrrFmtGMV(Number(mySnap.payout_amount || 0));
@@ -806,19 +810,24 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       stampHtml = nrrCommStampHtml(snap.snapshot_status, true);
     } else {
       var result = r.kind === 'tl' ? nrrTeamResult(r.email) : nrrKamResult(r.email);
-      var triple = nrrMonthTriple(result, period);
       var bm = result && period ? result.by_month[period] : null;
       nrrPct = bm ? bm.nrr_pct : null;
-      var est = triple ? nrrEstimateCommission([{ totalGMV: triple.run_rate, baseline: triple.base }]) : null;
+      var est = nrrCommEstimateFor(r.email, r.kind, period);
       payoutAmt = est ? est.est : 0;
       metaLabel = QNRR_CFG.months_th[period] || period;
       bd = null;
       isEstRow = true;
+      r._estNote = est ? est.note : null;
       stampHtml = nrrCommStampHtml('estimate', true);
     }
     var detailHtml = bd
       ? nrrCommissionBreakdownDetailHtml(bd)
-      : '<div class="ds-stat-row"><span class="ds-stat-label">ยังไม่มีรายละเอียด breakdown (ค่าประมาณ หรือยังไม่ถูก compute)</span></div>';
+      : '<div class="ds-stat-row"><span class="ds-stat-label">ประมาณการ: ' + nrrEsc(r._estNote || 'ยังไม่มีข้อมูลเพียงพอ') + '</span></div>';
+    // Admin sees team rows — expand to the KAMs inside that team so a TL's
+    // number is explainable without switching accounts (user ask 2026-07-09).
+    if (r.kind === 'tl' && isAdmin) {
+      detailHtml += nrrCommissionTeamKamsHtml(r.email, period);
+    }
     // V2: click-through to the full outlet-level drill-down drawer — only
     // meaningful for KAM rows (that's what has upsell/handover/outlet detail).
     var drillLink = r.kind === 'kam'
@@ -839,6 +848,35 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
 
   return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">' +
     (isAdmin ? 'รายทีม' : 'รายบุคคล (KAM)') + '</span></div>' + rowsHtml + '</div>';
+}
+
+// Per-KAM rows nested inside an admin team row — same snapshot-first,
+// estimate-fallback logic as the top-level rows, one line per KAM with a
+// drill-through button into the full outlet-level drawer.
+function nrrCommissionTeamKamsHtml(tlEmail, period) {
+  var kams = nrrListKamsForTeam(tlEmail);
+  if (!kams.length) return '';
+  var rows = kams.map(function (k) {
+    var snap = nrrLatestSnapshotFor(k.email);
+    var amt, stamp, pct;
+    if (snap) {
+      amt = Number(snap.payout_amount || 0);
+      stamp = nrrCommStampHtml(snap.snapshot_status, true);
+      pct = snap.governed_nrr_pct != null ? snap.governed_nrr_pct : snap.raw_nrr_pct;
+    } else {
+      var est = nrrCommEstimateFor(k.email, 'kam', period);
+      amt = est ? est.est : 0;
+      stamp = nrrCommStampHtml('estimate', true);
+      pct = est ? est.pct : null;
+    }
+    return '<div class="ds-stat-row">' +
+      '<span class="ds-stat-label">' + nrrEsc(k.name) + (pct != null ? ' · ' + pct + '%' : '') + ' ' + stamp + '</span>' +
+      '<span class="ds-stat-value" style="display:flex;gap:10px;align-items:center">' +
+      '<span class="num">' + nrrFmtGMV(amt) + '</span>' +
+      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" style="padding:2px 8px;font-size:12px" data-email="' + nrrEsc(k.email) + '" data-name="' + nrrEsc(k.name) + '" data-period="' + nrrEsc(period) + '">ดูร้าน →</button>' +
+      '</span></div>';
+  }).join('');
+  return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม</span></div>' + rows;
 }
 
 // Parses commission_payout_snapshots.breakdown (jsonb) into label/value

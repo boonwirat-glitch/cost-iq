@@ -9,7 +9,8 @@
 
 | ไฟล์ | เนื้อหา |
 |------|---------|
-| `docs/handoff-2026-07-09-nrr-phase-a.md` | **Latest — nrr_v12 (Phase A)** — commission เดือนปัจจุบัน (estimate fallback) + hash router โครงชั้น Portfolio + %NRR formula assertions |
+| `docs/handoff-2026-07-09-nrr-v13-fixes.md` | **Latest — nrr_v13** — estimator ใหม่บน tier จริง (เลิก %GMV เก่า), เงินแสดงตามจริงของเดือน (⚠️ convention ใหม่ %NRR เท่านั้นที่ normalize), admin เห็น KAM รายคน, appnav แท็บขีดเส้นใต้ |
+| `docs/handoff-2026-07-09-nrr-phase-a.md` | nrr_v12 (Phase A) — commission เดือนปัจจุบัน (estimate fallback) + hash router โครงชั้น Portfolio + %NRR formula assertions |
 | `docs/handoff-2026-07-08-nrr-transfer-in-fix.md` | nrr_v10 + Sense v852 — แก้บั๊กนับฐาน transfer_in ซ้ำทั้งสองแอป (Tape 92%→99%, org 105%→107%) ✅ in sync 100% |
 | `docs/handoff-2026-07-08-nrr-golive.md` | /nrr go-live (nrr_v9) — Commission V1/V2/V2.1 ครบ, sw.js v851 whitelist fix, `_redirects` 308-loop fix |
 | `docs/NRR_ARCHITECTURE.md` | /nrr โครงสร้างโค้ด + hard rules + วิธี build ฟีเจอร์เพิ่ม |
