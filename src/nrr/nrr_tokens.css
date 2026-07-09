@@ -68,6 +68,26 @@
   --mv-clay: #b0442b;            /* transfer_out — coral family, earthier */
   --mv-clay-soft: #f6e7e2;
 
+  /* Category palette (Phase C, 2026-07-09) — a THIRD categorical system,
+     separate from status (green/sun/coral thresholds) and from the
+     movement palette above (same precedent: movement got its own lane in
+     v4, this is the account-view equivalent for Freshket's 10 product
+     categories). Order matches _CAT_MASTER (nrr_account.js), ported from
+     02_data_pipeline.js:2 in both Sense and this repo. Bought category =
+     full color; not-yet-bought = same hue at low opacity (set at the
+     call site, not baked into these tokens) — never gray, so "hasn't
+     bought this" reads as "this category exists" not "no data." */
+  --cat-1: #8a6d3b;  /* DG Food */
+  --cat-2: #a35d8f;  /* Processed Food */
+  --cat-3: #4f9153;  /* Vegetable */
+  --cat-4: #b5473f;  /* Meat */
+  --cat-5: #3d7ea6;  /* Fish & Seafood */
+  --cat-6: #c98a2e;  /* Egg */
+  --cat-7: #cf6b3e;  /* Fruit */
+  --cat-8: #2f9ba0;  /* Beverage Non-alcohol */
+  --cat-9: #7a6bb0;  /* Beverage Alcohol */
+  --cat-10: #6b7280; /* DG Non-food */
+
   /* Radii */
   --r-sm: 12px;
   --r-md: 16px;

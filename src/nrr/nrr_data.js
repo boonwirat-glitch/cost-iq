@@ -486,3 +486,233 @@ async function nrrFetchBulkHistoryCsv(force) {
   return window.bulkHistoryData;
 }
 window.nrrFetchBulkHistoryCsv = nrrFetchBulkHistoryCsv;
+
+// ── Account view (Phase C) — per-KAM SKU detail ──────────────────────────
+// sense_skus_{kamSafeKey}.csv (~6-8MB/KAM) — account_id × month_label ×
+// item_id rows. Feeds BOTH the positive/cycle SKU signals (nrr_account.js)
+// AND the category SKU-count breakdown (group by dept) — one fetch, two
+// uses, same file already used for commission P1/P3 classification
+// (nrrFetchUpsellBundle above) but that's a DIFFERENT file (sense_upsell_)
+// — do not confuse the two.
+var nrrSenseSkusCache = {}; // { [kamEmail]: { byAccountId: {accountId: [row]}, loaded } }
+var nrrSenseSkusInFlight = {};
+
+function _nrrParseSenseSkusCsv(text) {
+  var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
+  var byAccountId = {};
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var row = {
+      account_id:       (p[0] || '').trim(),
+      month_label:      (p[1] || '').trim(),
+      item_id:          (p[2] || '').trim(),
+      item_name_th:     (p[3] || '').trim(),
+      dept:             (p[4] || '').trim(),
+      subclass:         (p[5] || '').trim(),
+      temperature:      (p[6] || '').trim(),
+      pack_size:        (p[7] || '').trim(),
+      gmv_ex_vat:       parseFloat(p[8]) || 0,
+      pct:              parseFloat(p[9]) || 0,
+      qty_kg:           parseFloat(p[10]) || 0,
+      unit_price:       parseFloat(p[11]) || 0,
+      order_count:      parseInt(p[12], 10) || 0,
+      avg_piece_price:  parseFloat(p[13]) || 0,
+      outlet_count_sku: parseInt(p[14], 10) || 0,
+      last_order_date:  (p[18] || '').trim()
+    };
+    if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
+    byAccountId[row.account_id].push(row);
+  });
+  return byAccountId;
+}
+
+async function nrrFetchSenseSkusCsv(kamEmail) {
+  if (nrrSenseSkusCache[kamEmail] && nrrSenseSkusCache[kamEmail].loaded) return nrrSenseSkusCache[kamEmail];
+  if (nrrSenseSkusInFlight[kamEmail]) return nrrSenseSkusInFlight[kamEmail];
+  var safeKey = _nrrKamSafeKey(kamEmail);
+  var p = (async function () {
+    try {
+      var res = await fetch(R2_BASE + '/sense_skus_' + safeKey + '.csv?cb=' + Date.now());
+      if (res.status === 404) return { byAccountId: {}, loaded: false, notFound: true };
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var bundle = { byAccountId: _nrrParseSenseSkusCsv(text), loaded: true, loadedAt: Date.now() };
+      nrrSenseSkusCache[kamEmail] = bundle;
+      return bundle;
+    } catch (e) {
+      console.warn('[nrr] failed to load sense_skus for ' + kamEmail, e);
+      return { byAccountId: {}, loaded: false, error: e.message };
+    } finally {
+      delete nrrSenseSkusInFlight[kamEmail];
+    }
+  })();
+  nrrSenseSkusInFlight[kamEmail] = p;
+  return p;
+}
+window.nrrFetchSenseSkusCsv = nrrFetchSenseSkusCsv;
+
+// sense_sku_outlet_{kamSafeKey}.csv (~1.2MB/KAM) — account_id × item_id ×
+// outlet_id, last/this month orders+gmv. Feeds the floating per-outlet
+// tooltip on SKU signal rows — confirmed live in R2 under THIS name
+// (2026-07-09; an earlier pass guessed "bulk_sku_outlet.csv"/Q12B and
+// wrongly concluded the data didn't exist — it does, just under Sense's
+// own real filename, cf. 02_data_pipeline.js:839-844,1680).
+var nrrSenseSkuOutletCache = {};
+var nrrSenseSkuOutletInFlight = {};
+
+function _nrrParseSenseSkuOutletCsv(text) {
+  var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
+  var byAccountItem = {}; // accountId -> itemId -> [{outlet_id,outlet_name,last_month_orders,last_month_gmv,this_month_orders,this_month_gmv}]
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var accountId = (p[0] || '').trim(), itemId = (p[1] || '').trim();
+    if (!byAccountItem[accountId]) byAccountItem[accountId] = {};
+    if (!byAccountItem[accountId][itemId]) byAccountItem[accountId][itemId] = [];
+    byAccountItem[accountId][itemId].push({
+      outlet_id: (p[2] || '').trim(),
+      outlet_name: (p[3] || '').trim(),
+      last_month_orders: parseInt(p[4], 10) || 0,
+      last_month_gmv: parseFloat(p[5]) || 0,
+      this_month_orders: parseInt(p[6], 10) || 0,
+      this_month_gmv: parseFloat(p[7]) || 0
+    });
+  });
+  return byAccountItem;
+}
+
+async function nrrFetchSenseSkuOutletCsv(kamEmail) {
+  if (nrrSenseSkuOutletCache[kamEmail] && nrrSenseSkuOutletCache[kamEmail].loaded) return nrrSenseSkuOutletCache[kamEmail];
+  if (nrrSenseSkuOutletInFlight[kamEmail]) return nrrSenseSkuOutletInFlight[kamEmail];
+  var safeKey = _nrrKamSafeKey(kamEmail);
+  var p = (async function () {
+    try {
+      var res = await fetch(R2_BASE + '/sense_sku_outlet_' + safeKey + '.csv?cb=' + Date.now());
+      if (res.status === 404) return { byAccountItem: {}, loaded: false, notFound: true };
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var bundle = { byAccountItem: _nrrParseSenseSkuOutletCsv(text), loaded: true, loadedAt: Date.now() };
+      nrrSenseSkuOutletCache[kamEmail] = bundle;
+      return bundle;
+    } catch (e) {
+      console.warn('[nrr] failed to load sense_sku_outlet for ' + kamEmail, e);
+      return { byAccountItem: {}, loaded: false, error: e.message };
+    } finally {
+      delete nrrSenseSkuOutletInFlight[kamEmail];
+    }
+  })();
+  nrrSenseSkuOutletInFlight[kamEmail] = p;
+  return p;
+}
+window.nrrFetchSenseSkuOutletCsv = nrrFetchSenseSkuOutletCsv;
+
+// bulk_outlets.csv (3.1MB, global) — account_id × month_label × outlet_id,
+// GMV/orders/last_order_date. Feeds the "สาขา" stat cell (movement +
+// per-outlet cycle signal for Chain accounts).
+window.bulkOutletsData = { loaded: false };
+function _nrrParseBulkOutletsCsv(text) {
+  var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
+  var byAccountId = {};
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var row = {
+      account_id: (p[0] || '').trim(), month_label: (p[1] || '').trim(),
+      outlet_id: (p[2] || '').trim(), outlet_name: (p[3] || '').trim(),
+      gmv_ex_vat: parseFloat(p[4]) || 0, orders: parseInt(p[5], 10) || 0,
+      last_order_date: (p[8] || '').trim()
+    };
+    if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
+    byAccountId[row.account_id].push(row);
+  });
+  return byAccountId;
+}
+async function nrrFetchBulkOutletsCsv(force) {
+  if (window.bulkOutletsData.loaded && !force) return window.bulkOutletsData;
+  try {
+    var res = await fetch(R2_BASE + '/bulk_outlets.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkOutletsData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkOutletsData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkOutletsData = { byAccountId: _nrrParseBulkOutletsCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load bulk_outlets.csv', e);
+    window.bulkOutletsData = { byAccountId: {}, loaded: false, error: e.message };
+  }
+  return window.bulkOutletsData;
+}
+window.nrrFetchBulkOutletsCsv = nrrFetchBulkOutletsCsv;
+
+// bulk_categories.csv (2.7MB, global) — account_id × month_label ×
+// category × gmv. Only rows for categories the account ACTUALLY bought —
+// absence of a row is how "hasn't bought this category" shows up, diffed
+// against _CAT_MASTER in nrr_account.js.
+window.bulkCategoriesData = { loaded: false };
+function _nrrParseBulkCategoriesCsv(text) {
+  var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
+  var byAccountId = {};
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var row = { account_id: (p[0] || '').trim(), month_label: (p[1] || '').trim(), category: (p[2] || '').trim(), gmv: parseFloat(p[3]) || 0 };
+    if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
+    byAccountId[row.account_id].push(row);
+  });
+  return byAccountId;
+}
+async function nrrFetchBulkCategoriesCsv(force) {
+  if (window.bulkCategoriesData.loaded && !force) return window.bulkCategoriesData;
+  try {
+    var res = await fetch(R2_BASE + '/bulk_categories.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkCategoriesData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkCategoriesData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkCategoriesData = { byAccountId: _nrrParseBulkCategoriesCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load bulk_categories.csv', e);
+    window.bulkCategoriesData = { byAccountId: {}, loaded: false, error: e.message };
+  }
+  return window.bulkCategoriesData;
+}
+window.nrrFetchBulkCategoriesCsv = nrrFetchBulkCategoriesCsv;
+
+// bulk_price.csv (36MB, global — the heaviest fetch in the app, accepted
+// deliberately as a one-time lazy cost on first Account view visit per
+// session, not a recurring one; see plan doc for the cost/benefit call).
+// account_id × month_label × item_id × unit_price — no item name column,
+// join against sense_skus_{kam}.csv (already fetched) for display names.
+window.bulkPriceData = { loaded: false };
+function _nrrParseBulkPriceCsv(text) {
+  var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
+  var byAccountItem = {}; // accountId -> itemId -> [{month_label, unit_price}]
+  lines.forEach(function (l) {
+    var p = parseCSVRow(l);
+    if (!p[0]) return;
+    var accountId = (p[0] || '').trim(), itemId = (p[2] || '').trim();
+    if (!byAccountItem[accountId]) byAccountItem[accountId] = {};
+    if (!byAccountItem[accountId][itemId]) byAccountItem[accountId][itemId] = [];
+    byAccountItem[accountId][itemId].push({ month_label: (p[1] || '').trim(), unit_price: parseFloat(p[3]) || 0 });
+  });
+  return byAccountItem;
+}
+async function nrrFetchBulkPriceCsv(force) {
+  if (window.bulkPriceData.loaded && !force) return window.bulkPriceData;
+  try {
+    var res = await fetch(R2_BASE + '/bulk_price.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkPriceData = { byAccountItem: {}, loaded: false, notFound: true }; return window.bulkPriceData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkPriceData = { byAccountItem: _nrrParseBulkPriceCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load bulk_price.csv', e);
+    window.bulkPriceData = { byAccountItem: {}, loaded: false, error: e.message };
+  }
+  return window.bulkPriceData;
+}
+window.nrrFetchBulkPriceCsv = nrrFetchBulkPriceCsv;

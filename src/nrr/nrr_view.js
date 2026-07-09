@@ -64,6 +64,8 @@ async function nrrInitApp() {
   document.getElementById('nrr-portfolio-body').addEventListener('click', nrrHandlePortfolioClick);
   document.getElementById('nrr-portfolio-body').addEventListener('input', nrrHandlePortfolioInput);
   document.getElementById('nrr-portfolio-body').addEventListener('change', nrrHandlePortfolioChange);
+  document.getElementById('nrr-account-body').addEventListener('click', nrrHandleAccountBodyClick);
+  document.getElementById('nrr-otip-backdrop').addEventListener('click', nrrCloseAccountOutletTip);
 
   // ── Router wiring — see nrr_router.js ──
   nrrRouterRegister('dashboard', function () {
@@ -155,7 +157,12 @@ function nrrAcctRowHtml(item) {
     ? '<span class="nrr-acct-flag ' + gap.cls + '">สั่งแล้ว ' + gap.ordered + '/' + gap.m + ' SKU</span>' : '';
   var missingHtml = r.missing_cat_count > 0
     ? '<span class="nrr-acct-flag">ไม่มีหมวด ' + r.missing_cat_count + '</span>' : '';
-  return '<div class="nrr-acct-row" style="border-left-color:' + color + '">' +
+  // Whole row is a link into Account view (Phase C) — was intentionally
+  // absent in Phase B ("ไม่มีปุ่ม/ลิงก์เข้า account detail" — the view didn't
+  // exist yet, an affordance that goes nowhere is worse than none). Now
+  // that #/account/:id is real, the row is the natural click target
+  // (matches Sense's own "tap the card to open the account" gesture).
+  return '<a class="nrr-acct-row" href="#/account/' + encodeURIComponent(r.account_id) + '" style="border-left-color:' + color + '">' +
     '<div class="nrr-acct-row-left">' +
     '<div class="nrr-acct-row-name">' + nrrEsc(r.account_name || r.account_id) + '</div>' +
     '<div class="nrr-acct-row-meta"><span class="num">' + nrrFmtGMV(r.runrate_gmv) + '</span><span class="micro">run-rate</span>' +
@@ -168,7 +175,7 @@ function nrrAcctRowHtml(item) {
     '<span class="nrr-acct-row-status" style="color:' + status.color + '">' + nrrEsc(status.text) + '</span>' +
     nrrAcctSparklineHtml(r, pace) +
     '</div>' +
-    '</div>';
+    '</a>';
 }
 
 // Portfolio-level risk summary — Sense's ON TRACK/MONITOR/AT RISK boxes
@@ -347,13 +354,429 @@ function nrrHandlePortfolioChange(e) {
   if (e.target.id !== 'nrr-port-kam-select') return;
   nrrNavigate('#/portfolio/' + encodeURIComponent(e.target.value));
 }
+// ── Account view (Phase C, 2026-07-09) ───────────────────────────────────
+// #/account/:id — opened from a Portfolio account row. Ownership guard
+// lives HERE (not in nrr_router.js's synchronous nrrRouteGuard) because a
+// rep/TL could deep-link straight to this URL before portview.csv has
+// loaded — the router can't know account→KAM mapping until data arrives,
+// so the check happens once that data is in hand (see nrr_router.js's own
+// comment, which anticipated exactly this).
+var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false };
+
 function nrrRenderAccountView(route) {
   var body = document.getElementById('nrr-account-body');
   if (!body) return;
+  var accountId = route.param;
+  if (!accountId) {
+    body.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">ไม่พบร้านนี้</div><div class="micro" style="margin-top:8px"><a href="#/portfolio" style="color:var(--green-deep)">← กลับ Portfolio</a></div></div>';
+    return;
+  }
+  body.innerHTML = '<div class="ds-skel" style="height:220px"></div>';
+  Promise.all([nrrFetchPortviewCsv(), nrrFetchBulkHistoryCsv()]).then(function () {
+    var row = (window.bulkPortviewData.allRows || []).filter(function (r) { return r.account_id === accountId; })[0];
+    if (!row) {
+      body.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">ไม่พบร้านนี้</div><div class="micro" style="margin-top:8px"><a href="#/portfolio" style="color:var(--green-deep)">← กลับ Portfolio</a></div></div>';
+      return;
+    }
+    if (nrrProfile.role === 'rep' && row.kam_email !== nrrProfile.email) { nrrNavigate('#/portfolio'); return; }
+    if (nrrProfile.role === 'tl' && row.tl_email !== nrrProfile.email) { nrrNavigate('#/portfolio'); return; }
+
+    nrrAccountState.accountId = accountId;
+    nrrAccountState.kamEmail = row.kam_email;
+    nrrAccountState.showAllPos = false;
+    nrrAccountState.showAllRisk = false;
+
+    Promise.all([
+      nrrFetchSenseSkusCsv(row.kam_email), nrrFetchSenseSkuOutletCsv(row.kam_email),
+      nrrFetchBulkOutletsCsv(), nrrFetchBulkCategoriesCsv(), nrrFetchBulkPriceCsv()
+    ]).then(function () {
+      if (nrrAccountState.accountId !== accountId) return; // navigated away mid-fetch
+      nrrRenderAccountBody(row);
+    });
+  });
+}
+
+function nrrRenderAccountBody(row) {
+  var body = document.getElementById('nrr-account-body');
+  if (!body) return;
+  var kamEmail = nrrAccountState.kamEmail;
   body.innerHTML =
-    '<div class="nrr-panel-head"><div class="h2">Account</div></div>' +
-    '<div class="sub" style="margin-top:6px">หน้าเจาะลึกรายร้าน — เร็วๆ นี้</div>' +
-    '<div class="micro" style="margin-top:12px"><a href="#/portfolio" style="color:var(--green-deep)">← กลับ Portfolio</a></div>';
+    nrrAccountHeaderHtml(row) +
+    nrrAccountHeroHtml(row) +
+    nrrAccountStatRowHtml(row, kamEmail) +
+    nrrAccountVerdictHtml(row, kamEmail) +
+    nrrAccountSignalListsHtml(row, kamEmail);
+  nrrRenderAccountTrendChart(row);
+}
+
+function nrrAccountHeaderHtml(row) {
+  return '<div class="nrr-acct-mast">' +
+    '<a href="#/portfolio" class="nrr-acct-back" aria-label="กลับ Portfolio">←</a>' +
+    '<div><div class="eyebrow">' + nrrEsc(row.account_type || '') +
+    '<span class="nrr-acct-type-chip">' + nrrEsc(row.kam_name || '') + '</span></div>' +
+    '<div class="h2" style="font-size:19px">' + nrrEsc(row.account_name || row.account_id) + '</div></div>' +
+    '</div>';
+}
+
+function nrrAccountHeroHtml(row) {
+  var pace = nrrPaceSignal(row);
+  var color = pace.pct == null ? 'var(--ink3)' : nrrThresholdColorVar(pace.pct);
+  var status = nrrPaceStatusWord(pace);
+  var scaleMax = Math.max(row.runrate_gmv || 0, pace.baseline_gmv || 0, row.gmv_to_date || 0) || 1;
+  var fillPct = Math.min(100, Math.round((row.gmv_to_date || 0) / scaleMax * 100));
+  var expectPct = (pace.expected != null) ? Math.min(100, Math.round(pace.expected / scaleMax * 100)) : null;
+
+  return '<div class="nrr-acct-hero">' +
+    '<div class="nrr-acct-hero-head">' +
+    '<div><div class="micro">ซื้อแล้วเดือนนี้ (MTD)</div><div class="num nrr-acct-hero-num" style="color:' + color + '">' + nrrFmtGMVExact(row.gmv_to_date) + '</div></div>' +
+    '<div class="nrr-acct-hero-side">' +
+    '<div class="num nrr-acct-hero-side-v">' + nrrFmtGMV(row.runrate_gmv) + '</div><div class="micro">คาดเต็มเดือน</div>' +
+    (pace.baseline_gmv ? '<div class="num nrr-acct-hero-side-v" style="color:var(--ink2);margin-top:6px">' + nrrFmtGMV(pace.baseline_gmv) + '</div><div class="micro">เดือนฐานไตรมาส (' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || '') + ')</div>' : '') +
+    '</div></div>' +
+    '<div class="nrr-acct-pace-row">' +
+    '<span class="micro"><b class="num" style="color:' + color + '">' + (pace.pct != null ? pace.label : '—') + '</b> ' + nrrEsc(status.text) + '</span>' +
+    '<div class="nrr-acct-pace-track"><div class="nrr-acct-pace-fill" style="width:' + fillPct + '%;background:' + color + '"></div>' +
+    (expectPct != null ? '<div class="nrr-acct-pace-expect" style="left:' + expectPct + '%" title="ควรได้ตอนนี้ ' + nrrFmtGMV(pace.expected) + '"></div>' : '') +
+    '</div>' +
+    '<span class="micro">วันที่ ' + (row.days_elapsed || 0) + '/' + (row.days_in_month || 0) + '</span>' +
+    '</div>' +
+    '<div class="nrr-acct-trend" id="nrr-acct-trend"></div>' +
+    '<div class="nrr-acct-trend-summary" id="nrr-acct-trend-summary"></div>' +
+    '</div>';
+}
+
+function nrrRenderAccountTrendChart(row) {
+  var histRows = ((window.bulkHistoryData && window.bulkHistoryData.byAccountId[row.account_id]) || []).slice()
+    .sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
+  var baseLabel = nrrBaseMonthThLabel();
+  var months = histRows.slice(-6).map(function (h) { return { label: h.month_label, v: h.gmv, isBase: h.month_label === baseLabel }; });
+  months.push({ label: nrrCommCurrentMonthLabel(), v: row.gmv_to_date || 0, proj: row.runrate_gmv || 0, current: true });
+  nrrAccountState.trendMonths = months;
+
+  var chart = document.getElementById('nrr-acct-trend');
+  if (!chart) return;
+  var maxV = Math.max.apply(null, months.map(function (m) { return m.proj || m.v; }).concat([1]));
+  chart.innerHTML = months.map(function (m, i) {
+    var totalH = Math.round(((m.proj || m.v) / maxV) * 78);
+    var solidH = m.current ? Math.round((m.v / maxV) * 78) : totalH;
+    var hatchH = m.current ? Math.max(0, totalH - solidH) : 0;
+    var bar = m.current
+      ? '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px"></div><div class="nrr-acct-trend-bar" style="height:' + solidH + 'px;background:var(--green);opacity:.85"></div>'
+      : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px' + (m.isBase ? ';border:1.5px dashed var(--ink3)' : '') + '"></div>';
+    return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + '" data-i="' + i + '">' +
+      '<div class="nrr-acct-trend-bar-track">' + bar + '</div><div class="nrr-acct-trend-lbl">' + nrrEsc(m.label.split(' ')[0]) + '</div></button>';
+  }).join('');
+  nrrSelectAccountTrendMonth(months.length - 1);
+}
+
+function nrrSelectAccountTrendMonth(i) {
+  var months = nrrAccountState.trendMonths || [];
+  var chart = document.getElementById('nrr-acct-trend');
+  if (chart) chart.querySelectorAll('.nrr-acct-trend-col').forEach(function (c, idx) { c.classList.toggle('sel', idx === i); });
+  var m = months[i];
+  if (!m) return;
+  var maxV = Math.max.apply(null, months.map(function (x) { return x.v; }).concat([1]));
+  var note = m.current ? 'MTD จริง' : m.isBase ? 'เดือนฐานของไตรมาสนี้' : (m.v === maxV ? 'สูงสุดในช่วงนี้' : '');
+  var summary = document.getElementById('nrr-acct-trend-summary');
+  if (summary) summary.innerHTML = '<span>' + nrrEsc(m.label) + (note ? ' · ' + nrrEsc(note) : '') + '</span><span class="num nrr-acct-trend-amt">' + nrrFmtGMVExact(m.v) + '</span>';
+}
+
+// ── Stat row (4 cells: AOV/outlet/category/price) — .nrr-triple-lg-style
+// hairline cells, never a filled box (see nrr_base.css's own warning
+// about gray fills being "the single biggest contributor to the boxes
+// everywhere look" — the design mockups fell into exactly that trap once
+// before this was written). Each cell opens #nrr-slideover, the SAME
+// component the commission drawer/movement drill-down already use — no
+// parallel overlay component.
+function nrrAcctSparklineSvg(months) {
+  var vals = months.map(function (m) { return m.aov; }).filter(function (v) { return v != null; });
+  if (vals.length < 2) return '';
+  var maxV = Math.max.apply(null, vals), minV = Math.min.apply(null, vals);
+  var range = maxV - minV || 1;
+  var pts = vals.map(function (v, i) { var x = i / (vals.length - 1) * 100; var y = 18 - ((v - minV) / range * 16 + 1); return x + ',' + y; }).join(' ');
+  var lastY = 18 - ((vals[vals.length - 1] - minV) / range * 16 + 1);
+  return '<svg class="nrr-acct-spark-svg" viewBox="0 0 100 18" preserveAspectRatio="none">' +
+    '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
+    '<circle cx="100" cy="' + lastY + '" r="2.4" fill="var(--green-deep)"></circle></svg>';
+}
+function nrrOutletDotGridHtml(outlets) {
+  return '<div class="nrr-acct-outlet-dots">' + outlets.map(function (o) {
+    var cls = (o.status === 'quiet' || o.cycle === 'gone') ? 'quiet' : o.status === 'new' ? 'new' : '';
+    return '<span class="' + cls + '" title="' + nrrEsc(o.outlet_name) + '"></span>';
+  }).join('') + '</div>';
+}
+function nrrOutletStackedBarHtml(counts, total) {
+  if (!total) return '';
+  function w(n) { return Math.round(n / total * 100); }
+  return '<div class="nrr-acct-outlet-stack">' +
+    '<i style="width:' + w(counts.steady) + '%;background:var(--green)"></i>' +
+    '<i style="width:' + w(counts.new) + '%;background:var(--sun)"></i>' +
+    '<i style="width:' + w(counts.quiet) + '%;background:var(--coral);opacity:.6"></i>' +
+    '</div>';
+}
+function nrrPriceDivBarHtml(price) {
+  var upTotal = price.up.reduce(function (s, e) { return s + e.impact; }, 0);
+  var downTotal = Math.abs(price.down.reduce(function (s, e) { return s + e.impact; }, 0));
+  var total = upTotal + downTotal;
+  if (!total) return '';
+  var upW = Math.round(upTotal / total * 100);
+  return '<div class="nrr-acct-price-div"><i style="width:' + upW + '%;background:var(--green)"></i><i style="width:' + (100 - upW) + '%;background:var(--coral)"></i></div>';
+}
+
+function nrrAccountStatRowHtml(row, kamEmail) {
+  var aov = nrrAccountAov(row.account_id);
+  var outlet = nrrOutletMovement(row.account_id);
+  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+  var price = nrrAccountPriceImpact(row.account_id, kamEmail);
+
+  var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov">' +
+    '<div class="nrr-acct-stat-lbl">AOV เฉลี่ย <span>›</span></div>' +
+    '<div class="num nrr-acct-stat-val" style="color:' + aov.band.color + '">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</div>' +
+    nrrAcctSparklineSvg(aov.months) +
+    '<div class="nrr-acct-stat-sub">ระดับ <b style="color:' + aov.band.color + '">' + nrrEsc(aov.band.label) + '</b>' +
+    (aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
+    '</button>';
+
+  var outletViz = outlet.total > 15 ? nrrOutletStackedBarHtml(outlet.counts, outlet.total) : nrrOutletDotGridHtml(outlet.outlets);
+  var outletCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="outlet">' +
+    '<div class="nrr-acct-stat-lbl">สาขา <span>›</span></div>' +
+    '<div class="nrr-acct-stat-val">' + outlet.total + ' สาขา</div>' +
+    outletViz +
+    '<div class="nrr-acct-stat-sub">' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ</div>' +
+    '</button>';
+
+  var catCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="category">' +
+    '<div class="nrr-acct-stat-lbl">หมวดสินค้า <span>›</span></div>' +
+    '<div class="nrr-acct-stat-val">' + cat.boughtCount + '<span style="font-size:12px;color:var(--ink3)">/' + cat.total + '</span></div>' +
+    '<div class="nrr-acct-cat-swatches">' + cat.categories.map(function (c) {
+      return '<i style="background:' + c.color + ';opacity:' + (c.bought ? '1' : '.25') + '" title="' + nrrEsc(c.name) + '"></i>';
+    }).join('') + '</div>' +
+    '<div class="nrr-acct-stat-sub">เหลือ ' + (cat.total - cat.boughtCount) + ' หมวดที่ยังไม่ซื้อ</div>' +
+    '</button>';
+
+  var priceCell;
+  if (!price) {
+    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default"><div class="nrr-acct-stat-lbl">ราคาสินค้า</div><div class="micro">กำลังโหลด...</div></div>';
+  } else if (!price.hasCurrentData) {
+    // bulk_price.csv hasn't been batched for this month yet — say so
+    // plainly rather than showing a "+฿0 ไม่มีการเปลี่ยนแปลง" that reads
+    // as a verified zero (see nrrAccountPriceImpact comment).
+    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default">' +
+      '<div class="nrr-acct-stat-lbl">ราคาสินค้า</div>' +
+      '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
+      '<div class="nrr-acct-stat-sub">รอข้อมูลราคาปิดเดือน</div>' +
+      '</div>';
+  } else {
+    var netColor = price.net >= 0 ? 'var(--green-deep)' : 'var(--coral)';
+    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price">' +
+      '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
+      '<div class="num nrr-acct-stat-val" style="color:' + netColor + '">' + (price.net >= 0 ? '+' : '') + nrrFmtGMVExact(price.net) + '</div>' +
+      nrrPriceDivBarHtml(price) +
+      '<div class="nrr-acct-stat-sub">▲' + price.upCount + ' ขึ้นราคา · ▼' + price.downCount + ' ลดราคา</div>' +
+      '</button>';
+  }
+
+  return '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div>';
+}
+
+function nrrAccountVerdictHtml(row, kamEmail) {
+  var net = nrrNetSignalSummary(row.account_id, kamEmail);
+  if (!net.gainCount && !net.riskCount) return '';
+  var parts = [];
+  if (net.gainCount) parts.push('โอกาสได้เพิ่ม <b class="num" style="color:var(--green-deep)">+' + nrrFmtGMVExact(net.gainAmount) + '</b> จาก ' + net.gainCount + ' สัญญาณบวก');
+  if (net.riskCount) parts.push('เสี่ยงเสีย <b class="num" style="color:var(--coral)">−' + nrrFmtGMVExact(net.riskAmount) + '</b> จาก ' + net.riskCount + ' รายการที่ต้องดูแล');
+  var tail = (net.netRunrate != null && net.runrate != null) ? ' — สุทธิ run-rate มีโอกาสขยับจาก ' + nrrFmtGMVExact(net.runrate) + ' เป็น ~' + nrrFmtGMVExact(net.netRunrate) : '';
+  return '<div class="nrr-acct-verdict-wrap"><div class="nrr-verdict">ถ้าเป็นแบบนี้ต่อไปทั้งเดือน: ' + parts.join(' เทียบกับ ') + tail + '</div></div>';
+}
+
+function nrrAccountSignalRowHtml(kind, item, accountId) {
+  var name = item.name, meta, right;
+  if (kind === 'new') {
+    meta = 'เพิ่งเริ่มสั่งเดือนนี้';
+    right = '<span class="num nrr-acct-sig-val up">' + nrrFmtGMVExact(item.gmv) + '</span>';
+  } else if (kind === 'growing') {
+    meta = 'โต ' + Math.round(item.chgPct * 100) + '% จากเดือนก่อน · คาดเต็มเดือน';
+    right = '<span class="num nrr-acct-sig-val up">+' + nrrFmtGMVExact(item.projInc) + '</span>';
+  } else {
+    meta = 'เคยสั่ง ' + nrrFmtGMVExact(item.monthlyGmv) + '/เดือน · ทุก ~' + Math.round(item.avgInterval) + ' วัน' + (item.lastOrderDate ? ' · ล่าสุด ' + nrrEsc(item.lastOrderDate) : '');
+    var tagText = kind === 'gone' ? 'เลยรอบ ' + item.daysLate + ' วันแล้ว' : 'เพิ่งเลยรอบ ' + item.daysLate + ' วัน';
+    right = '<span class="nrr-acct-sig-tag ' + kind + '">' + nrrEsc(tagText) + '</span>';
+  }
+  return '<div class="ds-row nrr-acct-sig-row">' +
+    '<span class="nrr-acct-sig-dot ' + kind + '"></span>' +
+    '<div style="flex:1;min-width:0"><div class="ds-row-name">' + nrrEsc(name) + '</div><span class="ds-row-meta">' + meta + '</span></div>' +
+    right +
+    '<button type="button" class="nrr-acct-otip-btn" data-item="' + nrrEsc(item.item_id) + '" data-account="' + nrrEsc(accountId) + '">รายสาขา</button>' +
+    '</div>';
+}
+
+function nrrAccountSignalListsHtml(row, kamEmail) {
+  var pos = nrrSkuPositiveSignals(row.account_id, kamEmail);
+  var risk = nrrSkuCycleSignals(row.account_id, kamEmail);
+  var posItems = pos.new.map(function (i) { return { kind: 'new', item: i }; })
+    .concat(pos.growing.map(function (i) { return { kind: 'growing', item: i }; }));
+  posItems.sort(function (a, b) {
+    var av = a.kind === 'new' ? a.item.gmv : a.item.projInc, bv = b.kind === 'new' ? b.item.gmv : b.item.projInc;
+    return bv - av;
+  });
+
+  var posCap = nrrAccountState.showAllPos ? posItems.length : 8;
+  var riskCap = nrrAccountState.showAllRisk ? risk.length : 8;
+  var posShown = posItems.slice(0, posCap);
+  var riskShown = risk.slice(0, riskCap);
+
+  function listHtml(items, mapFn) {
+    return items.length ? items.map(mapFn).join('') : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีรายการ</div></div>';
+  }
+
+  return '<div class="nrr-acct-signal-cols">' +
+    '<div class="nrr-acct-signal-col">' +
+    '<div class="nrr-panel-head" style="margin-bottom:8px"><div class="h2 nrr-acct-signal-title pos" style="font-size:16px">สัญญาณบวกเดือนนี้</div><div class="micro">' + posItems.length + ' รายการ</div></div>' +
+    listHtml(posShown, function (x) { return nrrAccountSignalRowHtml(x.kind, x.item, row.account_id); }) +
+    (posItems.length > posCap ? '<button type="button" class="btn-secondary nrr-acct-showall" data-list="pos" style="margin-top:10px">ดูทั้งหมด (' + posItems.length + ')</button>' : '') +
+    '</div>' +
+    '<div class="nrr-acct-signal-col">' +
+    '<div class="nrr-panel-head" style="margin-bottom:8px"><div class="h2 nrr-acct-signal-title watch" style="font-size:16px">ต้องดูแล</div><div class="micro">' + risk.length + ' รายการ</div></div>' +
+    listHtml(riskShown, function (x) { return nrrAccountSignalRowHtml(x.cls, x, row.account_id); }) +
+    (risk.length > riskCap ? '<button type="button" class="btn-secondary nrr-acct-showall" data-list="risk" style="margin-top:10px">ดูทั้งหมด (' + risk.length + ')</button>' : '') +
+    '</div>' +
+    '</div>';
+}
+
+// ── Slideover content builders — reuse #nrr-slideover exactly as the
+// commission drawer does (hide search/chips, own body div) ─────────────
+function nrrOpenAccountStatDrawer(key, row, kamEmail) {
+  document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
+  var title = '', html = '';
+  if (key === 'aov') {
+    var aov = nrrAccountAov(row.account_id);
+    title = 'AOV — ระดับและแนวโน้ม';
+    html = nrrAovDrawerHtml(aov);
+  } else if (key === 'outlet') {
+    var outlet = nrrOutletMovement(row.account_id);
+    title = outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
+    html = nrrOutletDrawerHtml(outlet);
+  } else if (key === 'category') {
+    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
+    html = nrrCategoryDrawerHtml(cat);
+  } else if (key === 'price') {
+    var price = nrrAccountPriceImpact(row.account_id, kamEmail);
+    title = 'ผลกระทบราคาสุทธิ ' + (price && price.net >= 0 ? '+' : '') + (price ? nrrFmtGMVExact(price.net) : '—');
+    html = nrrPriceDrawerHtml(price);
+  }
+  document.getElementById('nrr-slideover-title').textContent = title;
+  document.getElementById('nrr-slideover-sub').textContent = '';
+  document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds">' + html + '</div>';
+  document.getElementById('nrr-slideover-backdrop').classList.add('on');
+  document.getElementById('nrr-slideover').classList.add('on');
+}
+
+function nrrAovDrawerHtml(aov) {
+  function bandRow(range, label, color, active) {
+    return '<div class="ds-stat-row"' + (active ? ' style="font-weight:700"' : '') + '><span class="ds-stat-label">' + range + '</span><span class="ds-stat-value" style="color:' + color + '">' + label + '</span></div>';
+  }
+  return (aov.trendPct != null ? '<div class="nrr-verdict">' + (aov.trendPct >= 0 ? 'AOV กำลังโตขึ้น ' : 'AOV กำลังลดลง ') + Math.abs(aov.trendPct) + '% ใน 3 เดือน — อยู่ในเกณฑ์ <b>' + nrrEsc(aov.band.label) + '</b></div>' : '') +
+    bandRow('&lt; ฿1,500', 'ควรดู', 'var(--coral)', aov.band.cls === 'low') +
+    bandRow('฿1,500–3,000', 'ปานกลาง', 'var(--sun-deep)', aov.band.cls === 'mid') +
+    bandRow('฿3,000–5,000', 'ดี', 'var(--green)', aov.band.cls === 'good') +
+    bandRow('&gt; ฿5,000', 'ดีมาก', 'var(--green-deep)', aov.band.cls === 'great') +
+    '<div class="ds-row" style="margin-top:10px"><span class="ds-row-name">AOV เดือนนี้</span><span class="ds-row-meta">' + (aov.ordersThisMonth || 0) + ' ออเดอร์</span><span class="ds-row-value">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</span></div>' +
+    '<div class="ds-row"><span class="ds-row-name">AOV เดือนก่อน</span><span class="ds-row-meta">' + (aov.lastMonthOrders || 0) + ' ออเดอร์</span><span class="ds-row-value">' + (aov.lastMonthAov != null ? nrrFmtGMVExact(aov.lastMonthAov) : '—') + '</span></div>';
+}
+
+function nrrOutletDrawerHtml(outlet) {
+  if (!outlet.total) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีข้อมูลสาขา</div></div>';
+  var quietList = outlet.outlets.filter(function (o) { return o.status === 'quiet' || o.cycle === 'gone'; });
+  var verdict = quietList.length ? '<div class="nrr-verdict">' + quietList.length + ' สาขาเงียบไป แต่ยอดรวมอาจยังดูปกติเพราะสาขาอื่นชดเชยไว้</div>' : '';
+  return verdict + outlet.outlets.map(function (o) {
+    var badge = o.status === 'new' ? '<span style="color:var(--sun-deep);font-size:11px;font-weight:700;flex-shrink:0">ใหม่</span>'
+      : (o.status === 'quiet' || o.cycle === 'gone') ? '<span style="color:var(--coral);font-size:11px;font-weight:700;flex-shrink:0">เงียบ</span>'
+      : o.cycle === 'near' ? '<span style="color:var(--sun-deep);font-size:11px;font-weight:700;flex-shrink:0">เฝ้าดู</span>' : '';
+    return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(o.outlet_name) + '</span>' +
+      '<span class="ds-row-meta">' + (o.lastOrderDate ? 'ล่าสุด ' + nrrEsc(o.lastOrderDate) : '') + '</span>' + badge +
+      '<span class="ds-row-value">' + nrrFmtGMVExact(o.gmv) + '</span></div>';
+  }).join('');
+}
+
+function nrrCategoryDrawerHtml(cat) {
+  var gapCount = cat.total - cat.boughtCount;
+  var verdict = gapCount ? '<div class="nrr-verdict">เหลือ ' + gapCount + ' หมวดที่ยังไม่เคยซื้อ — โอกาสเปิดคุยตอนไปเยี่ยม</div>' : '';
+  return verdict + cat.categories.map(function (c) {
+    return '<div class="nrr-acct-catfull-row">' +
+      '<div class="nrr-acct-catfull-top"><span class="nrr-acct-catfull-sw" style="background:' + c.color + ';opacity:' + (c.bought ? '1' : '.3') + '"></span>' +
+      '<span style="flex:1;font-weight:' + (c.bought ? '600' : '500') + ';color:' + (c.bought ? 'var(--ink)' : 'var(--ink3)') + '">' + nrrEsc(c.name) + '</span>' +
+      '<span class="num" style="font-size:11.5px;color:var(--ink2)">' + (c.bought ? nrrFmtGMVExact(c.gmv) + ' · ' + c.skuCount + ' SKU · ' + c.pct + '%' : 'ยังไม่เคยซื้อ') + '</span></div>' +
+      '<div class="nrr-acct-catfull-track"><div class="nrr-acct-catfull-fill" style="width:' + c.pct + '%;background:' + c.color + '"></div></div></div>';
+  }).join('');
+}
+
+function nrrPriceDrawerHtml(price) {
+  if (!price) return '<div class="ds-empty"><div class="ds-empty-title">กำลังโหลดข้อมูลราคา...</div></div>';
+  if (!price.upCount && !price.downCount) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีการเปลี่ยนราคาที่มีนัยสำคัญเดือนนี้</div></div>';
+  var rows = price.up.concat(price.down);
+  return '<div class="nrr-verdict">ยอดโตส่วนหนึ่งอาจมาจากราคา ไม่ใช่ปริมาณอย่างเดียว — เช็คให้ชัดก่อนสรุปว่าร้านนี้โตจริง</div>' +
+    rows.map(function (e) {
+      return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(e.name) + '</span>' +
+        '<span class="ds-row-meta">' + (e.pctChange >= 0 ? 'ขึ้นราคา ' : 'ลดราคา ') + Math.abs(Math.round(e.pctChange * 10) / 10) + '%</span>' +
+        '<span class="ds-row-value" style="color:' + (e.impact >= 0 ? 'var(--green-deep)' : 'var(--coral)') + '">' + (e.impact >= 0 ? '+' : '') + nrrFmtGMVExact(e.impact) + '</span></div>';
+    }).join('');
+}
+
+// ── Floating per-outlet tooltip (SKU signal rows) ────────────────────────
+function nrrOpenAccountOutletTip(btn) {
+  var itemId = btn.dataset.item, accountId = btn.dataset.account;
+  var rows = nrrSkuOutletBreakdown(accountId, itemId, nrrAccountState.kamEmail);
+  var otip = document.getElementById('nrr-otip');
+  if (!otip) return;
+  if (!rows || !rows.length) {
+    otip.innerHTML = '<div class="nrr-otip-head">สั่งที่สาขาไหนบ้าง</div><div class="micro" style="padding:4px 14px 10px">ไม่มีข้อมูลรายสาขา</div>';
+  } else {
+    otip.innerHTML = '<div class="nrr-otip-head">สั่งที่สาขาไหนบ้าง (เดือนนี้)</div>' +
+      rows.slice().sort(function (a, b) { return b.this_month_gmv - a.this_month_gmv; }).map(function (r) {
+        var zero = r.this_month_orders === 0;
+        return '<div class="nrr-otip-row"><span class="n">' + nrrEsc(r.outlet_name) + '</span><span class="v' + (zero ? ' zero' : '') + '">' + (zero ? 'ยังไม่สั่ง' : nrrFmtGMVExact(r.this_month_gmv)) + '</span></div>';
+      }).join('');
+  }
+  var r = btn.getBoundingClientRect();
+  var top = r.bottom + 6;
+  if (top + 260 > window.innerHeight) top = Math.max(8, r.top - 6 - Math.min(260, otip.scrollHeight || 200));
+  var left = Math.min(Math.max(8, r.left - 200), window.innerWidth - 296);
+  otip.style.top = top + 'px';
+  otip.style.left = left + 'px';
+  otip.classList.add('on');
+  document.getElementById('nrr-otip-backdrop').classList.add('on');
+}
+function nrrCloseAccountOutletTip() {
+  var otip = document.getElementById('nrr-otip');
+  if (otip) otip.classList.remove('on');
+  var b = document.getElementById('nrr-otip-backdrop');
+  if (b) b.classList.remove('on');
+}
+
+// Delegated on #nrr-account-body (bound once in nrrInitApp) — the router
+// replaces this container's innerHTML on every render, so listeners must
+// live on the persistent parent, same pattern as Portfolio's handlers.
+function nrrHandleAccountBodyClick(e) {
+  var trendCol = e.target.closest('.nrr-acct-trend-col');
+  if (trendCol) { nrrSelectAccountTrendMonth(parseInt(trendCol.dataset.i, 10)); return; }
+  var statCell = e.target.closest('.nrr-acct-stat-cell[data-stat]');
+  if (statCell) {
+    var row = _nrrPortviewRowFor(nrrAccountState.accountId);
+    if (row) nrrOpenAccountStatDrawer(statCell.dataset.stat, row, nrrAccountState.kamEmail);
+    return;
+  }
+  var otipBtn = e.target.closest('.nrr-acct-otip-btn');
+  if (otipBtn) { e.stopPropagation(); nrrOpenAccountOutletTip(otipBtn); return; }
+  var showAllBtn = e.target.closest('.nrr-acct-showall');
+  if (showAllBtn) {
+    if (showAllBtn.dataset.list === 'pos') nrrAccountState.showAllPos = true;
+    else nrrAccountState.showAllRisk = true;
+    var row2 = _nrrPortviewRowFor(nrrAccountState.accountId);
+    var container = document.querySelector('.nrr-acct-signal-cols');
+    if (container && row2) container.outerHTML = nrrAccountSignalListsHtml(row2, nrrAccountState.kamEmail);
+  }
 }
 window.nrrInitApp = nrrInitApp;
 
@@ -444,7 +867,14 @@ function nrrShellHtml() {
     '  <div style="padding:12px 22px 0;display:flex;gap:8px;align-items:center"><input class="nrr-search" id="nrr-slideover-search" placeholder="ค้นหาร้านค้า/account..." style="flex:1;min-width:0"><span id="nrr-slideover-kamwrap" style="display:none"></span></div>' +
     '  <div style="padding:10px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-chips"></div></div>' +
     '  <div class="nrr-slideover-body" id="nrr-slideover-body"></div>' +
-    '</div>';
+    '</div>' +
+    // Floating per-outlet tooltip (Account view, Phase C) — sibling of the
+    // main containers, position:fixed, same reasoning as #nrr-slideover
+    // itself: a floating overlay must never be a descendant of anything
+    // that could clip it (see nrr_account.js port notes / plan doc — this
+    // exact bug bit the design mockup).
+    '<div class="nrr-otip-backdrop" id="nrr-otip-backdrop"></div>' +
+    '<div class="float nrr-otip" id="nrr-otip"></div>';
 }
 
 // ── Top-level render ─────────────────────────────────────────────────────

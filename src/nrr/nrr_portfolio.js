@@ -48,7 +48,11 @@ function nrrPaceSignal(row) {
   }
   var pct = row.runrate_gmv / baseRow.gmv * 100;
   var cls = pct >= 100 ? 'great' : pct >= 95 ? 'safe' : pct >= 90 ? 'warn' : 'danger';
-  return { pct: pct, cls: cls, label: Math.round(pct) + '%', baseline_gmv: baseRow.gmv };
+  // 'expected' = "should have by today if tracking baseline exactly"
+  // (Sense's computePaceSignal field of the same name) — Portfolio's row
+  // view doesn't show it (no room), the Account page hero does.
+  var expected = baseRow.gmv * (row.days_elapsed / (row.days_in_month || 30));
+  return { pct: pct, cls: cls, label: Math.round(pct) + '%', baseline_gmv: baseRow.gmv, expected: expected };
 }
 window.nrrPaceSignal = nrrPaceSignal;
 

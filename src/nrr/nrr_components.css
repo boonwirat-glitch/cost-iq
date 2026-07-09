@@ -81,7 +81,10 @@
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 12px 4px 12px 12px; border-bottom: 1px solid var(--line);
   border-left: 3px solid var(--ink3);
+  text-decoration: none; color: inherit; cursor: pointer;
+  transition: background 140ms ease;
 }
+.nrr-acct-row:hover { background: var(--green-soft); }
 .nrr-acct-list .nrr-acct-row:last-child { border-bottom: none; }
 .nrr-acct-row-left { min-width: 0; flex: 1; }
 .nrr-acct-row-name { font-size: 15px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -700,3 +703,124 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-footnote { font-size: 12.5px; color: var(--ink2); line-height: 1.7; }
 .nrr-skel { background: linear-gradient(90deg, var(--fill) 25%, var(--fill-deep) 37%, var(--fill) 63%); background-size: 400% 100%; animation: nrrShimmer 1.4s ease infinite; border-radius: 8px; }
 @keyframes nrrShimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+/* ══ Account view (Phase C, 2026-07-09) ═══════════════════════════════════
+   Reuses the app's existing visual language throughout — .nrr-triple-lg's
+   hairline-cell pattern (not filled boxes, see the "boxes everywhere" note
+   at the top of nrr_base.css), .ds-row for signal rows, .float for the
+   floating tooltip, #nrr-slideover (unchanged) for stat-cell detail. */
+
+.nrr-acct-mast { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.nrr-acct-back {
+  width: 30px; height: 30px; border-radius: 50%; background: none; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: var(--ink2); flex-shrink: 0;
+  text-decoration: none; transition: border-color 140ms ease;
+}
+.nrr-acct-back:hover { border-color: var(--ink3); }
+.nrr-acct-type-chip { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--ink2); margin-left: 6px; text-transform: none; letter-spacing: 0; }
+
+/* ── Hero: MTD headline + linear pace bar + 6-month trend chart ────────── */
+.nrr-acct-hero { margin-bottom: 6px; }
+.nrr-acct-hero-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.nrr-acct-hero-num { font-size: 32px; font-weight: 700; line-height: 1; }
+.nrr-acct-hero-side { text-align: right; flex-shrink: 0; }
+.nrr-acct-hero-side-v { font-size: 15px; font-weight: 700; }
+
+.nrr-acct-pace-row { display: flex; align-items: center; gap: 12px; padding: 14px 0 4px; }
+.nrr-acct-pace-track { flex: 1; position: relative; height: 9px; border-radius: var(--r-pill); background: var(--fill-deep); }
+.nrr-acct-pace-fill { position: absolute; inset: 0; border-radius: var(--r-pill); }
+.nrr-acct-pace-expect { position: absolute; top: -4px; bottom: -4px; width: 2.5px; background: var(--ink); border-radius: 1px; }
+
+.nrr-acct-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; padding: 0 2px; }
+.nrr-acct-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; border: none; background: none; padding: 0; font-family: var(--font-ui); }
+.nrr-acct-trend-bar-track { width: 100%; height: 78px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 4px 4px 1px 1px; overflow: hidden; }
+/* Closed-month bars are real GMV, not "no data" — must not use --fill-deep
+   (the app-wide "empty/unknown" neutral, same reasoning as category
+   coverage's faded-not-gray rule). Muted green at the .nrr-spark-seg
+   opacity precedent (0.55); current/selected months bump to full color
+   via inline style / .sel below. */
+.nrr-acct-trend-bar { width: 100%; background: var(--green); opacity: .5; transition: background 140ms ease, opacity 140ms ease; }
+.nrr-acct-trend-col.sel .nrr-acct-trend-bar { opacity: .8; }
+.nrr-acct-trend-lbl { font-size: 10.5px; color: var(--ink3); margin-top: 6px; font-weight: 600; }
+.nrr-acct-trend-col.sel .nrr-acct-trend-lbl { color: var(--ink); }
+.nrr-acct-trend-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 0; border-top: 1px solid var(--line); margin-top: 14px; font-size: 12.5px; color: var(--ink2); }
+.nrr-acct-trend-amt { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+/* ── Stat row — 4 hairline cells, .nrr-triple-lg's own pattern ─────────── */
+.nrr-acct-stat-row { display: flex; border-top: 1px solid var(--line); margin-top: 24px; }
+.nrr-acct-stat-cell {
+  flex: 1; padding: 16px 18px; border-left: 1px solid var(--line); border-top: none; border-right: none; border-bottom: none;
+  text-align: left; background: none; cursor: pointer; font-family: var(--font-ui); color: var(--ink);
+  display: flex; flex-direction: column; gap: 6px; transition: background 140ms ease;
+}
+.nrr-acct-stat-cell:first-child { border-left: none; }
+.nrr-acct-stat-cell:hover { background: var(--fill); }
+.nrr-acct-stat-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--ink3); display: flex; justify-content: space-between; text-transform: uppercase; }
+.nrr-acct-stat-val { font-size: 17px; font-weight: 700; line-height: 1.1; }
+.nrr-acct-stat-sub { font-size: 10.5px; color: var(--ink2); line-height: 1.35; }
+.nrr-acct-spark-svg { width: 100%; height: 18px; }
+.nrr-acct-outlet-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.nrr-acct-outlet-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: block; }
+.nrr-acct-outlet-dots span.new { background: var(--sun); }
+.nrr-acct-outlet-dots span.quiet { background: var(--coral); opacity: .6; }
+.nrr-acct-outlet-stack, .nrr-acct-price-div { display: flex; height: 8px; border-radius: var(--r-pill); overflow: hidden; }
+.nrr-acct-outlet-stack i, .nrr-acct-price-div i { display: block; height: 100%; }
+.nrr-acct-cat-swatches { display: flex; gap: 3px; flex-wrap: wrap; }
+.nrr-acct-cat-swatches i { width: 9px; height: 9px; border-radius: 2px; display: block; }
+@media (max-width: 640px) {
+  .nrr-acct-stat-row { flex-wrap: wrap; }
+  .nrr-acct-stat-cell { flex: 1 1 50%; border-top: 1px solid var(--line); }
+  .nrr-acct-stat-cell:nth-child(1), .nrr-acct-stat-cell:nth-child(2) { border-top: none; }
+  .nrr-acct-stat-cell:nth-child(odd) { border-left: none; }
+}
+
+.nrr-acct-verdict-wrap { margin-top: 22px; }
+
+/* ── Signal lists — .ds-row reused, side-by-side on wide screens ───────── */
+.nrr-acct-signal-cols { display: grid; grid-template-columns: 1fr; margin-top: 26px; gap: 0; }
+@media (min-width: 720px) {
+  .nrr-acct-signal-cols { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .nrr-acct-signal-cols .nrr-acct-signal-col + .nrr-acct-signal-col { border-left: 1px solid var(--line); padding-left: 32px; }
+}
+.nrr-acct-signal-title.pos { color: var(--green-deep); }
+.nrr-acct-signal-title.watch { color: var(--sun-deep); }
+.nrr-acct-sig-row { gap: 10px; }
+.nrr-acct-sig-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.nrr-acct-sig-dot.new { background: var(--green); }
+.nrr-acct-sig-dot.growing { background: var(--green-deep); }
+.nrr-acct-sig-dot.near { background: var(--sun); }
+.nrr-acct-sig-dot.gone { background: var(--coral); }
+.nrr-acct-sig-val { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.nrr-acct-sig-val.up { color: var(--green-deep); }
+.nrr-acct-sig-tag { font-size: 10px; font-weight: 700; padding: 1.5px 7px; border-radius: var(--r-pill); flex-shrink: 0; }
+.nrr-acct-sig-tag.near { background: var(--sun-soft); color: var(--sun-deep); }
+.nrr-acct-sig-tag.gone { background: var(--coral-soft); color: var(--coral); }
+.nrr-acct-otip-btn {
+  border: none; background: none; color: var(--ink3); font-size: 11px; font-weight: 700; cursor: pointer;
+  flex-shrink: 0; padding: 4px 8px; border-radius: 8px; transition: background 140ms ease, color 140ms ease;
+}
+.nrr-acct-otip-btn:hover { color: var(--green-deep); background: var(--green-soft); }
+
+/* ── Floating per-outlet tooltip — position:fixed, sibling of every other
+   top-level container (see nrr_view.js's shell comment) so it can never
+   be clipped by an ancestor's overflow rule, same reasoning as
+   #nrr-slideover. ─────────────────────────────────────────────────────── */
+.nrr-otip-backdrop { position: fixed; inset: 0; z-index: 210; display: none; }
+.nrr-otip-backdrop.on { display: block; }
+.nrr-otip {
+  position: fixed; z-index: 211; width: 280px; max-height: 260px; overflow-y: auto;
+  padding: 10px 4px; display: none;
+}
+.nrr-otip.on { display: block; }
+.nrr-otip-head { font-size: 11px; font-weight: 700; color: var(--ink3); padding: 2px 14px 8px; text-transform: uppercase; letter-spacing: .04em; }
+.nrr-otip-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 14px; font-size: 12.5px; }
+.nrr-otip-row .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-otip-row .v { font-family: var(--font-num); font-weight: 700; color: var(--ink2); flex-shrink: 0; }
+.nrr-otip-row .v.zero { color: var(--coral); }
+
+/* ── Category full breakdown (inside #nrr-slideover) ───────────────────── */
+.nrr-acct-catfull-row { margin-bottom: 11px; }
+.nrr-acct-catfull-top { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+.nrr-acct-catfull-sw { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.nrr-acct-catfull-track { height: 6px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; margin-left: 17px; }
+.nrr-acct-catfull-fill { height: 100%; border-radius: var(--r-pill); }
