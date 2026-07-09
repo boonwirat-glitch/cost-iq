@@ -271,9 +271,9 @@ window.nrrCommEstimateReceiptSteps = nrrCommEstimateReceiptSteps;
 
 // Same receipt shape, sourced from a LOCKED snapshot's breakdown jsonb
 // instead of a live estimate — field names match _commBuildSnapshotRows()
-// (07a_commission_engine.js) exactly, same shapes nrrCommissionBreakdownDetailHtml
-// already reads. Keeps one receipt renderer for both locked and unlocked
-// periods — the whole point of this redesign is that both look the same.
+// (07a_commission_engine.js) exactly. Keeps one receipt renderer for both
+// locked and unlocked periods — the whole point of this redesign is that
+// both look the same.
 function nrrCommSnapshotReceiptSteps(bd) {
   if (!bd) return [];
   var steps = [{ kind: 'add', first: true, label: 'NRR (' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];

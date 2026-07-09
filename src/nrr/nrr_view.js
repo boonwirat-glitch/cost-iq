@@ -1754,26 +1754,12 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
 
   var rowsHtml = resolved.map(function (x) {
     var r = x.r;
-    var detailHtml;
-    if (r.kind === 'tl') {
-      // TL detail = the TL receipt (same visual language as the KAM drawer),
-      // multiplier line expands to per-KAM upsell contributions.
-      var steps = x.bd ? nrrCommSnapshotReceiptSteps(x.bd) : nrrCommEstimateReceiptSteps(x.est);
-      var multBody = nrrCommTeamMultDrillHtml(r.email);
-      detailHtml = steps.length
-        ? nrrCommReceiptHtml(steps, multBody ? { mult: multBody } : {})
-        : '<div class="ds-stat-row"><span class="ds-stat-label">ยังไม่มีข้อมูลเพียงพอ</span></div>';
-      if (isAdmin) detailHtml += nrrCommissionTeamKamsHtml(r.email, period);
-    } else {
-      detailHtml = x.bd
-        ? nrrCommissionBreakdownDetailHtml(x.bd)
-        : '<div class="ds-stat-row"><span class="ds-stat-label">ประมาณการ: ' + nrrEsc(x.est ? x.est.note : 'ยังไม่มีข้อมูลเพียงพอ') + '</span></div>';
-    }
     // KAM rows open the full drawer directly on click (no inline expand) —
     // the drilldown is the whole point for a KAM (upsell/handover/outlet
-    // detail), so skip the intermediate expand step. TL/admin-team rows
-    // keep <details> because expanding shows the team receipt + the nested
-    // per-KAM list in place. (2026-07-09)
+    // detail), so skip the intermediate expand step (and skip computing
+    // detailHtml below entirely, since a kam row never renders it).
+    // TL/admin-team rows keep <details> because expanding shows the team
+    // receipt + the nested per-KAM list in place. (2026-07-09)
     if (r.kind === 'kam') {
       return '<button type="button" class="ds-row hover nrr-comm-kam-drill nrr-comm-drill-btn" ' +
         'data-email="' + nrrEsc(r.email) + '" data-name="' + nrrEsc(r.name) + '" data-period="' + nrrEsc(period) + '">' +
@@ -1786,6 +1772,14 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
         '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
         '</button>';
     }
+    // TL detail = the TL receipt (same visual language as the KAM drawer),
+    // multiplier line expands to per-KAM upsell contributions.
+    var steps = x.bd ? nrrCommSnapshotReceiptSteps(x.bd) : nrrCommEstimateReceiptSteps(x.est);
+    var multBody = nrrCommTeamMultDrillHtml(r.email);
+    var detailHtml = steps.length
+      ? nrrCommReceiptHtml(steps, multBody ? { mult: multBody } : {})
+      : '<div class="ds-stat-row"><span class="ds-stat-label">ยังไม่มีข้อมูลเพียงพอ</span></div>';
+    if (isAdmin) detailHtml += nrrCommissionTeamKamsHtml(r.email, period);
     return '<details class="nrr-comm-row-group">' +
       '<summary class="ds-row hover">' +
       '<span class="ds-chev">›</span>' +
@@ -1837,33 +1831,6 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
       '</span></button>';
   }).join('');
   return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม' + plan.headerStamp + '</span></div>' + rows;
-}
-
-// Parses commission_payout_snapshots.breakdown (jsonb) into label/value
-// lines — field names match _commBuildSnapshotRows() in
-// src/07a_commission_engine.js exactly (tl_full / kam_full shapes).
-function nrrCommissionBreakdownDetailHtml(bd) {
-  var lines = [];
-  function line(label, val) {
-    if (val == null) return;
-    lines.push('<div class="ds-stat-row"><span class="ds-stat-label">' + nrrEsc(label) + '</span><span class="ds-stat-value">' + val + '</span></div>');
-  }
-  if (bd.type === 'tl_full') {
-    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMVExact(bd.nrr_payout) : null);
-    line('Upsell multiplier', bd.upsell_mult != null && !isNaN(parseFloat(bd.upsell_mult)) ? parseFloat(bd.upsell_mult).toFixed(2) + '×' : null);
-    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMVExact(bd.excluded_base_gmv) : null);
-    line('Final payout', bd.final_payout != null ? nrrFmtGMVExact(bd.final_payout) : null);
-  } else if (bd.type === 'kam_full') {
-    line('NRR payout', bd.nrr_payout != null ? nrrFmtGMVExact(bd.nrr_payout) : null);
-    line('Upsell P1+P3', bd.upsell_sku && bd.upsell_sku.total_commission != null ? nrrFmtGMVExact(bd.upsell_sku.total_commission) : null);
-    line('Outlet commission', bd.upsell_outlet && bd.upsell_outlet.commission != null ? nrrFmtGMVExact(bd.upsell_outlet.commission) : null);
-    line('Handover', bd.handover && bd.handover.payout != null ? nrrFmtGMVExact(bd.handover.payout) : null);
-    line('Components subtotal', bd.components_subtotal != null ? nrrFmtGMVExact(bd.components_subtotal) : null);
-    line('GMV Gate', bd.gmv_gate && bd.gmv_gate.cap_multiplier != null ? Number(bd.gmv_gate.cap_multiplier).toFixed(2) + '×' : null);
-    line('Excluded base GMV', bd.excluded_base_gmv ? nrrFmtGMVExact(bd.excluded_base_gmv) : null);
-    line('Final payout', bd.final_payout != null ? nrrFmtGMVExact(bd.final_payout) : null);
-  }
-  return lines.length ? lines.join('') : '<div class="ds-stat-row"><span class="ds-stat-label">ไม่มีรายละเอียดใน breakdown นี้</span></div>';
 }
 
 // Live target_settings footnote — decision: show current Cockpit config,
