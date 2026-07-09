@@ -132,11 +132,17 @@ function nrrAcctSparklineHtml(row, pace) {
       inner = '<div class="nrr-spark-hatch" style="height:' + hatchH + 'px;background:repeating-linear-gradient(-45deg,rgba(255,255,255,0.5) 0 2px,rgba(255,255,255,0) 2px 5px),' + color + '"></div>' +
         '<div class="nrr-spark-seg" style="height:' + solidH + 'px;background:' + color + '"></div>';
     } else {
-      inner = '<div class="nrr-spark-seg" style="height:' + h + 'px;background:' + color + '"></div>';
+      // Base month gets an INSET top marker (box-shadow — draws inside
+      // the box, adds no height) instead of the old trailing mark element
+      // below the bar. That trailing element made the base column's total
+      // height greater than its neighbors; since columns bottom-align,
+      // the extra height pushed the base bar itself UP, making it look
+      // taller/bigger than its real value (2026-07-09 — same bug shape
+      // already fixed once in the Account view's own trend chart).
+      inner = '<div class="nrr-spark-seg" style="height:' + h + 'px;background:' + color + (b.isBase ? ';box-shadow:inset 0 2px 0 var(--ink)' : '') + '"></div>';
     }
     return '<div class="nrr-spark-col' + (b.isBase ? ' base' : '') + '" title="' + nrrEsc(b.label + ': ' + nrrFmtGMV(b.v) + (b.isBase ? ' (เดือนฐาน)' : '')) + '">' +
       '<div class="nrr-spark-stack">' + inner + '</div>' +
-      (b.isBase ? '<div class="nrr-spark-basemark"></div>' : '') +
       '</div>';
   }).join('');
   return '<div class="nrr-spark">' + barsHtml + '</div>';

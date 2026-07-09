@@ -292,6 +292,13 @@ function nrrRenderPortfolioBody() {
     nrrLoadCommissionUpsellSection(email, bundle.expansionOutletIds, bundle.bd, 'nrr-port-p1-body', 'nrr-port-p3-body',
       function (e) { return nrrPortfolioState.email === e; });
   }
+
+  // Lock the account-list container to its just-rendered height so typing
+  // in the search box (which only ever removes rows relative to this
+  // baseline) can't shrink the page and bounce the scroll position —
+  // re-measured fresh on every full body render (KAM switch included).
+  var gridElInit = document.getElementById('nrr-port-acct-grid');
+  if (gridElInit) gridElInit.style.minHeight = gridElInit.scrollHeight + 'px';
 }
 
 function nrrRenderPortfolioLayerView(route) {
@@ -363,6 +370,28 @@ function nrrHandlePortfolioChange(e) {
 // comment, which anticipated exactly this).
 var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false };
 
+// Shaped like the real page (mast/hero/stat-row/two lists), not one flat
+// bar — the fetch chain here includes bulk_price.csv (36MB) so this can
+// sit on screen for a few seconds; it should read as "loading this page"
+// not "the page broke." Reuses .ds-skel's shimmer (now unscoped, see
+// nrr_components.css) — no new animation.
+function nrrAccountSkeletonHtml() {
+  var trendBars = Array.from({ length: 7 }, function () { return '<div class="ds-skel nrr-acct-skel-bar"></div>'; }).join('');
+  var statCells = Array.from({ length: 4 }, function () { return '<div class="ds-skel nrr-acct-skel-stat"></div>'; }).join('');
+  var rows = Array.from({ length: 3 }, function () { return '<div class="ds-skel nrr-acct-skel-row"></div>'; }).join('');
+  return '<div class="nrr-acct-skel">' +
+    '<div class="nrr-acct-skel-mast"><div class="ds-skel" style="width:30px;height:30px;border-radius:50%"></div><div class="ds-skel" style="width:220px;height:19px"></div></div>' +
+    '<div class="ds-skel" style="width:130px;height:12px;margin-top:26px"></div>' +
+    '<div class="ds-skel" style="width:170px;height:32px;margin-top:8px"></div>' +
+    '<div class="ds-skel" style="height:9px;border-radius:999px;margin-top:18px"></div>' +
+    '<div class="nrr-acct-skel-trend">' + trendBars + '</div>' +
+    '<div class="nrr-acct-skel-stats">' + statCells + '</div>' +
+    '<div class="ds-skel" style="height:52px;margin-top:22px"></div>' +
+    '<div class="ds-skel" style="width:160px;height:16px;margin-top:26px"></div>' +
+    '<div class="nrr-acct-skel-rows">' + rows + '</div>' +
+    '</div>';
+}
+
 function nrrRenderAccountView(route) {
   var body = document.getElementById('nrr-account-body');
   if (!body) return;
@@ -371,7 +400,7 @@ function nrrRenderAccountView(route) {
     body.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">ไม่พบร้านนี้</div><div class="micro" style="margin-top:8px"><a href="#/portfolio" style="color:var(--green-deep)">← กลับ Portfolio</a></div></div>';
     return;
   }
-  body.innerHTML = '<div class="ds-skel" style="height:220px"></div>';
+  body.innerHTML = nrrAccountSkeletonHtml();
   Promise.all([nrrFetchPortviewCsv(), nrrFetchBulkHistoryCsv()]).then(function () {
     var row = (window.bulkPortviewData.allRows || []).filter(function (r) { return r.account_id === accountId; })[0];
     if (!row) {
@@ -460,11 +489,17 @@ function nrrRenderAccountTrendChart(row) {
     var totalH = Math.round(((m.proj || m.v) / maxV) * 78);
     var solidH = m.current ? Math.round((m.v / maxV) * 78) : totalH;
     var hatchH = m.current ? Math.max(0, totalH - solidH) : 0;
+    // No dashed border on the base month bar anymore — it read as a dark
+    // tick and inflated the bar's apparent height. Base month is marked on
+    // its LABEL instead (below), so the bar height stays truthful.
     var bar = m.current
       ? '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px"></div><div class="nrr-acct-trend-bar" style="height:' + solidH + 'px;background:var(--green);opacity:.85"></div>'
-      : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px' + (m.isBase ? ';border:1.5px dashed var(--ink3)' : '') + '"></div>';
-    return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + '" data-i="' + i + '">' +
-      '<div class="nrr-acct-trend-bar-track">' + bar + '</div><div class="nrr-acct-trend-lbl">' + nrrEsc(m.label.split(' ')[0]) + '</div></button>';
+      : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px"></div>';
+    var lbl = nrrEsc(m.label.split(' ')[0]) + (m.isBase ? '<span class="nrr-acct-trend-basetag">ฐาน</span>' : '');
+    return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + (m.isBase ? ' base' : '') + '" data-i="' + i + '">' +
+      '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div>' +
+      '<div class="nrr-acct-trend-bar-track">' + bar + '</div>' +
+      '<div class="nrr-acct-trend-lbl">' + lbl + '</div></button>';
   }).join('');
   nrrSelectAccountTrendMonth(months.length - 1);
 }
@@ -491,7 +526,12 @@ function nrrSelectAccountTrendMonth(i) {
 function nrrAcctSparklineSvg(months) {
   var vals = months.map(function (m) { return m.aov; }).filter(function (v) { return v != null; });
   if (vals.length < 2) return '';
-  var maxV = Math.max.apply(null, vals), minV = Math.min.apply(null, vals);
+  // Zero-floored scale, not min/max-of-visible-data — matches
+  // nrrRenderAccountTrendChart's convention. A min/max scale always fills
+  // the same pixel range regardless of magnitude, so a 77% decline and a
+  // 6% decline would render as visually identical slopes; scaling from 0
+  // lets a real decline actually look like one.
+  var maxV = Math.max.apply(null, vals.concat([0])) || 1, minV = 0;
   var range = maxV - minV || 1;
   var pts = vals.map(function (v, i) { var x = i / (vals.length - 1) * 100; var y = 18 - ((v - minV) / range * 16 + 1); return x + ',' + y; }).join(' ');
   var lastY = 18 - ((vals[vals.length - 1] - minV) / range * 16 + 1);
@@ -529,7 +569,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
   var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
   var price = nrrAccountPriceImpact(row.account_id, kamEmail);
 
-  var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov">' +
+  var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov" style="border-top-color:' + aov.band.color + '">' +
     '<div class="nrr-acct-stat-lbl">AOV เฉลี่ย <span>›</span></div>' +
     '<div class="num nrr-acct-stat-val" style="color:' + aov.band.color + '">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</div>' +
     nrrAcctSparklineSvg(aov.months) +
@@ -537,38 +577,44 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     (aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
     '</button>';
 
+  // Accent color per cell reflects that cell's own health, same "colored
+  // signal, not a decoration" rule as everywhere else in the app —
+  // outlet: any quiet outlet outranks a new one for attention.
+  var outletAccent = outlet.counts.quiet > 0 ? 'var(--coral)' : outlet.counts.new > 0 ? 'var(--sun)' : 'var(--green)';
   var outletViz = outlet.total > 15 ? nrrOutletStackedBarHtml(outlet.counts, outlet.total) : nrrOutletDotGridHtml(outlet.outlets);
-  var outletCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="outlet">' +
+  var outletCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="outlet" style="border-top-color:' + outletAccent + '">' +
     '<div class="nrr-acct-stat-lbl">สาขา <span>›</span></div>' +
-    '<div class="nrr-acct-stat-val">' + outlet.total + ' สาขา</div>' +
+    '<div class="num nrr-acct-stat-val">' + outlet.total + ' สาขา</div>' +
     outletViz +
     '<div class="nrr-acct-stat-sub">' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ</div>' +
     '</button>';
 
-  var catCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="category">' +
+  var catGaps = cat.total - cat.boughtCount;
+  var catAccent = catGaps === 0 ? 'var(--green)' : catGaps <= 3 ? 'var(--sun)' : 'var(--coral)';
+  var catCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="category" style="border-top-color:' + catAccent + '">' +
     '<div class="nrr-acct-stat-lbl">หมวดสินค้า <span>›</span></div>' +
-    '<div class="nrr-acct-stat-val">' + cat.boughtCount + '<span style="font-size:12px;color:var(--ink3)">/' + cat.total + '</span></div>' +
+    '<div class="num nrr-acct-stat-val">' + cat.boughtCount + '<span style="font-size:13px;color:var(--ink3)">/' + cat.total + '</span></div>' +
     '<div class="nrr-acct-cat-swatches">' + cat.categories.map(function (c) {
       return '<i style="background:' + c.color + ';opacity:' + (c.bought ? '1' : '.25') + '" title="' + nrrEsc(c.name) + '"></i>';
     }).join('') + '</div>' +
-    '<div class="nrr-acct-stat-sub">เหลือ ' + (cat.total - cat.boughtCount) + ' หมวดที่ยังไม่ซื้อ</div>' +
+    '<div class="nrr-acct-stat-sub">เหลือ ' + catGaps + ' หมวดที่ยังไม่ซื้อ</div>' +
     '</button>';
 
   var priceCell;
   if (!price) {
-    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default"><div class="nrr-acct-stat-lbl">ราคาสินค้า</div><div class="micro">กำลังโหลด...</div></div>';
+    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default;border-top-color:var(--ink3)"><div class="nrr-acct-stat-lbl">ราคาสินค้า</div><div class="micro">กำลังโหลด...</div></div>';
   } else if (!price.hasCurrentData) {
     // bulk_price.csv hasn't been batched for this month yet — say so
     // plainly rather than showing a "+฿0 ไม่มีการเปลี่ยนแปลง" that reads
     // as a verified zero (see nrrAccountPriceImpact comment).
-    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default">' +
+    priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default;border-top-color:var(--ink3)">' +
       '<div class="nrr-acct-stat-lbl">ราคาสินค้า</div>' +
       '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
       '<div class="nrr-acct-stat-sub">รอข้อมูลราคาปิดเดือน</div>' +
       '</div>';
   } else {
     var netColor = price.net >= 0 ? 'var(--green-deep)' : 'var(--coral)';
-    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price">' +
+    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + netColor + '">' +
       '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
       '<div class="num nrr-acct-stat-val" style="color:' + netColor + '">' + (price.net >= 0 ? '+' : '') + nrrFmtGMVExact(price.net) + '</div>' +
       nrrPriceDivBarHtml(price) +
@@ -579,35 +625,60 @@ function nrrAccountStatRowHtml(row, kamEmail) {
   return '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div>';
 }
 
+// "Before → after" transformation strip — deliberately its own visual
+// language (not .nrr-verdict's plain sentence, not the AOV callout's
+// icon-in-circle, not the stat row's top-accent cells — user asked for
+// something distinct from both when this reverted from prose back to a
+// visual, 2026-07-09). No background fill anywhere; the gradient line +
+// colored deltas carry it.
+// Simplified per feedback (2026-07-09, third pass on this component) —
+// Two soft-tint summary blocks (Round 5, 2026-07-09) — a deliberate,
+// user-approved exception to the app's "no fills" rule for JUST these two
+// headline totals, so the summary reads as distinctly more prominent than
+// (and visually separate from) the thin left-border signal rows below.
+// Numbers come straight from nrrNetSignalSummary — no math here.
 function nrrAccountVerdictHtml(row, kamEmail) {
   var net = nrrNetSignalSummary(row.account_id, kamEmail);
   if (!net.gainCount && !net.riskCount) return '';
-  var parts = [];
-  if (net.gainCount) parts.push('โอกาสได้เพิ่ม <b class="num" style="color:var(--green-deep)">+' + nrrFmtGMVExact(net.gainAmount) + '</b> จาก ' + net.gainCount + ' สัญญาณบวก');
-  if (net.riskCount) parts.push('เสี่ยงเสีย <b class="num" style="color:var(--coral)">−' + nrrFmtGMVExact(net.riskAmount) + '</b> จาก ' + net.riskCount + ' รายการที่ต้องดูแล');
-  var tail = (net.netRunrate != null && net.runrate != null) ? ' — สุทธิ run-rate มีโอกาสขยับจาก ' + nrrFmtGMVExact(net.runrate) + ' เป็น ~' + nrrFmtGMVExact(net.netRunrate) : '';
-  return '<div class="nrr-acct-verdict-wrap"><div class="nrr-verdict">ถ้าเป็นแบบนี้ต่อไปทั้งเดือน: ' + parts.join(' เทียบกับ ') + tail + '</div></div>';
+  var blocks = '';
+  if (net.gainCount) blocks += '<div class="nrr-acct-net-block up">' +
+    '<div class="nrr-acct-net-hd"><span class="nrr-acct-net-tri">▲</span>โอกาสได้เพิ่ม</div>' +
+    '<div class="num nrr-acct-net-amt">+' + nrrFmtGMVExact(net.gainAmount) + '</div>' +
+    '<div class="nrr-acct-net-sub">' + net.gainCount + ' สัญญาณบวก</div></div>';
+  if (net.riskCount) blocks += '<div class="nrr-acct-net-block down">' +
+    '<div class="nrr-acct-net-hd"><span class="nrr-acct-net-tri">▼</span>เสี่ยงเสีย</div>' +
+    '<div class="num nrr-acct-net-amt">−' + nrrFmtGMVExact(net.riskAmount) + '</div>' +
+    '<div class="nrr-acct-net-sub">' + net.riskCount + ' ต้องดูแล</div></div>';
+  return '<div class="nrr-acct-net">' + blocks + '</div>';
 }
 
 function nrrAccountSignalRowHtml(kind, item, accountId) {
-  var name = item.name, meta, right;
+  // Every row shares one visual grammar regardless of kind, so the two
+  // lists read the same way: name → colored badge (the one number/state
+  // that matters most) → muted secondary stats → a right-aligned ฿
+  // headline. Left border color repeats the badge color as a down-the-
+  // list scan cue (same motif as Portfolio's .nrr-acct-row pace border).
+  var name = item.name, badge, meta, amt, unit, border;
   if (kind === 'new') {
-    meta = 'เพิ่งเริ่มสั่งเดือนนี้';
-    right = '<span class="num nrr-acct-sig-val up">' + nrrFmtGMVExact(item.gmv) + '</span>';
+    badge = 'ใหม่'; meta = 'เพิ่งเริ่มสั่งเดือนนี้';
+    amt = nrrFmtGMVExact(item.gmv); unit = 'MTD'; border = 'var(--green)';
   } else if (kind === 'growing') {
-    meta = 'โต ' + Math.round(item.chgPct * 100) + '% จากเดือนก่อน · คาดเต็มเดือน';
-    right = '<span class="num nrr-acct-sig-val up">+' + nrrFmtGMVExact(item.projInc) + '</span>';
+    badge = '+' + Math.round(item.chgPct * 100) + '%'; meta = 'จากเดือนก่อน · คาดเต็มเดือน';
+    amt = '+' + nrrFmtGMVExact(item.projInc); unit = ''; border = 'var(--green)';
   } else {
-    meta = 'เคยสั่ง ' + nrrFmtGMVExact(item.monthlyGmv) + '/เดือน · ทุก ~' + Math.round(item.avgInterval) + ' วัน' + (item.lastOrderDate ? ' · ล่าสุด ' + nrrEsc(item.lastOrderDate) : '');
-    var tagText = kind === 'gone' ? 'เลยรอบ ' + item.daysLate + ' วันแล้ว' : 'เพิ่งเลยรอบ ' + item.daysLate + ' วัน';
-    right = '<span class="nrr-acct-sig-tag ' + kind + '">' + nrrEsc(tagText) + '</span>';
+    badge = kind === 'gone' ? 'เลยรอบ ' + item.daysLate + ' วันแล้ว' : 'เพิ่งเลยรอบ ' + item.daysLate + ' วัน';
+    meta = 'ทุก ~' + Math.round(item.avgInterval) + ' วัน' + (item.lastOrderDate ? ' · ล่าสุด ' + nrrEsc(item.lastOrderDate) : '');
+    amt = nrrFmtGMVExact(item.monthlyGmv); unit = '/เดือน'; border = kind === 'gone' ? 'var(--coral)' : 'var(--sun)';
   }
-  return '<div class="ds-row nrr-acct-sig-row">' +
-    '<span class="nrr-acct-sig-dot ' + kind + '"></span>' +
-    '<div style="flex:1;min-width:0"><div class="ds-row-name">' + nrrEsc(name) + '</div><span class="ds-row-meta">' + meta + '</span></div>' +
-    right +
-    '<button type="button" class="nrr-acct-otip-btn" data-item="' + nrrEsc(item.item_id) + '" data-account="' + nrrEsc(accountId) + '">รายสาขา</button>' +
-    '</div>';
+  var amtColor = (kind === 'new' || kind === 'growing') ? 'var(--green-deep)' : 'var(--ink)';
+  return '<button type="button" class="nrr-acct-sig-row ' + kind + '" style="border-left-color:' + border + '" data-item="' + nrrEsc(item.item_id) + '" data-account="' + nrrEsc(accountId) + '">' +
+    '<div class="nrr-acct-sig-main">' +
+    '<div class="nrr-acct-sig-name">' + nrrEsc(name) + '</div>' +
+    '<div class="nrr-acct-sig-line2"><span class="nrr-acct-sig-badge ' + kind + '">' + nrrEsc(badge) + '</span><span class="nrr-acct-sig-meta">' + meta + '</span></div>' +
+    '</div>' +
+    '<div class="nrr-acct-sig-right"><span class="num nrr-acct-sig-amt" style="color:' + amtColor + '">' + amt + '</span>' + (unit ? '<span class="nrr-acct-sig-unit">' + unit + '</span>' : '') + '</div>' +
+    '<span class="nrr-acct-sig-chev">›</span>' +
+    '</button>';
 }
 
 function nrrAccountSignalListsHtml(row, kamEmail) {
@@ -677,13 +748,37 @@ function nrrAovDrawerHtml(aov) {
   function bandRow(range, label, color, active) {
     return '<div class="ds-stat-row"' + (active ? ' style="font-weight:700"' : '') + '><span class="ds-stat-label">' + range + '</span><span class="ds-stat-value" style="color:' + color + '">' + label + '</span></div>';
   }
-  return (aov.trendPct != null ? '<div class="nrr-verdict">' + (aov.trendPct >= 0 ? 'AOV กำลังโตขึ้น ' : 'AOV กำลังลดลง ') + Math.abs(aov.trendPct) + '% ใน 3 เดือน — อยู่ในเกณฑ์ <b>' + nrrEsc(aov.band.label) + '</b></div>' : '') +
+  // This callout carries two independent axes at once — the absolute
+  // tier (band, threshold-based) and the recent direction (trendPct,
+  // 3-month movement) — which is exactly why it earns its own look
+  // instead of the generic .nrr-verdict wash every other drawer uses:
+  // a great-tier account can still be trending down, and that's worth
+  // seeing as its own signal, not flattened into one line of prose.
+  var callout = '';
+  if (aov.trendPct != null) {
+    var up = aov.trendPct >= 0;
+    callout = '<div class="nrr-acct-aov-callout ' + aov.band.cls + '">' +
+      '<span class="nrr-acct-aov-arrow ' + (up ? 'up' : 'down') + '">' + (up ? '▲' : '▼') + '</span>' +
+      '<div class="nrr-acct-aov-callout-body">' +
+      '<div class="num nrr-acct-aov-callout-pct">' + Math.abs(aov.trendPct) + '%</div>' +
+      '<div class="nrr-acct-aov-callout-label">AOV ' + (up ? 'กำลังโตขึ้น' : 'กำลังลดลง') + 'ใน 3 เดือน — อยู่ในเกณฑ์ <b>' + nrrEsc(aov.band.label) + '</b></div>' +
+      '</div></div>';
+  }
+  // History — MTD first (bold), then every closed month we have (most
+  // recent first), matching the hero trend chart's window instead of
+  // just "this month vs last month".
+  var histRows = aov.months.slice(-6).slice().reverse();
+  var history = '<div class="ds-row" style="font-weight:700"><span class="ds-row-name">เดือนนี้ (MTD)</span><span class="ds-row-meta">' + (aov.ordersThisMonth || 0) + ' ออเดอร์</span><span class="ds-row-value" style="color:' + aov.band.color + '">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</span></div>' +
+    histRows.map(function (m) {
+      return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(m.month) + '</span><span class="ds-row-meta">' + (m.orders || 0) + ' ออเดอร์</span><span class="ds-row-value">' + (m.aov != null ? nrrFmtGMVExact(m.aov) : '—') + '</span></div>';
+    }).join('');
+
+  return callout +
     bandRow('&lt; ฿1,500', 'ควรดู', 'var(--coral)', aov.band.cls === 'low') +
     bandRow('฿1,500–3,000', 'ปานกลาง', 'var(--sun-deep)', aov.band.cls === 'mid') +
     bandRow('฿3,000–5,000', 'ดี', 'var(--green)', aov.band.cls === 'good') +
     bandRow('&gt; ฿5,000', 'ดีมาก', 'var(--green-deep)', aov.band.cls === 'great') +
-    '<div class="ds-row" style="margin-top:10px"><span class="ds-row-name">AOV เดือนนี้</span><span class="ds-row-meta">' + (aov.ordersThisMonth || 0) + ' ออเดอร์</span><span class="ds-row-value">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</span></div>' +
-    '<div class="ds-row"><span class="ds-row-name">AOV เดือนก่อน</span><span class="ds-row-meta">' + (aov.lastMonthOrders || 0) + ' ออเดอร์</span><span class="ds-row-value">' + (aov.lastMonthAov != null ? nrrFmtGMVExact(aov.lastMonthAov) : '—') + '</span></div>';
+    '<div style="margin-top:14px">' + history + '</div>';
 }
 
 function nrrOutletDrawerHtml(outlet) {
@@ -767,8 +862,8 @@ function nrrHandleAccountBodyClick(e) {
     if (row) nrrOpenAccountStatDrawer(statCell.dataset.stat, row, nrrAccountState.kamEmail);
     return;
   }
-  var otipBtn = e.target.closest('.nrr-acct-otip-btn');
-  if (otipBtn) { e.stopPropagation(); nrrOpenAccountOutletTip(otipBtn); return; }
+  var sigRow = e.target.closest('.nrr-acct-sig-row[data-item]');
+  if (sigRow) { nrrOpenAccountOutletTip(sigRow); return; }
   var showAllBtn = e.target.closest('.nrr-acct-showall');
   if (showAllBtn) {
     if (showAllBtn.dataset.list === 'pos') nrrAccountState.showAllPos = true;
@@ -1511,12 +1606,16 @@ function nrrCommReceiptHtml(steps, sectionsByKey) {
     var lineCls = s.kind === 'multiply' ? ' op' : s.kind === 'subtotal' ? ' subtotal' : s.kind === 'total' ? ' total' : '';
     var rule = s.kind === 'subtotal' ? '<div class="nrr-comm-receipt-rule"></div>'
       : s.kind === 'total' ? '<div class="nrr-comm-receipt-rule total"></div>' : '';
+    // Per-component color cue (Round 5) — component lines (drillKey set)
+    // get a data-comm-type attr driving a colored left accent; subtotal/
+    // multiply/total lines stay neutral (no drillKey → no attr).
+    var typeAttr = (s.drillKey && s.drillKey !== 'mult') ? ' data-comm-type="' + s.drillKey + '"' : '';
     if (body) {
-      return rule + '<details class="nrr-comm-receipt-line expandable' + lineCls + '"><summary>' +
+      return rule + '<details class="nrr-comm-receipt-line expandable' + lineCls + '"' + typeAttr + '><summary>' +
         _nrrReceiptCells(op, nrrEsc(s.label) + metaHtml, valueHtml, true) +
         '</summary><div class="nrr-comm-receipt-detail">' + body + '</div></details>';
     }
-    return rule + '<div class="nrr-comm-receipt-line' + lineCls + '">' +
+    return rule + '<div class="nrr-comm-receipt-line' + lineCls + '"' + typeAttr + '>' +
       _nrrReceiptCells(op, nrrEsc(s.label) + metaHtml, valueHtml, false) + '</div>';
   }).join('');
   return '<div class="nrr-comm-receipt">' + rowsHtml + '</div>';
@@ -1670,11 +1769,23 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
         ? nrrCommissionBreakdownDetailHtml(x.bd)
         : '<div class="ds-stat-row"><span class="ds-stat-label">ประมาณการ: ' + nrrEsc(x.est ? x.est.note : 'ยังไม่มีข้อมูลเพียงพอ') + '</span></div>';
     }
-    // V2: click-through to the full outlet-level drill-down drawer — only
-    // meaningful for KAM rows (that's what has upsell/handover/outlet detail).
-    var drillLink = r.kind === 'kam'
-      ? '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(r.email) + '" data-name="' + nrrEsc(r.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียดร้านค้า →</button>'
-      : '';
+    // KAM rows open the full drawer directly on click (no inline expand) —
+    // the drilldown is the whole point for a KAM (upsell/handover/outlet
+    // detail), so skip the intermediate expand step. TL/admin-team rows
+    // keep <details> because expanding shows the team receipt + the nested
+    // per-KAM list in place. (2026-07-09)
+    if (r.kind === 'kam') {
+      return '<button type="button" class="ds-row hover nrr-comm-kam-drill nrr-comm-drill-btn" ' +
+        'data-email="' + nrrEsc(r.email) + '" data-name="' + nrrEsc(r.name) + '" data-period="' + nrrEsc(period) + '">' +
+        '<span class="ds-chev" style="transform:none">›</span>' +
+        '<span style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px;text-align:left">' +
+        '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
+        '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + (x.nrrPct != null ? x.nrrPct + '%' : '—') + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
+        nrrCommTierMiniHtml(r.kind, r.email, period, x.nrrPct) +
+        '</span>' +
+        '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
+        '</button>';
+    }
     return '<details class="nrr-comm-row-group">' +
       '<summary class="ds-row hover">' +
       '<span class="ds-chev">›</span>' +
@@ -1685,7 +1796,7 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       '</span>' +
       '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
       '</summary>' +
-      '<div class="ds-row-detail">' + detailHtml + drillLink + '</div>' +
+      '<div class="ds-row-detail">' + detailHtml + '</div>' +
       '</details>';
   }).join('');
 
@@ -1710,8 +1821,11 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
   });
   var plan = nrrCommStatusPlan(resolved.map(function (x) { return x.status; }));
   var rows = resolved.map(function (x) {
-    return '<div class="nrr-comm-kam-row">' +
-      '<span style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
+    // Whole row opens the drawer (2026-07-09) — was a div + separate
+    // "ดูรายละเอียด →" button; now a single clickable row for a bigger hit
+    // target, same .nrr-comm-drill-btn handler.
+    return '<button type="button" class="nrr-comm-kam-row nrr-comm-drill-btn" data-email="' + nrrEsc(x.k.email) + '" data-name="' + nrrEsc(x.k.name) + '" data-period="' + nrrEsc(period) + '">' +
+      '<span style="display:flex;flex-direction:column;gap:3px;min-width:0;text-align:left">' +
       '<span class="ds-stat-label">' + nrrEsc(x.k.name) +
       (x.pct != null ? ' · <span class="num" style="color:' + nrrThresholdColorVar(x.pct) + '">' + x.pct + '%</span>' : '') +
       plan.rowStamp(x.status) + '</span>' +
@@ -1719,8 +1833,8 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
       '</span>' +
       '<span class="nrr-comm-kam-row-right">' +
       '<span class="num" style="color:' + (x.snap ? 'var(--ink)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.amt) + '</span>' +
-      '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(x.k.email) + '" data-name="' + nrrEsc(x.k.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียด →</button>' +
-      '</span></div>';
+      '<span class="ds-chev" style="transform:none">›</span>' +
+      '</span></button>';
   }).join('');
   return '<div class="ds-section-hd" style="margin-top:14px"><span class="ds-eyebrow">KAM ในทีม' + plan.headerStamp + '</span></div>' + rows;
 }

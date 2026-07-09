@@ -250,14 +250,17 @@ function nrrCommEstimateReceiptSteps(est) {
     // the per-line rounding remainder so Σ(lines) === subtotal to the baht.
     var p1r = est.p1_comm || 0, p3r = est.p3_comm || 0;
     var outR = (est.upsell_comm || 0) - p1r - p3r;
+    var hoPay = (est.handover && est.handover.payout) || 0;
     steps.push({ kind: 'add', label: 'Upsell P1 · สินค้าใหม่', amount: p1r, drillKey: 'p1' });
     steps.push({ kind: 'add', label: 'Upsell P3 · สินค้าโต', amount: p3r, drillKey: 'p3' });
     steps.push({ kind: 'add', label: 'Expansion · ร้านขยาย 0.5%', amount: outR, drillKey: 'expansion' });
-    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) });
-    steps.push({ kind: 'multiply', label: 'NRR Gate (' + est.pct + '% ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
-    steps.push({ kind: 'add', label: 'Handover · retention', amount: (est.handover && est.handover.payout) || 0,
+    // Handover is INSIDE the gate (engine 07a:691) — show it as a component
+    // above the subtotal, then multiply the whole subtotal by the gate.
+    steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
       meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + est.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
       drillKey: est.handover && est.handover.detail && est.handover.detail.length ? 'handover' : null });
+    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) + hoPay });
+    steps.push({ kind: 'multiply', label: 'NRR Gate (' + est.pct + '% ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
   } else {
     steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม (' + (est.upsell_pct != null ? est.upsell_pct.toFixed(1) : '0.0') + '% ของฐาน)', factor: est.multiplier, drillKey: 'mult' });
   }
@@ -282,15 +285,18 @@ function nrrCommSnapshotReceiptSteps(bd) {
     var p1Comm = Math.round((sku.p1 && sku.p1.comm) || 0);
     var p3Comm = Math.round((sku.p3 && sku.p3.comm) || 0);
     var outletComm = Math.round(upsell) - p1Comm - p3Comm;
+    var hoPay = (bd.handover && bd.handover.payout) || 0;
     steps.push({ kind: 'add', label: 'Upsell P1 · สินค้าใหม่', amount: p1Comm, drillKey: 'p1' });
     steps.push({ kind: 'add', label: 'Upsell P3 · สินค้าโต', amount: p3Comm, drillKey: 'p3' });
     steps.push({ kind: 'add', label: 'Expansion · ร้านขยาย 0.5%', amount: outletComm, drillKey: 'expansion' });
-    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell });
-    var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
-    steps.push({ kind: 'multiply', label: 'NRR Gate' + (bd.nrr_pct != null ? ' (' + bd.nrr_pct + '%)' : ''), factor: gcap });
-    steps.push({ kind: 'add', label: 'Handover · retention', amount: (bd.handover && bd.handover.payout) || 0,
+    // Handover is INSIDE the gate (engine 07a:691) — component above the
+    // subtotal, whole subtotal then ×gate to reach final_payout.
+    steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
       meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + bd.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
       drillKey: bd.handover && bd.handover.detail && bd.handover.detail.length ? 'handover' : null });
+    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell + hoPay });
+    var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
+    steps.push({ kind: 'multiply', label: 'NRR Gate' + (bd.nrr_pct != null ? ' (' + bd.nrr_pct + '%)' : ''), factor: gcap });
   } else {
     var mult = bd.upsell_mult;
     steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: typeof mult === 'object' ? mult.multiplier : parseFloat(mult) || 1, drillKey: 'mult' });
@@ -451,11 +457,16 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   var outletComm = row.outlet_gmv * outRate;
   var upsellComm = p1Comm + p3Comm + outletComm;
   // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate).
-  // Per the real engine, the gate multiplies (nrr_payout + upsell incl.
-  // expansion outlet comm); handover is a SEPARATE flat bonus outside the
-  // gate (_commBuildKamPayout adds handover.payout un-multiplied) —
-  // verified against locked June rows: Dent (0+6596+707)×0.7=5112,
-  // Pop 17229×1+5000=22229.
+  // Handover IS gated: the real engine (_commBuildKamPayout,
+  // 07a_commission_engine.js:688-692) folds handover.payout into the
+  // subtotal FIRST, then multiplies the whole thing by the gate cap:
+  //   subtotal = nrr + upsell(sku+outlet) + handover
+  //   final    = round(subtotal × cap)
+  // (An earlier port added handover OUTSIDE the gate; that was wrong —
+  // the two "verification" rows it cited both happened to be cases where
+  // the formulas coincide, Dent handover=0 and Pop gate=1.0, so the
+  // gate<1 AND handover>0 case was never actually exercised. Fixed
+  // 2026-07-09 to match the engine that generates locked payroll.)
   var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
   var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
   var cap = 1.0;
@@ -467,10 +478,10 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
     p1_comm: Math.round(p1Comm), p3_comm: Math.round(p3Comm), outlet_comm: Math.round(outletComm),
     upsell_comm: Math.round(upsellComm),
     gate_threshold: t1, gate_cap: cap, handover: handover,
-    est: Math.round((nrrPayout + upsellComm) * cap) + handover.payout,
-    note: '(NRR ฿' + nrrPayout.toLocaleString('en-US') + ' + upsell ฿' + Math.round(upsellComm).toLocaleString('en-US') + ')' +
-      (cap < 1 ? ' × gate ' + cap + 'x' : '') +
-      (handover.payout ? ' + handover ฿' + handover.payout.toLocaleString('en-US') : '')
+    est: Math.round((nrrPayout + upsellComm + handover.payout) * cap),
+    note: '(NRR ฿' + nrrPayout.toLocaleString('en-US') + ' + upsell ฿' + Math.round(upsellComm).toLocaleString('en-US') +
+      (handover.payout ? ' + handover ฿' + handover.payout.toLocaleString('en-US') : '') + ')' +
+      (cap < 1 ? ' × gate ' + cap + 'x' : '')
   };
 }
 window.nrrEstimateKamCommission = nrrEstimateKamCommission;

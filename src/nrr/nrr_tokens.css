@@ -88,6 +88,26 @@
   --cat-9: #7a6bb0;  /* Beverage Alcohol */
   --cat-10: #6b7280; /* DG Non-food */
 
+  /* Commission-type palette (Round 5, 2026-07-09) — a FOURTH categorical
+     system, one hue per component of the KAM commission formula, used as a
+     leading color cue on each receipt line so the eye can track "which
+     kind of money is this" down the breakdown. Same precedent as the
+     movement and category palettes above (each got its own lane); kept
+     clear of status green/sun/coral, which stay reserved for NRR%
+     thresholds. Order = receipt order (NRR → P1 → P3 → Expansion →
+     Handover). Expansion/Handover intentionally echo the movement
+     palette's expansion/handover hues for cross-app consistency. */
+  --comm-nrr: #2f7d62;           /* NRR — the core retained-revenue payout */
+  --comm-nrr-soft: #e6f2ec;
+  --comm-p1: #c56a2c;            /* Upsell P1 — new products */
+  --comm-p1-soft: #f8e9dc;
+  --comm-p3: #b58a1f;            /* Upsell P3 — growing products */
+  --comm-p3-soft: #f6eecd;
+  --comm-expansion: #3d8bb0;     /* Expansion — new outlets (cool, "spread") */
+  --comm-expansion-soft: #e4eff5;
+  --comm-handover: #7d8ca3;      /* Handover — retention bonus (quiet slate) */
+  --comm-handover-soft: #eef1f5;
+
   /* Radii */
   --r-sm: 12px;
   --r-md: 16px;

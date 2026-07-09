@@ -104,8 +104,9 @@
 /* ── Portfolio pulse (round 2) — %NRR + base/MTD/run-rate triple, reuses
    .nrr-triple-lg exactly as the dashboard does (nrrTripleHtml('lg', ...)) —
    no new number-display component, just a bigger %NRR above it. */
-.nrr-port-pulse { margin: 10px 0 26px; }
+.nrr-port-pulse { margin: 10px 0 26px; text-align: center; }
 .nrr-port-pulse-pct { font-size: 48px; font-weight: 800; line-height: 1.0; letter-spacing: -0.02em; margin: 4px 0 14px; }
+.nrr-port-pulse .nrr-triple-lg { justify-content: center; }
 
 /* ── Risk summary strip (round 2/3) — Sense's ON TRACK/MONITOR/AT RISK
    boxes, ported as 3 quiet stat tiles (no card shadows — /nrr's own "no
@@ -142,7 +143,6 @@
 .nrr-spark-stack { width: 100%; display: flex; flex-direction: column; justify-content: flex-end; height: 22px; border-radius: 2px 2px 1px 1px; overflow: hidden; }
 .nrr-spark-seg { width: 100%; opacity: 0.55; }
 .nrr-spark-hatch { width: 100%; }
-.nrr-spark-basemark { width: 100%; height: 2px; background: var(--ink); border-radius: 1px; margin-top: 2px; }
 
 /* fade-up entrance + section rhythm: whitespace + hairline, not boxes */
 .nrr-section {
@@ -511,6 +511,13 @@
 }
 .nrr-comm-ds .nrr-comm-kam-row:last-child { border-bottom: none; }
 .nrr-comm-ds .nrr-comm-kam-row-right { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+/* KAM rows are now <button> (click → open drawer, 2026-07-09). Reset the
+   native button chrome but keep each rule's own border-bottom hairline. */
+.nrr-comm-ds button.ds-row, .nrr-comm-ds button.nrr-comm-kam-row {
+  width: 100%; border-top: none; border-left: none; border-right: none;
+  background: none; font: inherit; color: inherit; cursor: pointer;
+}
+.nrr-comm-ds button.ds-row.hover:hover, .nrr-comm-ds button.nrr-comm-kam-row:hover { background: var(--green-soft); }
 .nrr-comm-ds .ds-stat-label { font-size: 13.5px; color: var(--ink2); }
 .nrr-comm-ds .ds-stat-value { font-family: var(--font-num); font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 
@@ -550,8 +557,21 @@
 .nrr-comm-ds details.nrr-comm-receipt-line > summary {
   display: grid; grid-template-columns: 16px 20px minmax(0, 1fr) auto;
   align-items: baseline; gap: 2px;
-  padding: 8px 0; font-size: 14px; color: var(--ink);
+  padding: 8px 0 8px 11px; font-size: 14px; color: var(--ink);
+  border-left: 3px solid transparent; border-radius: 1px;
 }
+/* Round 5: commission-type color cue — a slim left accent per component
+   line (transparent by default so every line stays aligned). */
+.nrr-comm-ds .nrr-comm-receipt-line[data-comm-type="nrr"],
+.nrr-comm-ds details.nrr-comm-receipt-line[data-comm-type="nrr"] > summary { border-left-color: var(--comm-nrr); }
+.nrr-comm-ds .nrr-comm-receipt-line[data-comm-type="p1"],
+.nrr-comm-ds details.nrr-comm-receipt-line[data-comm-type="p1"] > summary { border-left-color: var(--comm-p1); }
+.nrr-comm-ds .nrr-comm-receipt-line[data-comm-type="p3"],
+.nrr-comm-ds details.nrr-comm-receipt-line[data-comm-type="p3"] > summary { border-left-color: var(--comm-p3); }
+.nrr-comm-ds .nrr-comm-receipt-line[data-comm-type="expansion"],
+.nrr-comm-ds details.nrr-comm-receipt-line[data-comm-type="expansion"] > summary { border-left-color: var(--comm-expansion); }
+.nrr-comm-ds .nrr-comm-receipt-line[data-comm-type="handover"],
+.nrr-comm-ds details.nrr-comm-receipt-line[data-comm-type="handover"] > summary { border-left-color: var(--comm-handover); }
 .nrr-comm-ds .nrr-rcpt-chev { color: var(--ink3); transition: transform 0.15s ease; transform-origin: 40% 50%; }
 .nrr-comm-ds .nrr-rcpt-op { color: var(--ink2); font-family: var(--font-num); font-weight: 700; }
 .nrr-comm-ds .nrr-rcpt-label { min-width: 0; }
@@ -581,14 +601,20 @@
 }
 .nrr-comm-ds .ds-btn-ghost:hover { background: var(--green-soft); }
 
-/* ── empty state ── */
-.nrr-comm-ds .ds-empty { display: flex; flex-direction: column; align-items: center; padding: 22px 16px; text-align: center; }
-.nrr-comm-ds .ds-empty-icon { width: 26px; height: 26px; color: var(--ink3); margin-bottom: 8px; }
-.nrr-comm-ds .ds-empty-title { font-size: 13.5px; font-weight: 600; color: var(--ink2); margin-bottom: 2px; }
-.nrr-comm-ds .ds-empty-desc { font-size: 13px; color: var(--ink3); max-width: 300px; }
+/* ── empty state — unscoped (2026-07-09): was `.nrr-comm-ds .ds-empty`,
+   but .ds-empty/.ds-skel are used all over nrr_view.js (Portfolio's
+   filtered-list empty state, Account view's not-found state, signal
+   lists' "ไม่มีรายการ") outside the commission drawer wrapper, where the
+   scoped rule silently didn't apply — rendering as unstyled plain text /
+   a truly blank box with zero background, which on this mostly-white page
+   read as "the page went blank." Same fix for both. ─────────────────── */
+.ds-empty { display: flex; flex-direction: column; align-items: center; padding: 22px 16px; text-align: center; }
+.ds-empty-icon { width: 26px; height: 26px; color: var(--ink3); margin-bottom: 8px; }
+.ds-empty-title { font-size: 13.5px; font-weight: 600; color: var(--ink2); margin-bottom: 2px; }
+.ds-empty-desc { font-size: 13px; color: var(--ink3); max-width: 300px; }
 
-/* ── loading skeleton ── */
-.nrr-comm-ds .ds-skel { background: linear-gradient(90deg, var(--fill) 25%, var(--fill-deep) 50%, var(--fill) 75%); background-size: 200% 100%; border-radius: var(--r-sm); animation: nrrCommSkelShimmer 1.5s infinite; height: 16px; }
+/* ── loading skeleton — unscoped, see .ds-empty comment above ── */
+.ds-skel { background: linear-gradient(90deg, var(--fill) 25%, var(--fill-deep) 50%, var(--fill) 75%); background-size: 200% 100%; border-radius: var(--r-sm); animation: nrrCommSkelShimmer 1.5s infinite; height: 16px; }
 @keyframes nrrCommSkelShimmer { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
 
 /* ── expand/collapse chevron (same language as .nrr-acct-group) ── */
@@ -726,13 +752,18 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-hero-side { text-align: right; flex-shrink: 0; }
 .nrr-acct-hero-side-v { font-size: 15px; font-weight: 700; }
 
-.nrr-acct-pace-row { display: flex; align-items: center; gap: 12px; padding: 14px 0 4px; }
+.nrr-acct-pace-row { display: flex; align-items: center; gap: 12px; padding: 14px 0 12px; }
 .nrr-acct-pace-track { flex: 1; position: relative; height: 9px; border-radius: var(--r-pill); background: var(--fill-deep); }
 .nrr-acct-pace-fill { position: absolute; inset: 0; border-radius: var(--r-pill); }
 .nrr-acct-pace-expect { position: absolute; top: -4px; bottom: -4px; width: 2.5px; background: var(--ink); border-radius: 1px; }
 
-.nrr-acct-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; padding: 0 2px; }
+.nrr-acct-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 42px 0 0; padding: 0 2px; }
 .nrr-acct-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; border: none; background: none; padding: 0; font-family: var(--font-ui); }
+.nrr-acct-trend-val { font-size: 11px; font-weight: 700; color: var(--ink2); margin-bottom: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nrr-acct-trend-col.sel .nrr-acct-trend-val { color: var(--ink); }
+.nrr-acct-trend-basetag { display: block; font-size: 8.5px; font-weight: 700; letter-spacing: .03em; color: var(--ink3); margin-top: 1px; }
+.nrr-acct-trend-col.base .nrr-acct-trend-lbl { font-weight: 700; color: var(--ink2); }
+@media (max-width: 640px) { .nrr-acct-trend-val { font-size: 9.5px; } .nrr-acct-trend { gap: 6px; } }
 .nrr-acct-trend-bar-track { width: 100%; height: 78px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 4px 4px 1px 1px; overflow: hidden; }
 /* Closed-month bars are real GMV, not "no data" — must not use --fill-deep
    (the app-wide "empty/unknown" neutral, same reasoning as category
@@ -746,22 +777,29 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-trend-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 0; border-top: 1px solid var(--line); margin-top: 14px; font-size: 12.5px; color: var(--ink2); }
 .nrr-acct-trend-amt { font-size: 14px; font-weight: 700; color: var(--ink); }
 
-/* ── Stat row — 4 hairline cells, .nrr-triple-lg's own pattern ─────────── */
-.nrr-acct-stat-row { display: flex; border-top: 1px solid var(--line); margin-top: 24px; }
+/* ── Stat row — 4 hairline cells, .nrr-triple-lg's own pattern. Made more
+   prominent per feedback via a colored top-accent strip (status-coded per
+   cell, not decoration) + bigger numbers — still no background fill, so
+   it stays in the app's "hairline, not boxes" language. */
+.nrr-acct-stat-row { display: flex; margin-top: 24px; }
 .nrr-acct-stat-cell {
-  flex: 1; padding: 16px 18px; border-left: 1px solid var(--line); border-top: none; border-right: none; border-bottom: none;
+  flex: 1; padding: 14px 18px 16px; border-left: 1px solid var(--line); border-right: none; border-bottom: none;
+  border-top: 3px solid var(--ink3);
   text-align: left; background: none; cursor: pointer; font-family: var(--font-ui); color: var(--ink);
   display: flex; flex-direction: column; gap: 6px; transition: background 140ms ease;
 }
 .nrr-acct-stat-cell:first-child { border-left: none; }
 .nrr-acct-stat-cell:hover { background: var(--fill); }
-.nrr-acct-stat-lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--ink3); display: flex; justify-content: space-between; text-transform: uppercase; }
-.nrr-acct-stat-val { font-size: 17px; font-weight: 700; line-height: 1.1; }
-.nrr-acct-stat-sub { font-size: 10.5px; color: var(--ink2); line-height: 1.35; }
+.nrr-acct-stat-lbl { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--ink3); display: flex; justify-content: space-between; text-transform: uppercase; }
+.nrr-acct-stat-val { font-size: 21px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; }
+.nrr-acct-stat-sub { font-size: 11px; color: var(--ink2); line-height: 1.35; }
 .nrr-acct-spark-svg { width: 100%; height: 18px; }
-.nrr-acct-outlet-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.nrr-acct-outlet-dots { display: flex; gap: 4px; flex-wrap: wrap; }
 .nrr-acct-outlet-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: block; }
-.nrr-acct-outlet-dots span.new { background: var(--sun); }
+/* "new" needs its own visual weight, not just a different hue lost among
+   many small dots — ring + slightly larger so it reads as "look here"
+   at a glance, not just a color someone has to decode. */
+.nrr-acct-outlet-dots span.new { width: 8px; height: 8px; background: var(--sun); box-shadow: 0 0 0 2px var(--sun-soft), 0 0 0 3px var(--sun); margin: 0 1px; }
 .nrr-acct-outlet-dots span.quiet { background: var(--coral); opacity: .6; }
 .nrr-acct-outlet-stack, .nrr-acct-price-div { display: flex; height: 8px; border-radius: var(--r-pill); overflow: hidden; }
 .nrr-acct-outlet-stack i, .nrr-acct-price-div i { display: block; height: 100%; }
@@ -769,37 +807,96 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-cat-swatches i { width: 9px; height: 9px; border-radius: 2px; display: block; }
 @media (max-width: 640px) {
   .nrr-acct-stat-row { flex-wrap: wrap; }
-  .nrr-acct-stat-cell { flex: 1 1 50%; border-top: 1px solid var(--line); }
-  .nrr-acct-stat-cell:nth-child(1), .nrr-acct-stat-cell:nth-child(2) { border-top: none; }
+  .nrr-acct-stat-cell { flex: 1 1 50%; }
   .nrr-acct-stat-cell:nth-child(odd) { border-left: none; }
 }
 
-.nrr-acct-verdict-wrap { margin-top: 22px; }
+/* ── Net verdict — two soft-tint headline blocks (Round 5, 2026-07-09).
+   A deliberate exception to the app's "no fills" rule for these two
+   summary totals only: the user wanted them clearly MORE prominent than,
+   and visually distinct from, the thin left-border signal rows below.
+   Tint + big number does that without turning the whole page boxy. */
+.nrr-acct-net { display: flex; gap: 12px; margin-top: 22px; }
+.nrr-acct-net-block { flex: 1; padding: 14px 16px; border-radius: var(--r-md); }
+.nrr-acct-net-block.up { background: var(--green-soft); }
+.nrr-acct-net-block.down { background: var(--coral-soft); }
+.nrr-acct-net-hd { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+.nrr-acct-net-block.up .nrr-acct-net-hd { color: var(--green-deep); }
+.nrr-acct-net-block.down .nrr-acct-net-hd { color: var(--coral); }
+.nrr-acct-net-tri { font-size: 10px; }
+.nrr-acct-net-amt { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin: 6px 0 2px; }
+.nrr-acct-net-block.up .nrr-acct-net-amt { color: var(--green-deep); }
+.nrr-acct-net-block.down .nrr-acct-net-amt { color: var(--coral); }
+.nrr-acct-net-sub { font-size: 12px; color: var(--ink2); }
+@media (max-width: 480px) { .nrr-acct-net { flex-direction: column; } }
 
-/* ── Signal lists — .ds-row reused, side-by-side on wide screens ───────── */
-.nrr-acct-signal-cols { display: grid; grid-template-columns: 1fr; margin-top: 26px; gap: 0; }
-@media (min-width: 720px) {
-  .nrr-acct-signal-cols { grid-template-columns: 1fr 1fr; gap: 32px; }
-  .nrr-acct-signal-cols .nrr-acct-signal-col + .nrr-acct-signal-col { border-left: 1px solid var(--line); padding-left: 32px; }
-}
+/* ── Signal lists — always single column (2-col was tried and reverted:
+   user feedback 2026-07-09 said the side-by-side split made the two
+   lists harder to scan, not easier — a single ranked list per section
+   reads better even when it runs long). ─────────────────────────────── */
+.nrr-acct-signal-cols { display: flex; flex-direction: column; margin-top: 26px; gap: 28px; }
 .nrr-acct-signal-title.pos { color: var(--green-deep); }
 .nrr-acct-signal-title.watch { color: var(--sun-deep); }
-.nrr-acct-sig-row { gap: 10px; }
-.nrr-acct-sig-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.nrr-acct-sig-dot.new { background: var(--green); }
-.nrr-acct-sig-dot.growing { background: var(--green-deep); }
-.nrr-acct-sig-dot.near { background: var(--sun); }
-.nrr-acct-sig-dot.gone { background: var(--coral); }
-.nrr-acct-sig-val { font-size: 13px; font-weight: 700; flex-shrink: 0; }
-.nrr-acct-sig-val.up { color: var(--green-deep); }
-.nrr-acct-sig-tag { font-size: 10px; font-weight: 700; padding: 1.5px 7px; border-radius: var(--r-pill); flex-shrink: 0; }
-.nrr-acct-sig-tag.near { background: var(--sun-soft); color: var(--sun-deep); }
-.nrr-acct-sig-tag.gone { background: var(--coral-soft); color: var(--coral); }
-.nrr-acct-otip-btn {
-  border: none; background: none; color: var(--ink3); font-size: 11px; font-weight: 700; cursor: pointer;
-  flex-shrink: 0; padding: 4px 8px; border-radius: 8px; transition: background 140ms ease, color 140ms ease;
+
+/* Each SKU is its own clickable row (tap anywhere → outlet breakdown,
+   not a separate button) — colored left border repeats the badge color
+   as a scan cue down the list, same motif as Portfolio's .nrr-acct-row
+   pace border. Generous padding + hairline separation gives each row
+   room to breathe without becoming a filled "box" (still just a border,
+   no background fill by default — see nrr_base.css's "boxes everywhere"
+   warning). */
+.nrr-acct-sig-row {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  border: none; border-left: 3px solid var(--ink3); border-bottom: 1px solid var(--line);
+  background: none; text-align: left; cursor: pointer; font-family: var(--font-ui); color: var(--ink);
+  padding: 13px 6px 13px 13px; transition: background 140ms ease;
 }
-.nrr-acct-otip-btn:hover { color: var(--green-deep); background: var(--green-soft); }
+.nrr-acct-sig-row:hover { background: var(--fill); }
+.nrr-acct-sig-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.nrr-acct-sig-name { font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+.nrr-acct-sig-line2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nrr-acct-sig-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill); flex-shrink: 0; white-space: nowrap; }
+.nrr-acct-sig-badge.new, .nrr-acct-sig-badge.growing { background: var(--green-soft); color: var(--green-deep); }
+.nrr-acct-sig-badge.near { background: var(--sun-soft); color: var(--sun-deep); }
+.nrr-acct-sig-badge.gone { background: var(--coral-soft); color: var(--coral); }
+.nrr-acct-sig-meta { font-size: 12px; color: var(--ink2); }
+.nrr-acct-sig-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-width: 78px; }
+.nrr-acct-sig-amt { font-size: 15px; font-weight: 700; }
+.nrr-acct-sig-unit { font-size: 10px; font-weight: 600; color: var(--ink3); }
+.nrr-acct-sig-chev { color: var(--ink3); font-size: 16px; flex-shrink: 0; }
+
+/* ── Account view loading skeleton — page-shaped, not a single bar ─────── */
+.nrr-acct-skel-mast { display: flex; align-items: center; gap: 12px; }
+.nrr-acct-skel-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; }
+.nrr-acct-skel-bar { flex: 1; align-self: stretch; }
+.nrr-acct-skel-bar:nth-child(1) { align-self: flex-end; height: 68%; }
+.nrr-acct-skel-bar:nth-child(2) { align-self: flex-end; height: 45%; }
+.nrr-acct-skel-bar:nth-child(3) { align-self: flex-end; height: 80%; }
+.nrr-acct-skel-bar:nth-child(4) { align-self: flex-end; height: 55%; }
+.nrr-acct-skel-bar:nth-child(5) { align-self: flex-end; height: 62%; }
+.nrr-acct-skel-bar:nth-child(6) { align-self: flex-end; height: 40%; }
+.nrr-acct-skel-bar:nth-child(7) { align-self: flex-end; height: 90%; }
+.nrr-acct-skel-stats { display: flex; gap: 18px; margin-top: 24px; }
+.nrr-acct-skel-stat { flex: 1; height: 78px; }
+.nrr-acct-skel-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.nrr-acct-skel-row { height: 52px; }
+@media (max-width: 640px) { .nrr-acct-skel-stats { flex-wrap: wrap; } .nrr-acct-skel-stat { flex: 1 1 45%; } }
+
+/* ── AOV drawer callout — carries two axes at once (absolute tier via
+   background wash + recent direction via the arrow), so it gets its own
+   look instead of the generic .nrr-verdict every other drawer uses. */
+.nrr-acct-aov-callout { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-md); margin-bottom: 16px; }
+.nrr-acct-aov-callout.low { background: var(--coral-soft); }
+.nrr-acct-aov-callout.mid { background: var(--sun-soft); }
+.nrr-acct-aov-callout.good, .nrr-acct-aov-callout.great { background: var(--green-soft); }
+.nrr-acct-aov-arrow {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 1px 2px rgba(16, 21, 16, 0.08);
+}
+.nrr-acct-aov-arrow.up { color: var(--green-deep); }
+.nrr-acct-aov-arrow.down { color: var(--coral); }
+.nrr-acct-aov-callout-pct { font-size: 22px; font-weight: 800; line-height: 1; }
+.nrr-acct-aov-callout-label { font-size: 12.5px; color: var(--ink2); margin-top: 3px; line-height: 1.4; }
 
 /* ── Floating per-outlet tooltip — position:fixed, sibling of every other
    top-level container (see nrr_view.js's shell comment) so it can never
