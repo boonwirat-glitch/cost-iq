@@ -201,6 +201,86 @@ function nrrCommTierPayout(role, email, period, pct) {
 }
 window.nrrCommTierPayout = nrrCommTierPayout;
 
+// Full tier ladder with current/next flags + the pp gap to the next tier —
+// feeds both the KAM/TL self-view tier chip+progress bar and the drawer's
+// "วิธีคิดค่าคอมฯ" table. Reuses the exact same tier source/matching
+// convention as nrrCommTierPayout (never a second source of truth).
+function nrrCommTierTable(role, email, period, pct) {
+  var std = role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
+  var code = nrrCommPlansCache.assignments[period + '|' + role + '|' + email] || std;
+  var tiers = nrrCommPlansCache.tiersByPlan[code] || nrrCommPlansCache.tiersByPlan[std];
+  if (!tiers || !tiers.length) tiers = nrrCommDefaultTiers(role);
+  tiers = tiers.slice().sort(function (a, b) { return (Number(a.min_value) || -Infinity) - (Number(b.min_value) || -Infinity); });
+
+  var currentIdx = -1;
+  if (pct != null && !isNaN(pct)) {
+    for (var i = 0; i < tiers.length; i++) {
+      var t = tiers[i];
+      var minOk = t.min_value == null || t.min_value === '' || pct >= Number(t.min_value);
+      var maxOk = t.max_value == null || t.max_value === '' || pct < Number(t.max_value);
+      if (minOk && maxOk) { currentIdx = i; break; }
+    }
+  }
+  var nextIdx = currentIdx >= 0 && currentIdx < tiers.length - 1 ? currentIdx + 1 : -1;
+  var rows = tiers.map(function (t, i) {
+    return { min: t.min_value, max: t.max_value, payout: Number(t.payout_value || 0), label: t.payout_label || '',
+      isCurrent: i === currentIdx, isNext: i === nextIdx };
+  });
+  var gapPp = (nextIdx >= 0 && pct != null) ? Math.max(0, Math.ceil(Number(tiers[nextIdx].min_value) - pct)) : null;
+  return { tiers: rows, currentTier: currentIdx >= 0 ? rows[currentIdx] : null, nextTier: nextIdx >= 0 ? rows[nextIdx] : null, gapPp: gapPp };
+}
+window.nrrCommTierTable = nrrCommTierTable;
+
+// Converts an estimate object (nrrEstimateTlCommission/nrrEstimateKamCommission's
+// return shape) into an ordered list of "receipt" steps — one line per
+// term of the real formula ((nrr_payout [+ upsell_comm]) × gate_cap [×
+// team multiplier for TL] + handover.payout) — so the drawer can render
+// the exact arithmetic instead of a paraphrased note. drillKey lets the
+// renderer wire each line to its matching account-level section (or null
+// for lines with no account list, e.g. the NRR tier line itself).
+function nrrCommEstimateReceiptSteps(est) {
+  if (!est) return [];
+  var steps = [{ kind: 'add', label: 'NRR (' + est.pct + '%)', amount: est.nrr_payout, drillKey: 'nrr' }];
+  if (est.kind === 'kam') {
+    if (est.upsell_comm) steps.push({ kind: 'add', label: 'Upsell P1 + P3 + Outlet', amount: est.upsell_comm, drillKey: 'upsell' });
+    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) });
+    steps.push({ kind: 'multiply', label: 'NRR Gate', factor: est.gate_cap });
+    if (est.handover && est.handover.payout) {
+      steps.push({ kind: 'add', label: 'Handover · retention bonus', amount: est.handover.payout, drillKey: 'handover' });
+    }
+  } else {
+    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: est.multiplier });
+  }
+  steps.push({ kind: 'total', label: 'รวมค่าคอมฯ', amount: est.est });
+  return steps;
+}
+window.nrrCommEstimateReceiptSteps = nrrCommEstimateReceiptSteps;
+
+// Same receipt shape, sourced from a LOCKED snapshot's breakdown jsonb
+// instead of a live estimate — field names match _commBuildSnapshotRows()
+// (07a_commission_engine.js) exactly, same shapes nrrCommissionBreakdownDetailHtml
+// already reads. Keeps one receipt renderer for both locked and unlocked
+// periods — the whole point of this redesign is that both look the same.
+function nrrCommSnapshotReceiptSteps(bd) {
+  if (!bd) return [];
+  var steps = [{ kind: 'add', label: 'NRR (' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];
+  if (bd.type === 'kam_full') {
+    var upsell = (bd.upsell_sku && bd.upsell_sku.total_commission || 0) + (bd.upsell_outlet && bd.upsell_outlet.commission || 0);
+    if (upsell) steps.push({ kind: 'add', label: 'Upsell P1 + P3 + Outlet', amount: upsell, drillKey: 'upsell' });
+    steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell });
+    steps.push({ kind: 'multiply', label: 'NRR Gate', factor: bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1 });
+    if (bd.handover && bd.handover.payout) {
+      steps.push({ kind: 'add', label: 'Handover · retention bonus', amount: bd.handover.payout, drillKey: 'handover' });
+    }
+  } else {
+    var mult = bd.upsell_mult;
+    steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: typeof mult === 'object' ? mult.multiplier : parseFloat(mult) || 1 });
+  }
+  steps.push({ kind: 'total', label: 'รวมค่าคอมฯ', amount: bd.final_payout != null ? bd.final_payout : 0 });
+  return steps;
+}
+window.nrrCommSnapshotReceiptSteps = nrrCommSnapshotReceiptSteps;
+
 // sense_upsell_team.csv — per-KAM quarter-to-date upsell GMV totals
 // (kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base). ~100KB.
 var nrrUpsellTeamCache = { byEmail: {}, loaded: false };

@@ -31,15 +31,14 @@ async function nrrInitApp() {
     nrrHandleNoteSaveClick(e);
     var retryBtn = e.target.closest('.nrr-comm-retry-upsell-btn');
     if (retryBtn && nrrCommDrawerState) {
-      var target = document.getElementById('nrr-comm-drawer-upsell');
-      if (target) target.innerHTML = '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span></div><div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
+      var target = document.getElementById('nrr-comm-drawer-upsell-body');
+      if (target) target.innerHTML = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
       delete nrrUpsellBundleCache[retryBtn.dataset.email];
       var snap = nrrLatestSnapshotFor(nrrCommDrawerState.kamEmail);
       var bd = snap && snap.breakdown ? snap.breakdown : null;
-      var result = nrrKamResult(nrrCommDrawerState.kamEmail);
-      var bm = result && nrrCommDrawerState.period && result.by_month ? result.by_month[nrrCommDrawerState.period] : null;
-      var expOutlets = (bm ? (bm.rows || []) : []).filter(function (r) { return r.movement_type === 'expansion'; });
-      nrrLoadCommissionUpsellSection(retryBtn.dataset.email, new Set(expOutlets.map(function (r) { return String(r.outlet_id); })), bd);
+      var expOutlets = nrrOutletsForKam(nrrCommDrawerState.kamEmail, nrrCommDrawerState.period)
+        .filter(function (o) { return o.movement === 'expansion'; });
+      nrrLoadCommissionUpsellSection(retryBtn.dataset.email, new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); })), bd);
     }
   });
   document.getElementById('nrr-slideover-body').addEventListener('keydown', nrrHandleNoteInputKeydown);
@@ -732,6 +731,86 @@ function nrrCommEstimateFor(email, kind, month) {
     : nrrEstimateKamCommission(email, month, pct);
 }
 
+// ── Tier achievement UI (Sense-pattern "hit/bonus/miss", ported to Fresh
+// Canvas tokens — never Sense's own gold/blue) — a SECOND status axis from
+// the ESTIMATE/DRAFT/FINAL stamp: that stamp says "is this number locked
+// yet"; this chip says "did the tier target get hit". Both can be shown
+// together without conflict. ──────────────────────────────────────────
+function nrrCommTierChipHtml(tierTable) {
+  if (!tierTable) return '';
+  var hasPayout = tierTable.currentTier && tierTable.currentTier.payout > 0;
+  var cls = !hasPayout ? 'miss' : tierTable.nextTier ? 'hit' : 'bonus';
+  var text = !hasPayout ? 'ยังไม่ถึงเกณฑ์' : tierTable.nextTier ? 'ถึงเกณฑ์แล้ว' : 'โบนัสสูงสุด';
+  return '<span class="nrr-comm-tier-chip ' + cls + '">' + text + '</span>';
+}
+
+function nrrCommProgressHtml(tierTable, pct) {
+  if (!tierTable || pct == null) return '';
+  var pctFill;
+  if (tierTable.currentTier && tierTable.nextTier) {
+    var lo = Number(tierTable.currentTier.min) || 0, hi = Number(tierTable.nextTier.min);
+    pctFill = hi > lo ? (pct - lo) / (hi - lo) * 100 : 100;
+  } else if (!tierTable.currentTier && tierTable.tiers.length) {
+    var firstMin = Number(tierTable.tiers[0].min) || 1;
+    pctFill = pct / firstMin * 100;
+  } else {
+    pctFill = 100; // max tier — bar reads full
+  }
+  pctFill = Math.max(2, Math.min(100, Math.round(pctFill)));
+  return '<div class="nrr-comm-progress"><div class="nrr-comm-progress-fill" style="width:' + pctFill + '%"></div></div>';
+}
+
+function nrrCommNextStepHtml(tierTable, pct) {
+  if (pct == null) return 'รอข้อมูล NRR ของเดือนนี้';
+  if (!tierTable) return '';
+  if (!tierTable.currentTier || tierTable.currentTier.payout === 0) {
+    var first = tierTable.tiers.filter(function (t) { return t.payout > 0; })[0];
+    if (first) return 'ดัน NRR อีก +' + Math.max(0, Math.ceil(Number(first.min) - pct)) + 'pp ถึงเกณฑ์แรก (' + nrrFmtGMVExact(first.payout) + ')';
+    return 'ดัน NRR ให้ถึงเกณฑ์แรกเพื่อเริ่มรับค่าคอมฯ';
+  }
+  if (tierTable.nextTier) {
+    return 'อีก +' + tierTable.gapPp + 'pp ถึง ' + nrrFmtGMVExact(tierTable.nextTier.payout) + (tierTable.nextTier.label ? ' (' + nrrEsc(tierTable.nextTier.label) + ')' : '');
+  }
+  return 'รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน';
+}
+
+// ── Receipt — the running-total "why is my number this" statement.
+// One line per formula term (add/multiply/subtotal/total). 'add' lines
+// with a drillKey and matching content in sectionsByKey become expandable
+// <details> rows revealing the account-level list; everything else is a
+// plain line. This is the SAME renderer for a locked snapshot's steps
+// (nrrCommSnapshotReceiptSteps) and a live estimate's steps
+// (nrrCommEstimateReceiptSteps) — one visual language regardless of lock
+// status, which is the point of this redesign.
+// Compact tier indicator for summary rows (main list + KAM-in-team list) —
+// chip + thin progress bar, no next-step prose (that's drawer-only detail).
+function nrrCommTierMiniHtml(role, email, period, pct) {
+  if (pct == null) return '';
+  var t = nrrCommTierTable(role, email, period, pct);
+  return '<span class="nrr-comm-tier-mini" style="flex:none;margin-top:2px">' + nrrCommTierChipHtml(t) + nrrCommProgressHtml(t, pct) + '</span>';
+}
+
+function nrrCommReceiptHtml(steps, sectionsByKey) {
+  sectionsByKey = sectionsByKey || {};
+  var rowsHtml = steps.map(function (s) {
+    if (s.kind === 'multiply') {
+      return '<div class="nrr-comm-receipt-line op"><span>× ' + nrrEsc(s.label) + '</span><span class="num">×' + Number(s.factor).toFixed(2) + '</span></div>';
+    }
+    if (s.kind === 'subtotal') {
+      return '<div class="nrr-comm-receipt-rule"></div><div class="nrr-comm-receipt-line subtotal"><span>' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
+    }
+    if (s.kind === 'total') {
+      return '<div class="nrr-comm-receipt-rule total"></div><div class="nrr-comm-receipt-line total"><span>' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
+    }
+    var body = s.drillKey ? sectionsByKey[s.drillKey] : null;
+    if (body) {
+      return '<details class="nrr-comm-receipt-line expandable"><summary><span>+ ' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></summary><div class="nrr-comm-receipt-detail">' + body + '</div></details>';
+    }
+    return '<div class="nrr-comm-receipt-line"><span>+ ' + nrrEsc(s.label) + '</span><span class="num">' + nrrFmtGMVExact(s.amount) + '</span></div>';
+  }).join('');
+  return '<div class="nrr-comm-receipt">' + rowsHtml + '</div>';
+}
+
 function nrrCommissionHeroHtml(isAdmin, period) {
   if (isAdmin) {
     var teams = nrrListTeams();
@@ -857,6 +936,7 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       '<span style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px">' +
       '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
       '<span class="ds-row-meta" style="flex:none">' + (nrrPct != null ? nrrPct + '% NRR' : '— NRR') + ' · ' + nrrEsc(metaLabel) + ' ' + stampHtml + '</span>' +
+      nrrCommTierMiniHtml(r.kind, r.email, period, nrrPct) +
       '</span>' +
       '<span class="ds-row-value" style="color:' + (isEstRow ? 'var(--sun-deep)' : 'var(--green-deep)') + '">' + nrrFmtGMVExact(payoutAmt) + '</span>' +
       '</summary>' +
@@ -888,7 +968,10 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
       pct = est ? est.pct : null;
     }
     return '<div class="nrr-comm-kam-row">' +
+      '<span style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
       '<span class="ds-stat-label">' + nrrEsc(k.name) + (pct != null ? ' · ' + pct + '%' : '') + ' ' + stamp + '</span>' +
+      nrrCommTierMiniHtml('kam', k.email, period, pct) +
+      '</span>' +
       '<span class="nrr-comm-kam-row-right">' +
       '<span class="num">' + nrrFmtGMVExact(amt) + '</span>' +
       '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-drill-btn" data-email="' + nrrEsc(k.email) + '" data-name="' + nrrEsc(k.name) + '" data-period="' + nrrEsc(period) + '">ดูรายละเอียด →</button>' +
@@ -1151,49 +1234,55 @@ function nrrRenderCommissionDrawerBody(kamEmail, period) {
   var bd = snap && snap.breakdown ? snap.breakdown : null;
   var result = nrrKamResult(kamEmail);
   var bm = result && period && result.by_month ? result.by_month[period] : null;
-  var rows = bm ? (bm.rows || []) : [];
   var livePct = bm ? bm.nrr_pct : null;
   var est = snap ? null : nrrEstimateKamCommission(kamEmail, period, livePct);
+  var pct = bd ? bd.nrr_pct : (est ? est.pct : livePct);
 
   var heroAmt = snap ? Number(snap.payout_amount || 0) : (est ? est.est : 0);
-  var heroSub;
-  if (bd) {
-    heroSub = 'NRR ' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ' · NRR payout ' + nrrFmtGMVExact(bd.nrr_payout || 0);
-  } else if (est) {
-    heroSub = 'NRR ' + est.pct + '% → ' + est.note + ' — ยังไม่ล็อก ตัวเลขนี้เป็นค่าประมาณจาก rate ปัจจุบัน';
-  } else {
-    heroSub = 'ยังไม่มีข้อมูล %NRR สำหรับงวดนี้';
-  }
-  // Gate line — always worth surfacing on its own (not buried in the note),
-  // it's the multiplier most likely to surprise someone reconciling pay.
-  var gateCap = bd && bd.gmv_gate ? bd.gmv_gate.cap_multiplier : (est ? est.gate_cap : null);
-  var gateHtml = gateCap != null
-    ? '<div class="ds-stat-row"><span class="ds-stat-label">NRR Gate</span><span class="ds-stat-value' + (gateCap < 1 ? '' : '') + '" style="color:' + (gateCap < 1 ? 'var(--coral)' : 'var(--green-deep)') + '">× ' + gateCap + '</span></div>'
-    : '';
+  var heroSub = bd
+    ? 'ล็อกแล้ว — ดูใบเสร็จด้านล่างว่ามาจากอะไรบ้าง'
+    : (est ? 'ยังไม่ล็อก · ตัวเลขนี้เป็นค่าประมาณจาก rate ปัจจุบัน' : 'ยังไม่มีข้อมูล %NRR สำหรับงวดนี้');
   var heroHtml = '<div class="ds-hero"><div class="ds-hero-eyebrow">Final payout ' +
     (snap ? nrrCommStampHtml(snap.snapshot_status) : nrrCommStampHtml('estimate')) + '</div>' +
     '<div class="ds-hero-number">' + nrrFmtGMVExact(heroAmt) + '</div>' +
-    '<div class="ds-hero-sub">' + heroSub + '</div>' + gateHtml + '</div>';
+    '<div class="ds-hero-sub">' + heroSub + '</div></div>';
 
-  var nrrOutlets = rows.filter(function (r) { return ['core_nrr', 'comeback', 'transfer_in'].indexOf(r.movement_type) > -1; });
-  var expOutlets = rows.filter(function (r) { return r.movement_type === 'expansion'; });
-  // Handover: prefer the locked snapshot's frozen detail when present (what
-  // was actually paid); otherwise compute live from portview_handover.csv
-  // (nrrEstimateKamCommission already ran this — reuse it, don't refetch).
-  var handoverDetail = (bd && bd.handover && bd.handover.detail) ||
-    (est && est.handover && est.handover.detail) || [];
-  var handoverPayout = bd && bd.handover ? bd.handover.payout : (est && est.handover ? est.handover.payout : 0);
+  // Tier chip + progress + next-step — same achievement-status language as
+  // the summary rows, so opening the drawer doesn't feel like a different
+  // app from the row you clicked.
+  var tierTable = pct != null ? nrrCommTierTable('kam', kamEmail, period, pct) : null;
+  var tierHtml = tierTable ? '<div class="nrr-comm-tier-block">' +
+    '<div class="nrr-comm-tier-row">' + nrrCommTierChipHtml(tierTable) +
+    '<span class="micro">NRR ' + pct + '%</span></div>' +
+    nrrCommProgressHtml(tierTable, pct) +
+    '<div class="nrr-comm-next-step">' + nrrEsc(nrrCommNextStepHtml(tierTable, pct)) + '</div>' +
+    '</div>' : '';
 
-  el.innerHTML = heroHtml +
-    nrrCommDrawerOutletSectionHtml('NRR', nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้') +
-    nrrCommDrawerOutletSectionHtml('Expansion · 0.5%', expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้') +
-    nrrCommDrawerHandoverSectionHtml(handoverDetail, handoverPayout) +
-    '<div class="nrr-comm-drawer-section" id="nrr-comm-drawer-upsell">' +
-    '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span></div>' +
-    '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>' +
-    '</div>';
+  // The receipt — one line per formula term, each optionally expandable
+  // into its account-level list. Locked and unlocked periods use the same
+  // renderer against two different (but shape-identical) step sources.
+  var steps = bd ? nrrCommSnapshotReceiptSteps(bd) : nrrCommEstimateReceiptSteps(est);
+  var outletsForKam = nrrOutletsForKam(kamEmail, period);
+  var nrrOutlets = outletsForKam.filter(function (o) { return ['core_nrr', 'comeback', 'transfer_in'].indexOf(o.movement) > -1; });
+  var expOutlets = outletsForKam.filter(function (o) { return o.movement === 'expansion'; });
+  var handoverDetail = (bd && bd.handover && bd.handover.detail) || (est && est.handover && est.handover.detail) || [];
+  var sectionsByKey = {
+    nrr: nrrCommOutletListHtml(nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้'),
+    upsell: '<div id="nrr-comm-drawer-upsell-body"><div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div></div>',
+    handover: nrrCommHandoverListHtml(handoverDetail)
+  };
+  // Expansion isn't a receipt line of its own (it's part of the "Upsell"
+  // sum) but still deserves its own drill list — append it after the
+  // upsell line's account content once that async fetch resolves too, so
+  // for now nest it directly under the upsell key's skeleton via a second
+  // block rendered alongside.
+  var receiptHtml = nrrCommReceiptHtml(steps, sectionsByKey);
+  var expansionHtml = '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Expansion · 0.5%</span><span class="ds-section-count">' + expOutlets.length + '</span></div>' +
+    nrrCommOutletListHtml(expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้', 0.005) + '</div>';
 
-  var expansionOutletIds = new Set(expOutlets.map(function (r) { return String(r.outlet_id); }));
+  el.innerHTML = heroHtml + tierHtml + receiptHtml + expansionHtml;
+
+  var expansionOutletIds = new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); }));
   nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd);
 }
 
@@ -1202,53 +1291,61 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd) {
     // Stale-guard: user may have closed/reopened the drawer for a different KAM
     // (or a different period) while this fetch was in flight.
     if (!nrrCommDrawerState || nrrCommDrawerState.kamEmail !== kamEmail) return;
-    var target = document.getElementById('nrr-comm-drawer-upsell');
+    var target = document.getElementById('nrr-comm-drawer-upsell-body');
     if (!target) return;
     if (!bundle.loaded) {
-      target.innerHTML = '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span></div>' +
-        '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div>' +
+      target.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div>' +
         '<div class="ds-empty-desc">ไม่สามารถโหลดข้อมูล upsell ได้ในขณะนี้</div>' +
         '<button type="button" class="ds-btn ds-btn-ghost nrr-comm-retry-upsell-btn" data-email="' + nrrEsc(kamEmail) + '">ลองใหม่</button></div>';
       return;
     }
     var upsell = nrrComputeUpsellSku(expansionOutletIds, bundle, QNRR_CFG.base_month);
-    target.innerHTML = nrrCommDrawerUpsellSectionHtml(upsell, bd);
+    target.innerHTML = nrrCommUpsellListHtml(upsell, bd);
   });
 }
 
-function nrrCommDrawerOutletSectionHtml(title, outlets, emptyText) {
-  var count = outlets.length;
-  if (!count) {
-    return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">' + nrrEsc(title) + '</span><span class="ds-section-count">0</span></div>' +
-      '<div class="ds-empty"><div class="ds-empty-title">' + nrrEsc(emptyText) + '</div></div></div>';
-  }
-  var rowsHtml = outlets
-    .sort(function (a, b) { return (b.curr_gmv || 0) - (a.curr_gmv || 0); })
-    .map(function (r) {
+// Account list body for one receipt line — no section wrapper (the
+// receipt's own <summary> carries the label+amount now; this is just the
+// expandable content). Takes {row, movement}[] — the SAME effective-
+// classification shape nrrOutletsForKam() already produces elsewhere in
+// the app (movement is post-nrrClassifyRow, so a core_nrr row with
+// curr_gmv=0 correctly arrives labeled 'core_nrr_churn', never bare
+// 'core_nrr' — the fix for the ฿0-outlets-in-the-NRR-list bug, 2026-07-09).
+// Two distinct row shapes by design intent:
+//   commissionRate given (Expansion)  -> this outlet EARNED money: show
+//     GMV and a real per-account commission = gmv × rate.
+//   commissionRate omitted (NRR)      -> this outlet is CONTEXT for why
+//     %NRR is what it is (a flat-tier payout, not a per-outlet sum) —
+//     show GMV + a movement-type dot, never a fake per-row "commission"
+//     that would wrongly imply each outlet was paid individually.
+function nrrCommOutletListHtml(outlets, emptyText, commissionRate) {
+  if (!outlets.length) return '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">' + nrrEsc(emptyText) + '</div></div>';
+  return outlets
+    .slice()
+    .sort(function (a, b) { return (b.row.curr_gmv || 0) - (a.row.curr_gmv || 0); })
+    .map(function (o) {
+      var r = o.row;
+      var gmv = parseFloat(r.curr_gmv) || 0;
       var segCls = r.account_type === 'Chain' ? 'ds-seg-ch' : r.account_type === 'SA' ? 'ds-seg-sa' : r.account_type === 'MC' ? 'ds-seg-mc' : '';
       var segChip = segCls ? '<span class="' + segCls + '">' + nrrEsc(r.account_type) + '</span>' : '';
-      return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(r.account_name || r.outlet_id) + '</span>' + segChip +
-        '<span class="ds-row-value">' + nrrFmtGMVExact(r.curr_gmv || 0) + '</span></div>';
+      var leading = commissionRate == null ? nrrMvDotHtml(o.movement) : '';
+      var valueHtml = commissionRate != null
+        ? '<span class="ds-row-value">' + nrrFmtGMVExact(gmv * commissionRate) + '</span>'
+        : '<span class="ds-row-meta">' + nrrFmtGMVExact(gmv) + '</span>';
+      return '<div class="ds-row">' + leading + '<span class="ds-row-name">' + nrrEsc(r.account_name || r.outlet_id) + '</span>' + segChip + valueHtml + '</div>';
     }).join('');
-  return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">' + nrrEsc(title) + '</span><span class="ds-section-count">' + count + '</span></div>' + rowsHtml + '</div>';
 }
 
-function nrrCommDrawerHandoverSectionHtml(detail, payout) {
-  var countHtml = '<span class="ds-section-count">' + (detail ? detail.length : 0) +
-    (payout ? ' · ' + nrrFmtGMVExact(payout) : '') + '</span>';
-  if (!detail || !detail.length) {
-    return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover</span>' + countHtml + '</div>' +
-      '<div class="ds-empty"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div></div>';
-  }
-  var rowsHtml = detail.map(function (d) {
+function nrrCommHandoverListHtml(detail) {
+  if (!detail || !detail.length) return '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
+  return detail.map(function (d) {
     var pct = d.baseline > 0 ? Math.round(d.current / d.baseline * 100) : 0;
     return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(d.name || d.account_id) + '</span>' +
       '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + pct + '%) · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
   }).join('');
-  return '<div class="nrr-comm-drawer-section"><div class="ds-section-hd"><span class="ds-eyebrow">Handover · retention bonus</span>' + countHtml + '</div>' + rowsHtml + '</div>';
 }
 
-function nrrCommDrawerUpsellSectionHtml(upsell, bd) {
+function nrrCommUpsellListHtml(upsell, bd) {
   var p1 = upsell.p1.groups, p3 = upsell.p3.groups;
   var p1Html = p1.length
     ? p1.map(function (g) {
@@ -1275,8 +1372,7 @@ function nrrCommDrawerUpsellSectionHtml(upsell, bd) {
     reconHtml = '<div class="nrr-comm-recon-note">ผลรวมด้านล่างคำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
 
-  return '<div class="ds-section-hd"><span class="ds-eyebrow">Upsell P1 / P3</span><span class="ds-section-count">' + (p1.length + p3.length) + '</span></div>' +
-    '<div class="micro" style="margin-bottom:4px">P1 · สินค้าใหม่ในร้าน</div>' + p1Html +
+  return '<div class="micro" style="margin-bottom:4px">P1 · สินค้าใหม่ในร้าน</div>' + p1Html +
     '<div class="micro" style="margin:12px 0 4px">P3 · สินค้าเดิมโตขึ้น</div>' + p3Html +
     reconHtml;
 }

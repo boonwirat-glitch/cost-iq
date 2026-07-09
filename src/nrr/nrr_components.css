@@ -430,13 +430,66 @@
    that also carries a drill-through button (was reading squeezed/mobile
    inside a 1020px-wide page, user flagged 2026-07-09). */
 .nrr-comm-ds .nrr-comm-kam-row {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 9px 0; border-bottom: 1px solid var(--line); gap: 16px;
 }
 .nrr-comm-ds .nrr-comm-kam-row:last-child { border-bottom: none; }
 .nrr-comm-ds .nrr-comm-kam-row-right { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
 .nrr-comm-ds .ds-stat-label { font-size: 13.5px; color: var(--ink2); }
 .nrr-comm-ds .ds-stat-value { font-family: var(--font-num); font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* ── Tier achievement (Sense hit/bonus/miss pattern, Fresh Canvas tokens —
+   2026-07-09 redesign). A SECOND status axis from the est/draft/final
+   stamp: that says "is this locked yet", this says "did the tier land". */
+.nrr-comm-ds .nrr-comm-tier-block { margin: 14px 0 20px; }
+.nrr-comm-ds .nrr-comm-tier-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.nrr-comm-ds .nrr-comm-tier-chip {
+  display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.03em; padding: 3px 10px; border-radius: var(--r-pill);
+}
+.nrr-comm-ds .nrr-comm-tier-chip.hit { background: var(--green-soft); color: var(--green-deep); }
+.nrr-comm-ds .nrr-comm-tier-chip.bonus { background: var(--sun-soft); color: var(--sun-deep); }
+.nrr-comm-ds .nrr-comm-tier-chip.miss { background: var(--coral-soft); color: var(--coral); }
+.nrr-comm-ds .nrr-comm-progress { height: 6px; border-radius: var(--r-pill); background: var(--fill-deep); overflow: hidden; margin-bottom: 8px; }
+.nrr-comm-ds .nrr-comm-progress-fill { height: 100%; background: var(--green); border-radius: var(--r-pill); transition: width 0.3s ease; }
+.nrr-comm-ds .nrr-comm-next-step { font-size: 13px; color: var(--ink2); }
+
+/* ── Compact tier indicator for the summary rows (row list + KAM-in-team
+   list) — same chip, a thinner progress bar, no next-step text (that's
+   drawer-only detail; the row just needs a glanceable status). ── */
+.nrr-comm-ds .nrr-comm-tier-mini { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.nrr-comm-ds .nrr-comm-tier-mini .nrr-comm-progress { flex: 1; max-width: 90px; height: 4px; margin-bottom: 0; }
+.nrr-comm-ds .nrr-comm-tier-mini .nrr-comm-tier-chip { font-size: 10.5px; padding: 2px 8px; }
+
+/* ── Receipt — the running-total "why is my number this" statement.
+   Vertical, not tabular: reads top-to-bottom like an invoice, each line
+   a formula term (add/multiply/subtotal/total). Expandable lines use the
+   native <details> idiom already established elsewhere in /nrr
+   (.nrr-acct-group) for interaction consistency. ── */
+.nrr-comm-ds .nrr-comm-receipt { margin: 4px 0 20px; }
+.nrr-comm-ds .nrr-comm-receipt-line {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; font-size: 14px; color: var(--ink);
+}
+.nrr-comm-ds .nrr-comm-receipt-line .num { font-weight: 700; }
+.nrr-comm-ds .nrr-comm-receipt-line.op { color: var(--ink2); font-size: 13px; }
+.nrr-comm-ds .nrr-comm-receipt-line.subtotal { color: var(--ink2); font-size: 13.5px; }
+.nrr-comm-ds .nrr-comm-receipt-line.total { font-size: 17px; font-weight: 700; color: var(--green-deep); padding-top: 10px; }
+.nrr-comm-ds .nrr-comm-receipt-rule { border-top: 1px solid var(--line); margin-top: 4px; }
+.nrr-comm-ds .nrr-comm-receipt-rule.total { border-top: 1.5px solid var(--ink); margin-top: 8px; }
+/* Expandable receipt lines: reuse <details>/<summary> — summary IS the line row. */
+.nrr-comm-ds details.nrr-comm-receipt-line { display: block; padding: 0; cursor: default; }
+.nrr-comm-ds details.nrr-comm-receipt-line > summary {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; font-size: 14px; color: var(--ink); cursor: pointer; list-style: none;
+}
+.nrr-comm-ds details.nrr-comm-receipt-line > summary::-webkit-details-marker { display: none; }
+.nrr-comm-ds details.nrr-comm-receipt-line > summary::before {
+  content: '›'; display: inline-block; margin-right: 6px; color: var(--ink3);
+  transition: transform 0.15s ease;
+}
+.nrr-comm-ds details.nrr-comm-receipt-line[open] > summary::before { transform: rotate(90deg); }
+.nrr-comm-ds .nrr-comm-receipt-detail { padding: 2px 0 12px 20px; border-left: 2px solid var(--line); margin-left: 4px; }
 
 /* ── ghost button (drill-down link) — pill, page chip language ── */
 .nrr-comm-ds .ds-btn {
