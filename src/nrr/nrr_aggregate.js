@@ -292,6 +292,32 @@ function nrrGroupOutletsByAccount(outlets) {
 }
 window.nrrGroupOutletsByAccount = nrrGroupOutletsByAccount;
 
+// Max last_order_date for ONE specific outlet within an account, across all
+// bulk_outlets.csv months for that outlet — deliberately scoped to
+// outlet_id, NOT the whole account_id. core_nrr_churn (nrrClassifyRow) is a
+// PER-OUTLET classification: a chain account can have one branch churn
+// (curr_gmv 0 this period) while a sibling branch under the SAME account_id
+// is still very much active. An account-wide max would silently borrow the
+// active sibling's fresh order date onto the churned branch's row, making a
+// real churn look like a false alarm — caught exactly this way in review
+// (2026-07-10): a 2-outlet account showed "churn" next to a days-old order
+// date that actually belonged to the OTHER outlet under that account_id.
+// ISO YYYY-MM-DD strings sort correctly with a plain string max. Returns
+// null if not loaded / no rows for this outlet.
+function nrrOutletLastOrderDate(accountId, outletId) {
+  var bo = window.bulkOutletsData;
+  if (!bo || !bo.loaded || !bo.byAccountId) return null;
+  var rows = bo.byAccountId[accountId];
+  if (!rows || !rows.length) return null;
+  var max = null;
+  rows.forEach(function (r) {
+    if (String(r.outlet_id) !== String(outletId)) return;
+    if (r.last_order_date && (!max || r.last_order_date > max)) max = r.last_order_date;
+  });
+  return max;
+}
+window.nrrOutletLastOrderDate = nrrOutletLastOrderDate;
+
 // ── PM / Admin portfolio-level rollups (3-level view: KAM / PM / Admin) ──
 // PM/Admin data has no TL/KAM attribution column at all (see nrr_data.js
 // header comment) — the user confirmed the intended mapping: a TL's "own"

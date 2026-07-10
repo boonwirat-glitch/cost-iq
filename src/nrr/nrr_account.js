@@ -227,13 +227,14 @@ function nrrAccountPriceImpact(accountId, kamEmail) {
   var priceBundle = window.bulkPriceData;
   if (!priceBundle || !priceBundle.loaded) return null;
   var byItem = priceBundle.byAccountItem[accountId];
-  if (!byItem) return { net: 0, up: [], down: [], upCount: 0, downCount: 0, hasCurrentData: false };
+  if (!byItem) return { net: 0, up: [], down: [], upCount: 0, downCount: 0, hasCurrentData: false, creeping: [] };
 
   var labels = _nrrAccountMonthLabels();
   var skuBundle = nrrSenseSkusCache[kamEmail];
   var skuRows = (skuBundle && skuBundle.loaded && skuBundle.byAccountId[accountId]) || [];
   var nameByItem = {}, qtyByItem = {};
   skuRows.forEach(function (r) {
+    if (!nameByItem[r.item_id]) nameByItem[r.item_id] = r.item_name_th; // any month, so an item dropped this month still gets a name
     if (r.month_label === labels.cur) { nameByItem[r.item_id] = r.item_name_th; qtyByItem[r.item_id] = r.qty_kg; }
   });
 
@@ -245,8 +246,18 @@ function nrrAccountPriceImpact(accountId, kamEmail) {
   // verified zero when it's actually just missing data.
   var hasCurrentData = false;
   var up = [], down = [];
+  var flagged = {};      // item_ids already caught by the this-month ≥1% threshold below
+  var historyByItem = {}; // item_id -> [{month_label, unit_price}] across all closed months in bulk_price.csv (up to 6)
+
   Object.keys(byItem).forEach(function (itemId) {
     var rows = byItem[itemId];
+    var history = rows
+      .filter(function (r) { return r.unit_price > 0; })
+      .slice()
+      .sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); })
+      .map(function (r) { return { month_label: r.month_label, unit_price: r.unit_price }; });
+    historyByItem[itemId] = history;
+
     var curRow = rows.filter(function (r) { return r.month_label === labels.cur; })[0];
     if (curRow) hasCurrentData = true;
     var lastRow = rows.filter(function (r) { return r.month_label === labels.last; })[0];
@@ -255,13 +266,52 @@ function nrrAccountPriceImpact(accountId, kamEmail) {
     if (Math.abs(pctChange) < 1) return; // Sense's own ≥1% threshold (computePriceChanges)
     var qty = qtyByItem[itemId] || 0;
     var impact = (curRow.unit_price - lastRow.unit_price) * qty;
-    var entry = { item_id: itemId, name: nameByItem[itemId] || itemId, pctChange: pctChange, impact: impact };
+    var entry = { item_id: itemId, name: nameByItem[itemId] || itemId, pctChange: pctChange, impact: impact, history: history };
     if (pctChange > 0) up.push(entry); else down.push(entry);
+    flagged[itemId] = true;
   });
   up.sort(function (a, b) { return b.impact - a.impact; });
   down.sort(function (a, b) { return a.impact - b.impact; });
   var net = up.reduce(function (s, e) { return s + e.impact; }, 0) + down.reduce(function (s, e) { return s + e.impact; }, 0);
-  return { net: net, up: up, down: down, upCount: up.length, downCount: down.length, hasCurrentData: hasCurrentData };
+
+  // Creep signal — cumulative % move across the full bulk_price.csv history
+  // (up to 6 closed months), for items the single-month threshold above
+  // never catches because no ONE step ever looked alarming on its own.
+  // Thresholds are calibrated against the real file, not guessed: a
+  // strict <1%-per-step / ≥3%-cumulative bar (matching the up/down list's
+  // own ≥1% threshold) fires on ZERO of the ~111K item-histories in
+  // bulk_price.csv as of 2026-07-09 — fresh-food pricing here moves in
+  // discrete jumps, not smooth drift, so that bar is unusable. <2%-per-step
+  // / ≥2.5%-cumulative fires on 299, a real and checkable set. Re-check
+  // this distribution if it goes quiet again after future price resets.
+  var CREEP_STEP_CEILING_PCT = 2;
+  var CREEP_THRESHOLD_PCT = 2.5;
+  var creeping = [];
+  Object.keys(historyByItem).forEach(function (itemId) {
+    if (flagged[itemId]) return;
+    var history = historyByItem[itemId];
+    if (history.length < 2) return;
+    // Every INDIVIDUAL step has to stay under the ceiling — otherwise this
+    // isn't a slow creep, it's a jump between two months that just happens
+    // not to be the cur/last pair the up/down list above checks (e.g. a
+    // spike between two closed months). With only 2 data points cumPct
+    // === the one step's pct, so this also naturally requires ≥3 months
+    // of history for anything to qualify.
+    var maxStepPct = 0;
+    for (var i = 1; i < history.length; i++) {
+      var p0 = history[i - 1].unit_price, p1 = history[i].unit_price;
+      if (p0 > 0) maxStepPct = Math.max(maxStepPct, Math.abs((p1 - p0) / p0 * 100));
+    }
+    if (maxStepPct >= CREEP_STEP_CEILING_PCT) return;
+    var first = history[0], last = history[history.length - 1];
+    if (!first.unit_price) return;
+    var cumPct = (last.unit_price - first.unit_price) / first.unit_price * 100;
+    if (Math.abs(cumPct) < CREEP_THRESHOLD_PCT) return;
+    creeping.push({ item_id: itemId, name: nameByItem[itemId] || itemId, cumPct: cumPct, history: history });
+  });
+  creeping.sort(function (a, b) { return Math.abs(b.cumPct) - Math.abs(a.cumPct); });
+
+  return { net: net, up: up, down: down, upCount: up.length, downCount: down.length, hasCurrentData: hasCurrentData, creeping: creeping };
 }
 window.nrrAccountPriceImpact = nrrAccountPriceImpact;
 

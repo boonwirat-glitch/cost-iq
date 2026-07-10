@@ -491,11 +491,18 @@ function nrrRenderAccountTrendChart(row) {
     var hatchH = m.current ? Math.max(0, totalH - solidH) : 0;
     // No dashed border on the base month bar anymore — it read as a dark
     // tick and inflated the bar's apparent height. Base month is marked on
-    // its LABEL instead (below), so the bar height stays truthful.
+    // its LABEL instead (below) — but the tag span is rendered for EVERY
+    // column now (CSS toggles visibility, see .nrr-acct-trend-basetag),
+    // not just appended for isBase. .nrr-acct-trend uses align-items:
+    // flex-end with no fixed column height, so a column whose label is
+    // taller than its siblings (the old conditional-append) gets its top
+    // pushed up to keep bottoms level — visually shifting its number/bar
+    // upward. Reserving the same slot on every column, hidden or not,
+    // keeps every column's height identical so none of them shift.
     var bar = m.current
       ? '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px"></div><div class="nrr-acct-trend-bar" style="height:' + solidH + 'px;background:var(--green);opacity:.85"></div>'
       : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px"></div>';
-    var lbl = nrrEsc(m.label.split(' ')[0]) + (m.isBase ? '<span class="nrr-acct-trend-basetag">ฐาน</span>' : '');
+    var lbl = nrrEsc(m.label.split(' ')[0]) + '<span class="nrr-acct-trend-basetag">ฐาน</span>';
     return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + (m.isBase ? ' base' : '') + '" data-i="' + i + '">' +
       '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div>' +
       '<div class="nrr-acct-trend-bar-track">' + bar + '</div>' +
@@ -539,6 +546,58 @@ function nrrAcctSparklineSvg(months) {
     '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
     '<circle cx="100" cy="' + lastY + '" r="2.4" fill="var(--green-deep)"></circle></svg>';
 }
+// ── SKU price history chart — click-to-expand row inside the "ราคาสินค้า"
+// drawer. Loosely ported from Sense's SKU detail sheet (05_kam_view.js
+// renderSkuDetailContent) but simplified: no opportunity/alternative
+// overlay, no qty footer — this rides entirely on bulk_price.csv's
+// unit_price so it renders even for items no longer on this month's SKU
+// list (nrrAccountPriceImpact's nameByItem fallback covers the name).
+// Min/max-of-data scale on purpose (NOT nrrAcctSparklineSvg's zero-floor
+// convention) — unit prices never approach ฿0, so zero-flooring would
+// flatten a real move into a barely-visible wiggle.
+function nrrFmtUnitPrice(v) {
+  if (v == null || isNaN(v)) return '—';
+  var r = Math.round(v * 100) / 100;
+  return '฿' + (r % 1 === 0 ? r.toFixed(0) : r.toFixed(2));
+}
+function nrrSkuPriceHistorySvg(history) {
+  if (!history || history.length < 2) {
+    return '<div class="micro" style="color:var(--ink3);padding:4px 0 10px">ไม่มีข้อมูลราคาย้อนหลังพอสำหรับกราฟ</div>';
+  }
+  var prices = history.map(function (h) { return h.unit_price; });
+  var mn = Math.min.apply(null, prices), mx = Math.max.apply(null, prices);
+  var rng = (mx - mn) || (mn * 0.01) || 1;
+  var first = history[0], last = history[history.length - 1];
+  var delta = last.unit_price - first.unit_price;
+  var flatBand = Math.abs(first.unit_price) * 0.005;
+  var color = delta > flatBand ? 'var(--green-deep)' : delta < -flatBand ? 'var(--coral)' : 'var(--ink3)';
+  var W = 280, H = 90, pL = 10, pR = 10, pT = 16, pB = 20;
+  var cW = W - pL - pR, cH = H - pT - pB;
+  var pts = history.map(function (h, i) {
+    return { x: pL + (i / (history.length - 1)) * cW, y: pT + cH - ((h.unit_price - mn) / rng) * cH, mo: h.month_label };
+  });
+  var linePts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+  var areaPts = pL + ',' + (pT + cH) + ' ' + linePts + ' ' + (pL + cW) + ',' + (pT + cH);
+  var dots = pts.map(function (p, i) {
+    return (i === 0 || i === pts.length - 1) ? '<circle cx="' + p.x + '" cy="' + p.y + '" r="2.6" fill="' + color + '"></circle>' : '';
+  }).join('');
+  var monthLbls = pts.map(function (p) {
+    return '<text x="' + p.x + '" y="' + (H - 4) + '" font-size="8" fill="var(--ink3)" text-anchor="middle">' + nrrEsc(p.mo.split(' ')[0]) + '</text>';
+  }).join('');
+  var deltaPct = first.unit_price > 0 ? (delta / first.unit_price) * 100 : 0;
+  return '<div style="padding:6px 0 10px">' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" preserveAspectRatio="none">' +
+    '<polygon points="' + areaPts + '" fill="' + color + '" opacity="0.08"></polygon>' +
+    '<polyline points="' + linePts + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
+    dots + monthLbls +
+    '</svg>' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:2px">' +
+    '<span style="color:var(--ink2)">' + nrrFmtUnitPrice(first.unit_price) + ' → ' + nrrFmtUnitPrice(last.unit_price) + '</span>' +
+    '<span style="color:' + color + ';font-weight:700">' + (deltaPct >= 0 ? '+' : '') + Math.round(deltaPct * 10) / 10 + '% ตลอดช่วง</span>' +
+    '</div></div>';
+}
+window.nrrSkuPriceHistorySvg = nrrSkuPriceHistorySvg;
+
 function nrrOutletDotGridHtml(outlets) {
   return '<div class="nrr-acct-outlet-dots">' + outlets.map(function (o) {
     var cls = (o.status === 'quiet' || o.cycle === 'gone') ? 'quiet' : o.status === 'new' ? 'new' : '';
@@ -603,7 +662,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
   var priceCell;
   if (!price) {
     priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default;border-top-color:var(--ink3)"><div class="nrr-acct-stat-lbl">ราคาสินค้า</div><div class="micro">กำลังโหลด...</div></div>';
-  } else if (!price.hasCurrentData) {
+  } else if (!price.hasCurrentData && !(price.creeping && price.creeping.length)) {
     // bulk_price.csv hasn't been batched for this month yet — say so
     // plainly rather than showing a "+฿0 ไม่มีการเปลี่ยนแปลง" that reads
     // as a verified zero (see nrrAccountPriceImpact comment).
@@ -612,6 +671,16 @@ function nrrAccountStatRowHtml(row, kamEmail) {
       '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
       '<div class="nrr-acct-stat-sub">รอข้อมูลราคาปิดเดือน</div>' +
       '</div>';
+  } else if (!price.hasCurrentData) {
+    // This-month comparison isn't ready, but the 6-month creep signal
+    // (nrrAccountPriceImpact) doesn't depend on the current month at all
+    // — still worth a clickable cell instead of burying it until the
+    // month-end batch lands.
+    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:var(--sun-deep)">' +
+      '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
+      '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
+      '<div class="nrr-acct-stat-sub">รอข้อมูลเดือนนี้ · ' + price.creeping.length + ' รายการขยับสะสม 6 เดือน</div>' +
+      '</button>';
   } else {
     var netColor = price.net >= 0 ? 'var(--green-deep)' : 'var(--coral)';
     priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + netColor + '">' +
@@ -734,7 +803,9 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
     html = nrrCategoryDrawerHtml(cat);
   } else if (key === 'price') {
     var price = nrrAccountPriceImpact(row.account_id, kamEmail);
-    title = 'ผลกระทบราคาสุทธิ ' + (price && price.net >= 0 ? '+' : '') + (price ? nrrFmtGMVExact(price.net) : '—');
+    title = (price && !price.hasCurrentData)
+      ? 'แนวโน้มราคาสะสม (รอข้อมูลปิดเดือนนี้)'
+      : 'ผลกระทบราคาสุทธิ ' + (price && price.net >= 0 ? '+' : '') + (price ? nrrFmtGMVExact(price.net) : '—');
     html = nrrPriceDrawerHtml(price);
   }
   document.getElementById('nrr-slideover-title').textContent = title;
@@ -807,16 +878,57 @@ function nrrCategoryDrawerHtml(cat) {
   }).join('');
 }
 
+// Each row is a native <details> accordion (same pattern as the commission
+// drawer's TL/admin rows, nrr_view.js:1783-1794) — click to expand a
+// 6-month price chart for that SKU inline, no JS click handler needed.
+function nrrPriceRowHtml(name, metaHtml, valueHtml, valueColor, history) {
+  return '<details class="nrr-price-row-group">' +
+    '<summary class="ds-row hover">' +
+    '<span class="ds-chev">›</span>' +
+    '<span class="ds-row-name">' + nrrEsc(name) + '</span>' +
+    '<span class="ds-row-meta">' + metaHtml + '</span>' +
+    '<span class="ds-row-value" style="color:' + valueColor + '">' + valueHtml + '</span>' +
+    '</summary>' +
+    '<div class="ds-row-detail">' + nrrSkuPriceHistorySvg(history) + '</div>' +
+    '</details>';
+}
 function nrrPriceDrawerHtml(price) {
   if (!price) return '<div class="ds-empty"><div class="ds-empty-title">กำลังโหลดข้อมูลราคา...</div></div>';
-  if (!price.upCount && !price.downCount) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีการเปลี่ยนราคาที่มีนัยสำคัญเดือนนี้</div></div>';
+  var hasCreep = price.creeping && price.creeping.length > 0;
+  if (!price.upCount && !price.downCount && !hasCreep) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีการเปลี่ยนราคาที่มีนัยสำคัญเดือนนี้</div></div>';
+
   var rows = price.up.concat(price.down);
+  var mainHtml = rows.map(function (e) {
+    return nrrPriceRowHtml(
+      e.name,
+      (e.pctChange >= 0 ? 'ขึ้นราคา ' : 'ลดราคา ') + Math.abs(Math.round(e.pctChange * 10) / 10) + '%',
+      (e.impact >= 0 ? '+' : '') + nrrFmtGMVExact(e.impact),
+      e.impact >= 0 ? 'var(--green-deep)' : 'var(--coral)',
+      e.history
+    );
+  }).join('');
+
+  // Cumulative 6-month creep — a distinct signal from the up/down list
+  // above (see nrrAccountPriceImpact): items that never crossed the ≥1%
+  // single-month threshold, but have drifted ≥3% over the full window.
+  var creepHtml = '';
+  if (hasCreep) {
+    creepHtml = '<div class="nrr-comm-drawer-section" style="margin-top:22px">' +
+      '<div class="ds-section-hd"><span class="ds-eyebrow">ราคาสะสมขึ้น/ลงต่อเนื่อง (6 เดือน)</span></div>' +
+      '<div class="micro" style="margin-bottom:6px;color:var(--ink3)">ไม่มีเดือนไหนขยับแรงพอให้สังเกตเห็นเดี่ยวๆ แต่สะสมหลายเดือนแล้วขยับจริง</div>' +
+      price.creeping.map(function (e) {
+        return nrrPriceRowHtml(
+          e.name,
+          'ย้อนหลัง ' + e.history.length + ' เดือน',
+          (e.cumPct >= 0 ? '+' : '') + Math.round(e.cumPct * 10) / 10 + '%',
+          e.cumPct >= 0 ? 'var(--green-deep)' : 'var(--coral)',
+          e.history
+        );
+      }).join('') + '</div>';
+  }
+
   return '<div class="nrr-verdict">ยอดโตส่วนหนึ่งอาจมาจากราคา ไม่ใช่ปริมาณอย่างเดียว — เช็คให้ชัดก่อนสรุปว่าร้านนี้โตจริง</div>' +
-    rows.map(function (e) {
-      return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(e.name) + '</span>' +
-        '<span class="ds-row-meta">' + (e.pctChange >= 0 ? 'ขึ้นราคา ' : 'ลดราคา ') + Math.abs(Math.round(e.pctChange * 10) / 10) + '%</span>' +
-        '<span class="ds-row-value" style="color:' + (e.impact >= 0 ? 'var(--green-deep)' : 'var(--coral)') + '">' + (e.impact >= 0 ? '+' : '') + nrrFmtGMVExact(e.impact) + '</span></div>';
-    }).join('');
+    mainHtml + creepHtml;
 }
 
 // ── Floating per-outlet tooltip (SKU signal rows) ────────────────────────
@@ -2272,13 +2384,22 @@ function nrrOpenSlideoverTeam(tlEmail) {
 // non-zero cell click routes here directly now (see nrrRenderMovementSection).
 function nrrOpenSlideoverMovement(mv, month, outlets, showKam, cohort) {
   var label = nrrMovementCellLabel(mv, cohort, month);
+  var negative = mv === 'core_nrr_churn' || mv === 'transfer_out';
   _nrrOpenSlideover({
     mode: 'movement', title: label + ' · ' + (QNRR_CFG.months_th[month] || month),
     sub: outlets.length + ' ร้าน',
     outlets: outlets, period: month, showKam: !!showKam, showKamChips: false, showMvChips: false,
-    negative: mv === 'core_nrr_churn' || mv === 'transfer_out'
+    negative: negative
   });
   nrrLoadNotesFor(outlets, month);
+  // Churn/transfer_out rows show last-order-date (nrrAccountLastOrderDate,
+  // sourced from bulk_outlets.csv) — lazy global fetch, same fire-then-
+  // rerender shape as nrrLoadNotesFor above. Gated on `negative` since only
+  // that row branch consumes the date — no point fetching 3.1MB for
+  // "New"/"Expansion" drawer opens.
+  if (negative && !window.bulkOutletsData.loaded) {
+    nrrFetchBulkOutletsCsv().then(function () { nrrRenderSlideoverBody(); });
+  }
 }
 
 function _nrrOpenSlideover(cfg) {

@@ -141,7 +141,17 @@ function nrrOutletRowHtml(o, opts) {
   var numbersHtml;
   if (opts.negative) {
     var lost = Math.round((parseFloat(r.base_gmv) || 0) / (parseFloat(r.base_days) || 31) * nrrBaseDays());
-    numbersHtml = '<div class="num nrr-lost">−' + nrrFmtGMV(lost) + '</div><div class="nrr-triple-sub">ฐานที่หาย</div>';
+    // Last order date — sourced from bulk_outlets.csv (nrrOutletLastOrderDate),
+    // lazily fetched by nrrOpenSlideoverMovement only for negative (churn/
+    // transfer_out) drawers. Omitted silently if not loaded/no rows yet —
+    // no loading placeholder, it just pops in on the next re-render.
+    // Scoped to THIS row's own outlet_id, not the whole account_id — a
+    // chain account can have one branch churn while a sibling branch is
+    // still active, and an account-wide max would show the sibling's date.
+    var lastOrderIso = (r.account_id && r.outlet_id) ? nrrOutletLastOrderDate(r.account_id, r.outlet_id) : null;
+    var lastOrderTh = lastOrderIso ? nrrShortThaiDate(lastOrderIso) : null;
+    var dateSub = lastOrderTh ? ' · สั่งล่าสุด ' + nrrEsc(lastOrderTh) : '';
+    numbersHtml = '<div class="num nrr-lost">−' + nrrFmtGMV(lost) + '</div><div class="nrr-triple-sub">ฐานที่หาย' + dateSub + '</div>';
   } else {
     var currD = parseFloat(r.curr_days) || 30;
     var mtd = parseFloat(r.curr_gmv) || 0;

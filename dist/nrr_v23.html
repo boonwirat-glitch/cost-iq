@@ -1041,16 +1041,7 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; cursor: pointer; border: none; background: none; padding: 0; font-family: var(--font-ui); }
 .nrr-acct-trend-val { font-size: 11px; font-weight: 700; color: var(--ink2); margin-bottom: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nrr-acct-trend-col.sel .nrr-acct-trend-val { color: var(--ink); }
-/* Rendered (invisible) on EVERY column, not just the base month — see
-   nrrRenderAccountTrendChart's comment. .nrr-acct-trend uses align-items:
-   flex-end with no fixed column height, so if only the base column had
-   this extra line its taller box would get pushed up to keep bottoms
-   level, visually shifting its number/bar. visibility (not display, which
-   would remove the reserved space back; not opacity, which would still
-   expose the hidden text to screen readers) keeps every column's height
-   identical while only actually showing the tag on .base. */
-.nrr-acct-trend-basetag { display: block; visibility: hidden; font-size: 8.5px; font-weight: 700; letter-spacing: .03em; color: var(--ink3); margin-top: 1px; }
-.nrr-acct-trend-col.base .nrr-acct-trend-basetag { visibility: visible; }
+.nrr-acct-trend-basetag { display: block; font-size: 8.5px; font-weight: 700; letter-spacing: .03em; color: var(--ink3); margin-top: 1px; }
 .nrr-acct-trend-col.base .nrr-acct-trend-lbl { font-weight: 700; color: var(--ink2); }
 @media (max-width: 640px) { .nrr-acct-trend-val { font-size: 9.5px; } .nrr-acct-trend { gap: 6px; } }
 .nrr-acct-trend-bar-track { width: 100%; height: 78px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 4px 4px 1px 1px; overflow: hidden; }
@@ -2011,20 +2002,6 @@ var _TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค
 
 function nrrThMonthLabel(d) { return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543); }
 
-// Every existing last_order_date consumer just echoes the raw ISO string —
-// this is a deliberate new convention for the churn drawer specifically,
-// since "29 มิ.ย." reads far better next to a Thai-labeled ฿ amount than
-// "2026-06-29" does. Day-level only (no year) to match the month chips'
-// own terseness.
-function nrrShortThaiDate(iso) {
-  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
-  if (!m) return null;
-  var mIdx = parseInt(m[2], 10) - 1;
-  if (mIdx < 0 || mIdx > 11) return null;
-  return parseInt(m[3], 10) + ' ' + _TH_MONTHS[mIdx];
-}
-window.nrrShortThaiDate = nrrShortThaiDate;
-
 // Rolling, "today"-relative 3-month window — matches 02_data_pipeline.js's
 // _p1BaselineLabels exactly (lag-1 anchor, months 1/2/3 back from there).
 // NOTE: this is deliberately NOT the quarterly-pinned base_month window —
@@ -2364,12 +2341,6 @@ window.nrrFetchSenseSkuOutletCsv = nrrFetchSenseSkuOutletCsv;
 // GMV/orders/last_order_date. Feeds the "สาขา" stat cell (movement +
 // per-outlet cycle signal for Chain accounts).
 window.bulkOutletsData = { loaded: false };
-// In-flight dedupe — harmless with the single Account-view call site this
-// had until now, but the Dashboard's Churn/transfer_out drawer is a SECOND
-// caller (see nrrOpenSlideoverMovement), and rapid clicks across those
-// cells would otherwise fire duplicate 3.1MB fetches (the cache-buster
-// query param defeats the HTTP cache too). Mirrors nrrSenseSkuOutletInFlight.
-var nrrBulkOutletsInFlight = null;
 function _nrrParseBulkOutletsCsv(text) {
   var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
   if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
@@ -2390,23 +2361,17 @@ function _nrrParseBulkOutletsCsv(text) {
 }
 async function nrrFetchBulkOutletsCsv(force) {
   if (window.bulkOutletsData.loaded && !force) return window.bulkOutletsData;
-  if (nrrBulkOutletsInFlight && !force) return nrrBulkOutletsInFlight;
-  nrrBulkOutletsInFlight = (async function () {
-    try {
-      var res = await fetch(R2_BASE + '/bulk_outlets.csv?cb=' + Date.now());
-      if (res.status === 404) { window.bulkOutletsData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkOutletsData; }
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var text = await res.text();
-      window.bulkOutletsData = { byAccountId: _nrrParseBulkOutletsCsv(text), loaded: true, loadedAt: Date.now() };
-    } catch (e) {
-      console.warn('[nrr] failed to load bulk_outlets.csv', e);
-      window.bulkOutletsData = { byAccountId: {}, loaded: false, error: e.message };
-    } finally {
-      nrrBulkOutletsInFlight = null;
-    }
-    return window.bulkOutletsData;
-  })();
-  return nrrBulkOutletsInFlight;
+  try {
+    var res = await fetch(R2_BASE + '/bulk_outlets.csv?cb=' + Date.now());
+    if (res.status === 404) { window.bulkOutletsData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkOutletsData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkOutletsData = { byAccountId: _nrrParseBulkOutletsCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load bulk_outlets.csv', e);
+    window.bulkOutletsData = { byAccountId: {}, loaded: false, error: e.message };
+  }
+  return window.bulkOutletsData;
 }
 window.nrrFetchBulkOutletsCsv = nrrFetchBulkOutletsCsv;
 
@@ -3053,32 +3018,6 @@ function nrrGroupOutletsByAccount(outlets) {
   return Object.values(groups).sort(function (a, b) { return b.total_curr_gmv - a.total_curr_gmv; });
 }
 window.nrrGroupOutletsByAccount = nrrGroupOutletsByAccount;
-
-// Max last_order_date for ONE specific outlet within an account, across all
-// bulk_outlets.csv months for that outlet — deliberately scoped to
-// outlet_id, NOT the whole account_id. core_nrr_churn (nrrClassifyRow) is a
-// PER-OUTLET classification: a chain account can have one branch churn
-// (curr_gmv 0 this period) while a sibling branch under the SAME account_id
-// is still very much active. An account-wide max would silently borrow the
-// active sibling's fresh order date onto the churned branch's row, making a
-// real churn look like a false alarm — caught exactly this way in review
-// (2026-07-10): a 2-outlet account showed "churn" next to a days-old order
-// date that actually belonged to the OTHER outlet under that account_id.
-// ISO YYYY-MM-DD strings sort correctly with a plain string max. Returns
-// null if not loaded / no rows for this outlet.
-function nrrOutletLastOrderDate(accountId, outletId) {
-  var bo = window.bulkOutletsData;
-  if (!bo || !bo.loaded || !bo.byAccountId) return null;
-  var rows = bo.byAccountId[accountId];
-  if (!rows || !rows.length) return null;
-  var max = null;
-  rows.forEach(function (r) {
-    if (String(r.outlet_id) !== String(outletId)) return;
-    if (r.last_order_date && (!max || r.last_order_date > max)) max = r.last_order_date;
-  });
-  return max;
-}
-window.nrrOutletLastOrderDate = nrrOutletLastOrderDate;
 
 // ── PM / Admin portfolio-level rollups (3-level view: KAM / PM / Admin) ──
 // PM/Admin data has no TL/KAM attribution column at all (see nrr_data.js
@@ -4549,17 +4488,7 @@ function nrrOutletRowHtml(o, opts) {
   var numbersHtml;
   if (opts.negative) {
     var lost = Math.round((parseFloat(r.base_gmv) || 0) / (parseFloat(r.base_days) || 31) * nrrBaseDays());
-    // Last order date — sourced from bulk_outlets.csv (nrrOutletLastOrderDate),
-    // lazily fetched by nrrOpenSlideoverMovement only for negative (churn/
-    // transfer_out) drawers. Omitted silently if not loaded/no rows yet —
-    // no loading placeholder, it just pops in on the next re-render.
-    // Scoped to THIS row's own outlet_id, not the whole account_id — a
-    // chain account can have one branch churn while a sibling branch is
-    // still active, and an account-wide max would show the sibling's date.
-    var lastOrderIso = (r.account_id && r.outlet_id) ? nrrOutletLastOrderDate(r.account_id, r.outlet_id) : null;
-    var lastOrderTh = lastOrderIso ? nrrShortThaiDate(lastOrderIso) : null;
-    var dateSub = lastOrderTh ? ' · สั่งล่าสุด ' + nrrEsc(lastOrderTh) : '';
-    numbersHtml = '<div class="num nrr-lost">−' + nrrFmtGMV(lost) + '</div><div class="nrr-triple-sub">ฐานที่หาย' + dateSub + '</div>';
+    numbersHtml = '<div class="num nrr-lost">−' + nrrFmtGMV(lost) + '</div><div class="nrr-triple-sub">ฐานที่หาย</div>';
   } else {
     var currD = parseFloat(r.curr_days) || 30;
     var mtd = parseFloat(r.curr_gmv) || 0;
@@ -5513,18 +5442,11 @@ function nrrRenderAccountTrendChart(row) {
     var hatchH = m.current ? Math.max(0, totalH - solidH) : 0;
     // No dashed border on the base month bar anymore — it read as a dark
     // tick and inflated the bar's apparent height. Base month is marked on
-    // its LABEL instead (below) — but the tag span is rendered for EVERY
-    // column now (CSS toggles visibility, see .nrr-acct-trend-basetag),
-    // not just appended for isBase. .nrr-acct-trend uses align-items:
-    // flex-end with no fixed column height, so a column whose label is
-    // taller than its siblings (the old conditional-append) gets its top
-    // pushed up to keep bottoms level — visually shifting its number/bar
-    // upward. Reserving the same slot on every column, hidden or not,
-    // keeps every column's height identical so none of them shift.
+    // its LABEL instead (below), so the bar height stays truthful.
     var bar = m.current
       ? '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px"></div><div class="nrr-acct-trend-bar" style="height:' + solidH + 'px;background:var(--green);opacity:.85"></div>'
       : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px"></div>';
-    var lbl = nrrEsc(m.label.split(' ')[0]) + '<span class="nrr-acct-trend-basetag">ฐาน</span>';
+    var lbl = nrrEsc(m.label.split(' ')[0]) + (m.isBase ? '<span class="nrr-acct-trend-basetag">ฐาน</span>' : '');
     return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + (m.isBase ? ' base' : '') + '" data-i="' + i + '">' +
       '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div>' +
       '<div class="nrr-acct-trend-bar-track">' + bar + '</div>' +
@@ -7406,22 +7328,13 @@ function nrrOpenSlideoverTeam(tlEmail) {
 // non-zero cell click routes here directly now (see nrrRenderMovementSection).
 function nrrOpenSlideoverMovement(mv, month, outlets, showKam, cohort) {
   var label = nrrMovementCellLabel(mv, cohort, month);
-  var negative = mv === 'core_nrr_churn' || mv === 'transfer_out';
   _nrrOpenSlideover({
     mode: 'movement', title: label + ' · ' + (QNRR_CFG.months_th[month] || month),
     sub: outlets.length + ' ร้าน',
     outlets: outlets, period: month, showKam: !!showKam, showKamChips: false, showMvChips: false,
-    negative: negative
+    negative: mv === 'core_nrr_churn' || mv === 'transfer_out'
   });
   nrrLoadNotesFor(outlets, month);
-  // Churn/transfer_out rows show last-order-date (nrrAccountLastOrderDate,
-  // sourced from bulk_outlets.csv) — lazy global fetch, same fire-then-
-  // rerender shape as nrrLoadNotesFor above. Gated on `negative` since only
-  // that row branch consumes the date — no point fetching 3.1MB for
-  // "New"/"Expansion" drawer opens.
-  if (negative && !window.bulkOutletsData.loaded) {
-    nrrFetchBulkOutletsCsv().then(function () { nrrRenderSlideoverBody(); });
-  }
 }
 
 function _nrrOpenSlideover(cfg) {

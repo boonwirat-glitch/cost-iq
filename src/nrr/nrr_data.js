@@ -274,6 +274,20 @@ var _TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค
 
 function nrrThMonthLabel(d) { return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543); }
 
+// Every existing last_order_date consumer just echoes the raw ISO string —
+// this is a deliberate new convention for the churn drawer specifically,
+// since "29 มิ.ย." reads far better next to a Thai-labeled ฿ amount than
+// "2026-06-29" does. Day-level only (no year) to match the month chips'
+// own terseness.
+function nrrShortThaiDate(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  if (!m) return null;
+  var mIdx = parseInt(m[2], 10) - 1;
+  if (mIdx < 0 || mIdx > 11) return null;
+  return parseInt(m[3], 10) + ' ' + _TH_MONTHS[mIdx];
+}
+window.nrrShortThaiDate = nrrShortThaiDate;
+
 // Rolling, "today"-relative 3-month window — matches 02_data_pipeline.js's
 // _p1BaselineLabels exactly (lag-1 anchor, months 1/2/3 back from there).
 // NOTE: this is deliberately NOT the quarterly-pinned base_month window —
@@ -613,6 +627,12 @@ window.nrrFetchSenseSkuOutletCsv = nrrFetchSenseSkuOutletCsv;
 // GMV/orders/last_order_date. Feeds the "สาขา" stat cell (movement +
 // per-outlet cycle signal for Chain accounts).
 window.bulkOutletsData = { loaded: false };
+// In-flight dedupe — harmless with the single Account-view call site this
+// had until now, but the Dashboard's Churn/transfer_out drawer is a SECOND
+// caller (see nrrOpenSlideoverMovement), and rapid clicks across those
+// cells would otherwise fire duplicate 3.1MB fetches (the cache-buster
+// query param defeats the HTTP cache too). Mirrors nrrSenseSkuOutletInFlight.
+var nrrBulkOutletsInFlight = null;
 function _nrrParseBulkOutletsCsv(text) {
   var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
   if (lines.length && /^account_id,/i.test(lines[0])) lines = lines.slice(1);
@@ -633,17 +653,23 @@ function _nrrParseBulkOutletsCsv(text) {
 }
 async function nrrFetchBulkOutletsCsv(force) {
   if (window.bulkOutletsData.loaded && !force) return window.bulkOutletsData;
-  try {
-    var res = await fetch(R2_BASE + '/bulk_outlets.csv?cb=' + Date.now());
-    if (res.status === 404) { window.bulkOutletsData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkOutletsData; }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var text = await res.text();
-    window.bulkOutletsData = { byAccountId: _nrrParseBulkOutletsCsv(text), loaded: true, loadedAt: Date.now() };
-  } catch (e) {
-    console.warn('[nrr] failed to load bulk_outlets.csv', e);
-    window.bulkOutletsData = { byAccountId: {}, loaded: false, error: e.message };
-  }
-  return window.bulkOutletsData;
+  if (nrrBulkOutletsInFlight && !force) return nrrBulkOutletsInFlight;
+  nrrBulkOutletsInFlight = (async function () {
+    try {
+      var res = await fetch(R2_BASE + '/bulk_outlets.csv?cb=' + Date.now());
+      if (res.status === 404) { window.bulkOutletsData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkOutletsData; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      window.bulkOutletsData = { byAccountId: _nrrParseBulkOutletsCsv(text), loaded: true, loadedAt: Date.now() };
+    } catch (e) {
+      console.warn('[nrr] failed to load bulk_outlets.csv', e);
+      window.bulkOutletsData = { byAccountId: {}, loaded: false, error: e.message };
+    } finally {
+      nrrBulkOutletsInFlight = null;
+    }
+    return window.bulkOutletsData;
+  })();
+  return nrrBulkOutletsInFlight;
 }
 window.nrrFetchBulkOutletsCsv = nrrFetchBulkOutletsCsv;
 
