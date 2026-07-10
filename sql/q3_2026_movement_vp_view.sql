@@ -464,11 +464,10 @@ m2_rows AS (
       ELSE COALESCE(mc.base_portfolio, mo.commercial_owner)
     END AS base_portfolio,
     CASE
-      WHEN ofd.first_portfolio_date IS NOT NULL
-        AND ofd.first_portfolio_date >= v_m1_start
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN (v_m1_str, v_m2_str, v_m3_str) THEN mso.sale_staff_owner
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN (v_base_str, v_m1_str, v_m2_str, v_m3_str)
+           AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
+               ELSE po.prev_owner END, 'SALE') = 'SALE' THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, mo.staff_owner)
     END,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,
@@ -569,11 +568,10 @@ m3_rows AS (
       ELSE COALESCE(mc.base_portfolio, jo.commercial_owner)
     END AS base_portfolio,
     CASE
-      WHEN ofd.first_portfolio_date IS NOT NULL
-        AND ofd.first_portfolio_date >= v_m1_start
-        AND COALESCE(po.prev_owner, '') = 'SALE'
-        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-            IN (v_m1_str, v_m2_str, v_m3_str) THEN mso.sale_staff_owner
+      WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
+           IN (v_base_str, v_m1_str, v_m2_str, v_m3_str)
+           AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
+               ELSE po.prev_owner END, 'SALE') = 'SALE' THEN mso.sale_staff_owner
       ELSE COALESCE(mc.base_staff_owner, jo.staff_owner)
     END,
     ofd.first_dollar_date, ofd.first_portfolio_date, ofd.first_dollar_owner,

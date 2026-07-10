@@ -651,7 +651,7 @@ transfer_out_rows AS (
     'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
-  CROSS JOIN UNNEST([v_m1_str, v_m2_str, v_base_str]) AS period_month
+  CROSS JOIN UNNEST([v_m1_str, v_m2_str, v_m3_str]) AS period_month
   -- เฉพาะ outlet ที่ latest_staff ≠ Mar staff
   WHERE lo.latest_commercial_owner != 'KAM'
 ),
