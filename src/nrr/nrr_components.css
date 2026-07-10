@@ -401,6 +401,8 @@
   display: grid; grid-template-columns: 20px 1fr 150px; column-gap: 10px;
   align-items: center; padding: 10px 0;
 }
+.nrr-row-linked { text-decoration: none; color: inherit; cursor: pointer; }
+.nrr-row-linked:hover { background: var(--green-soft); }
 .nrr-row + .nrr-row, .nrr-row-with-notes + .nrr-row, .nrr-row + .nrr-row-with-notes, .nrr-row-with-notes + .nrr-row-with-notes { border-top: 1px solid var(--line); }
 .nrr-row-chev { width: 20px; text-align: center; color: var(--ink3); }
 .nrr-chev-icon { display: inline-block; transition: transform 150ms ease; font-size: 15px; }

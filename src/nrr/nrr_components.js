@@ -163,13 +163,22 @@ function nrrOutletRowHtml(o, opts) {
       is_partial: true
     }, { signal: true });
   }
-  return '<div class="nrr-row' + (opts.indent ? ' nrr-row-branch' : '') + '">' +
+  // Whole row is a link into Account view (Phase C) when we have an
+  // account_id to link to — was a plain <div> before (dashboard drawers
+  // didn't reach that far); an outlet showing here as churned/at-risk is
+  // exactly when someone wants to drill in, and #/account/:id already
+  // exists and gracefully shows "ไม่พบร้านนี้" for the rare account not in
+  // portview.csv (e.g. fully inactive), so linking unconditionally is safe.
+  var isLink = !!r.account_id;
+  var tag = isLink ? 'a' : 'div';
+  var hrefAttr = isLink ? ' href="#/account/' + encodeURIComponent(r.account_id) + '"' : '';
+  return '<' + tag + ' class="nrr-row' + (isLink ? ' nrr-row-linked' : '') + (opts.indent ? ' nrr-row-branch' : '') + '"' + hrefAttr + '>' +
     '<div class="nrr-row-chev"></div>' +
     '<div class="nrr-row-text nrr-row-text-dot">' + nrrMvDotHtml(o.movement) +
     '<div><span class="nrr-row-name">' + nrrEsc(r.res_name || r.account_name) + '</span>' +
     '<div class="nrr-row-meta">' + kamMeta + nrrEsc(r.account_name || '') + transferMeta + '</div></div></div>' +
     '<div class="nrr-row-nums">' + numbersHtml + '</div>' +
-    '</div>';
+    '</' + tag + '>';
 }
 window.nrrOutletRowHtml = nrrOutletRowHtml;
 

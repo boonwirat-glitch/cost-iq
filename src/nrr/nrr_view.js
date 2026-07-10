@@ -156,7 +156,8 @@ function nrrSkuGapSeverity(row) {
   return { ordered: ordered, m: m, cls: cls };
 }
 
-function nrrAcctRowHtml(item) {
+function nrrAcctRowHtml(item, opts) {
+  opts = opts || {};
   var r = item.row, pace = item.pace;
   var color = pace.pct == null ? 'var(--ink3)' : nrrThresholdColorVar(pace.pct);
   var status = nrrPaceStatusWord(pace);
@@ -165,6 +166,10 @@ function nrrAcctRowHtml(item) {
     ? '<span class="nrr-acct-flag ' + gap.cls + '">สั่งแล้ว ' + gap.ordered + '/' + gap.m + ' SKU</span>' : '';
   var missingHtml = r.missing_cat_count > 0
     ? '<span class="nrr-acct-flag">ไม่มีหมวด ' + r.missing_cat_count + '</span>' : '';
+  // showKam (v31, company-wide search results): the per-KAM grid never
+  // needs this — you already picked the KAM — but a cross-KAM search
+  // result list is meaningless without saying who owns each hit.
+  var kamHtml = opts.showKam && r.kam_name ? '<span class="micro">· KAM: ' + nrrEsc(r.kam_name) + '</span>' : '';
   // Whole row is a link into Account view (Phase C) — was intentionally
   // absent in Phase B ("ไม่มีปุ่ม/ลิงก์เข้า account detail" — the view didn't
   // exist yet, an affordance that goes nowhere is worse than none). Now
@@ -175,7 +180,7 @@ function nrrAcctRowHtml(item) {
     '<div class="nrr-acct-row-name">' + nrrEsc(r.account_name || r.account_id) + '</div>' +
     '<div class="nrr-acct-row-meta"><span class="num">' + nrrFmtGMV(r.runrate_gmv) + '</span><span class="micro">run-rate</span>' +
     '<span class="micro">/ ' + (pace.pct != null ? nrrFmtGMV(pace.baseline_gmv) : '—') + ' เดือนฐาน</span>' +
-    '<span class="micro">· ดูแล ' + (r.days_with_current_kam || 0) + ' วัน</span></div>' +
+    '<span class="micro">· ดูแล ' + (r.days_with_current_kam || 0) + ' วัน</span>' + kamHtml + '</div>' +
     (gapHtml || missingHtml ? '<div class="nrr-acct-row-flags">' + gapHtml + missingHtml + '</div>' : '') +
     '</div>' +
     '<div class="nrr-acct-row-right">' +
@@ -262,12 +267,49 @@ function nrrPortfolioPulseHtml(email, period) {
     '</div>';
 }
 
+// ── Company-wide account search (v31) ────────────────────────────────────
+// The per-KAM search box (nrr-port-search, below) only ever filters inside
+// whichever ONE KAM is currently selected — useless if you don't already
+// know who owns the shop you're looking for (e.g. spotting a churned
+// account by name in a dashboard drawer and wanting to jump straight to
+// its Account page without hunting through every KAM's switcher entry).
+// admin/tl only — a rep has exactly one portfolio already, nothing to
+// search across.
+var nrrPortfolioGlobalSearch = '';
+
+function nrrPortfolioGlobalResultsHtml() {
+  var q = nrrPortfolioGlobalSearch;
+  if (!q) return '';
+  var pv = window.bulkPortviewData;
+  if (!pv || !pv.loaded) return '';
+  var matches = pv.allRows.filter(function (r) {
+    return (r.account_name || '').toLowerCase().indexOf(q) > -1;
+  });
+  if (!matches.length) {
+    return '<div class="ds-empty" style="margin-top:8px"><div class="ds-empty-title">ไม่พบร้านที่ตรงกับ "' + nrrEsc(q) + '"</div></div>';
+  }
+  var shown = matches.slice(0, 30);
+  var itemsHtml = shown.map(function (r) { return nrrAcctRowHtml({ row: r, pace: nrrPaceSignal(r) }, { showKam: true }); }).join('');
+  var moreHtml = matches.length > shown.length
+    ? '<div class="micro" style="margin-top:8px">พบทั้งหมด ' + matches.length.toLocaleString() + ' ร้าน แสดง ' + shown.length + ' รายการแรก — พิมพ์ให้เจาะจงขึ้นเพื่อผลลัพธ์แม่นยำกว่านี้</div>' : '';
+  return '<div class="nrr-acct-list" style="margin-top:8px">' + itemsHtml + '</div>' + moreHtml;
+}
+
+function nrrPortfolioGlobalSearchHtml() {
+  if (nrrProfile.role === 'rep') return '';
+  return '<div class="nrr-panel-head"><div><div class="eyebrow">ค้นหาทั้งบริษัท</div><div class="h2" style="font-size:18px">ค้นหาร้านค้า (ทุก KAM)</div></div></div>' +
+    '<input class="nrr-search" id="nrr-port-global-search" placeholder="ค้นหาร้านค้าทั้งบริษัท เช่น หมีปรุง..." value="' + nrrEsc(nrrPortfolioGlobalSearch) + '" style="width:100%;max-width:420px">' +
+    '<div id="nrr-port-global-results">' + nrrPortfolioGlobalResultsHtml() + '</div>' +
+    '<hr style="margin:22px 0;border:none;border-top:1px solid var(--line)">';
+}
+
 function nrrRenderPortfolioBody() {
   var body = document.getElementById('nrr-portfolio-body');
   if (!body) return;
   var email = nrrPortfolioState.email;
   if (!email) {
-    body.innerHTML = '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
+    body.innerHTML = nrrPortfolioGlobalSearchHtml() +
+      '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
       '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีมให้เลือกดู</div></div>';
     return;
   }
@@ -287,6 +329,7 @@ function nrrRenderPortfolioBody() {
   }
 
   body.innerHTML =
+    nrrPortfolioGlobalSearchHtml() +
     '<div class="nrr-panel-head">' +
     '<div><div class="eyebrow">Portfolio' + (nrrProfile.role !== 'rep' ? ' · ' + nrrEsc(kamName) : '') + '</div><div class="h2">' + (nrrProfile.role === 'rep' ? 'ของฉัน' : nrrEsc(kamName)) + '</div></div>' +
     switcherHtml +
@@ -360,6 +403,12 @@ function nrrHandlePortfolioClick(e) {
   }
 }
 function nrrHandlePortfolioInput(e) {
+  if (e.target.id === 'nrr-port-global-search') {
+    nrrPortfolioGlobalSearch = e.target.value.trim().toLowerCase();
+    var resultsEl = document.getElementById('nrr-port-global-results');
+    if (resultsEl) resultsEl.innerHTML = nrrPortfolioGlobalResultsHtml();
+    return;
+  }
   if (e.target.id !== 'nrr-port-search') return;
   nrrPortfolioState.search = e.target.value.trim().toLowerCase();
   var gridEl = document.getElementById('nrr-port-acct-grid');
