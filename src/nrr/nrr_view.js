@@ -14,7 +14,12 @@ var nrrState = {
     kamKey: 'org',     // 'org' | 'tl:<email>' | 'kam:<email>' (KAM tab)
     pmBucket: 'chain',
     adminBucket: 'chain'
-  }
+  },
+  // Company overview section (v26): month window + squad focus filters,
+  // survive re-renders same as mvView above.
+  companyMonths: 6,          // 3 | 6 | 0 (0 = all months, Jan→current)
+  companySquadFocus: 'all',  // 'all' | 'chain' | 'sa_mc'
+  pipelineExpandedBucket: null // which handover-pipeline chip's detail list is open
 };
 var nrrSlideoverState = { mode: 'kam', movementFilter: 'all', kamFilter: 'all', search: '' };
 var nrrSlideoverOutlets = [];
@@ -992,7 +997,7 @@ async function nrrRefresh(force) {
   if (status) status.textContent = 'กำลังโหลดข้อมูล...';
   try {
     await nrrFetchQnrrCsv(force);
-    await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force)]);
+    await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force), nrrFetchCompanyCsv(force), nrrFetchSalesPipelineCsv(force)]);
     await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates(),
                        nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv(), nrrFetchHandoverCsv()]);
     nrrRenderAll();
@@ -1022,6 +1027,8 @@ function nrrShellHtml() {
     '  <span class="nrr-appnav-div"></span>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
     '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
+    '    <a href="#nrr-sec-company" data-sec="nrr-sec-company" id="nrr-subnav-company" hidden>บริษัท</a>' +
+    '    <a href="#nrr-sec-sales" data-sec="nrr-sec-sales" id="nrr-subnav-sales" hidden>Sales</a>' +
     '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
     '    <a href="#nrr-sec-pm" data-sec="nrr-sec-pm">PM</a>' +
     '    <a href="#nrr-sec-admin" data-sec="nrr-sec-admin">Admin</a>' +
@@ -1036,6 +1043,10 @@ function nrrShellHtml() {
     '<div class="nrr-view" id="nrr-view-dashboard">' +
     '<div class="nrr-page">' +
     '  <div class="nrr-section" id="nrr-sec-pulse" style="animation-delay:.02s"><div class="nrr-panel-body" id="nrr-pulse-body"></div></div>' +
+    // Company overview + Sales segments (admin-only; unhidden in their render
+    // fns) — hidden default keeps TL views untouched.
+    '  <div class="nrr-section" id="nrr-sec-company" style="animation-delay:.04s" hidden><div class="nrr-panel-body" id="nrr-company-body"></div></div>' +
+    '  <div class="nrr-section" id="nrr-sec-sales" style="animation-delay:.05s" hidden><div class="nrr-panel-body" id="nrr-sales-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-teams" style="animation-delay:.06s"><div class="nrr-takeaway micro" id="nrr-teams-takeaway"></div><div class="nrr-team-cards" id="nrr-team-cards"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-movement" style="animation-delay:.10s"><div class="nrr-panel-body">' +
     '    <div class="nrr-panel-head"><div class="h2" id="nrr-movement-title">Outlet Movement</div>' +
@@ -1112,6 +1123,8 @@ function nrrRenderAll() {
   nrrRenderKamLeaderboard();
   nrrRenderPortfolioSection('pm');
   nrrRenderPortfolioSection('admin');
+  nrrRenderCompanySection();
+  nrrRenderSalesSection();
   nrrRenderCommissionSection();
   nrrBindLeaderboardControls();
   nrrInitScrollspy();
@@ -1546,6 +1559,336 @@ function nrrRenderPortfolioSection(kind) {
       else nrrState.mvView.adminBucket = btn.dataset.mvJump;
       nrrRenderMovementSection();
       document.getElementById('nrr-sec-movement').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+// ── Company Overview + Sales sections (admin-only) ───────────────────────
+// Whole-company GMV by segment from company_gmv.csv (sql/company_gmv.sql),
+// mirroring the "Target & Plan 2H 2026" sheet: B2C · squad Chain · squad
+// SA/MC, each squad broken into Sales/KAM/PM/Admin sub-rows. Raw actuals
+// (no ×30 normalization) so numbers reconcile with the sheet/DWH directly.
+// KAM GMV → squad via tl_email → squad_params (Supabase, TL_BUCKET_MAP
+// fallback); PM/Admin/Sales → squad via account_type bucket; see
+// nrrCompanyModel() in nrr_aggregate.js. Actuals only this round — targets
+// / %Ach deferred until head-of-squad commission is built in the Cockpit.
+
+function _nrrCompanyStaleBannerHtml(cd) {
+  if (!cd || !cd.isStale) return '';
+  return '<div class="nrr-stale-banner">⚠️ company_gmv.csv มีข้อมูลถึงเดือน ' + nrrEsc(cd.maxMonthKey || '—') +
+    ' แต่เดือนปัจจุบันคือ ' + nrrEsc(cd.currMonthKey || '—') +
+    ' — ไฟล์ยังไม่ได้ re-run/upload ใหม่ ตัวเลขด้านล่างไม่ใช่ข้อมูลล่าสุด</div>';
+}
+
+// Day-of-month of the lag-1 anchor — for the "MTD (ถึงวันที่ N)" chip.
+function _nrrCompanyMtdDay() {
+  var d = new Date(); d.setDate(d.getDate() - 1);
+  return d.getDate();
+}
+
+// Chain vs SA/MC trend — grouped bars, fixed categorical colors (validated:
+// #c56a2c/#1295a8 pass lightness/chroma/CVD/contrast in both light & dark —
+// see dataviz skill palette validator), legend + <title> tooltips + a
+// selective direct label on the current month only (never one per bar).
+function _nrrCompanyTrendSvg(months, labels, byMonth) {
+  if (!months.length) return '';
+  var chainColor = '#c56a2c', samcColor = '#1295a8';
+  var vals = [];
+  months.forEach(function (k) { vals.push(byMonth[k].squads.chain.total, byMonth[k].squads.sa_mc.total); });
+  var mx = Math.max.apply(null, vals) || 1;
+  var groupW = 46, barW = 16, gap = 3, padL = 6, padR = 6, padT = 22, padB = 22;
+  var W = padL + padR + months.length * groupW, H = 130, cH = H - padT - padB;
+  var bars = '', xLabels = '';
+  months.forEach(function (k, i) {
+    var gx = padL + i * groupW;
+    var m = byMonth[k];
+    var chainH = (m.squads.chain.total / mx) * cH;
+    var samcH = (m.squads.sa_mc.total / mx) * cH;
+    var isLast = i === months.length - 1;
+    var x1 = gx + (groupW - (barW * 2 + gap)) / 2;
+    var x2 = x1 + barW + gap;
+    bars +=
+      '<rect x="' + x1 + '" y="' + (padT + cH - chainH) + '" width="' + barW + '" height="' + Math.max(chainH, 1) + '" rx="2.5" fill="' + chainColor + '"><title>Chain ' + nrrEsc(labels[k]) + ': ' + nrrFmtGMVExact(m.squads.chain.total) + '</title></rect>' +
+      '<rect x="' + x2 + '" y="' + (padT + cH - samcH) + '" width="' + barW + '" height="' + Math.max(samcH, 1) + '" rx="2.5" fill="' + samcColor + '"><title>SA/MC ' + nrrEsc(labels[k]) + ': ' + nrrFmtGMVExact(m.squads.sa_mc.total) + '</title></rect>' +
+      (isLast ? '<text x="' + (x1 + barW / 2) + '" y="' + (padT + cH - chainH - 5) + '" font-size="9" fill="' + chainColor + '" text-anchor="middle" font-weight="700">' + nrrFmtGMV(m.squads.chain.total) + '</text>' +
+                '<text x="' + (x2 + barW / 2) + '" y="' + (padT + cH - samcH - 5) + '" font-size="9" fill="' + samcColor + '" text-anchor="middle" font-weight="700">' + nrrFmtGMV(m.squads.sa_mc.total) + '</text>' : '');
+    xLabels += '<text x="' + (gx + groupW / 2) + '" y="' + (H - 6) + '" font-size="9" fill="var(--ink3)" text-anchor="middle">' + nrrEsc((labels[k] || k).split(' ')[0]) + '</text>';
+  });
+  return '<div style="margin-top:14px">' +
+    '<div style="display:flex;gap:16px;align-items:center;font-size:12px;color:var(--ink2);margin-bottom:2px">' +
+    '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + chainColor + ';margin-right:5px"></span>Chain</span>' +
+    '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + samcColor + ';margin-right:5px"></span>SA/MC</span>' +
+    '</div>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" preserveAspectRatio="xMinYMid meet">' + bars + xLabels + '</svg>' +
+    '</div>';
+}
+
+function _nrrCompanyFilterChipsHtml() {
+  var monthOpts = [[3, '3 เดือน'], [6, '6 เดือน'], [0, 'ทั้งหมด']];
+  var squadOpts = [['all', 'ทั้งหมด'], ['chain', 'Chain'], ['sa_mc', 'SA/MC']];
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 4px">' +
+    '<div class="seg" id="nrr-company-months-seg">' + monthOpts.map(function (o) {
+      return '<button' + (nrrState.companyMonths === o[0] ? ' class="on"' : '') + ' data-months="' + o[0] + '">' + o[1] + '</button>';
+    }).join('') + '</div>' +
+    '<div class="seg" id="nrr-company-squad-seg">' + squadOpts.map(function (o) {
+      return '<button' + (nrrState.companySquadFocus === o[0] ? ' class="on"' : '') + ' data-squad="' + o[0] + '">' + o[1] + '</button>';
+    }).join('') + '</div>' +
+    '</div>';
+}
+
+function nrrRenderCompanySection() {
+  var sec = document.getElementById('nrr-sec-company');
+  var body = document.getElementById('nrr-company-body');
+  var pill = document.getElementById('nrr-subnav-company');
+  if (!sec || !body) return;
+  if (nrrProfile.role !== 'admin') { sec.hidden = true; if (pill) pill.hidden = true; return; }
+  sec.hidden = false; if (pill) pill.hidden = false;
+
+  var cd = window.bulkCompanyData;
+  var head = '<div class="nrr-panel-head"><div class="h2">ภาพรวมบริษัท — GMV ทุก Segment</div></div>';
+  if (cd && cd.notFound) {
+    body.innerHTML = head + '<div class="micro" style="margin-top:8px">ยังไม่มีข้อมูล — ไฟล์ company_gmv.csv ยังไม่ถูกอัปโหลดไป R2 (รัน sql/company_gmv.sql ใน BigQuery แล้วอัปโหลดก่อน)</div>';
+    return;
+  }
+  var model = nrrCompanyModel();
+  if (!model || !model.months.length) {
+    body.innerHTML = head + '<div class="micro" style="margin-top:8px">ยังไม่มีข้อมูล company_gmv.csv' + (cd && cd.error ? ' (โหลดไม่สำเร็จ: ' + nrrEsc(cd.error) + ')' : '') + '</div>';
+    return;
+  }
+
+  var allMonths = model.months;
+  var win = nrrState.companyMonths || allMonths.length;
+  var months = win > 0 ? allMonths.slice(-win) : allMonths;
+  var lastKey = months[months.length - 1];
+  var isMtd = cd && cd.currMonthKey && lastKey === cd.currMonthKey;
+  var lastM = model.by_month[lastKey];
+  var mtdChip = isMtd ? ' <span class="micro">(MTD ถึงวันที่ ' + _nrrCompanyMtdDay() + ')</span>' : '';
+  var focus = nrrState.companySquadFocus; // 'all' | 'chain' | 'sa_mc'
+
+  // KPI tiles — latest month (respect squad focus: show that squad's own
+  // Sales/KAM/PM/Admin split instead of the 4-way company split)
+  var tiles;
+  if (focus === 'all') {
+    tiles = [['Total GMV', lastM.total], ['B2C', lastM.b2c.gmv],
+             ['Squad Chain', lastM.squads.chain.total], ['Squad SA/MC', lastM.squads.sa_mc.total]];
+  } else {
+    var sq = lastM.squads[focus];
+    tiles = [['รวม Squad', sq.total], ['Sales', sq.sales], ['KAM', sq.kam], ['PM', sq.pm], ['Admin', sq.admin]];
+  }
+  var tilesHtml = '<div class="nrr-kpi-grid" style="grid-template-columns:repeat(' + tiles.length + ',1fr)">' +
+    tiles.map(function (t) {
+      return '<div class="nrr-kpi-tile">' +
+        '<div class="nrr-kpi-value num">' + nrrFmtGMV(t[1]) + '</div>' +
+        '<div class="nrr-kpi-label">' + t[0] + (isMtd ? ' — MTD' : '') + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+
+  var trendHtml = focus === 'all' ? _nrrCompanyTrendSvg(months, model.labels, model.by_month) : '';
+
+  // Sheet-mirror table: rows × months
+  function rowHtml(label, getter, opts) {
+    opts = opts || {};
+    var cells = months.map(function (k) {
+      var v = getter(model.by_month[k]);
+      return '<td class="num" style="text-align:right">' + (v ? nrrFmtGMVExact(v) : '—') + '</td>';
+    }).join('');
+    var style = (opts.bold ? 'font-weight:600;' : '') + (opts.indent ? 'padding-left:22px;' : '');
+    return '<tr' + (opts.topline ? ' style="border-top:1px solid var(--nrr-hairline,#e3e3e3)"' : '') + '>' +
+      '<td style="' + style + 'white-space:nowrap">' + label + '</td>' + cells + '</tr>';
+  }
+  var headCells = months.map(function (k) {
+    var isCur = isMtd && k === lastKey;
+    return '<th style="text-align:right;white-space:nowrap">' + nrrEsc(model.labels[k] || k) + (isCur ? mtdChip : '') + '</th>';
+  }).join('');
+  var hasUnassigned = months.some(function (k) { return model.by_month[k].unassigned > 0; });
+
+  var rows;
+  if (focus === 'all') {
+    rows =
+      rowHtml('B2C', function (m) { return m.b2c.gmv; }) +
+      rowHtml('Squad Chain', function (m) { return m.squads.chain.total; }, { bold: true, topline: true }) +
+      rowHtml('Sales', function (m) { return m.squads.chain.sales; }, { indent: true }) +
+      rowHtml('KAM', function (m) { return m.squads.chain.kam; }, { indent: true }) +
+      rowHtml('PM', function (m) { return m.squads.chain.pm; }, { indent: true }) +
+      rowHtml('Admin', function (m) { return m.squads.chain.admin; }, { indent: true }) +
+      rowHtml('Squad SA/MC', function (m) { return m.squads.sa_mc.total; }, { bold: true, topline: true }) +
+      rowHtml('Sales', function (m) { return m.squads.sa_mc.sales; }, { indent: true }) +
+      rowHtml('KAM', function (m) { return m.squads.sa_mc.kam; }, { indent: true }) +
+      rowHtml('PM', function (m) { return m.squads.sa_mc.pm; }, { indent: true }) +
+      rowHtml('Admin', function (m) { return m.squads.sa_mc.admin; }, { indent: true }) +
+      (hasUnassigned ? rowHtml('ยังไม่จัดกลุ่ม (other/unassigned)', function (m) { return m.unassigned; }, { topline: true }) : '') +
+      rowHtml('Total GMV', function (m) { return m.total; }, { bold: true, topline: true });
+  } else {
+    var sqLabel = focus === 'chain' ? 'Chain' : 'SA/MC';
+    rows =
+      rowHtml('Sales', function (m) { return m.squads[focus].sales; }) +
+      rowHtml('KAM', function (m) { return m.squads[focus].kam; }) +
+      rowHtml('PM', function (m) { return m.squads[focus].pm; }) +
+      rowHtml('Admin', function (m) { return m.squads[focus].admin; }) +
+      rowHtml('รวม Squad ' + sqLabel, function (m) { return m.squads[focus].total; }, { bold: true, topline: true });
+  }
+
+  body.innerHTML = head + _nrrCompanyStaleBannerHtml(cd) + _nrrCompanyFilterChipsHtml() + tilesHtml + trendHtml +
+    '<div style="margin-top:18px;overflow-x:auto">' +
+    '<table class="nrr-table"><thead><tr><th>Segment</th>' + headCells + '</tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+    '<div class="micro" style="margin-top:10px">' +
+    'ยอดจริงจาก DWH (gmv_ex_vat, ไม่ normalize) · KAM แบ่ง squad ตามพอร์ตของ TL (squad_params ใน Supabase) — ' +
+    'ไม่ใช่ตาม account_type ของร้าน (ยกเว้นร้านที่หา KAM เจ้าของไม่เจอในทะเบียน จะแบ่งตาม account_type แทน) · ' +
+    'Sales/PM/Admin แบ่งตาม account_type ตรงๆ · ' +
+    'B2C = account_type Consumer/Enduser · เดือนปัจจุบันเป็น MTD (ข้อมูลช้ากว่าจริง 1 วัน)' +
+    '</div>';
+
+  body.querySelectorAll('#nrr-company-months-seg button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      nrrState.companyMonths = parseInt(btn.dataset.months, 10);
+      nrrRenderCompanySection();
+    });
+  });
+  body.querySelectorAll('#nrr-company-squad-seg button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      nrrState.companySquadFocus = btn.dataset.squad;
+      nrrRenderCompanySection();
+    });
+  });
+}
+
+// ── Sales section: actuals-by-account_type + handover pipeline forecast ──
+// The pipeline forecast answers the Sales lead's actual question: "how much
+// of what's in my hands right now will roll off (get handed to KAM/PM/
+// Admin) in the coming months, and is anything overdue?" — built from
+// sales_handover_pipeline.csv's new_user_exp_date (the 45-day SA / 90-day
+// MC-Chain handover deadline, already computed upstream) via
+// nrrSalesPipelineModel(). Color = urgency (status), never identity alone —
+// each chip is labeled in text, not color-only.
+var PIPELINE_BUCKET_META = {
+  overdue:        { label: 'เลยกำหนดแล้ว', color: 'var(--coral)',    soft: 'var(--coral-soft)' },
+  this_month:     { label: 'เดือนนี้',      color: 'var(--sun-deep)', soft: 'var(--sun-soft)' },
+  next_month:     { label: 'เดือนหน้า',     color: 'var(--sun-deep)', soft: 'var(--sun-soft)' },
+  plus2:          { label: '+2 เดือน',      color: 'var(--ink2)',     soft: 'var(--fill)' },
+  plus3_or_later: { label: '+3 เดือนขึ้นไป', color: 'var(--ink2)',     soft: 'var(--fill)' },
+  no_date:        { label: 'ไม่มีกำหนด',    color: 'var(--ink3)',     soft: 'var(--fill)' }
+};
+
+function _nrrPipelineDetailRowsHtml(rows) {
+  if (!rows.length) return '<div class="micro" style="padding:8px 0">ไม่มีร้านในกลุ่มนี้</div>';
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  return '<div style="overflow-x:auto;margin-top:8px">' +
+    '<table class="nrr-table"><thead><tr><th>ร้านค้า</th><th>Account Type</th><th>วันครบกำหนด</th><th style="text-align:right">GMV เดือนล่าสุด</th></tr></thead><tbody>' +
+    rows.slice(0, 50).map(function (r) {
+      var dTxt = '—', dExtra = '';
+      if (r.new_user_exp_date) {
+        var d = new Date(r.new_user_exp_date + 'T00:00:00');
+        if (!isNaN(d.getTime())) {
+          dTxt = r.new_user_exp_date;
+          var days = Math.round((d - today) / 86400000);
+          dExtra = days < 0 ? ' <span style="color:var(--coral)">(เลย ' + Math.abs(days) + ' วัน)</span>' : days === 0 ? ' (วันนี้)' : ' (อีก ' + days + ' วัน)';
+        }
+      }
+      return '<tr><td>' + nrrEsc(r.account_name || r.account_id || '—') + '</td>' +
+        '<td>' + nrrEsc(r.account_type || '—') + '</td>' +
+        '<td>' + dTxt + dExtra + '</td>' +
+        '<td class="num" style="text-align:right">' + nrrFmtGMVExact(r.last_month_gmv) + '</td></tr>';
+    }).join('') +
+    '</tbody></table>' +
+    (rows.length > 50 ? '<div class="micro" style="margin-top:6px">แสดง 50 จาก ' + rows.length + ' ร้าน</div>' : '') +
+    '</div>';
+}
+
+function _nrrRenderPipelineForecastHtml(pm) {
+  if (!pm) return '';
+  var chipsHtml = pm.order.map(function (key) {
+    var b = pm.buckets[key], meta = PIPELINE_BUCKET_META[key];
+    var isOpen = nrrState.pipelineExpandedBucket === key;
+    return '<button class="nrr-pipeline-chip" data-bucket="' + key + '" style="border-color:' + meta.color + ';background:' + (isOpen ? meta.soft : 'transparent') + '">' +
+      '<div style="font-size:11px;color:' + meta.color + ';font-weight:600">' + meta.label + '</div>' +
+      '<div class="num" style="font-size:16px;font-weight:700;margin-top:2px">' + nrrFmtGMV(b.gmv) + '</div>' +
+      '<div class="micro">' + b.outlets + ' ร้าน</div>' +
+      '</button>';
+  }).join('');
+
+  var expandedKey = nrrState.pipelineExpandedBucket;
+  var detailHtml = '';
+  if (expandedKey && pm.buckets[expandedKey]) {
+    detailHtml = '<div style="margin-top:4px">' +
+      '<div class="h2" style="font-size:13px">รายละเอียด — ' + PIPELINE_BUCKET_META[expandedKey].label + '</div>' +
+      _nrrPipelineDetailRowsHtml(pm.buckets[expandedKey].rows) +
+      '</div>';
+  }
+
+  return '<div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--nrr-hairline,#e3e3e3)">' +
+    '<div class="nrr-panel-head"><div class="h2">Pipeline การส่งต่อ (Handover Forecast)</div></div>' +
+    '<div class="micro" style="margin-bottom:10px">ร้านที่อยู่ในมือ Sales ตอนนี้ ' + nrrFmtGMVExact(pm.total) + ' — จะทยอยโอนออกไปเดือนไหนบ้าง (SA 45 วัน / MC-Chain 90 วัน นับจากคำสั่งซื้อแรก) กดที่การ์ดเพื่อดูรายชื่อร้าน</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">' + chipsHtml + '</div>' +
+    detailHtml +
+    '</div>';
+}
+
+function nrrRenderSalesSection() {
+  var sec = document.getElementById('nrr-sec-sales');
+  var body = document.getElementById('nrr-sales-body');
+  var pill = document.getElementById('nrr-subnav-sales');
+  if (!sec || !body) return;
+  if (nrrProfile.role !== 'admin') { sec.hidden = true; if (pill) pill.hidden = true; return; }
+  sec.hidden = false; if (pill) pill.hidden = false;
+
+  var cd = window.bulkCompanyData;
+  var head = '<div class="nrr-panel-head"><div class="h2">Sales — ลูกค้าใหม่ (commercial_owner = SALE)</div></div>';
+  if (cd && cd.notFound) {
+    body.innerHTML = head + '<div class="micro" style="margin-top:8px">ยังไม่มีข้อมูล — ไฟล์ company_gmv.csv ยังไม่ถูกอัปโหลดไป R2</div>';
+    return;
+  }
+  var model = nrrSalesByBucket();
+  if (!model || !model.months.length) {
+    body.innerHTML = head + '<div class="micro" style="margin-top:8px">ยังไม่มีข้อมูล Sales ใน company_gmv.csv</div>';
+    return;
+  }
+
+  var months = model.months;
+  var lastKey = months[months.length - 1];
+  var isMtd = cd && cd.currMonthKey && lastKey === cd.currMonthKey;
+  var mtdChip = isMtd ? ' <span class="micro">(MTD ถึงวันที่ ' + _nrrCompanyMtdDay() + ')</span>' : '';
+  var headCells = months.map(function (k) {
+    var isCur = isMtd && k === lastKey;
+    return '<th style="text-align:right;white-space:nowrap">' + nrrEsc(model.labels[k] || k) + (isCur ? mtdChip : '') + '</th>';
+  }).join('');
+  function rowHtml(label, key, opts) {
+    opts = opts || {};
+    var cells = months.map(function (k) {
+      var v = model.by_month[k][key];
+      return '<td class="num" style="text-align:right">' + (v ? nrrFmtGMVExact(v) : '—') + '</td>';
+    }).join('');
+    return '<tr' + (opts.topline ? ' style="border-top:1px solid var(--nrr-hairline,#e3e3e3)"' : '') + '>' +
+      '<td style="' + (opts.bold ? 'font-weight:600;' : '') + 'white-space:nowrap">' + label + '</td>' + cells + '</tr>';
+  }
+  var hasOther = months.some(function (k) { return model.by_month[k].other > 0; });
+
+  var pd = window.bulkSalesPipelineData;
+  var pm = nrrSalesPipelineModel();
+  var pipelineHtml = pd && pd.notFound
+    ? '<div class="micro" style="margin-top:16px">Pipeline forecast: ยังไม่มีข้อมูล — ไฟล์ sales_handover_pipeline.csv ยังไม่ถูกอัปโหลดไป R2 (รัน sql/sales_handover_pipeline.sql ใน BigQuery แล้วอัปโหลดก่อน)</div>'
+    : _nrrRenderPipelineForecastHtml(pm);
+
+  body.innerHTML = head + _nrrCompanyStaleBannerHtml(cd) +
+    '<div style="overflow-x:auto">' +
+    '<table class="nrr-table"><thead><tr><th>Account Type</th>' + headCells + '</tr></thead>' +
+    '<tbody>' +
+    rowHtml('Chain', 'chain') +
+    rowHtml('SA/MC', 'sa_mc') +
+    (hasOther ? rowHtml('อื่นๆ', 'other') : '') +
+    rowHtml('รวม Sales', 'total', { bold: true, topline: true }) +
+    '</tbody></table></div>' +
+    '<div class="micro" style="margin-top:10px">' +
+    'ยอดซื้อลูกค้าใหม่จาก DWH order ที่ commercial_owner = SALE ตรงๆ (ไม่มี NRR concept) · ' +
+    'แบ่งตาม account_type ของร้าน · เดือนปัจจุบันเป็น MTD (ข้อมูลช้ากว่าจริง 1 วัน)' +
+    '</div>' +
+    pipelineHtml;
+
+  body.querySelectorAll('.nrr-pipeline-chip').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.dataset.bucket;
+      nrrState.pipelineExpandedBucket = nrrState.pipelineExpandedBucket === key ? null : key;
+      nrrRenderSalesSection();
     });
   });
 }
@@ -2339,7 +2682,7 @@ var _nrrSpy = null;
 function nrrInitScrollspy() {
   if (_nrrSpy) _nrrSpy.disconnect();
   var links = document.querySelectorAll('#nrr-subnav a');
-  var map = { 'nrr-sec-pulse': 'nrr-sec-pulse', 'nrr-sec-teams': 'nrr-sec-pulse', 'nrr-sec-movement': 'nrr-sec-movement', 'nrr-sec-kams': 'nrr-sec-movement', 'nrr-sec-pm': 'nrr-sec-pm', 'nrr-sec-admin': 'nrr-sec-admin', 'nrr-sec-commission': 'nrr-sec-admin' };
+  var map = { 'nrr-sec-pulse': 'nrr-sec-pulse', 'nrr-sec-company': 'nrr-sec-company', 'nrr-sec-sales': 'nrr-sec-sales', 'nrr-sec-teams': 'nrr-sec-pulse', 'nrr-sec-movement': 'nrr-sec-movement', 'nrr-sec-kams': 'nrr-sec-movement', 'nrr-sec-pm': 'nrr-sec-pm', 'nrr-sec-admin': 'nrr-sec-admin', 'nrr-sec-commission': 'nrr-sec-admin' };
   _nrrSpy = new IntersectionObserver(function (entries) {
     entries.forEach(function (en) {
       if (!en.isIntersecting) return;
@@ -2348,7 +2691,9 @@ function nrrInitScrollspy() {
       links.forEach(function (a) { a.classList.toggle('on', a.dataset.sec === target); });
     });
   }, { rootMargin: '-40% 0px -55% 0px' });
-  ['nrr-sec-pulse', 'nrr-sec-teams', 'nrr-sec-movement', 'nrr-sec-kams', 'nrr-sec-pm', 'nrr-sec-admin', 'nrr-sec-commission'].forEach(function (id) {
+  // hidden sections never intersect, so observing them unconditionally is
+  // safe for roles that can't see company/sales
+  ['nrr-sec-pulse', 'nrr-sec-company', 'nrr-sec-sales', 'nrr-sec-teams', 'nrr-sec-movement', 'nrr-sec-kams', 'nrr-sec-pm', 'nrr-sec-admin', 'nrr-sec-commission'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) _nrrSpy.observe(el);
   });

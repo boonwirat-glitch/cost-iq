@@ -245,6 +245,109 @@ async function nrrFetchVpCsv(force) {
 }
 window.nrrFetchVpCsv = nrrFetchVpCsv;
 
+// ── Company overview — company_gmv.csv (sql/company_gmv.sql) ─────────────
+// Whole-company monthly GMV by segment: b2c / kam / pm / admin / sale / other,
+// with bucket (chain|sa_mc|other) + kam/tl emails on kam rows. 404-graceful
+// like vp_view.csv — until the file is uploaded to R2 the company/sales
+// sections show an explicit empty state.
+window.bulkCompanyData = { loaded: false };
+
+// 8 cols: month_key, month_label, owner_group, kam_email, tl_email,
+//         bucket, gmv, orders
+function _nrrParseCompanyCsv(text) {
+  var lines = text.trim().split('\n').slice(1);
+  var rows = [];
+  lines.forEach(function (line) {
+    if (!line.trim()) return;
+    var p = parseCSVRow(line);
+    if (p.length < 8) return;
+    rows.push({
+      month_key:   (p[0] || '').trim(),
+      month_label: (p[1] || '').trim(),
+      owner_group: (p[2] || '').trim(),
+      kam_email:   (p[3] || '').trim().toLowerCase(),
+      tl_email:    (p[4] || '').trim().toLowerCase(),
+      bucket:      (p[5] || '').trim(),
+      gmv:         parseFloat(p[6]) || 0,
+      orders:      parseInt(p[7], 10) || 0
+    });
+  });
+  return rows;
+}
+
+async function nrrFetchCompanyCsv(force) {
+  if (window.bulkCompanyData.loaded && !force) return window.bulkCompanyData;
+  var url = R2_BASE + '/company_gmv.csv?cb=' + Date.now();
+  try {
+    var res = await fetch(url);
+    if (res.status === 404) { window.bulkCompanyData = { allRows: [], loaded: false, notFound: true }; return window.bulkCompanyData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    var allRows = _nrrParseCompanyCsv(text);
+    // Staleness: month_key-based (NOT QNRR_CFG.q_months-coupled — this file
+    // spans the whole calendar year and must survive quarter rollovers).
+    // Stale = the file's newest month is older than the lag-1 current month.
+    var lag = new Date(); lag.setDate(lag.getDate() - 1);
+    var currKey = lag.getFullYear() + '-' + String(lag.getMonth() + 1).padStart(2, '0');
+    var maxKey = allRows.reduce(function (m, r) { return r.month_key > m ? r.month_key : m; }, '');
+    var isStale = allRows.length > 0 && maxKey < currKey;
+    window.bulkCompanyData = { allRows: allRows, loaded: true, loadedAt: Date.now(), maxMonthKey: maxKey, currMonthKey: currKey, isStale: isStale };
+  } catch (e) {
+    console.warn('[nrr] failed to load company_gmv.csv', e);
+    window.bulkCompanyData = { allRows: [], loaded: false, error: e.message };
+  }
+  return window.bulkCompanyData;
+}
+window.nrrFetchCompanyCsv = nrrFetchCompanyCsv;
+
+// ── Sales handover pipeline — sales_handover_pipeline.csv ────────────────
+// Forward-looking snapshot (one row per outlet currently owned by Sales),
+// pairing new_user_exp_date (the 45-day SA / 90-day MC-Chain handover
+// deadline, already computed upstream) with last-closed-month GMV, so the
+// dashboard can forecast which month each outlet's GMV rolls off Sales'
+// book. 404-graceful like company_gmv.csv.
+window.bulkSalesPipelineData = { loaded: false };
+
+// 8 cols: outlet_id, account_id, account_name, account_type, bucket,
+//         new_user_exp_date (YYYY-MM-DD or ''), last_month_gmv, orders
+function _nrrParseSalesPipelineCsv(text) {
+  var lines = text.trim().split('\n').slice(1);
+  var rows = [];
+  lines.forEach(function (line) {
+    if (!line.trim()) return;
+    var p = parseCSVRow(line);
+    if (p.length < 8) return;
+    rows.push({
+      outlet_id: (p[0] || '').trim(),
+      account_id: (p[1] || '').trim(),
+      account_name: (p[2] || '').trim(),
+      account_type: (p[3] || '').trim(),
+      bucket: (p[4] || '').trim(),
+      new_user_exp_date: (p[5] || '').trim(),
+      last_month_gmv: parseFloat(p[6]) || 0,
+      orders: parseInt(p[7], 10) || 0
+    });
+  });
+  return rows;
+}
+
+async function nrrFetchSalesPipelineCsv(force) {
+  if (window.bulkSalesPipelineData.loaded && !force) return window.bulkSalesPipelineData;
+  var url = R2_BASE + '/sales_handover_pipeline.csv?cb=' + Date.now();
+  try {
+    var res = await fetch(url);
+    if (res.status === 404) { window.bulkSalesPipelineData = { allRows: [], loaded: false, notFound: true }; return window.bulkSalesPipelineData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkSalesPipelineData = { allRows: _nrrParseSalesPipelineCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load sales_handover_pipeline.csv', e);
+    window.bulkSalesPipelineData = { allRows: [], loaded: false, error: e.message };
+  }
+  return window.bulkSalesPipelineData;
+}
+window.nrrFetchSalesPipelineCsv = nrrFetchSalesPipelineCsv;
+
 // Single place that maps account_type -> the 2 buckets the business cares
 // about ('Unknown' and any unexpected value fall into 'other', confirmed
 // ~1 stray row in real pm_view.csv).

@@ -336,6 +336,194 @@ function nrrBucketForTl(tlEmail) {
 }
 window.nrrBucketForTl = nrrBucketForTl;
 
+// ── Squad config (company overview) ──────────────────────────────────────
+// TL → squad mapping for the company section. Source of truth is the
+// Supabase target_settings key 'squad_params' (seeded by
+// sql/supabase_seed_squad_params.sql, arrives for free inside
+// nrrCommRatesCache because nrrFetchCommissionRates() selects ALL of
+// target_settings and JSON-parses every '*_params' key). Falls back to a
+// TL_BUCKET_MAP-derived shape when the key is missing/unreadable, so the
+// section still works before the seed is run. head_email is reserved for
+// the future head-of-squad commission build — unused here.
+function nrrSquadConfig() {
+  try {
+    if (typeof nrrCommRatesCache !== 'undefined' && nrrCommRatesCache &&
+        nrrCommRatesCache.byKey && nrrCommRatesCache.byKey.squad_params) {
+      var sp = nrrCommRatesCache.byKey.squad_params;
+      if (sp && typeof sp === 'object' && sp.squads &&
+          sp.squads.chain && sp.squads.sa_mc) return sp;
+    }
+  } catch (e) {}
+  // Fallback: derive from the hardcoded TL_BUCKET_MAP
+  var squads = { chain: { label: 'Chain', head_email: '', tl_emails: [] },
+                 sa_mc: { label: 'SA/MC', head_email: '', tl_emails: [] } };
+  Object.keys(TL_BUCKET_MAP).forEach(function (tl) {
+    var b = TL_BUCKET_MAP[tl];
+    if (squads[b]) squads[b].tl_emails.push(tl);
+  });
+  return { version: 0, squads: squads };
+}
+window.nrrSquadConfig = nrrSquadConfig;
+
+function nrrSquadForTl(tlEmail) {
+  var t = (tlEmail || '').toLowerCase();
+  if (!t) return null;
+  var cfg = nrrSquadConfig();
+  var keys = Object.keys(cfg.squads);
+  for (var i = 0; i < keys.length; i++) {
+    var tls = cfg.squads[keys[i]].tl_emails || [];
+    if (tls.some(function (e) { return (e || '').toLowerCase() === t; })) return keys[i];
+  }
+  return null;
+}
+window.nrrSquadForTl = nrrSquadForTl;
+
+// ── Company model (from bulkCompanyData / company_gmv.csv) ───────────────
+// Classification (per user's rules):
+//   kam rows            → squad by tl_email → nrrSquadForTl (KAM inherits
+//                         their TL's squad — NOT the account's own type)
+//   pm/admin/sale rows  → squad by bucket (chain → chain, sa_mc → sa_mc)
+//   b2c rows            → company-level b2c (outside squads)
+//   everything unmapped → unassigned (owner_group 'other', bucket 'other',
+//                         kam rows with unknown TL) — kept visible so the
+//                         Total always reconciles to DWH.
+// Returns null until the CSV is loaded.
+// {
+//   months: ['2026-01', ...] (sorted month_keys),
+//   labels: {month_key: month_label},
+//   by_month: {month_key: {
+//     b2c: {gmv, orders},
+//     squads: {chain: {sales,kam,pm,admin,total}, sa_mc: {...}},  // gmv only
+//     unassigned: gmv, total: gmv
+//   }}
+// }
+function nrrCompanyModel() {
+  var cd = window.bulkCompanyData;
+  if (!cd || !cd.loaded || !cd.allRows || !cd.allRows.length) return null;
+  var months = [], labels = {}, byMonth = {};
+  function ensureMonth(k, lbl) {
+    if (!byMonth[k]) {
+      months.push(k); labels[k] = lbl;
+      byMonth[k] = {
+        b2c: { gmv: 0, orders: 0 },
+        squads: {
+          chain: { sales: 0, kam: 0, pm: 0, admin: 0, total: 0 },
+          sa_mc: { sales: 0, kam: 0, pm: 0, admin: 0, total: 0 }
+        },
+        unassigned: 0, total: 0
+      };
+    }
+    return byMonth[k];
+  }
+  cd.allRows.forEach(function (r) {
+    var m = ensureMonth(r.month_key, r.month_label);
+    m.total += r.gmv;
+    if (r.owner_group === 'b2c') { m.b2c.gmv += r.gmv; m.b2c.orders += r.orders; return; }
+    var squadKey = null, subKey = null;
+    if (r.owner_group === 'kam') {
+      squadKey = nrrSquadForTl(r.tl_email);
+      // v26-fix: a KAM row whose owning TL doesn't resolve to a squad (most
+      // commonly kam_email='unassigned' — the outlet's current owner isn't
+      // in the SQL's kam_directory roster, e.g. a resigned KAM's old book)
+      // falls back to the account's own account_type bucket, same as
+      // PM/Admin/Sales — per user: "ถ้าจัดไม่ได้เพราะไม่มี owner อยู่ใน list
+      // ให้แยกเข้า sa/mc/chain ตาม account type เลย". This does NOT apply to
+      // matched KAMs (squad always comes from their TL's portfolio first).
+      if (!squadKey && (r.bucket === 'chain' || r.bucket === 'sa_mc')) squadKey = r.bucket;
+      subKey = 'kam';
+    } else if (r.owner_group === 'pm' || r.owner_group === 'admin' || r.owner_group === 'sale') {
+      squadKey = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : null;
+      subKey = r.owner_group === 'sale' ? 'sales' : r.owner_group;
+    }
+    if (squadKey && m.squads[squadKey] && subKey) {
+      m.squads[squadKey][subKey] += r.gmv;
+      m.squads[squadKey].total += r.gmv;
+    } else {
+      m.unassigned += r.gmv;
+    }
+  });
+  months.sort();
+  return { months: months, labels: labels, by_month: byMonth };
+}
+window.nrrCompanyModel = nrrCompanyModel;
+
+// Sale-only pivot for the standalone Sales section: per month
+// {chain, sa_mc, other, total} (gmv) + {orders_total}.
+function nrrSalesByBucket() {
+  var cd = window.bulkCompanyData;
+  if (!cd || !cd.loaded || !cd.allRows || !cd.allRows.length) return null;
+  var months = [], labels = {}, byMonth = {};
+  cd.allRows.forEach(function (r) {
+    if (r.owner_group !== 'sale') return;
+    if (!byMonth[r.month_key]) {
+      months.push(r.month_key); labels[r.month_key] = r.month_label;
+      byMonth[r.month_key] = { chain: 0, sa_mc: 0, other: 0, total: 0, orders_total: 0 };
+    }
+    var m = byMonth[r.month_key];
+    var b = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
+    m[b] += r.gmv; m.total += r.gmv; m.orders_total += r.orders;
+  });
+  months.sort();
+  return { months: months, labels: labels, by_month: byMonth };
+}
+window.nrrSalesByBucket = nrrSalesByBucket;
+
+// ── Sales handover pipeline model (from bulkSalesPipelineData) ───────────
+// Buckets each currently-Sales-owned outlet by how soon its handover
+// deadline (new_user_exp_date) falls, using REAL today (not the day-1 lag
+// anchor used elsewhere) since this is a business deadline, not a
+// data-availability concern:
+//   overdue         — deadline already passed, still Sales-owned (needs
+//                     action now)
+//   this_month      — deadline is later this calendar month
+//   next_month      — deadline falls in the following calendar month
+//   plus2           — two months out
+//   plus3_or_later  — three-plus months out
+//   no_date         — new_user_exp_date missing/unparseable
+// Each bucket carries {gmv, outlets, rows[]} (rows sorted soonest/most-
+// overdue first) so the UI can both show a headline number and drill into
+// the underlying account list.
+function nrrSalesPipelineModel() {
+  var pd = window.bulkSalesPipelineData;
+  if (!pd || !pd.loaded || !pd.allRows || !pd.allRows.length) return null;
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var todayKey = today.getFullYear() * 12 + today.getMonth();
+  var BUCKET_ORDER = ['overdue', 'this_month', 'next_month', 'plus2', 'plus3_or_later', 'no_date'];
+  var buckets = {};
+  BUCKET_ORDER.forEach(function (k) { buckets[k] = { gmv: 0, outlets: 0, rows: [] }; });
+  var bySquad = { chain: 0, sa_mc: 0, other: 0 };
+
+  pd.allRows.forEach(function (r) {
+    var key;
+    var d = r.new_user_exp_date ? new Date(r.new_user_exp_date + 'T00:00:00') : null;
+    if (!d || isNaN(d.getTime())) {
+      key = 'no_date';
+    } else if (d < today) {
+      key = 'overdue';
+    } else {
+      var diff = (d.getFullYear() * 12 + d.getMonth()) - todayKey;
+      key = diff === 0 ? 'this_month' : diff === 1 ? 'next_month' : diff === 2 ? 'plus2' : 'plus3_or_later';
+    }
+    buckets[key].gmv += r.last_month_gmv;
+    buckets[key].outlets += 1;
+    buckets[key].rows.push(r);
+    if (r.bucket === 'chain' || r.bucket === 'sa_mc') bySquad[r.bucket] += r.last_month_gmv;
+    else bySquad.other += r.last_month_gmv;
+  });
+
+  // overdue: most-overdue (oldest date) first; future buckets: soonest first
+  BUCKET_ORDER.forEach(function (k) {
+    buckets[k].rows.sort(function (a, b) {
+      if (a.new_user_exp_date === b.new_user_exp_date) return 0;
+      return a.new_user_exp_date < b.new_user_exp_date ? -1 : 1;
+    });
+  });
+
+  var total = BUCKET_ORDER.reduce(function (s, k) { return s + buckets[k].gmv; }, 0);
+  return { buckets: buckets, order: BUCKET_ORDER, bySquad: bySquad, total: total, asOf: today };
+}
+window.nrrSalesPipelineModel = nrrSalesPipelineModel;
+
 // {chain: computeResult|null, sa_mc: computeResult|null, other: computeResult|null}
 function nrrPmResult() {
   var pd = window.bulkPmData;

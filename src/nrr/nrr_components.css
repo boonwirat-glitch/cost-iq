@@ -57,6 +57,16 @@
   font-size: 13px; color: var(--ink); line-height: 1.5;
 }
 
+/* Sales handover-pipeline forecast chips — urgency status, not identity;
+   border color carries the meaning, text label always present alongside. */
+.nrr-pipeline-chip {
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  padding: 10px 12px; text-align: left; cursor: pointer;
+  background: transparent; font: inherit; color: var(--ink);
+  transition: background 0.12s ease;
+}
+.nrr-pipeline-chip:hover { background: var(--fill); }
+
 /* First responsive pass — the portfolio layer is rep-facing (mobile-first
    users); the dashboard stays desktop-first. Masthead must not overflow. */
 @media (max-width: 640px) {
