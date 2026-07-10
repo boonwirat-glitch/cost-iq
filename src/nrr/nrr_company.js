@@ -211,9 +211,12 @@ function _nrrCoSquadTrendChartHtml(model, cd, sq) {
     var hatchH = f.is_partial ? Math.max(0, Math.round((proj - actual) * pxPer)) : 0;
     var isLast = k === lastKey;
     var title = (model.labels[k] || k) + ': ' + nrrFmtGMVExact(actual) + (f.is_partial ? ' (MTD · คาดการณ์ ~' + nrrFmtGMV(proj) + ')' : '');
-    var capHtml = isLast
-      ? '<div class="nrr-cogroup-caps num" style="justify-content:center;color:' + color + '">' + (f.is_partial ? '~' : '') + nrrFmtGMV(f.is_partial ? proj : actual) + '</div>'
-      : '<div class="nrr-cogroup-caps">&nbsp;</div>';
+    // Every column gets its own value label (not just the latest) — the
+    // latest still reads as the "headline" via bolder weight + squad color,
+    // earlier months in muted ink so the eye still lands on "now" first.
+    var capText = (f.is_partial ? '~' : '') + nrrFmtGMV(f.is_partial ? proj : actual);
+    var capHtml = '<div class="nrr-cogroup-caps num" style="color:' + (isLast ? color : 'var(--ink2)') +
+      ';font-weight:' + (isLast ? '700' : '600') + ';font-size:' + (isLast ? '12.5px' : '11px') + '">' + capText + '</div>';
     return '<div class="nrr-cogroup">' + capHtml +
       '<div class="nrr-cogroup-cols" style="height:' + H + 'px">' +
       '<div class="nrr-cocol" style="width:34px;max-width:42px" title="' + nrrEsc(title) + '">' +
@@ -354,12 +357,19 @@ function _nrrCoAuditTableHtml(model, cd) {
   // color at a glance — matches the trend-chart/squad-card colors exactly.
   function rowHtml(label, getter, opts) {
     opts = opts || {};
+    // Squad total rows get a light tint of the squad's own color so they
+    // pop above their Sales/KAM/PM/Admin sub-rows at a glance. Set on BOTH
+    // the <tr> (covers ordinary cells) AND the label <td>'s own inline
+    // style (an inline style always beats the sticky-column CSS class's
+    // opaque background, which would otherwise hide the tint on that cell).
+    var bg = opts.highlightRgb ? 'background:rgba(' + opts.highlightRgb + ',0.08);' : '';
     var cells = cols.map(function (col) { return cellHtml(col, getter(model.by_month[col.key])); }).join('');
     var style = (opts.bold ? 'font-weight:600;' : '') +
       'padding-left:' + (opts.indent ? '26px' : '12px') + ';' +
-      (opts.squadColor ? 'border-left:3px solid ' + opts.squadColor + ';' : '');
+      (opts.squadColor ? 'border-left:3px solid ' + opts.squadColor + ';' : '') + bg;
     var dotHtml = opts.dot ? '<span class="nrr-sat-dot" style="background:' + opts.dot + ';margin-right:7px"></span>' : '';
-    return '<tr' + (opts.topline ? ' style="border-top:1px solid var(--line)"' : '') + '>' +
+    var rowStyle = (opts.topline ? 'border-top:1px solid var(--line);' : '') + bg;
+    return '<tr' + (rowStyle ? ' style="' + rowStyle + '"' : '') + '>' +
       '<td style="' + style + 'white-space:nowrap">' + dotHtml + label + '</td>' + cells + '</tr>';
   }
   var headCells = cols.map(headHtml).join('');
@@ -367,12 +377,12 @@ function _nrrCoAuditTableHtml(model, cd) {
 
   var rows =
     rowHtml('B2C', function (m) { return m.b2c.gmv; }) +
-    rowHtml('Squad Chain', function (m) { return m.squads.chain.total; }, { bold: true, topline: true, dot: NRR_CO_COLORS.chain, squadColor: NRR_CO_COLORS.chain }) +
+    rowHtml('Squad Chain', function (m) { return m.squads.chain.total; }, { bold: true, topline: true, dot: NRR_CO_COLORS.chain, squadColor: NRR_CO_COLORS.chain, highlightRgb: NRR_CO_RGB.chain }) +
     rowHtml('Sales', function (m) { return m.squads.chain.sales; }, { indent: true, squadColor: NRR_CO_COLORS.chain }) +
     rowHtml('KAM', function (m) { return m.squads.chain.kam; }, { indent: true, squadColor: NRR_CO_COLORS.chain }) +
     rowHtml('PM', function (m) { return m.squads.chain.pm; }, { indent: true, squadColor: NRR_CO_COLORS.chain }) +
     rowHtml('Admin', function (m) { return m.squads.chain.admin; }, { indent: true, squadColor: NRR_CO_COLORS.chain }) +
-    rowHtml('Squad SA/MC', function (m) { return m.squads.sa_mc.total; }, { bold: true, topline: true, dot: NRR_CO_COLORS.sa_mc, squadColor: NRR_CO_COLORS.sa_mc }) +
+    rowHtml('Squad SA/MC', function (m) { return m.squads.sa_mc.total; }, { bold: true, topline: true, dot: NRR_CO_COLORS.sa_mc, squadColor: NRR_CO_COLORS.sa_mc, highlightRgb: NRR_CO_RGB.sa_mc }) +
     rowHtml('Sales', function (m) { return m.squads.sa_mc.sales; }, { indent: true, squadColor: NRR_CO_COLORS.sa_mc }) +
     rowHtml('KAM', function (m) { return m.squads.sa_mc.kam; }, { indent: true, squadColor: NRR_CO_COLORS.sa_mc }) +
     rowHtml('PM', function (m) { return m.squads.sa_mc.pm; }, { indent: true, squadColor: NRR_CO_COLORS.sa_mc }) +

@@ -87,15 +87,15 @@
 /* Grouped monthly columns: Chain vs SA/MC pairs. Same div-column language
    as .nrr-qchart; the hatch overlay carries the same "projected remainder"
    meaning as .nrr-qcol-hatch (background set inline per squad hue). */
-.nrr-cochart { display: flex; align-items: flex-end; gap: 20px; padding: 8px 4px 0; overflow-x: auto; }
-.nrr-cogroup { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 64px; }
+.nrr-cochart { display: flex; align-items: flex-end; gap: 8px; padding: 8px 4px 0; overflow-x: auto; }
+.nrr-cogroup { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 52px; max-width: 84px; }
 .nrr-cogroup-cols { display: flex; align-items: flex-end; justify-content: center; gap: 4px; width: 100%; }
 .nrr-cocol {
   display: flex; flex-direction: column; justify-content: flex-end;
   width: 28px; max-width: 34px; border-radius: 6px 6px 2px 2px; overflow: hidden;
 }
 .nrr-cocol-seg { width: 100%; }
-.nrr-cogroup-caps { display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.nrr-cogroup-caps { display: flex; justify-content: center; text-align: center; gap: 8px; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
 .nrr-cogroup-label { font-size: 12.5px; font-weight: 600; color: var(--ink2); margin-top: 2px; white-space: nowrap; }
 .nrr-co-legend { display: flex; gap: 16px; align-items: center; font-size: 12.5px; color: var(--ink2); margin: 4px 0 8px; flex-wrap: wrap; }
 .nrr-co-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }

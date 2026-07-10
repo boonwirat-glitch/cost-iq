@@ -1024,11 +1024,11 @@ function nrrShellHtml() {
     '  </div>' +
     '  <div class="nrr-masthead-nav">' +
     '  <nav class="nrr-appnav" id="nrr-appnav">' +
-    '    <a href="#/" data-view="dashboard" class="on">Dashboard</a>' +
+    '    <a href="#/" data-view="dashboard" class="on">NRR</a>' +
     // v28: whole-company views — admin only (profile is resolved before
     // nrrInitApp builds this shell; the router guard also redirects deep links)
     (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/company" data-view="company">บริษัท</a>' +
+      ? '    <a href="#/company" data-view="company">Overview</a>' +
         '    <a href="#/sales" data-view="sales">Sales</a>'
       : '') +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
