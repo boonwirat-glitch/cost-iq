@@ -652,9 +652,17 @@ function __legacyRenderKamThisMonthFallback(){
       <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:rgba(80,220,160,.85)">สัญญาณบวกเดือนนี้</span></div>
       <div class="kam-dc-body">`;
     // v760: commission badge — match subclass to p1/p3 groups
+    // v836-fix: was _commBuildKamPayout(currentUserProfile.email) — the VIEWER's email,
+    // not the account's actual KAM. A TL/Admin opening any individual account's "This
+    // Month" tab silently computed badges off their own (empty) upsell data instead of
+    // the account-owning KAM's. Resolve via _getKamEmailForAccount (same helper the
+    // portview account-switcher already uses), falling back to the viewer's own email
+    // only if that lookup is unavailable (e.g. a KAM viewing their own account, where
+    // both resolve to the same person anyway).
     const _commNewSet=new Set(),_commUpsellSet=new Set();
     try{
-      const _cp=typeof _commBuildKamPayout==='function'?_commBuildKamPayout(currentUserProfile&&currentUserProfile.email):null;
+      const _cpEmail=(typeof _getKamEmailForAccount==='function'&&_getKamEmailForAccount(currentAccountId))||(currentUserProfile&&currentUserProfile.email);
+      const _cp=typeof _commBuildKamPayout==='function'?_commBuildKamPayout(_cpEmail):null;
       (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p1&&_cp.upsell_sku.p1.groups||[]).forEach(g=>{if(g.groupKey)_commNewSet.add(g.groupKey.toUpperCase());});
       (_cp&&_cp.upsell_sku&&_cp.upsell_sku.p3&&_cp.upsell_sku.p3.groups||[]).forEach(g=>{if(g.groupKey)_commUpsellSet.add(g.groupKey.toUpperCase());});
     }catch(e){}

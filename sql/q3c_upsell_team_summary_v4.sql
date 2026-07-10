@@ -1,39 +1,101 @@
 -- ══════════════════════════════════════════════════════════════
--- Q3C Team Summary v5: sense_upsell_team.csv
--- v4 fixes (2 bugs from v3):
---   Bug A: Expansion outlets (new) were classified as P1 (3%) — fixed to outlet_gmv (1.5% flat)
---   Bug B: Comeback outlets were included in outlet_gmv — fixed to expansion-only
--- Logic now matches app detail path (_commComputeUpsellOutlet + _commComputeUpsellSku):
---   expansion (new)  → outlet_gmv only, at 1.5%
---   comeback         → excluded from all commission
---   existing         → P1 / P3 rules apply
--- Output columns (unchanged):
---   kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base
+-- Q3C Team Summary v7: sense_upsell_team.csv
+--
+-- 🔴 v7 BUG FIX (do not skip — this changes real payout numbers):
+-- The v827-auto quarter-anchor change (commit 3213afa, 2026-07-06) correctly
+-- redefined baseline_mo/lookback_start to FREEZE at the quarter's own base
+-- month (Jun/May/Apr for all of Q3), but the CTEs that actually build the
+-- "have they ever bought this before" baseline set were never updated to
+-- match — they still bounded their window with `< current_mo` (correct
+-- under the OLD rolling-MoM design, where lookback_start was ALWAYS exactly
+-- 3 months before current_mo, but wrong now that current_mo drifts forward
+-- every month within the quarter while baseline_mo doesn't). Consequence:
+-- baseline silently grew to include July when evaluating August, July+Aug
+-- when evaluating September — so an item bought new in July that simply
+-- MAINTAINED the same level in August (no further growth) looked like it
+-- was "already known" (fails P1) and its own July GMV inflated the max
+-- baseline it was being compared against (fails P3 too) — net effect: an
+-- account whose new-item spend held perfectly flat for 3 months earned
+-- commission ONLY in month 1, silently dropping to ฿0 in months 2-3.
+-- Same class of bug hit Expansion's outlet_status CASE (`first_seen >=
+-- current_mo` → 'expansion', else → 'comeback', which is EXCLUDED from all
+-- commission) — an outlet first seen in July silently became 'comeback' by
+-- August. Confirmed NOT systemic: sql/q3_2026_movement_rep_view.sql (NRR,
+-- independently spec-tested) uses explicit per-month DECLARE/SET variables
+-- instead of one shared drifting cutoff — that safer pattern is followed
+-- here too, both to fix the bug and avoid reintroducing this bug class
+-- while adding the rolling logic below.
+--
+-- v7 NEW — rolling cumulative commission (per KAM/TL/rep agreement,
+-- 2026-07-10): once a (kam, account, outlet, group_key) first qualifies as
+-- P1 or P3 in some month of the quarter, each SUBSEQUENT month it continues
+-- to qualify — which, now that the baseline is genuinely frozen, includes
+-- simply MAINTAINING the same elevated level, no further growth required —
+-- adds that month's own qualifying GMV to a running cumulative total for
+-- the reported month (300k/mo held flat for 3 months → 300k/600k/900k
+-- cumulative, matching the agreed worked example). The streak breaks the
+-- first month it fails to requalify (a real gap, not "no further growth"),
+-- and is capped at the quarter's own boundary — a September-starting item
+-- can only ever contribute 1 month within Q3 (accepted tradeoff vs a full
+-- cross-quarter ledger — see plan doc for the "spillover" fast-follow idea
+-- for last-month-of-quarter starters, not implemented in this version).
+-- Same treatment applied to Expansion (outlet_type='expansion'): widened
+-- from "first_seen in current_mo only" to "first_seen within the trailing
+-- quarter-capped 3 months," summed the same way.
+--
+-- ⚠️ NOT YET RUN AGAINST REAL DATA — written by Claude Code without BigQuery
+-- execution access. Before trusting this for real payroll: run it, then
+-- follow the plan doc's verification steps (trace one real item by hand
+-- through all 3 months, confirm July-only numbers are unchanged from v6,
+-- confirm a mid-quarter reversion correctly stops the streak).
+--
+-- v6 (kept): P3 min incremental config-driven (target_settings, not
+--   hardcoded), threshold 2.00x.
+-- v4/v5 (kept): expansion outlets → outlet_gmv only (not P1), comeback
+--   excluded entirely, P1 threshold ≥5000.
+-- Output columns (unchanged): kam_email, p1_gmv, p3_incremental, outlet_gmv, tl_upsell_base
 -- ══════════════════════════════════════════════════════════════
--- v6: P3 min incremental was hardcoded 5000, not synced with Commission Cockpit
--- (this SQL runs in BigQuery, which cannot read Supabase target_settings live —
--- unlike the app's JS calculation path, which does read it live). Real Cockpit
--- value confirmed via Supabase query on 2026-07-05 = 8000.
--- 🔴 BEFORE RUNNING THIS SCRIPT: open Commission Cockpit → "สินค้าใหม่ + ยอดเติบโต"
---    → check "P3 min incremental" value → update the DECLARE below if it changed.
 DECLARE v_p3_min_incremental FLOAT64 DEFAULT 8000;
 
+-- Explicit per-month date variables (mirrors q3_2026_movement_rep_view.sql's
+-- v_base/v_m1/v_m2/v_m3 pattern) — every "baseline" query below is bound by
+-- v_base_start/v_base_end/v_lookback_start ONLY, never by whichever month is
+-- currently being reported, so it genuinely cannot drift mid-quarter.
+DECLARE v_base_start DATE;
+DECLARE v_base_end   DATE;
+DECLARE v_lookback_start DATE;
+DECLARE v_m1_start DATE; DECLARE v_m1_end DATE;
+DECLARE v_m2_start DATE; DECLARE v_m2_end DATE;
+DECLARE v_m3_start DATE; DECLARE v_m3_end DATE;
+DECLARE v_current_mo_start DATE;
+
+SET v_m1_start   = DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), QUARTER);
+SET v_base_start = DATE_SUB(v_m1_start, INTERVAL 1 MONTH);
+SET v_base_end   = DATE_SUB(v_m1_start, INTERVAL 1 DAY);
+SET v_lookback_start = DATE_SUB(v_base_start, INTERVAL 2 MONTH);  -- Apr 1 (frozen Apr/May/Jun pool)
+SET v_m2_start   = DATE_ADD(v_m1_start, INTERVAL 1 MONTH);
+SET v_m1_end     = DATE_SUB(v_m2_start, INTERVAL 1 DAY);
+SET v_m3_start   = DATE_ADD(v_m1_start, INTERVAL 2 MONTH);
+SET v_m2_end     = DATE_SUB(v_m3_start, INTERVAL 1 DAY);
+SET v_m3_end     = DATE_SUB(DATE_ADD(v_m3_start, INTERVAL 1 MONTH), INTERVAL 1 DAY);
+-- current_mo_start = whichever of m1/m2/m3 is actually being reported (day-1
+-- lag, e.g. run Aug-1 → reports Jul → equals v_m1_start).
+SET v_current_mo_start = DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH);
+
 WITH
-dates AS (
-  SELECT
-    -- v827-auto: baseline_mo + lookback_start AUTO-DERIVE from current_mo's own quarter —
-    -- no manual date edit needed each new quarter (Q3→Q4→Q1... all self-adjust).
-    -- current_mo = the month being reported (day-1 lag, e.g. run Aug-1 → reports Jul).
-    -- baseline_mo = 1 month before the START of current_mo's quarter
-    --   (Jul/Aug/Sep all → Jun; Oct/Nov/Dec all → Sep; etc.)
-    -- lookback_start = 2 months before baseline_mo, giving a fixed 3-month pool
-    --   (baseline_mo, baseline_mo-1, baseline_mo-2) that stays constant across the whole quarter,
-    --   matching the app's _commBaseMonthLabels(base_month, 3) window.
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)                                       AS current_mo,
-    DATE_SUB(DATE_TRUNC(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), QUARTER),
-             INTERVAL 1 MONTH)                                                                        AS baseline_mo,
-    DATE_SUB(DATE_SUB(DATE_TRUNC(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), QUARTER),
-             INTERVAL 1 MONTH), INTERVAL 2 MONTH)                                                     AS lookback_start
+-- The 3 months of this quarter, tagged 1/2/3, bounded to only those that
+-- have actually elapsed by v_current_mo_start (running in July only
+-- evaluates July; running in September evaluates all 3).
+quarter_months AS (
+  SELECT 1 AS month_no, v_m1_start AS month_start, v_m1_end AS month_end
+  UNION ALL SELECT 2, v_m2_start, v_m2_end
+  UNION ALL SELECT 3, v_m3_start, v_m3_end
+),
+elapsed_months AS (
+  SELECT * FROM quarter_months WHERE month_start <= v_current_mo_start
+),
+report_month AS (
+  SELECT MAX(month_no) AS n FROM elapsed_months
 ),
 
 -- Active KAM whitelist (อัปเดตเมื่อมีการเปลี่ยนทีม)
@@ -57,7 +119,7 @@ kam_list AS (
   ])
 ),
 
--- KAM→account mapping (Q8E logic)
+-- KAM→account mapping (Q8E logic) — unchanged
 kam_outlets AS (
   SELECT
     CAST(um.res_id AS STRING)       AS res_id,
@@ -76,91 +138,85 @@ kam_outlets AS (
   ) = 1
 ),
 
--- ── NRR Core ownership: same KAM baseline_mo → current_mo ──────────────
--- v5: align upsell scope with NRR core definition (May backfill pattern)
--- Excludes: transfer_in (apr_kam ≠ may_kam) + handover_perf (new_user_exp_date in baseline_mo)
+-- ── NRR core ownership: same KAM in baseline month vs each elapsed month ──
+-- v7: per-elapsed-month (was: single "current_mo" ownership check) so a
+-- KAM reassignment mid-quarter is still tracked correctly month by month.
 apr_outlet_ownership AS (
-  -- Owner ณ baseline month (last order in month)
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
     TRIM(o.staff_owner)             AS staff_owner,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner,
     DATE(o.new_user_exp_date)       AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
-  CROSS JOIN dates d
-  WHERE o.delivery_date >= d.baseline_mo
-    AND o.delivery_date <  DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
+  WHERE o.delivery_date >= v_base_start AND o.delivery_date <= v_base_end
     AND o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
-may_outlet_ownership AS (
-  -- Owner ณ current month (last order in month)
+month_outlet_ownership AS (
   SELECT
+    em.month_no,
     CAST(o.user_id AS STRING)       AS outlet_id,
     TRIM(o.staff_owner)             AS staff_owner,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner
   FROM `freshket-rn.dwh.order` o
-  CROSS JOIN dates d
-  WHERE o.delivery_date >= d.current_mo
-    AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
-    AND o.account_type IN ('SA','MC','Chain','Unknown')
+  JOIN elapsed_months em ON o.delivery_date >= em.month_start AND o.delivery_date <= em.month_end
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY em.month_no, o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
--- NRR core outlet list: same KAM both months, no handover
 nrr_core_outlets AS (
-  SELECT m.outlet_id
-  FROM may_outlet_ownership m
+  SELECT m.month_no, m.outlet_id
+  FROM month_outlet_ownership m
   JOIN apr_outlet_ownership a ON m.outlet_id = a.outlet_id
-  JOIN kam_list k_may ON m.commercial_owner = 'KAM'
-    AND TRIM(m.staff_owner) = TRIM(k_may.kam_name)
-  JOIN kam_list k_apr ON a.commercial_owner = 'KAM'
-    AND TRIM(a.staff_owner) = TRIM(k_apr.kam_name)
-    AND k_apr.kam_email = k_may.kam_email   -- same KAM both months
-  WHERE (
-    a.new_user_exp_date IS NULL
-    OR a.new_user_exp_date < (SELECT baseline_mo FROM dates)  -- not handover in baseline month
-  )
+  JOIN kam_list k_m ON m.commercial_owner = 'KAM' AND TRIM(m.staff_owner) = TRIM(k_m.kam_name)
+  JOIN kam_list k_a ON a.commercial_owner = 'KAM' AND TRIM(a.staff_owner) = TRIM(k_a.kam_name)
+    AND k_a.kam_email = k_m.kam_email
+  WHERE (a.new_user_exp_date IS NULL OR a.new_user_exp_date < v_base_start)
 ),
 
--- Outlet status: existing / expansion (new) / comeback
--- expansion = first_seen this month (never ordered before in full window)
--- comeback  = ordered before, not in baseline month, back this month
--- existing  = ordered in baseline month AND in nrr_core_outlets
+-- ── Outlet status per elapsed month: existing / expansion / comeback ──
+-- v7 fix: expansion window widened from "first_seen in THIS month only" to
+-- "first_seen anywhere in the quarter up to and including this month" — an
+-- outlet first seen in July is still 'expansion' when August/September are
+-- evaluated, not silently 'comeback' (which is excluded from all commission).
+-- in_baseline/first_seen are now properties of the FROZEN baseline window
+-- only (never depend on which month is being evaluated).
 outlet_history AS (
   SELECT
     ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     MIN(o.delivery_date) AS first_seen,
-    MAX(CASE WHEN o.delivery_date >= d.baseline_mo
-              AND o.delivery_date <  DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
-             THEN 1 ELSE 0 END) AS in_baseline,
-    MAX(CASE WHEN o.delivery_date >= d.current_mo THEN 1 ELSE 0 END) AS in_current
+    MAX(CASE WHEN o.delivery_date >= v_base_start AND o.delivery_date <= v_base_end THEN 1 ELSE 0 END) AS in_baseline,
+    MAX(CASE WHEN o.delivery_date >= v_m1_start AND o.delivery_date <= v_m1_end THEN 1 ELSE 0 END) AS in_m1,
+    MAX(CASE WHEN o.delivery_date >= v_m2_start AND o.delivery_date <= v_m2_end THEN 1 ELSE 0 END) AS in_m2,
+    MAX(CASE WHEN o.delivery_date >= v_m3_start AND o.delivery_date <= v_m3_end THEN 1 ELSE 0 END) AS in_m3
   FROM `freshket-rn.dwh.order` o
-  CROSS JOIN dates d
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
-  WHERE o.delivery_date >= DATE_SUB((SELECT baseline_mo FROM dates), INTERVAL 5 MONTH)
-    AND o.delivery_date <  DATE_ADD((SELECT current_mo FROM dates), INTERVAL 1 MONTH)
+  WHERE o.delivery_date >= DATE_SUB(v_base_start, INTERVAL 5 MONTH)
+    AND o.delivery_date <= v_m3_end
   GROUP BY 1, 2
 ),
 outlet_status AS (
-  SELECT oh.account_id, oh.outlet_id,
+  SELECT
+    em.month_no, oh.account_id, oh.outlet_id,
     CASE
-      -- existing: in baseline month AND same KAM both months (NRR core)
-      WHEN oh.in_baseline = 1 AND nc.outlet_id IS NOT NULL             THEN 'existing'
-      WHEN oh.in_current  = 1 AND oh.first_seen >= (SELECT current_mo FROM dates) THEN 'expansion'
-      WHEN oh.in_current  = 1 AND oh.first_seen <  (SELECT current_mo FROM dates) THEN 'comeback'
+      WHEN oh.in_baseline = 1 AND nc.outlet_id IS NOT NULL THEN 'existing'
+      WHEN oh.first_seen >= v_m1_start AND oh.first_seen <= em.month_end THEN 'expansion'
+      ELSE 'comeback'
     END AS outlet_type
-  FROM outlet_history oh
-  LEFT JOIN nrr_core_outlets nc ON oh.outlet_id = nc.outlet_id
-  WHERE oh.in_current = 1
+  FROM elapsed_months em
+  CROSS JOIN outlet_history oh
+  LEFT JOIN nrr_core_outlets nc ON oh.outlet_id = nc.outlet_id AND nc.month_no = em.month_no
+  WHERE (em.month_no = 1 AND oh.in_m1 = 1)
+     OR (em.month_no = 2 AND oh.in_m2 = 1)
+     OR (em.month_no = 3 AND oh.in_m3 = 1)
 ),
 
--- Current month GMV at outlet × group_key, split by outlet type
+-- GMV at outlet × group_key, PER elapsed month, split by outlet type
 group_key_def AS (
   SELECT
-    ka.kam_email, ka.account_id,
+    em.month_no, ka.kam_email, ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
@@ -170,26 +226,29 @@ group_key_def AS (
     i.gmv_ex_vat
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
-  CROSS JOIN dates d
+  JOIN elapsed_months em ON o.delivery_date >= em.month_start AND o.delivery_date <= em.month_end
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
-  WHERE o.delivery_date >= d.current_mo
-    AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
-    AND i.gmv_ex_vat > 0
+  WHERE i.gmv_ex_vat > 0
 ),
 current_agg AS (
   SELECT
-    gk.kam_email, gk.account_id, gk.outlet_id, gk.group_key,
+    gk.month_no, gk.kam_email, gk.account_id, gk.outlet_id, gk.group_key,
     os.outlet_type,
     SUM(gk.gmv_ex_vat) AS total_gmv,
     SUM(CASE WHEN os.outlet_type = 'existing'  THEN gk.gmv_ex_vat ELSE 0 END) AS existing_gmv,
     SUM(CASE WHEN os.outlet_type = 'expansion' THEN gk.gmv_ex_vat ELSE 0 END) AS expansion_gmv
     -- comeback excluded from all commission (no column needed)
   FROM group_key_def gk
-  LEFT JOIN outlet_status os ON gk.account_id = os.account_id AND gk.outlet_id = os.outlet_id
-  GROUP BY 1, 2, 3, 4, 5
+  LEFT JOIN outlet_status os
+    ON gk.month_no = os.month_no AND gk.account_id = os.account_id AND gk.outlet_id = os.outlet_id
+  GROUP BY 1, 2, 3, 4, 5, 6
 ),
 
--- Baseline: outlet × group_key bought in any of 3 lookback months (for P1/P3 on existing outlets)
+-- ── FROZEN baseline (Apr/May/Jun only, computed ONCE — not per elapsed
+-- month, and never bounded by current_mo). This is the v7 bug fix: these
+-- two CTEs used to be bounded `< current_mo` (drifting); now bounded
+-- `<= v_base_end` (fixed) so July/August's own purchases can never leak
+-- into "have they ever bought this before" or "max baseline" ──
 baseline_groups AS (
   SELECT DISTINCT
     ka.kam_email, ka.account_id,
@@ -201,15 +260,10 @@ baseline_groups AS (
     END AS group_key
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
-  CROSS JOIN dates d
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
-  WHERE o.delivery_date >= d.lookback_start
-    AND o.delivery_date <  d.current_mo
+  WHERE o.delivery_date >= v_lookback_start AND o.delivery_date <= v_base_end
     AND i.gmv_ex_vat > 0
 ),
-
--- Max baseline 3 months normalize 30 days (for P3 on existing outlets)
--- Split into 2 CTEs to avoid referencing o.delivery_date outside GROUP BY
 lookback_monthly AS (
   SELECT
     ka.kam_email,
@@ -224,10 +278,8 @@ lookback_monthly AS (
     SUM(i.gmv_ex_vat) AS monthly_gmv
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
-  CROSS JOIN dates d
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
-  WHERE o.delivery_date >= d.lookback_start
-    AND o.delivery_date <  d.current_mo
+  WHERE o.delivery_date >= v_lookback_start AND o.delivery_date <= v_base_end
     AND i.gmv_ex_vat > 0
   GROUP BY
     ka.kam_email,
@@ -250,26 +302,15 @@ max_baseline AS (
   GROUP BY 1, 2, 3, 4
 ),
 
--- Classify P1 / P3 — EXISTING outlets only
--- expansion outlets go directly to outlet_gmv (1.5% flat, handled in final SELECT)
--- comeback outlets are excluded entirely
+-- Classify P1 / P3 PER elapsed month — same test as before, but now against
+-- the genuinely-frozen baseline, so an item that just MAINTAINS (doesn't
+-- need to grow further) its qualifying level keeps re-passing every month.
 commission_items AS (
   SELECT
-    c.kam_email, c.account_id, c.outlet_id, c.group_key,
-    c.outlet_type,
-    c.existing_gmv,
-    c.expansion_gmv,
-    c.total_gmv,
+    c.month_no, c.kam_email, c.account_id, c.outlet_id, c.group_key,
+    c.outlet_type, c.existing_gmv, c.expansion_gmv, c.total_gmv,
     COALESCE(mb.max_bl, 0) AS max_bl,
-    -- P1: existing outlet, group_key not in 3-month baseline
-    CASE
-      WHEN c.outlet_type = 'existing' AND bg.group_key IS NULL THEN 1
-      ELSE 0
-    END AS is_p1,
-    -- P3: existing outlet, group_key in baseline, existing_gmv > 200% of max_bl (2.00x)
-    -- v6: threshold was hardcoded 5000, but Commission Cockpit's real value is 8000
-    -- (target_settings.upsell_sku_params.p3_min_incremental). Now reads v_p3_min_incremental
-    -- declared at top of script -- 🔴 CHECK COCKPIT BEFORE RUNNING, UPDATE THAT DECLARE IF CHANGED.
+    CASE WHEN c.outlet_type = 'existing' AND bg.group_key IS NULL THEN 1 ELSE 0 END AS is_p1,
     CASE
       WHEN c.outlet_type = 'existing'
         AND bg.group_key IS NOT NULL
@@ -279,31 +320,145 @@ commission_items AS (
     END AS is_p3
   FROM current_agg c
   LEFT JOIN baseline_groups bg
-    ON c.kam_email  = bg.kam_email
-    AND c.account_id = bg.account_id
-    AND c.outlet_id  = bg.outlet_id
-    AND c.group_key  = bg.group_key
+    ON c.kam_email = bg.kam_email AND c.account_id = bg.account_id
+   AND c.outlet_id = bg.outlet_id AND c.group_key = bg.group_key
   LEFT JOIN max_baseline mb
-    ON c.kam_email  = mb.kam_email
-    AND c.account_id = mb.account_id
-    AND c.outlet_id  = mb.outlet_id
-    AND c.group_key  = mb.group_key
+    ON c.kam_email = mb.kam_email AND c.account_id = mb.account_id
+   AND c.outlet_id = mb.outlet_id AND c.group_key = mb.group_key
+),
+
+-- ── v7 NEW: rolling cumulative sum for P1/P3 ──────────────────────────
+p1p3_qualified AS (
+  SELECT
+    month_no, kam_email, account_id, outlet_id, group_key,
+    (is_p1 = 1 AND total_gmv >= 5000) OR is_p3 = 1 AS qualifies,
+    CASE
+      WHEN is_p1 = 1 AND total_gmv >= 5000 THEN existing_gmv    -- P1: full qualifying GMV
+      WHEN is_p3 = 1 THEN existing_gmv - max_bl                 -- P3: incremental over frozen baseline
+      ELSE 0
+    END AS month_contribution
+  FROM commission_items
+),
+-- Every (item, month_no) from 1..report_month, so a month with NO purchase
+-- at all (no row in commission_items) still counts as a gap, not silently
+-- skipped over.
+distinct_p1p3_items AS (
+  SELECT DISTINCT kam_email, account_id, outlet_id, group_key FROM p1p3_qualified
+),
+p1p3_item_month_grid AS (
+  SELECT d.kam_email, d.account_id, d.outlet_id, d.group_key, mn AS month_no
+  FROM distinct_p1p3_items d
+  CROSS JOIN UNNEST(GENERATE_ARRAY(1, (SELECT n FROM report_month))) AS mn
+),
+p1p3_item_month AS (
+  SELECT
+    g.kam_email, g.account_id, g.outlet_id, g.group_key, g.month_no,
+    COALESCE(q.qualifies, FALSE) AS qualifies,
+    COALESCE(q.month_contribution, 0) AS month_contribution
+  FROM p1p3_item_month_grid g
+  LEFT JOIN p1p3_qualified q USING (kam_email, account_id, outlet_id, group_key, month_no)
+),
+-- Streak = every month AFTER the most recent gap (a month that failed to
+-- qualify, or had no purchase at all). No gap ever → streak starts at
+-- month 1. This naturally caps at the quarter boundary since month_no never
+-- exceeds report_month.
+p1p3_last_gap AS (
+  SELECT kam_email, account_id, outlet_id, group_key,
+    MAX(CASE WHEN NOT qualifies THEN month_no ELSE NULL END) AS last_gap_month
+  FROM p1p3_item_month
+  GROUP BY 1, 2, 3, 4
+),
+p1p3_cumulative AS (
+  SELECT
+    m.kam_email, m.account_id, m.outlet_id, m.group_key,
+    SUM(CASE WHEN m.month_no > COALESCE(g.last_gap_month, 0) THEN m.month_contribution ELSE 0 END) AS cum_amount,
+    -- was this item's contribution P1-type or P3-type? Determined directly
+    -- from the FROZEN baseline_groups membership (stable per item, no month
+    -- dependency at all — an item is either always-P1-eligible or always-
+    -- P3-eligible for the whole quarter, never both, never changing month to
+    -- month, since the baseline itself never updates within the quarter).
+    bg.group_key IS NULL AS is_p1_type
+  FROM p1p3_item_month m
+  LEFT JOIN p1p3_last_gap g USING (kam_email, account_id, outlet_id, group_key)
+  LEFT JOIN baseline_groups bg
+    ON m.kam_email = bg.kam_email AND m.account_id = bg.account_id
+   AND m.outlet_id = bg.outlet_id AND m.group_key = bg.group_key
+  GROUP BY 1, 2, 3, 4, is_p1_type
+),
+
+-- ── v7 NEW: same rolling-cumulative treatment for Expansion ───────────
+-- Anchor is unambiguous (first_seen, no threshold-crossing heuristic
+-- needed) — "maintenance" test = still classified 'expansion' that month
+-- (per the widened outlet_status window above), sum each qualifying
+-- month's own expansion_gmv, same gap-detection as P1/P3.
+-- current_agg is grain (month, kam, account, outlet, group_key) — Expansion
+-- doesn't care about group_key, roll up to outlet grain first.
+expansion_by_outlet AS (
+  SELECT month_no, kam_email, account_id, outlet_id,
+    MAX(outlet_type = 'expansion') AS qualifies,
+    SUM(CASE WHEN outlet_type = 'expansion' THEN expansion_gmv ELSE 0 END) AS month_contribution
+  FROM current_agg
+  GROUP BY 1, 2, 3, 4
+),
+distinct_expansion_outlets AS (
+  SELECT DISTINCT kam_email, account_id, outlet_id FROM expansion_by_outlet
+),
+expansion_item_month_grid AS (
+  SELECT d.kam_email, d.account_id, d.outlet_id, mn AS month_no
+  FROM distinct_expansion_outlets d
+  CROSS JOIN UNNEST(GENERATE_ARRAY(1, (SELECT n FROM report_month))) AS mn
+),
+expansion_item_month AS (
+  SELECT
+    g.kam_email, g.account_id, g.outlet_id, g.month_no,
+    COALESCE(e.qualifies, FALSE) AS qualifies,
+    COALESCE(e.month_contribution, 0) AS month_contribution
+  FROM expansion_item_month_grid g
+  LEFT JOIN expansion_by_outlet e USING (kam_email, account_id, outlet_id, month_no)
+),
+expansion_last_gap AS (
+  SELECT kam_email, account_id, outlet_id,
+    MAX(CASE WHEN NOT qualifies THEN month_no ELSE NULL END) AS last_gap_month
+  FROM expansion_item_month
+  GROUP BY 1, 2, 3
+),
+expansion_cumulative AS (
+  SELECT
+    m.kam_email, m.account_id, m.outlet_id,
+    SUM(CASE WHEN m.month_no > COALESCE(g.last_gap_month, 0) THEN m.month_contribution ELSE 0 END) AS cum_amount
+  FROM expansion_item_month m
+  LEFT JOIN expansion_last_gap g USING (kam_email, account_id, outlet_id)
+  GROUP BY 1, 2, 3
+),
+
+-- Per-KAM rollups, computed separately so a KAM with Expansion but zero
+-- P1/P3 (or vice versa) still shows up correctly via the FULL OUTER JOIN
+-- below, rather than silently missing from the output.
+p1p3_by_kam AS (
+  SELECT kam_email,
+    SUM(CASE WHEN is_p1_type THEN cum_amount ELSE 0 END) AS p1_gmv,
+    SUM(CASE WHEN NOT is_p1_type THEN cum_amount ELSE 0 END) AS p3_incremental
+  FROM p1p3_cumulative
+  GROUP BY kam_email
+),
+expansion_by_kam AS (
+  SELECT kam_email, SUM(cum_amount) AS outlet_gmv
+  FROM expansion_cumulative
+  GROUP BY kam_email
 )
 
--- Output per KAM
--- outlet_gmv = expansion outlets total GMV (1.5% flat, no P1/P3)
--- p1_gmv     = P1-eligible GMV at existing outlets only (≥฿2,500)
--- p3_incr    = incremental GMV at P3-eligible existing outlets
--- tl_upsell_base = p1_gmv + p3_incremental (used for TL multiplier)
+-- Output per KAM — same 4 columns as before, now cumulative-quarter-to-date
+-- instead of single-month.
 SELECT
-  kam_email,
-  ROUND(SUM(CASE WHEN is_p1 = 1 AND total_gmv >= 5000 THEN existing_gmv ELSE 0 END), 2) AS p1_gmv,
-  ROUND(SUM(CASE WHEN is_p3 = 1 THEN existing_gmv - max_bl               ELSE 0 END), 2) AS p3_incremental,
-  ROUND(SUM(CASE WHEN outlet_type = 'expansion'       THEN expansion_gmv  ELSE 0 END), 2) AS outlet_gmv,
-  ROUND(
-    SUM(CASE WHEN is_p1 = 1 AND total_gmv >= 5000 THEN existing_gmv ELSE 0 END) +
-    SUM(CASE WHEN is_p3 = 1 THEN existing_gmv - max_bl               ELSE 0 END),
-  2) AS tl_upsell_base
-FROM commission_items
-GROUP BY 1
+  COALESCE(p.kam_email, e.kam_email) AS kam_email,
+  ROUND(COALESCE(p.p1_gmv, 0), 2) AS p1_gmv,
+  ROUND(COALESCE(p.p3_incremental, 0), 2) AS p3_incremental,
+  ROUND(COALESCE(e.outlet_gmv, 0), 2) AS outlet_gmv,
+  -- tl_upsell_base = p1_gmv + p3_incremental ONLY — matches the ORIGINAL
+  -- formula (see header) and the app's own JS (`tl_upsell_base: p1Gmv +
+  -- p3Incr`, 07a_commission_engine.js) — outlet_gmv/Expansion is
+  -- deliberately NOT included in the TL multiplier's numerator.
+  ROUND(COALESCE(p.p1_gmv, 0) + COALESCE(p.p3_incremental, 0), 2) AS tl_upsell_base
+FROM p1p3_by_kam p
+FULL OUTER JOIN expansion_by_kam e ON p.kam_email = e.kam_email
 ORDER BY tl_upsell_base DESC

@@ -169,10 +169,38 @@ function _commBaseMonthLabels(baseMonthOverride, count) {
   });
 }
 
+// v836: forward-walking counterpart to _commBaseMonthLabels — the quarter's OWN months
+// (baseMonth+1, +2, +3), capped at whichever one is "today" (_commCurrentMonthLabel()),
+// so a July run only evaluates July, an August run evaluates July+August, etc. Returns
+// [] for null baseMonthOverride (monthly/rolling mode has no "elapsed quarter months"
+// concept at all — callers should fall back to a single-month evaluation instead).
+function _commElapsedQuarterLabels(baseMonthOverride) {
+  if (!baseMonthOverride) return [];
+  var parts = baseMonthOverride.split('-');
+  var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10); // 1-based
+  var nowLbl = _commCurrentMonthLabel();
+  var out = [];
+  for (var i = 1; i <= 3; i++) {
+    var d = new Date(baseYr, baseMo - 1 + i, 1); // baseMonth+1, +2, +3
+    var lbl = _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    out.push(lbl);
+    if (lbl === nowLbl) break; // stop once we reach "today"'s month — don't evaluate the future
+  }
+  return out;
+}
+
 // ── Upsell SKU Engine ───────────────────────────────────────────
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
 // p3: { gmv_incremental, comm, groups:[{group_key,existing_curr,max_baseline,...}] }
+// v836: in quarterly mode (baseMonthOverride set), walks every ELAPSED month of the
+// quarter and sums a continuous qualifying streak ending at the current month — a shop
+// that just MAINTAINS an elevated level (not necessarily growing further, since the
+// frozen baseline never advances mid-quarter) keeps earning each month, capped at the
+// quarter boundary — matching the same algorithm already shipped in
+// sql/q3c_upsell_team_summary_v4.sql (the two must be kept in sync). Monthly/rolling
+// mode (baseMonthOverride null) is UNCHANGED — evalLabels degenerates to exactly
+// [currLabel], i.e. the original single-month behavior.
 function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
@@ -200,8 +228,11 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
     const baseLabel  = baseMonthOverride
       ? _commBaseMonthLabels(baseMonthOverride, 1)[0]
       : _commBaselineMonthLabel();
+    // v836: months to classify+sum — every elapsed quarter month up to "today" when
+    // quarterly, else just the single current month (original behavior, unchanged).
+    const evalLabels = baseMonthOverride ? _commElapsedQuarterLabels(baseMonthOverride) : [currLabel];
     console.log('%c[Sense Upsell] compute','color:#f0b000',
-      {kamEmail, kamKey:_kamKey, currLabel, baseLabel, accounts:Object.keys(kamData).length});
+      {kamEmail, kamKey:_kamKey, currLabel, baseLabel, evalLabels, accounts:Object.keys(kamData).length});
 
     // Config (admin-configurable, with spec defaults)
     const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01 (changed 2026-06-11, default never updated)
@@ -246,48 +277,73 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
 
         Object.keys(outletGroups).forEach(groupKey => {
           const monthData = outletGroups[groupKey];
-          const currRow = monthData[currLabel];
-          if (!currRow) return;
-
-          const rawTotalGmv = currRow.totalGmv || 0;
-          const rawExistingGmv = currRow.existingGmv || 0;
-          // v247d: rawNewGmv / rawComebackGmv removed — fields dropped from v4 CSV
-
-          // v2 P1: outlet ไม่เคยซื้อ group_key นี้ใน 3 เดือนย้อนหลัง
+          // v2 P1: outlet ไม่เคยซื้อ group_key นี้ใน 3 เดือนย้อนหลัง — a STABLE property of
+          // this (account,outlet,groupKey) triple once the baseline is frozen (quarterly
+          // mode never updates outletBaseline mid-quarter), so an item is either always-P1
+          // or always-P3-eligible for the whole quarter, never both, never changing month
+          // to month — matches the SQL's identical reasoning.
           const isP1 = !outletBaseline.has(groupKey);
 
-          if (isP1) {
-            // P1: outlet × group_key ใหม่ — total GMV × 3%
-            if (rawTotalGmv >= p1MinGmv) {
-              const comm = rawTotalGmv * p1Rate;
-              p1Groups.push({ accountId, outletId, groupKey, total_gmv: rawTotalGmv, commission: comm });
+          // v836: classify EVERY evaluated month (just currLabel in monthly/rolling mode,
+          // every elapsed quarter month up to "today" in quarterly mode), then keep only
+          // the trailing unbroken qualifying streak ending at the last evaluated month.
+          const perMonth = evalLabels.map(lbl => {
+            const row = monthData[lbl];
+            if (!row) return { label: lbl, qualifies: false, contribution: 0 };
+            const rawTotalGmv = row.totalGmv || 0;
+            const rawExistingGmv = row.existingGmv || 0;
+            if (isP1) {
+              // P1: outlet × group_key ใหม่ — total GMV × rate
+              if (rawTotalGmv >= p1MinGmv) {
+                return { label: lbl, qualifies: true, contribution: rawTotalGmv };
+              }
+              return { label: lbl, qualifies: false, contribution: 0 };
             }
-          } else {
-            // P3: คงเดิม — existing outlet ซื้อเพิ่มจาก max_baseline
-            let maxBaseline = 0;
-            let maxBaselineMonth = baseLabel;
-            // [quarterly] pin 3M window to base_month; [monthly] rolling lag-1 (unchanged)
+            // P3: existing outlet ซื้อเพิ่มจาก max_baseline — baseline window is ALWAYS the
+            // same frozen 3-month pool regardless of which elapsed month we're evaluating
+            // (matches the SQL fix: baseline never drifts within the quarter), so simply
+            // MAINTAINING (not growing further beyond) an already-qualifying level keeps
+            // passing this test every month.
+            let maxBaseline = 0, maxBaselineMonth = baseLabel;
             const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
             for (let i = 0; i < _p3Labels.length; i++) {
-              const lbl = _p3Labels[i];
-              const lRow = monthData[lbl];
+              const l = _p3Labels[i];
+              const lRow = monthData[l];
               if (!lRow) continue;
-              const d = _commDaysInLabel(lbl);
+              const d = _commDaysInLabel(l);
               const norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-              if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = lbl; }
+              if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
             }
-
             if (rawExistingGmv > maxBaseline * p3Thresh) {
               const incremental = rawExistingGmv - maxBaseline;
               if (incremental >= p3MinIncr) {
-                const comm = incremental * p3Rate;
-                p3Groups.push({ accountId, outletId, groupKey,
-                  existing_curr: rawExistingGmv,
-                  max_baseline: maxBaseline,
-                  max_baseline_month: maxBaselineMonth,
-                  incremental, commission: comm });
+                return { label: lbl, qualifies: true, contribution: incremental,
+                         existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth };
               }
             }
+            return { label: lbl, qualifies: false, contribution: 0 };
+          });
+
+          // Streak = every month AFTER the most recent gap (a month that failed to
+          // qualify, or had no purchase row at all). No gap ever → streak starts at the
+          // first evaluated month. In monthly/rolling mode evalLabels has exactly 1
+          // entry, so this always degenerates to the original single-month behavior.
+          let lastGapIdx = -1;
+          perMonth.forEach((m, i) => { if (!m.qualifies) lastGapIdx = i; });
+          const streak = perMonth.slice(lastGapIdx + 1);
+          if (streak.length === 0) return;
+
+          const cumAmount = streak.reduce((s, m) => s + m.contribution, 0);
+          const last = streak[streak.length - 1];
+
+          if (isP1) {
+            p1Groups.push({ accountId, outletId, groupKey, total_gmv: cumAmount, commission: cumAmount * p1Rate });
+          } else {
+            p3Groups.push({ accountId, outletId, groupKey,
+              existing_curr: last.existing_curr,
+              max_baseline: last.max_baseline,
+              max_baseline_month: last.max_baseline_month,
+              incremental: cumAmount, commission: cumAmount * p3Rate });
           }
         });
       });
@@ -653,10 +709,24 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
     // [quarterly] Expansion GMV comes from qnrrResult (bulkQnrrData), Upsell SKU uses pin window
     // [monthly]   existing logic unchanged
     let upsellSku, upsellOutlet;
-    const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded;
     // Q3C Team SQL keys by ka_owner (display name), not email — try both
     const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
     const _kamDisplayName = _pvRow ? (_pvRow.kamName || '') : '';
+    // v836-fix: was `bulkUpsellData.loaded` alone — a GLOBAL flag that flips true the
+    // moment ANY one KAM's per-KAM bundle is fetched (e.g. a TL/Admin drilling into just
+    // one KAM's detail, or that KAM's own session auto-fetching it on login) and then
+    // stays true for the rest of the browser session. Every OTHER KAM would then also
+    // take the "detailed" branch below even though THEIR OWN bundle was never fetched —
+    // _commComputeUpsellSku's byKam lookup finds nothing for them and silently returns
+    // ฿0 upsell commission instead of falling back to the correct team-summary number.
+    // Now checks THIS SPECIFIC KAM's bundle presence (same kamName-or-email key
+    // resolution _commComputeUpsellSku itself uses) so one KAM's data being loaded can
+    // never affect another KAM's branch decision.
+    const _bundleLoaded = typeof bulkUpsellData !== 'undefined' && bulkUpsellData && bulkUpsellData.loaded &&
+      bulkUpsellData.byKam && (
+        (bulkUpsellData.byKam[_kamDisplayName] && Object.keys(bulkUpsellData.byKam[_kamDisplayName]).length > 0) ||
+        (bulkUpsellData.byKam[kamEmail] && Object.keys(bulkUpsellData.byKam[kamEmail]).length > 0)
+      );
     const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData &&
       (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
     const upsellLoading = !_bundleLoaded && !_teamRow; // v228-fix: flag when upsell data unavailable

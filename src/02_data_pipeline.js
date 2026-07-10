@@ -1049,7 +1049,20 @@ function handleFileUpload(type,input){
         // v233-fix: P1 baseline = exactly 3 months (M-1, M-2, M-3) matching P3 window.
         // Bug: previously used ALL non-current months → ม.ค. (4 months ago) was included
         // → outlet that bought in ม.ค. then stopped 3 months was wrongly classified as existing.
-        const _p1BaselineLabels=new Set([1,2,3].map(i=>{const d=new Date(_lagU.getFullYear(),_lagU.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
+        // v836-fix: was UNCONDITIONALLY rolling off "today" even in quarterly mode — every
+        // KAM's own commission self-view (which always takes this ingestion path — see the
+        // per-KAM _bundleLoaded fix in 07a_commission_engine.js) silently drifted P1's "has
+        // this been bought before" test off the current date instead of staying frozen to
+        // the quarter's base month, even though _commComputeUpsellSku's P3 window was
+        // already correctly pinned via baseMonthOverride. Now mirrors that same frozen-
+        // base-month logic for P1 whenever the active nrr_policies row says
+        // commission_mode==='quarterly' (matches _commBaseMonthLabels(baseMonthOverride, 3)
+        // in 07a_commission_engine.js exactly — keep these two in sync if either changes).
+        const _q3cPolicy=(typeof _nrrGovResolveForVisibleScope==='function')?_nrrGovResolveForVisibleScope():null;
+        const _q3cBaseMonth=(_q3cPolicy&&_q3cPolicy.commission_mode==='quarterly')?_q3cPolicy.base_month:null;
+        const _p1BaselineLabels=_q3cBaseMonth
+          ? new Set([0,1,2].map(i=>{const p=_q3cBaseMonth.split('-');const yr=parseInt(p[0],10),mo=parseInt(p[1],10);const d=new Date(yr,mo-1-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}))
+          : new Set([1,2,3].map(i=>{const d=new Date(_lagU.getFullYear(),_lagU.getMonth()-i,1);return _thMonths[d.getMonth()]+' '+(d.getFullYear()+543);}));
         // v4: detect CSV format — 7 cols = v4 (outlet_id + no new/comeback), 9 cols = v3, 8 cols = legacy
         const _sampleCols=(lines[0]||'').split(',').length;
         const _hasOutlet=_sampleCols>=7;
