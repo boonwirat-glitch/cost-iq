@@ -178,13 +178,17 @@ function _commElapsedQuarterLabels(baseMonthOverride) {
   if (!baseMonthOverride) return [];
   var parts = baseMonthOverride.split('-');
   var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10); // 1-based
-  var nowLbl = _commCurrentMonthLabel();
+  var lagDate = _commLagDate();
   var out = [];
   for (var i = 1; i <= 3; i++) {
     var d = new Date(baseYr, baseMo - 1 + i, 1); // baseMonth+1, +2, +3
-    var lbl = _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
-    out.push(lbl);
-    if (lbl === nowLbl) break; // stop once we reach "today"'s month — don't evaluate the future
+    // v854-fix: was string-label equality against _commCurrentMonthLabel(), which
+    // never matches on the quarter's own day-1 (lag anchor still reads the OLD
+    // quarter's last month) — the break never fired and the loop wrongly walked
+    // all 3 unelapsed future months. Compare dates directly against the lag anchor
+    // instead: a month hasn't elapsed if it starts after "today" (lag-adjusted).
+    if (d > lagDate) break;
+    out.push(_TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543));
   }
   return out;
 }
@@ -609,7 +613,7 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     const kamEmails = Array.from(new Set(
@@ -632,7 +636,10 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly) {
         teamUpsellGmv += bulkUpsellTeamData[ke].tl_upsell_base || 0;
       } else if (bulkUpsellData && bulkUpsellData.loaded) {
         // Fallback: compute from per-KAM bundle if loaded
-        const upsell = _commComputeUpsellSku(ke);
+        // v854-fix: was missing baseMonthOverride — silently fell back to rolling/
+        // monthly logic for this KAM's contribution even in quarterly mode whenever
+        // they were absent from that day's team-summary CSV.
+        const upsell = _commComputeUpsellSku(ke, undefined, baseMonthOverride);
         teamUpsellGmv += upsell.tl_upsell_base;
       }
       // v828: quarterly mode sums each KAM's fixed-base GMV from QNRR, not MoM rolling base
@@ -793,6 +800,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     // v829: resolve policy for the period being computed, not always "today" (see _commBuildKamPayout)
     const policy = periodOverride ? _nrrGovGet(periodOverride, 'all', 'all') : _nrrGovResolveForVisibleScope();
     const isQ    = policy && policy.commission_mode === 'quarterly';
+    const baseMo = isQ ? (policy.base_month || null) : null;
 
     // [quarterly] TL NRR from QNRR sheet (tl scope); [monthly] existing _tgtComputeKamNRR,
     // periodOverride threads through as asOfPeriod for frozen historical-month NRR
@@ -808,7 +816,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
     const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ);
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ, baseMo);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
@@ -1688,13 +1696,18 @@ function _tgtRenderTeamGovCard() {
     : `${!policyPublished ? 'Policy still draft' : ''}${(!policyPublished && pending) ? ' · ' : ''}${pending ? pending + ' pending exception' + (pending>1?'s':'') : ''}`;
   const isAdmin = isAdminRole(role);
   const commissionMain = isTLRole(role) ? summary.tlPayout : summary.total;
+  // v854-fix: baseMo threaded to _commComputeTeamUpsellMult so its per-KAM fallback
+  // path (used when a KAM is missing from the team-summary CSV) doesn't silently
+  // revert to rolling logic while the org is in quarterly mode.
+  const _tgcIsQ   = policy && policy.commission_mode === 'quarterly';
+  const _tgcBaseMo = _tgcIsQ ? (policy.base_month || null) : null;
   // QC-12: show TL multiplier tier in govCard meta
   let _tlMultText = '';
   try {
     if (isTLRole(role)) {
       const _govEm2 = (currentUserProfile && currentUserProfile.email) || '';
       const _um2 = typeof _commComputeTeamUpsellMult==='function' && (typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0)
-        ? _commComputeTeamUpsellMult(_govEm2, policy && policy.commission_mode === 'quarterly') : null;
+        ? _commComputeTeamUpsellMult(_govEm2, _tgcIsQ, _tgcBaseMo) : null;
       if (_um2 && _um2.multiplier > 1) _tlMultText = ` · ×${_um2.multiplier.toFixed(2)} upsell mult`;
     }
   } catch(e) {}
@@ -1710,7 +1723,7 @@ function _tgtRenderTeamGovCard() {
       const _govEmail = isTLRole(role)
         ? ((currentUserProfile && currentUserProfile.email) || '')
         : ((_commGetTlListFromPortview()[0] || {}).email || '');
-      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail, policy && policy.commission_mode === 'quarterly') : null;
+      umData = _govEmail ? _commComputeTeamUpsellMult(_govEmail, _tgcIsQ, _tgcBaseMo) : null;
       if (umData && _teamUpsellReady) {
         const multCls = umData.multiplier > 1 ? 'ok' : '';
         multBadge = `<span class="tv-mult-badge ${multCls}">×${umData.multiplier.toFixed(2)}</span>`;
@@ -2490,7 +2503,14 @@ function _commOpenTlDetailSheet(opts) {
   const tlEmail = (currentUserProfile && currentUserProfile.email) || '';
   const tlPayout = _commBuildTlPayout(tlEmail);
   const summary = _commBuildPayoutSummary('tl');
-  const um = typeof _commComputeTeamUpsellMult === 'function' ? _commComputeTeamUpsellMult(tlEmail) : {multiplier:1.0,tier:1,team_upsell_pct:0};
+  // v854-fix: was calling _commComputeTeamUpsellMult(tlEmail) with no isQuarterly/
+  // baseMo, so the multiplier % badge shown here always used rolling-MoM logic even
+  // in quarterly mode — diverging from tlPayout.upsell_mult (the value actually baked
+  // into final_payout above, which IS correctly wired via _commBuildTlPayout).
+  const _tdsPolicy = typeof _nrrGovResolveForVisibleScope === 'function' ? _nrrGovResolveForVisibleScope() : null;
+  const _tdsIsQ     = _tdsPolicy && _tdsPolicy.commission_mode === 'quarterly';
+  const _tdsBaseMo  = _tdsIsQ ? (_tdsPolicy.base_month || null) : null;
+  const um = typeof _commComputeTeamUpsellMult === 'function' ? _commComputeTeamUpsellMult(tlEmail, _tdsIsQ, _tdsBaseMo) : {multiplier:1.0,tier:1,team_upsell_pct:0};
   const multLoaded = typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0; // v230fix3: use team summary, not full bundle
   function fmtP(n){ return _commFmtPayout(n||0); }
 

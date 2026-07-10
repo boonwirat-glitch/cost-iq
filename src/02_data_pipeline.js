@@ -1101,7 +1101,14 @@ function handleFileUpload(type,input){
           if(!byKam[kamEmail][accountId][outletId][groupKey])byKam[kamEmail][accountId][outletId][groupKey]={};
           byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,totalGmv};
           // v233-fix: only months within 3-month window qualify as P1 baseline
-          if(monthLabel!==_currLabel && totalGmv>0 && _p1BaselineLabels.has(monthLabel)){
+          // v854-fix: the !==_currLabel guard exists to stop rolling mode's "current
+          // month" from counting as its own baseline. In quarterly mode _p1BaselineLabels
+          // is already a closed, past-bounded window ending at the frozen base_month, so
+          // it can never include "the row being tested" by construction — but on the
+          // quarter's own day-1, the lag anchor still reads base_month itself, making
+          // _currLabel wrongly collide with (and strip out) the base month's own data.
+          // Skip this guard entirely in quarterly mode.
+          if((_q3cBaseMonth || monthLabel!==_currLabel) && totalGmv>0 && _p1BaselineLabels.has(monthLabel)){
             if(!baselineGroups[kamEmail])baselineGroups[kamEmail]={};
             if(!baselineGroups[kamEmail][accountId])baselineGroups[kamEmail][accountId]={};
             if(!baselineGroups[kamEmail][accountId][outletId])baselineGroups[kamEmail][accountId][outletId]=new Set();
