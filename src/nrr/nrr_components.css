@@ -58,7 +58,9 @@
 }
 
 /* Sales handover-pipeline forecast chips — urgency status, not identity;
-   border color carries the meaning, text label always present alongside. */
+   border color carries the meaning, text label always present alongside.
+   (v29: superseded by the pipeline table's .nrr-pipe-cell for #/sales, but
+   left in place — a compact chip summary is a reasonable future reuse.) */
 .nrr-pipeline-chip {
   border: 1.5px solid var(--line); border-radius: var(--r-md);
   padding: 10px 12px; text-align: left; cursor: pointer;
@@ -66,6 +68,57 @@
   transition: background 0.12s ease;
 }
 .nrr-pipeline-chip:hover { background: var(--fill); }
+.nrr-pipe-cell:hover { background: var(--fill); }
+
+/* Denser row height for wide multi-month tables (company audit table,
+   sales actuals/pipeline table) — same .nrr-table base, tighter padding. */
+.nrr-table-compact td, .nrr-table-compact th { padding: 7px 12px; }
+
+/* Sticky first (label) column — horizontal scroll on a wide month table no
+   longer loses the row label off-screen. Needs an opaque background so
+   scrolled content doesn't show through underneath. */
+.nrr-table-sticky-col th:first-child, .nrr-table-sticky-col td:first-child {
+  position: sticky; left: 0; background: var(--bg); z-index: 1;
+}
+.nrr-table-sticky-col thead th { position: sticky; top: 0; background: var(--bg); z-index: 2; }
+.nrr-table-sticky-col thead th:first-child { z-index: 3; }
+
+/* ── Company view (#/company, v28) — squad race chart + cards ──────────── */
+/* Grouped monthly columns: Chain vs SA/MC pairs. Same div-column language
+   as .nrr-qchart; the hatch overlay carries the same "projected remainder"
+   meaning as .nrr-qcol-hatch (background set inline per squad hue). */
+.nrr-cochart { display: flex; align-items: flex-end; gap: 20px; padding: 8px 4px 0; overflow-x: auto; }
+.nrr-cogroup { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 64px; }
+.nrr-cogroup-cols { display: flex; align-items: flex-end; justify-content: center; gap: 4px; width: 100%; }
+.nrr-cocol {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  width: 28px; max-width: 34px; border-radius: 6px 6px 2px 2px; overflow: hidden;
+}
+.nrr-cocol-seg { width: 100%; }
+.nrr-cogroup-caps { display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.nrr-cogroup-label { font-size: 12.5px; font-weight: 600; color: var(--ink2); margin-top: 2px; white-space: nowrap; }
+.nrr-co-legend { display: flex; gap: 16px; align-items: center; font-size: 12.5px; color: var(--ink2); margin: 4px 0 8px; flex-wrap: wrap; }
+.nrr-co-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+/* "waiting in Sales' hands" line inside a squad card */
+.nrr-squad-handover { margin-top: 14px; font-size: 13px; color: var(--ink2); }
+.nrr-squad-handover a { color: var(--green-deep); font-weight: 600; text-decoration: none; margin-left: 6px; }
+
+/* B2C's own slim row below the two squad cards (kept out of the card grid
+   so Chain/SA-MC can each spread full-width) */
+.nrr-b2c-row {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+}
+
+/* ── Sales pipeline drawer rows (#/sales, v28) — slideover custom body ── */
+.nrr-pipe-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 10px 2px; border-bottom: 1px solid var(--line);
+}
+.nrr-pipe-main { min-width: 0; }
+.nrr-pipe-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pipe-gmv { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.nrr-pipe-more { margin: 4px auto; }
 
 /* First responsive pass — the portfolio layer is rep-facing (mobile-first
    users); the dashboard stays desktop-first. Masthead must not overflow. */

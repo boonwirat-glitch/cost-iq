@@ -1,12 +1,17 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- SALES_HANDOVER_PIPELINE v3 — Sales → KAM/PM/Admin handover forecast
+-- SALES_HANDOVER_PIPELINE v4 — Sales → KAM/PM/Admin handover forecast
 -- Output:  sales_handover_pipeline.csv (upload to R2 root, same bucket as
 --          company_gmv.csv)
 -- Refresh: manual BigQuery run + manual R2 upload (daily recommended, same
 --          cadence as company_gmv.csv — the pipeline shifts every day as
 --          deadlines pass)
--- Columns (8): outlet_id, account_id, account_name, account_type, bucket,
---              new_user_exp_date, last_month_gmv, orders
+-- Columns (9): outlet_id, account_id, account_name, account_type, bucket,
+--              new_user_exp_date, last_month_gmv, orders, staff_owner
+--
+-- v4: added staff_owner (the Sales rep currently on the outlet's most recent
+--   order — same field q3_2026_movement_rep_view.sql's latest_own CTE reads
+--   as latest_staff_owner) so the /nrr dashboard can break the pipeline down
+--   per rep, not just per outlet.
 -- Grain:   one row per outlet CURRENTLY owned by Sales. This is a
 --          forward-looking snapshot, not a historical monthly series
 --          (contrast with company_gmv.csv).
@@ -61,6 +66,7 @@ latest_own AS (
     CAST(o.account_id AS STRING)    AS account_id,
     o.res_name                      AS account_name,
     o.account_type                  AS account_type,
+    TRIM(o.staff_owner)             AS staff_owner,
     UPPER(TRIM(o.commercial_owner)) AS latest_commercial_owner
   FROM `freshket-rn.dwh.order` o
   WHERE o.user_id IS NOT NULL
@@ -107,7 +113,8 @@ SELECT
   END AS bucket,
   IFNULL(CAST(oed.new_user_exp_date AS STRING), '') AS new_user_exp_date,
   IFNULL(lmg.gmv, 0)    AS last_month_gmv,
-  IFNULL(lmg.orders, 0) AS orders
+  IFNULL(lmg.orders, 0) AS orders,
+  IFNULL(lo.staff_owner, '') AS staff_owner
 FROM latest_own lo
 LEFT JOIN outlet_exp_date oed ON lo.outlet_id = oed.outlet_id
 LEFT JOIN last_month_gmv lmg  ON lo.outlet_id = lmg.outlet_id

@@ -483,14 +483,34 @@ window.nrrSalesByBucket = nrrSalesByBucket;
 // Each bucket carries {gmv, outlets, rows[]} (rows sorted soonest/most-
 // overdue first) so the UI can both show a headline number and drill into
 // the underlying account list.
+// v29: buckets by REAL forward calendar month (not vague "+N เดือน" labels)
+// so the pipeline reads as an actual month-by-month table, same language as
+// the company audit table. Buckets: overdue, m0 (this month) .. m{MAX_OFFSET}
+// (the last one is a "this month or later" catch-all), no_date. 45-day SA /
+// 90-day MC-Chain deadlines mean nothing meaningful lives past ~3 months out
+// today, but the bucket count isn't hardcoded to that assumption.
+var NRR_PIPE_MAX_OFFSET = 5;
+
 function nrrSalesPipelineModel() {
   var pd = window.bulkSalesPipelineData;
   if (!pd || !pd.loaded || !pd.allRows || !pd.allRows.length) return null;
+  var TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   var today = new Date(); today.setHours(0, 0, 0, 0);
   var todayKey = today.getFullYear() * 12 + today.getMonth();
-  var BUCKET_ORDER = ['overdue', 'this_month', 'next_month', 'plus2', 'plus3_or_later', 'no_date'];
+
+  var order = ['overdue'];
+  var labels = { overdue: 'เลยกำหนดแล้ว', no_date: 'ไม่มีกำหนด' };
+  for (var i = 0; i <= NRR_PIPE_MAX_OFFSET; i++) {
+    var d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    var key = 'm' + i;
+    order.push(key);
+    var lbl = TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    labels[key] = i === 0 ? 'เดือนนี้ (' + lbl + ')' : (i === NRR_PIPE_MAX_OFFSET ? lbl + ' ขึ้นไป' : lbl);
+  }
+  order.push('no_date');
+
   var buckets = {};
-  BUCKET_ORDER.forEach(function (k) { buckets[k] = { gmv: 0, outlets: 0, rows: [] }; });
+  order.forEach(function (k) { buckets[k] = { gmv: 0, outlets: 0, rows: [] }; });
   var bySquad = { chain: 0, sa_mc: 0, other: 0 };
 
   pd.allRows.forEach(function (r) {
@@ -502,7 +522,7 @@ function nrrSalesPipelineModel() {
       key = 'overdue';
     } else {
       var diff = (d.getFullYear() * 12 + d.getMonth()) - todayKey;
-      key = diff === 0 ? 'this_month' : diff === 1 ? 'next_month' : diff === 2 ? 'plus2' : 'plus3_or_later';
+      key = 'm' + Math.min(diff, NRR_PIPE_MAX_OFFSET);
     }
     buckets[key].gmv += r.last_month_gmv;
     buckets[key].outlets += 1;
@@ -512,17 +532,34 @@ function nrrSalesPipelineModel() {
   });
 
   // overdue: most-overdue (oldest date) first; future buckets: soonest first
-  BUCKET_ORDER.forEach(function (k) {
+  order.forEach(function (k) {
     buckets[k].rows.sort(function (a, b) {
       if (a.new_user_exp_date === b.new_user_exp_date) return 0;
       return a.new_user_exp_date < b.new_user_exp_date ? -1 : 1;
     });
   });
 
-  var total = BUCKET_ORDER.reduce(function (s, k) { return s + buckets[k].gmv; }, 0);
-  return { buckets: buckets, order: BUCKET_ORDER, bySquad: bySquad, total: total, asOf: today };
+  var total = order.reduce(function (s, k) { return s + buckets[k].gmv; }, 0);
+  return { buckets: buckets, order: order, labels: labels, bySquad: bySquad, total: total, asOf: today };
 }
 window.nrrSalesPipelineModel = nrrSalesPipelineModel;
+
+// Per-Sales-rep breakdown of a set of pipeline rows (a bucket's rows, or any
+// subset) — {rep, gmv, outlets, rows[]} sorted by GMV desc. Rows with no
+// staff_owner (old CSV before the v4 SQL added it, or genuinely blank) group
+// under "ไม่ระบุ Sales".
+function nrrPipelineByRep(rows) {
+  var byRep = {};
+  rows.forEach(function (r) {
+    var rep = (r.staff_owner || '').trim() || 'ไม่ระบุ Sales';
+    if (!byRep[rep]) byRep[rep] = { rep: rep, gmv: 0, outlets: 0, rows: [] };
+    byRep[rep].gmv += r.last_month_gmv;
+    byRep[rep].outlets += 1;
+    byRep[rep].rows.push(r);
+  });
+  return Object.values(byRep).sort(function (a, b) { return b.gmv - a.gmv; });
+}
+window.nrrPipelineByRep = nrrPipelineByRep;
 
 // {chain: computeResult|null, sa_mc: computeResult|null, other: computeResult|null}
 function nrrPmResult() {

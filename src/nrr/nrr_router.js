@@ -27,6 +27,8 @@ function nrrParseHash() {
   if (!parts.length) return { view: 'dashboard', param: null };
   if (parts[0] === 'portfolio') return { view: 'portfolio', param: parts[1] ? decodeURIComponent(parts[1]) : null };
   if (parts[0] === 'account') return { view: 'account', param: parts[1] ? decodeURIComponent(parts[1]) : null };
+  if (parts[0] === 'company') return { view: 'company', param: null };
+  if (parts[0] === 'sales') return { view: 'sales', param: null };
   return { view: 'dashboard', param: null };
 }
 
@@ -45,6 +47,10 @@ function nrrParseHash() {
 function nrrRouteGuard(route) {
   var p = window.nrrProfile;
   if (!p) return route;
+  // Company overview + Sales pipeline (v28): whole-company data — admin only.
+  if ((route.view === 'company' || route.view === 'sales') && p.role !== 'admin') {
+    return { view: 'dashboard', param: null, redirect: true };
+  }
   if (p.role === 'rep') {
     if (route.view === 'dashboard') return { view: 'portfolio', param: null, redirect: true };
     if (route.view === 'portfolio' && route.param && route.param !== p.email) {
@@ -80,8 +86,11 @@ function nrrHandleRoute() {
     el.hidden = el.id !== 'nrr-view-' + route.view;
   });
 
-  // App-level nav active state: the account view belongs to the portfolio family.
-  var navFamily = route.view === 'dashboard' ? 'dashboard' : 'portfolio';
+  // App-level nav active state: the account view belongs to the portfolio
+  // family; company/sales (v28) are their own tabs.
+  var navFamily = route.view === 'dashboard' ? 'dashboard'
+    : (route.view === 'company' || route.view === 'sales') ? route.view
+    : 'portfolio';
   document.querySelectorAll('#nrr-appnav a').forEach(function (a) {
     a.classList.toggle('on', a.dataset.view === navFamily);
   });

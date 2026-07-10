@@ -308,8 +308,9 @@ window.nrrFetchCompanyCsv = nrrFetchCompanyCsv;
 // book. 404-graceful like company_gmv.csv.
 window.bulkSalesPipelineData = { loaded: false };
 
-// 8 cols: outlet_id, account_id, account_name, account_type, bucket,
-//         new_user_exp_date (YYYY-MM-DD or ''), last_month_gmv, orders
+// 9 cols (v4 SQL — staff_owner added): outlet_id, account_id, account_name,
+//         account_type, bucket, new_user_exp_date (YYYY-MM-DD or ''),
+//         last_month_gmv, orders, staff_owner
 function _nrrParseSalesPipelineCsv(text) {
   var lines = text.trim().split('\n').slice(1);
   var rows = [];
@@ -325,7 +326,10 @@ function _nrrParseSalesPipelineCsv(text) {
       bucket: (p[4] || '').trim(),
       new_user_exp_date: (p[5] || '').trim(),
       last_month_gmv: parseFloat(p[6]) || 0,
-      orders: parseInt(p[7], 10) || 0
+      orders: parseInt(p[7], 10) || 0,
+      // v4 SQL column — absent (undefined→'') in any CSV uploaded before
+      // that re-run; degrades gracefully to "ไม่ระบุ Sales" grouping.
+      staff_owner: (p[8] || '').trim()
     });
   });
   return rows;
