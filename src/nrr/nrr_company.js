@@ -486,20 +486,32 @@ function _nrrSalesPipelineTableHtml(pm) {
   var headCells = pm.order.map(function (key) {
     return '<th style="text-align:right;white-space:nowrap;color:' + _nrrPipeBucketColor(key) + '">' + nrrEsc(pm.labels[key]) + '</th>';
   }).join('');
-  var amtCells = pm.order.map(function (key) {
-    var b = pm.buckets[key];
-    return '<td class="num nrr-pipe-cell" data-bucket="' + key + '" style="text-align:right;font-weight:700;cursor:pointer;color:' + _nrrPipeBucketColor(key) + '">' +
-      (b.gmv ? nrrFmtGMVExact(b.gmv) : '—') + '</td>';
-  }).join('');
-  var cntCells = pm.order.map(function (key) {
-    var b = pm.buckets[key];
-    return '<td class="micro nrr-pipe-cell" data-bucket="' + key + '" style="text-align:right;cursor:pointer">' + b.outlets.toLocaleString() + ' ร้าน</td>';
-  }).join('');
+  var hasOther = pm.order.some(function (key) { return pm.buckets[key].bySquad.other.gmv > 0; });
+
+  function cellHtml(key, squadKey) {
+    var b = squadKey ? pm.buckets[key].bySquad[squadKey] : pm.buckets[key];
+    var attrs = 'data-bucket="' + key + '"' + (squadKey ? ' data-squad="' + squadKey + '"' : '');
+    if (!b.gmv) return '<td class="num nrr-pipe-cell" ' + attrs + ' style="text-align:right;cursor:pointer;color:var(--ink3)">—</td>';
+    return '<td class="num nrr-pipe-cell" ' + attrs + ' style="text-align:right;cursor:pointer">' +
+      nrrFmtGMVExact(b.gmv) +
+      '<div class="micro" style="margin-top:1px;color:var(--ink3)">' + b.outlets.toLocaleString() + ' ร้าน</div></td>';
+  }
+  function rowHtml(label, squadKey, opts) {
+    opts = opts || {};
+    var color = squadKey === 'chain' ? NRR_CO_COLORS.chain : squadKey === 'sa_mc' ? NRR_CO_COLORS.sa_mc : null;
+    var dotHtml = color ? '<span class="nrr-sat-dot" style="background:' + color + ';margin-right:7px"></span>' : '';
+    var borderStyle = color ? 'border-left:3px solid ' + color + ';' : '';
+    var cells = pm.order.map(function (key) { return cellHtml(key, squadKey); }).join('');
+    return '<tr' + (opts.topline ? ' style="border-top:1px solid var(--line)"' : '') + '>' +
+      '<td style="' + (opts.bold ? 'font-weight:600;' : '') + borderStyle + 'padding-left:12px;white-space:nowrap">' + dotHtml + label + '</td>' + cells + '</tr>';
+  }
   return '<div style="overflow-x:auto">' +
     '<table class="nrr-table nrr-table-compact"><thead><tr><th></th>' + headCells + '</tr></thead>' +
     '<tbody>' +
-    '<tr><td style="font-weight:600;white-space:nowrap">GMV</td>' + amtCells + '</tr>' +
-    '<tr><td class="micro" style="white-space:nowrap">จำนวนร้าน</td>' + cntCells + '</tr>' +
+    rowHtml('Chain', 'chain') +
+    rowHtml('SA/MC', 'sa_mc') +
+    (hasOther ? rowHtml('อื่นๆ', 'other') : '') +
+    rowHtml('รวม Sales ทั้งหมด', null, { bold: true, topline: true }) +
     '</tbody></table></div>' +
     '<div class="micro" style="margin-top:8px">กดตัวเลขเพื่อดูรายชื่อร้าน (แยกตาม Sales รายคนได้) · SA ต้องส่งมอบใน 45 วัน / MC-Chain ใน 90 วัน นับจากคำสั่งซื้อแรก</div>';
 }
@@ -587,7 +599,7 @@ function nrrRenderSalesView() {
 
 function nrrHandleSalesClick(e) {
   var cell = e.target.closest('.nrr-pipe-cell[data-bucket]');
-  if (cell) { nrrOpenPipelineDrawer(cell.dataset.bucket); return; }
+  if (cell) { nrrOpenPipelineDrawer(cell.dataset.bucket, cell.dataset.squad || null); return; }
 }
 
 // ── Pipeline drawer — slideover with custom body (commission precedent) ──
@@ -597,17 +609,20 @@ function nrrHandleSalesClick(e) {
 // +300 per "โหลดเพิ่ม") behind a dedicated search input, so the drawer
 // never locks the DOM even for the biggest bucket.
 
-var nrrPipeDrawerState = null; // { bucketKey, search, shown, repFilter }
+var nrrPipeDrawerState = null; // { bucketKey, squadKey, search, shown, repFilter }
 
-function nrrOpenPipelineDrawer(bucketKey) {
+var NRR_PIPE_SQUAD_LABEL = { chain: 'Chain', sa_mc: 'SA/MC', other: 'อื่นๆ' };
+
+function nrrOpenPipelineDrawer(bucketKey, squadKey) {
   var pm = typeof nrrSalesPipelineModel === 'function' ? nrrSalesPipelineModel() : null;
   if (!pm || !pm.buckets[bucketKey]) return;
   var label = pm.labels[bucketKey];
-  var b = pm.buckets[bucketKey];
+  var b = squadKey ? pm.buckets[bucketKey].bySquad[squadKey] : pm.buckets[bucketKey];
+  if (!b) return;
   nrrCommDrawerState = null; // leaving commission mode (stale-guards its async fetch)
-  nrrPipeDrawerState = { bucketKey: bucketKey, search: '', shown: 100, repFilter: null };
+  nrrPipeDrawerState = { bucketKey: bucketKey, squadKey: squadKey || null, search: '', shown: 100, repFilter: null };
 
-  document.getElementById('nrr-slideover-title').textContent = 'Pipeline — ' + label;
+  document.getElementById('nrr-slideover-title').textContent = 'Pipeline — ' + label + (squadKey ? ' · ' + NRR_PIPE_SQUAD_LABEL[squadKey] : '');
   document.getElementById('nrr-slideover-sub').textContent = b.outlets.toLocaleString() + ' ร้าน · ' + nrrFmtGMVExact(b.gmv);
   // Hide the shared search/chips rows — _nrrOpenSlideover restores them on
   // its next open (same pattern as the commission drawer)
@@ -654,6 +669,13 @@ function nrrRenderPipeRows() {
   var pm = typeof nrrSalesPipelineModel === 'function' ? nrrSalesPipelineModel() : null;
   if (!pm) { wrap.innerHTML = ''; return; }
   var bucketRows = pm.buckets[nrrPipeDrawerState.bucketKey].rows;
+  var squadKey = nrrPipeDrawerState.squadKey;
+  if (squadKey) {
+    bucketRows = bucketRows.filter(function (r) {
+      var sq = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
+      return sq === squadKey;
+    });
+  }
   var q = nrrPipeDrawerState.search;
 
   // ── Level 1: per-Sales-rep summary (default view) ──

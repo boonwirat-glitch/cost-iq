@@ -510,7 +510,9 @@ function nrrSalesPipelineModel() {
   order.push('no_date');
 
   var buckets = {};
-  order.forEach(function (k) { buckets[k] = { gmv: 0, outlets: 0, rows: [] }; });
+  order.forEach(function (k) {
+    buckets[k] = { gmv: 0, outlets: 0, rows: [], bySquad: { chain: { gmv: 0, outlets: 0 }, sa_mc: { gmv: 0, outlets: 0 }, other: { gmv: 0, outlets: 0 } } };
+  });
   var bySquad = { chain: 0, sa_mc: 0, other: 0 };
 
   pd.allRows.forEach(function (r) {
@@ -524,11 +526,13 @@ function nrrSalesPipelineModel() {
       var diff = (d.getFullYear() * 12 + d.getMonth()) - todayKey;
       key = 'm' + Math.min(diff, NRR_PIPE_MAX_OFFSET);
     }
+    var sq = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
     buckets[key].gmv += r.last_month_gmv;
     buckets[key].outlets += 1;
     buckets[key].rows.push(r);
-    if (r.bucket === 'chain' || r.bucket === 'sa_mc') bySquad[r.bucket] += r.last_month_gmv;
-    else bySquad.other += r.last_month_gmv;
+    buckets[key].bySquad[sq].gmv += r.last_month_gmv;
+    buckets[key].bySquad[sq].outlets += 1;
+    bySquad[sq] += r.last_month_gmv;
   });
 
   // overdue: most-overdue (oldest date) first; future buckets: soonest first
