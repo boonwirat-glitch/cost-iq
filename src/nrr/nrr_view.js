@@ -661,11 +661,17 @@ function nrrPriceChartHtml(it) {
     return '<text x="' + p.x + '" y="' + (H - 6) + '" font-size="9" fill="var(--ink3)" text-anchor="' + a + '">' + nrrEsc(p.mo.split(' ')[0]) + '</text>';
   }).join('');
   var deltaPct = first > 0 ? delta / first * 100 : 0;
+  // v42: a short chart (SQL-side ฿100 GMV floor on bulk_price.csv means some
+  // months for low-volume SKUs never export a unit_price) should read as
+  // "sparse history" not "broken feature" — see nrr-project-status.md for
+  // the confirmed root cause.
+  var sparseNote = n < 6 ? '<div class="micro" style="color:var(--ink3);margin-top:2px">ข้อมูล ' + n + '/6 เดือน (บางเดือนซื้อต่ำกว่า ฿100 จึงไม่บันทึกราคาต่อหน่วย)</div>' : '';
   return '<div class="nrr-price-chart">' +
     '<div class="nrr-price-chart-head">' +
     '<div><span class="nrr-price-chart-now num">' + nrrFmtUnitPrice(last) + '</span><span class="nrr-price-chart-unit">/' + nrrEsc(it.displayUnit) + '</span>' + (it.pack_size ? ' <span class="micro">· ' + nrrEsc(it.pack_size) + '</span>' : '') + '</div>' +
     '<span class="num" style="font-weight:700;color:' + color + '">' + (deltaPct >= 0 ? '+' : '') + (Math.round(deltaPct * 10) / 10) + '% ตลอดช่วง</span>' +
     '</div>' +
+    sparseNote +
     '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto">' +
     '<polygon points="' + area + '" fill="' + color + '" opacity="0.08"></polygon>' +
     '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
@@ -755,11 +761,24 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     // buyer lens: any price INCREASE is the thing a KAM most wants flagged
     // (cost creep / churn risk) → amber accent; else green if only drops.
     var pAccent = pUp > 0 ? 'var(--sun-deep)' : pDown > 0 ? 'var(--green-deep)' : 'var(--ink3)';
-    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + pAccent + '">' +
+    // v42: headline is the net ฿ price-only effect (fixed-Q) when there's a
+    // real MoM comparison to compute it from; falls back to the SKU count
+    // when nothing had a comparable prior price (a real "no data" state must
+    // never look like an honest "฿0").
+    var netFx = nrrAccountPriceNetEffect(priceList);
+    var priceHeadline, priceAccent;
+    if (netFx.n > 0) {
+      priceAccent = netFx.net < 0 ? 'var(--green-deep)' : netFx.net > 0 ? 'var(--sun-deep)' : 'var(--ink3)';
+      priceHeadline = (netFx.net < 0 ? '−' : netFx.net > 0 ? '+' : '') + nrrFmtGMVExact(Math.abs(netFx.net));
+    } else {
+      priceAccent = pAccent;
+      priceHeadline = priceList.items.length + '<span style="font-size:13px;color:var(--ink3)"> SKU</span>';
+    }
+    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + priceAccent + '">' +
       '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
-      '<div class="num nrr-acct-stat-val">' + priceList.items.length + '<span style="font-size:13px;color:var(--ink3)"> SKU</span></div>' +
+      '<div class="num nrr-acct-stat-val" style="color:' + (netFx.n > 0 ? priceAccent : 'inherit') + '">' + priceHeadline + '</div>' +
       nrrPriceDivBarHtml(pDown, pUp) +
-      '<div class="nrr-acct-stat-sub">▲' + pUp + ' แพงขึ้น · ▼' + pDown + ' ถูกลง</div>' +
+      '<div class="nrr-acct-stat-sub">▲' + pUp + ' แพงขึ้น · ▼' + pDown + ' ถูกลง' + (netFx.n > 0 ? ' · ' + priceList.items.length + ' SKU' : '') + '</div>' +
       '</button>';
   }
 
@@ -989,12 +1008,12 @@ function nrrCategoryDrawerHtml(cat) {
 // ฿/หน่วย + monthly spend + MoM %change, expanding to the fixed 6-month
 // chart. Custom-body drawer (same precedent as the commission/pipeline
 // drawers: hide the shared search/chips rows, own body, own state).
-var nrrPriceDrawerState = null; // { accountId, kamEmail, cat, search, move, data }
+var nrrPriceDrawerState = null; // { accountId, kamEmail, cat, search, move, rowView, data }
 
 function nrrOpenPriceDrawer(accountId, kamEmail) {
   nrrCommDrawerState = null;
   var data = nrrAccountPriceList(accountId, kamEmail);
-  nrrPriceDrawerState = { accountId: accountId, kamEmail: kamEmail, cat: 'all', search: '', move: 'all', data: data };
+  nrrPriceDrawerState = { accountId: accountId, kamEmail: kamEmail, cat: 'all', search: '', move: 'all', rowView: 'value', data: data };
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
@@ -1013,40 +1032,62 @@ function nrrOpenPriceDrawer(accountId, kamEmail) {
   data.items.forEach(function (it) { if (it.chgPct != null) { if (it.chgPct >= 1) up++; else if (it.chgPct <= -1) down++; } });
   document.getElementById('nrr-slideover-sub').textContent = data.items.length + ' SKU' + (data.useLabel ? ' · ' + data.useLabel : '');
 
-  // category pills — only categories actually present, in NRR_CAT_MASTER order
+  // category dropdown — only categories actually present, in NRR_CAT_MASTER order
   var present = {};
   data.items.forEach(function (it) { present[it.dept] = (present[it.dept] || 0) + 1; });
-  var catPills = '<button type="button" class="nrr-chip on" data-cat="all">ทั้งหมด ' + data.items.length + '</button>' +
+  var catOptions = '<option value="all">ทั้งหมด (' + data.items.length + ')</option>' +
     (window.NRR_CAT_MASTER || []).filter(function (c) { return present[c.n]; }).map(function (c) {
-      return '<button type="button" class="nrr-chip" data-cat="' + nrrEsc(c.n) + '">' + nrrEsc(c.n) + ' ' + present[c.n] + '</button>';
+      return '<option value="' + nrrEsc(c.n) + '">' + nrrEsc(c.n) + ' (' + present[c.n] + ')</option>';
     }).join('');
-  var movePills = '<button type="button" class="nrr-chip on" data-move="all">ทั้งหมด</button>' +
-    (down ? '<button type="button" class="nrr-chip" data-move="down"><span style="color:var(--green-deep)">▼</span> ถูกลง ' + down + '</button>' : '') +
-    (up ? '<button type="button" class="nrr-chip" data-move="up"><span style="color:var(--sun-deep)">▲</span> แพงขึ้น ' + up + '</button>' : '');
 
+  // v42: filter collapsed to ONE row — category <select> + search + a
+  // ▲/▼ toggle (was 3 separate pill/input rows) — and a ฿/〰 toggle for the
+  // list rows' default display, per the user's explicit design choice.
   body.innerHTML = '<div class="nrr-comm-ds">' +
-    '<div class="nrr-verdict">เดือนนี้ ▲ ' + up + ' รายการราคาขึ้น · ▼ ' + down + ' รายการราคาลง — ดูว่ายอดที่เปลี่ยนมาจากราคาหรือปริมาณ</div>' +
-    '<div class="nrr-chip-row" id="nrr-price-cat-pills" style="margin-bottom:8px">' + catPills + '</div>' +
-    '<div style="margin-bottom:8px"><input class="nrr-search" id="nrr-price-search" placeholder="ค้นหาสินค้า..." style="width:100%"></div>' +
-    '<div class="nrr-chip-row" id="nrr-price-move-pills">' + movePills + '</div>' +
+    '<div class="nrr-price-filter-row">' +
+    '<select class="nrr-search" id="nrr-price-cat-select">' + catOptions + '</select>' +
+    '<input class="nrr-search" id="nrr-price-search" placeholder="ค้นหาสินค้า...">' +
+    '<div class="nrr-price-toggle-grp">' +
+    '<button type="button" class="nrr-price-toggle" id="nrr-price-move-down" title="เรียงถูกลง">▼<span class="micro">' + down + '</span></button>' +
+    '<button type="button" class="nrr-price-toggle" id="nrr-price-move-up" title="เรียงแพงขึ้น">▲<span class="micro">' + up + '</span></button>' +
+    '</div>' +
+    '<div class="nrr-price-toggle-grp">' +
+    '<button type="button" class="nrr-price-toggle on" id="nrr-price-view-value" title="แสดงราคา/หน่วย">฿</button>' +
+    '<button type="button" class="nrr-price-toggle" id="nrr-price-view-spark" title="แสดงกราฟแนวโน้ม">〰</button>' +
+    '</div>' +
+    '</div>' +
     '<div id="nrr-price-list"></div>' +
     '</div>';
   nrrRenderPriceDrawerList();
 
-  document.getElementById('nrr-price-cat-pills').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-cat]'); if (!b) return;
-    nrrPriceDrawerState.cat = b.dataset.cat;
-    this.querySelectorAll('.nrr-chip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on');
-    nrrRenderPriceDrawerList();
-  });
-  document.getElementById('nrr-price-move-pills').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-move]'); if (!b) return;
-    nrrPriceDrawerState.move = b.dataset.move;
-    this.querySelectorAll('.nrr-chip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on');
+  document.getElementById('nrr-price-cat-select').addEventListener('change', function () {
+    nrrPriceDrawerState.cat = this.value;
     nrrRenderPriceDrawerList();
   });
   var searchEl = document.getElementById('nrr-price-search');
   searchEl.addEventListener('input', function () { nrrPriceDrawerState.search = searchEl.value.trim().toLowerCase(); nrrRenderPriceDrawerList(); });
+
+  function bindMoveToggle(id, val) {
+    document.getElementById(id).addEventListener('click', function () {
+      nrrPriceDrawerState.move = (nrrPriceDrawerState.move === val) ? 'all' : val;
+      document.getElementById('nrr-price-move-down').classList.toggle('on', nrrPriceDrawerState.move === 'down');
+      document.getElementById('nrr-price-move-up').classList.toggle('on', nrrPriceDrawerState.move === 'up');
+      nrrRenderPriceDrawerList();
+    });
+  }
+  bindMoveToggle('nrr-price-move-down', 'down');
+  bindMoveToggle('nrr-price-move-up', 'up');
+
+  function bindViewToggle(id, val) {
+    document.getElementById(id).addEventListener('click', function () {
+      nrrPriceDrawerState.rowView = val;
+      document.getElementById('nrr-price-view-value').classList.toggle('on', val === 'value');
+      document.getElementById('nrr-price-view-spark').classList.toggle('on', val === 'spark');
+      nrrRenderPriceDrawerList();
+    });
+  }
+  bindViewToggle('nrr-price-view-value', 'value');
+  bindViewToggle('nrr-price-view-spark', 'spark');
 
   backdrop.classList.add('on'); over.classList.add('on');
 }
@@ -1067,18 +1108,40 @@ function nrrRenderPriceDrawerList() {
     : '<div class="ds-empty" style="padding:20px 0"><div class="ds-empty-title">ไม่พบสินค้าที่ตรงกับตัวกรอง</div></div>';
 }
 
+// v42: small trend line for the row's collapsed state — mirrors
+// nrrAcctSparklineSvg's minimal-noise pattern (no axes/labels, just shape +
+// buyer-lens color), parameterized so it takes a plain price array rather
+// than an `aov`-shaped months object.
+function nrrPriceRowSparkSvg(history, color) {
+  var vals = (history || []).map(function (p) { return p.price; });
+  if (vals.length < 2) return '<span class="micro" style="color:var(--ink3)">—</span>';
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rng = (mx - mn) || 1;
+  var pts = vals.map(function (v, i) { return (i / (vals.length - 1) * 56) + ',' + (15 - (v - mn) / rng * 12 - 1.5); }).join(' ');
+  return '<svg class="nrr-price-row-spark" viewBox="0 0 56 16" width="56" height="16" preserveAspectRatio="none">' +
+    '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>';
+}
 function nrrPriceListRowHtml(it) {
   var chg = '';
   if (it.chgPct != null && Math.abs(it.chgPct) >= 1) {
     var dn = it.chgPct < 0;
     chg = ' · <span class="nrr-price-chg" style="color:' + (dn ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + (dn ? '▼' : '▲') + ' ' + Math.abs(Math.round(it.chgPct * 10) / 10) + '%</span>';
   }
+  var sub;
+  if (nrrPriceDrawerState && nrrPriceDrawerState.rowView === 'spark') {
+    var h = it.history || [];
+    var first = h.length ? h[0].price : 0, last = h.length ? h[h.length - 1].price : 0;
+    var band = Math.abs(first) * 0.005;
+    var sparkColor = (last - first) < -band ? 'var(--green-deep)' : (last - first) > band ? 'var(--sun-deep)' : 'var(--ink3)';
+    sub = '<div class="nrr-price-row-sub" style="display:flex;align-items:center;gap:8px">' + (it.pack_size ? nrrEsc(it.pack_size) : '') + nrrPriceRowSparkSvg(h, sparkColor) + '</div>';
+  } else {
+    sub = '<div class="nrr-price-row-sub">' + (it.pack_size ? nrrEsc(it.pack_size) + ' · ' : '') + nrrFmtUnitPrice(it.displayPrice) + '/' + nrrEsc(it.displayUnit) + chg + '</div>';
+  }
   return '<details class="nrr-price-row-group">' +
     '<summary class="nrr-price-row">' +
     '<span class="ds-chev">›</span>' +
     '<div class="nrr-price-row-main">' +
     '<div class="nrr-price-row-name">' + nrrEsc(it.name) + '</div>' +
-    '<div class="nrr-price-row-sub">' + (it.pack_size ? nrrEsc(it.pack_size) + ' · ' : '') + nrrFmtUnitPrice(it.displayPrice) + '/' + nrrEsc(it.displayUnit) + chg + '</div>' +
+    sub +
     '</div>' +
     '<div class="nrr-price-row-right"><div class="num nrr-price-row-spend">' + nrrFmtGMVExact(it.gmv) + '</div><div class="micro">/เดือน</div></div>' +
     '</summary>' +

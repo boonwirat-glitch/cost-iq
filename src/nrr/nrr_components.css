@@ -980,6 +980,23 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-price-chart-foot { display: flex; gap: 22px; margin-top: 8px; }
 .nrr-price-chart-foot .num { font-size: 14px; font-weight: 700; }
 
+/* ── Price drawer filter row (v42) — collapsed from 3 rows (cat pills,
+   search, movement pills) into ONE: category <select> + search (grows) +
+   a compact ▲/▼ toggle group, plus a ฿/〰 row-view toggle group. */
+.nrr-price-filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.nrr-price-filter-row select.nrr-search { flex: none; width: auto; min-width: 0; max-width: 150px; }
+.nrr-price-filter-row input.nrr-search { flex: 1; min-width: 0; }
+.nrr-price-toggle-grp { display: flex; gap: 4px; flex: none; }
+.nrr-price-toggle {
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: transparent; color: var(--ink2); font-size: 12.5px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; gap: 4px; line-height: 1;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+.nrr-price-toggle:hover { border-color: var(--ink3); }
+.nrr-price-toggle.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.nrr-price-row-spark { display: block; flex: none; }
+
 /* ── Account view loading skeleton — page-shaped, not a single bar ─────── */
 .nrr-acct-skel-mast { display: flex; align-items: center; gap: 12px; }
 .nrr-acct-skel-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; }

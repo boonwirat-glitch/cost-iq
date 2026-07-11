@@ -643,6 +643,26 @@ function nrrAccountPriceList(accountId, kamEmail) {
 }
 window.nrrAccountPriceList = nrrAccountPriceList;
 
+// ── Net price-effect (v42) — fixed-quantity, price-only ฿ impact across every
+// SKU with a real MoM comparison. Since it.gmv = cur * qty_current by
+// construction, holding THIS month's quantity fixed and asking "what if we'd
+// paid last month's price instead" collapses to gmv*(1 - prev/cur) — no
+// separate qty field needed. Negative = ร้านจ่ายถูกลงจากราคาล้วน (buyer-lens
+// good), positive = แพงขึ้นจากราคาล้วน. Feeds the "ราคาสินค้า" stat cell.
+function nrrAccountPriceNetEffect(priceList) {
+  var net = 0, upAmt = 0, downAmt = 0, n = 0;
+  (priceList && priceList.items || []).forEach(function (it) {
+    if (it.chgPct == null || !it.history || it.history.length < 2) return;
+    var cur = it.history[it.history.length - 1].price, prev = it.history[it.history.length - 2].price;
+    if (!(cur > 0) || !(prev > 0)) return;
+    var effect = it.gmv * (1 - prev / cur);
+    net += effect; n++;
+    if (effect > 0) upAmt += effect; else downAmt += effect;
+  });
+  return { net: net, upAmt: upAmt, downAmt: downAmt, n: n };
+}
+window.nrrAccountPriceNetEffect = nrrAccountPriceNetEffect;
+
 // ── Price impact — net ฿ effect of price changes this month vs last ─────
 function nrrAccountPriceImpact(accountId, kamEmail) {
   var priceBundle = window.bulkPriceData;
