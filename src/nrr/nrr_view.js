@@ -18,7 +18,7 @@ var nrrState = {
   // v28: company/sales moved to their own views (#/company, #/sales) —
   // their state lives in nrrCompanyState (nrr_company.js).
 };
-var nrrSlideoverState = { mode: 'kam', movementFilter: 'all', kamFilter: 'all', search: '' };
+var nrrSlideoverState = { mode: 'kam', movementFilter: 'all', momentumFilter: 'all', kamFilter: 'all', search: '' };
 var nrrSlideoverOutlets = [];
 var nrrLastComparison = null;
 var nrrLastKamRows = null;
@@ -845,6 +845,7 @@ function nrrAccountSignalListsHtml(row, kamEmail) {
 function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
   var title = '', html = '';
   if (key === 'aov') {
     var aov = nrrAccountAov(row.account_id);
@@ -1139,6 +1140,7 @@ function nrrShellHtml() {
     '  <div class="nrr-slideover-head"><div><div class="nrr-sh-title" id="nrr-slideover-title">ร้านค้า</div><div class="meta" id="nrr-slideover-sub"></div></div><button class="nrr-sh-close" id="nrr-slideover-close">✕</button></div>' +
     '  <div style="padding:12px 22px 0;display:flex;gap:8px;align-items:center"><input class="nrr-search" id="nrr-slideover-search" placeholder="ค้นหาร้านค้า/account..." style="flex:1;min-width:0"><span id="nrr-slideover-kamwrap" style="display:none"></span></div>' +
     '  <div style="padding:10px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-chips"></div></div>' +
+    '  <div style="padding:6px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-momentum-chips" style="display:none"></div></div>' +
     '  <div class="nrr-slideover-body" id="nrr-slideover-body"></div>' +
     '</div>' +
     // Floating per-outlet tooltip (Account view, Phase C) — sibling of the
@@ -2223,6 +2225,7 @@ function nrrOpenCommissionDrawer(kamEmail, kamName, period) {
   document.getElementById('nrr-slideover-sub').textContent = (QNRR_CFG.months_th[period] || period) + ' · รายละเอียดคอมมิชชั่น';
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
   document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds" id="nrr-comm-drawer-body"></div>';
   nrrRenderCommissionDrawerBody(kamEmail, period);
   document.getElementById('nrr-slideover-backdrop').classList.add('on');
@@ -2493,9 +2496,21 @@ function nrrLoadNotesFor(outlets, period) {
   });
 }
 
+// Same momentum computation nrrOutletRowHtml already does for its glyph
+// (base_gmv vs run_rate) — reused here so the up/down chip counts and
+// filter always agree exactly with what each row visibly shows.
+function _nrrSlideoverRowMomentum(row) {
+  var currD = parseFloat(row.curr_days) || 30;
+  var mtd = parseFloat(row.curr_gmv) || 0;
+  var base = Math.round(parseFloat(row.base_gmv) || 0);
+  var runRate = Math.round(currD > 0 ? mtd / currD * nrrDaysIn(row.period_month) : 0);
+  return nrrMomentum(base, runRate);
+}
+
 function nrrRenderSlideoverChips(showMv, showKamChips) {
   var mvEl = document.getElementById('nrr-slideover-chips');
   var kamWrap = document.getElementById('nrr-slideover-kamwrap');
+  var momEl = document.getElementById('nrr-slideover-momentum-chips');
 
   if (showMv) {
     var counts = {};
@@ -2513,7 +2528,36 @@ function nrrRenderSlideoverChips(showMv, showKamChips) {
         nrrRenderSlideoverBody();
       });
     });
-  } else { mvEl.style.display = 'none'; mvEl.innerHTML = ''; }
+
+    // Up/down momentum filter — orthogonal to movement type (own toggle
+    // group, own state field): a shop can be "Core NRR" AND "trending up"
+    // at the same time, so this is an independent AND-condition, not a
+    // sibling option inside the movement-type chip row.
+    var upCount = 0, downCount = 0;
+    nrrSlideoverOutlets.forEach(function (o) {
+      var sig = _nrrSlideoverRowMomentum(o.row);
+      if (sig.cls === 'nrr-sig-up') upCount++;
+      else if (sig.cls === 'nrr-sig-down') downCount++;
+    });
+    momEl.style.display = '';
+    momEl.innerHTML =
+      '<button class="nrr-chip" data-mom="all">แนวโน้ม: ทั้งหมด</button>' +
+      '<button class="nrr-chip" data-mom="nrr-sig-up"><span style="color:var(--green-deep)">▲</span> โตขึ้น ' + upCount + '</button>' +
+      '<button class="nrr-chip" data-mom="nrr-sig-down"><span style="color:var(--coral)">▼</span> ลดลง ' + downCount + '</button>';
+    var momOn = momEl.querySelector('[data-mom="' + nrrSlideoverState.momentumFilter + '"]');
+    if (momOn) momOn.classList.add('on');
+    momEl.querySelectorAll('.nrr-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        momEl.querySelectorAll('.nrr-chip').forEach(function (b) { b.classList.remove('on'); });
+        btn.classList.add('on');
+        nrrSlideoverState.momentumFilter = btn.dataset.mom;
+        nrrRenderSlideoverBody();
+      });
+    });
+  } else {
+    mvEl.style.display = 'none'; mvEl.innerHTML = '';
+    momEl.style.display = 'none'; momEl.innerHTML = '';
+  }
 
   // v5: KAM filter as a dropdown beside the search box (chips wasted a
   // whole wrapping row for 8+ names).
@@ -2541,6 +2585,7 @@ function nrrRenderSlideoverBody() {
   var st = nrrSlideoverState;
   var filtered = nrrSlideoverOutlets.filter(function (o) {
     if (st.movementFilter !== 'all' && o.movement !== st.movementFilter) return false;
+    if (st.momentumFilter && st.momentumFilter !== 'all' && _nrrSlideoverRowMomentum(o.row).cls !== st.momentumFilter) return false;
     if (st.kamFilter && st.kamFilter !== 'all' && (o.row.latest_staff_owner || '—') !== st.kamFilter) return false;
     if (st.search) {
       var hay = ((o.row.account_name || '') + ' ' + (o.row.res_name || '') + ' ' + (o.row.latest_staff_owner || '')).toLowerCase();

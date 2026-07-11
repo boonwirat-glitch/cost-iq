@@ -628,6 +628,7 @@ function nrrOpenPipelineDrawer(bucketKey, squadKey) {
   // its next open (same pattern as the commission drawer)
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
   document.getElementById('nrr-slideover-body').innerHTML =
     '<div style="padding:4px 2px 12px"><input class="nrr-search" id="nrr-pipe-search" placeholder="ค้นหาร้านค้า หรือชื่อ Sales..." style="width:100%"></div>' +
     '<div id="nrr-pipe-rows"></div>';
