@@ -962,7 +962,8 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-swap-new { color: var(--ink); }
 
 /* ── Price drawer (v41) — browsable SKU price list + per-SKU chart.
-   Buyer lens: price down = green (cheaper), up = --sun-deep (cost warning). */
+   Buyer lens: price down = green (cheaper), up = --attention (vibrant
+   orange cost warning — not the dull --sun-deep olive used elsewhere). */
 .nrr-comm-ds .nrr-price-row-group { border-bottom: 1px solid var(--line); }
 .nrr-comm-ds .nrr-price-row-group:last-of-type { border-bottom: none; }
 .nrr-price-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 2px; cursor: pointer; list-style: none; }

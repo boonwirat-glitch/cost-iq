@@ -622,14 +622,16 @@ function nrrAcctSparklineSvg(months) {
     '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
     '<circle cx="100" cy="' + lastY + '" r="2.4" fill="var(--green-deep)"></circle></svg>';
 }
-// ── Per-SKU price history chart (v41) — expand inside the reworked price
-// drawer. Takes a nrrAccountPriceList item {history:[{month_label,price}],
-// displayUnit, pack_size, gmv} where `price` is ALREADY in the display unit.
-// Buyer lens: price DOWN = green (ร้านจ่ายถูกลง), UP = amber/--sun-deep.
-// Fixed from the old version: NO preserveAspectRatio="none" (that stretched
-// the fonts horizontally + squashed the plot); width:100%+height:auto scales
-// uniformly. Header shows ฿latest/<unit> + pack, footer shows ต่ำสุด/สูงสุด/
-// ซื้อ-เดือน — so the ฿-per-what and monthly-spend questions are answered.
+// ── Per-SKU price history chart (v41, revised v43) — expand inside the
+// reworked price drawer. Takes a nrrAccountPriceList item
+// {history:[{month_label,price}], displayUnit, pack_size, gmv} where `price`
+// is ALREADY in the display unit. Buyer lens: price DOWN = green (ร้านจ่าย
+// ถูกลง), UP = vibrant orange (--attention, not the dull olive --sun-deep —
+// user explicitly asked for more color, 2026-07-11). Fixed from the old
+// version: NO preserveAspectRatio="none" (that stretched the fonts
+// horizontally + squashed the plot); width:100%+height:auto scales uniformly.
+// Header shows ฿latest/<unit> + pack, footer shows ต่ำสุด/สูงสุด/ซื้อ-เดือน —
+// so the ฿-per-what and monthly-spend questions are answered.
 function nrrFmtUnitPrice(v) {
   if (v == null || isNaN(v)) return '—';
   var r = Math.round(v * 100) / 100;
@@ -643,24 +645,30 @@ function nrrPriceChartHtml(it) {
   var rng = (mx - mn) || (mn * 0.02) || 1;
   var first = h[0].price, last = h[h.length - 1].price, n = h.length;
   var delta = last - first, band = Math.abs(first) * 0.005;
-  // buyer lens: down = good = green, up = cost warning = --sun-deep
-  var color = delta < -band ? 'var(--green-deep)' : delta > band ? 'var(--sun-deep)' : 'var(--ink3)';
+  // buyer lens: down = good = green, up = cost warning = vibrant orange
+  var color = delta < -band ? 'var(--green-deep)' : delta > band ? 'var(--attention)' : 'var(--ink3)';
   var W = 300, H = 118, pL = 12, pR = 12, pT = 22, pB = 22, cW = W - pL - pR, cH = H - pT - pB;
   var pts = h.map(function (p, i) {
     return { x: pL + (n === 1 ? 0 : (i / (n - 1)) * cW), y: pT + cH - ((p.price - mn) / rng) * cH, mo: p.month_label, price: p.price };
   });
   var line = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
   var area = pL + ',' + (pT + cH) + ' ' + line + ' ' + (pL + cW) + ',' + (pT + cH);
-  var dots = pts.map(function (p, i) { return (i === 0 || i === n - 1) ? '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '"></circle>' : ''; }).join('');
+  // v43: a dot at EVERY month (was only first/last — user asked for a visible
+  // changepoint marker each month, and since history is capped at 6 points
+  // total this never gets cluttered).
+  var dots = pts.map(function (p) { return '<circle cx="' + p.x + '" cy="' + p.y + '" r="' + (p === pts[0] || p === pts[n - 1] ? 3 : 2.4) + '" fill="' + color + '"></circle>'; }).join('');
   function vlab(p, a) { return '<text x="' + p.x + '" y="' + (p.y - 7) + '" font-size="9.5" font-weight="700" fill="' + color + '" text-anchor="' + a + '">' + nrrFmtUnitPrice(p.price) + '</text>'; }
   var valLabels = vlab(pts[0], 'start') + vlab(pts[n - 1], 'end');
+  // v43: show EVERY month label (was thinned to ~3 for n>4) — history is
+  // capped at 6 points so a label per point stays readable at W=300.
   var moLabels = pts.map(function (p, i) {
-    var show = n <= 4 || i === 0 || i === n - 1 || i === Math.floor((n - 1) / 2);
-    if (!show) return '';
     var a = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
     return '<text x="' + p.x + '" y="' + (H - 6) + '" font-size="9" fill="var(--ink3)" text-anchor="' + a + '">' + nrrEsc(p.mo.split(' ')[0]) + '</text>';
   }).join('');
   var deltaPct = first > 0 ? delta / first * 100 : 0;
+  // v43: "ตลอดช่วง" was unclear about WHICH period — spell out the actual
+  // month range shown on the chart instead (e.g. "ก.พ.–ก.ค.").
+  var rangeLabel = nrrEsc(h[0].month_label.split(' ')[0]) + '–' + nrrEsc(h[n - 1].month_label.split(' ')[0]);
   // v42: a short chart (SQL-side ฿100 GMV floor on bulk_price.csv means some
   // months for low-volume SKUs never export a unit_price) should read as
   // "sparse history" not "broken feature" — see nrr-project-status.md for
@@ -669,7 +677,7 @@ function nrrPriceChartHtml(it) {
   return '<div class="nrr-price-chart">' +
     '<div class="nrr-price-chart-head">' +
     '<div><span class="nrr-price-chart-now num">' + nrrFmtUnitPrice(last) + '</span><span class="nrr-price-chart-unit">/' + nrrEsc(it.displayUnit) + '</span>' + (it.pack_size ? ' <span class="micro">· ' + nrrEsc(it.pack_size) + '</span>' : '') + '</div>' +
-    '<span class="num" style="font-weight:700;color:' + color + '">' + (deltaPct >= 0 ? '+' : '') + (Math.round(deltaPct * 10) / 10) + '% ตลอดช่วง</span>' +
+    '<span class="num" style="font-weight:700;color:' + color + '">' + (deltaPct >= 0 ? '+' : '') + (Math.round(deltaPct * 10) / 10) + '% (' + rangeLabel + ')</span>' +
     '</div>' +
     sparseNote +
     '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto">' +
@@ -679,7 +687,7 @@ function nrrPriceChartHtml(it) {
     '</svg>' +
     '<div class="nrr-price-chart-foot">' +
     '<div><div class="micro">ต่ำสุด</div><div class="num" style="color:var(--green-deep)">' + nrrFmtUnitPrice(mn) + '</div></div>' +
-    '<div><div class="micro">สูงสุด</div><div class="num" style="color:var(--sun-deep)">' + nrrFmtUnitPrice(mx) + '</div></div>' +
+    '<div><div class="micro">สูงสุด</div><div class="num" style="color:var(--attention)">' + nrrFmtUnitPrice(mx) + '</div></div>' +
     '<div><div class="micro">ซื้อ/เดือน</div><div class="num">' + nrrFmtGMVExact(it.gmv) + '</div></div>' +
     '</div></div>';
 }
@@ -701,12 +709,12 @@ function nrrOutletStackedBarHtml(counts, total) {
     '</div>';
 }
 // Two-segment count bar for the price tile — buyer lens: DOWN (cheaper) is
-// the good green segment, UP (pricier) the amber warning segment.
+// the good green segment, UP (pricier) the vibrant-orange warning segment.
 function nrrPriceDivBarHtml(downCount, upCount) {
   var total = downCount + upCount;
   if (!total) return '';
   var downW = Math.round(downCount / total * 100);
-  return '<div class="nrr-acct-price-div"><i style="width:' + downW + '%;background:var(--green)"></i><i style="width:' + (100 - downW) + '%;background:var(--sun-deep)"></i></div>';
+  return '<div class="nrr-acct-price-div"><i style="width:' + downW + '%;background:var(--green)"></i><i style="width:' + (100 - downW) + '%;background:var(--attention)"></i></div>';
 }
 
 function nrrAccountStatRowHtml(row, kamEmail) {
@@ -759,8 +767,8 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     var pUp = 0, pDown = 0;
     priceList.items.forEach(function (it) { if (it.chgPct != null) { if (it.chgPct >= 1) pUp++; else if (it.chgPct <= -1) pDown++; } });
     // buyer lens: any price INCREASE is the thing a KAM most wants flagged
-    // (cost creep / churn risk) → amber accent; else green if only drops.
-    var pAccent = pUp > 0 ? 'var(--sun-deep)' : pDown > 0 ? 'var(--green-deep)' : 'var(--ink3)';
+    // (cost creep / churn risk) → vibrant-orange accent; else green if only drops.
+    var pAccent = pUp > 0 ? 'var(--attention)' : pDown > 0 ? 'var(--green-deep)' : 'var(--ink3)';
     // v42: headline is the net ฿ price-only effect (fixed-Q) when there's a
     // real MoM comparison to compute it from; falls back to the SKU count
     // when nothing had a comparable prior price (a real "no data" state must
@@ -768,7 +776,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     var netFx = nrrAccountPriceNetEffect(priceList);
     var priceHeadline, priceAccent;
     if (netFx.n > 0) {
-      priceAccent = netFx.net < 0 ? 'var(--green-deep)' : netFx.net > 0 ? 'var(--sun-deep)' : 'var(--ink3)';
+      priceAccent = netFx.net < 0 ? 'var(--green-deep)' : netFx.net > 0 ? 'var(--attention)' : 'var(--ink3)';
       priceHeadline = (netFx.net < 0 ? '−' : netFx.net > 0 ? '+' : '') + nrrFmtGMVExact(Math.abs(netFx.net));
     } else {
       priceAccent = pAccent;
@@ -1124,15 +1132,17 @@ function nrrPriceListRowHtml(it) {
   var chg = '';
   if (it.chgPct != null && Math.abs(it.chgPct) >= 1) {
     var dn = it.chgPct < 0;
-    chg = ' · <span class="nrr-price-chg" style="color:' + (dn ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + (dn ? '▼' : '▲') + ' ' + Math.abs(Math.round(it.chgPct * 10) / 10) + '%</span>';
+    chg = ' · <span class="nrr-price-chg" style="color:' + (dn ? 'var(--green-deep)' : 'var(--attention)') + '">' + (dn ? '▼' : '▲') + ' ' + Math.abs(Math.round(it.chgPct * 10) / 10) + '%</span>';
   }
   var sub;
   if (nrrPriceDrawerState && nrrPriceDrawerState.rowView === 'spark') {
-    var h = it.history || [];
-    var first = h.length ? h[0].price : 0, last = h.length ? h[h.length - 1].price : 0;
-    var band = Math.abs(first) * 0.005;
-    var sparkColor = (last - first) < -band ? 'var(--green-deep)' : (last - first) > band ? 'var(--sun-deep)' : 'var(--ink3)';
-    sub = '<div class="nrr-price-row-sub" style="display:flex;align-items:center;gap:8px">' + (it.pack_size ? nrrEsc(it.pack_size) : '') + nrrPriceRowSparkSvg(h, sparkColor) + '</div>';
+    // v43: color the sparkline by the SAME metric the ▲/▼ filter uses
+    // (chgPct, last-vs-prior month) — not the whole-6-month first/last trend.
+    // User caught the mismatch live: filtering to "ถูกลง" (down) could still
+    // show an "up"-colored spark if the item's longer history happened to
+    // trend up even though last month dropped. One signal, one color, always.
+    var sparkColor = it.chgPct == null ? 'var(--ink3)' : it.chgPct <= -1 ? 'var(--green-deep)' : it.chgPct >= 1 ? 'var(--attention)' : 'var(--ink3)';
+    sub = '<div class="nrr-price-row-sub" style="display:flex;align-items:center;gap:8px">' + (it.pack_size ? nrrEsc(it.pack_size) : '') + nrrPriceRowSparkSvg(it.history, sparkColor) + '</div>';
   } else {
     sub = '<div class="nrr-price-row-sub">' + (it.pack_size ? nrrEsc(it.pack_size) + ' · ' : '') + nrrFmtUnitPrice(it.displayPrice) + '/' + nrrEsc(it.displayUnit) + chg + '</div>';
   }
