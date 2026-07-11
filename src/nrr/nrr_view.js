@@ -655,8 +655,16 @@ function nrrPriceChartHtml(it) {
   var area = pL + ',' + (pT + cH) + ' ' + line + ' ' + (pL + cW) + ',' + (pT + cH);
   // v43: a dot at EVERY month (was only first/last — user asked for a visible
   // changepoint marker each month, and since history is capped at 6 points
-  // total this never gets cluttered).
-  var dots = pts.map(function (p) { return '<circle cx="' + p.x + '" cy="' + p.y + '" r="' + (p === pts[0] || p === pts[n - 1] ? 3 : 2.4) + '" fill="' + color + '"></circle>'; }).join('');
+  // total this never gets cluttered). v44: only first/last get a printed ฿
+  // label — added a native <title> tooltip (+ a larger invisible hit-circle,
+  // since a 2.4px dot is too small to reliably hover) so every month's exact
+  // price is reachable on hover, per the user's explicit ask.
+  var dots = pts.map(function (p, i) {
+    var r = (i === 0 || i === n - 1) ? 3 : 2.4;
+    var tip = '<title>' + nrrEsc(p.mo) + ': ' + nrrFmtUnitPrice(p.price) + '</title>';
+    return '<circle cx="' + p.x + '" cy="' + p.y + '" r="' + r + '" fill="' + color + '">' + tip + '</circle>' +
+      '<circle cx="' + p.x + '" cy="' + p.y + '" r="10" fill="transparent" style="cursor:default">' + tip + '</circle>';
+  }).join('');
   function vlab(p, a) { return '<text x="' + p.x + '" y="' + (p.y - 7) + '" font-size="9.5" font-weight="700" fill="' + color + '" text-anchor="' + a + '">' + nrrFmtUnitPrice(p.price) + '</text>'; }
   var valLabels = vlab(pts[0], 'start') + vlab(pts[n - 1], 'end');
   // v43: show EVERY month label (was thinned to ~3 for n>4) — history is
@@ -1133,6 +1141,18 @@ function nrrPriceListRowHtml(it) {
   if (it.chgPct != null && Math.abs(it.chgPct) >= 1) {
     var dn = it.chgPct < 0;
     chg = ' · <span class="nrr-price-chg" style="color:' + (dn ? 'var(--green-deep)' : 'var(--attention)') + '">' + (dn ? '▼' : '▲') + ' ' + Math.abs(Math.round(it.chgPct * 10) / 10) + '%</span>';
+  } else if (it.history && it.history.length >= 2) {
+    // v44: user asked why some SKUs show no mark at all (e.g. an egg SKU
+    // that rose ~20% ก.พ.→ก.ค. but had a <1% last-month step, so the
+    // MoM badge above never fires). Add a softer "creep" indicator — hollow
+    // triangle, muted — for meaningful whole-history drift so slow,
+    // step-by-step moves aren't completely invisible on the collapsed row.
+    var hFirst = it.history[0].price, hLast = it.history[it.history.length - 1].price;
+    var creepPct = hFirst > 0 ? (hLast - hFirst) / hFirst * 100 : 0;
+    if (Math.abs(creepPct) >= 3) {
+      var creepDn = creepPct < 0;
+      chg = ' · <span class="nrr-price-chg-creep" style="color:' + (creepDn ? 'var(--green-deep)' : 'var(--attention)') + '">' + (creepDn ? '▽' : '△') + ' ' + Math.abs(Math.round(creepPct)) + '% ใน ' + it.history.length + ' ด.</span>';
+    }
   }
   var sub;
   if (nrrPriceDrawerState && nrrPriceDrawerState.rowView === 'spark') {

@@ -972,6 +972,10 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-price-row-name { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrr-price-row-sub { font-size: 12px; color: var(--ink2); margin-top: 3px; }
 .nrr-price-chg { font-weight: 700; }
+/* v44: softer than .nrr-price-chg — a cumulative multi-month "creep" mark
+   shown ONLY when no single-month move cleared 1% (so it never competes
+   with the sharp badge, only fills the gap when that one is silent). */
+.nrr-price-chg-creep { font-weight: 600; opacity: .75; }
 .nrr-price-row-right { flex-shrink: 0; text-align: right; }
 .nrr-price-row-spend { font-size: 14px; font-weight: 700; }
 .nrr-price-chart { padding: 6px 2px 10px; }
