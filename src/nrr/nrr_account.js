@@ -139,13 +139,28 @@ function _nrrSkuFamilyKey(name, subclass) {
 // not when both sides share the same generic state word. This is a
 // curated list, not a provably complete one — extend it if further
 // mismatches like this turn up in real use (see plan doc).
+// 2026-07-11 round 2: two more real false positives — "ควินัวขาว ออแกนิค
+// ตรากรีนไลฟ์" (quinoa) matched "เมล็ดเจีย ออแกนิค ตรากรีนไลฟ์" (chia
+// seeds), and two different Monin syrup FLAVORS matched via "เพียวเร่"
+// (puree format) + brand. Root cause, both times: the brand-word filter
+// below only ever matched a token that WAS EXACTLY "ตรา"/"brand"/"ยี่ห้อ"
+// — but real product names always FUSE the brand into one token
+// ("ตรากรีนไลฟ์", "ตราโมนิน", "ตราเบทาโกร" — every single example seen
+// this session), so the brand filter has never actually fired in
+// practice. Once the brand token is (wrongly) left in, two otherwise-
+// unrelated products sharing a brand look deceptively similar. Fixed by
+// PREFIX-matching brand tokens instead of exact-matching them. Also found
+// "ออร์แกนิค" (the word added below) doesn't match the real spelling
+// variant "ออแกนิค" (no ร์) actually used in the data — added both.
 var _NRR_SKU_QUALIFIER_STOPWORDS = [
   'แช่แข็ง', 'frozen', 'แช่เย็น', 'chilled', 'สด', 'ทั้งตัว', 'คัดพิเศษ',
-  'เกรดเอ', 'เกรด', 'ออร์แกนิค', 'ตัดแต่ง', 'นำเข้า'
+  'เกรดเอ', 'เกรด', 'ออร์แกนิค', 'ออแกนิค', 'ตัดแต่ง', 'นำเข้า',
+  'เพียวเร่', 'คอนเซนเทรต'
 ];
+var _NRR_SKU_BRAND_PREFIX_RE = /^(ตรา|brand|ยี่ห้อ)/;
 function _nrrSkuTokens(name) {
   return _nrrSkuNormName(name).split(' ').filter(function (t) {
-    return t && !/^\d+$/.test(t) && ['ตรา', 'brand', 'ยี่ห้อ'].indexOf(t) === -1
+    return t && !/^\d+$/.test(t) && !_NRR_SKU_BRAND_PREFIX_RE.test(t)
       && _NRR_SKU_QUALIFIER_STOPWORDS.indexOf(t) === -1;
   });
 }

@@ -3132,9 +3132,20 @@ function getThaiMonthDays(label){
   // deterministic fallback (used whenever AI errors/is unavailable) isn't
   // silently wrong. Curated list, not provably complete — extend if more
   // mismatches turn up.
-  const QUALIFIER_STOPWORDS = ['แช่แข็ง','frozen','แช่เย็น','chilled','สด','ทั้งตัว','คัดพิเศษ','เกรดเอ','เกรด','ออร์แกนิค','ตัดแต่ง','นำเข้า'];
+  // 2026-07-11 round 2: two more real false positives on /nrr's port —
+  // "ควินัวขาว ออแกนิค ตรากรีนไลฟ์" (quinoa) matched "เมล็ดเจีย ออแกนิค
+  // ตรากรีนไลฟ์" (chia seeds), and two different Monin syrup FLAVORS
+  // matched via "เพียวเร่" (puree format) + brand. Root cause both times:
+  // the brand-word filter only ever matched a token that WAS EXACTLY
+  // "ตรา"/"brand"/"ยี่ห้อ" — but real product names always FUSE the brand
+  // into one token ("ตรากรีนไลฟ์", "ตราโมนิน", "ตราเบทาโกร"), so the
+  // brand filter never actually fired. Fixed by PREFIX-matching brand
+  // tokens instead. Also: "ออร์แกนิค" doesn't match the real spelling
+  // variant "ออแกนิค" (no ร์) actually used in the data — added both.
+  const QUALIFIER_STOPWORDS = ['แช่แข็ง','frozen','แช่เย็น','chilled','สด','ทั้งตัว','คัดพิเศษ','เกรดเอ','เกรด','ออร์แกนิค','ออแกนิค','ตัดแต่ง','นำเข้า','เพียวเร่','คอนเซนเทรต'];
+  const BRAND_PREFIX_RE = /^(ตรา|brand|ยี่ห้อ)/;
   function tokens(name){
-    return normName(name).split(' ').filter(t=>t && !/^\d+$/.test(t) && !['ตรา','brand','ยี่ห้อ'].includes(t) && !QUALIFIER_STOPWORDS.includes(t));
+    return normName(name).split(' ').filter(t=>t && !/^\d+$/.test(t) && !BRAND_PREFIX_RE.test(t) && !QUALIFIER_STOPWORDS.includes(t));
   }
   function jaccard(a,b){
     const A = new Set(tokens(a)), B = new Set(tokens(b));
