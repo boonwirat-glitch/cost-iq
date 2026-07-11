@@ -542,28 +542,37 @@ function nrrRenderAccountTrendChart(row) {
 
   var chart = document.getElementById('nrr-acct-trend');
   if (!chart) return;
+  // v40: fixed height lives on the INNER bar track only (H), not the outer
+  // .nrr-acct-trend container — mirrors the company squad chart
+  // (_nrrCoSquadTrendChartHtml). Previously the outer had height:78px while
+  // each column's real content was ~125px, so columns overflowed ~47px
+  // upward into the pace bar ("ติดกัน"). Natural-height outer + fixed-height
+  // track fixes that and lets the chart be a readable 140px tall.
+  var H = 140;
   var maxV = Math.max.apply(null, months.map(function (m) { return m.proj || m.v; }).concat([1]));
   chart.innerHTML = months.map(function (m, i) {
-    var totalH = Math.round(((m.proj || m.v) / maxV) * 78);
-    var solidH = m.current ? Math.round((m.v / maxV) * 78) : totalH;
+    var totalH = Math.max(2, Math.round(((m.proj || m.v) / maxV) * H));
+    var solidH = m.current ? Math.max(2, Math.round((m.v / maxV) * H)) : totalH;
     var hatchH = m.current ? Math.max(0, totalH - solidH) : 0;
-    // No dashed border on the base month bar anymore — it read as a dark
-    // tick and inflated the bar's apparent height. Base month is marked on
-    // its LABEL instead (below) — but the tag span is rendered for EVERY
-    // column now (CSS toggles visibility, see .nrr-acct-trend-basetag),
-    // not just appended for isBase. .nrr-acct-trend uses align-items:
-    // flex-end with no fixed column height, so a column whose label is
-    // taller than its siblings (the old conditional-append) gets its top
-    // pushed up to keep bottoms level — visually shifting its number/bar
-    // upward. Reserving the same slot on every column, hidden or not,
-    // keeps every column's height identical so none of them shift.
+    // Base month is marked on its LABEL (the "ฐาน" tag), rendered on EVERY
+    // column (CSS toggles visibility) so all columns stay identical height
+    // — otherwise flex-end bottom-alignment would shift the taller one.
     var bar = m.current
       ? '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px"></div><div class="nrr-acct-trend-bar" style="height:' + solidH + 'px;background:var(--green);opacity:.85"></div>'
       : '<div class="nrr-acct-trend-bar" style="height:' + solidH + 'px"></div>';
+    // Two-line cap on every column (2nd line reserved-but-hidden on closed
+    // months) so heights match. Current month: line 1 = MTD actual, line 2
+    // = "~run-rate" projection. This fixes the user's complaint that the
+    // single MTD label used to sit at the top of the GHOST bar and read as
+    // if MTD had already hit the run-rate — now MTD and run-rate are both
+    // labeled and distinguished (plain vs "~").
+    var caps = m.current
+      ? '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div><div class="nrr-acct-trend-val2 num">~' + nrrFmtGMV(m.proj) + '</div>'
+      : '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div><div class="nrr-acct-trend-val2 num" aria-hidden="true">&nbsp;</div>';
     var lbl = nrrEsc(m.label.split(' ')[0]) + '<span class="nrr-acct-trend-basetag">ฐาน</span>';
-    return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + (m.isBase ? ' base' : '') + '" data-i="' + i + '">' +
-      '<div class="nrr-acct-trend-val num">' + nrrFmtGMV(m.v) + '</div>' +
-      '<div class="nrr-acct-trend-bar-track">' + bar + '</div>' +
+    return '<button type="button" class="nrr-acct-trend-col' + (i === months.length - 1 ? ' sel' : '') + (m.isBase ? ' base' : '') + (m.current ? ' current' : '') + '" data-i="' + i + '">' +
+      '<div class="nrr-acct-trend-caps">' + caps + '</div>' +
+      '<div class="nrr-acct-trend-bar-track" style="height:' + H + 'px">' + bar + '</div>' +
       '<div class="nrr-acct-trend-lbl">' + lbl + '</div></button>';
   }).join('');
   nrrSelectAccountTrendMonth(months.length - 1);
@@ -576,9 +585,18 @@ function nrrSelectAccountTrendMonth(i) {
   var m = months[i];
   if (!m) return;
   var maxV = Math.max.apply(null, months.map(function (x) { return x.v; }).concat([1]));
-  var note = m.current ? 'MTD จริง' : m.isBase ? 'เดือนฐานของไตรมาสนี้' : (m.v === maxV ? 'สูงสุดในช่วงนี้' : '');
   var summary = document.getElementById('nrr-acct-trend-summary');
-  if (summary) summary.innerHTML = '<span>' + nrrEsc(m.label) + (note ? ' · ' + nrrEsc(note) : '') + '</span><span class="num nrr-acct-trend-amt">' + nrrFmtGMVExact(m.v) + '</span>';
+  if (!summary) return;
+  if (m.current) {
+    // Spell out BOTH numbers in full here so there's zero ambiguity about
+    // which is MTD vs projection, complementing the compact bar caps.
+    summary.innerHTML = '<span>' + nrrEsc(m.label) + ' · MTD จริง</span>' +
+      '<span class="num nrr-acct-trend-amt">' + nrrFmtGMVExact(m.v) +
+      '<span class="nrr-acct-trend-amt-sub"> · คาดเต็มเดือน ~' + nrrFmtGMV(m.proj) + '</span></span>';
+    return;
+  }
+  var note = m.isBase ? 'เดือนฐานของไตรมาสนี้' : (m.v === maxV ? 'สูงสุดในช่วงนี้' : '');
+  summary.innerHTML = '<span>' + nrrEsc(m.label) + (note ? ' · ' + nrrEsc(note) : '') + '</span><span class="num nrr-acct-trend-amt">' + nrrFmtGMVExact(m.v) + '</span>';
 }
 
 // ── Stat row (4 cells: AOV/outlet/category/price) — .nrr-triple-lg-style
