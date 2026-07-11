@@ -58,7 +58,29 @@ function nrrSkuMonthDiff(accountId, kamEmail) {
   // a swap candidate — the signal lists' own display thresholds (below)
   // are separate and unaffected by this floor.
   var droppedItems = lastRows.filter(function (r) { return !curByItem[r.item_id] && r.gmv_ex_vat > 300; });
-  return { curRows: curRows, lastRows: lastRows, curByItem: curByItem, lastByItem: lastByItem, droppedItems: droppedItems };
+
+  // Items present both months with meaningful projected growth — same
+  // rule nrrSkuPositiveSignals uses for its own "growing" bucket (>=20%
+  // projected run-rate vs last month, current GMV>2000), computed once
+  // here so the swap detector can ALSO consider these as swap-partner
+  // candidates (2026-07-11: a real production account showed a dropped
+  // SKU's volume landing on an ALREADY-EXISTING sibling pack size that
+  // was simply growing, not a brand-new item — the swap detector's
+  // original "dropped + genuinely new only" scope missed this).
+  var acctRow = _nrrPortviewRowFor(accountId);
+  var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
+  var daysInMonth = (acctRow && acctRow.days_in_month) || 30;
+  var ratio = daysElapsed > 0 ? daysInMonth / daysElapsed : 1;
+  var growingItems = [];
+  curRows.forEach(function (r) {
+    var last = lastByItem[r.item_id];
+    if (!last || !last.gmv_ex_vat) return;
+    var proj = r.gmv_ex_vat * ratio;
+    var chgPct = (proj - last.gmv_ex_vat) / last.gmv_ex_vat;
+    if (chgPct >= 0.20 && r.gmv_ex_vat > 2000) growingItems.push(r);
+  });
+
+  return { curRows: curRows, lastRows: lastRows, curByItem: curByItem, lastByItem: lastByItem, droppedItems: droppedItems, growingItems: growingItems };
 }
 window.nrrSkuMonthDiff = nrrSkuMonthDiff;
 
@@ -167,24 +189,45 @@ function _nrrSkuPairScore(pair) {
 }
 
 // Best-match-per-dropped-item (mirrors Sense's fallbackSubstitutions), with
-// a reverse guard so one new item can't simultaneously "absorb" two
-// different dropped items — the higher-scoring claim wins, the loser stays
-// an unmatched (genuine) signal in its own list.
+// a reverse guard so one candidate partner can't simultaneously "absorb"
+// two different dropped items — the higher-scoring claim wins, the loser
+// stays an unmatched (genuine) signal in its own list.
+//
+// Two kinds of partner, DIFFERENT downstream treatment (decided with the
+// user 2026-07-11 after a real account showed this exact split):
+//   'new'      — partner never existed before this month. Net delta is
+//                close to ฿0 by construction (nothing else could explain
+//                its GMV) — this is a genuine "same non-event," shown in
+//                its own "สลับ SKU" section, excluded entirely from both
+//                signal lists.
+//   'growing'  — partner already existed last month too and is ALSO
+//                independently growing (nrrSkuMonthDiff's own growingItems
+//                bucket). Its GMV is NOT purely explained by the dropped
+//                item — the account's real production data showed a case
+//                where the combined category total grew ~15-25%/month even
+//                after accounting for the swap, i.e. genuine extra demand,
+//                not just a relabeled transfer. So the growing side stays
+//                fully visible in "สัญญาณบวก" (never netted out), and only
+//                the dropped side gets pulled off "ต้องดูแล" — annotated
+//                with which item it was absorbed by, not hidden as a wash.
 function nrrSkuSwapPairs(accountId, kamEmail) {
   var diff = nrrSkuMonthDiff(accountId, kamEmail);
   var newRows = diff.curRows.filter(function (r) { return !diff.lastByItem[r.item_id]; });
+  var partners = newRows.map(function (r) { return { row: r, kind: 'new' }; })
+    .concat(diff.growingItems.map(function (r) { return { row: r, kind: 'growing' }; }));
   var droppedRows = diff.droppedItems;
-  if (!droppedRows.length || !newRows.length) return [];
+  if (!droppedRows.length || !partners.length) return [];
 
   var candidates = [];
   droppedRows.forEach(function (d) {
     var best = null, bestScore = 0;
-    newRows.forEach(function (n) {
+    partners.forEach(function (p) {
+      var n = p.row;
       var s = _nrrSkuPairScore({
         droppedName: d.item_name_th, droppedSubclass: d.subclass, droppedGmv: d.gmv_ex_vat, droppedQty: d.qty_kg,
         newName: n.item_name_th, newSubclass: n.subclass, newGmv: n.gmv_ex_vat, newQty: n.qty_kg
       });
-      if (s.ok && s.score > bestScore) { best = { dropped: d, newRow: n, score: s.score }; bestScore = s.score; }
+      if (s.ok && s.score > bestScore) { best = { dropped: d, newRow: n, kind: p.kind, score: s.score }; bestScore = s.score; }
     });
     if (best) candidates.push(best);
   });
@@ -200,6 +243,7 @@ function nrrSkuSwapPairs(accountId, kamEmail) {
     })
     .map(function (c) {
       return {
+        kind: c.kind,
         droppedItemId: c.dropped.item_id, droppedName: c.dropped.item_name_th, droppedGmv: c.dropped.gmv_ex_vat,
         newItemId: c.newRow.item_id, newName: c.newRow.item_name_th, newGmv: c.newRow.gmv_ex_vat,
         netDelta: c.newRow.gmv_ex_vat - c.dropped.gmv_ex_vat
@@ -208,21 +252,31 @@ function nrrSkuSwapPairs(accountId, kamEmail) {
 }
 window.nrrSkuSwapPairs = nrrSkuSwapPairs;
 
-// Plain-object "set" of every item_id involved in a confirmed swap this
-// month (both the dropped side and the new side) — O(1) exclusion lookup
-// for the two signal-list functions below.
-function nrrSkuSwapItemIds(accountId, kamEmail) {
+// Exclusion/annotation lookups for the two signal-list functions below.
+//   droppedIds   — every dropped item_id from ANY confirmed pair (both
+//                  kinds) — always pulled off "ต้องดูแล", since in both
+//                  cases the customer hasn't genuinely lost the need.
+//   newOnlyIds   — only 'new'-kind partner item_ids — pulled off
+//                  "สัญญาณบวก"'s "new" bucket (shown in "สลับ SKU" instead).
+//   growingNotes — item_id -> the dropped item's name it absorbed, for a
+//                  small annotation on the still-fully-shown "growing" row
+//                  (never excluded — see nrrSkuSwapPairs' header comment).
+function nrrSkuSwapExclusions(accountId, kamEmail) {
   var pairs = nrrSkuSwapPairs(accountId, kamEmail);
-  var ids = {};
-  pairs.forEach(function (p) { ids[String(p.droppedItemId)] = true; ids[String(p.newItemId)] = true; });
-  return ids;
+  var droppedIds = {}, newOnlyIds = {}, growingNotes = {};
+  pairs.forEach(function (p) {
+    droppedIds[String(p.droppedItemId)] = true;
+    if (p.kind === 'new') newOnlyIds[String(p.newItemId)] = true;
+    else growingNotes[String(p.newItemId)] = p.droppedName;
+  });
+  return { droppedIds: droppedIds, newOnlyIds: newOnlyIds, growingNotes: growingNotes };
 }
-window.nrrSkuSwapItemIds = nrrSkuSwapItemIds;
+window.nrrSkuSwapExclusions = nrrSkuSwapExclusions;
 
 // ── Positive signals — live, run-rate projected ──────────────────────────
 function nrrSkuPositiveSignals(accountId, kamEmail) {
   var diff = nrrSkuMonthDiff(accountId, kamEmail);
-  var swapItemIds = nrrSkuSwapItemIds(accountId, kamEmail);
+  var swapEx = nrrSkuSwapExclusions(accountId, kamEmail);
 
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
@@ -233,9 +287,9 @@ function nrrSkuPositiveSignals(accountId, kamEmail) {
   diff.curRows.forEach(function (r) {
     var last = diff.lastByItem[r.item_id];
     if (!last) {
-      // Confirmed swap partner — shown in the "สลับ SKU" section instead,
-      // not double-counted here as a genuine "new" signal.
-      if (swapItemIds[String(r.item_id)]) return;
+      // Confirmed "new"-kind swap partner — shown in the "สลับ SKU" section
+      // instead, not double-counted here as a genuine "new" signal.
+      if (swapEx.newOnlyIds[String(r.item_id)]) return;
       if (r.gmv_ex_vat > 1000) newItems.push({ item_id: r.item_id, name: r.item_name_th, gmv: r.gmv_ex_vat });
       return;
     }
@@ -243,7 +297,11 @@ function nrrSkuPositiveSignals(accountId, kamEmail) {
     var proj = r.gmv_ex_vat * ratio;
     var chgPct = (proj - last.gmv_ex_vat) / last.gmv_ex_vat;
     if (chgPct >= 0.20 && r.gmv_ex_vat > 2000) {
-      growing.push({ item_id: r.item_id, name: r.item_name_th, gmvToDate: r.gmv_ex_vat, proj: proj, lastGmv: last.gmv_ex_vat, projInc: proj - last.gmv_ex_vat, chgPct: chgPct });
+      // "growing"-kind swap partner — NEVER excluded (see nrrSkuSwapPairs'
+      // header comment: this GMV is real, not purely explained by the
+      // dropped item), just annotated with which item it absorbed.
+      var swapNote = swapEx.growingNotes[String(r.item_id)] || null;
+      growing.push({ item_id: r.item_id, name: r.item_name_th, gmvToDate: r.gmv_ex_vat, proj: proj, lastGmv: last.gmv_ex_vat, projInc: proj - last.gmv_ex_vat, chgPct: chgPct, swapNote: swapNote });
     }
   });
   newItems.sort(function (a, b) { return b.gmv - a.gmv; });
@@ -256,16 +314,17 @@ window.nrrSkuPositiveSignals = nrrSkuPositiveSignals;
 function nrrSkuCycleSignals(accountId, kamEmail) {
   var diff = nrrSkuMonthDiff(accountId, kamEmail);
   var lastRows = diff.lastRows;
-  var swapItemIds = nrrSkuSwapItemIds(accountId, kamEmail);
+  var swapEx = nrrSkuSwapExclusions(accountId, kamEmail);
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
   var daysInMonth = (acctRow && acctRow.days_in_month) || 30;
 
   var out = [];
   lastRows.forEach(function (r) {
-    // Confirmed swap partner (the dropped side) — shown in the "สลับ SKU"
-    // section instead, not double-counted here as a genuine risk signal.
-    if (swapItemIds[String(r.item_id)]) return;
+    // Confirmed dropped-side swap (either kind — see nrrSkuSwapPairs' header
+    // comment) — the customer hasn't genuinely lost this need either way,
+    // so it's never a real risk signal regardless of which kind matched.
+    if (swapEx.droppedIds[String(r.item_id)]) return;
     // Pre-existing gap, found 2026-07-11 while investigating a real account
     // showing the SAME item in both "สัญญาณบวก" and "ต้องดูแล" at once: this
     // whole function only ever looked at LAST month's cadence to predict

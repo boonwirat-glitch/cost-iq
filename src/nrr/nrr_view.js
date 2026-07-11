@@ -791,6 +791,10 @@ function nrrAccountSignalRowHtml(kind, item, accountId) {
     amt = nrrFmtGMVExact(item.gmv); unit = 'MTD'; border = 'var(--green)';
   } else if (kind === 'growing') {
     badge = '+' + Math.round(item.chgPct * 100) + '%'; meta = 'จากเดือนก่อน · คาดเต็มเดือน';
+    // Rule-based swap detection matched this to a dropped SKU this month —
+    // shown as a note here (not netted out) since this item's own GMV is
+    // real growth, not purely explained by the swap. See nrrSkuSwapPairs.
+    if (item.swapNote) meta += ' · สลับมาจาก "' + nrrEsc(item.swapNote) + '"';
     amt = '+' + nrrFmtGMVExact(item.projInc); unit = ''; border = 'var(--green)';
   } else {
     badge = kind === 'gone' ? 'เลยรอบ ' + item.daysLate + ' วันแล้ว' : 'เพิ่งเลยรอบ ' + item.daysLate + ' วัน';
@@ -860,7 +864,12 @@ function nrrSkuSwapRowHtml(pair) {
 }
 
 function nrrSkuSwapListHtml(row, kamEmail) {
-  var pairs = typeof nrrSkuSwapPairs === 'function' ? nrrSkuSwapPairs(row.account_id, kamEmail) : [];
+  var allPairs = typeof nrrSkuSwapPairs === 'function' ? nrrSkuSwapPairs(row.account_id, kamEmail) : [];
+  // Only "new"-kind pairs belong here — net delta is close to ฿0 by
+  // construction, a genuine non-event. "growing"-kind pairs are annotated
+  // in place on the still-fully-shown "สัญญาณบวก" row instead (see
+  // nrrAccountSignalRowHtml) since that GMV is real, not a wash.
+  var pairs = allPairs.filter(function (p) { return p.kind === 'new'; });
   if (!pairs.length) return '';
   return '<div class="nrr-panel-head" style="margin-top:22px;margin-bottom:8px"><div class="h2" style="font-size:16px;color:var(--ink2)">สลับ SKU เดือนนี้</div><div class="micro">' + pairs.length + ' คู่ · ไม่นับเป็นสัญญาณบวก/ต้องดูแลด้านบน</div></div>' +
     '<div class="micro" style="margin-bottom:8px">ร้านนี้น่าจะแค่เปลี่ยน SKU ที่ซื้อ ไม่ได้เพิ่ม/ลดยอดจริง — ระบบตรวจจากชื่อ/หมวดสินค้า/ปริมาณที่ใกล้เคียงกัน</div>' +
