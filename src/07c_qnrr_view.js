@@ -9,7 +9,7 @@ var QNRR_CFG = {
     '2026-06':'มิ.ย.','2026-07':'ก.ค.',
     '2026-08':'ส.ค.', '2026-09':'ก.ย.'
   },
-  csv_file:   'sense_qnrr_2026q3.csv'
+  csv_file:   'kam_rep_view.csv'
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -400,7 +400,7 @@ window._qnrrEnsureLoaded = _qnrrEnsureLoaded;
 
 // ── _qnrrComputeForCommission (Q3 quarterly mode) ───────────────────────────────
 // Wraps _qnrrCompute() and reshapes output for _commBuildKamPayout / _commBuildTlPayout.
-// Source of truth: bulkQnrrData (sense_qnrr_2026q3.csv) — same as QNRR sheet.
+// Source of truth: bulkQnrrData (kam_rep_view.csv) — same as QNRR sheet.
 // Guarantees NRR% in commission = NRR% in QNRR sheet (T3).
 //
 // scope: 'kam' | 'tl' | 'admin'

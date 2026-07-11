@@ -34,7 +34,7 @@ var QNRR_CFG = {
     '2026-06': 'มิ.ย.', '2026-07': 'ก.ค.',
     '2026-08': 'ส.ค.',  '2026-09': 'ก.ย.'
   },
-  csv_file:   'sense_qnrr_2026q3.csv'
+  csv_file:   'kam_rep_view.csv'
 };
 window.QNRR_CFG = QNRR_CFG;
 

@@ -1815,8 +1815,11 @@ async function _fetchUpsellBundle(kamEmail){
 window._fetchUpsellBundle=_fetchUpsellBundle;
 
 // v753g: Fetch Quarter NRR — SINGLE FILE for all KAMs (~2.6MB)
-// File: sense_qnrr_2026q2.csv (no per-KAM split)
-// Quarter key: update each Q. IDB cache tab='qnrr' TTL=6h
+// File: kam_rep_view.csv (no per-KAM split) — renamed from sense_qnrr_2026qN.csv
+// (2026-07-11) to match the pm_view/admin_view/vp_view naming convention; the
+// file itself no longer embeds the quarter, so it never needs renaming at
+// quarterly rollover — only re-uploading with the same name.
+// IDB cache tab='qnrr' TTL=6h
 const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q3';
 let _qnrrFetchPromise = null; // global dedup — only one fetch ever
 async function _fetchQnrrBundle(){
@@ -1838,7 +1841,7 @@ async function _fetchQnrrBundle(){
   }catch(e){}
   _qnrrFetchPromise=(async()=>{
     try{
-      const url=`${R2_BASE}/sense_qnrr_${_QNRR_QUARTER}.csv`;
+      const url=`${R2_BASE}/kam_rep_view.csv`;
       console.log('%c[Sense qnrr] fetching single file','color:#4ddc97;font-weight:bold',url);
       const ok=await _fetchKamFile({url,type:'bulk-qnrr-single',tab:'qnrr'});
       if(ok){
