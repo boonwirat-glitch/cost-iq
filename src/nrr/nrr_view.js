@@ -1272,6 +1272,9 @@ function nrrShellHtml() {
         '    <a href="#/sales" data-view="sales">Sales</a>'
       : '') +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
+    (nrrProfile && nrrProfile.role === 'admin'
+      ? '    <a href="#/pulse" data-view="pulse">Today</a>'
+      : '') +
     '  </nav>' +
     '  <span class="nrr-appnav-div"></span>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
@@ -1316,6 +1319,11 @@ function nrrShellHtml() {
     '  </div></div>' +
     '</div>' +
     '</div>' +
+    // v45: pulse signage view — renders its own full-bleed board
+    // v46: dedicated wide container, NOT .nrr-page (that class caps every
+    // other view at 1020px for readable analyst text — wrong for a
+    // landscape TV board, which should use the full screen).
+    '<div class="nrr-view" id="nrr-view-pulse" hidden><div class="nrr-pulse-page" id="nrr-pulse-page"></div></div>' +
     // v28: company + sales views — pages render their own .nrr-section stack
     '<div class="nrr-view" id="nrr-view-company" hidden><div class="nrr-page" id="nrr-company-page"></div></div>' +
     '<div class="nrr-view" id="nrr-view-sales" hidden><div class="nrr-page" id="nrr-sales-page"></div></div>' +

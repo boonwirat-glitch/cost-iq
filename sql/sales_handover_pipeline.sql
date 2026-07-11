@@ -1,12 +1,34 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- SALES_HANDOVER_PIPELINE v4 — Sales → KAM/PM/Admin handover forecast
+-- SALES_HANDOVER_PIPELINE v5 — Sales → KAM/PM/Admin handover forecast
 -- Output:  sales_handover_pipeline.csv (upload to R2 root, same bucket as
 --          company_gmv.csv)
 -- Refresh: manual BigQuery run + manual R2 upload (daily recommended, same
 --          cadence as company_gmv.csv — the pipeline shifts every day as
 --          deadlines pass)
--- Columns (9): outlet_id, account_id, account_name, account_type, bucket,
---              new_user_exp_date, last_month_gmv, orders, staff_owner
+-- Columns (11): outlet_id, account_id, account_name, account_type, bucket,
+--               new_user_exp_date, last_month_gmv, orders, staff_owner,
+--               first_dollar_date, mtd_gmv
+--
+-- v5: added first_dollar_date + mtd_gmv — the /nrr "Portfolio Pulse" signage
+--   page (#/pulse) needs a genuine "new Sales customer THIS MONTH/TODAY"
+--   signal, which turned out to be impossible with v4's columns: this file
+--   is (by design) the ONLY export scoped to outlets still owned by Sales
+--   (`WHERE latest_commercial_owner = 'SALE'`, the exact complement of
+--   q3_2026_movement_rep_view.sql's KAM-only scope) — real BigQuery
+--   verification (2026-07-11) confirmed 97 genuinely new-this-month accounts
+--   exist with first_dollar_owner='SALE', and NONE of them appear in
+--   kam_rep_view.csv at all (not staleness — structural exclusion, since
+--   that file only ever includes KAM-owned outlets). But this file's own
+--   `new_user_exp_date` is a handover DEADLINE (derived from something
+--   upstream, empirically ~6-7 days later than first_dollar_date, not a
+--   clean +45/+90 offset) — not usable as a proxy for "when did they
+--   arrive." `last_month_gmv`/`orders` are deliberately the LAST CLOSED
+--   month (excludes current MTD by design, see v4 note below) — genuinely
+--   new accounts show ฿0/0 orders there even with real GMV this month,
+--   which would make the pulse page look broken. `first_dollar_date`
+--   (mirrors q3_2026_movement_rep_view.sql's own outlet_first_dollar CTE —
+--   same filters, same "first order across ALL owners" semantics) and
+--   `mtd_gmv` (this month's actual GMV to date) close both gaps.
 --
 -- v4: added staff_owner (the Sales rep currently on the outlet's most recent
 --   order — same field q3_2026_movement_rep_view.sql's latest_own CTE reads
@@ -54,6 +76,7 @@
 DECLARE v_data_end          DATE DEFAULT DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY);
 DECLARE v_last_closed_end   DATE DEFAULT DATE_SUB(DATE_TRUNC(v_data_end, MONTH), INTERVAL 1 DAY);
 DECLARE v_last_closed_start DATE DEFAULT DATE_TRUNC(v_last_closed_end, MONTH);
+DECLARE v_month_start       DATE DEFAULT DATE_TRUNC(v_data_end, MONTH);
 
 WITH
 
@@ -99,6 +122,34 @@ last_month_gmv AS (
     AND delivery_date <= v_last_closed_end
     AND gmv_ex_vat > 0
   GROUP BY outlet_id
+),
+
+-- ── v5: first order EVER, across ALL owners — mirrors
+-- q3_2026_movement_rep_view.sql's outlet_first_dollar CTE exactly (same
+-- filters), so "new this month/today" means the same thing in both files.
+outlet_first_dollar AS (
+  SELECT
+    CAST(o.user_id AS STRING) AS outlet_id,
+    MIN(DATE(o.delivery_date)) AS first_dollar_date
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.user_id IS NOT NULL
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  GROUP BY 1
+),
+
+-- ── v5: current month-to-date GMV — last_month_gmv above is deliberately
+-- the LAST CLOSED month (excludes MTD), which would show ฿0 for a genuinely
+-- brand-new account; this fills that gap for the pulse page's "จาก Sales" ฿.
+mtd_gmv AS (
+  SELECT
+    CAST(user_id AS STRING)   AS outlet_id,
+    ROUND(SUM(gmv_ex_vat), 0) AS gmv
+  FROM `freshket-rn.dwh.order`
+  WHERE delivery_date >= v_month_start
+    AND delivery_date <= v_data_end
+    AND gmv_ex_vat > 0
+  GROUP BY outlet_id
 )
 
 SELECT
@@ -114,9 +165,13 @@ SELECT
   IFNULL(CAST(oed.new_user_exp_date AS STRING), '') AS new_user_exp_date,
   IFNULL(lmg.gmv, 0)    AS last_month_gmv,
   IFNULL(lmg.orders, 0) AS orders,
-  IFNULL(lo.staff_owner, '') AS staff_owner
+  IFNULL(lo.staff_owner, '') AS staff_owner,
+  IFNULL(CAST(ofd.first_dollar_date AS STRING), '') AS first_dollar_date,
+  IFNULL(mg.gmv, 0) AS mtd_gmv
 FROM latest_own lo
-LEFT JOIN outlet_exp_date oed ON lo.outlet_id = oed.outlet_id
-LEFT JOIN last_month_gmv lmg  ON lo.outlet_id = lmg.outlet_id
+LEFT JOIN outlet_exp_date oed     ON lo.outlet_id = oed.outlet_id
+LEFT JOIN last_month_gmv lmg      ON lo.outlet_id = lmg.outlet_id
+LEFT JOIN outlet_first_dollar ofd ON lo.outlet_id = ofd.outlet_id
+LEFT JOIN mtd_gmv mg              ON lo.outlet_id = mg.outlet_id
 WHERE lo.latest_commercial_owner = 'SALE'
 ORDER BY oed.new_user_exp_date, lo.account_name;

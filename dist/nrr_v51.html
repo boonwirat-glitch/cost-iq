@@ -1362,20 +1362,17 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    chip (color hashed per person in JS, _nrrPulseOwnerColor) so a KAM can
    learn "I'm this color" and spot their own rows across the whole board at
    a glance, instead of having to read every name. Shared by every list
-   (Sales/Expansion/at-risk) — same person, same color, everywhere.
-   v51 tried a fixed-width CHIP to stop column drift — wrong fix (made every
-   chip the same size regardless of name, which read oddly stretched/padded
-   for short names). v53: chip goes back to hugging its own text; instead a
-   fixed-width, right-aligned SLOT wraps it, so the chip's right edge (the
-   edge nearest the ฿ figure, the one the eye actually tracks) lands in the
-   same column every row while its left edge is free to vary with the name. */
-/* v54: width now set inline per-list (measured from real text, see
-   _nrrPulseOwnerSlotWidth in nrr_pulse.js) — not a guessed constant here. */
-.nrr-pulse-owner-slot { flex: none; display: flex; justify-content: flex-end; }
+   (Sales/Expansion/at-risk) — same person, same color, everywhere. */
+/* v51: was content-width (auto padding) — a short nickname ("Mild") and a
+   long one ("Bookbig") produced different-width chips, so the chip's LEFT
+   edge shifted row to row instead of lining up in a clean column ("ส่ายไป
+   ส่ายมา"). Fixed width + centered text makes every chip identical, so the
+   owner column reads as one straight line regardless of name length. */
 .nrr-pulse-owner-chip {
-  display: inline-block; padding: 4px 11px; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 92px; padding: 4px 6px; border-radius: var(--r-pill);
   font-size: 12px; font-weight: 800; color: #fff; letter-spacing: 0.01em;
-  white-space: nowrap;
+  flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--ink); flex: none; }
 
@@ -1387,23 +1384,9 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    trailing amount block stays risk-specific (฿ shortfall + its reason). */
 .nrr-pulse-risk-row { display: flex; align-items: center; gap: 12px; height: 44px; border-bottom: 1px solid var(--line); }
 .nrr-pulse-risk-row:last-child { border-bottom: none; }
-/* v52: the chip fix (v51) wasn't the real cause — .nrr-pulse-risk-amt-wrap
-   itself had NO fixed width (only `max-width` on the label inside it, which
-   caps but doesn't force), so "เงียบ" (short) vs "ต่ำกว่าฐาน 45%" (long)
-   rendered the whole wrap block at different widths row to row. Since
-   .nrr-pulse-arr-main is flex:1 (fills whatever's left), a wider/narrower
-   amt-wrap shifted how much space main actually got, which moved the owner
-   chip's position between them — the chip was never the moving part, the
-   block to its right was. Fixed width on the wrap stops the whole row's
-   layout from depending on the reason text's length at all.
-   v55: 132px was a GUESSED constant — same bug class as the owner slot
-   (v53). For any row shorter than the guess, right-aligned text left dead
-   space right next to the chip, reading as "chip far from the number".
-   Width now set inline per-list from real measured text
-   (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here. */
 .nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
 .nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--coral); }
-.nrr-pulse-risk-amt-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-risk-amt-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 
 @media (max-width: 900px) {
   .nrr-pulse-heroes, .nrr-pulse-arrivals, .nrr-pulse-lower { grid-template-columns: 1fr; }
@@ -6258,60 +6241,10 @@ function _nrrPulseOwnerColor(nick) {
   for (var i = 0; i < nick.length; i++) h = (h * 31 + nick.charCodeAt(i)) >>> 0;
   return _NRR_PULSE_OWNER_PALETTE[h % _NRR_PULSE_OWNER_PALETTE.length];
 }
-// v53: tried a FIXED px slot (100px) so the chip's right edge would still
-// line up in a column while its own width kept following the name — right
-// idea, wrong number: 100px was a guess, so a short nickname ("To", ~35px)
-// left ~65px of unexplained-looking dead space before the chip. v54: instead
-// of guessing, MEASURE every nickname actually in this list (via canvas
-// text metrics — real pixel widths, not a character-count estimate) and use
-// the single longest one as the slot width — so the gap left in front of
-// any shorter chip is only ever the true difference to the longest real
-// name in that list, never an arbitrary number. Computed ONCE from the
-// list's FULL item set (not just the rotating window) so the column width
-// never visibly resizes as rotation cycles through different names.
-var _nrrPulseMeasureCanvas = null;
-function _nrrPulseTextWidth(text, font) {
-  if (!_nrrPulseMeasureCanvas) _nrrPulseMeasureCanvas = document.createElement('canvas');
-  var ctx = _nrrPulseMeasureCanvas.getContext('2d');
-  ctx.font = font || '800 12px -apple-system, "Helvetica Neue", Arial, sans-serif';
-  return ctx.measureText(text).width;
-}
-function _nrrPulseOwnerSlotWidth(items, ownerKey) {
-  var maxW = 0;
-  (items || []).forEach(function (it) {
-    var nick = _nrrPulseNick(it[ownerKey]);
-    if (!nick) return;
-    var w = _nrrPulseTextWidth(nick);
-    if (w > maxW) maxW = w;
-  });
-  return maxW > 0 ? Math.ceil(maxW) + 22 : 0; // +22 = chip's own left+right padding
-}
-// Same bug, same fix, one column over: .nrr-pulse-risk-amt-wrap used to be a
-// GUESSED fixed width (132px) so the wrap's width wouldn't depend on the
-// reason text ("เงียบ" vs "ต่ำกว่าฐาน 45%") and shift the owner chip beside
-// it. That stopped the shift, but for any row whose real text is narrower
-// than the guess, the right-aligned content leaves dead space on ITS OWN
-// left — directly next to the chip — which is exactly what reads as "the
-// chip is oddly far from the number." Fix: measure the two real lines
-// (amount + reason) actually in this list and use the true longest one,
-// same technique as the owner slot above.
-function _nrrPulseRiskAmtWidth(items) {
-  var maxW = 0;
-  (items || []).forEach(function (it) {
-    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), '800 16px "Space Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var lblW = _nrrPulseTextWidth(it.reason || '', '700 10.5px -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var w = Math.max(amtW, lblW);
-    if (w > maxW) maxW = w;
-  });
-  // +3: canvas measureText() slightly underestimates real rendered width
-  // (subpixel/font-metric rounding) — without a small buffer, the widest
-  // string in the list clips itself by ~1px and silently ellipsizes.
-  return maxW > 0 ? Math.ceil(maxW) + 3 : 0;
-}
-function _nrrPulseOwnerChip(fullName, slotWidth) {
+function _nrrPulseOwnerChip(fullName) {
   var nick = _nrrPulseNick(fullName);
-  var chip = nick ? '<span class="nrr-pulse-owner-chip" style="background:' + _nrrPulseOwnerColor(nick) + '">' + nrrEsc(nick) + '</span>' : '';
-  return '<span class="nrr-pulse-owner-slot" style="width:' + slotWidth + 'px">' + chip + '</span>';
+  if (!nick) return '';
+  return '<span class="nrr-pulse-owner-chip" style="background:' + _nrrPulseOwnerColor(nick) + '">' + nrrEsc(nick) + '</span>';
 }
 
 // The data "as of" date = yesterday (day-1 lag convention used app-wide).
@@ -6579,9 +6512,6 @@ function _nrrPulseWindow(items, idx, max) {
 
 function _nrrPulseArrivalRowsHtml(items, max) {
   if (!items.length) return '<div class="nrr-pulse-empty">— ยังไม่มีเดือนนี้ —</div>';
-  // v54: measured once from the FULL list (not the rotating window) so the
-  // owner column's width never changes as rotation cycles through names.
-  var slotW = _nrrPulseOwnerSlotWidth(items, 'owner');
   return _nrrPulseWindow(items, nrrPulseState.rotIdx, max).map(function (x) {
     // v46: primary = outlet/branch name (x.name), secondary = the full legal
     // entity name ONLY when it genuinely differs (x.sub) — was showing the
@@ -6593,7 +6523,7 @@ function _nrrPulseArrivalRowsHtml(items, max) {
       '<div class="nrr-pulse-arr-name">' + nrrEsc(x.name) + '</div>' +
       (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
       '</div>' +
-      _nrrPulseOwnerChip(x.owner, slotW) +
+      _nrrPulseOwnerChip(x.owner) +
       '<div class="nrr-pulse-arr-gmv">' + nrrFmtGMV(x.gmv) + '</div>' +
       '</div>';
   }).join('');
@@ -6621,16 +6551,14 @@ function _nrrPulseSkuRowsHtml(items, max) {
 // number and its cause read together instead of needing a separate legend.
 function _nrrPulseRiskRowsHtml(items, max) {
   if (!items.length) return '<div class="nrr-pulse-empty">— ไม่มีร้านที่ต้องตามด่วน —</div>';
-  var slotW = _nrrPulseOwnerSlotWidth(items, 'kam');
-  var amtW = _nrrPulseRiskAmtWidth(items);
   return _nrrPulseWindow(items, nrrPulseState.rotIdx, max).map(function (x) {
     return '<div class="nrr-pulse-risk-row">' +
       '<div class="nrr-pulse-arr-main">' +
       '<div class="nrr-pulse-arr-name">' + nrrEsc(x.name) + '</div>' +
       (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
       '</div>' +
-      _nrrPulseOwnerChip(x.kam, slotW) +
-      '<div class="nrr-pulse-risk-amt-wrap" style="width:' + amtW + 'px"><div class="nrr-pulse-risk-amt">−' + nrrFmtGMV(x.risk) + '</div>' +
+      _nrrPulseOwnerChip(x.kam) +
+      '<div class="nrr-pulse-risk-amt-wrap"><div class="nrr-pulse-risk-amt">−' + nrrFmtGMV(x.risk) + '</div>' +
       '<div class="nrr-pulse-risk-amt-lbl">' + nrrEsc(x.reason) + '</div></div>' +
       '</div>';
   }).join('');
@@ -8736,13 +8664,11 @@ function nrrShellHtml() {
     // v28: whole-company views — admin only (profile is resolved before
     // nrrInitApp builds this shell; the router guard also redirects deep links)
     (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/company" data-view="company">Overview</a>' +
+      ? '    <a href="#/pulse" data-view="pulse">วันนี้</a>' +
+        '    <a href="#/company" data-view="company">Overview</a>' +
         '    <a href="#/sales" data-view="sales">Sales</a>'
       : '') +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/pulse" data-view="pulse">Today</a>'
-      : '') +
     '  </nav>' +
     '  <span class="nrr-appnav-div"></span>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +

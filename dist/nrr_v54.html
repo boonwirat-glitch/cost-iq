@@ -1395,13 +1395,8 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    amt-wrap shifted how much space main actually got, which moved the owner
    chip's position between them — the chip was never the moving part, the
    block to its right was. Fixed width on the wrap stops the whole row's
-   layout from depending on the reason text's length at all.
-   v55: 132px was a GUESSED constant — same bug class as the owner slot
-   (v53). For any row shorter than the guess, right-aligned text left dead
-   space right next to the chip, reading as "chip far from the number".
-   Width now set inline per-list from real measured text
-   (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here. */
-.nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
+   layout from depending on the reason text's length at all. */
+.nrr-pulse-risk-amt-wrap { flex: none; width: 132px; text-align: right; }
 .nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--coral); }
 .nrr-pulse-risk-amt-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -6270,10 +6265,10 @@ function _nrrPulseOwnerColor(nick) {
 // list's FULL item set (not just the rotating window) so the column width
 // never visibly resizes as rotation cycles through different names.
 var _nrrPulseMeasureCanvas = null;
-function _nrrPulseTextWidth(text, font) {
+function _nrrPulseTextWidth(text) {
   if (!_nrrPulseMeasureCanvas) _nrrPulseMeasureCanvas = document.createElement('canvas');
   var ctx = _nrrPulseMeasureCanvas.getContext('2d');
-  ctx.font = font || '800 12px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '800 12px -apple-system, "Helvetica Neue", Arial, sans-serif';
   return ctx.measureText(text).width;
 }
 function _nrrPulseOwnerSlotWidth(items, ownerKey) {
@@ -6285,28 +6280,6 @@ function _nrrPulseOwnerSlotWidth(items, ownerKey) {
     if (w > maxW) maxW = w;
   });
   return maxW > 0 ? Math.ceil(maxW) + 22 : 0; // +22 = chip's own left+right padding
-}
-// Same bug, same fix, one column over: .nrr-pulse-risk-amt-wrap used to be a
-// GUESSED fixed width (132px) so the wrap's width wouldn't depend on the
-// reason text ("เงียบ" vs "ต่ำกว่าฐาน 45%") and shift the owner chip beside
-// it. That stopped the shift, but for any row whose real text is narrower
-// than the guess, the right-aligned content leaves dead space on ITS OWN
-// left — directly next to the chip — which is exactly what reads as "the
-// chip is oddly far from the number." Fix: measure the two real lines
-// (amount + reason) actually in this list and use the true longest one,
-// same technique as the owner slot above.
-function _nrrPulseRiskAmtWidth(items) {
-  var maxW = 0;
-  (items || []).forEach(function (it) {
-    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), '800 16px "Space Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var lblW = _nrrPulseTextWidth(it.reason || '', '700 10.5px -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var w = Math.max(amtW, lblW);
-    if (w > maxW) maxW = w;
-  });
-  // +3: canvas measureText() slightly underestimates real rendered width
-  // (subpixel/font-metric rounding) — without a small buffer, the widest
-  // string in the list clips itself by ~1px and silently ellipsizes.
-  return maxW > 0 ? Math.ceil(maxW) + 3 : 0;
 }
 function _nrrPulseOwnerChip(fullName, slotWidth) {
   var nick = _nrrPulseNick(fullName);
@@ -6622,7 +6595,6 @@ function _nrrPulseSkuRowsHtml(items, max) {
 function _nrrPulseRiskRowsHtml(items, max) {
   if (!items.length) return '<div class="nrr-pulse-empty">— ไม่มีร้านที่ต้องตามด่วน —</div>';
   var slotW = _nrrPulseOwnerSlotWidth(items, 'kam');
-  var amtW = _nrrPulseRiskAmtWidth(items);
   return _nrrPulseWindow(items, nrrPulseState.rotIdx, max).map(function (x) {
     return '<div class="nrr-pulse-risk-row">' +
       '<div class="nrr-pulse-arr-main">' +
@@ -6630,7 +6602,7 @@ function _nrrPulseRiskRowsHtml(items, max) {
       (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
       '</div>' +
       _nrrPulseOwnerChip(x.kam, slotW) +
-      '<div class="nrr-pulse-risk-amt-wrap" style="width:' + amtW + 'px"><div class="nrr-pulse-risk-amt">−' + nrrFmtGMV(x.risk) + '</div>' +
+      '<div class="nrr-pulse-risk-amt-wrap"><div class="nrr-pulse-risk-amt">−' + nrrFmtGMV(x.risk) + '</div>' +
       '<div class="nrr-pulse-risk-amt-lbl">' + nrrEsc(x.reason) + '</div></div>' +
       '</div>';
   }).join('');
@@ -8736,13 +8708,11 @@ function nrrShellHtml() {
     // v28: whole-company views — admin only (profile is resolved before
     // nrrInitApp builds this shell; the router guard also redirects deep links)
     (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/company" data-view="company">Overview</a>' +
+      ? '    <a href="#/pulse" data-view="pulse">วันนี้</a>' +
+        '    <a href="#/company" data-view="company">Overview</a>' +
         '    <a href="#/sales" data-view="sales">Sales</a>'
       : '') +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/pulse" data-view="pulse">Today</a>'
-      : '') +
     '  </nav>' +
     '  <span class="nrr-appnav-div"></span>' +
     '  <nav class="seg nrr-subnav" id="nrr-subnav">' +

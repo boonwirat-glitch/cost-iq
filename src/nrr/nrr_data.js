@@ -308,9 +308,10 @@ window.nrrFetchCompanyCsv = nrrFetchCompanyCsv;
 // book. 404-graceful like company_gmv.csv.
 window.bulkSalesPipelineData = { loaded: false };
 
-// 9 cols (v4 SQL — staff_owner added): outlet_id, account_id, account_name,
-//         account_type, bucket, new_user_exp_date (YYYY-MM-DD or ''),
-//         last_month_gmv, orders, staff_owner
+// 11 cols (v5 SQL — first_dollar_date + mtd_gmv added): outlet_id,
+//         account_id, account_name, account_type, bucket, new_user_exp_date
+//         (YYYY-MM-DD or ''), last_month_gmv, orders, staff_owner,
+//         first_dollar_date (YYYY-MM-DD or ''), mtd_gmv
 function _nrrParseSalesPipelineCsv(text) {
   var lines = text.trim().split('\n').slice(1);
   var rows = [];
@@ -329,7 +330,12 @@ function _nrrParseSalesPipelineCsv(text) {
       orders: parseInt(p[7], 10) || 0,
       // v4 SQL column — absent (undefined→'') in any CSV uploaded before
       // that re-run; degrades gracefully to "ไม่ระบุ Sales" grouping.
-      staff_owner: (p[8] || '').trim()
+      staff_owner: (p[8] || '').trim(),
+      // v5 SQL columns — absent (undefined→''/0) in any CSV uploaded before
+      // that re-run; the Pulse page's "จาก Sales" block degrades to showing
+      // 0 items rather than crashing (same graceful-degrade precedent).
+      first_dollar_date: (p[9] || '').trim(),
+      mtd_gmv: parseFloat(p[10]) || 0
     });
   });
   return rows;
@@ -351,6 +357,45 @@ async function nrrFetchSalesPipelineCsv(force) {
   return window.bulkSalesPipelineData;
 }
 window.nrrFetchSalesPipelineCsv = nrrFetchSalesPipelineCsv;
+
+// ── new_skus_portfolio.csv (v46, sql/new_skus_portfolio.sql) — portfolio-
+// wide "new SKU adoption this month" ranking, feeds the Pulse page's SKU
+// block with real names instead of a bare count. 4 cols: item_id,
+// item_name_th, new_gmv, account_count. 404-graceful (page falls back to
+// the count-only view if this CSV hasn't been uploaded yet).
+window.bulkNewSkusPortfolioData = { loaded: false };
+function _nrrParseNewSkusPortfolioCsv(text) {
+  var lines = text.trim().split('\n').slice(1);
+  var rows = [];
+  lines.forEach(function (line) {
+    if (!line.trim()) return;
+    var p = parseCSVRow(line);
+    if (p.length < 4) return;
+    rows.push({
+      item_id: (p[0] || '').trim(),
+      item_name_th: (p[1] || '').trim(),
+      new_gmv: parseFloat(p[2]) || 0,
+      account_count: parseInt(p[3], 10) || 0
+    });
+  });
+  return rows;
+}
+async function nrrFetchNewSkusPortfolioCsv(force) {
+  if (window.bulkNewSkusPortfolioData.loaded && !force) return window.bulkNewSkusPortfolioData;
+  var url = R2_BASE + '/new_skus_portfolio.csv?cb=' + Date.now();
+  try {
+    var res = await fetch(url);
+    if (res.status === 404) { window.bulkNewSkusPortfolioData = { allRows: [], loaded: false, notFound: true }; return window.bulkNewSkusPortfolioData; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var text = await res.text();
+    window.bulkNewSkusPortfolioData = { allRows: _nrrParseNewSkusPortfolioCsv(text), loaded: true, loadedAt: Date.now() };
+  } catch (e) {
+    console.warn('[nrr] failed to load new_skus_portfolio.csv', e);
+    window.bulkNewSkusPortfolioData = { allRows: [], loaded: false, error: e.message };
+  }
+  return window.bulkNewSkusPortfolioData;
+}
+window.nrrFetchNewSkusPortfolioCsv = nrrFetchNewSkusPortfolioCsv;
 
 // Single place that maps account_type -> the 2 buckets the business cares
 // about ('Unknown' and any unexpected value fall into 'other', confirmed

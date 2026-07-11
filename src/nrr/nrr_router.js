@@ -29,6 +29,7 @@ function nrrParseHash() {
   if (parts[0] === 'account') return { view: 'account', param: parts[1] ? decodeURIComponent(parts[1]) : null };
   if (parts[0] === 'company') return { view: 'company', param: null };
   if (parts[0] === 'sales') return { view: 'sales', param: null };
+  if (parts[0] === 'pulse') return { view: 'pulse', param: null };
   return { view: 'dashboard', param: null };
 }
 
@@ -47,8 +48,9 @@ function nrrParseHash() {
 function nrrRouteGuard(route) {
   var p = window.nrrProfile;
   if (!p) return route;
-  // Company overview + Sales pipeline (v28): whole-company data — admin only.
-  if ((route.view === 'company' || route.view === 'sales') && p.role !== 'admin') {
+  // Company overview + Sales pipeline (v28) + Pulse signage (v45): whole-
+  // company data — admin only.
+  if ((route.view === 'company' || route.view === 'sales' || route.view === 'pulse') && p.role !== 'admin') {
     return { view: 'dashboard', param: null, redirect: true };
   }
   if (p.role === 'rep') {
@@ -89,7 +91,7 @@ function nrrHandleRoute() {
   // App-level nav active state: the account view belongs to the portfolio
   // family; company/sales (v28) are their own tabs.
   var navFamily = route.view === 'dashboard' ? 'dashboard'
-    : (route.view === 'company' || route.view === 'sales') ? route.view
+    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse') ? route.view
     : 'portfolio';
   document.querySelectorAll('#nrr-appnav a').forEach(function (a) {
     a.classList.toggle('on', a.dataset.view === navFamily);
