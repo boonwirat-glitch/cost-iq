@@ -266,6 +266,17 @@ function nrrSkuCycleSignals(accountId, kamEmail) {
     // Confirmed swap partner (the dropped side) — shown in the "สลับ SKU"
     // section instead, not double-counted here as a genuine risk signal.
     if (swapItemIds[String(r.item_id)]) return;
+    // Pre-existing gap, found 2026-07-11 while investigating a real account
+    // showing the SAME item in both "สัญญาณบวก" and "ต้องดูแล" at once: this
+    // whole function only ever looked at LAST month's cadence to predict
+    // "should have reordered by now" — it never checked whether the item
+    // has ALREADY been reordered THIS month (diff.curByItem). An item
+    // growing nicely this month could still get flagged overdue purely
+    // because the check never looked at current-month activity at all.
+    // If it has any row this month, the cadence question is moot — skip it
+    // here entirely (nrrSkuPositiveSignals already judges whether that
+    // current-month activity is itself growing/flat/declining).
+    if (diff.curByItem[r.item_id]) return;
     if (!r.order_count || r.order_count < 1) return; // need order history to derive a cycle at all
     var outletCount = r.outlet_count_sku || 1;
     var perOutletFreq = r.order_count / outletCount;
