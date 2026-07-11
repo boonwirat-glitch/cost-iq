@@ -504,6 +504,145 @@ function nrrAccountCategoryCoverage(accountId, kamEmail) {
 }
 window.nrrAccountCategoryCoverage = nrrAccountCategoryCoverage;
 
+// ── Price-unit normalization (v41, ported from Sense's own tiers —
+// 04_sku_matcher.js:2246-2349 + 02_data_pipeline.js:417-473). Turns a SKU's
+// raw unit_price (฿ per whatever qty basis BigQuery summed — ambiguous
+// per-kg vs per-piece) into a clearly-LABELED ฿/หน่วย: weight→฿/กก.,
+// liquid→฿/ลิตร, count/egg→฿/<eaUnit> ฟอง/ขวด/ลัง. `divisor` is the number
+// to divide a raw unit_price by to land in that display unit — reused to
+// convert bulk_price.csv's older-month unit_price history into the same unit.
+function _nrrPkRangeKgMax(s) {
+  s = (s || '').toLowerCase().trim(); if (!s) return null;
+  var km = s.match(/(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)\s*(kg|กก\.?)/i);
+  if (km) { var mk = Math.max(parseFloat(km[1]), parseFloat(km[2])); return mk > 0 ? mk : null; }
+  var gm = s.match(/(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)\s*(g\b|g\.|กรัม)/i);
+  if (gm) { var mg = Math.max(parseFloat(gm[1]), parseFloat(gm[2])); return mg > 0 ? mg / 1000 : null; }
+  return null;
+}
+function _nrrPkPackUnits(s) {
+  s = (s || '').trim(); if (!s) return null;
+  if (/\d+\s*[-~]\s*\d+\s*(?:kg|กก\.?|g\b|g\.|กรัม)/i.test(s)) return null; // ranges → _nrrPkRangeKgMax
+  var m;
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:kg|กก\.?)(?:\b|\/|$|\s|,)/i))) return { kg: parseFloat(m[1]) * parseFloat(m[2]) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:kg|กก\.?)(?:\b|\/|$|\s|,)/i))) return { kg: parseFloat(m[1]) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:g\.?|กรัม)(?:\b|\/|$|\s|,)/i))) { var k = parseFloat(m[1]) * parseFloat(m[2]) / 1000; return k > 0 ? { kg: k } : null; }
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:g\.?|กรัม)(?:\b|\/|$|\s|,)/i))) { var k2 = parseFloat(m[1]) / 1000; return k2 > 0 ? { kg: k2 } : null; }
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:l(?:iter|itre)?|ลิตร|lt)\b/i))) return { liter: parseFloat(m[1]) * parseFloat(m[2]) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:l(?:iter|itre)?|ลิตร|lt)\b/i))) return { liter: parseFloat(m[1]) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:ml|cc)\b/i))) return { liter: parseFloat(m[1]) * parseFloat(m[2]) / 1000 };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:ml|cc)\b/i))) return { liter: parseFloat(m[1]) / 1000 };
+  return null;
+}
+function _nrrPkDetectBasis(s, unitPrice, kgPrice) {
+  s = (s || '').toLowerCase();
+  if (/\d+\s*(g\b|g\.|กรัม|kg\b)/.test(s)) return 'per_kg';
+  if (/\d+\s*(ml|ลิตร|liter)\b/.test(s)) return 'per_unit_volume';
+  if (/\b(l\/|\/l\b)/.test(s) && !/\bkg\b/.test(s)) return 'per_unit_volume';
+  if (/กระป๋อง|ขวด|ลัง|แพ็ค|can|bottle|case|carton|piece|pcs|ชิ้น/.test(s)) return 'per_unit_count';
+  if (unitPrice > 0 && kgPrice > 0 && Math.abs(unitPrice - kgPrice) / kgPrice > 0.4) return 'per_unit_count';
+  return 'per_kg';
+}
+function _nrrPkUnitLabel(s) {
+  s = (s || '').toLowerCase();
+  if (s.indexOf('ถัง') >= 0) return 'ถัง';
+  if (s.indexOf('ลัง') >= 0 || s.indexOf('case') >= 0 || s.indexOf('carton') >= 0) return 'ลัง';
+  if (s.indexOf('กระป๋อง') >= 0 || s.indexOf('can') >= 0) return 'กระป๋อง';
+  if (s.indexOf('ขวด') >= 0 || s.indexOf('bottle') >= 0) return 'ขวด';
+  if (s.indexOf('แพ็ค') >= 0 || s.indexOf('แพ็ก') >= 0 || s.indexOf('pack') >= 0) return 'แพ็ค';
+  if (s.indexOf('ชิ้น') >= 0 || s.indexOf('pcs') >= 0 || s.indexOf('piece') >= 0) return 'ชิ้น';
+  if (s.indexOf('โหล') >= 0 || s.indexOf('dozen') >= 0) return 'โหล';
+  if (/ml|ลิตร|liter/.test(s)) return 'ขวด';
+  var t = (s || '').trim();
+  return (t && t.length <= 20) ? t : 'ชิ้น';
+}
+function nrrSkuDisplayPrice(row) {
+  var packSize = row.pack_size || '', dug = row.default_unit_group || '';
+  var unitPrice = row.unit_price || 0, avgPiece = row.avg_piece_price || 0;
+  var eaName = row.ea_unit_name || '', eaVal = row.universal_ea_value || 0;
+  var rangeKg = _nrrPkRangeKgMax(packSize);
+  var packU = dug !== 'WEIGHT' ? _nrrPkPackUnits(packSize) : null;
+  var dp, du, div;
+  if (dug === 'WEIGHT') { dp = unitPrice; du = 'กก.'; div = 1; }
+  else if (rangeKg && avgPiece > 0) { dp = avgPiece / rangeKg; du = 'กก.'; div = rangeKg; }
+  else if (packU && packU.kg > 0) { dp = unitPrice / packU.kg; du = 'กก.'; div = packU.kg; }
+  else if (packU && packU.liter > 0) { dp = unitPrice / packU.liter; du = 'ลิตร'; div = packU.liter; }
+  else if (eaName === 'แกลลอน' && eaVal > 0) { var lg = eaVal * 3.785; dp = unitPrice / lg; du = 'ลิตร'; div = lg; }
+  else if (eaName === 'ปี๊บ' && eaVal > 0) { var lp = eaVal * 16; dp = unitPrice / lp; du = 'ลิตร'; div = lp; }
+  else if ((dug === 'EACH' || dug === 'VOLUME') && eaName && eaVal > 0) { var base = avgPiece > 0 ? avgPiece : unitPrice; dp = base / eaVal; du = eaName; div = eaVal; }
+  else {
+    var dstr = packSize || ((row.subclass || '') + ' ' + (row.item_name_th || ''));
+    var basis = _nrrPkDetectBasis(dstr, avgPiece, unitPrice);
+    var hasUp = basis !== 'per_kg' && avgPiece > 0;
+    dp = hasUp ? avgPiece : unitPrice; du = hasUp ? _nrrPkUnitLabel(dstr) : 'กก.'; div = 1;
+  }
+  if (!dp || dp <= 0) { dp = unitPrice; du = 'กก.'; div = 1; }
+  return { displayPrice: Math.round(dp * 100) / 100, displayUnit: du, divisor: div || 1 };
+}
+window.nrrSkuDisplayPrice = nrrSkuDisplayPrice;
+
+// ── Price list (v41) — ALL of this account's current-month SKUs, GMV-sorted,
+// each with a normalized ฿/หน่วย, monthly spend, MoM %change, and a merged
+// 6-month price history (sense_skus recent + bulk_price older, both converted
+// to the display unit via the same divisor). Drives the reworked price
+// drawer + tile. Built off sense_skus (which HAS the live MTD month + names +
+// pack), so it never goes dark mid-month like the old bulk_price-gated path,
+// and never shows a raw SKU code (every listed item has a name by
+// construction).
+function nrrAccountPriceList(accountId, kamEmail) {
+  var skuBundle = nrrSenseSkusCache[kamEmail];
+  if (!skuBundle || !skuBundle.loaded) return null;
+  var allRows = skuBundle.byAccountId[accountId] || [];
+  if (!allRows.length) return { items: [], useLabel: null };
+  var labels = _nrrAccountMonthLabels();
+  var hasCur = allRows.some(function (r) { return r.month_label === labels.cur; });
+  var useLabel = hasCur ? labels.cur : labels.last;
+
+  var metaByItem = {}, skuMonthsByItem = {};
+  allRows.forEach(function (r) {
+    (skuMonthsByItem[r.item_id] = skuMonthsByItem[r.item_id] || {})[r.month_label] = r;
+    if (!metaByItem[r.item_id] || r.month_label === useLabel) metaByItem[r.item_id] = r;
+  });
+  var priceByItem = (window.bulkPriceData && window.bulkPriceData.loaded && window.bulkPriceData.byAccountItem[accountId]) || {};
+
+  var curRows = allRows.filter(function (r) { return r.month_label === useLabel; });
+  var items = curRows.map(function (cur) {
+    var meta = metaByItem[cur.item_id] || cur;
+    var disp = nrrSkuDisplayPrice(meta);
+    var div = disp.divisor || 1;
+    // merged monthly display-price history, dedup by month; sense_skus wins
+    // over bulk_price for a shared month (it's the same-basis source we
+    // computed `div` from). Current month forced to the proper displayPrice
+    // so the row headline and the chart's last point always agree.
+    var hist = {};
+    (priceByItem[cur.item_id] || []).forEach(function (p) { if (p.unit_price > 0) hist[p.month_label] = p.unit_price / div; });
+    Object.keys(skuMonthsByItem[cur.item_id] || {}).forEach(function (ml) {
+      var sr = skuMonthsByItem[cur.item_id][ml];
+      if (sr.unit_price > 0) hist[ml] = sr.unit_price / div;
+    });
+    if (disp.displayPrice > 0) hist[useLabel] = disp.displayPrice;
+    var history = Object.keys(hist).map(function (ml) { return { month_label: ml, price: hist[ml] }; })
+      .sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); })
+      .slice(-6);
+    var chgPct = null;
+    for (var i = history.length - 1; i >= 1; i--) {
+      if (history[i].month_label === useLabel) {
+        var prevP = history[i - 1].price;
+        if (prevP > 0) chgPct = (history[i].price - prevP) / prevP * 100;
+        break;
+      }
+    }
+    return {
+      item_id: cur.item_id, name: cur.item_name_th || cur.item_id, pack_size: cur.pack_size,
+      dept: cur.dept, gmv: cur.gmv_ex_vat, qty_kg: cur.qty_kg,
+      displayPrice: disp.displayPrice, displayUnit: disp.displayUnit,
+      chgPct: chgPct, history: history
+    };
+  });
+  items.sort(function (a, b) { return b.gmv - a.gmv; });
+  return { items: items, useLabel: useLabel };
+}
+window.nrrAccountPriceList = nrrAccountPriceList;
+
 // ── Price impact — net ฿ effect of price changes this month vs last ─────
 function nrrAccountPriceImpact(accountId, kamEmail) {
   var priceBundle = window.bulkPriceData;

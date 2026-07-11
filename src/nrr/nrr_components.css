@@ -961,6 +961,25 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-swap-arrow { color: var(--ink3); }
 .nrr-acct-swap-new { color: var(--ink); }
 
+/* ── Price drawer (v41) — browsable SKU price list + per-SKU chart.
+   Buyer lens: price down = green (cheaper), up = --sun-deep (cost warning). */
+.nrr-comm-ds .nrr-price-row-group { border-bottom: 1px solid var(--line); }
+.nrr-comm-ds .nrr-price-row-group:last-of-type { border-bottom: none; }
+.nrr-price-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 2px; cursor: pointer; list-style: none; }
+.nrr-price-row::-webkit-details-marker { display: none; }
+.nrr-price-row-main { flex: 1; min-width: 0; }
+.nrr-price-row-name { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-price-row-sub { font-size: 12px; color: var(--ink2); margin-top: 3px; }
+.nrr-price-chg { font-weight: 700; }
+.nrr-price-row-right { flex-shrink: 0; text-align: right; }
+.nrr-price-row-spend { font-size: 14px; font-weight: 700; }
+.nrr-price-chart { padding: 6px 2px 10px; }
+.nrr-price-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; font-size: 12px; }
+.nrr-price-chart-now { font-size: 17px; font-weight: 800; }
+.nrr-price-chart-unit { font-size: 12px; color: var(--ink3); font-weight: 600; }
+.nrr-price-chart-foot { display: flex; gap: 22px; margin-top: 8px; }
+.nrr-price-chart-foot .num { font-size: 14px; font-weight: 700; }
+
 /* ── Account view loading skeleton — page-shaped, not a single bar ─────── */
 .nrr-acct-skel-mast { display: flex; align-items: center; gap: 12px; }
 .nrr-acct-skel-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; }

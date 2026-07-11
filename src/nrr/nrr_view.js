@@ -622,57 +622,62 @@ function nrrAcctSparklineSvg(months) {
     '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
     '<circle cx="100" cy="' + lastY + '" r="2.4" fill="var(--green-deep)"></circle></svg>';
 }
-// ── SKU price history chart — click-to-expand row inside the "ราคาสินค้า"
-// drawer. Loosely ported from Sense's SKU detail sheet (05_kam_view.js
-// renderSkuDetailContent) but simplified: no opportunity/alternative
-// overlay, no qty footer — this rides entirely on bulk_price.csv's
-// unit_price so it renders even for items no longer on this month's SKU
-// list (nrrAccountPriceImpact's nameByItem fallback covers the name).
-// Min/max-of-data scale on purpose (NOT nrrAcctSparklineSvg's zero-floor
-// convention) — unit prices never approach ฿0, so zero-flooring would
-// flatten a real move into a barely-visible wiggle.
+// ── Per-SKU price history chart (v41) — expand inside the reworked price
+// drawer. Takes a nrrAccountPriceList item {history:[{month_label,price}],
+// displayUnit, pack_size, gmv} where `price` is ALREADY in the display unit.
+// Buyer lens: price DOWN = green (ร้านจ่ายถูกลง), UP = amber/--sun-deep.
+// Fixed from the old version: NO preserveAspectRatio="none" (that stretched
+// the fonts horizontally + squashed the plot); width:100%+height:auto scales
+// uniformly. Header shows ฿latest/<unit> + pack, footer shows ต่ำสุด/สูงสุด/
+// ซื้อ-เดือน — so the ฿-per-what and monthly-spend questions are answered.
 function nrrFmtUnitPrice(v) {
   if (v == null || isNaN(v)) return '—';
   var r = Math.round(v * 100) / 100;
-  return '฿' + (r % 1 === 0 ? r.toFixed(0) : r.toFixed(2));
+  return '฿' + (r % 1 === 0 ? nrrFmtGMVExact(r).replace('฿', '') : r.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 }
-function nrrSkuPriceHistorySvg(history) {
-  if (!history || history.length < 2) {
-    return '<div class="micro" style="color:var(--ink3);padding:4px 0 10px">ไม่มีข้อมูลราคาย้อนหลังพอสำหรับกราฟ</div>';
-  }
-  var prices = history.map(function (h) { return h.unit_price; });
+function nrrPriceChartHtml(it) {
+  var h = it.history || [];
+  if (h.length < 2) return '<div class="micro" style="color:var(--ink3);padding:6px 2px 12px">ข้อมูลราคาย้อนหลังไม่พอสำหรับกราฟ (ต้องมีอย่างน้อย 2 เดือน)</div>';
+  var prices = h.map(function (p) { return p.price; });
   var mn = Math.min.apply(null, prices), mx = Math.max.apply(null, prices);
-  var rng = (mx - mn) || (mn * 0.01) || 1;
-  var first = history[0], last = history[history.length - 1];
-  var delta = last.unit_price - first.unit_price;
-  var flatBand = Math.abs(first.unit_price) * 0.005;
-  var color = delta > flatBand ? 'var(--green-deep)' : delta < -flatBand ? 'var(--coral)' : 'var(--ink3)';
-  var W = 280, H = 90, pL = 10, pR = 10, pT = 16, pB = 20;
-  var cW = W - pL - pR, cH = H - pT - pB;
-  var pts = history.map(function (h, i) {
-    return { x: pL + (i / (history.length - 1)) * cW, y: pT + cH - ((h.unit_price - mn) / rng) * cH, mo: h.month_label };
+  var rng = (mx - mn) || (mn * 0.02) || 1;
+  var first = h[0].price, last = h[h.length - 1].price, n = h.length;
+  var delta = last - first, band = Math.abs(first) * 0.005;
+  // buyer lens: down = good = green, up = cost warning = --sun-deep
+  var color = delta < -band ? 'var(--green-deep)' : delta > band ? 'var(--sun-deep)' : 'var(--ink3)';
+  var W = 300, H = 118, pL = 12, pR = 12, pT = 22, pB = 22, cW = W - pL - pR, cH = H - pT - pB;
+  var pts = h.map(function (p, i) {
+    return { x: pL + (n === 1 ? 0 : (i / (n - 1)) * cW), y: pT + cH - ((p.price - mn) / rng) * cH, mo: p.month_label, price: p.price };
   });
-  var linePts = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
-  var areaPts = pL + ',' + (pT + cH) + ' ' + linePts + ' ' + (pL + cW) + ',' + (pT + cH);
-  var dots = pts.map(function (p, i) {
-    return (i === 0 || i === pts.length - 1) ? '<circle cx="' + p.x + '" cy="' + p.y + '" r="2.6" fill="' + color + '"></circle>' : '';
+  var line = pts.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+  var area = pL + ',' + (pT + cH) + ' ' + line + ' ' + (pL + cW) + ',' + (pT + cH);
+  var dots = pts.map(function (p, i) { return (i === 0 || i === n - 1) ? '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '"></circle>' : ''; }).join('');
+  function vlab(p, a) { return '<text x="' + p.x + '" y="' + (p.y - 7) + '" font-size="9.5" font-weight="700" fill="' + color + '" text-anchor="' + a + '">' + nrrFmtUnitPrice(p.price) + '</text>'; }
+  var valLabels = vlab(pts[0], 'start') + vlab(pts[n - 1], 'end');
+  var moLabels = pts.map(function (p, i) {
+    var show = n <= 4 || i === 0 || i === n - 1 || i === Math.floor((n - 1) / 2);
+    if (!show) return '';
+    var a = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
+    return '<text x="' + p.x + '" y="' + (H - 6) + '" font-size="9" fill="var(--ink3)" text-anchor="' + a + '">' + nrrEsc(p.mo.split(' ')[0]) + '</text>';
   }).join('');
-  var monthLbls = pts.map(function (p) {
-    return '<text x="' + p.x + '" y="' + (H - 4) + '" font-size="8" fill="var(--ink3)" text-anchor="middle">' + nrrEsc(p.mo.split(' ')[0]) + '</text>';
-  }).join('');
-  var deltaPct = first.unit_price > 0 ? (delta / first.unit_price) * 100 : 0;
-  return '<div style="padding:6px 0 10px">' +
-    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" preserveAspectRatio="none">' +
-    '<polygon points="' + areaPts + '" fill="' + color + '" opacity="0.08"></polygon>' +
-    '<polyline points="' + linePts + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
-    dots + monthLbls +
+  var deltaPct = first > 0 ? delta / first * 100 : 0;
+  return '<div class="nrr-price-chart">' +
+    '<div class="nrr-price-chart-head">' +
+    '<div><span class="nrr-price-chart-now num">' + nrrFmtUnitPrice(last) + '</span><span class="nrr-price-chart-unit">/' + nrrEsc(it.displayUnit) + '</span>' + (it.pack_size ? ' <span class="micro">· ' + nrrEsc(it.pack_size) + '</span>' : '') + '</div>' +
+    '<span class="num" style="font-weight:700;color:' + color + '">' + (deltaPct >= 0 ? '+' : '') + (Math.round(deltaPct * 10) / 10) + '% ตลอดช่วง</span>' +
+    '</div>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto">' +
+    '<polygon points="' + area + '" fill="' + color + '" opacity="0.08"></polygon>' +
+    '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>' +
+    dots + valLabels + moLabels +
     '</svg>' +
-    '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:2px">' +
-    '<span style="color:var(--ink2)">' + nrrFmtUnitPrice(first.unit_price) + ' → ' + nrrFmtUnitPrice(last.unit_price) + '</span>' +
-    '<span style="color:' + color + ';font-weight:700">' + (deltaPct >= 0 ? '+' : '') + Math.round(deltaPct * 10) / 10 + '% ตลอดช่วง</span>' +
+    '<div class="nrr-price-chart-foot">' +
+    '<div><div class="micro">ต่ำสุด</div><div class="num" style="color:var(--green-deep)">' + nrrFmtUnitPrice(mn) + '</div></div>' +
+    '<div><div class="micro">สูงสุด</div><div class="num" style="color:var(--sun-deep)">' + nrrFmtUnitPrice(mx) + '</div></div>' +
+    '<div><div class="micro">ซื้อ/เดือน</div><div class="num">' + nrrFmtGMVExact(it.gmv) + '</div></div>' +
     '</div></div>';
 }
-window.nrrSkuPriceHistorySvg = nrrSkuPriceHistorySvg;
+window.nrrPriceChartHtml = nrrPriceChartHtml;
 
 function nrrOutletDotGridHtml(outlets) {
   return '<div class="nrr-acct-outlet-dots">' + outlets.map(function (o) {
@@ -689,20 +694,20 @@ function nrrOutletStackedBarHtml(counts, total) {
     '<i style="width:' + w(counts.quiet) + '%;background:var(--coral);opacity:.6"></i>' +
     '</div>';
 }
-function nrrPriceDivBarHtml(price) {
-  var upTotal = price.up.reduce(function (s, e) { return s + e.impact; }, 0);
-  var downTotal = Math.abs(price.down.reduce(function (s, e) { return s + e.impact; }, 0));
-  var total = upTotal + downTotal;
+// Two-segment count bar for the price tile — buyer lens: DOWN (cheaper) is
+// the good green segment, UP (pricier) the amber warning segment.
+function nrrPriceDivBarHtml(downCount, upCount) {
+  var total = downCount + upCount;
   if (!total) return '';
-  var upW = Math.round(upTotal / total * 100);
-  return '<div class="nrr-acct-price-div"><i style="width:' + upW + '%;background:var(--green)"></i><i style="width:' + (100 - upW) + '%;background:var(--coral)"></i></div>';
+  var downW = Math.round(downCount / total * 100);
+  return '<div class="nrr-acct-price-div"><i style="width:' + downW + '%;background:var(--green)"></i><i style="width:' + (100 - downW) + '%;background:var(--sun-deep)"></i></div>';
 }
 
 function nrrAccountStatRowHtml(row, kamEmail) {
   var aov = nrrAccountAov(row.account_id);
   var outlet = nrrOutletMovement(row.account_id);
   var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
-  var price = nrrAccountPriceImpact(row.account_id, kamEmail);
+  var priceList = nrrAccountPriceList(row.account_id, kamEmail);
 
   var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov" style="border-top-color:' + aov.band.color + '">' +
     '<div class="nrr-acct-stat-lbl">AOV เฉลี่ย <span>›</span></div>' +
@@ -736,34 +741,25 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     '</button>';
 
   var priceCell;
-  if (!price) {
+  if (!priceList) {
     priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default;border-top-color:var(--ink3)"><div class="nrr-acct-stat-lbl">ราคาสินค้า</div><div class="micro">กำลังโหลด...</div></div>';
-  } else if (!price.hasCurrentData && !(price.creeping && price.creeping.length)) {
-    // bulk_price.csv hasn't been batched for this month yet — say so
-    // plainly rather than showing a "+฿0 ไม่มีการเปลี่ยนแปลง" that reads
-    // as a verified zero (see nrrAccountPriceImpact comment).
+  } else if (!priceList.items.length) {
     priceCell = '<div class="nrr-acct-stat-cell" style="cursor:default;border-top-color:var(--ink3)">' +
       '<div class="nrr-acct-stat-lbl">ราคาสินค้า</div>' +
       '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
-      '<div class="nrr-acct-stat-sub">รอข้อมูลราคาปิดเดือน</div>' +
+      '<div class="nrr-acct-stat-sub">ยังไม่มีข้อมูลราคา</div>' +
       '</div>';
-  } else if (!price.hasCurrentData) {
-    // This-month comparison isn't ready, but the 6-month creep signal
-    // (nrrAccountPriceImpact) doesn't depend on the current month at all
-    // — still worth a clickable cell instead of burying it until the
-    // month-end batch lands.
-    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:var(--sun-deep)">' +
-      '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
-      '<div class="num nrr-acct-stat-val" style="color:var(--ink3)">—</div>' +
-      '<div class="nrr-acct-stat-sub">รอข้อมูลเดือนนี้ · ' + price.creeping.length + ' รายการขยับสะสม 6 เดือน</div>' +
-      '</button>';
   } else {
-    var netColor = price.net >= 0 ? 'var(--green-deep)' : 'var(--coral)';
-    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + netColor + '">' +
+    var pUp = 0, pDown = 0;
+    priceList.items.forEach(function (it) { if (it.chgPct != null) { if (it.chgPct >= 1) pUp++; else if (it.chgPct <= -1) pDown++; } });
+    // buyer lens: any price INCREASE is the thing a KAM most wants flagged
+    // (cost creep / churn risk) → amber accent; else green if only drops.
+    var pAccent = pUp > 0 ? 'var(--sun-deep)' : pDown > 0 ? 'var(--green-deep)' : 'var(--ink3)';
+    priceCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="price" style="border-top-color:' + pAccent + '">' +
       '<div class="nrr-acct-stat-lbl">ราคาสินค้า <span>›</span></div>' +
-      '<div class="num nrr-acct-stat-val" style="color:' + netColor + '">' + (price.net >= 0 ? '+' : '') + nrrFmtGMVExact(price.net) + '</div>' +
-      nrrPriceDivBarHtml(price) +
-      '<div class="nrr-acct-stat-sub">▲' + price.upCount + ' ขึ้นราคา · ▼' + price.downCount + ' ลดราคา</div>' +
+      '<div class="num nrr-acct-stat-val">' + priceList.items.length + '<span style="font-size:13px;color:var(--ink3)"> SKU</span></div>' +
+      nrrPriceDivBarHtml(pDown, pUp) +
+      '<div class="nrr-acct-stat-sub">▲' + pUp + ' แพงขึ้น · ▼' + pDown + ' ถูกลง</div>' +
       '</button>';
   }
 
@@ -897,6 +893,9 @@ function nrrSkuSwapListHtml(row, kamEmail) {
 // ── Slideover content builders — reuse #nrr-slideover exactly as the
 // commission drawer does (hide search/chips, own body div) ─────────────
 function nrrOpenAccountStatDrawer(key, row, kamEmail) {
+  // Price has its own interactive drawer (filters + search + list) — route
+  // to it and bail; it does its own title/body/open.
+  if (key === 'price') { nrrOpenPriceDrawer(row.account_id, kamEmail); return; }
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
@@ -913,12 +912,6 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
     var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
     title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
     html = nrrCategoryDrawerHtml(cat);
-  } else if (key === 'price') {
-    var price = nrrAccountPriceImpact(row.account_id, kamEmail);
-    title = (price && !price.hasCurrentData)
-      ? 'แนวโน้มราคาสะสม (รอข้อมูลปิดเดือนนี้)'
-      : 'ผลกระทบราคาสุทธิ ' + (price && price.net >= 0 ? '+' : '') + (price ? nrrFmtGMVExact(price.net) : '—');
-    html = nrrPriceDrawerHtml(price);
   }
   document.getElementById('nrr-slideover-title').textContent = title;
   document.getElementById('nrr-slideover-sub').textContent = '';
@@ -990,57 +983,107 @@ function nrrCategoryDrawerHtml(cat) {
   }).join('');
 }
 
-// Each row is a native <details> accordion (same pattern as the commission
-// drawer's TL/admin rows, nrr_view.js:1783-1794) — click to expand a
-// 6-month price chart for that SKU inline, no JS click handler needed.
-function nrrPriceRowHtml(name, metaHtml, valueHtml, valueColor, history) {
-  return '<details class="nrr-price-row-group">' +
-    '<summary class="ds-row hover">' +
-    '<span class="ds-chev">›</span>' +
-    '<span class="ds-row-name">' + nrrEsc(name) + '</span>' +
-    '<span class="ds-row-meta">' + metaHtml + '</span>' +
-    '<span class="ds-row-value" style="color:' + valueColor + '">' + valueHtml + '</span>' +
-    '</summary>' +
-    '<div class="ds-row-detail">' + nrrSkuPriceHistorySvg(history) + '</div>' +
-    '</details>';
-}
-function nrrPriceDrawerHtml(price) {
-  if (!price) return '<div class="ds-empty"><div class="ds-empty-title">กำลังโหลดข้อมูลราคา...</div></div>';
-  var hasCreep = price.creeping && price.creeping.length > 0;
-  if (!price.upCount && !price.downCount && !hasCreep) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีการเปลี่ยนราคาที่มีนัยสำคัญเดือนนี้</div></div>';
+// ── Reworked price drawer (v41) — a browsable, always-live SKU price list
+// off nrrAccountPriceList: every purchased SKU (GMV-sorted), category
+// filter, search, up/down movement filter, each row showing normalized
+// ฿/หน่วย + monthly spend + MoM %change, expanding to the fixed 6-month
+// chart. Custom-body drawer (same precedent as the commission/pipeline
+// drawers: hide the shared search/chips rows, own body, own state).
+var nrrPriceDrawerState = null; // { accountId, kamEmail, cat, search, move, data }
 
-  var rows = price.up.concat(price.down);
-  var mainHtml = rows.map(function (e) {
-    return nrrPriceRowHtml(
-      e.name,
-      (e.pctChange >= 0 ? 'ขึ้นราคา ' : 'ลดราคา ') + Math.abs(Math.round(e.pctChange * 10) / 10) + '%',
-      (e.impact >= 0 ? '+' : '') + nrrFmtGMVExact(e.impact),
-      e.impact >= 0 ? 'var(--green-deep)' : 'var(--coral)',
-      e.history
-    );
-  }).join('');
+function nrrOpenPriceDrawer(accountId, kamEmail) {
+  nrrCommDrawerState = null;
+  var data = nrrAccountPriceList(accountId, kamEmail);
+  nrrPriceDrawerState = { accountId: accountId, kamEmail: kamEmail, cat: 'all', search: '', move: 'all', data: data };
+  document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
+  document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
+  document.getElementById('nrr-slideover-title').textContent = 'ราคาสินค้าที่ร้านนี้ซื้อ';
+  var body = document.getElementById('nrr-slideover-body');
+  var backdrop = document.getElementById('nrr-slideover-backdrop');
+  var over = document.getElementById('nrr-slideover');
 
-  // Cumulative 6-month creep — a distinct signal from the up/down list
-  // above (see nrrAccountPriceImpact): items that never crossed the ≥1%
-  // single-month threshold, but have drifted ≥3% over the full window.
-  var creepHtml = '';
-  if (hasCreep) {
-    creepHtml = '<div class="nrr-comm-drawer-section" style="margin-top:22px">' +
-      '<div class="ds-section-hd"><span class="ds-eyebrow">ราคาสะสมขึ้น/ลงต่อเนื่อง (6 เดือน)</span></div>' +
-      '<div class="micro" style="margin-bottom:6px;color:var(--ink3)">ไม่มีเดือนไหนขยับแรงพอให้สังเกตเห็นเดี่ยวๆ แต่สะสมหลายเดือนแล้วขยับจริง</div>' +
-      price.creeping.map(function (e) {
-        return nrrPriceRowHtml(
-          e.name,
-          'ย้อนหลัง ' + e.history.length + ' เดือน',
-          (e.cumPct >= 0 ? '+' : '') + Math.round(e.cumPct * 10) / 10 + '%',
-          e.cumPct >= 0 ? 'var(--green-deep)' : 'var(--coral)',
-          e.history
-        );
-      }).join('') + '</div>';
+  if (!data || !data.items || !data.items.length) {
+    document.getElementById('nrr-slideover-sub').textContent = '';
+    body.innerHTML = '<div class="nrr-comm-ds"><div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูลราคาสินค้าของร้านนี้</div></div></div>';
+    backdrop.classList.add('on'); over.classList.add('on'); return;
   }
 
-  return '<div class="nrr-verdict">ยอดโตส่วนหนึ่งอาจมาจากราคา ไม่ใช่ปริมาณอย่างเดียว — เช็คให้ชัดก่อนสรุปว่าร้านนี้โตจริง</div>' +
-    mainHtml + creepHtml;
+  var up = 0, down = 0;
+  data.items.forEach(function (it) { if (it.chgPct != null) { if (it.chgPct >= 1) up++; else if (it.chgPct <= -1) down++; } });
+  document.getElementById('nrr-slideover-sub').textContent = data.items.length + ' SKU' + (data.useLabel ? ' · ' + data.useLabel : '');
+
+  // category pills — only categories actually present, in NRR_CAT_MASTER order
+  var present = {};
+  data.items.forEach(function (it) { present[it.dept] = (present[it.dept] || 0) + 1; });
+  var catPills = '<button type="button" class="nrr-chip on" data-cat="all">ทั้งหมด ' + data.items.length + '</button>' +
+    (window.NRR_CAT_MASTER || []).filter(function (c) { return present[c.n]; }).map(function (c) {
+      return '<button type="button" class="nrr-chip" data-cat="' + nrrEsc(c.n) + '">' + nrrEsc(c.n) + ' ' + present[c.n] + '</button>';
+    }).join('');
+  var movePills = '<button type="button" class="nrr-chip on" data-move="all">ทั้งหมด</button>' +
+    (down ? '<button type="button" class="nrr-chip" data-move="down"><span style="color:var(--green-deep)">▼</span> ถูกลง ' + down + '</button>' : '') +
+    (up ? '<button type="button" class="nrr-chip" data-move="up"><span style="color:var(--sun-deep)">▲</span> แพงขึ้น ' + up + '</button>' : '');
+
+  body.innerHTML = '<div class="nrr-comm-ds">' +
+    '<div class="nrr-verdict">เดือนนี้ ▲ ' + up + ' รายการราคาขึ้น · ▼ ' + down + ' รายการราคาลง — ดูว่ายอดที่เปลี่ยนมาจากราคาหรือปริมาณ</div>' +
+    '<div class="nrr-chip-row" id="nrr-price-cat-pills" style="margin-bottom:8px">' + catPills + '</div>' +
+    '<div style="margin-bottom:8px"><input class="nrr-search" id="nrr-price-search" placeholder="ค้นหาสินค้า..." style="width:100%"></div>' +
+    '<div class="nrr-chip-row" id="nrr-price-move-pills">' + movePills + '</div>' +
+    '<div id="nrr-price-list"></div>' +
+    '</div>';
+  nrrRenderPriceDrawerList();
+
+  document.getElementById('nrr-price-cat-pills').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-cat]'); if (!b) return;
+    nrrPriceDrawerState.cat = b.dataset.cat;
+    this.querySelectorAll('.nrr-chip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on');
+    nrrRenderPriceDrawerList();
+  });
+  document.getElementById('nrr-price-move-pills').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-move]'); if (!b) return;
+    nrrPriceDrawerState.move = b.dataset.move;
+    this.querySelectorAll('.nrr-chip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on');
+    nrrRenderPriceDrawerList();
+  });
+  var searchEl = document.getElementById('nrr-price-search');
+  searchEl.addEventListener('input', function () { nrrPriceDrawerState.search = searchEl.value.trim().toLowerCase(); nrrRenderPriceDrawerList(); });
+
+  backdrop.classList.add('on'); over.classList.add('on');
+}
+window.nrrOpenPriceDrawer = nrrOpenPriceDrawer;
+
+function nrrRenderPriceDrawerList() {
+  var st = nrrPriceDrawerState; if (!st) return;
+  var wrap = document.getElementById('nrr-price-list'); if (!wrap) return;
+  var items = st.data.items.filter(function (it) {
+    if (st.cat !== 'all' && it.dept !== st.cat) return false;
+    if (st.move === 'up' && !(it.chgPct != null && it.chgPct >= 1)) return false;
+    if (st.move === 'down' && !(it.chgPct != null && it.chgPct <= -1)) return false;
+    if (st.search && it.name.toLowerCase().indexOf(st.search) === -1) return false;
+    return true;
+  });
+  wrap.innerHTML = items.length
+    ? items.map(nrrPriceListRowHtml).join('')
+    : '<div class="ds-empty" style="padding:20px 0"><div class="ds-empty-title">ไม่พบสินค้าที่ตรงกับตัวกรอง</div></div>';
+}
+
+function nrrPriceListRowHtml(it) {
+  var chg = '';
+  if (it.chgPct != null && Math.abs(it.chgPct) >= 1) {
+    var dn = it.chgPct < 0;
+    chg = ' · <span class="nrr-price-chg" style="color:' + (dn ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + (dn ? '▼' : '▲') + ' ' + Math.abs(Math.round(it.chgPct * 10) / 10) + '%</span>';
+  }
+  return '<details class="nrr-price-row-group">' +
+    '<summary class="nrr-price-row">' +
+    '<span class="ds-chev">›</span>' +
+    '<div class="nrr-price-row-main">' +
+    '<div class="nrr-price-row-name">' + nrrEsc(it.name) + '</div>' +
+    '<div class="nrr-price-row-sub">' + (it.pack_size ? nrrEsc(it.pack_size) + ' · ' : '') + nrrFmtUnitPrice(it.displayPrice) + '/' + nrrEsc(it.displayUnit) + chg + '</div>' +
+    '</div>' +
+    '<div class="nrr-price-row-right"><div class="num nrr-price-row-spend">' + nrrFmtGMVExact(it.gmv) + '</div><div class="micro">/เดือน</div></div>' +
+    '</summary>' +
+    '<div class="ds-row-detail">' + nrrPriceChartHtml(it) + '</div>' +
+    '</details>';
 }
 
 // ── Floating per-outlet tooltip (SKU signal rows) ────────────────────────

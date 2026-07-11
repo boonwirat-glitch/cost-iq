@@ -641,6 +641,14 @@ function _nrrParseSenseSkusCsv(text) {
       order_count:      parseInt(p[12], 10) || 0,
       avg_piece_price:  parseFloat(p[13]) || 0,
       outlet_count_sku: parseInt(p[14], 10) || 0,
+      // cols 15-17: unit-normalization metadata from item_master (SQL1
+      // v207g exports these; earlier the parser skipped straight to 18).
+      // Feed nrrSkuDisplayPrice → normalized ฿/หน่วย (฿/กก., ฿/ลิตร,
+      // ฿/ฟอง...) so the price feature never shows an unlabeled raw
+      // unit_price whose basis (per-kg vs per-piece) is ambiguous.
+      default_unit_group: (p[15] || '').trim(),
+      ea_unit_name:       (p[16] || '').trim(),
+      universal_ea_value: parseFloat(p[17]) || 0,
       last_order_date:  (p[18] || '').trim()
     };
     if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
