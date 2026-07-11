@@ -128,9 +128,25 @@ function _nrrSkuFamilyKey(name, subclass) {
   var sub = _nrrSkuNormName(subclass || '');
   return sub ? 'sub:' + sub : '';
 }
+// Generic preservation-state/quality/sourcing qualifiers — describe HOW a
+// product is kept/graded/sourced, not WHAT it is, so they must not count
+// toward name similarity. Added 2026-07-11 after a real false positive:
+// "ปีกไก่กลาง (แช่แข็ง) ตราเบทาโกร" (frozen chicken wing) matched "ขาไก่
+// (ตัดเล็บ) (แช่แข็ง)" (frozen chicken leg) as a "swap" — the ONLY token
+// the two names shared was "แช่แข็ง" (frozen), a word that appears on
+// countless unrelated frozen products. formConflict's frozen/แช่แข็ง group
+// doesn't catch this: it only fires on a MISMATCH (one frozen, one not),
+// not when both sides share the same generic state word. This is a
+// curated list, not a provably complete one — extend it if further
+// mismatches like this turn up in real use (see plan doc).
+var _NRR_SKU_QUALIFIER_STOPWORDS = [
+  'แช่แข็ง', 'frozen', 'แช่เย็น', 'chilled', 'สด', 'ทั้งตัว', 'คัดพิเศษ',
+  'เกรดเอ', 'เกรด', 'ออร์แกนิค', 'ตัดแต่ง', 'นำเข้า'
+];
 function _nrrSkuTokens(name) {
   return _nrrSkuNormName(name).split(' ').filter(function (t) {
-    return t && !/^\d+$/.test(t) && ['ตรา', 'brand', 'ยี่ห้อ'].indexOf(t) === -1;
+    return t && !/^\d+$/.test(t) && ['ตรา', 'brand', 'ยี่ห้อ'].indexOf(t) === -1
+      && _NRR_SKU_QUALIFIER_STOPWORDS.indexOf(t) === -1;
   });
 }
 function _nrrSkuJaccard(a, b) {
