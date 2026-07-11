@@ -3118,8 +3118,23 @@ function getThaiMonthDays(label){
     if(sub) return 'sub:'+sub;
     return '';
   }
+  // Generic preservation-state/quality/sourcing qualifiers — describe HOW a
+  // product is kept/graded/sourced, not WHAT it is, so they must not count
+  // toward name similarity. Added 2026-07-11: /nrr's port of this exact
+  // scorer (nrr_account.js) hit a real false positive where "ปีกไก่กลาง
+  // (แช่แข็ง)" (frozen chicken wing) matched "ขาไก่ (ตัดเล็บ) (แช่แข็ง)"
+  // (frozen chicken leg) as a substitute — the ONLY shared token was
+  // "แช่แข็ง" (frozen), a word on countless unrelated frozen products.
+  // formConflict's frozen/แช่แข็ง group doesn't catch this (it only fires
+  // on a MISMATCH, not both sides sharing the same generic state word).
+  // This bug is latent here too (identical algorithm) — normally masked
+  // by judgePairsWithAI's review, but worth fixing at the root so the
+  // deterministic fallback (used whenever AI errors/is unavailable) isn't
+  // silently wrong. Curated list, not provably complete — extend if more
+  // mismatches turn up.
+  const QUALIFIER_STOPWORDS = ['แช่แข็ง','frozen','แช่เย็น','chilled','สด','ทั้งตัว','คัดพิเศษ','เกรดเอ','เกรด','ออร์แกนิค','ตัดแต่ง','นำเข้า'];
   function tokens(name){
-    return normName(name).split(' ').filter(t=>t && !/^\d+$/.test(t) && !['ตรา','brand','ยี่ห้อ'].includes(t));
+    return normName(name).split(' ').filter(t=>t && !/^\d+$/.test(t) && !['ตรา','brand','ยี่ห้อ'].includes(t) && !QUALIFIER_STOPWORDS.includes(t));
   }
   function jaccard(a,b){
     const A = new Set(tokens(a)), B = new Set(tokens(b));
