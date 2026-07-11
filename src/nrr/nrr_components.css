@@ -939,6 +939,20 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-sig-unit { font-size: 10px; font-weight: 600; color: var(--ink3); }
 .nrr-acct-sig-chev { color: var(--ink3); font-size: 16px; flex-shrink: 0; }
 
+/* ── SKU swap row — explanatory, not actionable: no border-left color
+   (that's reserved for the real risk/opportunity signals), no hover/click
+   affordance, muted ฿ delta since it should read close to zero. */
+.nrr-acct-swap-row {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  border-bottom: 1px solid var(--line); padding: 11px 6px;
+}
+.nrr-acct-swap-row:last-child { border-bottom: none; }
+.nrr-acct-swap-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nrr-acct-swap-pair { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.nrr-acct-swap-old { color: var(--ink2); text-decoration: line-through; text-decoration-color: var(--ink3); }
+.nrr-acct-swap-arrow { color: var(--ink3); }
+.nrr-acct-swap-new { color: var(--ink); }
+
 /* ── Account view loading skeleton — page-shaped, not a single bar ─────── */
 .nrr-acct-skel-mast { display: flex; align-items: center; gap: 12px; }
 .nrr-acct-skel-trend { display: flex; align-items: flex-end; gap: 12px; height: 78px; margin: 18px 0 0; }

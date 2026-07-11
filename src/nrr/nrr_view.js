@@ -491,7 +491,8 @@ function nrrRenderAccountBody(row) {
     nrrAccountHeroHtml(row) +
     nrrAccountStatRowHtml(row, kamEmail) +
     nrrAccountVerdictHtml(row, kamEmail) +
-    nrrAccountSignalListsHtml(row, kamEmail);
+    nrrAccountSignalListsHtml(row, kamEmail) +
+    nrrSkuSwapListHtml(row, kamEmail);
   nrrRenderAccountTrendChart(row);
 }
 
@@ -838,6 +839,32 @@ function nrrAccountSignalListsHtml(row, kamEmail) {
     (risk.length > riskCap ? '<button type="button" class="btn-secondary nrr-acct-showall" data-list="risk" style="margin-top:10px">ดูทั้งหมด (' + risk.length + ')</button>' : '') +
     '</div>' +
     '</div>';
+}
+
+// ── SKU swap section — "these two aren't independent signals, they're
+// the same non-event" — a third, explanatory (not actionable) section
+// below the two real signal lists. Net delta reads close to ฿0 by
+// construction (that's the whole point: proving it's not real growth/
+// loss), so it's shown muted rather than colored like a real gain/risk.
+function nrrSkuSwapRowHtml(pair) {
+  var deltaSign = pair.netDelta >= 0 ? '+' : '';
+  return '<div class="nrr-acct-swap-row">' +
+    '<div class="nrr-acct-swap-main">' +
+    '<div class="nrr-acct-swap-pair"><span class="nrr-acct-swap-old">' + nrrEsc(pair.droppedName) + '</span>' +
+    '<span class="nrr-acct-swap-arrow">→</span>' +
+    '<span class="nrr-acct-swap-new">' + nrrEsc(pair.newName) + '</span></div>' +
+    '<div class="micro">฿เดิม ' + nrrFmtGMVExact(pair.droppedGmv) + ' · ฿ใหม่ ' + nrrFmtGMVExact(pair.newGmv) + '</div>' +
+    '</div>' +
+    '<div class="num" style="color:var(--ink3)">' + deltaSign + nrrFmtGMVExact(pair.netDelta) + '</div>' +
+    '</div>';
+}
+
+function nrrSkuSwapListHtml(row, kamEmail) {
+  var pairs = typeof nrrSkuSwapPairs === 'function' ? nrrSkuSwapPairs(row.account_id, kamEmail) : [];
+  if (!pairs.length) return '';
+  return '<div class="nrr-panel-head" style="margin-top:22px;margin-bottom:8px"><div class="h2" style="font-size:16px;color:var(--ink2)">สลับ SKU เดือนนี้</div><div class="micro">' + pairs.length + ' คู่ · ไม่นับเป็นสัญญาณบวก/ต้องดูแลด้านบน</div></div>' +
+    '<div class="micro" style="margin-bottom:8px">ร้านนี้น่าจะแค่เปลี่ยน SKU ที่ซื้อ ไม่ได้เพิ่ม/ลดยอดจริง — ระบบตรวจจากชื่อ/หมวดสินค้า/ปริมาณที่ใกล้เคียงกัน</div>' +
+    pairs.map(nrrSkuSwapRowHtml).join('');
 }
 
 // ── Slideover content builders — reuse #nrr-slideover exactly as the

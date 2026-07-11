@@ -42,13 +42,187 @@ function _nrrSkusRowsForMonth(accountId, kamEmail, monthLabel) {
   return (bundle.byAccountId[accountId] || []).filter(function (r) { return r.month_label === monthLabel; });
 }
 
-// ── Positive signals — live, run-rate projected ──────────────────────────
-function nrrSkuPositiveSignals(accountId, kamEmail) {
+// Shared month-over-month item diff — nrrSkuPositiveSignals, nrrSkuCycleSignals
+// and nrrSkuSwapPairs all read from this ONE computation instead of each
+// rebuilding curByItem/lastByItem independently, so they can never drift
+// apart on what counts as "new"/"dropped" this month.
+function nrrSkuMonthDiff(accountId, kamEmail) {
   var labels = _nrrAccountMonthLabels();
   var curRows = _nrrSkusRowsForMonth(accountId, kamEmail, labels.cur);
   var lastRows = _nrrSkusRowsForMonth(accountId, kamEmail, labels.last);
-  var lastByItem = {};
+  var curByItem = {}, lastByItem = {};
+  curRows.forEach(function (r) { curByItem[r.item_id] = r; });
   lastRows.forEach(function (r) { lastByItem[r.item_id] = r; });
+  // Dropped = ordered last month, no row at all this month. Small noise
+  // floor (฿300) so a one-off trivial last-month purchase doesn't generate
+  // a swap candidate — the signal lists' own display thresholds (below)
+  // are separate and unaffected by this floor.
+  var droppedItems = lastRows.filter(function (r) { return !curByItem[r.item_id] && r.gmv_ex_vat > 300; });
+  return { curRows: curRows, lastRows: lastRows, curByItem: curByItem, lastByItem: lastByItem, droppedItems: droppedItems };
+}
+window.nrrSkuMonthDiff = nrrSkuMonthDiff;
+
+// ── SKU swap detection — rule-based, NO AI (ported from Sense's own
+// deterministic "SKU Verify" fallback scorer, src/05_kam_view.js:3096-3167 —
+// same thresholds, same Thai stopword list, same form-conflict rules).
+// Runs automatically on every Account page render, narrowed to a SINGLE
+// high-confidence tier (no medium/annotate tier — a match either moves out
+// of the risk/opportunity lists entirely, or it isn't treated as a swap at
+// all): egg-grade-number match, OR same family (subclass) + name similarity
+// >=0.4 + no form conflict + comparable quantity.
+//
+// Sense's version is human-reviewed (a KAM eyeballs each pair before it
+// affects anything visible); this version runs unsupervised and reshapes
+// real risk/opportunity numbers, so it adds one gate Sense's doesn't need:
+// magnitude comparability. Decided 2026-07-11 (see plan doc) to gate this
+// on QUANTITY (qty_kg), not GMV — a genuine pack-size swap (1kg pack -> 5kg
+// pack, same product) keeps roughly the same purchased volume while its
+// GMV can legitimately jump 4-5x, so a GMV-based gate would wrongly reject
+// real pack-size swaps. Falls back to a GMV-ratio check only when qty_kg
+// is missing/zero on either side.
+var _NRR_SKU_TH_DIGITS = { '๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9' };
+function _nrrSkuToAsciiDigits(s) {
+  return String(s || '').replace(/[๐-๙]/g, function (d) { return _NRR_SKU_TH_DIGITS[d] || d; });
+}
+function _nrrSkuNormName(s) {
+  return _nrrSkuToAsciiDigits(s).toLowerCase()
+    .replace(/[()\[\]{}]/g, ' ')
+    .replace(/[·•|,:;_\-/\\]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function _nrrSkuCompact(s) { return _nrrSkuNormName(s).replace(/\s+/g, ''); }
+function _nrrSkuEggKey(name) {
+  var n = _nrrSkuNormName(name), c = _nrrSkuCompact(name);
+  if (n.indexOf('ไข่') < 0 && c.indexOf('egg') < 0) return '';
+  var m = n.match(/เบอร์\s*(\d+)/) || c.match(/เบอร์(\d+)/) || n.match(/no\.?\s*(\d+)/) || c.match(/no(\d+)/);
+  if (m && m[1]) return 'egg:no' + m[1];
+  if (c.indexOf('เบอร์หนึ่ง') >= 0) return 'egg:no1';
+  return 'egg:unknown';
+}
+function _nrrSkuFamilyKey(name, subclass) {
+  var e = _nrrSkuEggKey(name);
+  if (e && e !== 'egg:unknown') return e;
+  var sub = _nrrSkuNormName(subclass || '');
+  return sub ? 'sub:' + sub : '';
+}
+function _nrrSkuTokens(name) {
+  return _nrrSkuNormName(name).split(' ').filter(function (t) {
+    return t && !/^\d+$/.test(t) && ['ตรา', 'brand', 'ยี่ห้อ'].indexOf(t) === -1;
+  });
+}
+function _nrrSkuJaccard(a, b) {
+  var tokA = _nrrSkuTokens(a), tokB = _nrrSkuTokens(b);
+  if (!tokA.length || !tokB.length) return 0;
+  var setA = {}; tokA.forEach(function (t) { setA[t] = true; });
+  var setB = {}; tokB.forEach(function (t) { setB[t] = true; });
+  var sizeA = Object.keys(setA).length, sizeB = Object.keys(setB).length;
+  var inter = 0;
+  Object.keys(setA).forEach(function (t) { if (setB[t]) inter++; });
+  return inter / Math.max(1, sizeA + sizeB - inter);
+}
+function _nrrSkuFormConflict(a, b) {
+  var aa = _nrrSkuCompact(a), bb = _nrrSkuCompact(b);
+  var groups = [['บด', 'สับ'], ['ชิ้น', 'แผ่น', 'สไลซ์'], ['ผง'], ['น้ำ'], ['แช่แข็ง', 'frozen']];
+  for (var i = 0; i < groups.length; i++) {
+    var g = groups[i];
+    var ha = g.some(function (x) { return aa.indexOf(x) >= 0; });
+    var hb = g.some(function (x) { return bb.indexOf(x) >= 0; });
+    if ((ha || hb) && ha !== hb) return true;
+  }
+  return false;
+}
+function _nrrSkuMagnitudeOk(pair) {
+  var qtyA = parseFloat(pair.droppedQty) || 0, qtyB = parseFloat(pair.newQty) || 0;
+  if (qtyA > 0 && qtyB > 0) {
+    var qr = qtyB / qtyA;
+    return qr >= 0.4 && qr <= 2.5;
+  }
+  // qty_kg missing on either side — fall back to GMV ratio as a secondary
+  // safety net only (not the primary check — see header note above).
+  var gA = parseFloat(pair.droppedGmv) || 0, gB = parseFloat(pair.newGmv) || 0;
+  if (!gA || !gB) return false;
+  var gr = gB / gA;
+  return gr >= 0.4 && gr <= 2.5;
+}
+function _nrrSkuPairScore(pair) {
+  if (_nrrSkuFormConflict(pair.droppedName, pair.newName)) return { ok: false, score: 0 };
+  if (!_nrrSkuMagnitudeOk(pair)) return { ok: false, score: 0 };
+  var eggA = _nrrSkuEggKey(pair.droppedName), eggB = _nrrSkuEggKey(pair.newName);
+  if (eggA && eggB && eggA === eggB) return { ok: true, score: 1.0 };
+  var fkA = _nrrSkuFamilyKey(pair.droppedName, pair.droppedSubclass);
+  var fkB = _nrrSkuFamilyKey(pair.newName, pair.newSubclass);
+  if (fkA && fkB && fkA === fkB) {
+    // Threshold kept at Sense's own proven 0.20 (not tightened further) —
+    // testing during implementation showed short 2-3 token Thai product
+    // names (e.g. "แครอทหั่นเต๋า ตราเอ" vs "...ตราบี") structurally cap
+    // around jaccard 0.33 even for an obvious same-product/different-brand
+    // pair, so a stricter bar would miss common real cases. The magnitude
+    // (qty_kg) gate above is this feature's actual extra safety net for
+    // running unsupervised, not a tighter jaccard bar on top of it too.
+    var sim = _nrrSkuJaccard(pair.droppedName, pair.newName);
+    if (sim >= 0.20) return { ok: true, score: 0.72 + sim };
+  }
+  return { ok: false, score: 0 };
+}
+
+// Best-match-per-dropped-item (mirrors Sense's fallbackSubstitutions), with
+// a reverse guard so one new item can't simultaneously "absorb" two
+// different dropped items — the higher-scoring claim wins, the loser stays
+// an unmatched (genuine) signal in its own list.
+function nrrSkuSwapPairs(accountId, kamEmail) {
+  var diff = nrrSkuMonthDiff(accountId, kamEmail);
+  var newRows = diff.curRows.filter(function (r) { return !diff.lastByItem[r.item_id]; });
+  var droppedRows = diff.droppedItems;
+  if (!droppedRows.length || !newRows.length) return [];
+
+  var candidates = [];
+  droppedRows.forEach(function (d) {
+    var best = null, bestScore = 0;
+    newRows.forEach(function (n) {
+      var s = _nrrSkuPairScore({
+        droppedName: d.item_name_th, droppedSubclass: d.subclass, droppedGmv: d.gmv_ex_vat, droppedQty: d.qty_kg,
+        newName: n.item_name_th, newSubclass: n.subclass, newGmv: n.gmv_ex_vat, newQty: n.qty_kg
+      });
+      if (s.ok && s.score > bestScore) { best = { dropped: d, newRow: n, score: s.score }; bestScore = s.score; }
+    });
+    if (best) candidates.push(best);
+  });
+
+  var claimedNew = {};
+  return candidates
+    .sort(function (a, b) { return b.score - a.score; })
+    .filter(function (c) {
+      var nid = c.newRow.item_id;
+      if (claimedNew[nid]) return false;
+      claimedNew[nid] = true;
+      return true;
+    })
+    .map(function (c) {
+      return {
+        droppedItemId: c.dropped.item_id, droppedName: c.dropped.item_name_th, droppedGmv: c.dropped.gmv_ex_vat,
+        newItemId: c.newRow.item_id, newName: c.newRow.item_name_th, newGmv: c.newRow.gmv_ex_vat,
+        netDelta: c.newRow.gmv_ex_vat - c.dropped.gmv_ex_vat
+      };
+    });
+}
+window.nrrSkuSwapPairs = nrrSkuSwapPairs;
+
+// Plain-object "set" of every item_id involved in a confirmed swap this
+// month (both the dropped side and the new side) — O(1) exclusion lookup
+// for the two signal-list functions below.
+function nrrSkuSwapItemIds(accountId, kamEmail) {
+  var pairs = nrrSkuSwapPairs(accountId, kamEmail);
+  var ids = {};
+  pairs.forEach(function (p) { ids[String(p.droppedItemId)] = true; ids[String(p.newItemId)] = true; });
+  return ids;
+}
+window.nrrSkuSwapItemIds = nrrSkuSwapItemIds;
+
+// ── Positive signals — live, run-rate projected ──────────────────────────
+function nrrSkuPositiveSignals(accountId, kamEmail) {
+  var diff = nrrSkuMonthDiff(accountId, kamEmail);
+  var swapItemIds = nrrSkuSwapItemIds(accountId, kamEmail);
 
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
@@ -56,9 +230,12 @@ function nrrSkuPositiveSignals(accountId, kamEmail) {
   var ratio = daysElapsed > 0 ? daysInMonth / daysElapsed : 1;
 
   var newItems = [], growing = [];
-  curRows.forEach(function (r) {
-    var last = lastByItem[r.item_id];
+  diff.curRows.forEach(function (r) {
+    var last = diff.lastByItem[r.item_id];
     if (!last) {
+      // Confirmed swap partner — shown in the "สลับ SKU" section instead,
+      // not double-counted here as a genuine "new" signal.
+      if (swapItemIds[String(r.item_id)]) return;
       if (r.gmv_ex_vat > 1000) newItems.push({ item_id: r.item_id, name: r.item_name_th, gmv: r.gmv_ex_vat });
       return;
     }
@@ -77,14 +254,18 @@ window.nrrSkuPositiveSignals = nrrSkuPositiveSignals;
 
 // ── Cycle signals — interval-aware, per-SKU, last month's own cadence ────
 function nrrSkuCycleSignals(accountId, kamEmail) {
-  var labels = _nrrAccountMonthLabels();
-  var lastRows = _nrrSkusRowsForMonth(accountId, kamEmail, labels.last);
+  var diff = nrrSkuMonthDiff(accountId, kamEmail);
+  var lastRows = diff.lastRows;
+  var swapItemIds = nrrSkuSwapItemIds(accountId, kamEmail);
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
   var daysInMonth = (acctRow && acctRow.days_in_month) || 30;
 
   var out = [];
   lastRows.forEach(function (r) {
+    // Confirmed swap partner (the dropped side) — shown in the "สลับ SKU"
+    // section instead, not double-counted here as a genuine risk signal.
+    if (swapItemIds[String(r.item_id)]) return;
     if (!r.order_count || r.order_count < 1) return; // need order history to derive a cycle at all
     var outletCount = r.outlet_count_sku || 1;
     var perOutletFreq = r.order_count / outletCount;
