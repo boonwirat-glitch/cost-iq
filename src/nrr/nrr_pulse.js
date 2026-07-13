@@ -13,16 +13,28 @@
 // bulkPortviewData (account pace, sku counts, churn), bulkHistoryData
 // (quarter base-month baseline, via nrrPaceSignal).
 
-var nrrPulseState = { rotIdx: 0, model: null };
+var NRR_PULSE_ROT_MS = 8000;                // default rotate spotlight lists every 8s
+var nrrPulseState = { rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS };
 var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
 var NRR_PULSE_REFRESH_MS = 10 * 60 * 1000; // re-pull + re-render every 10 min
-var NRR_PULSE_ROT_MS = 8000;               // rotate spotlight lists every 8s
 var NRR_PULSE_ARR_MAX = 5;                 // arrivals shown per block before rotating
 // v48: was 6 (one more than every other list) — with the SKU block's caption
 // line taking extra vertical space, a mismatched row count made "ต้องดูแล"
 // visibly taller/heavier than its neighbor. Matched to 5 for parity.
 var NRR_PULSE_RISK_MAX = 5;
+var NRR_PULSE_HERO_TODAY_MAX = 6;           // rows shown in the green hero's "today" mini-list
+// v56: session-only rotation-speed choices (no localStorage — user's explicit
+// choice; no /nrr-local persistence precedent existed anyway). [ms, label].
+var NRR_PULSE_ROT_CHOICES = [['5000', '5s'], ['8000', '8s'], ['15000', '15s'], ['30000', '30s']];
+
+// v56: 5 rows/block everywhere used to be the ceiling even when fullscreen
+// left real leftover vertical space on a real TV — one more row fits fine in
+// fullscreen (masthead/nav hidden, page expands to 100vw), but the embedded
+// admin-nav view is tighter, so only bump the count while actually fullscreen.
+function _nrrPulseEffMax(baseMax) {
+  return document.fullscreenElement ? baseMax + 1 : baseMax;
+}
 
 var _NRR_PULSE_TH_DOW = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 
@@ -168,6 +180,10 @@ function nrrPulseModel() {
       sub: secondary,
       owner: r.latest_staff_owner || r.latest_commercial_owner || '',
       gmv: r.curr_gmv || 0,
+      // v56: outlet-grain by construction (one row = one outlet), so unlike
+      // the Sales side there's no multi-outlet sum to worry about — today's
+      // amount is simply this row's own curr_gmv when isToday, else 0.
+      todayGmv: isToday ? (r.curr_gmv || 0) : 0,
       isToday: isToday
     };
   }
@@ -201,13 +217,24 @@ function nrrPulseModel() {
       // company-level name is exported here, so there's no secondary line
       // to show (`sub` stays empty); this file already gives the short
       // branch-style name by construction.
-      if (!acctMap[k]) acctMap[k] = { name: r.account_name, owner: r.staff_owner, gmv: 0, isToday: false };
+      if (!acctMap[k]) acctMap[k] = { name: r.account_name, owner: r.staff_owner, gmv: 0, isToday: false, todayGmv: 0 };
       acctMap[k].gmv += r.mtd_gmv || 0;
-      if (r.first_dollar_date === yIso) acctMap[k].isToday = true;
+      // v56: track TODAY's amount separately from the account's full MTD sum.
+      // `isToday` fires if ANY ONE outlet under this account first-ordered
+      // yesterday — but `gmv` above sums MTD across every outlet under the
+      // account. An account with two outlets (one that first-ordered days
+      // ago, one yesterday) would otherwise report its combined MTD total as
+      // "today's" amount. todayGmv only accumulates the outlet-day(s) that
+      // actually match yIso, so the Pulse hero's "มาใหม่วันนี้" list can show
+      // the real today figure instead of an inflated multi-outlet sum.
+      if (r.first_dollar_date === yIso) {
+        acctMap[k].isToday = true;
+        acctMap[k].todayGmv += r.mtd_gmv || 0;
+      }
     });
     salesItems = Object.keys(acctMap).map(function (k) {
       var it = acctMap[k];
-      return { kind: 'sales', name: it.name, sub: '', owner: it.owner, gmv: it.gmv, isToday: it.isToday };
+      return { kind: 'sales', name: it.name, sub: '', owner: it.owner, gmv: it.gmv, isToday: it.isToday, todayGmv: it.todayGmv };
     }).sort(function (a, b) { return b.gmv - a.gmv; });
   }
 
@@ -215,6 +242,12 @@ function nrrPulseModel() {
   var expGmv = expItems.reduce(function (s, x) { return s + x.gmv; }, 0);
   var todayCount = salesItems.filter(function (x) { return x.isToday; }).length
     + expItems.filter(function (x) { return x.isToday; }).length;
+  // v56: today's arrivals across BOTH sources, ranked by actual today's
+  // spend (todayGmv, not the account's/outlet's full MTD gmv) — feeds the
+  // green hero's new "มาใหม่วันนี้" mini-list.
+  var todayItems = salesItems.filter(function (x) { return x.isToday; })
+    .concat(expItems.filter(function (x) { return x.isToday; }))
+    .sort(function (a, b) { return b.todayGmv - a.todayGmv; });
 
   // ── Portfolio momentum + at-risk, from portview + history (nrrPaceSignal) ──
   var pv = window.bulkPortviewData;
@@ -286,6 +319,7 @@ function nrrPulseModel() {
     newStoreCount: salesItems.length + expItems.length,
     newStoreGmv: salesGmv + expGmv,
     todayCount: todayCount,
+    todayItems: todayItems,
     sales: { count: salesItems.length, gmv: salesGmv, items: salesItems },
     expansion: { count: expItems.length, gmv: expGmv, items: expItems },
     newSkuAdded: newSkuAdded,
@@ -302,6 +336,16 @@ function nrrPulseModel() {
 window.nrrPulseModel = nrrPulseModel;
 
 // ── Render ─────────────────────────────────────────────────────────────────
+// v56: rotation-speed control — session-only (no localStorage anywhere in
+// /nrr yet, and the user explicitly doesn't want this persisted), hidden
+// once fullscreen via the same .nrr-pulse-fs-active class the fs button
+// already toggles (a real TV screen shouldn't show interactive chrome).
+function _nrrPulseRotControlHtml() {
+  return '<div class="nrr-pulse-rot-ctrl"><span class="nrr-pulse-rot-lbl">ความเร็วหมุน</span>' +
+    _nrrCoSegHtml('nrr-pulse-rot-seg', String(nrrPulseState.rotMs), NRR_PULSE_ROT_CHOICES, 'rotms') +
+    '</div>';
+}
+
 function _nrrPulseDatelineHtml(m) {
   var d = m.asOf;
   var dow = _NRR_PULSE_TH_DOW[d.getDay()];
@@ -311,8 +355,11 @@ function _nrrPulseDatelineHtml(m) {
   return '<div class="nrr-pulse-dateline">' +
     '<div><div class="nrr-pulse-dateline-main">เช้าวัน' + dow + ' · ' + nrrEsc(dateTh) + '</div>' +
     '<div class="nrr-pulse-dateline-sub">ภาพรวม portfolio · ข้อมูลถึงเมื่อวาน · อัปเดต ' + upd + '</div></div>' +
+    '<div class="nrr-pulse-dateline-controls">' +
+    _nrrPulseRotControlHtml() +
     '<button type="button" class="nrr-pulse-fs-btn" id="nrr-pulse-fs-btn">' +
     (isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
+    '</div>' +
     '</div>';
 }
 
@@ -335,7 +382,40 @@ document.addEventListener('fullscreenchange', function () {
   document.body.classList.toggle('nrr-pulse-fs-active', isFs);
   var btn = document.getElementById('nrr-pulse-fs-btn');
   if (btn) btn.textContent = isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
+  // v56: row cap (_nrrPulseEffMax) depends on document.fullscreenElement —
+  // re-fill immediately so the count changes the instant fullscreen toggles,
+  // not just on the next 8s rotation tick.
+  if (nrrPulseState.model) _nrrPulseFillLists();
 });
+
+// v56: green hero's "มาใหม่วันนี้" mini-list — ranked by todayGmv (see the
+// bug-fix comment in nrrPulseModel), capped with an overflow line rather
+// than silently dropping accounts past the cap.
+function _nrrPulseHeroTodayRowsHtml(items) {
+  if (!items.length) return '';
+  var shown = items.slice(0, NRR_PULSE_HERO_TODAY_MAX);
+  var extra = items.length - shown.length;
+  return '<div class="nrr-pulse-hero-list">' +
+    shown.map(function (x) {
+      return '<div class="nrr-pulse-hero-row">' +
+        '<span class="nrr-pulse-hero-row-name">' + nrrEsc(x.name) + '</span>' +
+        '<span class="nrr-pulse-hero-row-amt">' + nrrFmtGMV(x.todayGmv) + '</span></div>';
+    }).join('') +
+    (extra > 0 ? '<div class="nrr-pulse-hero-row-more">+' + extra + ' ร้านอื่นๆวันนี้</div>' : '') +
+    '</div>';
+}
+
+// v56: orange hero's top-3 at-risk accounts — m.risk is already sorted desc
+// by shortfall (see riskItems.sort in nrrPulseModel), just take the head.
+function _nrrPulseHeroRiskRowsHtml(items) {
+  if (!items.length) return '';
+  return '<div class="nrr-pulse-hero-list">' +
+    items.slice(0, 3).map(function (x) {
+      return '<div class="nrr-pulse-hero-row">' +
+        '<span class="nrr-pulse-hero-row-name">' + nrrEsc(x.name) + '</span>' +
+        '<span class="nrr-pulse-hero-row-amt">−' + nrrFmtGMV(x.risk) + '</span></div>';
+    }).join('') + '</div>';
+}
 
 function _nrrPulseHeroHtml(m) {
   var net = m.momentum.net;
@@ -343,24 +423,38 @@ function _nrrPulseHeroHtml(m) {
   var netSign = net >= 0 ? '+' : '−';
   var todayChip = m.todayCount > 0
     ? '<span class="nrr-pulse-today-chip">＋' + m.todayCount + ' วันนี้</span>' : '';
+  var todayList = _nrrPulseHeroTodayRowsHtml(m.todayItems);
+  var riskList = _nrrPulseHeroRiskRowsHtml(m.risk);
   return '<div class="nrr-pulse-heroes">' +
-    // new stores
-    '<div class="nrr-pulse-hero green">' +
+    // new stores — v57: list moved beside the stat (not stacked below it) —
+    // the box was otherwise wasting the whole right half of its own row on
+    // blank space next to a short number/label. `.has-list` switches the box
+    // to a row layout only when there's something to show on the right;
+    // falls back to the plain stack (pre-v56 look) when todayItems is empty.
+    '<div class="nrr-pulse-hero green' + (todayList ? ' has-list' : '') + '">' +
+    '<div class="nrr-pulse-hero-main">' +
     '<div class="nrr-pulse-hero-lbl">ร้านใหม่เดือนนี้</div>' +
     '<div class="nrr-pulse-hero-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
     '<div class="nrr-pulse-hero-sub">' + nrrFmtGMV(m.newStoreGmv) + ' ' + todayChip + '</div>' +
     '</div>' +
+    todayList +
+    '</div>' +
     // net momentum
     '<div class="nrr-pulse-hero ' + netCls + '">' +
+    '<div class="nrr-pulse-hero-main">' +
     '<div class="nrr-pulse-hero-lbl">โมเมนตัมสุทธิ <span style="opacity:.75;font-weight:600">(คาดการณ์เต็มเดือน)</span></div>' +
     '<div class="nrr-pulse-hero-num">' + netSign + nrrFmtGMV(Math.abs(net)) + '</div>' +
     '<div class="nrr-pulse-hero-sub">▲ ' + nrrFmtGMV(m.momentum.upside) + ' ได้เพิ่ม · ▼ ' + nrrFmtGMV(m.momentum.downside) + ' เสี่ยง</div>' +
     '</div>' +
+    '</div>' +
     // needs attention
-    '<div class="nrr-pulse-hero ' + (m.dangerCount > 0 ? 'alert' : 'calm') + '">' +
+    '<div class="nrr-pulse-hero ' + (m.dangerCount > 0 ? 'alert' : 'calm') + (riskList ? ' has-list' : '') + '">' +
+    '<div class="nrr-pulse-hero-main">' +
     '<div class="nrr-pulse-hero-lbl">ต้องตามด่วน</div>' +
     '<div class="nrr-pulse-hero-num" data-count="' + m.dangerCount + '">' + m.dangerCount + '</div>' +
     '<div class="nrr-pulse-hero-sub">ร้านยอดตกต่ำกว่าฐาน หรือเงียบไป</div>' +
+    '</div>' +
+    riskList +
     '</div>' +
     '</div>';
 }
@@ -437,13 +531,13 @@ function _nrrPulseFillLists() {
   var m = nrrPulseState.model;
   if (!m) return;
   var s = document.getElementById('nrr-pulse-sales-list');
-  if (s) s.innerHTML = _nrrPulseArrivalRowsHtml(m.sales.items, NRR_PULSE_ARR_MAX);
+  if (s) s.innerHTML = _nrrPulseArrivalRowsHtml(m.sales.items, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
   var e = document.getElementById('nrr-pulse-exp-list');
-  if (e) e.innerHTML = _nrrPulseArrivalRowsHtml(m.expansion.items, NRR_PULSE_ARR_MAX);
+  if (e) e.innerHTML = _nrrPulseArrivalRowsHtml(m.expansion.items, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
   var r = document.getElementById('nrr-pulse-risk-list');
-  if (r) r.innerHTML = _nrrPulseRiskRowsHtml(m.risk, NRR_PULSE_RISK_MAX);
+  if (r) r.innerHTML = _nrrPulseRiskRowsHtml(m.risk, _nrrPulseEffMax(NRR_PULSE_RISK_MAX));
   var sk = document.getElementById('nrr-pulse-sku-list');
-  if (sk) sk.innerHTML = _nrrPulseSkuRowsHtml(m.newSkuItems, NRR_PULSE_ARR_MAX);
+  if (sk) sk.innerHTML = _nrrPulseSkuRowsHtml(m.newSkuItems, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
 }
 
 function _nrrPulseArrivalsHtml(m) {
@@ -530,6 +624,8 @@ function _nrrPulseRender() {
   page.innerHTML =
     '<div class="nrr-pulseboard">' +
     _nrrPulseDatelineHtml(m) +
+    (typeof nrrStalePortviewBannerHtml === 'function' ? nrrStalePortviewBannerHtml() : '') +
+    (typeof nrrStaleBulkHistoryBannerHtml === 'function' ? nrrStaleBulkHistoryBannerHtml() : '') +
     _nrrPulseHeroHtml(m) +
     _nrrPulseArrivalsHtml(m) +
     _nrrPulseLowerHtml(m) +
@@ -542,6 +638,22 @@ function _nrrPulseRender() {
   });
   var fsBtn = document.getElementById('nrr-pulse-fs-btn');
   if (fsBtn) fsBtn.addEventListener('click', _nrrPulseToggleFullscreen);
+  var rotSeg = document.getElementById('nrr-pulse-rot-seg');
+  if (rotSeg) rotSeg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-rotms]');
+    if (!btn) return;
+    var ms = parseInt(btn.dataset.rotms, 10);
+    if (!ms || ms === nrrPulseState.rotMs) return;
+    nrrPulseState.rotMs = ms;
+    rotSeg.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('on', parseInt(b.dataset.rotms, 10) === ms);
+    });
+    // re-arm with the new interval — _nrrPulseArmTimers always clears both
+    // timers first, so this also resets the 10-min refresh countdown; a
+    // harmless side effect (refresh lands up to ~10min later, worst case),
+    // not worth splitting into two separate arm functions for this scope.
+    _nrrPulseArmTimers();
+  });
 }
 
 // ── Timers (auto-refresh + spotlight rotation) ──────────────────────────────
@@ -551,9 +663,9 @@ function _nrrPulseArmTimers() {
   _nrrPulseClearTimers();
   _nrrPulseRotTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
-    nrrPulseState.rotIdx += Math.max(NRR_PULSE_ARR_MAX, NRR_PULSE_RISK_MAX);
+    nrrPulseState.rotIdx += Math.max(_nrrPulseEffMax(NRR_PULSE_ARR_MAX), _nrrPulseEffMax(NRR_PULSE_RISK_MAX));
     _nrrPulseFillLists();
-  }, NRR_PULSE_ROT_MS);
+  }, nrrPulseState.rotMs);
   _nrrPulseRefreshTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
     Promise.all([

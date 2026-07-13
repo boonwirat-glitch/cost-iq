@@ -1,7 +1,11 @@
 -- ════════════════════════════════════════════════════════════
 -- Q8E v3: Portview Enriched + KAM Mapping
 -- ════════════════════════════════════════════════════════════
--- Output: portview.csv  (20 columns, account-level, 1 row / account_guid)
+-- Output: portview.csv  (21 columns, account-level, 1 row / account_guid)
+--
+-- v4 (2026-07-13): +data_asof_date (col [20], = lag_date) — lets the app
+-- detect when this file itself is stale, since it carries no other
+-- date/period marker at all. See the FINAL SELECT comment below.
 --
 -- เปลี่ยนจาก v207h:
 --   1. OWNERSHIP = user_master เท่านั้น (ตัด order_fallback ทิ้ง)
@@ -256,7 +260,18 @@ cat_gap_summary AS (
   GROUP BY 1
 )
 
--- ── FINAL: 20 columns ตรง parser (portview_original) ──
+-- ── FINAL: 21 columns (v4: +data_asof_date) ──
+-- v4: added data_asof_date (col [20]) — this file is a single current-state
+-- snapshot with NO date/period column of any kind, unlike vp_view/pm_view/
+-- admin_view (which carry period_month and already get a staleness banner
+-- comparing that against QNRR_CFG.q_months). Nothing existed here for the
+-- app to detect "this file is N days old" — confirmed the hard way when a
+-- real account (หมีปรุง (OOA), 2026-07-13) showed a fresh MTD order in
+-- kam_rep_view.csv-driven UI but ฿0/churned here, because this file simply
+-- hadn't been re-run recently — invisible until manually cross-referenced.
+-- lag_date is recomputed fresh every time this query actually runs, so
+-- exporting it directly answers "as of what date do these numbers reflect,"
+-- regardless of when the CSV was last uploaded to R2.
 SELECT
   ar.account_id,                                                            -- [0]
   ar.account_name,                                                          -- [1]
@@ -278,7 +293,8 @@ SELECT
   alo.kam_name,                                                             -- [16]
   alo.kam_email,                                                            -- [17]
   alo.tl_email,                                                             -- [18]
-  ar.days_with_current_kam                                                  -- [19]
+  ar.days_with_current_kam,                                                 -- [19]
+  p.lag_date                                                    AS data_asof_date -- [20]
 FROM account_rolled ar
 JOIN account_latest_outlet alo ON alo.account_id = ar.account_id
 LEFT JOIN churn_summary ch     ON ch.account_id  = ar.account_id

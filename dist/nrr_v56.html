@@ -1328,45 +1328,25 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 
 /* Hero row — three big glance blocks */
 .nrr-pulse-heroes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.nrr-pulse-hero { border-radius: var(--r-lg); padding: 22px 24px; color: #fff; min-height: 150px; display: flex; flex-direction: column; }
+.nrr-pulse-hero { border-radius: var(--r-lg); padding: 22px 24px; color: #fff; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; }
 .nrr-pulse-hero.green { background: var(--green); }
 .nrr-pulse-hero.up    { background: var(--green); }
 .nrr-pulse-hero.down  { background: var(--coral); }
 .nrr-pulse-hero.alert { background: var(--attention); }
 .nrr-pulse-hero.calm  { background: var(--ink2); }
-/* v57: label/num/sub used to be 3 direct children of the hero's own column
-   flex + justify-content:space-between. Wrapped in one .nrr-pulse-hero-main
-   so a hero WITH a list (.has-list) can switch to a row layout — main on
-   the left, list on the right, sharing the box's existing height — instead
-   of stacking the list full-width below (which just pushed the box taller
-   and left the whole right half of the stat area blank). flex:1 here makes
-   main fill all available space in the plain (no-list) case, same as
-   before; .has-list overrides this to flex:none below. */
-.nrr-pulse-hero-main { display: flex; flex-direction: column; justify-content: space-between; flex: 1; min-width: 0; }
 .nrr-pulse-hero-lbl { font-size: 15px; font-weight: 700; opacity: 0.92; }
 .nrr-pulse-hero-num { font-family: var(--font-num); font-size: 76px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
 .nrr-pulse-hero-sub { font-size: 14px; font-weight: 600; opacity: 0.92; }
 .nrr-pulse-today-chip { display: inline-block; background: rgba(255,255,255,0.24); border-radius: var(--r-pill); padding: 2px 10px; font-weight: 800; margin-left: 4px; }
-/* v56/v57: green hero's "มาใหม่วันนี้" list + orange hero's top-3 risk list
-   — one shared class for both since .nrr-pulse-hero already sets
-   color:#fff for every hero variant. Sits BESIDE .nrr-pulse-hero-main (not
-   stacked below it) via .has-list switching the box to a row: main keeps
-   its natural width (flex:none), the list takes the rest (flex:1) and
-   align-items:stretch (row default) makes both columns share the box's
-   full height — main's own space-between then spreads label/num/sub across
-   that height so it lines up with the list beside it, instead of leaving
-   the whole right side blank. No max-height anywhere in this chain — the
-   box is expected to grow a little if the list has more rows than the stat
-   block is tall; the middle "โมเมนตัมสุทธิ" hero (no list, unaffected) still
-   stretches to match via the heroes row's own grid align-items:stretch and
-   just shows extra blank space, confirmed acceptable. */
-.nrr-pulse-hero.has-list { flex-direction: row; align-items: stretch; gap: 22px; }
-.nrr-pulse-hero.has-list .nrr-pulse-hero-main { flex: none; }
-.nrr-pulse-hero-list {
-  display: flex; flex-direction: column; justify-content: center; gap: 3px;
-  flex: 1; min-width: 0; border-left: 1px solid rgba(255,255,255,0.28); padding-left: 22px;
-}
-.nrr-pulse-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 700; padding: 2px 0; }
+/* v56: green hero's "มาใหม่วันนี้" list + orange hero's top-3 risk list —
+   one shared class for both since .nrr-pulse-hero already sets color:#fff
+   for every hero variant, no per-color override needed here. No max-height:
+   .nrr-pulse-hero has no max-height either (min-height:150px is a floor,
+   not a cap) — these boxes are expected to grow taller than before; the
+   middle "โมเมนตัมสุทธิ" hero stretches to match via the row's default grid
+   align-items:stretch and just shows extra blank space, by design. */
+.nrr-pulse-hero-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.25); }
+.nrr-pulse-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 700; padding: 3px 0; }
 .nrr-pulse-hero-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.95; }
 .nrr-pulse-hero-row-amt { font-family: var(--font-num); font-weight: 800; flex: none; }
 .nrr-pulse-hero-row-more { font-size: 11px; font-weight: 700; opacity: 0.75; margin-top: 2px; }
@@ -2615,11 +2595,7 @@ function _nrrParsePortviewCsv(text) {
       kam_name:              (p[16] || '').trim(),
       kam_email:             (p[17] || '').trim(),
       tl_email:              (p[18] || '').trim(),
-      days_with_current_kam: parseInt(p[19], 10) || 0,
-      // v4 (2026-07-13): may be absent on an un-re-run CSV — stays '' until
-      // Q8E_portview_v3.sql is rerun, which is the graceful-degrade signal
-      // nrrFetchPortviewCsv uses to skip the staleness banner entirely.
-      data_asof_date:        (p[20] || '').trim()
+      days_with_current_kam: parseInt(p[19], 10) || 0
     };
     allRows.push(row);
     if (row.kam_email) {
@@ -2630,29 +2606,6 @@ function _nrrParsePortviewCsv(text) {
   return { byKamEmail: byKamEmail, allRows: allRows };
 }
 
-// v4 (2026-07-13): portview.csv is a single current-state snapshot with no
-// date/period column otherwise — data_asof_date (= the SQL's own lag_date)
-// is the only signal the app has for "how fresh is this file." Computed
-// once per fetch (not per-row, every row shares the same value) so
-// nrrStalePortviewBannerHtml can render one banner without re-deriving this
-// on every call. daysBehind=0 means "run today" (asOfDate = yesterday,
-// matching the same day-1 lag convention used everywhere else in /nrr);
-// null means the CSV predates this column (un-re-run) — banner skips
-// entirely rather than guessing, same 404-graceful precedent as other
-// new columns added to existing CSVs this session.
-function _nrrPortviewAsOfDate(dateStr) {
-  if (!dateStr) return null;
-  var d = new Date(dateStr + 'T00:00:00');
-  return isNaN(d.getTime()) ? null : d;
-}
-function _nrrPortviewDaysBehind(asOfDate) {
-  if (!asOfDate) return null;
-  var expected = new Date();
-  expected.setDate(expected.getDate() - 1);
-  expected.setHours(0, 0, 0, 0);
-  return Math.round((expected - asOfDate) / 86400000);
-}
-
 async function nrrFetchPortviewCsv(force) {
   if (window.bulkPortviewData.loaded && !force) return window.bulkPortviewData;
   try {
@@ -2661,11 +2614,7 @@ async function nrrFetchPortviewCsv(force) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var text = await res.text();
     var parsed = _nrrParsePortviewCsv(text);
-    var asOfDate = parsed.allRows.length ? _nrrPortviewAsOfDate(parsed.allRows[0].data_asof_date) : null;
-    window.bulkPortviewData = {
-      allRows: parsed.allRows, byKamEmail: parsed.byKamEmail, loaded: true, loadedAt: Date.now(),
-      asOfDate: asOfDate, daysBehind: _nrrPortviewDaysBehind(asOfDate)
-    };
+    window.bulkPortviewData = { allRows: parsed.allRows, byKamEmail: parsed.byKamEmail, loaded: true, loadedAt: Date.now() };
   } catch (e) {
     console.warn('[nrr] failed to load portview.csv', e);
     window.bulkPortviewData = { allRows: [], byKamEmail: {}, loaded: false, error: e.message };
@@ -2687,11 +2636,6 @@ window.bulkHistoryData = { loaded: false };
 function _nrrParseBulkHistoryCsv(text) {
   var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
   var byAccountId = {};
-  // v56: no schema change needed here (unlike portview.csv) — this file
-  // already carries month_label per row; staleness just means "the latest
-  // CLOSED month isn't present yet." Collected once during parsing so the
-  // staleness check doesn't have to rescan every account's row array.
-  var monthsPresent = {};
   lines.forEach(function (l) {
     var p = parseCSVRow(l);
     if (!p[0]) return;
@@ -2704,37 +2648,21 @@ function _nrrParseBulkHistoryCsv(text) {
     };
     if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
     byAccountId[row.account_id].push(row);
-    if (row.month_label) monthsPresent[row.month_label] = true;
   });
-  return { byAccountId: byAccountId, monthsPresent: monthsPresent };
-}
-
-// v56: expected latest CLOSED month label, mirroring Q9B_bulk_history.sql's
-// own WHERE clause exactly (`< DATE_TRUNC(DATE_SUB(lag_date, INTERVAL 1
-// DAY), MONTH)` — i.e. the month before the one containing "yesterday").
-function _nrrBulkHistoryExpectedLatestMonth() {
-  var lag = new Date(); lag.setDate(lag.getDate() - 1);
-  var closed = new Date(lag.getFullYear(), lag.getMonth(), 1);
-  closed.setMonth(closed.getMonth() - 1);
-  return nrrThMonthLabel(closed);
+  return byAccountId;
 }
 
 async function nrrFetchBulkHistoryCsv(force) {
   if (window.bulkHistoryData.loaded && !force) return window.bulkHistoryData;
   try {
     var res = await fetch(R2_BASE + '/bulk_history.csv?cb=' + Date.now());
-    if (res.status === 404) { window.bulkHistoryData = { byAccountId: {}, monthsPresent: {}, loaded: false, notFound: true }; return window.bulkHistoryData; }
+    if (res.status === 404) { window.bulkHistoryData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkHistoryData; }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var text = await res.text();
-    var parsed = _nrrParseBulkHistoryCsv(text);
-    var expectedMonth = _nrrBulkHistoryExpectedLatestMonth();
-    window.bulkHistoryData = {
-      byAccountId: parsed.byAccountId, monthsPresent: parsed.monthsPresent, loaded: true, loadedAt: Date.now(),
-      expectedMonth: expectedMonth, isStaleMonth: !parsed.monthsPresent[expectedMonth]
-    };
+    window.bulkHistoryData = { byAccountId: _nrrParseBulkHistoryCsv(text), loaded: true, loadedAt: Date.now() };
   } catch (e) {
     console.warn('[nrr] failed to load bulk_history.csv', e);
-    window.bulkHistoryData = { byAccountId: {}, monthsPresent: {}, loaded: false, error: e.message };
+    window.bulkHistoryData = { byAccountId: {}, loaded: false, error: e.message };
   }
   return window.bulkHistoryData;
 }
@@ -6722,38 +6650,26 @@ function _nrrPulseHeroHtml(m) {
   var netSign = net >= 0 ? '+' : '−';
   var todayChip = m.todayCount > 0
     ? '<span class="nrr-pulse-today-chip">＋' + m.todayCount + ' วันนี้</span>' : '';
-  var todayList = _nrrPulseHeroTodayRowsHtml(m.todayItems);
-  var riskList = _nrrPulseHeroRiskRowsHtml(m.risk);
   return '<div class="nrr-pulse-heroes">' +
-    // new stores — v57: list moved beside the stat (not stacked below it) —
-    // the box was otherwise wasting the whole right half of its own row on
-    // blank space next to a short number/label. `.has-list` switches the box
-    // to a row layout only when there's something to show on the right;
-    // falls back to the plain stack (pre-v56 look) when todayItems is empty.
-    '<div class="nrr-pulse-hero green' + (todayList ? ' has-list' : '') + '">' +
-    '<div class="nrr-pulse-hero-main">' +
+    // new stores
+    '<div class="nrr-pulse-hero green">' +
     '<div class="nrr-pulse-hero-lbl">ร้านใหม่เดือนนี้</div>' +
     '<div class="nrr-pulse-hero-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
     '<div class="nrr-pulse-hero-sub">' + nrrFmtGMV(m.newStoreGmv) + ' ' + todayChip + '</div>' +
-    '</div>' +
-    todayList +
+    _nrrPulseHeroTodayRowsHtml(m.todayItems) +
     '</div>' +
     // net momentum
     '<div class="nrr-pulse-hero ' + netCls + '">' +
-    '<div class="nrr-pulse-hero-main">' +
     '<div class="nrr-pulse-hero-lbl">โมเมนตัมสุทธิ <span style="opacity:.75;font-weight:600">(คาดการณ์เต็มเดือน)</span></div>' +
     '<div class="nrr-pulse-hero-num">' + netSign + nrrFmtGMV(Math.abs(net)) + '</div>' +
     '<div class="nrr-pulse-hero-sub">▲ ' + nrrFmtGMV(m.momentum.upside) + ' ได้เพิ่ม · ▼ ' + nrrFmtGMV(m.momentum.downside) + ' เสี่ยง</div>' +
     '</div>' +
-    '</div>' +
     // needs attention
-    '<div class="nrr-pulse-hero ' + (m.dangerCount > 0 ? 'alert' : 'calm') + (riskList ? ' has-list' : '') + '">' +
-    '<div class="nrr-pulse-hero-main">' +
+    '<div class="nrr-pulse-hero ' + (m.dangerCount > 0 ? 'alert' : 'calm') + '">' +
     '<div class="nrr-pulse-hero-lbl">ต้องตามด่วน</div>' +
     '<div class="nrr-pulse-hero-num" data-count="' + m.dangerCount + '">' + m.dangerCount + '</div>' +
     '<div class="nrr-pulse-hero-sub">ร้านยอดตกต่ำกว่าฐาน หรือเงียบไป</div>' +
-    '</div>' +
-    riskList +
+    _nrrPulseHeroRiskRowsHtml(m.risk) +
     '</div>' +
     '</div>';
 }
@@ -6923,8 +6839,6 @@ function _nrrPulseRender() {
   page.innerHTML =
     '<div class="nrr-pulseboard">' +
     _nrrPulseDatelineHtml(m) +
-    (typeof nrrStalePortviewBannerHtml === 'function' ? nrrStalePortviewBannerHtml() : '') +
-    (typeof nrrStaleBulkHistoryBannerHtml === 'function' ? nrrStaleBulkHistoryBannerHtml() : '') +
     _nrrPulseHeroHtml(m) +
     _nrrPulseArrivalsHtml(m) +
     _nrrPulseLowerHtml(m) +
@@ -8161,8 +8075,6 @@ function nrrRenderAccountBody(row) {
   if (!body) return;
   var kamEmail = nrrAccountState.kamEmail;
   body.innerHTML =
-    nrrStalePortviewBannerHtml() +
-    nrrStaleBulkHistoryBannerHtml() +
     nrrAccountHeaderHtml(row) +
     nrrAccountHeroHtml(row) +
     nrrAccountStatRowHtml(row, kamEmail) +
@@ -9442,40 +9354,6 @@ function nrrStaleCsvBannerHtml(bulkData, filename) {
   return '<div class="nrr-stale-banner">⚠️ ' + nrrEsc(filename) + ' มีข้อมูลเดือน ' + nrrEsc(monthList) +
     ' — ไม่ใช่ไตรมาสปัจจุบัน (' + nrrEsc(QNRR_CFG.q_months.map(function (m) { return QNRR_CFG.months_th[m] || m; }).join(', ')) + ') ' +
     'ตัวเลขด้านล่างเป็นข้อมูลไตรมาสก่อนที่ยังไม่ได้ re-run/upload ใหม่</div>';
-}
-
-// v56 (2026-07-13): portview.csv (bulkPortviewData) has no period_month —
-// it's a single current-state snapshot, not month-labeled rows — so the
-// quarter-comparison check above can't apply. Real incident that prompted
-// this: an account showed a fresh MTD order everywhere EXCEPT the Account
-// page + Pulse "Today" page (both portview-driven), because portview.csv
-// simply hadn't been re-run in a while — invisible until manually cross-
-// referenced against another page. daysBehind/asOfDate come from the new
-// data_asof_date column (nrr_data.js's nrrFetchPortviewCsv); null on an
-// un-re-run CSV that predates that column — skip silently rather than
-// guessing, same 404-graceful precedent used for other new CSV columns.
-function nrrStalePortviewBannerHtml() {
-  var pv = window.bulkPortviewData;
-  if (!pv || !pv.loaded || pv.daysBehind == null || pv.daysBehind <= 0) return '';
-  var d = pv.asOfDate;
-  return '<div class="nrr-stale-banner">⚠️ portview.csv ข้อมูลล่าสุดถึง ' +
-    nrrEsc(d.getDate() + ' ' + nrrThMonthLabel(d)) + ' (' + pv.daysBehind + ' วันก่อน) — ' +
-    'ตัวเลข MTD/churn ในหน้านี้อาจไม่ตรงกับความเป็นจริง จนกว่าจะ re-run Q8E_portview_v3.sql ' +
-    'แล้วอัปโหลด portview.csv ใหม่</div>';
-}
-
-// v56: bulk_history.csv needs no schema change (it already carries
-// month_label per row) — staleness here means "the latest CLOSED month
-// isn't present yet" (isStaleMonth/expectedMonth set in nrrFetchBulkHistoryCsv,
-// nrr_data.js). Lower-severity than portview (weekly refresh, closed-month
-// data only) but same failure class — flagged wherever baseline_gmv (the
-// quarter-base comparison nrrPaceSignal reads from this file) is shown.
-function nrrStaleBulkHistoryBannerHtml() {
-  var bh = window.bulkHistoryData;
-  if (!bh || !bh.loaded || !bh.isStaleMonth) return '';
-  return '<div class="nrr-stale-banner">⚠️ bulk_history.csv ยังไม่มีข้อมูลเดือน ' +
-    nrrEsc(bh.expectedMonth) + ' — เดือนฐาน/แนวโน้มด้านล่างอาจอิงข้อมูลเก่ากว่าที่ควร ' +
-    'จนกว่าจะ re-run Q9B_bulk_history.sql แล้วอัปโหลด bulk_history.csv ใหม่</div>';
 }
 
 function nrrRenderPortfolioSection(kind) {

@@ -580,7 +580,11 @@ function _nrrParsePortviewCsv(text) {
       kam_name:              (p[16] || '').trim(),
       kam_email:             (p[17] || '').trim(),
       tl_email:              (p[18] || '').trim(),
-      days_with_current_kam: parseInt(p[19], 10) || 0
+      days_with_current_kam: parseInt(p[19], 10) || 0,
+      // v4 (2026-07-13): may be absent on an un-re-run CSV — stays '' until
+      // Q8E_portview_v3.sql is rerun, which is the graceful-degrade signal
+      // nrrFetchPortviewCsv uses to skip the staleness banner entirely.
+      data_asof_date:        (p[20] || '').trim()
     };
     allRows.push(row);
     if (row.kam_email) {
@@ -591,6 +595,29 @@ function _nrrParsePortviewCsv(text) {
   return { byKamEmail: byKamEmail, allRows: allRows };
 }
 
+// v4 (2026-07-13): portview.csv is a single current-state snapshot with no
+// date/period column otherwise — data_asof_date (= the SQL's own lag_date)
+// is the only signal the app has for "how fresh is this file." Computed
+// once per fetch (not per-row, every row shares the same value) so
+// nrrStalePortviewBannerHtml can render one banner without re-deriving this
+// on every call. daysBehind=0 means "run today" (asOfDate = yesterday,
+// matching the same day-1 lag convention used everywhere else in /nrr);
+// null means the CSV predates this column (un-re-run) — banner skips
+// entirely rather than guessing, same 404-graceful precedent as other
+// new columns added to existing CSVs this session.
+function _nrrPortviewAsOfDate(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+function _nrrPortviewDaysBehind(asOfDate) {
+  if (!asOfDate) return null;
+  var expected = new Date();
+  expected.setDate(expected.getDate() - 1);
+  expected.setHours(0, 0, 0, 0);
+  return Math.round((expected - asOfDate) / 86400000);
+}
+
 async function nrrFetchPortviewCsv(force) {
   if (window.bulkPortviewData.loaded && !force) return window.bulkPortviewData;
   try {
@@ -599,7 +626,11 @@ async function nrrFetchPortviewCsv(force) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var text = await res.text();
     var parsed = _nrrParsePortviewCsv(text);
-    window.bulkPortviewData = { allRows: parsed.allRows, byKamEmail: parsed.byKamEmail, loaded: true, loadedAt: Date.now() };
+    var asOfDate = parsed.allRows.length ? _nrrPortviewAsOfDate(parsed.allRows[0].data_asof_date) : null;
+    window.bulkPortviewData = {
+      allRows: parsed.allRows, byKamEmail: parsed.byKamEmail, loaded: true, loadedAt: Date.now(),
+      asOfDate: asOfDate, daysBehind: _nrrPortviewDaysBehind(asOfDate)
+    };
   } catch (e) {
     console.warn('[nrr] failed to load portview.csv', e);
     window.bulkPortviewData = { allRows: [], byKamEmail: {}, loaded: false, error: e.message };
@@ -621,6 +652,11 @@ window.bulkHistoryData = { loaded: false };
 function _nrrParseBulkHistoryCsv(text) {
   var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
   var byAccountId = {};
+  // v56: no schema change needed here (unlike portview.csv) — this file
+  // already carries month_label per row; staleness just means "the latest
+  // CLOSED month isn't present yet." Collected once during parsing so the
+  // staleness check doesn't have to rescan every account's row array.
+  var monthsPresent = {};
   lines.forEach(function (l) {
     var p = parseCSVRow(l);
     if (!p[0]) return;
@@ -633,21 +669,37 @@ function _nrrParseBulkHistoryCsv(text) {
     };
     if (!byAccountId[row.account_id]) byAccountId[row.account_id] = [];
     byAccountId[row.account_id].push(row);
+    if (row.month_label) monthsPresent[row.month_label] = true;
   });
-  return byAccountId;
+  return { byAccountId: byAccountId, monthsPresent: monthsPresent };
+}
+
+// v56: expected latest CLOSED month label, mirroring Q9B_bulk_history.sql's
+// own WHERE clause exactly (`< DATE_TRUNC(DATE_SUB(lag_date, INTERVAL 1
+// DAY), MONTH)` — i.e. the month before the one containing "yesterday").
+function _nrrBulkHistoryExpectedLatestMonth() {
+  var lag = new Date(); lag.setDate(lag.getDate() - 1);
+  var closed = new Date(lag.getFullYear(), lag.getMonth(), 1);
+  closed.setMonth(closed.getMonth() - 1);
+  return nrrThMonthLabel(closed);
 }
 
 async function nrrFetchBulkHistoryCsv(force) {
   if (window.bulkHistoryData.loaded && !force) return window.bulkHistoryData;
   try {
     var res = await fetch(R2_BASE + '/bulk_history.csv?cb=' + Date.now());
-    if (res.status === 404) { window.bulkHistoryData = { byAccountId: {}, loaded: false, notFound: true }; return window.bulkHistoryData; }
+    if (res.status === 404) { window.bulkHistoryData = { byAccountId: {}, monthsPresent: {}, loaded: false, notFound: true }; return window.bulkHistoryData; }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var text = await res.text();
-    window.bulkHistoryData = { byAccountId: _nrrParseBulkHistoryCsv(text), loaded: true, loadedAt: Date.now() };
+    var parsed = _nrrParseBulkHistoryCsv(text);
+    var expectedMonth = _nrrBulkHistoryExpectedLatestMonth();
+    window.bulkHistoryData = {
+      byAccountId: parsed.byAccountId, monthsPresent: parsed.monthsPresent, loaded: true, loadedAt: Date.now(),
+      expectedMonth: expectedMonth, isStaleMonth: !parsed.monthsPresent[expectedMonth]
+    };
   } catch (e) {
     console.warn('[nrr] failed to load bulk_history.csv', e);
-    window.bulkHistoryData = { byAccountId: {}, loaded: false, error: e.message };
+    window.bulkHistoryData = { byAccountId: {}, monthsPresent: {}, loaded: false, error: e.message };
   }
   return window.bulkHistoryData;
 }

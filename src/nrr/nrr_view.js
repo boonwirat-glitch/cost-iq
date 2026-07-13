@@ -487,6 +487,8 @@ function nrrRenderAccountBody(row) {
   if (!body) return;
   var kamEmail = nrrAccountState.kamEmail;
   body.innerHTML =
+    nrrStalePortviewBannerHtml() +
+    nrrStaleBulkHistoryBannerHtml() +
     nrrAccountHeaderHtml(row) +
     nrrAccountHeroHtml(row) +
     nrrAccountStatRowHtml(row, kamEmail) +
@@ -1766,6 +1768,40 @@ function nrrStaleCsvBannerHtml(bulkData, filename) {
   return '<div class="nrr-stale-banner">⚠️ ' + nrrEsc(filename) + ' มีข้อมูลเดือน ' + nrrEsc(monthList) +
     ' — ไม่ใช่ไตรมาสปัจจุบัน (' + nrrEsc(QNRR_CFG.q_months.map(function (m) { return QNRR_CFG.months_th[m] || m; }).join(', ')) + ') ' +
     'ตัวเลขด้านล่างเป็นข้อมูลไตรมาสก่อนที่ยังไม่ได้ re-run/upload ใหม่</div>';
+}
+
+// v56 (2026-07-13): portview.csv (bulkPortviewData) has no period_month —
+// it's a single current-state snapshot, not month-labeled rows — so the
+// quarter-comparison check above can't apply. Real incident that prompted
+// this: an account showed a fresh MTD order everywhere EXCEPT the Account
+// page + Pulse "Today" page (both portview-driven), because portview.csv
+// simply hadn't been re-run in a while — invisible until manually cross-
+// referenced against another page. daysBehind/asOfDate come from the new
+// data_asof_date column (nrr_data.js's nrrFetchPortviewCsv); null on an
+// un-re-run CSV that predates that column — skip silently rather than
+// guessing, same 404-graceful precedent used for other new CSV columns.
+function nrrStalePortviewBannerHtml() {
+  var pv = window.bulkPortviewData;
+  if (!pv || !pv.loaded || pv.daysBehind == null || pv.daysBehind <= 0) return '';
+  var d = pv.asOfDate;
+  return '<div class="nrr-stale-banner">⚠️ portview.csv ข้อมูลล่าสุดถึง ' +
+    nrrEsc(d.getDate() + ' ' + nrrThMonthLabel(d)) + ' (' + pv.daysBehind + ' วันก่อน) — ' +
+    'ตัวเลข MTD/churn ในหน้านี้อาจไม่ตรงกับความเป็นจริง จนกว่าจะ re-run Q8E_portview_v3.sql ' +
+    'แล้วอัปโหลด portview.csv ใหม่</div>';
+}
+
+// v56: bulk_history.csv needs no schema change (it already carries
+// month_label per row) — staleness here means "the latest CLOSED month
+// isn't present yet" (isStaleMonth/expectedMonth set in nrrFetchBulkHistoryCsv,
+// nrr_data.js). Lower-severity than portview (weekly refresh, closed-month
+// data only) but same failure class — flagged wherever baseline_gmv (the
+// quarter-base comparison nrrPaceSignal reads from this file) is shown.
+function nrrStaleBulkHistoryBannerHtml() {
+  var bh = window.bulkHistoryData;
+  if (!bh || !bh.loaded || !bh.isStaleMonth) return '';
+  return '<div class="nrr-stale-banner">⚠️ bulk_history.csv ยังไม่มีข้อมูลเดือน ' +
+    nrrEsc(bh.expectedMonth) + ' — เดือนฐาน/แนวโน้มด้านล่างอาจอิงข้อมูลเก่ากว่าที่ควร ' +
+    'จนกว่าจะ re-run Q9B_bulk_history.sql แล้วอัปโหลด bulk_history.csv ใหม่</div>';
 }
 
 function nrrRenderPortfolioSection(kind) {
