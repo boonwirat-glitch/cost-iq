@@ -23,7 +23,8 @@ var NRR_PULSE_ARR_MAX = 5;                 // arrivals shown per block before ro
 // line taking extra vertical space, a mismatched row count made "ต้องดูแล"
 // visibly taller/heavier than its neighbor. Matched to 5 for parity.
 var NRR_PULSE_RISK_MAX = 5;
-var NRR_PULSE_HERO_TODAY_MAX = 6;           // rows shown in the green hero's "today" mini-list
+var NRR_PULSE_HERO_TODAY_MAX = 8;           // rows shown in the green hero's "today" mini-list
+var NRR_PULSE_HERO_RISK_MAX = 8;            // rows shown in the orange hero's top-risk mini-list
 // v56: session-only rotation-speed choices (no localStorage — user's explicit
 // choice; no /nrr-local persistence precedent existed anyway). [ms, label].
 var NRR_PULSE_ROT_CHOICES = [['5000', '5s'], ['8000', '8s'], ['15000', '15s'], ['30000', '30s']];
@@ -405,12 +406,12 @@ function _nrrPulseHeroTodayRowsHtml(items) {
     '</div>';
 }
 
-// v56: orange hero's top-3 at-risk accounts — m.risk is already sorted desc
+// v56: orange hero's top at-risk accounts — m.risk is already sorted desc
 // by shortfall (see riskItems.sort in nrrPulseModel), just take the head.
 function _nrrPulseHeroRiskRowsHtml(items) {
   if (!items.length) return '';
   return '<div class="nrr-pulse-hero-list">' +
-    items.slice(0, 3).map(function (x) {
+    items.slice(0, NRR_PULSE_HERO_RISK_MAX).map(function (x) {
       return '<div class="nrr-pulse-hero-row">' +
         '<span class="nrr-pulse-hero-row-name">' + nrrEsc(x.name) + '</span>' +
         '<span class="nrr-pulse-hero-row-amt">−' + nrrFmtGMV(x.risk) + '</span></div>';
