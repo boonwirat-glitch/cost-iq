@@ -46,6 +46,12 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   // "locking June" a few days into July would compare June's cohort against July's first
   // 1-3 days of GMV, producing near-zero NRR for everyone.
   const _isFrozen = !!asOfPeriod;
+  // v865 (waived-account feature): period_month key ('YYYY-MM') for the
+  // nrr_exclusions lookup -- frozen mode already gets it for free (asOfPeriod
+  // IS this format); live mode derives "today" the same lag-1 way
+  // _nrrExclusionCurrentPeriod() does, so both stay consistent with the
+  // quarterly engine's own period_month convention.
+  const periodMonth = asOfPeriod || (typeof _nrrExclusionCurrentPeriod === 'function' ? _nrrExclusionCurrentPeriod() : null);
   if (_isFrozen) {
     const _parts = asOfPeriod.split('-');
     const asYr = parseInt(_parts[0], 10);
@@ -178,6 +184,13 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
       if (_useExclude && excludeFilter.has(k)) return false;
       return true;
     };
+    // v865/v866 (waived-account feature): checked per-outlet below, where
+    // outlet_id is known (real outlet-level exclusion support) -- the
+    // account-level fallback branch (no outlet breakdown available) can
+    // only honor a WHOLE-ACCOUNT waiver, never an outlet-scoped one, since
+    // there's no per-outlet split to apply it against in that data shape.
+    const _waived = (acctId, oid) => periodMonth && typeof _nrrAccountWaivedForPeriod === 'function'
+      && _nrrAccountWaivedForPeriod(acctId, periodMonth, oid);
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
@@ -202,7 +215,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0 && _passFilter(oid)){
+          if(oid && o.gmv>0 && _passFilter(oid) && !_waived(a.id, oid)){
             prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
             outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -210,7 +223,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         });
         (outletMonths[currentMonthLabel]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0 && _passFilter(oid)){
+          if(oid && o.gmv>0 && _passFilter(oid) && !_waived(a.id, oid)){
             currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
             if(!outletToAcct[oid])outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -223,6 +236,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         // unless this account id itself is a moved outlet (rare; res_id≠account_guid).
         if (_useFilter) return; // positive filter active → no account-level fallback rows
         if (_useExclude && excludeFilter.has(String(a.id))) return;
+        if (_waived(a.id, null)) return; // whole-account waiver only -- no outlet grain here
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
@@ -437,6 +451,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
     // Core NRR (backward-compatible fields)
     nrr: core.nrr ?? null,
     daysElapsed, prevDays, prevMonth, currentMonthLabel,
+    currentPeriod: periodMonth, // v865: 'YYYY-MM', for nrr_exclusions period_month lookups downstream
     cohortCount:   core.cohortCount   || 0,
     cohortGmv:     core.cohortGmv     || 0,
     baselinePrevGmv: core.baselinePrevGmv || 0,

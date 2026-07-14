@@ -161,7 +161,7 @@ function _qnrrCompute(kamEmail, scope) {
     // baseMap ถูกต้อง — ร้านนั้นเป็นของ scope นั้นตั้งแต่เดือนฐานจริงๆ
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
         && _effectiveMovement(r) !== 'transfer_in') {
-      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
+      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });
 
@@ -282,7 +282,14 @@ function _qnrrCompute(kamEmail, scope) {
         core_nrr_base_sum += (parseFloat(r.base_gmv) || 0) / base_d * 30;
       }
 
-      if ((mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
+      // Waived accounts (nrr_exclusions, approved for this exact period_month)
+      // still count toward GMV/segments/outlets above -- only excluded from the
+      // NRR numerator (here) and denominator (base_norm, see effectiveBaseNorm
+      // below) since GMV/other performance metrics must stay unaffected.
+      var waived = typeof _nrrAccountWaivedForPeriod === 'function' &&
+        _nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+
+      if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days = r.curr_days || 30;
@@ -298,7 +305,7 @@ function _qnrrCompute(kamEmail, scope) {
       // numerator against an unchanged base. Example: base 10M (core 10M + comeback 0M since
       // inactive in base month) -> Sep core 9.5M + comeback 0.5M -> numerator 9.5+0.5=10M ->
       // NRR = 10M/10M = 100%.
-      if (mv === 'comeback') {
+      if (!waived && mv === 'comeback') {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days_cb = r.curr_days || 30;
@@ -307,9 +314,23 @@ function _qnrrCompute(kamEmail, scope) {
       }
     });
 
-    // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive)
-    var nrr_pct = base_norm > 0
-      ? Math.round(nrr_curr_norm / base_norm * 100)
+    // Waived-account (nrr_exclusions) base contribution is removed per-month --
+    // unlike transfer_out/in (quarter-wide, computed once into base_norm above),
+    // a waiver applies to one specific month only, so it must be recomputed here.
+    var effectiveBaseNorm = base_norm;
+    if (typeof _nrrAccountWaivedForPeriod === 'function') {
+      Object.keys(baseMap).forEach(function(oid){
+        var b = baseMap[oid];
+        if (b.account_id && _nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+          effectiveBaseNorm -= (b.gmv / b.days);
+        }
+      });
+    }
+
+    // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive,
+    // และหัก waived-account base ของเดือนนี้)
+    var nrr_pct = effectiveBaseNorm > 0
+      ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100)
       : null;
 
     var total_gmv = MOVEMENTS
@@ -327,6 +348,7 @@ function _qnrrCompute(kamEmail, scope) {
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
+      effective_base_norm: effectiveBaseNorm, // v865: per-month base after waived-account subtraction (base_norm itself is quarter-wide)
       total_gmv:      total_gmv,
       segments:       segments,
       outlets:        outlets,
@@ -450,8 +472,11 @@ function _qnrrComputeForCommission(kamEmail, scope, asOfPeriod) {
     var segs    = monthData.segments || {};
     var outlets = monthData.outlets  || {};
 
-    // base_norm × 30 = normalized base GMV (Jun @ 30 days — locked for Q3)
-    var baseGmv = Math.round((result.base_norm || 0) * 30);
+    // effective_base_norm × 30 = normalized base GMV for this month (Jun @ 30 days,
+    // locked for Q3), already net of any waived account's base for this specific
+    // month — falls back to the quarter-wide base_norm for older by_month entries
+    // that predate this field.
+    var baseGmv = Math.round((monthData.effective_base_norm != null ? monthData.effective_base_norm : result.base_norm || 0) * 30);
 
     // Thai month label for base_month (มิ.ย. 2569) — shown in history detail
     var baseMo  = QNRR_CFG.base_month;  // '2026-06'

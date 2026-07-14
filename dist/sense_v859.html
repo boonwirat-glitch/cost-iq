@@ -1,4 +1,4 @@
-<!-- Freshket Sense v860: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v859: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v860',
+      version: 'v859',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -35611,7 +35611,7 @@ async function loadTargets(quarter) {
 
   try {
     const { data: excl, error: exclErr } = await supa.from('nrr_exclusions')
-      .select('id,period_month,account_id,outlet_id,target_kam_email,target_tl_email,reason_code,reason_text,status,requested_by,requested_at,reviewed_by,reviewed_at,review_note,base_gmv,estimated_base_gmv')
+      .select('id,period_month,account_id,outlet_id,applies_to,target_kam_email,target_tl_email,reason_code,reason_text,status,requested_by,requested_at,reviewed_by,reviewed_at,review_note,base_gmv,estimated_base_gmv')
       .in('period_month', months);
     if (exclErr) throw new Error(exclErr.message);
     _nrrExclusions = excl || [];
@@ -36787,19 +36787,10 @@ function _nrrExclusionApprovedForScope(kamEmail, tlEmail, periodMonth) {
 // final payout number -- see [[commission-quarterly-fix]] round 4 / the
 // waived-account feature plan for why "computed in more than one place"
 // is the exact bug class this avoids).
-// v866 (outlet-level waiving): a row with outlet_id set is scoped to ONLY
-// that outlet -- it must never fall back to matching by account_id alone,
-// or an outlet-scoped waiver would silently over-exclude every other
-// outlet under the same account too. A row with outlet_id null is a
-// whole-account waiver and matches by account_id regardless of which
-// outlet the caller is asking about.
-function _nrrAccountWaivedForPeriod(accountId, periodMonth, outletId) {
+function _nrrAccountWaivedForPeriod(accountId, periodMonth) {
   if (!accountId || !periodMonth) return false;
-  return (_nrrExclusions || []).some(x => {
-    if (x.status !== 'approved' || x.period_month !== periodMonth) return false;
-    if (x.outlet_id) return !!outletId && x.outlet_id === outletId;
-    return x.account_id === accountId;
-  });
+  return (_nrrExclusions || []).some(x =>
+    x.status === 'approved' && x.account_id === accountId && x.period_month === periodMonth);
 }
 window._nrrAccountWaivedForPeriod = _nrrAccountWaivedForPeriod;
 function _nrrExclusionBaseImpact(kamEmail, tlEmail, periodMonth) {
@@ -39583,6 +39574,14 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   // When omitted (core path), all outlets of each account are included as before.
   function _groupNRR(group, outletFilter, excludeFilter) {
     if (!group.length) return null;
+    // v865 (waived-account feature): drop waived accounts from this group
+    // entirely -- applies to core/transfer_in/new_sales alike since all
+    // three call sites share this function. GMV/other metrics elsewhere are
+    // untouched; this only removes the account from NRR numerator+denominator.
+    if (periodMonth && typeof _nrrAccountWaivedForPeriod === 'function') {
+      group = group.filter(a => !_nrrAccountWaivedForPeriod(a.id, periodMonth));
+      if (!group.length) return null;
+    }
     const _useFilter = outletFilter instanceof Set && outletFilter.size > 0;
     const _useExclude = excludeFilter instanceof Set && excludeFilter.size > 0;
     // positive filter: outlet must be IN outletFilter. negative filter: outlet must NOT be
@@ -39593,13 +39592,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
       if (_useExclude && excludeFilter.has(k)) return false;
       return true;
     };
-    // v865/v866 (waived-account feature): checked per-outlet below, where
-    // outlet_id is known (real outlet-level exclusion support) -- the
-    // account-level fallback branch (no outlet breakdown available) can
-    // only honor a WHOLE-ACCOUNT waiver, never an outlet-scoped one, since
-    // there's no per-outlet split to apply it against in that data shape.
-    const _waived = (acctId, oid) => periodMonth && typeof _nrrAccountWaivedForPeriod === 'function'
-      && _nrrAccountWaivedForPeriod(acctId, periodMonth, oid);
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
@@ -39624,7 +39616,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         });
         (outletMonths[prevMonth]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0 && _passFilter(oid) && !_waived(a.id, oid)){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             prevGmvByOutlet[oid]=(prevGmvByOutlet[oid]||0)+o.gmv;
             outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -39632,7 +39624,7 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         });
         (outletMonths[currentMonthLabel]||[]).forEach(o => {
           const oid=o.outlet_id||o.outletId||o.id;
-          if(oid && o.gmv>0 && _passFilter(oid) && !_waived(a.id, oid)){
+          if(oid && o.gmv>0 && _passFilter(oid)){
             currGmvByOutlet[oid]=(currGmvByOutlet[oid]||0)+o.gmv;
             if(!outletToAcct[oid])outletToAcct[oid]={acctId:a.id,acctName};
             if(!outletName[oid])outletName[oid]=o.outlet_name||o.outletName||oid;
@@ -39645,7 +39637,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         // unless this account id itself is a moved outlet (rare; res_id≠account_guid).
         if (_useFilter) return; // positive filter active → no account-level fallback rows
         if (_useExclude && excludeFilter.has(String(a.id))) return;
-        if (_waived(a.id, null)) return; // whole-account waiver only -- no outlet grain here
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
@@ -52597,7 +52588,7 @@ function _qnrrCompute(kamEmail, scope) {
       // NRR numerator (here) and denominator (base_norm, see effectiveBaseNorm
       // below) since GMV/other performance metrics must stay unaffected.
       var waived = typeof _nrrAccountWaivedForPeriod === 'function' &&
-        _nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+        _nrrAccountWaivedForPeriod(r.account_id, month);
 
       if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
@@ -52631,7 +52622,7 @@ function _qnrrCompute(kamEmail, scope) {
     if (typeof _nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function(oid){
         var b = baseMap[oid];
-        if (b.account_id && _nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+        if (b.account_id && _nrrAccountWaivedForPeriod(b.account_id, month)) {
           effectiveBaseNorm -= (b.gmv / b.days);
         }
       });

@@ -23,6 +23,14 @@ function nrrNormalizeRole(r) {
   return s || '';
 }
 
+function nrrRoleLabel(role) {
+  if (role === 'tl') return 'Team Lead';
+  if (role === 'admin') return 'Admin';
+  if (role === 'rep') return 'Rep';
+  return role || '—';
+}
+window.nrrRoleLabel = nrrRoleLabel;
+
 window.addEventListener('DOMContentLoaded', async function () {
   supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 

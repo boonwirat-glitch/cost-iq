@@ -30,6 +30,7 @@ function nrrParseHash() {
   if (parts[0] === 'company') return { view: 'company', param: null };
   if (parts[0] === 'sales') return { view: 'sales', param: null };
   if (parts[0] === 'pulse') return { view: 'pulse', param: null };
+  if (parts[0] === 'waivers') return { view: 'waivers', param: null };
   return { view: 'dashboard', param: null };
 }
 
@@ -52,6 +53,12 @@ function nrrRouteGuard(route) {
   // company data — admin only.
   if ((route.view === 'company' || route.view === 'sales' || route.view === 'pulse') && p.role !== 'admin') {
     return { view: 'dashboard', param: null, redirect: true };
+  }
+  // Waivers (2026-07-14): TL sees their own team's requests, Admin sees the
+  // full approve/reject queue — rep has no team/portfolio-wide governance
+  // role here.
+  if (route.view === 'waivers' && p.role === 'rep') {
+    return { view: 'portfolio', param: null, redirect: true };
   }
   if (p.role === 'rep') {
     if (route.view === 'dashboard') return { view: 'portfolio', param: null, redirect: true };
@@ -91,7 +98,7 @@ function nrrHandleRoute() {
   // App-level nav active state: the account view belongs to the portfolio
   // family; company/sales (v28) are their own tabs.
   var navFamily = route.view === 'dashboard' ? 'dashboard'
-    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse') ? route.view
+    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse' || route.view === 'waivers') ? route.view
     : 'portfolio';
   document.querySelectorAll('#nrr-appnav a').forEach(function (a) {
     a.classList.toggle('on', a.dataset.view === navFamily);

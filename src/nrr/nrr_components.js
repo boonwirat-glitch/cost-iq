@@ -246,11 +246,15 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
       hatchHtml = '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px" title="' + nrrEsc('ส่วนคาดการณ์ (run-rate − MTD)') + '"></div>';
     }
     var pct = bm ? bm.nrr_pct : null;
+    var waivedCount = (bm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
+    var waivedTag = waivedCount > 0
+      ? '<span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>'
+      : '';
     return '<div class="nrr-qcol">' +
       '<div class="nrr-qcol-cap num" style="color:' + (isPartial ? 'var(--green-deep)' : 'var(--ink)') + '">' + (isPartial ? '~' : '') + nrrFmtGMV(runRate) + '</div>' +
       '<div class="nrr-qcol-stack">' + hatchHtml + upSegs + '</div>' +
       '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
-      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + pct + '%') + '</div></div>';
+      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + pct + '%') + (waivedTag ? '<br>' + waivedTag : '') + '</div></div>';
   }).join('');
   return '<div class="nrr-qchart">' + colsHtml + '</div>' +
     '<div class="micro" style="margin-top:10px">ลายเฉียง = ส่วนคาดการณ์ของเดือนที่ยังไม่จบ (run-rate − MTD) · churn ไม่รวมในความสูงแท่ง ดูที่ตารางด้านล่าง</div>';
@@ -323,6 +327,10 @@ function _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAd
       }
       var activeOutlets = bm ? (bm.outlets.core_nrr || 0) : 0;
       subLabel = activeOutlets + ' สาขา' + (triple && triple.is_partial ? ' · MTD ' + nrrFmtGMV(triple.mtd) : '');
+      var waivedCount = (bm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
+      if (waivedCount > 0) {
+        subLabel += '<br><span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>';
+      }
     }
     return '<div class="nrr-col">' +
       '<div class="nrr-col-top num">' + topLabel + '</div>' +
@@ -451,8 +459,37 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return html;
   }
 
+  // Waived-account (NRR Exclusion) sub-row -- mirrors "↳ Churn" exactly
+  // (same sub-row visual language, same "under Core NRR active" grouping)
+  // but shows the BASE reduction for whichever month(s) have an approved
+  // waiver, not a GMV movement. Only rendered for months actually affected
+  // (same "only show if non-empty" convention as the handover cohort
+  // sub-rows below). This is the direct fix for a real user-reported
+  // confusion (2026-07-14): the standalone footnote said "ฐานปรับจาก X → Y"
+  // with no visible connection to which column it applied to, so it read
+  // as contradicting the "ฐาน (มิ.ย.)" column above -- putting the same
+  // number inline, in the exact column it affects, removes the ambiguity.
+  function waivedRowHtml() {
+    if (typeof nrrWaivedAccountCountForRows !== 'function') return '';
+    var anyWaived = result.months.some(function (m) {
+      var bm = result.by_month[m];
+      return bm && nrrWaivedAccountCountForRows(bm.rows, m) > 0;
+    });
+    if (!anyWaived) return '';
+    var cells = columns.map(function (c) {
+      if (c.isBase) return DASH;
+      var bm = result.by_month[c.month];
+      var count = bm ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
+      if (!count) return DASH;
+      var effBase = bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
+      var delta = Math.round((result.base_norm - effBase) * nrrBaseDays());
+      return '<td class="num-cell" style="color:var(--ink3)" title="' + count + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">−' + nrrFmtGMV(delta) + '</td>';
+    }).join('');
+    return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
+  }
+
   var tbodyHtml =
-    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) +
+    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) + waivedRowHtml() +
     handoverBlockHtml() +
     TABLE_ROWS.slice(2).map(simpleRowHtml).join('');
   var totalRow = '<tr class="nrr-table-total"><td>Total GMV</td>' + columns.map(function (c) {
@@ -468,7 +505,43 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ')' : '') +
       '</div>';
   }
-  tableEl.innerHTML = '<table class="nrr-table nrr-mv-table"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + totalRow + '</tbody></table>' + adjNote;
+  // Waived-account (NRR Exclusion) note -- structurally parallel to adjNote
+  // above but a separate mechanism (per-month, not quarter-wide transfer
+  // in/out) -- surfaces here since otherwise an approved waiver only shifts
+  // %NRR silently with nothing on screen explaining why. Unlike the transfer
+  // adjustment (uniform across every month), the waived base varies PER
+  // MONTH -- so this note states each affected month's own adjusted base
+  // explicitly, rather than implying the single "ฐาน" bar above already
+  // reflects it (it doesn't -- that bar is always result.base_norm, the
+  // transfer-adjusted quarter-wide figure, not any one month's
+  // effective_base_norm).
+  var waivedNote = '';
+  if (typeof nrrWaivedAccountCountForRows === 'function') {
+    var waivedByMonth = result.months
+      .map(function (m) {
+        var bm = result.by_month[m];
+        var count = nrrWaivedAccountCountForRows(bm && bm.rows, m);
+        var effBase = bm && bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
+        return { month: m, count: count, effBaseGmv: Math.round(effBase * nrrBaseDays()) };
+      })
+      .filter(function (w) { return w.count > 0; });
+    if (waivedByMonth.length) {
+      // Deliberately phrased as "%NRR ... คำนวณจาก" (the ratio for that
+      // month is computed from), never "ฐานปรับจาก" (the base changed to) --
+      // the ฐาน (มิ.ย.) column above is NOT being revised; only that one
+      // month's own %NRR denominator is smaller. Reusing adjNote's exact
+      // wording here (as an earlier version did) reads as if it updates the
+      // same number, which is what caused the "table says 181.1M, note
+      // says 180.6M" confusion this was fixed from.
+      waivedNote = '<div class="micro" style="margin-top:4px">⚠️ ' +
+        waivedByMonth.map(function (w) {
+          return '%NRR เดือน ' + (QNRR_CFG.months_th[w.month] || w.month) + ' คำนวณจากฐานเฉพาะเดือนนั้น ' + nrrFmtGMV(w.effBaseGmv) +
+            ' (ต่ำกว่าฐาน ' + nrrFmtGMV(baseAdjusted) + ' ด้านบน ' + w.count + ' ร้านถูกยกเว้น −' + nrrFmtGMV(baseAdjusted - w.effBaseGmv) + ' ดูแถว "↳ ยกเว้นจากฐาน NRR" ในตาราง)';
+        }).join(' · ') +
+        ' — ดูรายละเอียดที่ <a href="#/waivers">Waivers</a></div>';
+    }
+  }
+  tableEl.innerHTML = '<table class="nrr-table nrr-mv-table"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + totalRow + '</tbody></table>' + adjNote + waivedNote;
 
   // v6: click delegation — every non-zero cell opens the slide-over
   // directly (movement mode) instead of an inline expansion row. Bound

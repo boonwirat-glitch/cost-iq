@@ -8205,37 +8205,8 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return html;
   }
 
-  // Waived-account (NRR Exclusion) sub-row -- mirrors "↳ Churn" exactly
-  // (same sub-row visual language, same "under Core NRR active" grouping)
-  // but shows the BASE reduction for whichever month(s) have an approved
-  // waiver, not a GMV movement. Only rendered for months actually affected
-  // (same "only show if non-empty" convention as the handover cohort
-  // sub-rows below). This is the direct fix for a real user-reported
-  // confusion (2026-07-14): the standalone footnote said "ฐานปรับจาก X → Y"
-  // with no visible connection to which column it applied to, so it read
-  // as contradicting the "ฐาน (มิ.ย.)" column above -- putting the same
-  // number inline, in the exact column it affects, removes the ambiguity.
-  function waivedRowHtml() {
-    if (typeof nrrWaivedAccountCountForRows !== 'function') return '';
-    var anyWaived = result.months.some(function (m) {
-      var bm = result.by_month[m];
-      return bm && nrrWaivedAccountCountForRows(bm.rows, m) > 0;
-    });
-    if (!anyWaived) return '';
-    var cells = columns.map(function (c) {
-      if (c.isBase) return DASH;
-      var bm = result.by_month[c.month];
-      var count = bm ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
-      if (!count) return DASH;
-      var effBase = bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
-      var delta = Math.round((result.base_norm - effBase) * nrrBaseDays());
-      return '<td class="num-cell" style="color:var(--ink3)" title="' + count + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">−' + nrrFmtGMV(delta) + '</td>';
-    }).join('');
-    return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
-  }
-
   var tbodyHtml =
-    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) + waivedRowHtml() +
+    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) +
     handoverBlockHtml() +
     TABLE_ROWS.slice(2).map(simpleRowHtml).join('');
   var totalRow = '<tr class="nrr-table-total"><td>Total GMV</td>' + columns.map(function (c) {
@@ -8272,17 +8243,10 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       })
       .filter(function (w) { return w.count > 0; });
     if (waivedByMonth.length) {
-      // Deliberately phrased as "%NRR ... คำนวณจาก" (the ratio for that
-      // month is computed from), never "ฐานปรับจาก" (the base changed to) --
-      // the ฐาน (มิ.ย.) column above is NOT being revised; only that one
-      // month's own %NRR denominator is smaller. Reusing adjNote's exact
-      // wording here (as an earlier version did) reads as if it updates the
-      // same number, which is what caused the "table says 181.1M, note
-      // says 180.6M" confusion this was fixed from.
       waivedNote = '<div class="micro" style="margin-top:4px">⚠️ ' +
         waivedByMonth.map(function (w) {
-          return '%NRR เดือน ' + (QNRR_CFG.months_th[w.month] || w.month) + ' คำนวณจากฐานเฉพาะเดือนนั้น ' + nrrFmtGMV(w.effBaseGmv) +
-            ' (ต่ำกว่าฐาน ' + nrrFmtGMV(baseAdjusted) + ' ด้านบน ' + w.count + ' ร้านถูกยกเว้น −' + nrrFmtGMV(baseAdjusted - w.effBaseGmv) + ' ดูแถว "↳ ยกเว้นจากฐาน NRR" ในตาราง)';
+          return (QNRR_CFG.months_th[w.month] || w.month) + ': ฐานปรับจาก ' + nrrFmtGMV(baseAdjusted) + ' → ' + nrrFmtGMV(w.effBaseGmv) +
+            ' (ยกเว้น ' + w.count + ' ร้าน −' + nrrFmtGMV(baseAdjusted - w.effBaseGmv) + ')';
         }).join(' · ') +
         ' — ดูรายละเอียดที่ <a href="#/waivers">Waivers</a></div>';
     }

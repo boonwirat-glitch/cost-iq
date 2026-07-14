@@ -297,21 +297,6 @@ html, body {
 .nrr-masthead-h { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
 .nrr-masthead-actions { display: flex; align-items: center; gap: 14px; }
 
-/* Logged-in-as chip — who + what role, so it's obvious at a glance whose
-   view this is (matters most when switching test accounts / demoing). */
-.nrr-profile-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12.5px; font-weight: 600; color: var(--ink2);
-  background: var(--fill); border-radius: var(--r-pill); padding: 5px 10px 5px 8px;
-  white-space: nowrap;
-}
-.nrr-profile-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
-.nrr-profile-role {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
-  color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill);
-  padding: 2px 7px; margin-left: 2px;
-}
-
 /* Sub-nav shares .seg styling (nrr_base.css) — no extra track here. */
 .nrr-subnav { }
 .nrr-month-capsule { white-space: nowrap; }
@@ -371,12 +356,6 @@ html, body {
 }
 .nrr-exclusion-reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .nrr-exclusion-reason-opt { font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
-.nrr-exclusion-scope { display: flex; flex-direction: column; gap: 6px; }
-.nrr-exclusion-outlet-select {
-  font-size: 13px; font-family: inherit; border: 1px solid var(--line);
-  border-radius: var(--r-sm); padding: 5px 8px; margin-left: 20px;
-}
-.nrr-exclusion-outlet-select:disabled { opacity: .5; }
 .nrr-exclusion-note {
   width: 100%; box-sizing: border-box; font-size: 13px; font-family: inherit;
   border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px;
@@ -1597,37 +1576,6 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-acct-catfull-sw { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .nrr-acct-catfull-track { height: 6px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; margin-left: 17px; }
 .nrr-acct-catfull-fill { height: 100%; border-radius: var(--r-pill); }
-
-/* ── Boot loader — covers the shell while nrrRefresh() fetches data on
-   first load, so the user never sees the bare/half-rendered dashboard
-   sections. A bouncing produce wave instead of a skeleton -- purely
-   decorative, no data dependency. ── */
-.nrr-boot-loader {
-  position: fixed; inset: 0; z-index: 500;
-  background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 18px;
-}
-.nrr-boot-icons { display: flex; gap: 10px; }
-.nrr-boot-icon {
-  font-size: 34px; line-height: 1;
-  animation: nrrBootBounce 1.1s ease-in-out infinite;
-}
-.nrr-boot-icon:nth-child(1) { animation-delay: 0.00s; }
-.nrr-boot-icon:nth-child(2) { animation-delay: 0.09s; }
-.nrr-boot-icon:nth-child(3) { animation-delay: 0.18s; }
-.nrr-boot-icon:nth-child(4) { animation-delay: 0.27s; }
-.nrr-boot-icon:nth-child(5) { animation-delay: 0.36s; }
-.nrr-boot-icon:nth-child(6) { animation-delay: 0.45s; }
-.nrr-boot-icon:nth-child(7) { animation-delay: 0.54s; }
-@keyframes nrrBootBounce {
-  0%, 60%, 100% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-16px) scale(1.08); }
-}
-.nrr-boot-text { font-size: 13px; font-weight: 600; color: var(--ink2); letter-spacing: .01em; }
-@media (prefers-reduced-motion: reduce) {
-  .nrr-boot-icon { animation: none; }
-}
 </style>
 </head>
 <body>
@@ -1645,19 +1593,6 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 </div>
 
 <div id="nrr-app"></div>
-
-<div id="nrr-boot-loader" class="nrr-boot-loader" style="display:none">
-  <div class="nrr-boot-icons">
-    <span class="nrr-boot-icon">🍋</span>
-    <span class="nrr-boot-icon">🍅</span>
-    <span class="nrr-boot-icon">🥕</span>
-    <span class="nrr-boot-icon">🍓</span>
-    <span class="nrr-boot-icon">🧅</span>
-    <span class="nrr-boot-icon">🥦</span>
-    <span class="nrr-boot-icon">🥬</span>
-  </div>
-  <div class="nrr-boot-text">กำลังโหลดข้อมูล...</div>
-</div>
 
 <script>
 // ── nrr_logic.js ──────────────────────────────────────────────────────────
@@ -1908,7 +1843,7 @@ function _qnrrCompute(kamEmail, scope) {
       // excluded from the NRR numerator (here) and denominator
       // (effectiveBaseNorm below).
       var waived = typeof nrrAccountWaivedForPeriod === 'function' &&
-        nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+        nrrAccountWaivedForPeriod(r.account_id, month);
 
       if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
@@ -1938,7 +1873,7 @@ function _qnrrCompute(kamEmail, scope) {
     if (typeof nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function (oid) {
         var b = baseMap[oid];
-        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month)) {
           effectiveBaseNorm -= (b.gmv / b.days);
         }
       });
@@ -2109,7 +2044,7 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
       outlets[mv] = (outlets[mv] || 0) + 1;
 
       var waived = typeof nrrAccountWaivedForPeriod === 'function' &&
-        nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+        nrrAccountWaivedForPeriod(r.account_id, month);
 
       if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
@@ -2127,7 +2062,7 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     if (typeof nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function (oid) {
         var b = baseMap[oid];
-        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month)) {
           effectiveBaseNorm -= (b.gmv / b.days);
         }
       });
@@ -3229,14 +3164,6 @@ function nrrNormalizeRole(r) {
   if (['admin', 'ad'].includes(s)) return 'admin';
   return s || '';
 }
-
-function nrrRoleLabel(role) {
-  if (role === 'tl') return 'Team Lead';
-  if (role === 'admin') return 'Admin';
-  if (role === 'rep') return 'Rep';
-  return role || '—';
-}
-window.nrrRoleLabel = nrrRoleLabel;
 
 window.addEventListener('DOMContentLoaded', async function () {
   supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
@@ -4920,7 +4847,6 @@ window.nrrExclusionReasonLabel = nrrExclusionReasonLabel;
 function nrrExclusionStatusLabel(status) {
   if (status === 'approved') return 'อนุมัติแล้ว';
   if (status === 'rejected') return 'ปฏิเสธ';
-  if (status === 'revoked') return 'เพิกถอนแล้ว';
   if (status === 'submitted') return 'รออนุมัติ';
   return status || '—';
 }
@@ -4947,16 +4873,10 @@ async function nrrFetchExclusions(force) {
 window.nrrFetchExclusions = nrrFetchExclusions;
 
 // The one shared predicate every NRR compute function in nrr_logic.js calls.
-// v866 (outlet-level waiving): a row with outlet_id set is scoped to ONLY
-// that outlet -- never falls back to matching by account_id alone, or an
-// outlet-scoped waiver would over-exclude every other outlet under the
-// same account. A row with outlet_id null is a whole-account waiver.
-function nrrAccountWaivedForPeriod(accountId, periodMonth, outletId) {
+function nrrAccountWaivedForPeriod(accountId, periodMonth) {
   if (!accountId || !periodMonth) return false;
   return (nrrExclusionsCache || []).some(function (x) {
-    if (x.status !== 'approved' || x.period_month !== periodMonth) return false;
-    if (x.outlet_id) return !!outletId && x.outlet_id === outletId;
-    return x.account_id === accountId;
+    return x.status === 'approved' && x.account_id === accountId && x.period_month === periodMonth;
   });
 }
 window.nrrAccountWaivedForPeriod = nrrAccountWaivedForPeriod;
@@ -4965,45 +4885,6 @@ function nrrExclusionsForAccount(accountId) {
   return (nrrExclusionsCache || []).filter(function (x) { return x.account_id === accountId; });
 }
 window.nrrExclusionsForAccount = nrrExclusionsForAccount;
-
-// "Today's" period_month (lag-1, same convention as Sense's
-// _nrrExclusionCurrentPeriod), clamped to the active quarter. Deliberately
-// independent of any specific KAM's _qnrrCompute result -- the account
-// page previously derived this via nrrCurrentPeriod(nrrKamResult(kamEmail)),
-// which silently returned null (hiding the request button entirely, no
-// error) whenever that KAM had no rows in kam_rep_view.csv for any reason.
-// Requesting a waiver for "this month" shouldn't depend on whether that
-// KAM's cohort happened to compute successfully.
-function nrrExclusionCurrentPeriod() {
-  var now = new Date();
-  var lag1 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  var lagYM = lag1.getFullYear() + '-' + String(lag1.getMonth() + 1).padStart(2, '0');
-  var q = QNRR_CFG.q_months;
-  return q.indexOf(lagYM) > -1 ? lagYM : q[q.length - 1];
-}
-window.nrrExclusionCurrentPeriod = nrrExclusionCurrentPeriod;
-
-// How many distinct accounts within a given set of rows (e.g. one
-// by_month[period].rows array from any _qnrrCompute/nrrComputeBucket/
-// nrrComputeRowsPool result) are waived for that period -- used to surface
-// a visible "N ร้านถูกยกเว้น" indicator on the Outlet Movement chart/table,
-// since the waiver otherwise only shows up as a silent shift in %NRR with
-// no on-screen explanation (2026-07-14 user report: "how do I see an
-// adjustment was made on this page").
-function nrrWaivedAccountCountForRows(rows, periodMonth) {
-  if (!rows || !rows.length || typeof nrrAccountWaivedForPeriod !== 'function') return 0;
-  var seen = {}; var count = 0;
-  rows.forEach(function (r) {
-    if (seen[r.account_id]) return;
-    seen[r.account_id] = true;
-    // Pass r.outlet_id too -- an outlet-scoped waiver only matches when the
-    // caller supplies the matching outlet_id (see nrrAccountWaivedForPeriod);
-    // omitting it here would silently undercount outlet-level waivers.
-    if (nrrAccountWaivedForPeriod(r.account_id, periodMonth, r.outlet_id)) count++;
-  });
-  return count;
-}
-window.nrrWaivedAccountCountForRows = nrrWaivedAccountCountForRows;
 
 // A period is locked once ANY commission_payout_snapshots row for it is
 // 'final' — same signal Sense's own lock/compute cycle uses (confirmed
@@ -5017,25 +4898,16 @@ function nrrIsPeriodLocked(periodMonth) {
 }
 window.nrrIsPeriodLocked = nrrIsPeriodLocked;
 
-async function nrrRequestExclusion(accountId, periodMonth, reasonCode, reasonText, targetKamEmail, targetTlEmail, baseGmv, outletId) {
+async function nrrRequestExclusion(accountId, periodMonth, reasonCode, reasonText, targetKamEmail, targetTlEmail, baseGmv) {
   if (!supa || !nrrProfile) return { ok: false, error: 'not_authenticated' };
   if (nrrIsPeriodLocked(periodMonth)) return { ok: false, error: 'period_locked' };
-  // "Already requested" is scoped to the EXACT scope being requested now --
-  // matches the DB's two partial unique indexes (one whole-account row per
-  // account+month, one row per outlet+month) -- a different outlet under
-  // the same account, or the whole account itself, can still get its own
-  // independent request even if some other scope already has one.
-  if (nrrExclusionsForAccount(accountId).some(function (x) {
-    if (x.period_month !== periodMonth || x.status === 'rejected') return false;
-    return outletId ? x.outlet_id === outletId : !x.outlet_id;
-  })) {
+  if (nrrExclusionsForAccount(accountId).some(function (x) { return x.period_month === periodMonth && x.status !== 'rejected'; })) {
     return { ok: false, error: 'already_requested' };
   }
   try {
     var row = {
       period_month: periodMonth,
       account_id: accountId,
-      outlet_id: outletId || null,
       target_kam_email: targetKamEmail || null,
       target_tl_email: targetTlEmail || null,
       reason_code: reasonCode,
@@ -5089,11 +4961,7 @@ window.nrrReviewExclusion = nrrReviewExclusion;
 function nrrRenderWaiversView(route) {
   var body = document.getElementById('nrr-waivers-body');
   if (!body) return;
-  // portview.csv resolves account_id -> account_name (_nrrAccountNameFor
-  // below) -- it's normally only fetched when the Account/Portfolio view
-  // renders, so landing on #/waivers directly (without visiting either
-  // first) previously showed raw UUIDs instead of names.
-  Promise.all([nrrFetchExclusions(), nrrFetchPortviewCsv()]).then(function () {
+  nrrFetchExclusions().then(function () {
     body.innerHTML = nrrWaiversPageHtml();
   });
 }
@@ -5110,15 +4978,6 @@ function _nrrAccountNameFor(accountId) {
 function nrrWaiversPageHtml() {
   var isAdmin = nrrProfile && nrrProfile.role === 'admin';
   var title = isAdmin ? 'คำขอยกเว้น NRR (ทั้งบริษัท)' : 'คำขอยกเว้น NRR ของทีมฉัน';
-  // This page is history/review only -- the actual "request" control lives
-  // on each account's own page (#/account/:id), since a waiver is inherently
-  // tied to one specific account+month. Say so up front (TL especially) so
-  // landing here doesn't read as a dead end.
-  var howTo = '<div class="micro" style="margin-top:6px;color:var(--ink2)">' +
-    (isAdmin
-      ? 'อนุมัติ/ปฏิเสธคำขอได้ที่นี่ — TL ส่งคำขอจากหน้าร้านค้านั้นๆ ใน Portfolio'
-      : 'หน้านี้แสดงประวัติคำขอเท่านั้น — วิธีขอยกเว้นใหม่: เข้าไปที่หน้าร้านค้านั้นๆ (Portfolio → เลือกร้าน) แล้วกดปุ่ม "ขอยกเว้น NRR เดือนนี้"') +
-    '</div>';
 
   if (nrrExclusionsAvailable === false) {
     return '<div class="h2">' + title + '</div>' +
@@ -5134,15 +4993,12 @@ function nrrWaiversPageHtml() {
   var pending = rows.filter(function (x) { return x.status === 'submitted'; });
   var approved = rows.filter(function (x) { return x.status === 'approved'; });
   var rejected = rows.filter(function (x) { return x.status === 'rejected'; });
-  var revoked = rows.filter(function (x) { return x.status === 'revoked'; });
 
   return '<div class="h2">' + title + '</div>' +
-    howTo +
     '<div class="nrr-waivers-kpis">' +
     '<div class="nrr-waivers-kpi"><div class="num">' + pending.length + '</div><div class="micro">รออนุมัติ</div></div>' +
     '<div class="nrr-waivers-kpi"><div class="num">' + approved.length + '</div><div class="micro">อนุมัติแล้ว</div></div>' +
     '<div class="nrr-waivers-kpi"><div class="num">' + rejected.length + '</div><div class="micro">ปฏิเสธ</div></div>' +
-    '<div class="nrr-waivers-kpi"><div class="num">' + revoked.length + '</div><div class="micro">เพิกถอนแล้ว</div></div>' +
     '</div>' +
     (rows.length
       ? rows.map(function (r) { return nrrWaiverRowHtml(r, isAdmin); }).join('')
@@ -5152,11 +5008,9 @@ function nrrWaiversPageHtml() {
 function nrrWaiverRowHtml(r, isAdmin) {
   var monthLabel = QNRR_CFG.months_th[r.period_month] || r.period_month;
   var acctName = _nrrAccountNameFor(r.account_id);
-  var scopeLabel = r.outlet_id ? ('สาขา ' + r.outlet_id) : 'ทั้ง account';
-  var locked = nrrIsPeriodLocked(r.period_month);
   var actions = '';
   if (isAdmin && r.status === 'submitted') {
-    if (locked) {
+    if (nrrIsPeriodLocked(r.period_month)) {
       actions = '<div class="micro" style="color:var(--ink3);margin-top:6px">เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — อนุมัติ/ปฏิเสธไม่ได้แล้ว</div>';
     } else {
       actions = '<div class="nrr-waiver-actions">' +
@@ -5164,23 +5018,13 @@ function nrrWaiverRowHtml(r, isAdmin) {
         '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>' +
         '</div>';
     }
-  } else if (isAdmin && r.status === 'approved') {
-    // Revoking an already-effective waiver retroactively changes %NRR/
-    // commission math for that month -- disallow once the month is Lock-ed,
-    // same rule as new requests, so a paid-out period never silently
-    // changes after the fact.
-    actions = locked
-      ? '<div class="micro" style="color:var(--ink3);margin-top:6px">เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — เพิกถอนไม่ได้แล้ว</div>'
-      : '<div class="nrr-waiver-actions">' +
-        '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>' +
-        '</div>';
   }
   return '<div class="nrr-waiver-card ' + r.status + '">' +
     '<div class="nrr-waiver-top">' +
     '<a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a>' +
     '<span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span>' +
     '</div>' +
-    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · ระดับ: ' + nrrEsc(scopeLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
+    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
     (r.target_tl_email ? ' · TL ' + nrrEsc(r.target_tl_email) : '') +
     (r.target_kam_email ? ' · KAM ' + nrrEsc(r.target_kam_email) : '') + '</div>' +
     (r.reason_text ? '<div class="micro" style="margin-top:4px;color:var(--ink2)">' + nrrEsc(r.reason_text) + '</div>' : '') +
@@ -5189,11 +5033,9 @@ function nrrWaiverRowHtml(r, isAdmin) {
 }
 
 function nrrHandleWaiversClick(e) {
-  var btn = e.target.closest('[data-action="waiver-approve"],[data-action="waiver-reject"],[data-action="waiver-revoke"]');
+  var btn = e.target.closest('[data-action="waiver-approve"],[data-action="waiver-reject"]');
   if (!btn) return;
-  var status = btn.dataset.action === 'waiver-approve' ? 'approved'
-    : btn.dataset.action === 'waiver-revoke' ? 'revoked' : 'rejected';
-  if (status === 'revoked' && !confirm('เพิกถอนคำอนุมัตินี้? ร้านนี้จะกลับมานับ NRR ตามปกติทันที')) return;
+  var status = btn.dataset.action === 'waiver-approve' ? 'approved' : 'rejected';
   btn.disabled = true;
   nrrReviewExclusion(btn.dataset.id, status).then(function (res) {
     if (!res.ok && typeof nrrToast === 'function') nrrToast('อัปเดตไม่สำเร็จ: ' + (res.error || ''));
@@ -7992,15 +7834,11 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
       hatchHtml = '<div class="nrr-qcol-hatch" style="height:' + hatchH + 'px" title="' + nrrEsc('ส่วนคาดการณ์ (run-rate − MTD)') + '"></div>';
     }
     var pct = bm ? bm.nrr_pct : null;
-    var waivedCount = (bm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
-    var waivedTag = waivedCount > 0
-      ? '<span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>'
-      : '';
     return '<div class="nrr-qcol">' +
       '<div class="nrr-qcol-cap num" style="color:' + (isPartial ? 'var(--green-deep)' : 'var(--ink)') + '">' + (isPartial ? '~' : '') + nrrFmtGMV(runRate) + '</div>' +
       '<div class="nrr-qcol-stack">' + hatchHtml + upSegs + '</div>' +
       '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
-      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + pct + '%') + (waivedTag ? '<br>' + waivedTag : '') + '</div></div>';
+      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + pct + '%') + '</div></div>';
   }).join('');
   return '<div class="nrr-qchart">' + colsHtml + '</div>' +
     '<div class="micro" style="margin-top:10px">ลายเฉียง = ส่วนคาดการณ์ของเดือนที่ยังไม่จบ (run-rate − MTD) · churn ไม่รวมในความสูงแท่ง ดูที่ตารางด้านล่าง</div>';
@@ -8073,10 +7911,6 @@ function _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAd
       }
       var activeOutlets = bm ? (bm.outlets.core_nrr || 0) : 0;
       subLabel = activeOutlets + ' สาขา' + (triple && triple.is_partial ? ' · MTD ' + nrrFmtGMV(triple.mtd) : '');
-      var waivedCount = (bm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
-      if (waivedCount > 0) {
-        subLabel += '<br><span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>';
-      }
     }
     return '<div class="nrr-col">' +
       '<div class="nrr-col-top num">' + topLabel + '</div>' +
@@ -8205,37 +8039,8 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return html;
   }
 
-  // Waived-account (NRR Exclusion) sub-row -- mirrors "↳ Churn" exactly
-  // (same sub-row visual language, same "under Core NRR active" grouping)
-  // but shows the BASE reduction for whichever month(s) have an approved
-  // waiver, not a GMV movement. Only rendered for months actually affected
-  // (same "only show if non-empty" convention as the handover cohort
-  // sub-rows below). This is the direct fix for a real user-reported
-  // confusion (2026-07-14): the standalone footnote said "ฐานปรับจาก X → Y"
-  // with no visible connection to which column it applied to, so it read
-  // as contradicting the "ฐาน (มิ.ย.)" column above -- putting the same
-  // number inline, in the exact column it affects, removes the ambiguity.
-  function waivedRowHtml() {
-    if (typeof nrrWaivedAccountCountForRows !== 'function') return '';
-    var anyWaived = result.months.some(function (m) {
-      var bm = result.by_month[m];
-      return bm && nrrWaivedAccountCountForRows(bm.rows, m) > 0;
-    });
-    if (!anyWaived) return '';
-    var cells = columns.map(function (c) {
-      if (c.isBase) return DASH;
-      var bm = result.by_month[c.month];
-      var count = bm ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
-      if (!count) return DASH;
-      var effBase = bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
-      var delta = Math.round((result.base_norm - effBase) * nrrBaseDays());
-      return '<td class="num-cell" style="color:var(--ink3)" title="' + count + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">−' + nrrFmtGMV(delta) + '</td>';
-    }).join('');
-    return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
-  }
-
   var tbodyHtml =
-    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) + waivedRowHtml() +
+    simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) +
     handoverBlockHtml() +
     TABLE_ROWS.slice(2).map(simpleRowHtml).join('');
   var totalRow = '<tr class="nrr-table-total"><td>Total GMV</td>' + columns.map(function (c) {
@@ -8251,43 +8056,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ')' : '') +
       '</div>';
   }
-  // Waived-account (NRR Exclusion) note -- structurally parallel to adjNote
-  // above but a separate mechanism (per-month, not quarter-wide transfer
-  // in/out) -- surfaces here since otherwise an approved waiver only shifts
-  // %NRR silently with nothing on screen explaining why. Unlike the transfer
-  // adjustment (uniform across every month), the waived base varies PER
-  // MONTH -- so this note states each affected month's own adjusted base
-  // explicitly, rather than implying the single "ฐาน" bar above already
-  // reflects it (it doesn't -- that bar is always result.base_norm, the
-  // transfer-adjusted quarter-wide figure, not any one month's
-  // effective_base_norm).
-  var waivedNote = '';
-  if (typeof nrrWaivedAccountCountForRows === 'function') {
-    var waivedByMonth = result.months
-      .map(function (m) {
-        var bm = result.by_month[m];
-        var count = nrrWaivedAccountCountForRows(bm && bm.rows, m);
-        var effBase = bm && bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
-        return { month: m, count: count, effBaseGmv: Math.round(effBase * nrrBaseDays()) };
-      })
-      .filter(function (w) { return w.count > 0; });
-    if (waivedByMonth.length) {
-      // Deliberately phrased as "%NRR ... คำนวณจาก" (the ratio for that
-      // month is computed from), never "ฐานปรับจาก" (the base changed to) --
-      // the ฐาน (มิ.ย.) column above is NOT being revised; only that one
-      // month's own %NRR denominator is smaller. Reusing adjNote's exact
-      // wording here (as an earlier version did) reads as if it updates the
-      // same number, which is what caused the "table says 181.1M, note
-      // says 180.6M" confusion this was fixed from.
-      waivedNote = '<div class="micro" style="margin-top:4px">⚠️ ' +
-        waivedByMonth.map(function (w) {
-          return '%NRR เดือน ' + (QNRR_CFG.months_th[w.month] || w.month) + ' คำนวณจากฐานเฉพาะเดือนนั้น ' + nrrFmtGMV(w.effBaseGmv) +
-            ' (ต่ำกว่าฐาน ' + nrrFmtGMV(baseAdjusted) + ' ด้านบน ' + w.count + ' ร้านถูกยกเว้น −' + nrrFmtGMV(baseAdjusted - w.effBaseGmv) + ' ดูแถว "↳ ยกเว้นจากฐาน NRR" ในตาราง)';
-        }).join(' · ') +
-        ' — ดูรายละเอียดที่ <a href="#/waivers">Waivers</a></div>';
-    }
-  }
-  tableEl.innerHTML = '<table class="nrr-table nrr-mv-table"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + totalRow + '</tbody></table>' + adjNote + waivedNote;
+  tableEl.innerHTML = '<table class="nrr-table nrr-mv-table"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + totalRow + '</tbody></table>' + adjNote;
 
   // v6: click delegation — every non-zero cell opens the slide-over
   // directly (movement mode) instead of an inline expansion row. Bound
@@ -8469,11 +8238,6 @@ var nrrLastTeamName = '';
 async function nrrInitApp() {
   var app = document.getElementById('nrr-app');
   app.innerHTML = nrrShellHtml();
-  // Cover the just-built (still empty) shell while nrrRefresh() below fetches
-  // real data -- otherwise the user briefly sees bare section headers with
-  // no rows (the "half-broken" look reported live 2026-07-14).
-  var _bootLoader = document.getElementById('nrr-boot-loader');
-  if (_bootLoader) _bootLoader.style.display = 'flex';
   document.getElementById('nrr-refresh-btn').addEventListener('click', function () { nrrRefresh(true); });
   document.getElementById('nrr-slideover-body').addEventListener('click', function (e) {
     nrrHandleNoteAffClick(e);
@@ -8514,13 +8278,6 @@ async function nrrInitApp() {
   document.getElementById('nrr-portfolio-body').addEventListener('input', nrrHandlePortfolioInput);
   document.getElementById('nrr-portfolio-body').addEventListener('change', nrrHandlePortfolioChange);
   document.getElementById('nrr-account-body').addEventListener('click', nrrHandleAccountBodyClick);
-  document.getElementById('nrr-account-body').addEventListener('change', function (e) {
-    if (e.target.name === 'nrr-excl-scope') {
-      var form = e.target.closest('.nrr-exclusion-form');
-      var select = form && form.querySelector('.nrr-exclusion-outlet-select');
-      if (select) select.disabled = e.target.value !== 'outlet';
-    }
-  });
   document.getElementById('nrr-otip-backdrop').addEventListener('click', nrrCloseAccountOutletTip);
   var _waiversBody = document.getElementById('nrr-waivers-body');
   if (_waiversBody && typeof nrrHandleWaiversClick === 'function') _waiversBody.addEventListener('click', nrrHandleWaiversClick);
@@ -8542,7 +8299,6 @@ async function nrrInitApp() {
 
   await nrrRefresh(false);
   nrrHandleRoute();
-  if (_bootLoader) _bootLoader.style.display = 'none';
 }
 
 // ── Portfolio layer view (Phase B, 2026-07-09) ───────────────────────────
@@ -8882,7 +8638,7 @@ function nrrHandlePortfolioChange(e) {
 // loaded — the router can't know account→KAM mapping until data arrives,
 // so the check happens once that data is in hand (see nrr_router.js's own
 // comment, which anticipated exactly this).
-var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [], monthFilter: null, exclusionFormOpen: false, exclusionFormError: null };
+var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [], monthFilter: null, exclusionFormOpen: false };
 
 // Shaped like the real page (mast/hero/stat-row/two lists), not one flat
 // bar — the fetch chain here includes bulk_price.csv (36MB) so this can
@@ -8931,7 +8687,6 @@ function nrrRenderAccountView(route) {
     nrrAccountState.branchFilter = [];
     nrrAccountState.monthFilter = null;
     nrrAccountState.exclusionFormOpen = false;
-    nrrAccountState.exclusionFormError = null;
 
     Promise.all([
       nrrFetchSenseSkusCsv(row.kam_email), nrrFetchSenseSkuOutletCsv(row.kam_email),
@@ -8974,28 +8729,11 @@ function nrrAccountHeaderHtml(row) {
 // admin review UI has been retired in favor of #/waivers). This badge is
 // the "clear UI showing which months/accounts were adjusted and why"
 // requirement — same visual convention as the stale-data banners above.
-// De-duplicated {outlet_id, outlet_name} list for one account, from the
-// same window.bulkOutletsData.byAccountId source nrrOutletMovement (Account
-// view's branch-filter drawer) already reads — reused here so the waiver
-// request form's outlet picker shows the same names/ids the rest of this
-// page already uses, not a re-derived source that could drift.
-function _nrrOutletOptionsForAccount(accountId) {
-  var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
-  var seen = {}; var out = [];
-  rows.forEach(function (r) {
-    if (seen[r.outlet_id]) return;
-    seen[r.outlet_id] = true;
-    out.push({ outlet_id: r.outlet_id, outlet_name: r.outlet_name || r.outlet_id });
-  });
-  return out;
-}
-
 function nrrExclusionBadgeHtml(row) {
   if (nrrExclusionsAvailable === false) return '';
   var rows = nrrExclusionsForAccount(row.account_id);
-  var currentPeriod = nrrExclusionCurrentPeriod();
-  var outletNames = {};
-  _nrrOutletOptionsForAccount(row.account_id).forEach(function (o) { outletNames[o.outlet_id] = o.outlet_name; });
+  var kamResult = nrrKamResult(row.kam_email);
+  var currentPeriod = nrrCurrentPeriod(kamResult);
 
   var banners = rows
     .filter(function (x) { return x.status === 'approved' || x.status === 'submitted'; })
@@ -9003,29 +8741,26 @@ function nrrExclusionBadgeHtml(row) {
     .map(function (x) {
       var monthLabel = QNRR_CFG.months_th[x.period_month] || x.period_month;
       var reasonLabel = nrrExclusionReasonLabel(x.reason_code);
-      var scopeLabel = x.outlet_id ? (' (เฉพาะสาขา ' + nrrEsc(outletNames[x.outlet_id] || x.outlet_id) + ')') : '';
       if (x.status === 'approved') {
-        return '<div class="nrr-exclusion-banner approved">NRR ปรับสำหรับ ' + nrrEsc(monthLabel) + scopeLabel +
+        return '<div class="nrr-exclusion-banner approved">NRR ปรับสำหรับ ' + nrrEsc(monthLabel) +
           ' · เหตุผล: ' + nrrEsc(reasonLabel) + '</div>';
       }
-      return '<div class="nrr-exclusion-banner pending">รออนุมัติ — ขอยกเว้น NRR เดือน ' + nrrEsc(monthLabel) + scopeLabel +
+      return '<div class="nrr-exclusion-banner pending">รออนุมัติ — ขอยกเว้น NRR เดือน ' + nrrEsc(monthLabel) +
         ' · เหตุผล: ' + nrrEsc(reasonLabel) + '</div>';
     }).join('');
 
   var canRequest = nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin') && !!currentPeriod;
   var control = '';
   if (canRequest) {
+    var hasCurrentReq = rows.some(function (x) { return x.period_month === currentPeriod && x.status !== 'rejected'; });
     if (nrrAccountState.exclusionFormOpen) {
       control = nrrExclusionFormHtml(row, currentPeriod);
-    } else if (nrrIsPeriodLocked(currentPeriod)) {
-      control = '<div class="micro" style="color:var(--ink3);margin-top:4px">เดือน ' + nrrEsc(QNRR_CFG.months_th[currentPeriod] || currentPeriod) + ' Lock แล้ว — ขอยกเว้นย้อนหลังไม่ได้</div>';
-    } else {
-      // Whether a request already exists for THIS scope (whole-account, or
-      // this exact outlet) is re-checked at submit time against the
-      // specific scope chosen in the form -- a different outlet under the
-      // same account can still get its own waiver even if one outlet (or
-      // the whole account) already has a request this month.
-      control = '<button class="nrr-exclusion-request-btn" data-action="nrr-excl-open">ขอยกเว้น NRR เดือนนี้</button>';
+    } else if (!hasCurrentReq) {
+      if (nrrIsPeriodLocked(currentPeriod)) {
+        control = '<div class="micro" style="color:var(--ink3);margin-top:4px">เดือน ' + nrrEsc(QNRR_CFG.months_th[currentPeriod] || currentPeriod) + ' Lock แล้ว — ขอยกเว้นย้อนหลังไม่ได้</div>';
+      } else {
+        control = '<button class="nrr-exclusion-request-btn" data-action="nrr-excl-open">ขอยกเว้น NRR เดือนนี้</button>';
+      }
     }
   }
 
@@ -9037,24 +8772,10 @@ function nrrExclusionFormHtml(row, currentPeriod) {
   var options = NRR_EXCLUSION_REASONS.map(function (r, i) {
     return '<label class="nrr-exclusion-reason-opt"><input type="radio" name="nrr-excl-reason" value="' + r.code + '"' + (i === 0 ? ' checked' : '') + '> ' + nrrEsc(r.label) + '</label>';
   }).join('');
-  var outlets = _nrrOutletOptionsForAccount(row.account_id);
-  var outletOptions = outlets.map(function (o) {
-    return '<option value="' + nrrEsc(o.outlet_id) + '">' + nrrEsc(o.outlet_name) + '</option>';
-  }).join('');
-  var err = nrrAccountState.exclusionFormError;
   return '<div class="nrr-exclusion-form">' +
-    '<div class="micro" style="margin-bottom:6px">ขอยกเว้น NRR เดือน ' + nrrEsc(QNRR_CFG.months_th[currentPeriod] || currentPeriod) + '</div>' +
-    '<div class="nrr-exclusion-scope">' +
-    '<label class="nrr-exclusion-reason-opt"><input type="radio" name="nrr-excl-scope" value="account" checked> ทั้ง account</label>' +
-    (outlets.length
-      ? '<label class="nrr-exclusion-reason-opt"><input type="radio" name="nrr-excl-scope" value="outlet"> เฉพาะสาขา:</label>' +
-        '<select class="nrr-exclusion-outlet-select" disabled>' + outletOptions + '</select>'
-      : '') +
-    '</div>' +
-    '<div class="micro" style="margin:8px 0 6px">เลือกเหตุผล</div>' +
+    '<div class="micro" style="margin-bottom:6px">ขอยกเว้น NRR เดือน ' + nrrEsc(QNRR_CFG.months_th[currentPeriod] || currentPeriod) + ' — เลือกเหตุผล</div>' +
     '<div class="nrr-exclusion-reasons">' + options + '</div>' +
     '<textarea class="nrr-exclusion-note" placeholder="หมายเหตุ (ถ้ามี)" rows="2"></textarea>' +
-    (err ? '<div class="micro" style="color:var(--coral);margin-bottom:8px">' + nrrEsc(err) + '</div>' : '') +
     '<div class="nrr-exclusion-form-actions">' +
     '<button class="nrr-exclusion-cancel-btn" data-action="nrr-excl-cancel">ยกเลิก</button>' +
     '<button class="nrr-exclusion-submit-btn" data-action="nrr-excl-submit">ส่งคำขอ</button>' +
@@ -9075,35 +8796,27 @@ function nrrHandleExclusionAction(actionEl, row) {
   var action = actionEl.dataset.action;
   if (action === 'nrr-excl-open') {
     nrrAccountState.exclusionFormOpen = true;
-    nrrAccountState.exclusionFormError = null;
     _nrrRerenderExclusionBadge(row);
   } else if (action === 'nrr-excl-cancel') {
     nrrAccountState.exclusionFormOpen = false;
-    nrrAccountState.exclusionFormError = null;
     _nrrRerenderExclusionBadge(row);
   } else if (action === 'nrr-excl-submit') {
     var formEl = actionEl.closest('.nrr-exclusion-form');
     var checked = formEl && formEl.querySelector('input[name="nrr-excl-reason"]:checked');
-    var scopeChecked = formEl && formEl.querySelector('input[name="nrr-excl-scope"]:checked');
-    var outletSelect = formEl && formEl.querySelector('.nrr-exclusion-outlet-select');
-    var outletId = (scopeChecked && scopeChecked.value === 'outlet' && outletSelect) ? outletSelect.value : null;
     var noteEl = formEl && formEl.querySelector('.nrr-exclusion-note');
-    var currentPeriod = nrrExclusionCurrentPeriod();
+    var kamResult = nrrKamResult(row.kam_email);
+    var currentPeriod = nrrCurrentPeriod(kamResult);
     var pace = nrrPaceSignal(row);
     actionEl.disabled = true;
     nrrRequestExclusion(row.account_id, currentPeriod, checked ? checked.value : NRR_EXCLUSION_REASONS[0].code,
-      noteEl ? noteEl.value.trim() : '', row.kam_email, row.tl_email, pace ? pace.baseline_gmv : null, outletId
+      noteEl ? noteEl.value.trim() : '', row.kam_email, row.tl_email, pace ? pace.baseline_gmv : null
     ).then(function (res) {
-      if (res.ok) {
-        nrrAccountState.exclusionFormOpen = false;
-        nrrAccountState.exclusionFormError = null;
-      } else {
-        // Keep the form open with the note/reason still filled in so the TL
-        // isn't left thinking the request went through silently -- /nrr has
-        // no toast/notification system to surface this any other way.
-        nrrAccountState.exclusionFormError = res.error === 'period_locked' ? 'เดือนนี้ Lock แล้ว ไม่สามารถขอยกเว้นได้'
+      nrrAccountState.exclusionFormOpen = false;
+      if (!res.ok) {
+        var msg = res.error === 'period_locked' ? 'เดือนนี้ Lock แล้ว ไม่สามารถขอยกเว้นได้'
           : res.error === 'already_requested' ? 'มีคำขอสำหรับเดือนนี้อยู่แล้ว'
           : 'ส่งคำขอไม่สำเร็จ: ' + (res.error || '');
+        if (typeof nrrToast === 'function') nrrToast(msg); else console.warn(msg);
       }
       _nrrRerenderExclusionBadge(row);
     });
@@ -10060,13 +9773,7 @@ function nrrShellHtml() {
     '  <div class="nrr-masthead-actions">' +
     '    <span class="meta nrr-month-capsule" id="nrr-month-capsule">—</span>' +
     '    <span class="micro" id="nrr-sync-status">—</span>' +
-    (nrrProfile
-      ? '    <span class="nrr-profile-chip" title="' + nrrEsc(nrrProfile.email) + '">' +
-        '<span class="nrr-profile-dot"></span>' + nrrEsc(nrrProfile.name) +
-        '<span class="nrr-profile-role">' + nrrEsc(nrrRoleLabel(nrrProfile.role)) + '</span></span>'
-      : '') +
     '    <button class="btn-secondary" id="nrr-refresh-btn">รีเฟรช</button>' +
-    '    <button class="btn-secondary" id="nrr-logout-btn" onclick="nrrDoLogout()">ออกจากระบบ</button>' +
     '  </div>' +
     '</div>' +
     '<div class="nrr-view" id="nrr-view-dashboard">' +
@@ -10479,14 +10186,9 @@ function nrrRenderKamLeaderboard() {
   tbody.innerHTML = kams.map(function (k, i) {
     var kamResult = nrrKamResult(k.kam_email);
     var triple = nrrMonthTriple(kamResult, k.period);
-    var kamBm = kamResult && kamResult.by_month ? kamResult.by_month[k.period] : null;
-    var waivedCount = (kamBm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(kamBm.rows, k.period) : 0;
-    var waivedTag = waivedCount > 0
-      ? '<span class="tag muted" style="margin-left:4px" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>'
-      : '';
     return '<tr data-email="' + nrrEsc(k.kam_email) + '" data-period="' + nrrEsc(k.period) + '" data-name="' + nrrEsc(k.kam_name.toLowerCase()) + '" style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row">' +
       '<td>' + nrrEsc(k.kam_name) + '</td>' +
-      '<td class="num-cell" style="color:' + nrrThresholdColorVar(k.nrr_pct) + '">' + nrrFmtPct(k.nrr_pct) + waivedTag + '</td>' +
+      '<td class="num-cell" style="color:' + nrrThresholdColorVar(k.nrr_pct) + '">' + nrrFmtPct(k.nrr_pct) + '</td>' +
       '<td>' + nrrTripleHtml('md', triple) + '</td>' +
       '<td class="num-cell">' + k.outlet_count + '</td>' +
       '</tr>';

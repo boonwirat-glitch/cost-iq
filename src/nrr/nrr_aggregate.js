@@ -100,7 +100,11 @@ function nrrTeamComparison() {
       tl_email: t.email,
       tl_name: t.name,
       nrr_pct: bm ? bm.nrr_pct : null,
-      base_gmv: result ? Math.round(result.base_norm * nrrBaseDays()) : 0,
+      // v865 (waived-account feature): effective_base_norm is per-month (net
+      // of any waived account for THIS period) -- base_norm alone is the
+      // quarter-wide figure and would show a "ฐาน" number inconsistent with
+      // the %NRR right next to it once a waiver is approved.
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm) * nrrBaseDays()) : 0,
       outlet_count: outletCount,
       delta_vs_org: (bm && bm.nrr_pct != null && orgPct != null) ? bm.nrr_pct - orgPct : null,
       period: period,
@@ -154,7 +158,7 @@ function nrrKamRowsForTeam(tlEmail, period) {
       kam_email: k.email,
       kam_name: k.name,
       nrr_pct: bm ? bm.nrr_pct : null,
-      base_gmv: kamResult ? Math.round(kamResult.base_norm * nrrBaseDays()) : 0,
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : kamResult.base_norm) * nrrBaseDays()) : 0,
       outlet_count: outlets.length,
       period: kamPeriod,
       outlets: outlets
@@ -205,7 +209,7 @@ function nrrMonthTriple(result, month) {
     mtd += parseFloat(r.curr_gmv) || 0;
   });
   return {
-    base: Math.round(result.base_norm * nrrBaseDays()),
+    base: Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm) * nrrBaseDays()),
     mtd: Math.round(mtd),
     run_rate: Math.round(bm.total_gmv || 0),
     curr_days: bm.curr_days,
@@ -658,8 +662,9 @@ window.nrrHandoverCohorts = nrrHandoverCohorts;
 function nrrTotalPortfolio() {
   var kam = nrrOrgResult();
   var kamPeriod = nrrCurrentPeriod(kam);
-  var kamPct = kam && kamPeriod ? kam.by_month[kamPeriod].nrr_pct : null;
-  var kamGmv = kam ? Math.round(kam.base_norm * nrrBaseDays()) : 0;
+  var kamBm = kam && kamPeriod ? kam.by_month[kamPeriod] : null;
+  var kamPct = kamBm ? kamBm.nrr_pct : null;
+  var kamGmv = kam ? Math.round((kamBm && kamBm.effective_base_norm != null ? kamBm.effective_base_norm : kam.base_norm) * nrrBaseDays()) : 0;
 
   var pm = nrrPmResult();
   var pmPct = _nrrBlendedBucketPct(pm);
@@ -692,8 +697,9 @@ function _nrrBlendedBucketPct(bucketResult) {
     var period = nrrCurrentPeriod(r);
     var bm = period ? r.by_month[period] : null;
     if (!bm || bm.nrr_pct == null) return;
-    den += r.base_norm;
-    num += (bm.nrr_pct / 100) * r.base_norm;
+    var w = bm.effective_base_norm != null ? bm.effective_base_norm : r.base_norm;
+    den += w;
+    num += (bm.nrr_pct / 100) * w;
   });
   return den > 0 ? Math.round(num / den * 100) : null;
 }
@@ -704,7 +710,10 @@ function _nrrBlendedBucketGmv(bucketResult) {
   var total = 0;
   buckets.forEach(function (b) {
     var r = bucketResult[b];
-    if (r) total += Math.round(r.base_norm * nrrBaseDays());
+    if (!r) return;
+    var period = nrrCurrentPeriod(r);
+    var bm = period ? r.by_month[period] : null;
+    total += Math.round((bm && bm.effective_base_norm != null ? bm.effective_base_norm : r.base_norm) * nrrBaseDays());
   });
   return total;
 }

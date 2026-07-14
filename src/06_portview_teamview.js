@@ -2429,8 +2429,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
-    const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
-    const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
+    // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
+    // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
+    // button was already a dead no-op click in production.
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
@@ -2439,7 +2440,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       <div class="tv-full-bar"><div class="tv-full-fill ${g.paceCls}" style="width:${Math.min(g.pace||0,100)}%"></div></div>
       <div class="tv-full-meta">
         <div class="tv-risk-chips">${chips}${nrrPill}</div>
-        ${rrStr}${exclBtn}
+        ${rrStr}
       </div>
     </div>`;
   }
@@ -2461,8 +2462,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
-    const worst=(g.accounts||[]).find(a=>a.paceSignal&&(a.paceSignal.cls==='danger'||a.paceSignal.cls==='warn')) || (g.accounts||[])[0] || {};
-    const exclBtn=`<button class="tgt-excl-request-btn tv-card-exclude" onclick="event.stopPropagation();openNrrExclusionSheetFromKam('${g.kamEmail||''}','${worst.id||''}','${(worst.name||g.kamName||'').replace(/'/g,'')}','${worst.paceSignal?.baselineGmv||g.baseline||0}','${worst.tlEmail||''}')">ขอ exclude</button>`;
+    // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
+    // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
+    // button was already a dead no-op click in production.
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
@@ -2474,7 +2476,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       <div class="tv-star-bar"><div class="tv-star-fill" style="width:${Math.min(g.pace,100)}%"></div></div>
       <div class="tv-full-meta">
         <div class="tv-risk-chips">${chips}${nrrPill}</div>
-        ${rrStr}${exclBtn}
+        ${rrStr}
       </div>
     </div>`;
   }

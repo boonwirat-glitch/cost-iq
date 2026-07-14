@@ -145,7 +145,6 @@
 ║   id="scr-teamview"               Teamview (TL/Admin)                       ║
 ║   id="verifySheet"                SKU Verify sheet                           ║
 ║   id="sense-gate"                 Sense Gate overlay                         ║
-║   id="nrr-excl-overlay"           NRR Exclusion sheet                        ║
 ║   id="commission-cockpit-overlay" Commission Cockpit sheet                   ║
 ║                                                                              ║
 ║  MAIN SCRIPT SECTIONS (grep "SECTION:" to jump)                              ║
@@ -195,7 +194,7 @@
 ║   SECTION:COMMISSION_CORE     _commDefaultTiers, _commGetDraft,              ║
 ║                               _commRulesForRole, _commMatchTierByCode        ║
 ║   SECTION:COMMISSION_PREVIEW  _commBuildPreviewModel, _commBuildSnapshotRows ║
-║   SECTION:NRR_EXCLUSIONS      _nrrGovernedPct, submitNrrExclusionRequest     ║
+║   SECTION:NRR_EXCLUSIONS      _nrrGovernedPct, _nrrAccountWaivedForPeriod    ║
 ║   SECTION:COMMISSION_KAM_SELF _commBuildKamSelfState, _commRenderKamSelfStrip║
 ║   SECTION:SNAPSHOT_LOCK       lockCommissionSnapshot, exportCommissionSnapshotCsv║
 ║   SECTION:COMMISSION_COCKPIT  openCommissionCockpit, renderCommissionCockpit ║
@@ -255,11 +254,11 @@
 ║   callAI()                  SECTION:AI_CLIENT                               ║
 ║                                                                              ║
 ║  COMMISSION FEATURE MAP (governance-grade — all in target-module-js)         ║
-║   HTML:  id="commission-cockpit-overlay"  id="nrr-excl-overlay"             ║
-║   CSS:   grep ".comm-\|.pv-comm\|.tgt-excl" in <style> block               ║
+║   HTML:  id="commission-cockpit-overlay"                                    ║
+║   CSS:   grep ".comm-\|.pv-comm" in <style> block                          ║
 ║   JS:    grep "SECTION:COMMISSION\|SECTION:NRR\|SECTION:SNAPSHOT"          ║
 ║   DB:    commission_rules, commission_assignments,                           ║
-║          commission_snapshots, nrr_exclusion_requests                        ║
+║          commission_snapshots, nrr_exclusions (request/approve UI: /nrr)     ║
 ║                                                                              ║
 ║  DEAD CODE                                                                   ║
 ║   grep "UNUSED" -> 7 functions (no callers): libDelClick, retryMatcherItem,  ║
@@ -3721,7 +3720,6 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <button class="tgt-tab-btn" id="tgt-tab-policy" onclick="switchTargetTab('policy')">NRR Policy</button>
 <button class="tgt-tab-btn" id="tgt-tab-rules" onclick="switchTargetTab('rules')">Payout Rules</button>
 <button class="tgt-tab-btn" id="tgt-tab-preview" onclick="switchTargetTab('preview')">Preview</button>
-<button class="tgt-tab-btn" id="tgt-tab-exclusions" onclick="switchTargetTab('exclusions')">Exclusions</button>
 <button class="tgt-tab-btn" id="tgt-tab-lock" onclick="switchTargetTab('lock')">Lock</button>
 </div>
 <div class="tgt-sheet-body" id="tgt-sheet-body">

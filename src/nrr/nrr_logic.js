@@ -20,6 +20,13 @@
 // fix is applied in src/07c_qnrr_view.js (v852) — both engines are in sync.
 // Details: docs/handoff-2026-07-08-nrr-transfer-in-fix.md
 //
+// NOTE (2026-07-14, waived-account feature): a deliberate, CONFIRMED
+// exception to the "do not fix independently" rule above — this is a real
+// feature addition (waived-account NRR exclusion), not an unreviewed bug
+// fix, applied in lockstep with the identical diff in
+// src/07c_qnrr_view.js's _qnrrCompute in the same commit. See
+// nrr_exclusions.js for nrrAccountWaivedForPeriod().
+//
 // Consumes window.bulkQnrrData, built by nrr_data.js in the exact same shape
 // Sense itself builds it in (src/02_data_pipeline.js, bulk-qnrr-single
 // handler): { byKamEmail:{email:[row]}, byTlEmail:{email:[row]}, allRows:[],
@@ -134,7 +141,7 @@ function _qnrrCompute(kamEmail, scope) {
     // base — it was this scope's outlet in the base month already.
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
         && _effectiveMovement(r) !== 'transfer_in') {
-      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
+      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });
 
@@ -234,7 +241,14 @@ function _qnrrCompute(kamEmail, scope) {
         core_nrr_base_sum += (parseFloat(r.base_gmv) || 0) / base_d * 30;
       }
 
-      if ((mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
+      // Waived accounts (nrr_exclusions, approved for this exact
+      // period_month) still count toward GMV/segments/outlets above — only
+      // excluded from the NRR numerator (here) and denominator
+      // (effectiveBaseNorm below).
+      var waived = typeof nrrAccountWaivedForPeriod === 'function' &&
+        nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+
+      if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days = r.curr_days || 30;
@@ -246,7 +260,7 @@ function _qnrrCompute(kamEmail, scope) {
       // unchanged base (comeback outlets have base_gmv=0 by definition —
       // never in baseMap, never touch the denominator). Intentionally
       // asymmetric with transfer_in, which adds to BOTH sides.
-      if (mv === 'comeback') {
+      if (!waived && mv === 'comeback') {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days_cb = r.curr_days || 30;
@@ -255,7 +269,20 @@ function _qnrrCompute(kamEmail, scope) {
       }
     });
 
-    var nrr_pct = base_norm > 0 ? Math.round(nrr_curr_norm / base_norm * 100) : null;
+    // Waived-account base contribution removed per-month (unlike
+    // transfer_out/in, which are quarter-wide and already baked into
+    // base_norm above) — a waiver applies to one specific month only.
+    var effectiveBaseNorm = base_norm;
+    if (typeof nrrAccountWaivedForPeriod === 'function') {
+      Object.keys(baseMap).forEach(function (oid) {
+        var b = baseMap[oid];
+        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+          effectiveBaseNorm -= (b.gmv / b.days);
+        }
+      });
+    }
+
+    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100) : null;
 
     var total_gmv = MOVEMENTS
       .filter(function (m) { return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
@@ -270,7 +297,7 @@ function _qnrrCompute(kamEmail, scope) {
     var isPartial   = curr_days > 0 && curr_days < daysInMonth - 2;
 
     by_month[month] = {
-      nrr_pct: nrr_pct, total_gmv: total_gmv, segments: segments, outlets: outlets,
+      nrr_pct: nrr_pct, effective_base_norm: effectiveBaseNorm, total_gmv: total_gmv, segments: segments, outlets: outlets,
       rows: monthRows, curr_days: curr_days, days_in_month: daysInMonth,
       is_partial: isPartial, core_nrr_base: core_nrr_base_sum, contraction: contraction
     };
@@ -352,7 +379,7 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     // transfer_in rows too, so the pool base double-counts identically.
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
         && effMv(r) !== 'transfer_in') {
-      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31 };
+      baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });
 
@@ -419,19 +446,32 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
       segments[mv] = (segments[mv] || 0) + gmvVal;
       outlets[mv] = (outlets[mv] || 0) + 1;
 
-      if ((mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
+      var waived = typeof nrrAccountWaivedForPeriod === 'function' &&
+        nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
+
+      if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           nrr_curr_norm += r.curr_days > 0 ? r.curr_gmv / r.curr_days : 0;
         }
       }
-      if (mv === 'comeback' && !seenOutlets[r.outlet_id]) {
+      if (!waived && mv === 'comeback' && !seenOutlets[r.outlet_id]) {
         seenOutlets[r.outlet_id] = true;
         nrr_curr_norm += r.curr_days > 0 ? r.curr_gmv / r.curr_days : 0;
       }
     });
 
-    var nrr_pct = base_norm > 0 ? Math.round(nrr_curr_norm / base_norm * 100) : null;
+    var effectiveBaseNorm = base_norm;
+    if (typeof nrrAccountWaivedForPeriod === 'function') {
+      Object.keys(baseMap).forEach(function (oid) {
+        var b = baseMap[oid];
+        if (b.account_id && nrrAccountWaivedForPeriod(b.account_id, month, oid)) {
+          effectiveBaseNorm -= (b.gmv / b.days);
+        }
+      });
+    }
+
+    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100) : null;
 
     // v4 additive fields mirroring _qnrrCompute's month block, so the
     // shared movement chart/table + expansion components can consume both
@@ -446,7 +486,7 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     var isPartial = curr_days > 0 && curr_days < daysInMonth - 2;
 
     by_month[month] = {
-      nrr_pct: nrr_pct, segments: segments, outlets: outlets,
+      nrr_pct: nrr_pct, effective_base_norm: effectiveBaseNorm, segments: segments, outlets: outlets,
       rows: monthRows, total_gmv: total_gmv,
       curr_days: curr_days, days_in_month: daysInMonth, is_partial: isPartial
     };

@@ -21,8 +21,7 @@ function ensureCommissionCockpitOverlay() {
         <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
         <button class="comm-step" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">2 Assignment</button>
         <button class="comm-step" id="comm-step-rules" onclick="switchCommissionStep('rules')">3 Rules</button>
-        <button class="comm-step" id="comm-step-exceptions" onclick="switchCommissionStep('exceptions')">4 Exceptions</button>
-        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">5 Preview<br>& Lock</button>
+        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">4 Preview<br>& Lock</button>
       </div>
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
@@ -74,7 +73,7 @@ window.openCommissionCockpit = openCommissionCockpit;
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
-    const step = btn.classList.contains('commission-open') ? (btn.textContent && btn.textContent.includes('Review') ? 'exceptions' : 'lock') : 'lock';
+    const step = 'lock'; // v865: 'exceptions' step (NRR Exclusion Governance) retired -- see nrr_waivers.js in /nrr
     if (typeof window.openCommissionCockpit === 'function') window.openCommissionCockpit(step);
   }, true);
 })();
@@ -253,7 +252,6 @@ function renderCommissionCockpit() {
   if (_commCockpitStep === 'policy') out = renderCommPolicyStep(body);
   else if (_commCockpitStep === 'assignment') out = renderCommAssignmentStep(body);
   else if (_commCockpitStep === 'rules') out = renderCommRulesStep(body);
-  else if (_commCockpitStep === 'exceptions') out = renderCommExceptionsStep(body);
   else out = renderCommLockStep(body);
   _commLastRenderedStep = _commCockpitStep;
   _commUpdateSaveButtonState();
@@ -810,19 +808,6 @@ Archive ต่อหรือไม่? หลัง archive rule นี้จ�
   }
 }
 
-function renderCommExceptionsStep(body) {
-  _nrrExclusionView = _nrrExclusionView || 'pending';
-  const savedBody = document.getElementById('tgt-sheet-body');
-  // Render a clean, embedded copy instead of reusing the old target body.
-  const current = _nrrExclusionCurrentPeriod();
-  const rows = (_nrrExclusions || []).filter(r => r.period_month === current);
-  const pending = rows.filter(r => r.status === 'submitted' || r.status === 'pending');
-  const approved = rows.filter(r => r.status === 'approved');
-  body.innerHTML = `
-    <div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">4. Review Exceptions</div><div class="comm-hero-sub">Approved เท่านั้นที่กระทบ Governed NRR และ payout preview</div></div><span class="comm-badge ${pending.length?'warn':'ok'}">${pending.length} pending</span></div>
-    <div class="comm-kpis"><div class="comm-kpi"><div class="comm-kpi-lbl">Pending</div><div class="comm-kpi-val">${pending.length}</div></div><div class="comm-kpi"><div class="comm-kpi-lbl">Approved</div><div class="comm-kpi-val">${approved.length}</div></div><div class="comm-kpi"><div class="comm-kpi-lbl">Base impact</div><div class="comm-kpi-val">${_tgtFmtM(approved.reduce((s,r)=>s+Number(r.base_gmv||r.estimated_base_gmv||0),0))}</div></div></div></div>
-    ${rows.length ? rows.map(r=>_renderNrrExclusionCard(r,(currentUserProfile&&currentUserProfile.role)==='admin')).join('') : `<div class="comm-empty">ยังไม่มี exception request</div>`}`;
-}
 function renderCommLockStep(body) {
   const model = _commBuildPreviewModel();
   const teams = _commBuildTeamPreviewGroups();
@@ -1171,147 +1156,6 @@ function renderCommissionLockTab() {
     <div class="tgt-rule-note">Compute = บันทึก draft · Lock = confirm final · Export ดึงจาก stored rows ไม่ recompute</div>
     </div>
   `;
-}
-
-
-function renderNrrExclusionsTab() {
-  const body = document.getElementById('tgt-sheet-body');
-  if (!body) return;
-  const role = (currentUserProfile && currentUserProfile.role) || '';
-  const isAdmin = role === 'admin';
-  const current = _nrrExclusionCurrentPeriod();
-  const rows = (_nrrExclusions || []).filter(r => !current || r.period_month === current);
-  const filtered = rows.filter(r => {
-    if (_nrrExclusionView === 'pending') return r.status === 'submitted' || r.status === 'pending';
-    if (_nrrExclusionView === 'approved') return r.status === 'approved';
-    if (_nrrExclusionView === 'rejected') return r.status === 'rejected';
-    return true;
-  });
-  const pendingCount = rows.filter(r => r.status === 'submitted' || r.status === 'pending').length;
-  const approvedCount = rows.filter(r => r.status === 'approved').length;
-  const impact = rows.filter(r => r.status === 'approved').reduce((s,r)=>s+Number(r.base_gmv || r.estimated_base_gmv || 0),0);
-  body.innerHTML = `
-    <div class="tgt-excl-head">
-      <div>
-        <div class="tgt-excl-title">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(240,176,0,.9)" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-          NRR Exclusion Governance
-        </div>
-        <div class="tgt-excl-sub">TL request ได้ แต่ Admin เท่านั้นที่ approve/reject แล้วจึงกระทบ Governed NRR</div>
-      </div>
-      <span class="tgt-rule-pill">${_nrrGovMonthLabel(current)}</span>
-    </div>
-    <div class="tgt-preview-grid" style="margin-bottom:12px">
-      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Pending</div><div class="tgt-preview-kpi-val">${pendingCount}</div></div>
-      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Approved</div><div class="tgt-preview-kpi-val">${approvedCount}</div></div>
-      <div class="tgt-preview-kpi"><div class="tgt-preview-kpi-label">Base impact</div><div class="tgt-preview-kpi-val">${_tgtFmtM(impact)}</div></div>
-    </div>
-    <div class="tgt-excl-tabs">
-      ${['pending','approved','rejected','all'].map(v=>`<button class="tgt-excl-tab ${_nrrExclusionView===v?'active':''}" onclick="setNrrExclusionView('${v}')">${v==='pending'?'Pending':v==='approved'?'Approved':v==='rejected'?'Rejected':'All'}</button>`).join('')}
-    </div>
-    ${filtered.length ? filtered.map(r=>_renderNrrExclusionCard(r,isAdmin)).join('') : `<div class="tgt-preview-empty">ไม่มีรายการในสถานะนี้</div>`}
-    <div class="tgt-rule-note">ตอนนี้ใช้ base impact จาก request estimate ก่อน รอบ lock จะสร้าง immutable snapshot แยกต่างหาก</div>
-  `;
-}
-function _renderNrrExclusionCard(r, isAdmin) {
-  const status = r.status === 'pending' ? 'submitted' : r.status;
-  const base = Number(r.base_gmv || r.estimated_base_gmv || 0);
-  const payoutImpact = 0; // precise payout delta will be calculated at snapshot phase
-  return `<div class="tgt-excl-card ${status === 'submitted' ? 'pending' : status}">
-    <div class="tgt-excl-top">
-      <div>
-        <div class="tgt-excl-name">${r.account_id || 'Account'} ${r.outlet_id ? '· '+r.outlet_id : ''}</div>
-        <div class="tgt-excl-meta">${_nrrReasonLabel(r.reason_code)} · KAM ${r.target_kam_email || '—'} · TL ${r.target_tl_email || '—'}</div>
-      </div>
-      <span class="tgt-excl-status ${status === 'submitted' ? 'pending' : status}">${_nrrExclusionStatusLabel(status)}</span>
-    </div>
-    ${r.reason_text ? `<div class="tgt-excl-meta" style="margin-top:7px">${r.reason_text}</div>` : ''}
-    <div class="tgt-excl-impact">
-      <span class="tgt-excl-chip">Base ${_tgtFmtM(base)}</span>
-      <span class="tgt-excl-chip good">Governed NRR impact after approval</span>
-      <span class="tgt-excl-chip money">Payout impact calculated in preview</span>
-    </div>
-    ${isAdmin && status === 'submitted' ? `<div class="tgt-excl-actions">
-      <button class="tgt-excl-action approve" onclick="reviewNrrExclusion('${r.id}','approved')">Approve</button>
-      <button class="tgt-excl-action reject" onclick="reviewNrrExclusion('${r.id}','rejected')">Reject</button>
-    </div>` : ''}
-  </div>`;
-}
-function setNrrExclusionView(v) {
-  _nrrExclusionView = v;
-  renderNrrExclusionsTab();
-}
-function openNrrExclusionSheetFromKam(kamEmail, accountId, accountName, baseGmv, tlEmail) {
-  _nrrExclusionDraft = {
-    period_month: _nrrExclusionCurrentPeriod(),
-    account_id: accountId || accountName || '',
-    account_name: accountName || accountId || '',
-    target_kam_email: kamEmail || '',
-    target_tl_email: tlEmail || '',
-    base_gmv: Number(baseGmv || 0)
-  };
-  const ov = document.getElementById('nrr-excl-overlay');
-  const acc = document.getElementById('nrr-excl-account');
-  const note = document.getElementById('nrr-excl-note');
-  const reason = document.getElementById('nrr-excl-reason');
-  if (acc) acc.value = `${_nrrExclusionDraft.account_name || _nrrExclusionDraft.account_id} · base ${_tgtFmtM(_nrrExclusionDraft.base_gmv)}`;
-  if (note) note.value = '';
-  if (reason) reason.value = 'closed_business';
-  if (ov) ov.classList.add('open');
-}
-function closeNrrExclusionSheet() {
-  const ov = document.getElementById('nrr-excl-overlay');
-  if (ov) ov.classList.remove('open');
-  _nrrExclusionDraft = null;
-}
-async function submitNrrExclusionRequest() {
-  if (!_nrrExclusionDraft) return;
-  const reason = document.getElementById('nrr-excl-reason')?.value || 'other';
-  const note = document.getElementById('nrr-excl-note')?.value || '';
-  const actor = (currentUserProfile && currentUserProfile.email) || '';
-  const row = {
-    period_month: _nrrExclusionDraft.period_month,
-    account_id: _nrrExclusionDraft.account_id,
-    outlet_id: null,
-    applies_to: 'both',
-    target_kam_email: _nrrExclusionDraft.target_kam_email,
-    target_tl_email: _nrrExclusionDraft.target_tl_email,
-    reason_code: reason,
-    reason_text: note,
-    status: 'submitted',
-    requested_by: actor,
-    requested_at: new Date().toISOString(),
-    base_gmv: _nrrExclusionDraft.base_gmv,
-    estimated_base_gmv: _nrrExclusionDraft.base_gmv
-  };
-  try {
-    const { data, error } = await supa.from('nrr_exclusions').insert(row).select('*').single();
-    if (error) throw new Error(error.message);
-    _nrrExclusions.push(data || row);
-    closeNrrExclusionSheet();
-    if (typeof showToast === 'function') showToast('ส่งคำขอ exclusion แล้ว', 'ok');
-    try { renderTeamviewSummary(); renderTeamviewKamList(); } catch(e) {}
-  } catch (e) {
-    console.error('[NRR exclusion] submit failed:', e);
-    if (typeof showToast === 'function') showToast('ส่งคำขอไม่สำเร็จ: ' + (e.message || ''), '!');
-  }
-}
-async function reviewNrrExclusion(id, status) {
-  const actor = (currentUserProfile && currentUserProfile.email) || '';
-  try {
-    const { data, error } = await supa.from('nrr_exclusions')
-      .update({ status, reviewed_by: actor, reviewed_at: new Date().toISOString() })
-      .eq('id', id)
-      .select('*')
-      .single();
-    if (error) throw new Error(error.message);
-    _nrrExclusions = (_nrrExclusions || []).map(r => r.id === id ? (data || { ...r, status }) : r);
-    renderNrrExclusionsTab();
-    try { renderTeamviewSummary(); renderTeamviewKamList(); renderCommissionPreviewTab(); } catch(e) {}
-  } catch (e) {
-    console.error('[NRR exclusion] review failed:', e);
-    if (typeof showToast === 'function') showToast('อัปเดตไม่สำเร็จ: ' + (e.message || ''), '!');
-  }
 }
 
 

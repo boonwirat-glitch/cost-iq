@@ -20,6 +20,8 @@ bundler). Modules (inject order matters — dependencies before dependents):
   nrr_router.js      hash router (#/ dashboard · #/portfolio · #/account) + role guards
   nrr_aggregate.js   org/team/KAM/outlet rollups on top of nrr_logic
   nrr_commission.js  reads commission_payout_snapshots (no re-derivation)
+  nrr_exclusions.js  waived-account (NRR exclusion) request/approve + nrrAccountWaivedForPeriod predicate (nrr_logic.js calls into this)
+  nrr_waivers.js     #/waivers route — TL request history + Admin approve/reject queue
   nrr_portfolio.js   Portfolio layer pace/filter logic over window.bulkPortviewData (Phase B)
   nrr_account.js     Account view (#/account/:id) signal logic — SKU positive/cycle, AOV, outlet, category, price (Phase C)
   nrr_company.js     Company overview (#/company) + Sales pipeline (#/sales) views — admin-only (v28)
@@ -45,6 +47,8 @@ nrr_core         = read('src/nrr/nrr_core.js')
 nrr_router       = read('src/nrr/nrr_router.js')
 nrr_aggregate    = read('src/nrr/nrr_aggregate.js')
 nrr_commission   = read('src/nrr/nrr_commission.js')
+nrr_exclusions   = read('src/nrr/nrr_exclusions.js')
+nrr_waivers      = read('src/nrr/nrr_waivers.js')
 nrr_portfolio    = read('src/nrr/nrr_portfolio.js')
 nrr_account      = read('src/nrr/nrr_account.js')
 nrr_company      = read('src/nrr/nrr_company.js')
@@ -63,6 +67,8 @@ SLOTS = [
     ('<!-- INJECT_ROUTER -->',         nrr_router,          'script'),
     ('<!-- INJECT_AGGREGATE -->',      nrr_aggregate,       'script'),
     ('<!-- INJECT_COMMISSION -->',     nrr_commission,      'script'),
+    ('<!-- INJECT_EXCLUSIONS -->',     nrr_exclusions,      'script'),
+    ('<!-- INJECT_WAIVERS -->',        nrr_waivers,         'script'),
     ('<!-- INJECT_PORTFOLIO -->',      nrr_portfolio,       'script'),
     ('<!-- INJECT_ACCOUNT -->',        nrr_account,         'script'),
     ('<!-- INJECT_COMPANY -->',        nrr_company,         'script'),

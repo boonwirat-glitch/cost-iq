@@ -59,9 +59,7 @@ let _nrrGovPolicies = {};     // { "2026-07|all|all": {...} }
 let _nrrGovPending = {};      // { "2026-07|all|all": {...draft...} }
 let _commRuleConfig = {};     // { plans:{}, rules:{}, tiers:{} }
 let _commRulePending = {};    // editable payout rule draft by plan code
-let _nrrExclusions = [];       // loaded/requested NRR exclusions
-let _nrrExclusionDraft = null;
-let _nrrExclusionView = 'pending';
+let _nrrExclusions = [];       // loaded/requested NRR exclusions (request/approve UI lives in /nrr -- see nrr_waivers.js)
 let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supabase
 let _commCockpitStep = 'policy';
 let _commAssignmentPending = {}; // period|scope|assignee -> plan_code
@@ -939,7 +937,7 @@ async function loadTargets(quarter) {
 
   try {
     const { data: excl, error: exclErr } = await supa.from('nrr_exclusions')
-      .select('id,period_month,account_id,outlet_id,applies_to,target_kam_email,target_tl_email,reason_code,reason_text,status,requested_by,requested_at,reviewed_by,reviewed_at,review_note,base_gmv,estimated_base_gmv')
+      .select('id,period_month,account_id,outlet_id,target_kam_email,target_tl_email,reason_code,reason_text,status,requested_by,requested_at,reviewed_by,reviewed_at,review_note,base_gmv,estimated_base_gmv')
       .in('period_month', months);
     if (exclErr) throw new Error(exclErr.message);
     _nrrExclusions = excl || [];
@@ -1091,7 +1089,7 @@ async function openTargetSetup(mode) {
   const tabRow = document.getElementById('tgt-tab-row');
   if (tabRow) tabRow.style.display = mode === 'admin' ? 'flex' : 'none';
   // v209: Target sheet is for target/settings only. Commission governance moved to Commission Cockpit.
-  ['policy','rules','preview','exclusions','lock'].forEach(k=>{
+  ['policy','rules','preview','lock'].forEach(k=>{
     const b=document.getElementById('tgt-tab-'+k);
     if(b) b.style.display='none';
   });
@@ -1194,10 +1192,6 @@ function renderTargetSheetBody() {
   }
   if (_tgtActiveTab === 'preview' && _tgtMode === 'admin') {
     renderCommissionPreviewTab();
-    return;
-  }
-  if (_tgtActiveTab === 'exclusions') {
-    renderNrrExclusionsTab();
     return;
   }
   if (_tgtActiveTab === 'lock' && _tgtMode === 'admin') {
@@ -2099,37 +2093,69 @@ function _nrrExclusionCurrentPeriod() {
 function _nrrExclusionRowKey(r) {
   return `${r.period_month}|${r.account_id || ''}|${r.outlet_id || ''}|${r.target_kam_email || ''}|${r.status || ''}`;
 }
-function _nrrExclusionApprovedForScope(kamEmail, tlEmail) {
+// v865 (waived-account feature): fixed to actually scope by period_month --
+// previously an approved waiver for one month silently suppressed NRR for
+// every other month too, since this filter never checked period_month
+// despite the column existing on every row.
+function _nrrExclusionApprovedForScope(kamEmail, tlEmail, periodMonth) {
   return (_nrrExclusions || []).filter(x =>
     x.status === 'approved' &&
+    (!periodMonth || x.period_month === periodMonth) &&
     (!x.target_kam_email || !kamEmail || x.target_kam_email === kamEmail) &&
     (!x.target_tl_email || !tlEmail || x.target_tl_email === tlEmail)
   );
 }
-function _nrrExclusionBaseImpact(kamEmail, tlEmail) {
-  const approved = _nrrExclusionApprovedForScope(kamEmail, tlEmail);
+// v865: the one shared predicate every NRR compute function (Sense's
+// _qnrrCompute/_groupNRR and /nrr's ports) calls to check whether an
+// account is waived for a given month -- single source of truth, so the
+// exclusion is applied once, upstream, instead of only in the commission
+// payout wrapper (which used to under-apply it everywhere except the
+// final payout number -- see [[commission-quarterly-fix]] round 4 / the
+// waived-account feature plan for why "computed in more than one place"
+// is the exact bug class this avoids).
+// v866 (outlet-level waiving): a row with outlet_id set is scoped to ONLY
+// that outlet -- it must never fall back to matching by account_id alone,
+// or an outlet-scoped waiver would silently over-exclude every other
+// outlet under the same account too. A row with outlet_id null is a
+// whole-account waiver and matches by account_id regardless of which
+// outlet the caller is asking about.
+function _nrrAccountWaivedForPeriod(accountId, periodMonth, outletId) {
+  if (!accountId || !periodMonth) return false;
+  return (_nrrExclusions || []).some(x => {
+    if (x.status !== 'approved' || x.period_month !== periodMonth) return false;
+    if (x.outlet_id) return !!outletId && x.outlet_id === outletId;
+    return x.account_id === accountId;
+  });
+}
+window._nrrAccountWaivedForPeriod = _nrrAccountWaivedForPeriod;
+function _nrrExclusionBaseImpact(kamEmail, tlEmail, periodMonth) {
+  const approved = _nrrExclusionApprovedForScope(kamEmail, tlEmail, periodMonth);
   return approved.reduce((s,x)=>s + Number(x.base_gmv || x.estimated_base_gmv || 0), 0);
 }
-function _nrrGovernedPct(rawResult, kamEmail, tlEmail) {
+// v865: the waiver is now applied INSIDE the core compute functions
+// (_qnrrCompute/_groupNRR via _nrrAccountWaivedForPeriod) so rawResult.nrr
+// already reflects it -- this is now a pure passthrough. It used to
+// separately re-subtract excluded base here on top of the raw result,
+// which after this change would double-subtract. Kept as a named function
+// (rather than inlined at call sites) so a future "%NRR annotation" can
+// still hook in without touching payout math.
+function _nrrGovernedPct(rawResult) {
   if (!rawResult || rawResult.nrr === null) return null;
-  const base = Number(rawResult.baselinePrevGmv || 0);
-  const curr = Number(rawResult.cohortGmv || 0);
-  const excludedBase = Math.min(base, _nrrExclusionBaseImpact(kamEmail, tlEmail));
-  if (base <= 0 || excludedBase <= 0) return Math.round(rawResult.nrr * 100);
-  // v247d: normalize by daily rate (same as raw NRR) — prevents mid-month deflation when exclusion is approved
-  const prevDays = Number(rawResult.prevDays || 30);
-  const daysElapsed = Number(rawResult.daysElapsed || 30);
-  const eligibleBase = Math.max(1, base - excludedBase);
-  const currRate = daysElapsed > 0 ? curr / daysElapsed : 0;
-  const baseRate = prevDays > 0 ? eligibleBase / prevDays : 0;
-  return baseRate > 0 ? Math.round(currRate / baseRate * 100) : Math.round(rawResult.nrr * 100);
+  return Math.round(rawResult.nrr * 100);
+}
+// v865: read-only reporting helper -- "this month's %NRR excludes N waived
+// accounts totaling ฿X" -- must never feed back into payout math (that's
+// exactly the bug _nrrGovernedPct used to have).
+function _nrrWaivedAccountsSummary(kamEmail, tlEmail, periodMonth) {
+  const rows = _nrrExclusionApprovedForScope(kamEmail, tlEmail, periodMonth);
+  return { count: rows.length, totalBaseGmv: rows.reduce((s,x)=>s + Number(x.base_gmv || x.estimated_base_gmv || 0), 0) };
 }
 function _nrrGovernanceForVisibleTeam() {
   const scope = _commVisibleTeamScope();
   const raw = _tgtGetVisibleTeamNrrResult();
   const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-  const governedPct = _nrrGovernedPct(raw, null, scope.tlEmail);
-  const exclBase = _nrrExclusionBaseImpact(null, scope.tlEmail);
+  const governedPct = _nrrGovernedPct(raw);
+  const exclBase = _nrrExclusionBaseImpact(null, scope.tlEmail, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
 }
 function _nrrGovernanceForKam(kamEmail) {
@@ -2139,8 +2165,8 @@ function _nrrGovernanceForKam(kamEmail) {
     ? window._qnrrComputeForCommission(kamEmail, 'kam')
     : _tgtComputeKamNRR(kamEmail, null);
   const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
-  const governedPct = _nrrGovernedPct(raw, kamEmail, null);
-  const exclBase = _nrrExclusionBaseImpact(kamEmail, null);
+  const governedPct = _nrrGovernedPct(raw);
+  const exclBase = _nrrExclusionBaseImpact(kamEmail, null, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
 }
 
@@ -2828,19 +2854,6 @@ async function lockCommissionSnapshot(periodOverride) {
     console.error('[CommLock] failed:', e);
     if (typeof showToast === 'function') showToast('Lock ไม่สำเร็จ: ' + (e.message || ''), '!');
   }
-}
-function _nrrExclusionStatusLabel(s) {
-  return s === 'approved' ? 'Approved' : s === 'rejected' ? 'Rejected' : s === 'submitted' ? 'Pending' : (s || 'Draft');
-}
-function _nrrReasonLabel(code) {
-  const m = {
-    closed_business:'ร้านปิดกิจการ',
-    bad_debt:'ติดหนี้ / credit hold',
-    force_majeure:'Force majeure',
-    fraud:'Fraud / data issue',
-    other:'Other'
-  };
-  return m[code] || code || '—';
 }
 
 // ── v247e: End-of-month lock status ────────────────────────────────────────
