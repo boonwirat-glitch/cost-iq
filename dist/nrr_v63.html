@@ -8879,21 +8879,6 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
 
-  // v63 fix: the AOV/หมวดสินค้า/สาขา STAT TILES already respected a selected
-  // trend-chart month (nrrAccountStatRowHtml), but opening the drawer behind
-  // any of them re-fetched unfiltered current-month data — a real
-  // inconsistency the user caught live (tile said 8/10 categories, drawer
-  // said 10/10). Resolve the same monthFilter/prevMonth once here too, so
-  // every drawer matches whatever its tile is currently showing.
-  var monthFilter = nrrAccountState.monthFilter;
-  var prevMonth = null;
-  if (monthFilter) {
-    var tMonths = nrrAccountState.trendMonths || [];
-    for (var mi = 1; mi < tMonths.length; mi++) {
-      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
-    }
-  }
-
   // v60: outlet drawer doubles as the branch-filter picker — checking one
   // or more outlets here drives the trend chart + AOV tile on the page
   // behind it (nrrAccountBranchTrendMonths/nrrAccountBranchAov, both pure
@@ -8903,7 +8888,7 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   // drawer) on every toggle.
   if (key === 'outlet') {
     var renderOutletDrawer = function () {
-      var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
+      var outlet = nrrOutletMovement(row.account_id);
       document.getElementById('nrr-slideover-title').textContent =
         outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
       document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds">' + nrrOutletDrawerHtml(outlet, nrrAccountState.branchFilter) + '</div>';
@@ -8933,12 +8918,12 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
 
   var title = '', html = '';
   if (key === 'aov') {
-    var aov = nrrAccountAov(row.account_id, monthFilter);
-    title = monthFilter ? 'AOV — ' + monthFilter : 'AOV — ระดับและแนวโน้ม';
+    var aov = nrrAccountAov(row.account_id);
+    title = 'AOV — ระดับและแนวโน้ม';
     html = nrrAovDrawerHtml(aov);
   } else if (key === 'category') {
-    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
-    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket' + (monthFilter ? ' — ' + monthFilter : '');
+    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
     html = nrrCategoryDrawerHtml(cat);
   }
   document.getElementById('nrr-slideover-title').textContent = title;

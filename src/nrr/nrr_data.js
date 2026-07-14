@@ -440,21 +440,54 @@ function nrrShortThaiDate(iso) {
 }
 window.nrrShortThaiDate = nrrShortThaiDate;
 
-// Rolling, "today"-relative 3-month window — matches 02_data_pipeline.js's
-// _p1BaselineLabels exactly (lag-1 anchor, months 1/2/3 back from there).
-// NOTE: this is deliberately NOT the quarterly-pinned base_month window —
-// P1's "has this outlet ever bought this group" check floats with today's
-// date in the real system too; only P3's baseline magnitude is quarter-pinned
-// (see nrrP3WindowLabels). Faithfully replicating both, not "fixing" either.
-function nrrP1BaselineLabels() {
-  var lag = new Date(); lag.setDate(lag.getDate() - 1);
+// v860-fix (2026-07-13): this comment used to say P1's baseline
+// "deliberately floats with today's date, faithfully replicating" the real
+// engine — that was true before commit 44c8bee, but the real engine's own
+// P1 baseline now FREEZES to the quarter's base month in quarterly mode
+// (02_data_pipeline.js:1061-1065, the `_q3cBaseMonth` branch). This was a
+// real, unfixed divergence between /nrr's drill-down and Sense's actual
+// payout math — found during a repo-wide commission-quarterly-alignment
+// audit. Now mirrors that branch exactly: pass baseMonthIso (/nrr always
+// does — QNRR_CFG.base_month is always set) to freeze the window; the
+// rolling fallback below only exists for signature parity with the real
+// engine, which still supports a non-quarterly mode /nrr doesn't need.
+function nrrP1BaselineLabels(baseMonthIso) {
   var set = {};
+  if (baseMonthIso) {
+    var p = baseMonthIso.split('-');
+    var yr = parseInt(p[0], 10), mo = parseInt(p[1], 10);
+    [0, 1, 2].forEach(function (i) {
+      var d = new Date(yr, mo - 1 - i, 1);
+      set[nrrThMonthLabel(d)] = true;
+    });
+    return set;
+  }
+  var lag = new Date(); lag.setDate(lag.getDate() - 1);
   [1, 2, 3].forEach(function (i) {
     var d = new Date(lag.getFullYear(), lag.getMonth() - i, 1);
     set[nrrThMonthLabel(d)] = true;
   });
   return set;
 }
+
+// Mirrors 07a_commission_engine.js's _commElapsedQuarterLabels exactly —
+// every ELAPSED month of the quarter (base_month+1, +2, +3, capped at
+// today's lag-1 date) — so /nrr's P1/P3 drill-down can sum a real
+// cumulative streak instead of evaluating only the current month.
+function _nrrCommElapsedQuarterLabels(baseMonthIso) {
+  if (!baseMonthIso) return [];
+  var parts = baseMonthIso.split('-');
+  var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
+  var lag = new Date(); lag.setDate(lag.getDate() - 1);
+  var out = [];
+  for (var i = 1; i <= 3; i++) {
+    var d = new Date(baseYr, baseMo - 1 + i, 1);
+    if (d > lag) break;
+    out.push(nrrThMonthLabel(d));
+  }
+  return out;
+}
+window._nrrCommElapsedQuarterLabels = _nrrCommElapsedQuarterLabels;
 
 function nrrCommCurrentMonthLabel() {
   var lag = new Date(); lag.setDate(lag.getDate() - 1);
@@ -488,7 +521,7 @@ function nrrDaysInLabel(label) {
 }
 window.nrrDaysInLabel = nrrDaysInLabel;
 
-async function nrrFetchUpsellBundle(kamEmail) {
+async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
   if (nrrUpsellBundleCache[kamEmail] && nrrUpsellBundleCache[kamEmail].loaded) return nrrUpsellBundleCache[kamEmail];
   if (nrrUpsellBundleInFlight[kamEmail]) return nrrUpsellBundleInFlight[kamEmail];
   var safeKey = _nrrKamSafeKey(kamEmail);
@@ -502,7 +535,7 @@ async function nrrFetchUpsellBundle(kamEmail) {
       var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
       if (lines.length && /account_id/i.test(lines[0])) lines = lines.slice(1);
 
-      var p1Labels = nrrP1BaselineLabels();
+      var p1Labels = nrrP1BaselineLabels(baseMonthIso);
       var currLabel = nrrCommCurrentMonthLabel();
       var data = {};             // accountId -> outletId -> groupKey -> monthLabel -> {existingGmv,totalGmv}
       var baselineGroups = {};   // accountId -> outletId -> Set-like object of groupKey -> true
@@ -524,7 +557,15 @@ async function nrrFetchUpsellBundle(kamEmail) {
         if (!data[accountId][outletId][groupKey]) data[accountId][outletId][groupKey] = {};
         data[accountId][outletId][groupKey][monthLabel] = { existingGmv: existingGmv, totalGmv: totalGmv };
 
-        if (monthLabel !== currLabel && totalGmv > 0 && p1Labels[monthLabel]) {
+        // v860-fix: mirrors 02_data_pipeline.js:1104-1111's v854 fix — in
+        // quarterly mode (baseMonthIso set) p1Labels is already a closed,
+        // past-bounded window ending at the frozen base month, so it can
+        // never include the row being tested by construction. Skip the
+        // !==currLabel guard entirely in that mode (it exists only to stop
+        // rolling mode's "current month" from counting as its own
+        // baseline, and on the quarter's own day-1 the lag anchor still
+        // reads base_month itself, wrongly colliding with it otherwise).
+        if ((baseMonthIso || monthLabel !== currLabel) && totalGmv > 0 && p1Labels[monthLabel]) {
           if (!baselineGroups[accountId]) baselineGroups[accountId] = {};
           if (!baselineGroups[accountId][outletId]) baselineGroups[accountId][outletId] = {};
           baselineGroups[accountId][outletId][groupKey] = true;

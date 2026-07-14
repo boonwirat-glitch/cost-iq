@@ -425,7 +425,7 @@ function nrrHandlePortfolioChange(e) {
 // loaded — the router can't know account→KAM mapping until data arrives,
 // so the check happens once that data is in hand (see nrr_router.js's own
 // comment, which anticipated exactly this).
-var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false };
+var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [], monthFilter: null };
 
 // Shaped like the real page (mast/hero/stat-row/two lists), not one flat
 // bar — the fetch chain here includes bulk_price.csv (36MB) so this can
@@ -471,6 +471,8 @@ function nrrRenderAccountView(route) {
     nrrAccountState.kamEmail = row.kam_email;
     nrrAccountState.showAllPos = false;
     nrrAccountState.showAllRisk = false;
+    nrrAccountState.branchFilter = [];
+    nrrAccountState.monthFilter = null;
 
     Promise.all([
       nrrFetchSenseSkusCsv(row.kam_email), nrrFetchSenseSkuOutletCsv(row.kam_email),
@@ -529,17 +531,32 @@ function nrrAccountHeroHtml(row) {
     '</div>' +
     '<span class="micro">วันที่ ' + (row.days_elapsed || 0) + '/' + (row.days_in_month || 0) + '</span>' +
     '</div>' +
+    (nrrAccountState.branchFilter && nrrAccountState.branchFilter.length
+      ? '<div class="nrr-acct-branch-filter-tag">กรอง ' + nrrAccountState.branchFilter.length + ' สาขา — แตะ "สาขา" ด้านล่างเพื่อเปลี่ยน</div>'
+      : '') +
     '<div class="nrr-acct-trend" id="nrr-acct-trend"></div>' +
     '<div class="nrr-acct-trend-summary" id="nrr-acct-trend-summary"></div>' +
     '</div>';
 }
 
 function nrrRenderAccountTrendChart(row) {
-  var histRows = ((window.bulkHistoryData && window.bulkHistoryData.byAccountId[row.account_id]) || []).slice()
-    .sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
-  var baseLabel = nrrBaseMonthThLabel();
-  var months = histRows.slice(-6).map(function (h) { return { label: h.month_label, v: h.gmv, isBase: h.month_label === baseLabel }; });
-  months.push({ label: nrrCommCurrentMonthLabel(), v: row.gmv_to_date || 0, proj: row.runrate_gmv || 0, current: true });
+  // v60: branch filter active → recompute the same 7-bar shape from
+  // bulk_outlets.csv (outlet grain, already loaded) instead of
+  // bulk_history.csv/portview.csv (account-only rollups) — see
+  // nrrAccountBranchTrendMonths (nrr_account.js). Empty filter = untouched
+  // original behavior, so deselecting all branches is a clean regression-
+  // free revert to the account-level chart.
+  var branchFilter = nrrAccountState.branchFilter;
+  var months;
+  if (branchFilter && branchFilter.length) {
+    months = nrrAccountBranchTrendMonths(row.account_id, branchFilter);
+  } else {
+    var histRows = ((window.bulkHistoryData && window.bulkHistoryData.byAccountId[row.account_id]) || []).slice()
+      .sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
+    var baseLabel = nrrBaseMonthThLabel();
+    months = histRows.slice(-6).map(function (h) { return { label: h.month_label, v: h.gmv, isBase: h.month_label === baseLabel }; });
+    months.push({ label: nrrCommCurrentMonthLabel(), v: row.gmv_to_date || 0, proj: row.runrate_gmv || 0, current: true });
+  }
   nrrAccountState.trendMonths = months;
 
   var chart = document.getElementById('nrr-acct-trend');
@@ -577,7 +594,18 @@ function nrrRenderAccountTrendChart(row) {
       '<div class="nrr-acct-trend-bar-track" style="height:' + H + 'px">' + bar + '</div>' +
       '<div class="nrr-acct-trend-lbl">' + lbl + '</div></button>';
   }).join('');
-  nrrSelectAccountTrendMonth(months.length - 1);
+  // v62: preserve an already-active month selection across re-renders (e.g.
+  // the branch-filter checkbox triggers a full nrrRenderAccountBody, which
+  // rebuilds this chart) instead of always snapping back to the current
+  // month — otherwise picking a branch would silently clear whatever past
+  // month the user was looking at.
+  var selIdx = months.length - 1;
+  if (nrrAccountState.monthFilter) {
+    for (var si = 0; si < months.length; si++) {
+      if (months[si].label === nrrAccountState.monthFilter) { selIdx = si; break; }
+    }
+  }
+  nrrSelectAccountTrendMonth(selIdx);
 }
 
 function nrrSelectAccountTrendMonth(i) {
@@ -586,6 +614,20 @@ function nrrSelectAccountTrendMonth(i) {
   if (chart) chart.querySelectorAll('.nrr-acct-trend-col').forEach(function (c, idx) { c.classList.toggle('sel', idx === i); });
   var m = months[i];
   if (!m) return;
+
+  // v62: clicking a bar also filters AOV/หมวดสินค้า/สาขา to that month —
+  // clicking the CURRENT (rightmost) bar clears the filter back to the live
+  // default, since that's already what "no filter" shows. Only re-renders
+  // the stat-row container (#nrr-acct-stat-row), not the whole page — the
+  // chart/hero/signal lists are untouched by this.
+  var newMonthFilter = m.current ? null : m.label;
+  if (nrrAccountState.monthFilter !== newMonthFilter) {
+    nrrAccountState.monthFilter = newMonthFilter;
+    var acctRow = _nrrPortviewRowFor(nrrAccountState.accountId);
+    var statWrap = document.getElementById('nrr-acct-stat-row');
+    if (acctRow && statWrap) statWrap.outerHTML = nrrAccountStatRowHtml(acctRow, nrrAccountState.kamEmail);
+  }
+
   var maxV = Math.max.apply(null, months.map(function (x) { return x.v; }).concat([1]));
   var summary = document.getElementById('nrr-acct-trend-summary');
   if (!summary) return;
@@ -728,17 +770,45 @@ function nrrPriceDivBarHtml(downCount, upCount) {
 }
 
 function nrrAccountStatRowHtml(row, kamEmail) {
-  var aov = nrrAccountAov(row.account_id);
-  var outlet = nrrOutletMovement(row.account_id);
-  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+  // v62: month filter — clicking a bar in the trend chart sets
+  // nrrAccountState.monthFilter to that bar's label (null = current month,
+  // the original/default behavior). prevMonth is resolved from the trend
+  // chart's own ordered month list (nrrAccountState.trendMonths) since
+  // nrrOutletMovement's new/quiet/steady classification is inherently a
+  // this-vs-previous comparison and needs both ends when targeting a month
+  // that isn't "current."
+  var monthFilter = nrrAccountState.monthFilter;
+  var prevMonth = null;
+  if (monthFilter) {
+    var tMonths = nrrAccountState.trendMonths || [];
+    for (var mi = 1; mi < tMonths.length; mi++) {
+      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
+    }
+  }
+  var aov = nrrAccountAov(row.account_id, monthFilter);
+  var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
+  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
   var priceList = nrrAccountPriceList(row.account_id, kamEmail);
 
-  var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov" style="border-top-color:' + aov.band.color + '">' +
+  // v60: branch filter active → current-month AOV comes from bulk_outlets.csv
+  // (nrrAccountBranchAov, outlet grain already loaded) instead of the
+  // account-level portview/bulk_history figures. Only the headline number +
+  // band re-derive; the sparkline/trend% stay account-level (a per-branch
+  // multi-month AOV series isn't needed to answer what was asked here).
+  // v62: composes with monthFilter too (branch + specific month together).
+  var branchFilter = nrrAccountState.branchFilter;
+  var aovCurrent = aov.current, aovBand = aov.band;
+  if (branchFilter && branchFilter.length) {
+    var bAov = nrrAccountBranchAov(row.account_id, branchFilter, monthFilter);
+    aovCurrent = bAov.current;
+    aovBand = nrrAovBand(aovCurrent);
+  }
+  var aovCell = '<button type="button" class="nrr-acct-stat-cell" data-stat="aov" style="border-top-color:' + aovBand.color + '">' +
     '<div class="nrr-acct-stat-lbl">AOV เฉลี่ย <span>›</span></div>' +
-    '<div class="num nrr-acct-stat-val" style="color:' + aov.band.color + '">' + (aov.current != null ? nrrFmtGMVExact(aov.current) : '—') + '</div>' +
+    '<div class="num nrr-acct-stat-val" style="color:' + aovBand.color + '">' + (aovCurrent != null ? nrrFmtGMVExact(aovCurrent) : '—') + '</div>' +
     nrrAcctSparklineSvg(aov.months) +
-    '<div class="nrr-acct-stat-sub">ระดับ <b style="color:' + aov.band.color + '">' + nrrEsc(aov.band.label) + '</b>' +
-    (aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
+    '<div class="nrr-acct-stat-sub">ระดับ <b style="color:' + aovBand.color + '">' + nrrEsc(aovBand.label) + '</b>' +
+    (!branchFilter.length && !monthFilter && aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
     '</button>';
 
   // Accent color per cell reflects that cell's own health, same "colored
@@ -800,7 +870,10 @@ function nrrAccountStatRowHtml(row, kamEmail) {
       '</button>';
   }
 
-  return '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div>';
+  var monthTag = monthFilter
+    ? '<div class="nrr-acct-month-filter-tag">กำลังดูเดือน ' + nrrEsc(monthFilter) + ' — คลิกแท่งปัจจุบันด้านบนเพื่อกลับ</div>'
+    : '';
+  return '<div id="nrr-acct-stat-row">' + monthTag + '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div></div>';
 }
 
 // "Before → after" transformation strip — deliberately its own visual
@@ -936,18 +1009,67 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
+
+  // v63 fix: the AOV/หมวดสินค้า/สาขา STAT TILES already respected a selected
+  // trend-chart month (nrrAccountStatRowHtml), but opening the drawer behind
+  // any of them re-fetched unfiltered current-month data — a real
+  // inconsistency the user caught live (tile said 8/10 categories, drawer
+  // said 10/10). Resolve the same monthFilter/prevMonth once here too, so
+  // every drawer matches whatever its tile is currently showing.
+  var monthFilter = nrrAccountState.monthFilter;
+  var prevMonth = null;
+  if (monthFilter) {
+    var tMonths = nrrAccountState.trendMonths || [];
+    for (var mi = 1; mi < tMonths.length; mi++) {
+      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
+    }
+  }
+
+  // v60: outlet drawer doubles as the branch-filter picker — checking one
+  // or more outlets here drives the trend chart + AOV tile on the page
+  // behind it (nrrAccountBranchTrendMonths/nrrAccountBranchAov, both pure
+  // reads of bulk_outlets.csv already loaded, no new fetch). Re-renders
+  // both the drawer body (so checkbox state/title stay in sync) and the
+  // main account body (so the chart/AOV update live without closing the
+  // drawer) on every toggle.
+  if (key === 'outlet') {
+    var renderOutletDrawer = function () {
+      var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
+      document.getElementById('nrr-slideover-title').textContent =
+        outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
+      document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds">' + nrrOutletDrawerHtml(outlet, nrrAccountState.branchFilter) + '</div>';
+      document.querySelectorAll('.nrr-acct-branch-chk').forEach(function (chk) {
+        chk.addEventListener('change', function () {
+          var oid = chk.dataset.outletId;
+          var idx = nrrAccountState.branchFilter.indexOf(oid);
+          if (chk.checked && idx === -1) nrrAccountState.branchFilter.push(oid);
+          else if (!chk.checked && idx !== -1) nrrAccountState.branchFilter.splice(idx, 1);
+          renderOutletDrawer();
+          nrrRenderAccountBody(row);
+        });
+      });
+      var clearBtn = document.getElementById('nrr-acct-branch-clear');
+      if (clearBtn) clearBtn.addEventListener('click', function () {
+        nrrAccountState.branchFilter = [];
+        renderOutletDrawer();
+        nrrRenderAccountBody(row);
+      });
+    };
+    renderOutletDrawer();
+    document.getElementById('nrr-slideover-sub').textContent = '';
+    document.getElementById('nrr-slideover-backdrop').classList.add('on');
+    document.getElementById('nrr-slideover').classList.add('on');
+    return;
+  }
+
   var title = '', html = '';
   if (key === 'aov') {
-    var aov = nrrAccountAov(row.account_id);
-    title = 'AOV — ระดับและแนวโน้ม';
+    var aov = nrrAccountAov(row.account_id, monthFilter);
+    title = monthFilter ? 'AOV — ' + monthFilter : 'AOV — ระดับและแนวโน้ม';
     html = nrrAovDrawerHtml(aov);
-  } else if (key === 'outlet') {
-    var outlet = nrrOutletMovement(row.account_id);
-    title = outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
-    html = nrrOutletDrawerHtml(outlet);
   } else if (key === 'category') {
-    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
-    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
+    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
+    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket' + (monthFilter ? ' — ' + monthFilter : '');
     html = nrrCategoryDrawerHtml(cat);
   }
   document.getElementById('nrr-slideover-title').textContent = title;
@@ -994,17 +1116,32 @@ function nrrAovDrawerHtml(aov) {
     '<div style="margin-top:14px">' + history + '</div>';
 }
 
-function nrrOutletDrawerHtml(outlet) {
+// v60: `branchFilter` (nrrAccountState.branchFilter, array of selected
+// outlet_id) turns this drawer into the branch-selector control for the
+// trend chart/AOV tile — a checkbox per outlet plus a clear-filter action.
+// Passing no filter/empty array renders identically to before (no visual
+// change when the feature isn't in use).
+function nrrOutletDrawerHtml(outlet, branchFilter) {
   if (!outlet.total) return '<div class="ds-empty"><div class="ds-empty-title">ไม่มีข้อมูลสาขา</div></div>';
+  var filterSet = {};
+  (branchFilter || []).forEach(function (id) { filterSet[id] = true; });
   var quietList = outlet.outlets.filter(function (o) { return o.status === 'quiet' || o.cycle === 'gone'; });
   var verdict = quietList.length ? '<div class="nrr-verdict">' + quietList.length + ' สาขาเงียบไป แต่ยอดรวมอาจยังดูปกติเพราะสาขาอื่นชดเชยไว้</div>' : '';
-  return verdict + outlet.outlets.map(function (o) {
+  var filterHead = '<div class="nrr-acct-branch-head">' +
+    '<span class="micro">เลือกสาขาเพื่อกรองกราฟแนวโน้ม/AOV ด้านหลัง</span>' +
+    (branchFilter && branchFilter.length
+      ? '<button type="button" class="nrr-acct-branch-clear" id="nrr-acct-branch-clear">แสดงทุกสาขา (' + branchFilter.length + ' เลือกอยู่)</button>'
+      : '') +
+    '</div>';
+  return filterHead + verdict + outlet.outlets.map(function (o) {
     var badge = o.status === 'new' ? '<span style="color:var(--sun-deep);font-size:11px;font-weight:700;flex-shrink:0">ใหม่</span>'
       : (o.status === 'quiet' || o.cycle === 'gone') ? '<span style="color:var(--coral);font-size:11px;font-weight:700;flex-shrink:0">เงียบ</span>'
       : o.cycle === 'near' ? '<span style="color:var(--sun-deep);font-size:11px;font-weight:700;flex-shrink:0">เฝ้าดู</span>' : '';
-    return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(o.outlet_name) + '</span>' +
+    return '<label class="ds-row nrr-acct-branch-row">' +
+      '<input type="checkbox" class="nrr-acct-branch-chk" data-outlet-id="' + nrrEsc(o.outlet_id) + '"' + (filterSet[o.outlet_id] ? ' checked' : '') + '>' +
+      '<span class="ds-row-name">' + nrrEsc(o.outlet_name) + '</span>' +
       '<span class="ds-row-meta">' + (o.lastOrderDate ? 'ล่าสุด ' + nrrEsc(o.lastOrderDate) : '') + '</span>' + badge +
-      '<span class="ds-row-value">' + nrrFmtGMVExact(o.gmv) + '</span></div>';
+      '<span class="ds-row-value">' + nrrFmtGMVExact(o.gmv) + '</span></label>';
   }).join('');
 }
 
@@ -1028,9 +1165,13 @@ function nrrCategoryDrawerHtml(cat) {
 // drawers: hide the shared search/chips rows, own body, own state).
 var nrrPriceDrawerState = null; // { accountId, kamEmail, cat, search, move, rowView, data }
 
-function nrrOpenPriceDrawer(accountId, kamEmail) {
+// v60: targetMonth lets the drawer reopen scoped to a specific past month
+// (see the month <select> below) instead of always defaulting to current/
+// last. Re-running the whole open function on month change is simplest and
+// safest — it rebuilds every listener fresh, no partial-render drift.
+function nrrOpenPriceDrawer(accountId, kamEmail, targetMonth) {
   nrrCommDrawerState = null;
-  var data = nrrAccountPriceList(accountId, kamEmail);
+  var data = nrrAccountPriceList(accountId, kamEmail, targetMonth);
   nrrPriceDrawerState = { accountId: accountId, kamEmail: kamEmail, cat: 'all', search: '', move: 'all', rowView: 'value', data: data };
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
@@ -1050,6 +1191,15 @@ function nrrOpenPriceDrawer(accountId, kamEmail) {
   data.items.forEach(function (it) { if (it.chgPct != null) { if (it.chgPct >= 1) up++; else if (it.chgPct <= -1) down++; } });
   document.getElementById('nrr-slideover-sub').textContent = data.items.length + ' SKU' + (data.useLabel ? ' · ' + data.useLabel : '');
 
+  // month dropdown — every month sense_skus actually carries for this
+  // account (currently MTD + 2 full prior months), newest first. Only
+  // rendered when there's more than one month to pick from.
+  var monthOptions = (data.availableMonths || []).map(function (ml) {
+    return '<option value="' + nrrEsc(ml) + '"' + (ml === data.useLabel ? ' selected' : '') + '>' + nrrEsc(ml) + '</option>';
+  }).join('');
+  var monthSelectHtml = (data.availableMonths && data.availableMonths.length > 1)
+    ? '<select class="nrr-search" id="nrr-price-month-select">' + monthOptions + '</select>' : '';
+
   // category dropdown — only categories actually present, in NRR_CAT_MASTER order
   var present = {};
   data.items.forEach(function (it) { present[it.dept] = (present[it.dept] || 0) + 1; });
@@ -1063,6 +1213,7 @@ function nrrOpenPriceDrawer(accountId, kamEmail) {
   // list rows' default display, per the user's explicit design choice.
   body.innerHTML = '<div class="nrr-comm-ds">' +
     '<div class="nrr-price-filter-row">' +
+    monthSelectHtml +
     '<select class="nrr-search" id="nrr-price-cat-select">' + catOptions + '</select>' +
     '<input class="nrr-search" id="nrr-price-search" placeholder="ค้นหาสินค้า...">' +
     '<div class="nrr-price-toggle-grp">' +
@@ -1077,6 +1228,11 @@ function nrrOpenPriceDrawer(accountId, kamEmail) {
     '<div id="nrr-price-list"></div>' +
     '</div>';
   nrrRenderPriceDrawerList();
+
+  var monthEl = document.getElementById('nrr-price-month-select');
+  if (monthEl) monthEl.addEventListener('change', function () {
+    nrrOpenPriceDrawer(accountId, kamEmail, monthEl.value);
+  });
 
   document.getElementById('nrr-price-cat-select').addEventListener('change', function () {
     nrrPriceDrawerState.cat = this.value;
@@ -2513,7 +2669,13 @@ function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
   var expOutlets = outletsForKam.filter(function (o) { return o.movement === 'expansion'; });
   var handoverDetail = (bd && bd.handover && bd.handover.detail) || (est && est.handover && est.handover.detail) || [];
   var skel = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
-  var p1p3Note = '<div class="nrr-rcpt-note">นับเฉพาะร้านนอกกลุ่ม Expansion — ร้านขยายได้ 0.5% ในบรรทัด Expansion</div>';
+  // v861-fix: user flagged this note (sitting right under the "Upsell P1"/
+  // "Upsell P3" headers, right next to P1/P3's own 1% rate) as reading
+  // ambiguously — the old wording put a bare "0.5%" next to those headers
+  // with no clear signal it belongs to an entirely different, separate
+  // commission line. Reworded to state the exclusion first, then explicitly
+  // say the 0.5% is earned "separately, in the Expansion line instead."
+  var p1p3Note = '<div class="nrr-rcpt-note">ไม่รวมร้านกลุ่ม Expansion — ร้านกลุ่มนั้นได้ค่าคอมฯ 0.5% แยกต่างหากในบรรทัด Expansion แทน</div>';
   var sectionsByKey = {
     nrr: nrrCommOutletListHtml(nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้'),
     p1: p1p3Note + '<div id="' + p1ElId + '">' + skel + '</div>',
@@ -2545,7 +2707,7 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd, p1ElId
   p1ElId = p1ElId || 'nrr-comm-drawer-p1-body';
   p3ElId = p3ElId || 'nrr-comm-drawer-p3-body';
   guardFn = guardFn || function (email) { return nrrCommDrawerState && nrrCommDrawerState.kamEmail === email; };
-  nrrFetchUpsellBundle(kamEmail).then(function (bundle) {
+  nrrFetchUpsellBundle(kamEmail, QNRR_CFG.base_month).then(function (bundle) {
     if (!guardFn(kamEmail)) return;
     var p1Target = document.getElementById(p1ElId);
     var p3Target = document.getElementById(p3ElId);

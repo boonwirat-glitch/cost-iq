@@ -393,15 +393,33 @@ function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
     const rate = _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
 
     if (qnrrRaw) {
-      const monthData = qnrrRaw.by_month && qnrrRaw.currentPeriod ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
-      const rows = (monthData && monthData.rows) || [];
+      // v860-fix: was reading only qnrrRaw.currentPeriod's single month — the
+      // one tier in the quarterly system that never accumulated across the
+      // quarter like P1/P3 do (found during a repo-wide commission-alignment
+      // audit, 2026-07-13; user decision: make it cumulative to match P1/P3's
+      // model). No per-item "does it still qualify" streak-break check is
+      // needed here the way P1/P3 has one — expansion status is a categorical
+      // per-row tag from the NRR movement classification, not a threshold
+      // test, so every elapsed month an outlet is tagged 'expansion' its GMV
+      // simply counts. Reuses qnrrRaw.by_month's own availability (already
+      // established elsewhere in this file, see _qnrrComputeForCommission's
+      // "period data not yet available" handling) as the elapsed-months
+      // list, rather than re-deriving elapsed dates separately — by_month
+      // only ever has entries for months that have actually started.
+      const periods = (qnrrRaw.by_month && QNRR_CFG.q_months)
+        ? QNRR_CFG.q_months.filter(m => !!qnrrRaw.by_month[m])
+        : (qnrrRaw.currentPeriod ? [qnrrRaw.currentPeriod] : []);
       const expansionIds = new Set();
       let expansionGmv = 0;
-      rows.forEach(r => {
-        if (r.movement_type === 'expansion') {
-          if (r.outlet_id) expansionIds.add(String(r.outlet_id));
-          expansionGmv += parseFloat(r.curr_gmv) || 0;
-        }
+      periods.forEach(p => {
+        const monthData = qnrrRaw.by_month[p];
+        const rows = (monthData && monthData.rows) || [];
+        rows.forEach(r => {
+          if (r.movement_type === 'expansion') {
+            if (r.outlet_id) expansionIds.add(String(r.outlet_id));
+            expansionGmv += parseFloat(r.curr_gmv) || 0;
+          }
+        });
       });
       return {
         outlet_gmv: expansionGmv,
@@ -488,6 +506,12 @@ function _commQnrrDrillResult(email, scope) {
       comebackGmv: sumCurr(comebackDetail), comebackCount: sumCnt(comebackDetail),
       expansionGmv: sumCurr(expansionDetail), expansionCount: sumCnt(expansionDetail),
       cohortDetail, comebackDetail, expansionDetail,
+      // v860-fix: forward daysElapsed/daysInMonth from qr (see the matching
+      // fix in 07c_qnrr_view.js's _qnrrComputeForCommission) — 07b_cds.js's
+      // rr() helper and totals bar both read nr.daysElapsed/nr.daysInMonth
+      // and silently fell back to two different wrong constants when this
+      // wrapper dropped them on the floor.
+      daysElapsed: qr.daysElapsed, daysInMonth: qr.daysInMonth,
       transferIn: null, newFromSales: null // quarterly mode doesn't split these separately
     };
   } catch(e) { console.warn('[CommEngine] _commQnrrDrillResult error', e); return null; }

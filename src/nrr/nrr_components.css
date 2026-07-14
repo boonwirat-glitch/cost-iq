@@ -557,6 +557,23 @@
 .nrr-comm-ds details:last-of-type > summary.ds-row { border-bottom: none; }
 .nrr-comm-ds .ds-row.hover { cursor: pointer; transition: background 140ms ease; }
 .nrr-comm-ds .ds-row.hover:hover { background: var(--green-soft); }
+
+/* v60: branch/outlet filter picker — reuses the outlet drawer's own row
+   list, each row becomes a checkbox label instead of a plain row. */
+.nrr-acct-branch-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0 10px; flex-wrap: wrap; }
+.nrr-acct-branch-clear {
+  border: 1px solid var(--line); background: transparent; border-radius: var(--r-pill);
+  padding: 5px 12px; font-size: 12px; font-weight: 700; color: var(--green-deep);
+  cursor: pointer; white-space: nowrap; transition: background 140ms ease;
+}
+.nrr-acct-branch-clear:hover { background: var(--green-soft); }
+.nrr-acct-branch-row { cursor: pointer; transition: background 140ms ease; }
+.nrr-acct-branch-row:hover { background: var(--fill); }
+.nrr-acct-branch-chk { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--green-deep); cursor: pointer; }
+.nrr-acct-branch-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-top: 8px; }
+/* v62: month-filter tag — sits above the AOV/สาขา/หมวดสินค้า stat row when a
+   past trend-chart bar is selected, mirrors the branch-filter tag's look. */
+.nrr-acct-month-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-bottom: 8px; }
 .nrr-comm-ds .ds-row-name { font-size: 15px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
 .nrr-comm-ds .ds-row-meta { font-size: 13px; font-weight: 500; color: var(--ink2); }
 .nrr-comm-ds .ds-row-value { font-family: var(--font-num); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }

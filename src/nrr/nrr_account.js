@@ -407,32 +407,56 @@ function nrrAovBand(aov) {
 }
 window.nrrAovBand = nrrAovBand;
 
-function nrrAccountAov(accountId) {
+// v62: targetMonth lets the stat tile show a SPECIFIC past month (selected
+// by clicking a bar in the trend chart) instead of always the live current
+// month. `months` (from bulk_history.csv) already carries every closed
+// month's own AOV — the current-month figure alone came from portview.csv,
+// so a targeted past month is read from `months` while the current month
+// (targetMonth omitted, or explicitly equal to it) keeps the original
+// portview-based calc unchanged for every existing caller.
+function nrrAccountAov(accountId, targetMonth) {
   var row = _nrrPortviewRowFor(accountId);
-  var current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
+  var curLabel = nrrCommCurrentMonthLabel();
   var hist = (window.bulkHistoryData && window.bulkHistoryData.byAccountId[accountId]) || [];
   var sorted = hist.slice().sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
   var months = sorted.map(function (h) { return { month: h.month_label, aov: h.orders > 0 ? h.gmv / h.orders : null, orders: h.orders }; });
+  var current, ordersThisMonth;
+  if (targetMonth && targetMonth !== curLabel) {
+    var picked = months.filter(function (m) { return m.month === targetMonth; })[0];
+    current = picked ? picked.aov : null;
+    ordersThisMonth = picked ? picked.orders : 0;
+  } else {
+    current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
+    ordersThisMonth = row ? row.orders_to_date : 0;
+  }
   var threeAgo = months.length >= 3 ? months[months.length - 3].aov : null;
   var trendPct = (current != null && threeAgo) ? Math.round((current / threeAgo - 1) * 100) : null;
   var lastMonth = months.length ? months[months.length - 1] : null;
   return {
     current: current, band: nrrAovBand(current), months: months, trendPct: trendPct,
-    ordersThisMonth: row ? row.orders_to_date : 0,
+    ordersThisMonth: ordersThisMonth,
     lastMonthAov: lastMonth ? lastMonth.aov : null, lastMonthOrders: lastMonth ? lastMonth.orders : 0
   };
 }
 window.nrrAccountAov = nrrAccountAov;
 
 // ── Outlet movement + per-outlet cycle signal (Chain accounts) ──────────
-function nrrOutletMovement(accountId) {
+// v62: targetMonth/prevMonth let this show a past month's outlet status
+// (selected via the trend chart) instead of always "current vs last" — the
+// per-outlet new/steady/quiet classification is inherently a THIS-vs-PREVIOUS
+// comparison, so the caller must supply both ends when targeting a past
+// month (nrr_view.js resolves prevMonth from the trend chart's own ordered
+// month list). Omitted = unchanged original current/last behavior.
+function nrrOutletMovement(accountId, targetMonth, prevMonth) {
   var labels = _nrrAccountMonthLabels();
+  var curLbl = targetMonth || labels.cur;
+  var lastLbl = targetMonth ? (prevMonth || null) : labels.last;
   var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
   var curByOutlet = {}, lastByOutlet = {}, nameByOutlet = {};
   rows.forEach(function (r) {
     nameByOutlet[r.outlet_id] = r.outlet_name;
-    if (r.month_label === labels.cur) curByOutlet[r.outlet_id] = r;
-    if (r.month_label === labels.last) lastByOutlet[r.outlet_id] = r;
+    if (r.month_label === curLbl) curByOutlet[r.outlet_id] = r;
+    if (r.month_label === lastLbl) lastByOutlet[r.outlet_id] = r;
   });
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
@@ -473,12 +497,77 @@ function nrrOutletMovement(accountId) {
 }
 window.nrrOutletMovement = nrrOutletMovement;
 
+// ── Branch/outlet-filtered trend + AOV (v60) ────────────────────────────
+// bulk_outlets.csv already covers the SAME 7-month window the account-level
+// trend chart needs (6 closed months + current MTD), at real outlet grain
+// (sql/Q5B_bulk_outlets.sql, GROUP BY account_id, month_date, outlet_id) —
+// confirmed via Explore investigation 2026-07-13 that this is a pure JS
+// regroup of data already loaded (window.bulkOutletsData), no new SQL.
+// Empty/omitted outletIds = every outlet for this account (used as the
+// "no filter selected" case, distinct from the account-level chart which
+// instead reads bulk_history.csv/portview.csv — kept as two code paths so
+// selecting/deselecting the filter can't regress the unfiltered numbers).
+function nrrAccountBranchTrendMonths(accountId, outletIds) {
+  var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
+  if (outletIds && outletIds.length) {
+    var want = {};
+    outletIds.forEach(function (id) { want[id] = true; });
+    rows = rows.filter(function (r) { return want[r.outlet_id]; });
+  }
+  var curLabel = nrrCommCurrentMonthLabel();
+  var byMonth = {};
+  rows.forEach(function (r) {
+    if (!byMonth[r.month_label]) byMonth[r.month_label] = { gmv: 0, orders: 0 };
+    byMonth[r.month_label].gmv += r.gmv_ex_vat || 0;
+    byMonth[r.month_label].orders += r.orders || 0;
+  });
+  var baseLabel = nrrBaseMonthThLabel();
+  var closedLabels = Object.keys(byMonth).filter(function (ml) { return ml !== curLabel; })
+    .sort(function (a, b) { return (_nrrParseThLabel(a).key || 0) - (_nrrParseThLabel(b).key || 0); })
+    .slice(-6);
+  var months = closedLabels.map(function (ml) { return { label: ml, v: byMonth[ml].gmv, isBase: ml === baseLabel }; });
+  // Run-rate projection for the current-month bar reuses the account-level
+  // days_elapsed/days_in_month from portview.csv — calendar constants, not
+  // outlet-specific, so they apply unchanged to any outlet subset.
+  var acctRow = _nrrPortviewRowFor(accountId);
+  var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
+  var daysInMonth = (acctRow && acctRow.days_in_month) || 30;
+  var curGmv = (byMonth[curLabel] && byMonth[curLabel].gmv) || 0;
+  var runrate = daysElapsed > 0 ? Math.round(curGmv / daysElapsed * daysInMonth) : curGmv;
+  months.push({ label: curLabel, v: curGmv, proj: runrate, current: true });
+  return months;
+}
+window.nrrAccountBranchTrendMonths = nrrAccountBranchTrendMonths;
+
+// v62: targetMonth composes with the outlet filter — lets "select a branch
+// + click a past month" show that specific combination's AOV.
+function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
+  var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
+  var targetLabel = targetMonth || nrrCommCurrentMonthLabel();
+  var want = null;
+  if (outletIds && outletIds.length) {
+    want = {};
+    outletIds.forEach(function (id) { want[id] = true; });
+  }
+  var gmv = 0, orders = 0;
+  rows.forEach(function (r) {
+    if (r.month_label !== targetLabel) return;
+    if (want && !want[r.outlet_id]) return;
+    gmv += r.gmv_ex_vat || 0;
+    orders += r.orders || 0;
+  });
+  return { current: orders > 0 ? gmv / orders : null, ordersThisMonth: orders };
+}
+window.nrrAccountBranchAov = nrrAccountBranchAov;
+
 // ── Category coverage — all 10 Freshket categories, gaps included ───────
-function nrrAccountCategoryCoverage(accountId, kamEmail) {
+// v62: targetMonth lets this reflect a past month selected via the trend
+// chart instead of always current/last.
+function nrrAccountCategoryCoverage(accountId, kamEmail, targetMonth) {
   var catRows = (window.bulkCategoriesData && window.bulkCategoriesData.byAccountId[accountId]) || [];
   var labels = _nrrAccountMonthLabels();
   var hasCur = catRows.some(function (r) { return r.month_label === labels.cur; });
-  var useLabel = hasCur ? labels.cur : labels.last; // early-month MTD may have zero category rows yet
+  var useLabel = targetMonth || (hasCur ? labels.cur : labels.last); // early-month MTD may have zero category rows yet
 
   var byCat = {};
   catRows.forEach(function (r) { if (r.month_label === useLabel) byCat[r.category] = (byCat[r.category] || 0) + r.gmv; });
@@ -588,14 +677,26 @@ window.nrrSkuDisplayPrice = nrrSkuDisplayPrice;
 // pack), so it never goes dark mid-month like the old bulk_price-gated path,
 // and never shows a raw SKU code (every listed item has a name by
 // construction).
-function nrrAccountPriceList(accountId, kamEmail) {
+// v60: targetLabel lets the drawer browse a specific past month instead of
+// always locking to "current, else last" — allRows already carries every
+// month sense_skus exports (currently MTD + 2 full prior months), this was
+// purely a JS filter, not a data limit (confirmed via Explore investigation
+// 2026-07-13). Falls back to the old cur/last behavior when targetLabel is
+// omitted or isn't actually present for this account, so every existing
+// caller keeps working unchanged.
+function nrrAccountPriceList(accountId, kamEmail, targetLabel) {
   var skuBundle = nrrSenseSkusCache[kamEmail];
   if (!skuBundle || !skuBundle.loaded) return null;
   var allRows = skuBundle.byAccountId[accountId] || [];
-  if (!allRows.length) return { items: [], useLabel: null };
+  if (!allRows.length) return { items: [], useLabel: null, availableMonths: [] };
   var labels = _nrrAccountMonthLabels();
   var hasCur = allRows.some(function (r) { return r.month_label === labels.cur; });
-  var useLabel = hasCur ? labels.cur : labels.last;
+  var monthSet = {};
+  allRows.forEach(function (r) { if (r.month_label) monthSet[r.month_label] = true; });
+  var availableMonths = Object.keys(monthSet).sort(function (a, b) {
+    return (_nrrParseThLabel(b).key || 0) - (_nrrParseThLabel(a).key || 0); // newest first
+  });
+  var useLabel = (targetLabel && monthSet[targetLabel]) ? targetLabel : (hasCur ? labels.cur : labels.last);
 
   var metaByItem = {}, skuMonthsByItem = {};
   allRows.forEach(function (r) {
@@ -639,7 +740,7 @@ function nrrAccountPriceList(accountId, kamEmail) {
     };
   });
   items.sort(function (a, b) { return b.gmv - a.gmv; });
-  return { items: items, useLabel: useLabel };
+  return { items: items, useLabel: useLabel, availableMonths: availableMonths };
 }
 window.nrrAccountPriceList = nrrAccountPriceList;
 

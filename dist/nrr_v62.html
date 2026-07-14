@@ -851,9 +851,6 @@ html, body {
 .nrr-acct-branch-row:hover { background: var(--fill); }
 .nrr-acct-branch-chk { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--green-deep); cursor: pointer; }
 .nrr-acct-branch-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-top: 8px; }
-/* v62: month-filter tag — sits above the AOV/สาขา/หมวดสินค้า stat row when a
-   past trend-chart bar is selected, mirrors the branch-filter tag's look. */
-.nrr-acct-month-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-bottom: 8px; }
 .nrr-comm-ds .ds-row-name { font-size: 15px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
 .nrr-comm-ds .ds-row-meta { font-size: 13px; font-weight: 500; color: var(--ink2); }
 .nrr-comm-ds .ds-row-value { font-family: var(--font-num); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -5265,56 +5262,32 @@ function nrrAovBand(aov) {
 }
 window.nrrAovBand = nrrAovBand;
 
-// v62: targetMonth lets the stat tile show a SPECIFIC past month (selected
-// by clicking a bar in the trend chart) instead of always the live current
-// month. `months` (from bulk_history.csv) already carries every closed
-// month's own AOV — the current-month figure alone came from portview.csv,
-// so a targeted past month is read from `months` while the current month
-// (targetMonth omitted, or explicitly equal to it) keeps the original
-// portview-based calc unchanged for every existing caller.
-function nrrAccountAov(accountId, targetMonth) {
+function nrrAccountAov(accountId) {
   var row = _nrrPortviewRowFor(accountId);
-  var curLabel = nrrCommCurrentMonthLabel();
+  var current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
   var hist = (window.bulkHistoryData && window.bulkHistoryData.byAccountId[accountId]) || [];
   var sorted = hist.slice().sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
   var months = sorted.map(function (h) { return { month: h.month_label, aov: h.orders > 0 ? h.gmv / h.orders : null, orders: h.orders }; });
-  var current, ordersThisMonth;
-  if (targetMonth && targetMonth !== curLabel) {
-    var picked = months.filter(function (m) { return m.month === targetMonth; })[0];
-    current = picked ? picked.aov : null;
-    ordersThisMonth = picked ? picked.orders : 0;
-  } else {
-    current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
-    ordersThisMonth = row ? row.orders_to_date : 0;
-  }
   var threeAgo = months.length >= 3 ? months[months.length - 3].aov : null;
   var trendPct = (current != null && threeAgo) ? Math.round((current / threeAgo - 1) * 100) : null;
   var lastMonth = months.length ? months[months.length - 1] : null;
   return {
     current: current, band: nrrAovBand(current), months: months, trendPct: trendPct,
-    ordersThisMonth: ordersThisMonth,
+    ordersThisMonth: row ? row.orders_to_date : 0,
     lastMonthAov: lastMonth ? lastMonth.aov : null, lastMonthOrders: lastMonth ? lastMonth.orders : 0
   };
 }
 window.nrrAccountAov = nrrAccountAov;
 
 // ── Outlet movement + per-outlet cycle signal (Chain accounts) ──────────
-// v62: targetMonth/prevMonth let this show a past month's outlet status
-// (selected via the trend chart) instead of always "current vs last" — the
-// per-outlet new/steady/quiet classification is inherently a THIS-vs-PREVIOUS
-// comparison, so the caller must supply both ends when targeting a past
-// month (nrr_view.js resolves prevMonth from the trend chart's own ordered
-// month list). Omitted = unchanged original current/last behavior.
-function nrrOutletMovement(accountId, targetMonth, prevMonth) {
+function nrrOutletMovement(accountId) {
   var labels = _nrrAccountMonthLabels();
-  var curLbl = targetMonth || labels.cur;
-  var lastLbl = targetMonth ? (prevMonth || null) : labels.last;
   var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
   var curByOutlet = {}, lastByOutlet = {}, nameByOutlet = {};
   rows.forEach(function (r) {
     nameByOutlet[r.outlet_id] = r.outlet_name;
-    if (r.month_label === curLbl) curByOutlet[r.outlet_id] = r;
-    if (r.month_label === lastLbl) lastByOutlet[r.outlet_id] = r;
+    if (r.month_label === labels.cur) curByOutlet[r.outlet_id] = r;
+    if (r.month_label === labels.last) lastByOutlet[r.outlet_id] = r;
   });
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
@@ -5397,11 +5370,9 @@ function nrrAccountBranchTrendMonths(accountId, outletIds) {
 }
 window.nrrAccountBranchTrendMonths = nrrAccountBranchTrendMonths;
 
-// v62: targetMonth composes with the outlet filter — lets "select a branch
-// + click a past month" show that specific combination's AOV.
-function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
+function nrrAccountBranchAov(accountId, outletIds) {
   var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
-  var targetLabel = targetMonth || nrrCommCurrentMonthLabel();
+  var curLabel = nrrCommCurrentMonthLabel();
   var want = null;
   if (outletIds && outletIds.length) {
     want = {};
@@ -5409,7 +5380,7 @@ function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
   }
   var gmv = 0, orders = 0;
   rows.forEach(function (r) {
-    if (r.month_label !== targetLabel) return;
+    if (r.month_label !== curLabel) return;
     if (want && !want[r.outlet_id]) return;
     gmv += r.gmv_ex_vat || 0;
     orders += r.orders || 0;
@@ -5419,13 +5390,11 @@ function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
 window.nrrAccountBranchAov = nrrAccountBranchAov;
 
 // ── Category coverage — all 10 Freshket categories, gaps included ───────
-// v62: targetMonth lets this reflect a past month selected via the trend
-// chart instead of always current/last.
-function nrrAccountCategoryCoverage(accountId, kamEmail, targetMonth) {
+function nrrAccountCategoryCoverage(accountId, kamEmail) {
   var catRows = (window.bulkCategoriesData && window.bulkCategoriesData.byAccountId[accountId]) || [];
   var labels = _nrrAccountMonthLabels();
   var hasCur = catRows.some(function (r) { return r.month_label === labels.cur; });
-  var useLabel = targetMonth || (hasCur ? labels.cur : labels.last); // early-month MTD may have zero category rows yet
+  var useLabel = hasCur ? labels.cur : labels.last; // early-month MTD may have zero category rows yet
 
   var byCat = {};
   catRows.forEach(function (r) { if (r.month_label === useLabel) byCat[r.category] = (byCat[r.category] || 0) + r.gmv; });
@@ -8294,7 +8263,7 @@ function nrrHandlePortfolioChange(e) {
 // loaded — the router can't know account→KAM mapping until data arrives,
 // so the check happens once that data is in hand (see nrr_router.js's own
 // comment, which anticipated exactly this).
-var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [], monthFilter: null };
+var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [] };
 
 // Shaped like the real page (mast/hero/stat-row/two lists), not one flat
 // bar — the fetch chain here includes bulk_price.csv (36MB) so this can
@@ -8341,7 +8310,6 @@ function nrrRenderAccountView(route) {
     nrrAccountState.showAllPos = false;
     nrrAccountState.showAllRisk = false;
     nrrAccountState.branchFilter = [];
-    nrrAccountState.monthFilter = null;
 
     Promise.all([
       nrrFetchSenseSkusCsv(row.kam_email), nrrFetchSenseSkuOutletCsv(row.kam_email),
@@ -8463,18 +8431,7 @@ function nrrRenderAccountTrendChart(row) {
       '<div class="nrr-acct-trend-bar-track" style="height:' + H + 'px">' + bar + '</div>' +
       '<div class="nrr-acct-trend-lbl">' + lbl + '</div></button>';
   }).join('');
-  // v62: preserve an already-active month selection across re-renders (e.g.
-  // the branch-filter checkbox triggers a full nrrRenderAccountBody, which
-  // rebuilds this chart) instead of always snapping back to the current
-  // month — otherwise picking a branch would silently clear whatever past
-  // month the user was looking at.
-  var selIdx = months.length - 1;
-  if (nrrAccountState.monthFilter) {
-    for (var si = 0; si < months.length; si++) {
-      if (months[si].label === nrrAccountState.monthFilter) { selIdx = si; break; }
-    }
-  }
-  nrrSelectAccountTrendMonth(selIdx);
+  nrrSelectAccountTrendMonth(months.length - 1);
 }
 
 function nrrSelectAccountTrendMonth(i) {
@@ -8483,20 +8440,6 @@ function nrrSelectAccountTrendMonth(i) {
   if (chart) chart.querySelectorAll('.nrr-acct-trend-col').forEach(function (c, idx) { c.classList.toggle('sel', idx === i); });
   var m = months[i];
   if (!m) return;
-
-  // v62: clicking a bar also filters AOV/หมวดสินค้า/สาขา to that month —
-  // clicking the CURRENT (rightmost) bar clears the filter back to the live
-  // default, since that's already what "no filter" shows. Only re-renders
-  // the stat-row container (#nrr-acct-stat-row), not the whole page — the
-  // chart/hero/signal lists are untouched by this.
-  var newMonthFilter = m.current ? null : m.label;
-  if (nrrAccountState.monthFilter !== newMonthFilter) {
-    nrrAccountState.monthFilter = newMonthFilter;
-    var acctRow = _nrrPortviewRowFor(nrrAccountState.accountId);
-    var statWrap = document.getElementById('nrr-acct-stat-row');
-    if (acctRow && statWrap) statWrap.outerHTML = nrrAccountStatRowHtml(acctRow, nrrAccountState.kamEmail);
-  }
-
   var maxV = Math.max.apply(null, months.map(function (x) { return x.v; }).concat([1]));
   var summary = document.getElementById('nrr-acct-trend-summary');
   if (!summary) return;
@@ -8639,24 +8582,9 @@ function nrrPriceDivBarHtml(downCount, upCount) {
 }
 
 function nrrAccountStatRowHtml(row, kamEmail) {
-  // v62: month filter — clicking a bar in the trend chart sets
-  // nrrAccountState.monthFilter to that bar's label (null = current month,
-  // the original/default behavior). prevMonth is resolved from the trend
-  // chart's own ordered month list (nrrAccountState.trendMonths) since
-  // nrrOutletMovement's new/quiet/steady classification is inherently a
-  // this-vs-previous comparison and needs both ends when targeting a month
-  // that isn't "current."
-  var monthFilter = nrrAccountState.monthFilter;
-  var prevMonth = null;
-  if (monthFilter) {
-    var tMonths = nrrAccountState.trendMonths || [];
-    for (var mi = 1; mi < tMonths.length; mi++) {
-      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
-    }
-  }
-  var aov = nrrAccountAov(row.account_id, monthFilter);
-  var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
-  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
+  var aov = nrrAccountAov(row.account_id);
+  var outlet = nrrOutletMovement(row.account_id);
+  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
   var priceList = nrrAccountPriceList(row.account_id, kamEmail);
 
   // v60: branch filter active → current-month AOV comes from bulk_outlets.csv
@@ -8664,11 +8592,10 @@ function nrrAccountStatRowHtml(row, kamEmail) {
   // account-level portview/bulk_history figures. Only the headline number +
   // band re-derive; the sparkline/trend% stay account-level (a per-branch
   // multi-month AOV series isn't needed to answer what was asked here).
-  // v62: composes with monthFilter too (branch + specific month together).
   var branchFilter = nrrAccountState.branchFilter;
   var aovCurrent = aov.current, aovBand = aov.band;
   if (branchFilter && branchFilter.length) {
-    var bAov = nrrAccountBranchAov(row.account_id, branchFilter, monthFilter);
+    var bAov = nrrAccountBranchAov(row.account_id, branchFilter);
     aovCurrent = bAov.current;
     aovBand = nrrAovBand(aovCurrent);
   }
@@ -8677,7 +8604,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     '<div class="num nrr-acct-stat-val" style="color:' + aovBand.color + '">' + (aovCurrent != null ? nrrFmtGMVExact(aovCurrent) : '—') + '</div>' +
     nrrAcctSparklineSvg(aov.months) +
     '<div class="nrr-acct-stat-sub">ระดับ <b style="color:' + aovBand.color + '">' + nrrEsc(aovBand.label) + '</b>' +
-    (!branchFilter.length && !monthFilter && aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
+    (!branchFilter.length && aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
     '</button>';
 
   // Accent color per cell reflects that cell's own health, same "colored
@@ -8739,10 +8666,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
       '</button>';
   }
 
-  var monthTag = monthFilter
-    ? '<div class="nrr-acct-month-filter-tag">กำลังดูเดือน ' + nrrEsc(monthFilter) + ' — คลิกแท่งปัจจุบันด้านบนเพื่อกลับ</div>'
-    : '';
-  return '<div id="nrr-acct-stat-row">' + monthTag + '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div></div>';
+  return '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div>';
 }
 
 // "Before → after" transformation strip — deliberately its own visual
@@ -8879,21 +8803,6 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
 
-  // v63 fix: the AOV/หมวดสินค้า/สาขา STAT TILES already respected a selected
-  // trend-chart month (nrrAccountStatRowHtml), but opening the drawer behind
-  // any of them re-fetched unfiltered current-month data — a real
-  // inconsistency the user caught live (tile said 8/10 categories, drawer
-  // said 10/10). Resolve the same monthFilter/prevMonth once here too, so
-  // every drawer matches whatever its tile is currently showing.
-  var monthFilter = nrrAccountState.monthFilter;
-  var prevMonth = null;
-  if (monthFilter) {
-    var tMonths = nrrAccountState.trendMonths || [];
-    for (var mi = 1; mi < tMonths.length; mi++) {
-      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
-    }
-  }
-
   // v60: outlet drawer doubles as the branch-filter picker — checking one
   // or more outlets here drives the trend chart + AOV tile on the page
   // behind it (nrrAccountBranchTrendMonths/nrrAccountBranchAov, both pure
@@ -8903,7 +8812,7 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   // drawer) on every toggle.
   if (key === 'outlet') {
     var renderOutletDrawer = function () {
-      var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
+      var outlet = nrrOutletMovement(row.account_id);
       document.getElementById('nrr-slideover-title').textContent =
         outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
       document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds">' + nrrOutletDrawerHtml(outlet, nrrAccountState.branchFilter) + '</div>';
@@ -8933,12 +8842,12 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
 
   var title = '', html = '';
   if (key === 'aov') {
-    var aov = nrrAccountAov(row.account_id, monthFilter);
-    title = monthFilter ? 'AOV — ' + monthFilter : 'AOV — ระดับและแนวโน้ม';
+    var aov = nrrAccountAov(row.account_id);
+    title = 'AOV — ระดับและแนวโน้ม';
     html = nrrAovDrawerHtml(aov);
   } else if (key === 'category') {
-    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
-    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket' + (monthFilter ? ' — ' + monthFilter : '');
+    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
     html = nrrCategoryDrawerHtml(cat);
   }
   document.getElementById('nrr-slideover-title').textContent = title;

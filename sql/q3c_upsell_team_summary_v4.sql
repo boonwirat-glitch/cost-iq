@@ -1,5 +1,11 @@
 -- ══════════════════════════════════════════════════════════════
--- Q3C Team Summary v7: sense_upsell_team.csv
+-- Q3C Team Summary v8: sense_upsell_team.csv
+--
+-- v8: fixed a day-1-of-quarter miscalculation in v_m1_start (see the
+-- SET statement below for the full explanation) — found during a repo-wide
+-- commission-quarterly-alignment audit, 2026-07-13. Not an active bug on
+-- any day except a literal quarter boundary; fixed before this file's
+-- first real run rather than waiting to hit it.
 --
 -- 🔴 v7 BUG FIX (do not skip — this changes real payout numbers):
 -- The v827-auto quarter-anchor change (commit 3213afa, 2026-07-06) correctly
@@ -69,7 +75,18 @@ DECLARE v_m2_start DATE; DECLARE v_m2_end DATE;
 DECLARE v_m3_start DATE; DECLARE v_m3_end DATE;
 DECLARE v_current_mo_start DATE;
 
-SET v_m1_start   = DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), QUARTER);
+-- v8 FIX (do not skip): was DATE_TRUNC(lag-1 date, QUARTER) — on the literal
+-- first calendar day of a new quarter (e.g. 2026-07-01), lag-1 is still
+-- 2026-06-30 (OLD quarter), so DATE_TRUNC(...,QUARTER) resolved to April 1
+-- (Q2's start) instead of July 1 — the whole quarter_months/elapsed_months
+-- grid silently built for the wrong quarter that one day. Same bug class
+-- v854 fixed on the JS side (_commElapsedQuarterLabels comparing real
+-- dates, not string labels) — never ported here. Which QUARTER we're in is
+-- never a lag/data-availability question (a quarter boundary is a hardcoded
+-- calendar fact), so it must NOT use the lag-1 date — only v_current_mo_start
+-- below (which decides which MONTH within the quarter is reportable yet)
+-- legitimately needs the lag-1 adjustment, and it already has it.
+SET v_m1_start   = DATE_TRUNC(CURRENT_DATE('Asia/Bangkok'), QUARTER);
 SET v_base_start = DATE_SUB(v_m1_start, INTERVAL 1 MONTH);
 SET v_base_end   = DATE_SUB(v_m1_start, INTERVAL 1 DAY);
 SET v_lookback_start = DATE_SUB(v_base_start, INTERVAL 2 MONTH);  -- Apr 1 (frozen Apr/May/Jun pool)

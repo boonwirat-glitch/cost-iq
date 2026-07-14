@@ -495,6 +495,18 @@ window.nrrEstimateKamCommission = nrrEstimateKamCommission;
 // the 0.5% outlet commission, excluded here — /nrr derives this for free
 // from its own already-loaded QNRR rows (movement_type === 'expansion'),
 // no extra fetch needed.
+// v860-fix (2026-07-13): was hardcoded to evaluate ONLY currLabel — no
+// cumulative-quarter logic existed here at all, unlike the real engine's
+// v836 fix (_commComputeUpsellSku + _commElapsedQuarterLabels,
+// 07a_commission_engine.js:177-194,294-340). A shop holding an elevated
+// purchase level for 3 months would show only 1 month's worth here while
+// Sense's own numbers (and the locked snapshot, once it exists) reflected
+// the full cumulative streak — found during a repo-wide commission-
+// alignment audit. Now mirrors that exact algorithm: classify EVERY
+// elapsed quarter month, keep only the trailing unbroken qualifying
+// streak, sum it. In non-quarterly use (baseMonthIso falsy — /nrr never
+// actually calls it that way today) evalLabels degenerates to exactly
+// [currLabel], i.e. the original single-month behavior, unchanged.
 function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
   var EMPTY = { p1: { gmv: 0, comm: 0, groups: [] }, p3: { gmv_incremental: 0, comm: 0, groups: [] },
                 total_comm: 0, total_gmv_eligible: 0 };
@@ -511,6 +523,7 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 
   var currLabel = nrrCommCurrentMonthLabel();
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
+  var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
 
   var p1Groups = [], p3Groups = [];
 
@@ -525,36 +538,58 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 
       Object.keys(outletGroups).forEach(function (groupKey) {
         var monthData = outletGroups[groupKey];
-        var currRow = monthData[currLabel];
-        if (!currRow) return;
-
-        var rawTotalGmv = currRow.totalGmv || 0;
-        var rawExistingGmv = currRow.existingGmv || 0;
+        // v860-fix: isP1 is a STABLE property of this (account,outlet,
+        // groupKey) triple once the baseline is frozen (quarterly mode
+        // never updates outletBaseline mid-quarter) — matches the real
+        // engine's identical reasoning, so classifying once outside the
+        // per-month loop below is correct, not an approximation.
         var isP1 = !outletBaseline[groupKey];
 
-        if (isP1) {
-          if (rawTotalGmv >= p1MinGmv) {
-            var p1Comm = rawTotalGmv * p1Rate;
-            p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: rawTotalGmv, commission: p1Comm });
+        var perMonth = evalLabels.map(function (lbl) {
+          var row = monthData[lbl];
+          if (!row) return { label: lbl, qualifies: false, contribution: 0 };
+          var rawTotalGmv = row.totalGmv || 0;
+          var rawExistingGmv = row.existingGmv || 0;
+          if (isP1) {
+            if (rawTotalGmv >= p1MinGmv) return { label: lbl, qualifies: true, contribution: rawTotalGmv };
+            return { label: lbl, qualifies: false, contribution: 0 };
           }
-        } else {
           var maxBaseline = 0, maxBaselineMonth = p3Labels[0];
-          p3Labels.forEach(function (lbl) {
-            var lRow = monthData[lbl];
+          p3Labels.forEach(function (l) {
+            var lRow = monthData[l];
             if (!lRow) return;
-            var d = nrrDaysInLabel(lbl);
+            var d = nrrDaysInLabel(l);
             var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = lbl; }
+            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
           });
           if (rawExistingGmv > maxBaseline * p3Thresh) {
             var incremental = rawExistingGmv - maxBaseline;
             if (incremental >= p3MinIncr) {
-              var p3Comm = incremental * p3Rate;
-              p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
-                existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth,
-                incremental: incremental, commission: p3Comm });
+              return { label: lbl, qualifies: true, contribution: incremental,
+                       existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth };
             }
           }
+          return { label: lbl, qualifies: false, contribution: 0 };
+        });
+
+        // Streak = every month AFTER the most recent gap (a month that
+        // failed to qualify, or had no purchase row at all). No gap ever
+        // → streak starts at the first evaluated month. Degenerates to the
+        // single-entry perMonth array in non-quarterly use.
+        var lastGapIdx = -1;
+        perMonth.forEach(function (m, i) { if (!m.qualifies) lastGapIdx = i; });
+        var streak = perMonth.slice(lastGapIdx + 1);
+        if (streak.length === 0) return;
+
+        var cumAmount = streak.reduce(function (s, m) { return s + m.contribution; }, 0);
+        var last = streak[streak.length - 1];
+
+        if (isP1) {
+          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: cumAmount, commission: cumAmount * p1Rate });
+        } else {
+          p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
+            existing_curr: last.existing_curr, max_baseline: last.max_baseline, max_baseline_month: last.max_baseline_month,
+            incremental: cumAmount, commission: cumAmount * p3Rate });
         }
       });
     });

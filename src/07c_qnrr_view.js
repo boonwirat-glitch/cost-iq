@@ -471,6 +471,14 @@ function _qnrrComputeForCommission(kamEmail, scope, asOfPeriod) {
       expansionGmv:     segs.expansion  || 0,
       comebackGmv:      segs.comeback   || 0,
       cohortCount:      outlets.core_nrr || 0,
+      // v860-fix: monthData already computes these correctly (line ~319-335
+      // above) but this return object never forwarded them — 07b_cds.js's
+      // RUN RATE column/totals silently fell back to two DIFFERENT (and
+      // wrong) constants when they came through as undefined, producing
+      // "RUN RATE == MTD" per row and a ~30x-inflated totals-bar number.
+      // Forwarding the real values here fixes both call sites at once.
+      daysElapsed:      monthData.curr_days,
+      daysInMonth:      monthData.days_in_month,
       // Quarterly metadata — stored in breakdown snapshot
       prevMonth:        baseMoLabel,           // 'มิ.ย. 2569' — fixed label for Q3
       base_month:       baseMo,                // '2026-06'

@@ -851,9 +851,6 @@ html, body {
 .nrr-acct-branch-row:hover { background: var(--fill); }
 .nrr-acct-branch-chk { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--green-deep); cursor: pointer; }
 .nrr-acct-branch-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-top: 8px; }
-/* v62: month-filter tag — sits above the AOV/สาขา/หมวดสินค้า stat row when a
-   past trend-chart bar is selected, mirrors the branch-filter tag's look. */
-.nrr-acct-month-filter-tag { font-size: 11.5px; font-weight: 700; color: var(--green-deep); background: var(--green-soft); border-radius: var(--r-pill); padding: 4px 10px; display: inline-block; margin-bottom: 8px; }
 .nrr-comm-ds .ds-row-name { font-size: 15px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
 .nrr-comm-ds .ds-row-meta { font-size: 13px; font-weight: 500; color: var(--ink2); }
 .nrr-comm-ds .ds-row-value { font-family: var(--font-num); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -2492,54 +2489,21 @@ function nrrShortThaiDate(iso) {
 }
 window.nrrShortThaiDate = nrrShortThaiDate;
 
-// v860-fix (2026-07-13): this comment used to say P1's baseline
-// "deliberately floats with today's date, faithfully replicating" the real
-// engine — that was true before commit 44c8bee, but the real engine's own
-// P1 baseline now FREEZES to the quarter's base month in quarterly mode
-// (02_data_pipeline.js:1061-1065, the `_q3cBaseMonth` branch). This was a
-// real, unfixed divergence between /nrr's drill-down and Sense's actual
-// payout math — found during a repo-wide commission-quarterly-alignment
-// audit. Now mirrors that branch exactly: pass baseMonthIso (/nrr always
-// does — QNRR_CFG.base_month is always set) to freeze the window; the
-// rolling fallback below only exists for signature parity with the real
-// engine, which still supports a non-quarterly mode /nrr doesn't need.
-function nrrP1BaselineLabels(baseMonthIso) {
-  var set = {};
-  if (baseMonthIso) {
-    var p = baseMonthIso.split('-');
-    var yr = parseInt(p[0], 10), mo = parseInt(p[1], 10);
-    [0, 1, 2].forEach(function (i) {
-      var d = new Date(yr, mo - 1 - i, 1);
-      set[nrrThMonthLabel(d)] = true;
-    });
-    return set;
-  }
+// Rolling, "today"-relative 3-month window — matches 02_data_pipeline.js's
+// _p1BaselineLabels exactly (lag-1 anchor, months 1/2/3 back from there).
+// NOTE: this is deliberately NOT the quarterly-pinned base_month window —
+// P1's "has this outlet ever bought this group" check floats with today's
+// date in the real system too; only P3's baseline magnitude is quarter-pinned
+// (see nrrP3WindowLabels). Faithfully replicating both, not "fixing" either.
+function nrrP1BaselineLabels() {
   var lag = new Date(); lag.setDate(lag.getDate() - 1);
+  var set = {};
   [1, 2, 3].forEach(function (i) {
     var d = new Date(lag.getFullYear(), lag.getMonth() - i, 1);
     set[nrrThMonthLabel(d)] = true;
   });
   return set;
 }
-
-// Mirrors 07a_commission_engine.js's _commElapsedQuarterLabels exactly —
-// every ELAPSED month of the quarter (base_month+1, +2, +3, capped at
-// today's lag-1 date) — so /nrr's P1/P3 drill-down can sum a real
-// cumulative streak instead of evaluating only the current month.
-function _nrrCommElapsedQuarterLabels(baseMonthIso) {
-  if (!baseMonthIso) return [];
-  var parts = baseMonthIso.split('-');
-  var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
-  var lag = new Date(); lag.setDate(lag.getDate() - 1);
-  var out = [];
-  for (var i = 1; i <= 3; i++) {
-    var d = new Date(baseYr, baseMo - 1 + i, 1);
-    if (d > lag) break;
-    out.push(nrrThMonthLabel(d));
-  }
-  return out;
-}
-window._nrrCommElapsedQuarterLabels = _nrrCommElapsedQuarterLabels;
 
 function nrrCommCurrentMonthLabel() {
   var lag = new Date(); lag.setDate(lag.getDate() - 1);
@@ -2573,7 +2537,7 @@ function nrrDaysInLabel(label) {
 }
 window.nrrDaysInLabel = nrrDaysInLabel;
 
-async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
+async function nrrFetchUpsellBundle(kamEmail) {
   if (nrrUpsellBundleCache[kamEmail] && nrrUpsellBundleCache[kamEmail].loaded) return nrrUpsellBundleCache[kamEmail];
   if (nrrUpsellBundleInFlight[kamEmail]) return nrrUpsellBundleInFlight[kamEmail];
   var safeKey = _nrrKamSafeKey(kamEmail);
@@ -2587,7 +2551,7 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
       var lines = text.trim().split(/\r?\n/).filter(function (l) { return l.trim(); });
       if (lines.length && /account_id/i.test(lines[0])) lines = lines.slice(1);
 
-      var p1Labels = nrrP1BaselineLabels(baseMonthIso);
+      var p1Labels = nrrP1BaselineLabels();
       var currLabel = nrrCommCurrentMonthLabel();
       var data = {};             // accountId -> outletId -> groupKey -> monthLabel -> {existingGmv,totalGmv}
       var baselineGroups = {};   // accountId -> outletId -> Set-like object of groupKey -> true
@@ -2609,15 +2573,7 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
         if (!data[accountId][outletId][groupKey]) data[accountId][outletId][groupKey] = {};
         data[accountId][outletId][groupKey][monthLabel] = { existingGmv: existingGmv, totalGmv: totalGmv };
 
-        // v860-fix: mirrors 02_data_pipeline.js:1104-1111's v854 fix — in
-        // quarterly mode (baseMonthIso set) p1Labels is already a closed,
-        // past-bounded window ending at the frozen base month, so it can
-        // never include the row being tested by construction. Skip the
-        // !==currLabel guard entirely in that mode (it exists only to stop
-        // rolling mode's "current month" from counting as its own
-        // baseline, and on the quarter's own day-1 the lag anchor still
-        // reads base_month itself, wrongly colliding with it otherwise).
-        if ((baseMonthIso || monthLabel !== currLabel) && totalGmv > 0 && p1Labels[monthLabel]) {
+        if (monthLabel !== currLabel && totalGmv > 0 && p1Labels[monthLabel]) {
           if (!baselineGroups[accountId]) baselineGroups[accountId] = {};
           if (!baselineGroups[accountId][outletId]) baselineGroups[accountId][outletId] = {};
           baselineGroups[accountId][outletId][groupKey] = true;
@@ -4548,18 +4504,6 @@ window.nrrEstimateKamCommission = nrrEstimateKamCommission;
 // the 0.5% outlet commission, excluded here — /nrr derives this for free
 // from its own already-loaded QNRR rows (movement_type === 'expansion'),
 // no extra fetch needed.
-// v860-fix (2026-07-13): was hardcoded to evaluate ONLY currLabel — no
-// cumulative-quarter logic existed here at all, unlike the real engine's
-// v836 fix (_commComputeUpsellSku + _commElapsedQuarterLabels,
-// 07a_commission_engine.js:177-194,294-340). A shop holding an elevated
-// purchase level for 3 months would show only 1 month's worth here while
-// Sense's own numbers (and the locked snapshot, once it exists) reflected
-// the full cumulative streak — found during a repo-wide commission-
-// alignment audit. Now mirrors that exact algorithm: classify EVERY
-// elapsed quarter month, keep only the trailing unbroken qualifying
-// streak, sum it. In non-quarterly use (baseMonthIso falsy — /nrr never
-// actually calls it that way today) evalLabels degenerates to exactly
-// [currLabel], i.e. the original single-month behavior, unchanged.
 function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
   var EMPTY = { p1: { gmv: 0, comm: 0, groups: [] }, p3: { gmv_incremental: 0, comm: 0, groups: [] },
                 total_comm: 0, total_gmv_eligible: 0 };
@@ -4576,7 +4520,6 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 
   var currLabel = nrrCommCurrentMonthLabel();
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
-  var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
 
   var p1Groups = [], p3Groups = [];
 
@@ -4591,58 +4534,36 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 
       Object.keys(outletGroups).forEach(function (groupKey) {
         var monthData = outletGroups[groupKey];
-        // v860-fix: isP1 is a STABLE property of this (account,outlet,
-        // groupKey) triple once the baseline is frozen (quarterly mode
-        // never updates outletBaseline mid-quarter) — matches the real
-        // engine's identical reasoning, so classifying once outside the
-        // per-month loop below is correct, not an approximation.
+        var currRow = monthData[currLabel];
+        if (!currRow) return;
+
+        var rawTotalGmv = currRow.totalGmv || 0;
+        var rawExistingGmv = currRow.existingGmv || 0;
         var isP1 = !outletBaseline[groupKey];
 
-        var perMonth = evalLabels.map(function (lbl) {
-          var row = monthData[lbl];
-          if (!row) return { label: lbl, qualifies: false, contribution: 0 };
-          var rawTotalGmv = row.totalGmv || 0;
-          var rawExistingGmv = row.existingGmv || 0;
-          if (isP1) {
-            if (rawTotalGmv >= p1MinGmv) return { label: lbl, qualifies: true, contribution: rawTotalGmv };
-            return { label: lbl, qualifies: false, contribution: 0 };
+        if (isP1) {
+          if (rawTotalGmv >= p1MinGmv) {
+            var p1Comm = rawTotalGmv * p1Rate;
+            p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: rawTotalGmv, commission: p1Comm });
           }
+        } else {
           var maxBaseline = 0, maxBaselineMonth = p3Labels[0];
-          p3Labels.forEach(function (l) {
-            var lRow = monthData[l];
+          p3Labels.forEach(function (lbl) {
+            var lRow = monthData[lbl];
             if (!lRow) return;
-            var d = nrrDaysInLabel(l);
+            var d = nrrDaysInLabel(lbl);
             var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
+            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = lbl; }
           });
           if (rawExistingGmv > maxBaseline * p3Thresh) {
             var incremental = rawExistingGmv - maxBaseline;
             if (incremental >= p3MinIncr) {
-              return { label: lbl, qualifies: true, contribution: incremental,
-                       existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth };
+              var p3Comm = incremental * p3Rate;
+              p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
+                existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth,
+                incremental: incremental, commission: p3Comm });
             }
           }
-          return { label: lbl, qualifies: false, contribution: 0 };
-        });
-
-        // Streak = every month AFTER the most recent gap (a month that
-        // failed to qualify, or had no purchase row at all). No gap ever
-        // → streak starts at the first evaluated month. Degenerates to the
-        // single-entry perMonth array in non-quarterly use.
-        var lastGapIdx = -1;
-        perMonth.forEach(function (m, i) { if (!m.qualifies) lastGapIdx = i; });
-        var streak = perMonth.slice(lastGapIdx + 1);
-        if (streak.length === 0) return;
-
-        var cumAmount = streak.reduce(function (s, m) { return s + m.contribution; }, 0);
-        var last = streak[streak.length - 1];
-
-        if (isP1) {
-          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: cumAmount, commission: cumAmount * p1Rate });
-        } else {
-          p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
-            existing_curr: last.existing_curr, max_baseline: last.max_baseline, max_baseline_month: last.max_baseline_month,
-            incremental: cumAmount, commission: cumAmount * p3Rate });
         }
       });
     });
@@ -5265,56 +5186,32 @@ function nrrAovBand(aov) {
 }
 window.nrrAovBand = nrrAovBand;
 
-// v62: targetMonth lets the stat tile show a SPECIFIC past month (selected
-// by clicking a bar in the trend chart) instead of always the live current
-// month. `months` (from bulk_history.csv) already carries every closed
-// month's own AOV — the current-month figure alone came from portview.csv,
-// so a targeted past month is read from `months` while the current month
-// (targetMonth omitted, or explicitly equal to it) keeps the original
-// portview-based calc unchanged for every existing caller.
-function nrrAccountAov(accountId, targetMonth) {
+function nrrAccountAov(accountId) {
   var row = _nrrPortviewRowFor(accountId);
-  var curLabel = nrrCommCurrentMonthLabel();
+  var current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
   var hist = (window.bulkHistoryData && window.bulkHistoryData.byAccountId[accountId]) || [];
   var sorted = hist.slice().sort(function (a, b) { return (_nrrParseThLabel(a.month_label).key || 0) - (_nrrParseThLabel(b.month_label).key || 0); });
   var months = sorted.map(function (h) { return { month: h.month_label, aov: h.orders > 0 ? h.gmv / h.orders : null, orders: h.orders }; });
-  var current, ordersThisMonth;
-  if (targetMonth && targetMonth !== curLabel) {
-    var picked = months.filter(function (m) { return m.month === targetMonth; })[0];
-    current = picked ? picked.aov : null;
-    ordersThisMonth = picked ? picked.orders : 0;
-  } else {
-    current = (row && row.orders_to_date > 0) ? row.gmv_to_date / row.orders_to_date : null;
-    ordersThisMonth = row ? row.orders_to_date : 0;
-  }
   var threeAgo = months.length >= 3 ? months[months.length - 3].aov : null;
   var trendPct = (current != null && threeAgo) ? Math.round((current / threeAgo - 1) * 100) : null;
   var lastMonth = months.length ? months[months.length - 1] : null;
   return {
     current: current, band: nrrAovBand(current), months: months, trendPct: trendPct,
-    ordersThisMonth: ordersThisMonth,
+    ordersThisMonth: row ? row.orders_to_date : 0,
     lastMonthAov: lastMonth ? lastMonth.aov : null, lastMonthOrders: lastMonth ? lastMonth.orders : 0
   };
 }
 window.nrrAccountAov = nrrAccountAov;
 
 // ── Outlet movement + per-outlet cycle signal (Chain accounts) ──────────
-// v62: targetMonth/prevMonth let this show a past month's outlet status
-// (selected via the trend chart) instead of always "current vs last" — the
-// per-outlet new/steady/quiet classification is inherently a THIS-vs-PREVIOUS
-// comparison, so the caller must supply both ends when targeting a past
-// month (nrr_view.js resolves prevMonth from the trend chart's own ordered
-// month list). Omitted = unchanged original current/last behavior.
-function nrrOutletMovement(accountId, targetMonth, prevMonth) {
+function nrrOutletMovement(accountId) {
   var labels = _nrrAccountMonthLabels();
-  var curLbl = targetMonth || labels.cur;
-  var lastLbl = targetMonth ? (prevMonth || null) : labels.last;
   var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
   var curByOutlet = {}, lastByOutlet = {}, nameByOutlet = {};
   rows.forEach(function (r) {
     nameByOutlet[r.outlet_id] = r.outlet_name;
-    if (r.month_label === curLbl) curByOutlet[r.outlet_id] = r;
-    if (r.month_label === lastLbl) lastByOutlet[r.outlet_id] = r;
+    if (r.month_label === labels.cur) curByOutlet[r.outlet_id] = r;
+    if (r.month_label === labels.last) lastByOutlet[r.outlet_id] = r;
   });
   var acctRow = _nrrPortviewRowFor(accountId);
   var daysElapsed = (acctRow && acctRow.days_elapsed) || 1;
@@ -5397,11 +5294,9 @@ function nrrAccountBranchTrendMonths(accountId, outletIds) {
 }
 window.nrrAccountBranchTrendMonths = nrrAccountBranchTrendMonths;
 
-// v62: targetMonth composes with the outlet filter — lets "select a branch
-// + click a past month" show that specific combination's AOV.
-function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
+function nrrAccountBranchAov(accountId, outletIds) {
   var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
-  var targetLabel = targetMonth || nrrCommCurrentMonthLabel();
+  var curLabel = nrrCommCurrentMonthLabel();
   var want = null;
   if (outletIds && outletIds.length) {
     want = {};
@@ -5409,7 +5304,7 @@ function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
   }
   var gmv = 0, orders = 0;
   rows.forEach(function (r) {
-    if (r.month_label !== targetLabel) return;
+    if (r.month_label !== curLabel) return;
     if (want && !want[r.outlet_id]) return;
     gmv += r.gmv_ex_vat || 0;
     orders += r.orders || 0;
@@ -5419,13 +5314,11 @@ function nrrAccountBranchAov(accountId, outletIds, targetMonth) {
 window.nrrAccountBranchAov = nrrAccountBranchAov;
 
 // ── Category coverage — all 10 Freshket categories, gaps included ───────
-// v62: targetMonth lets this reflect a past month selected via the trend
-// chart instead of always current/last.
-function nrrAccountCategoryCoverage(accountId, kamEmail, targetMonth) {
+function nrrAccountCategoryCoverage(accountId, kamEmail) {
   var catRows = (window.bulkCategoriesData && window.bulkCategoriesData.byAccountId[accountId]) || [];
   var labels = _nrrAccountMonthLabels();
   var hasCur = catRows.some(function (r) { return r.month_label === labels.cur; });
-  var useLabel = targetMonth || (hasCur ? labels.cur : labels.last); // early-month MTD may have zero category rows yet
+  var useLabel = hasCur ? labels.cur : labels.last; // early-month MTD may have zero category rows yet
 
   var byCat = {};
   catRows.forEach(function (r) { if (r.month_label === useLabel) byCat[r.category] = (byCat[r.category] || 0) + r.gmv; });
@@ -8294,7 +8187,7 @@ function nrrHandlePortfolioChange(e) {
 // loaded — the router can't know account→KAM mapping until data arrives,
 // so the check happens once that data is in hand (see nrr_router.js's own
 // comment, which anticipated exactly this).
-var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [], monthFilter: null };
+var nrrAccountState = { accountId: null, kamEmail: null, trendMonths: null, showAllPos: false, showAllRisk: false, branchFilter: [] };
 
 // Shaped like the real page (mast/hero/stat-row/two lists), not one flat
 // bar — the fetch chain here includes bulk_price.csv (36MB) so this can
@@ -8341,7 +8234,6 @@ function nrrRenderAccountView(route) {
     nrrAccountState.showAllPos = false;
     nrrAccountState.showAllRisk = false;
     nrrAccountState.branchFilter = [];
-    nrrAccountState.monthFilter = null;
 
     Promise.all([
       nrrFetchSenseSkusCsv(row.kam_email), nrrFetchSenseSkuOutletCsv(row.kam_email),
@@ -8463,18 +8355,7 @@ function nrrRenderAccountTrendChart(row) {
       '<div class="nrr-acct-trend-bar-track" style="height:' + H + 'px">' + bar + '</div>' +
       '<div class="nrr-acct-trend-lbl">' + lbl + '</div></button>';
   }).join('');
-  // v62: preserve an already-active month selection across re-renders (e.g.
-  // the branch-filter checkbox triggers a full nrrRenderAccountBody, which
-  // rebuilds this chart) instead of always snapping back to the current
-  // month — otherwise picking a branch would silently clear whatever past
-  // month the user was looking at.
-  var selIdx = months.length - 1;
-  if (nrrAccountState.monthFilter) {
-    for (var si = 0; si < months.length; si++) {
-      if (months[si].label === nrrAccountState.monthFilter) { selIdx = si; break; }
-    }
-  }
-  nrrSelectAccountTrendMonth(selIdx);
+  nrrSelectAccountTrendMonth(months.length - 1);
 }
 
 function nrrSelectAccountTrendMonth(i) {
@@ -8483,20 +8364,6 @@ function nrrSelectAccountTrendMonth(i) {
   if (chart) chart.querySelectorAll('.nrr-acct-trend-col').forEach(function (c, idx) { c.classList.toggle('sel', idx === i); });
   var m = months[i];
   if (!m) return;
-
-  // v62: clicking a bar also filters AOV/หมวดสินค้า/สาขา to that month —
-  // clicking the CURRENT (rightmost) bar clears the filter back to the live
-  // default, since that's already what "no filter" shows. Only re-renders
-  // the stat-row container (#nrr-acct-stat-row), not the whole page — the
-  // chart/hero/signal lists are untouched by this.
-  var newMonthFilter = m.current ? null : m.label;
-  if (nrrAccountState.monthFilter !== newMonthFilter) {
-    nrrAccountState.monthFilter = newMonthFilter;
-    var acctRow = _nrrPortviewRowFor(nrrAccountState.accountId);
-    var statWrap = document.getElementById('nrr-acct-stat-row');
-    if (acctRow && statWrap) statWrap.outerHTML = nrrAccountStatRowHtml(acctRow, nrrAccountState.kamEmail);
-  }
-
   var maxV = Math.max.apply(null, months.map(function (x) { return x.v; }).concat([1]));
   var summary = document.getElementById('nrr-acct-trend-summary');
   if (!summary) return;
@@ -8639,24 +8506,9 @@ function nrrPriceDivBarHtml(downCount, upCount) {
 }
 
 function nrrAccountStatRowHtml(row, kamEmail) {
-  // v62: month filter — clicking a bar in the trend chart sets
-  // nrrAccountState.monthFilter to that bar's label (null = current month,
-  // the original/default behavior). prevMonth is resolved from the trend
-  // chart's own ordered month list (nrrAccountState.trendMonths) since
-  // nrrOutletMovement's new/quiet/steady classification is inherently a
-  // this-vs-previous comparison and needs both ends when targeting a month
-  // that isn't "current."
-  var monthFilter = nrrAccountState.monthFilter;
-  var prevMonth = null;
-  if (monthFilter) {
-    var tMonths = nrrAccountState.trendMonths || [];
-    for (var mi = 1; mi < tMonths.length; mi++) {
-      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
-    }
-  }
-  var aov = nrrAccountAov(row.account_id, monthFilter);
-  var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
-  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
+  var aov = nrrAccountAov(row.account_id);
+  var outlet = nrrOutletMovement(row.account_id);
+  var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
   var priceList = nrrAccountPriceList(row.account_id, kamEmail);
 
   // v60: branch filter active → current-month AOV comes from bulk_outlets.csv
@@ -8664,11 +8516,10 @@ function nrrAccountStatRowHtml(row, kamEmail) {
   // account-level portview/bulk_history figures. Only the headline number +
   // band re-derive; the sparkline/trend% stay account-level (a per-branch
   // multi-month AOV series isn't needed to answer what was asked here).
-  // v62: composes with monthFilter too (branch + specific month together).
   var branchFilter = nrrAccountState.branchFilter;
   var aovCurrent = aov.current, aovBand = aov.band;
   if (branchFilter && branchFilter.length) {
-    var bAov = nrrAccountBranchAov(row.account_id, branchFilter, monthFilter);
+    var bAov = nrrAccountBranchAov(row.account_id, branchFilter);
     aovCurrent = bAov.current;
     aovBand = nrrAovBand(aovCurrent);
   }
@@ -8677,7 +8528,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
     '<div class="num nrr-acct-stat-val" style="color:' + aovBand.color + '">' + (aovCurrent != null ? nrrFmtGMVExact(aovCurrent) : '—') + '</div>' +
     nrrAcctSparklineSvg(aov.months) +
     '<div class="nrr-acct-stat-sub">ระดับ <b style="color:' + aovBand.color + '">' + nrrEsc(aovBand.label) + '</b>' +
-    (!branchFilter.length && !monthFilter && aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
+    (!branchFilter.length && aov.trendPct != null ? ' · ' + (aov.trendPct >= 0 ? 'โต' : 'ลด') + ' ' + Math.abs(aov.trendPct) + '%/3 เดือน' : '') + '</div>' +
     '</button>';
 
   // Accent color per cell reflects that cell's own health, same "colored
@@ -8739,10 +8590,7 @@ function nrrAccountStatRowHtml(row, kamEmail) {
       '</button>';
   }
 
-  var monthTag = monthFilter
-    ? '<div class="nrr-acct-month-filter-tag">กำลังดูเดือน ' + nrrEsc(monthFilter) + ' — คลิกแท่งปัจจุบันด้านบนเพื่อกลับ</div>'
-    : '';
-  return '<div id="nrr-acct-stat-row">' + monthTag + '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div></div>';
+  return '<div class="nrr-acct-stat-row">' + aovCell + outletCell + catCell + priceCell + '</div>';
 }
 
 // "Before → after" transformation strip — deliberately its own visual
@@ -8879,21 +8727,6 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
 
-  // v63 fix: the AOV/หมวดสินค้า/สาขา STAT TILES already respected a selected
-  // trend-chart month (nrrAccountStatRowHtml), but opening the drawer behind
-  // any of them re-fetched unfiltered current-month data — a real
-  // inconsistency the user caught live (tile said 8/10 categories, drawer
-  // said 10/10). Resolve the same monthFilter/prevMonth once here too, so
-  // every drawer matches whatever its tile is currently showing.
-  var monthFilter = nrrAccountState.monthFilter;
-  var prevMonth = null;
-  if (monthFilter) {
-    var tMonths = nrrAccountState.trendMonths || [];
-    for (var mi = 1; mi < tMonths.length; mi++) {
-      if (tMonths[mi].label === monthFilter) { prevMonth = tMonths[mi - 1].label; break; }
-    }
-  }
-
   // v60: outlet drawer doubles as the branch-filter picker — checking one
   // or more outlets here drives the trend chart + AOV tile on the page
   // behind it (nrrAccountBranchTrendMonths/nrrAccountBranchAov, both pure
@@ -8903,7 +8736,7 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   // drawer) on every toggle.
   if (key === 'outlet') {
     var renderOutletDrawer = function () {
-      var outlet = nrrOutletMovement(row.account_id, monthFilter, prevMonth);
+      var outlet = nrrOutletMovement(row.account_id);
       document.getElementById('nrr-slideover-title').textContent =
         outlet.total + ' สาขา — ' + outlet.counts.steady + ' ปกติ · ' + outlet.counts.new + ' ใหม่ · ' + outlet.counts.quiet + ' เงียบ';
       document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds">' + nrrOutletDrawerHtml(outlet, nrrAccountState.branchFilter) + '</div>';
@@ -8933,12 +8766,12 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
 
   var title = '', html = '';
   if (key === 'aov') {
-    var aov = nrrAccountAov(row.account_id, monthFilter);
-    title = monthFilter ? 'AOV — ' + monthFilter : 'AOV — ระดับและแนวโน้ม';
+    var aov = nrrAccountAov(row.account_id);
+    title = 'AOV — ระดับและแนวโน้ม';
     html = nrrAovDrawerHtml(aov);
   } else if (key === 'category') {
-    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail, monthFilter);
-    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket' + (monthFilter ? ' — ' + monthFilter : '');
+    var cat = nrrAccountCategoryCoverage(row.account_id, kamEmail);
+    title = 'ซื้ออยู่ ' + cat.boughtCount + '/' + cat.total + ' หมวดของ Freshket';
     html = nrrCategoryDrawerHtml(cat);
   }
   document.getElementById('nrr-slideover-title').textContent = title;
@@ -10538,13 +10371,7 @@ function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
   var expOutlets = outletsForKam.filter(function (o) { return o.movement === 'expansion'; });
   var handoverDetail = (bd && bd.handover && bd.handover.detail) || (est && est.handover && est.handover.detail) || [];
   var skel = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
-  // v861-fix: user flagged this note (sitting right under the "Upsell P1"/
-  // "Upsell P3" headers, right next to P1/P3's own 1% rate) as reading
-  // ambiguously — the old wording put a bare "0.5%" next to those headers
-  // with no clear signal it belongs to an entirely different, separate
-  // commission line. Reworded to state the exclusion first, then explicitly
-  // say the 0.5% is earned "separately, in the Expansion line instead."
-  var p1p3Note = '<div class="nrr-rcpt-note">ไม่รวมร้านกลุ่ม Expansion — ร้านกลุ่มนั้นได้ค่าคอมฯ 0.5% แยกต่างหากในบรรทัด Expansion แทน</div>';
+  var p1p3Note = '<div class="nrr-rcpt-note">นับเฉพาะร้านนอกกลุ่ม Expansion — ร้านขยายได้ 0.5% ในบรรทัด Expansion</div>';
   var sectionsByKey = {
     nrr: nrrCommOutletListHtml(nrrOutlets, 'ยังไม่มีร้านในหมวดนี้เดือนนี้'),
     p1: p1p3Note + '<div id="' + p1ElId + '">' + skel + '</div>',
@@ -10576,7 +10403,7 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd, p1ElId
   p1ElId = p1ElId || 'nrr-comm-drawer-p1-body';
   p3ElId = p3ElId || 'nrr-comm-drawer-p3-body';
   guardFn = guardFn || function (email) { return nrrCommDrawerState && nrrCommDrawerState.kamEmail === email; };
-  nrrFetchUpsellBundle(kamEmail, QNRR_CFG.base_month).then(function (bundle) {
+  nrrFetchUpsellBundle(kamEmail).then(function (bundle) {
     if (!guardFn(kamEmail)) return;
     var p1Target = document.getElementById(p1ElId);
     var p3Target = document.getElementById(p3ElId);
