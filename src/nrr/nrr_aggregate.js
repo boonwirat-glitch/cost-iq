@@ -701,7 +701,9 @@ function _nrrBlendedBucketPct(bucketResult) {
     den += w;
     num += (bm.nrr_pct / 100) * w;
   });
-  return den > 0 ? Math.round(num / den * 100) : null;
+  // 1-decimal precision (was whole-number) — matches the compute engine's
+  // own nrr_pct fields this blends together (see nrr_logic.js).
+  return den > 0 ? Math.round(num / den * 1000) / 10 : null;
 }
 
 function _nrrBlendedBucketGmv(bucketResult) {

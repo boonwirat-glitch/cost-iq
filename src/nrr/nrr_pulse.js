@@ -13,18 +13,22 @@
 // bulkPortviewData (account pace, sku counts, churn), bulkHistoryData
 // (quarter base-month baseline, via nrrPaceSignal).
 
-var NRR_PULSE_ROT_MS = 8000;                // default rotate spotlight lists every 8s
-var nrrPulseState = { rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS };
+// v65 (major redesign — rotating full-screen SCENES, not a shared page):
+// one big idea per glance, cycling automatically — see nrr_pulse.js's own
+// header comment update below and the plan doc for the design-thinking
+// rationale (a lobby TV read for 2-3s at a time can't absorb ~24 rows of
+// simultaneous list content, which the pre-v65 "3 heroes + 4 lists on one
+// page" layout required).
+var NRR_PULSE_ROT_MS = 8000;                // default: advance to the next scene every 8s
+var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [] };
 var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
-var NRR_PULSE_REFRESH_MS = 10 * 60 * 1000; // re-pull + re-render every 10 min
-var NRR_PULSE_ARR_MAX = 5;                 // arrivals shown per block before rotating
-// v48: was 6 (one more than every other list) — with the SKU block's caption
-// line taking extra vertical space, a mismatched row count made "ต้องดูแล"
-// visibly taller/heavier than its neighbor. Matched to 5 for parity.
-var NRR_PULSE_RISK_MAX = 5;
-var NRR_PULSE_HERO_TODAY_MAX = 8;           // rows shown in the green hero's "today" mini-list
-var NRR_PULSE_HERO_RISK_MAX = 8;            // rows shown in the orange hero's top-risk mini-list
+var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
+var NRR_PULSE_REFRESH_MS = 10 * 60 * 1000;      // re-pull + re-render every 10 min
+var NRR_PULSE_SCENE_SUBROT_MS = 3500;           // internal list re-slice cadence within a scene (faster than full-scene rotation, so more names get airtime before the scene moves on)
+var NRR_PULSE_SCENE_SKU_MAX = 10;   // rows shown at once in the full-screen "new products" scene
+var NRR_PULSE_SCENE_RISK_MAX = 8;   // rows shown at once in the full-screen "needs attention" scene
+var NRR_PULSE_WINS_SPOTLIGHT_MAX = 3; // "today's wins" scene: how many first-order-today names to spotlight at once (see plan doc — this is inherently a small/sparse list, no rotation needed)
 // v56: session-only rotation-speed choices (no localStorage — user's explicit
 // choice; no /nrr-local persistence precedent existed anyway). [ms, label].
 var NRR_PULSE_ROT_CHOICES = [['5000', '5s'], ['8000', '8s'], ['15000', '15s'], ['30000', '30s']];
@@ -81,7 +85,12 @@ var _nrrPulseMeasureCanvas = null;
 function _nrrPulseTextWidth(text, font) {
   if (!_nrrPulseMeasureCanvas) _nrrPulseMeasureCanvas = document.createElement('canvas');
   var ctx = _nrrPulseMeasureCanvas.getContext('2d');
-  ctx.font = font || '800 12px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  // v65: default bumped 12px -> 16px to match the new .nrr-pulse-owner-chip
+  // font-size (every list row is bigger now that each scene owns the full
+  // screen) — MUST stay in sync with that CSS rule or the measured slot
+  // width silently goes wrong (a hard-learned lesson from v51-v55, see the
+  // comments on _nrrPulseOwnerSlotWidth/_nrrPulseRiskAmtWidth below).
+  ctx.font = font || '800 16px -apple-system, "Helvetica Neue", Arial, sans-serif';
   return ctx.measureText(text).width;
 }
 function _nrrPulseOwnerSlotWidth(items, ownerKey) {
@@ -106,8 +115,10 @@ function _nrrPulseOwnerSlotWidth(items, ownerKey) {
 function _nrrPulseRiskAmtWidth(items) {
   var maxW = 0;
   (items || []).forEach(function (it) {
-    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), '800 16px "Space Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var lblW = _nrrPulseTextWidth(it.reason || '', '700 10.5px -apple-system, "Helvetica Neue", Arial, sans-serif');
+    // v65: 16px/10.5px -> 22px/13px, matching the new .nrr-pulse-risk-amt/
+    // .nrr-pulse-risk-amt-lbl font sizes (full-screen scene, bigger rows).
+    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), '800 22px "Space Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif');
+    var lblW = _nrrPulseTextWidth(it.reason || '', '700 13px -apple-system, "Helvetica Neue", Arial, sans-serif');
     var w = Math.max(amtW, lblW);
     if (w > maxW) maxW = w;
   });
@@ -250,9 +261,9 @@ function nrrPulseModel() {
     .concat(expItems.filter(function (x) { return x.isToday; }))
     .sort(function (a, b) { return b.todayGmv - a.todayGmv; });
 
-  // ── Portfolio momentum + at-risk, from portview + history (nrrPaceSignal) ──
+  // ── At-risk accounts, from portview + history (nrrPaceSignal) ──
   var pv = window.bulkPortviewData;
-  var upside = 0, downside = 0, dangerCount = 0, newSkuAdded = 0;
+  var dangerCount = 0, newSkuAdded = 0;
   var riskItems = [];
   if (pv && pv.loaded && pv.allRows) {
     pv.allRows.forEach(function (row) {
@@ -263,10 +274,7 @@ function nrrPulseModel() {
       var pace = (typeof nrrPaceSignal === 'function') ? nrrPaceSignal(row) : { pct: null, cls: 'unknown', baseline_gmv: 0 };
       if (pace.pct == null) return; // no baseline (brand-new account) — nothing to compare
       var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
-      if (pace.cls === 'great' || pace.cls === 'safe') {
-        upside += Math.max(0, runrate - baseline);
-      } else {
-        downside += Math.max(0, baseline - runrate);
+      if (pace.cls !== 'great' && pace.cls !== 'safe') {
         // v49: "ต้องดูแล" now requires a drop of MORE than 20% below baseline
         // (pct < 80) — was nrrPaceSignal's own 'danger' band (pct < 90, i.e.
         // >10% drop), which the user found too inclusive/noisy for a "act on
@@ -297,7 +305,6 @@ function nrrPulseModel() {
   // every one, not just the rotating top-N shown) — user asked for the real
   // total ฿ at risk, not just individual row amounts.
   var riskTotal = riskItems.reduce(function (s, x) { return s + x.risk; }, 0);
-  var netMomentum = upside - downside;
 
   // ── New SKUs sold this month — named + ranked (v46) via
   // new_skus_portfolio.csv (sql/new_skus_portfolio.sql), falling back to the
@@ -327,7 +334,6 @@ function nrrPulseModel() {
     newSkuItems: newSkuItems,
     newSkuGmv: newSkuGmv,
     newSkuCount: newSkuItems.length,
-    momentum: { net: netMomentum, upside: upside, downside: downside },
     dangerCount: dangerCount,
     riskTotal: riskTotal,
     risk: riskItems,
@@ -383,80 +389,54 @@ document.addEventListener('fullscreenchange', function () {
   document.body.classList.toggle('nrr-pulse-fs-active', isFs);
   var btn = document.getElementById('nrr-pulse-fs-btn');
   if (btn) btn.textContent = isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
-  // v56: row cap (_nrrPulseEffMax) depends on document.fullscreenElement —
-  // re-fill immediately so the count changes the instant fullscreen toggles,
-  // not just on the next 8s rotation tick.
-  if (nrrPulseState.model) _nrrPulseFillLists();
+  // v56/v65: row cap (_nrrPulseEffMax) depends on document.fullscreenElement —
+  // re-show the current scene immediately so the row count changes the
+  // instant fullscreen toggles, not just on the next rotation tick.
+  if (nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
 });
 
-// v56: green hero's "มาใหม่วันนี้" mini-list — ranked by todayGmv (see the
-// bug-fix comment in nrrPulseModel), capped with an overflow line rather
-// than silently dropping accounts past the cap.
-function _nrrPulseHeroTodayRowsHtml(items) {
-  if (!items.length) return '';
-  var shown = items.slice(0, NRR_PULSE_HERO_TODAY_MAX);
-  var extra = items.length - shown.length;
-  return '<div class="nrr-pulse-hero-list">' +
-    shown.map(function (x) {
-      return '<div class="nrr-pulse-hero-row">' +
-        '<span class="nrr-pulse-hero-row-name">' + nrrEsc(x.name) + '</span>' +
-        '<span class="nrr-pulse-hero-row-amt">' + nrrFmtGMV(x.todayGmv) + '</span></div>';
-    }).join('') +
-    (extra > 0 ? '<div class="nrr-pulse-hero-row-more">+' + extra + ' ร้านอื่นๆวันนี้</div>' : '') +
-    '</div>';
-}
+// ── Scenes ───────────────────────────────────────────────────────────────
+// v65: each scene is a full-screen "moment," meant to be read in a single
+// 2-3s glance and never sharing the screen with another scene. Order is
+// fixed: wins -> skus -> risk. _nrrPulseActiveScenes(m) below decides which
+// of these actually get airtime on a given data refresh.
+// v76: dropped the "Vibe check" net-momentum scene per explicit user request
+// (removed, not hidden — no toggle to bring it back without re-adding this
+// function + its 'vibe' scene-key wiring + the .nrr-pulse-scene-vibe CSS).
 
-// v56: orange hero's top at-risk accounts — m.risk is already sorted desc
-// by shortfall (see riskItems.sort in nrrPulseModel), just take the head.
-function _nrrPulseHeroRiskRowsHtml(items) {
-  if (!items.length) return '';
-  return '<div class="nrr-pulse-hero-list">' +
-    items.slice(0, NRR_PULSE_HERO_RISK_MAX).map(function (x) {
-      return '<div class="nrr-pulse-hero-row">' +
-        '<span class="nrr-pulse-hero-row-name">' + nrrEsc(x.name) + '</span>' +
-        '<span class="nrr-pulse-hero-row-amt">−' + nrrFmtGMV(x.risk) + '</span></div>';
-    }).join('') + '</div>';
-}
-
-function _nrrPulseHeroHtml(m) {
-  var net = m.momentum.net;
-  var netCls = net >= 0 ? 'up' : 'down';
-  var netSign = net >= 0 ? '+' : '−';
-  var todayChip = m.todayCount > 0
-    ? '<span class="nrr-pulse-today-chip">＋' + m.todayCount + ' วันนี้</span>' : '';
-  var todayList = _nrrPulseHeroTodayRowsHtml(m.todayItems);
-  var riskList = _nrrPulseHeroRiskRowsHtml(m.risk);
-  return '<div class="nrr-pulse-heroes">' +
-    // new stores — v57: list moved beside the stat (not stacked below it) —
-    // the box was otherwise wasting the whole right half of its own row on
-    // blank space next to a short number/label. `.has-list` switches the box
-    // to a row layout only when there's something to show on the right;
-    // falls back to the plain stack (pre-v56 look) when todayItems is empty.
-    '<div class="nrr-pulse-hero green' + (todayList ? ' has-list' : '') + '">' +
-    '<div class="nrr-pulse-hero-main">' +
-    '<div class="nrr-pulse-hero-lbl">ร้านใหม่เดือนนี้</div>' +
-    '<div class="nrr-pulse-hero-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
-    '<div class="nrr-pulse-hero-sub">' + nrrFmtGMV(m.newStoreGmv) + ' ' + todayChip + '</div>' +
+// Scene 1 — Today's wins: cumulative monthly count (the original "137" hero,
+// kept verbatim so the whole-month running total isn't lost) + a name-forward
+// spotlight of TODAY's specific first-order arrivals (small/sparse by nature
+// — see plan doc — so top-3, no internal rotation needed). Each spotlighted
+// name carries its existing owner chip AND a new Sales/Expansion source tag,
+// both from fields the item already has (`.owner`, `.kind`) — no new data.
+function _nrrPulseSceneWinsHtml(m) {
+  var spotlight = m.todayItems.slice(0, NRR_PULSE_WINS_SPOTLIGHT_MAX);
+  var extra = m.todayItems.length - spotlight.length;
+  var slotW = _nrrPulseOwnerSlotWidth(spotlight, 'owner');
+  var rowsHtml = spotlight.length
+    ? spotlight.map(function (x) {
+        var sourceLabel = x.kind === 'sales' ? 'Sales' : 'Expansion';
+        return '<div class="nrr-pulse-spotlight-row">' +
+          '<span class="nrr-pulse-today-dot" title="เปิดบิลแรกวันนี้"></span>' +
+          '<div class="nrr-pulse-spotlight-main">' +
+          '<div class="nrr-pulse-spotlight-name">' + nrrEsc(x.name) + '</div>' +
+          (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
+          '</div>' +
+          '<span class="nrr-pulse-source-tag ' + x.kind + '">' + sourceLabel + '</span>' +
+          _nrrPulseOwnerChip(x.owner, slotW) +
+          '<div class="nrr-pulse-spotlight-amt">' + nrrFmtGMV(x.todayGmv) + '</div>' +
+          '</div>';
+      }).join('') + (extra > 0 ? '<div class="nrr-pulse-hero-row-more">+' + extra + ' ร้านอื่นๆวันนี้</div>' : '')
+    : '<div class="nrr-pulse-empty" style="color:rgba(255,255,255,.85)">— ยังไม่มีร้านใหม่วันนี้ —</div>';
+  return '<div class="nrr-pulse-scene nrr-pulse-scene-wins" data-scene="wins">' +
+    '<div class="nrr-pulse-scene-cumul">' +
+    '<div class="nrr-pulse-scene-lbl">ร้านใหม่สะสมเดือนนี้</div>' +
+    '<div class="nrr-pulse-scene-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
+    '<div class="nrr-pulse-scene-sub">' + nrrFmtGMV(m.newStoreGmv) + '</div>' +
     '</div>' +
-    todayList +
-    '</div>' +
-    // net momentum
-    '<div class="nrr-pulse-hero ' + netCls + '">' +
-    '<div class="nrr-pulse-hero-main">' +
-    '<div class="nrr-pulse-hero-lbl">โมเมนตัมสุทธิ <span style="opacity:.75;font-weight:600">(คาดการณ์เต็มเดือน)</span></div>' +
-    '<div class="nrr-pulse-hero-num">' + netSign + nrrFmtGMV(Math.abs(net)) + '</div>' +
-    '<div class="nrr-pulse-hero-sub">▲ ' + nrrFmtGMV(m.momentum.upside) + ' ได้เพิ่ม · ▼ ' + nrrFmtGMV(m.momentum.downside) + ' เสี่ยง</div>' +
-    '</div>' +
-    '</div>' +
-    // needs attention
-    '<div class="nrr-pulse-hero ' + (m.dangerCount > 0 ? 'alert' : 'calm') + (riskList ? ' has-list' : '') + '">' +
-    '<div class="nrr-pulse-hero-main">' +
-    '<div class="nrr-pulse-hero-lbl">ต้องตามด่วน</div>' +
-    '<div class="nrr-pulse-hero-num" data-count="' + m.dangerCount + '">' + m.dangerCount + '</div>' +
-    '<div class="nrr-pulse-hero-sub">ร้านยอดตกต่ำกว่าฐาน หรือเงียบไป</div>' +
-    '</div>' +
-    riskList +
-    '</div>' +
+    '<div class="nrr-pulse-spotlight-title">วันนี้</div>' +
+    '<div class="nrr-pulse-spotlight-list">' + rowsHtml + '</div>' +
     '</div>';
 }
 
@@ -465,28 +445,6 @@ function _nrrPulseWindow(items, idx, max) {
   var out = [];
   for (var i = 0; i < max; i++) out.push(items[(idx + i) % items.length]);
   return out;
-}
-
-function _nrrPulseArrivalRowsHtml(items, max) {
-  if (!items.length) return '<div class="nrr-pulse-empty">— ยังไม่มีเดือนนี้ —</div>';
-  // v54: measured once from the FULL list (not the rotating window) so the
-  // owner column's width never changes as rotation cycles through names.
-  var slotW = _nrrPulseOwnerSlotWidth(items, 'owner');
-  return _nrrPulseWindow(items, nrrPulseState.rotIdx, max).map(function (x) {
-    // v46: primary = outlet/branch name (x.name), secondary = the full legal
-    // entity name ONLY when it genuinely differs (x.sub) — was showing the
-    // long combined-entity name as the primary line, which is what made
-    // rows like "บริษัท ปตท. ... (มหาชน) ... & บริษัท ..." unreadable on a TV.
-    return '<div class="nrr-pulse-arr-row">' +
-      (x.isToday ? '<span class="nrr-pulse-today-dot" title="เปิดบิลแรกเมื่อวาน"></span>' : '<span class="nrr-pulse-arr-dot"></span>') +
-      '<div class="nrr-pulse-arr-main">' +
-      '<div class="nrr-pulse-arr-name">' + nrrEsc(x.name) + '</div>' +
-      (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
-      '</div>' +
-      _nrrPulseOwnerChip(x.owner, slotW) +
-      '<div class="nrr-pulse-arr-gmv">' + nrrFmtGMV(x.gmv) + '</div>' +
-      '</div>';
-  }).join('');
 }
 
 // v46: ranked, named new-SKU rows (once new_skus_portfolio.csv is uploaded)
@@ -526,70 +484,101 @@ function _nrrPulseRiskRowsHtml(items, max) {
   }).join('');
 }
 
-// Re-fill only the rotating list containers (called by main render + rotation
-// timer) so rotation never rebuilds the whole page.
-function _nrrPulseFillLists() {
+// Re-fill only the currently-active scene's rotating list container (called
+// on scene entry + by the scene's own sub-rotation timer) — the "skus"/"risk"
+// scenes are the only ones with a list that can outgrow its on-screen max.
+function _nrrPulseFillLists(sceneKey) {
   var m = nrrPulseState.model;
   if (!m) return;
-  var s = document.getElementById('nrr-pulse-sales-list');
-  if (s) s.innerHTML = _nrrPulseArrivalRowsHtml(m.sales.items, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
-  var e = document.getElementById('nrr-pulse-exp-list');
-  if (e) e.innerHTML = _nrrPulseArrivalRowsHtml(m.expansion.items, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
-  var r = document.getElementById('nrr-pulse-risk-list');
-  if (r) r.innerHTML = _nrrPulseRiskRowsHtml(m.risk, _nrrPulseEffMax(NRR_PULSE_RISK_MAX));
-  var sk = document.getElementById('nrr-pulse-sku-list');
-  if (sk) sk.innerHTML = _nrrPulseSkuRowsHtml(m.newSkuItems, _nrrPulseEffMax(NRR_PULSE_ARR_MAX));
+  if (sceneKey === 'skus') {
+    var sk = document.getElementById('nrr-pulse-sku-list');
+    if (sk) sk.innerHTML = _nrrPulseSkuRowsHtml(m.newSkuItems, _nrrPulseEffMax(NRR_PULSE_SCENE_SKU_MAX));
+  } else if (sceneKey === 'risk') {
+    var r = document.getElementById('nrr-pulse-risk-list');
+    if (r) r.innerHTML = _nrrPulseRiskRowsHtml(m.risk, _nrrPulseEffMax(NRR_PULSE_SCENE_RISK_MAX));
+  }
 }
 
-function _nrrPulseArrivalsHtml(m) {
-  return '<div class="nrr-pulse-arrivals">' +
-    '<div class="nrr-pulse-block teal">' +
-    '<div class="nrr-pulse-block-head"><span class="nrr-pulse-block-title">มาใหม่ · จาก Sales</span>' +
-    '<span class="nrr-pulse-block-tally">' + m.sales.count + ' ร้าน · ' + nrrFmtGMV(m.sales.gmv) + '</span></div>' +
-    '<div class="nrr-pulse-list" id="nrr-pulse-sales-list"></div>' +
-    '</div>' +
-    '<div class="nrr-pulse-block leaf">' +
-    '<div class="nrr-pulse-block-head"><span class="nrr-pulse-block-title">มาใหม่ · จาก Expansion</span>' +
-    '<span class="nrr-pulse-block-tally">' + m.expansion.count + ' สาขา · ' + nrrFmtGMV(m.expansion.gmv) + '</span></div>' +
-    '<div class="nrr-pulse-list" id="nrr-pulse-exp-list"></div>' +
-    '</div>' +
+// v65: which scenes actually get airtime this data refresh — an empty scene
+// (e.g. zero new SKUs some day) is hard-skipped from rotation, never shown
+// blank. Recomputed once per NRR_PULSE_REFRESH_MS tick, not per rotation tick.
+function _nrrPulseActiveScenes(m) {
+  var scenes = ['wins'];
+  if (m.newSkuItems.length > 0 || m.newSkuAdded > 0) scenes.push('skus');
+  if (m.risk.length > 0) scenes.push('risk');
+  return scenes;
+}
+
+// Scene 3 — New products moving. Falls back to the bare count (no
+// new_skus_portfolio.csv uploaded yet) same as the pre-v65 page did.
+function _nrrPulseSceneSkusHtml(m) {
+  if (!m.newSkuItems.length) {
+    return '<div class="nrr-pulse-scene nrr-pulse-scene-skus" data-scene="skus">' +
+      '<div class="nrr-pulse-scene-lbl">สินค้าใหม่ที่ขายได้</div>' +
+      '<div class="nrr-pulse-scene-num">＋' + m.newSkuAdded.toLocaleString() + '</div>' +
+      '<div class="nrr-pulse-scene-sub">จำนวน SKU ที่ร้านต่างๆ ซื้อเพิ่มเดือนนี้ (นับรวมทั้ง portfolio)</div>' +
+      '</div>';
+  }
+  return '<div class="nrr-pulse-scene nrr-pulse-scene-skus" data-scene="skus">' +
+    '<div class="nrr-pulse-scene-head"><span class="nrr-pulse-block-title">สินค้าใหม่ที่ขายได้</span>' +
+    '<span class="nrr-pulse-block-tally">' + m.newSkuCount + ' SKU · ' + nrrFmtGMV(m.newSkuGmv) + '</span></div>' +
+    '<div class="nrr-pulse-block-caption">สินค้าที่ร้านเริ่มซื้อเดือนนี้ — เดือนก่อนไม่เคยซื้อ และซื้อแล้วอย่างน้อย ฿1,000/ร้าน</div>' +
+    '<div class="nrr-pulse-list" id="nrr-pulse-sku-list"></div>' +
     '</div>';
 }
 
-function _nrrPulseLowerHtml(m) {
-  // v46: named + ranked once new_skus_portfolio.csv is uploaded (sql/
-  // new_skus_portfolio.sql); falls back to the v1 bare count otherwise —
-  // 404-graceful, same precedent as the Sales fix before its SQL reran.
-  // v47: show a real "N SKU" count (not just ฿) + a plain-language caption
-  // explaining what "new" means — user asked "how many SKU are new, and
-  // what does new even mean, in simple words." Definition, spelled out:
-  // an item counts once a SHOP buys it for the first time this month
-  // (didn't buy it last month) and spends at least ฿1,000 on it — summed
-  // across every shop in the portfolio.
-  var skuBlock = m.newSkuItems.length
-    ? '<div class="nrr-pulse-block sun">' +
-      '<div class="nrr-pulse-block-head"><span class="nrr-pulse-block-title">สินค้าใหม่ที่ขายได้</span>' +
-      '<span class="nrr-pulse-block-tally">' + m.newSkuCount + ' SKU · ' + nrrFmtGMV(m.newSkuGmv) + '</span></div>' +
-      '<div class="nrr-pulse-block-caption">สินค้าที่ร้านเริ่มซื้อเดือนนี้ — เดือนก่อนไม่เคยซื้อ และซื้อแล้วอย่างน้อย ฿1,000/ร้าน</div>' +
-      '<div class="nrr-pulse-list" id="nrr-pulse-sku-list"></div>' +
-      '</div>'
-    : '<div class="nrr-pulse-block sun compact">' +
-      '<div class="nrr-pulse-block-title">สินค้าใหม่ที่ขายได้</div>' +
-      '<div class="nrr-pulse-sku-num">＋' + m.newSkuAdded.toLocaleString() + '</div>' +
-      '<div class="nrr-pulse-sku-sub">จำนวน SKU ที่ร้านต่างๆ ซื้อเพิ่มเดือนนี้ (นับรวมทั้ง portfolio)</div>' +
-      '</div>';
-  return '<div class="nrr-pulse-lower">' +
-    skuBlock +
-    // at-risk list — v48: total ฿ at risk across ALL 156 (not just the
-    // rotating rows shown), + a caption defining "ฐาน" so the whole block
-    // reads as clearly as the SKU block next to it.
-    '<div class="nrr-pulse-block coral">' +
-    '<div class="nrr-pulse-block-head"><span class="nrr-pulse-block-title">ต้องดูแล — เงียบ / ยอดตก</span>' +
+// Scene 4 — Needs attention: merges the old orange hero (count + total ฿ at
+// risk) with its full list onto one screen — deliberately never shares a
+// screen with a celebratory scene.
+function _nrrPulseSceneRiskHtml(m) {
+  return '<div class="nrr-pulse-scene nrr-pulse-scene-risk" data-scene="risk">' +
+    '<div class="nrr-pulse-scene-head"><span class="nrr-pulse-block-title">ต้องดูแล — เงียบ / ยอดตก</span>' +
     '<span class="nrr-pulse-block-tally">' + m.dangerCount + ' ร้าน · −' + nrrFmtGMV(m.riskTotal) + '</span></div>' +
     '<div class="nrr-pulse-block-caption">ยอดวิ่ง (run-rate) ต่ำกว่าฐานไตรมาส (มิ.ย.) หรือหยุดสั่งซื้อไปแล้ว</div>' +
     '<div class="nrr-pulse-list" id="nrr-pulse-risk-list"></div>' +
-    '</div>' +
     '</div>';
+}
+
+// Show exactly one scene (fade via the .active class in CSS), fill its list
+// if it has one, arm/disarm the faster internal sub-rotation accordingly, and
+// re-trigger the count-up animation on that scene's own number(s) each time
+// it comes back around — so a KAM who glances back at the same scene an hour
+// later still sees the number "land," not a static already-settled figure.
+function _nrrPulseShowScene(idx) {
+  var scenes = nrrPulseState.activeScenes;
+  if (!scenes.length) return;
+  nrrPulseState.sceneIdx = ((idx % scenes.length) + scenes.length) % scenes.length;
+  var key = scenes[nrrPulseState.sceneIdx];
+  var area = document.getElementById('nrr-pulse-scene-area');
+  if (!area) return;
+  area.querySelectorAll('.nrr-pulse-scene').forEach(function (el) {
+    el.classList.toggle('active', el.dataset.scene === key);
+  });
+  if (key === 'skus' || key === 'risk') {
+    nrrPulseState.rotIdx = 0;
+    _nrrPulseFillLists(key);
+  }
+  _nrrPulseArmSceneSubRotation(key);
+  var activeEl = area.querySelector('.nrr-pulse-scene[data-scene="' + key + '"]');
+  if (activeEl) activeEl.querySelectorAll('.nrr-pulse-scene-num[data-count]').forEach(function (el) {
+    var target = parseInt(el.dataset.count, 10) || 0;
+    nrrCountUp(el, target, 800, function (n) { return Math.round(n).toLocaleString(); });
+  });
+}
+
+// Only "skus"/"risk" scenes can hold more rows than fit on screen at once —
+// re-slice their list at a faster cadence than the full-scene rotation so a
+// long risk list still gets real airtime before the board moves on, instead
+// of only ever showing its first N accounts forever.
+function _nrrPulseArmSceneSubRotation(key) {
+  if (_nrrPulseSceneSubTimer) { clearInterval(_nrrPulseSceneSubTimer); _nrrPulseSceneSubTimer = null; }
+  if (key !== 'skus' && key !== 'risk') return;
+  _nrrPulseSceneSubTimer = setInterval(function () {
+    if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
+    var max = key === 'skus' ? NRR_PULSE_SCENE_SKU_MAX : NRR_PULSE_SCENE_RISK_MAX;
+    nrrPulseState.rotIdx += _nrrPulseEffMax(max);
+    _nrrPulseFillLists(key);
+  }, NRR_PULSE_SCENE_SUBROT_MS);
 }
 
 function nrrRenderPulseView() {
@@ -607,12 +596,20 @@ function nrrRenderPulseView() {
     (typeof nrrFetchNewSkusPortfolioCsv === 'function' ? nrrFetchNewSkusPortfolioCsv(false) : Promise.resolve())
   ]).then(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') return; // navigated away mid-fetch
-    _nrrPulseRender();
+    // Order matters: _nrrPulseArmTimers() clears ALL timers (including the
+    // scene sub-rotation one) before re-arming rot+refresh — must run BEFORE
+    // _nrrPulseRender()'s _nrrPulseShowScene() call arms the sub-timer, or
+    // this would immediately wipe out the sub-rotation it just started.
     _nrrPulseArmTimers();
+    _nrrPulseRender();
   });
 }
 window.nrrRenderPulseView = nrrRenderPulseView;
 
+// v65: builds the WHOLE rotation up front — every active scene's DOM node
+// inserted into .nrr-pulse-scene-area, hidden via CSS except the active one
+// — rather than re-rendering innerHTML per rotation tick (smoother fades,
+// far less GC churn over unattended kiosk hours; see plan doc).
 function _nrrPulseRender() {
   var page = document.getElementById('nrr-pulse-page');
   if (!page) return;
@@ -622,21 +619,21 @@ function _nrrPulseRender() {
     page.innerHTML = '<div class="nrr-pulse-loading">ยังไม่มีข้อมูลภาพรวม</div>';
     return;
   }
+  var scenes = _nrrPulseActiveScenes(m);
+  nrrPulseState.activeScenes = scenes;
+  // keep showing "the same moment" across a data refresh where possible,
+  // clamped in case the previous scene got dropped for being empty now.
+  var keepIdx = Math.min(nrrPulseState.sceneIdx, scenes.length - 1);
+  var sceneHtmlByKey = { wins: _nrrPulseSceneWinsHtml, skus: _nrrPulseSceneSkusHtml, risk: _nrrPulseSceneRiskHtml };
+  var sceneAreaHtml = scenes.map(function (key) { return sceneHtmlByKey[key](m); }).join('');
   page.innerHTML =
     '<div class="nrr-pulseboard">' +
     _nrrPulseDatelineHtml(m) +
     (typeof nrrStalePortviewBannerHtml === 'function' ? nrrStalePortviewBannerHtml() : '') +
     (typeof nrrStaleBulkHistoryBannerHtml === 'function' ? nrrStaleBulkHistoryBannerHtml() : '') +
-    _nrrPulseHeroHtml(m) +
-    _nrrPulseArrivalsHtml(m) +
-    _nrrPulseLowerHtml(m) +
+    '<div class="nrr-pulse-scene-area" id="nrr-pulse-scene-area">' + sceneAreaHtml + '</div>' +
     '</div>';
-  _nrrPulseFillLists();
-  // celebratory count-up on the two integer heroes
-  page.querySelectorAll('.nrr-pulse-hero-num[data-count]').forEach(function (el) {
-    var target = parseInt(el.dataset.count, 10) || 0;
-    nrrCountUp(el, target, 800, function (n) { return Math.round(n).toLocaleString(); });
-  });
+  _nrrPulseShowScene(keepIdx < 0 ? 0 : keepIdx);
   var fsBtn = document.getElementById('nrr-pulse-fs-btn');
   if (fsBtn) fsBtn.addEventListener('click', _nrrPulseToggleFullscreen);
   var rotSeg = document.getElementById('nrr-pulse-rot-seg');
@@ -664,8 +661,7 @@ function _nrrPulseArmTimers() {
   _nrrPulseClearTimers();
   _nrrPulseRotTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
-    nrrPulseState.rotIdx += Math.max(_nrrPulseEffMax(NRR_PULSE_ARR_MAX), _nrrPulseEffMax(NRR_PULSE_RISK_MAX));
-    _nrrPulseFillLists();
+    _nrrPulseShowScene(nrrPulseState.sceneIdx + 1);
   }, nrrPulseState.rotMs);
   _nrrPulseRefreshTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
@@ -680,10 +676,18 @@ function _nrrPulseArmTimers() {
       _nrrPulseRender();
     });
   }, NRR_PULSE_REFRESH_MS);
+  // _nrrPulseClearTimers() above just wiped the scene sub-rotation timer too
+  // (e.g. when a rotation-speed pill click re-arms everything) — restart it
+  // for whichever scene is currently showing so a list-heavy scene doesn't
+  // silently lose its internal cycling until the next full-scene rotation.
+  if (nrrPulseState.activeScenes.length) {
+    _nrrPulseArmSceneSubRotation(nrrPulseState.activeScenes[nrrPulseState.sceneIdx]);
+  }
 }
 function _nrrPulseClearTimers() {
   if (_nrrPulseRotTimer) { clearInterval(_nrrPulseRotTimer); _nrrPulseRotTimer = null; }
   if (_nrrPulseRefreshTimer) { clearInterval(_nrrPulseRefreshTimer); _nrrPulseRefreshTimer = null; }
+  if (_nrrPulseSceneSubTimer) { clearInterval(_nrrPulseSceneSubTimer); _nrrPulseSceneSubTimer = null; }
   // Leaving #/pulse always exits TV fullscreen too — same cleanup hook.
   if (document.fullscreenElement) (document.exitFullscreen() || Promise.resolve()).catch(function () {});
 }

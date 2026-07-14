@@ -277,7 +277,7 @@ function nrrPortfolioPulseHtml(email, period) {
   var triple = nrrMonthTriple(result, period);
   return '<div class="nrr-port-pulse">' +
     '<div class="eyebrow">%NRR · ' + nrrEsc(QNRR_CFG.months_th[period] || period) + '</div>' +
-    '<div class="num nrr-port-pulse-pct" style="color:' + (pct != null ? nrrThresholdColorVar(pct) : 'var(--ink3)') + '">' + (pct != null ? pct + '%' : '—') + '</div>' +
+    '<div class="num nrr-port-pulse-pct" style="color:' + (pct != null ? nrrThresholdColorVar(pct) : 'var(--ink3)') + '">' + nrrFmtPct(pct) + '</div>' +
     nrrTripleHtml('lg', triple) +
     '</div>';
 }
@@ -1763,9 +1763,9 @@ function nrrRenderPulse(result) {
 
   var verdict;
   if (pct == null) verdict = 'ยังไม่มีข้อมูลเดือนนี้';
-  else if (pct >= 100) verdict = 'เหนือเป้า +' + (pct - 100) + 'pp เทียบ 100%';
-  else if (pct >= 90) verdict = 'ต่ำกว่าเป้า −' + (100 - pct) + 'pp — จับตา';
-  else verdict = 'ต่ำกว่าเป้า −' + (100 - pct) + 'pp — ต้องแก้';
+  else if (pct >= 100) verdict = 'เหนือเป้า +' + (pct - 100).toFixed(1) + 'pp เทียบ 100%';
+  else if (pct >= 90) verdict = 'ต่ำกว่าเป้า −' + (100 - pct).toFixed(1) + 'pp — จับตา';
+  else verdict = 'ต่ำกว่าเป้า −' + (100 - pct).toFixed(1) + 'pp — ต้องแก้';
 
   var satDot = '<span class="nrr-sat-dot"></span>';
   var satellitesHtml = '';
@@ -1806,7 +1806,7 @@ function nrrRenderPulse(result) {
     '<div class="nrr-pulse">' +
     '  <div class="nrr-pulse-verdict">' +
     '    <div class="eyebrow">' + nrrEsc(eyebrowLabel) + ' · ' + nrrEsc(QNRR_CFG.months_th[period] || period || '—') + '</div>' +
-    '    <div class="nrr-pulse-pct num" id="nrr-pulse-pct" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (triple && triple.is_partial ? '~' : '') + pct + '%') + '</div>' +
+    '    <div class="nrr-pulse-pct num" id="nrr-pulse-pct" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (triple && triple.is_partial ? '~' : '') + nrrFmtPct(pct)) + '</div>' +
     '    <div class="nrr-verdict">' + nrrEsc(verdict) + '</div>' + satellitesHtml +
     '  </div>' +
     '  <div class="nrr-pulse-triple">' + nrrTripleHtml('lg', triple) + '</div>' +
@@ -1836,7 +1836,7 @@ function nrrRenderTeamCards() {
   if (isAdmin && comp.rows.length >= 2) {
     var lead = comp.rows[0];
     takeaway.textContent = 'ทีม ' + lead.tl_name + ' นำที่ ' + nrrFmtPct(lead.nrr_pct) +
-      ' (' + (lead.delta_vs_org >= 0 ? '+' : '') + lead.delta_vs_org + 'pp เทียบองค์กร)';
+      ' (' + (lead.delta_vs_org >= 0 ? '+' : '') + lead.delta_vs_org.toFixed(1) + 'pp เทียบองค์กร)';
   } else { takeaway.textContent = ''; }
 
   // v7 mockup-parity: divider-split halves (no cards) — lead badge on the
@@ -1848,7 +1848,7 @@ function nrrRenderTeamCards() {
   wrap.innerHTML = rows.map(function (r) {
     var triple = nrrMonthTriple(r.result, nrrState.period);
     var pct = r.result && r.result.by_month[nrrState.period] ? r.result.by_month[nrrState.period].nrr_pct : r.nrr_pct;
-    var badge = r.tl_email === leadEmail ? '<span class="nrr-team-badge">นำ +' + leadGap + 'pp</span>' : '';
+    var badge = r.tl_email === leadEmail ? '<span class="nrr-team-badge">นำ +' + leadGap.toFixed(1) + 'pp</span>' : '';
     var sub = triple
       ? (triple.is_partial ? '~' : '') + nrrFmtGMV(triple.run_rate) + ' · MTD ' + nrrFmtGMV(triple.mtd) + ' · ' + r.outlet_count.toLocaleString() + ' ร้านค้า'
       : r.outlet_count.toLocaleString() + ' ร้านค้า';
@@ -2312,11 +2312,11 @@ function nrrCommNextStepHtml(tierTable, pct) {
   if (!tierTable) return '';
   if (!tierTable.currentTier || tierTable.currentTier.payout === 0) {
     var first = tierTable.tiers.filter(function (t) { return t.payout > 0; })[0];
-    if (first) return 'ดัน NRR อีก +' + Math.max(0, Math.ceil(Number(first.min) - pct)) + 'pp ถึงเกณฑ์แรก (' + nrrFmtGMVExact(first.payout) + ')';
+    if (first) return 'ดัน NRR อีก +' + Math.max(0, Math.ceil((Number(first.min) - pct) * 10) / 10).toFixed(1) + 'pp ถึงเกณฑ์แรก (' + nrrFmtGMVExact(first.payout) + ')';
     return 'ดัน NRR ให้ถึงเกณฑ์แรกเพื่อเริ่มรับค่าคอมฯ';
   }
   if (tierTable.nextTier) {
-    return 'อีก +' + tierTable.gapPp + 'pp ถึง ' + nrrFmtGMVExact(tierTable.nextTier.payout) + (tierTable.nextTier.label ? ' (' + nrrEsc(tierTable.nextTier.label) + ')' : '');
+    return 'อีก +' + tierTable.gapPp.toFixed(1) + 'pp ถึง ' + nrrFmtGMVExact(tierTable.nextTier.payout) + (tierTable.nextTier.label ? ' (' + nrrEsc(tierTable.nextTier.label) + ')' : '');
   }
   return 'รักษา NRR ให้อยู่ใน tier นี้จนจบเดือน';
 }
@@ -2523,7 +2523,7 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
         '<span class="ds-chev" style="transform:none">›</span>' +
         '<span style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px;text-align:left">' +
         '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
-        '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + (x.nrrPct != null ? x.nrrPct + '%' : '—') + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
+        '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + nrrFmtPct(x.nrrPct) + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
         nrrCommTierMiniHtml(r.kind, r.email, period, x.nrrPct) +
         '</span>' +
         '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
@@ -2542,7 +2542,7 @@ function nrrCommissionRowsHtml(isAdmin, rows, period) {
       '<span class="ds-chev">›</span>' +
       '<span style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px">' +
       '<span class="ds-row-name" style="flex:none">' + nrrEsc(r.name) + '</span>' +
-      '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + (x.nrrPct != null ? x.nrrPct + '%' : '—') + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
+      '<span class="ds-row-meta" style="flex:none"><span class="num" style="color:' + nrrThresholdColorVar(x.nrrPct) + '">' + nrrFmtPct(x.nrrPct) + '</span> NRR · ' + nrrEsc(x.metaLabel) + plan.rowStamp(x.status) + '</span>' +
       nrrCommTierMiniHtml(r.kind, r.email, period, x.nrrPct) +
       '</span>' +
       '<span class="ds-row-value" style="color:' + (x.snap ? 'var(--green-deep)' : 'var(--sun-deep)') + '">' + nrrFmtGMVExact(x.payoutAmt) + '</span>' +
@@ -2578,7 +2578,7 @@ function nrrCommissionTeamKamsHtml(tlEmail, period) {
     return '<button type="button" class="nrr-comm-kam-row nrr-comm-drill-btn" data-email="' + nrrEsc(x.k.email) + '" data-name="' + nrrEsc(x.k.name) + '" data-period="' + nrrEsc(period) + '">' +
       '<span style="display:flex;flex-direction:column;gap:3px;min-width:0;text-align:left">' +
       '<span class="ds-stat-label">' + nrrEsc(x.k.name) +
-      (x.pct != null ? ' · <span class="num" style="color:' + nrrThresholdColorVar(x.pct) + '">' + x.pct + '%</span>' : '') +
+      (x.pct != null ? ' · <span class="num" style="color:' + nrrThresholdColorVar(x.pct) + '">' + nrrFmtPct(x.pct) + '</span>' : '') +
       plan.rowStamp(x.status) + '</span>' +
       nrrCommTierMiniHtml('kam', x.k.email, period, x.pct) +
       '</span>' +
@@ -2705,7 +2705,7 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
     var rowStamp = (!allFinal && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr><td>' + nrrEsc(bd.team_lead_name || r.beneficiary_email) + rowStamp + '</td>' +
-      '<td>' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + '</td>' +
+      '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
       '<td>' + nrrFmtGMVExact(bd.nrr_payout || 0) + '</td>' +
       '<td>' + nrrFmtGMVExact(upsellGmv) + '</td>' +
       '<td>' + multHtml + '</td>' +
@@ -2762,7 +2762,7 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
     return '<tr>' +
       '<td><b>' + nrrEsc(bd.kam_name || r.beneficiary_email) + '</b>' + noteHtml + rowStamp +
       '<div class="nrr-comm-cell-meta">' + nrrEsc((r.beneficiary_email || '').split('@')[0]) + '</div></td>' +
-      '<td>' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + '</td>' +
+      '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
       _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + ho.retention_pct + '%' : null) +
       _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMVExact(outlet.outlet_gmv) : null) +
@@ -2841,7 +2841,7 @@ function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
   var tierTable = pct != null ? nrrCommTierTable('kam', kamEmail, period, pct) : null;
   var tierHtml = tierTable ? '<div class="nrr-comm-tier-block">' +
     '<div class="nrr-comm-tier-row">' + nrrCommTierChipHtml(tierTable) +
-    '<span class="micro">NRR ' + pct + '%</span></div>' +
+    '<span class="micro">NRR ' + nrrFmtPct(pct) + '</span></div>' +
     nrrCommProgressHtml(tierTable, pct) +
     '<div class="nrr-comm-next-step">' + nrrEsc(nrrCommNextStepHtml(tierTable, pct)) + '</div>' +
     '</div>' : '';
@@ -3041,7 +3041,7 @@ function nrrOpenSlideoverMovement(mv, month, outlets, showKam, cohort) {
     mode: 'movement', title: label + ' · ' + (QNRR_CFG.months_th[month] || month),
     sub: outlets.length + ' ร้าน',
     outlets: outlets, period: month, showKam: !!showKam, showKamChips: false, showMvChips: false,
-    negative: negative
+    showMomentumChips: true, negative: negative
   });
   nrrLoadNotesFor(outlets, month);
   // Churn/transfer_out rows show last-order-date (nrrAccountLastOrderDate,
@@ -3066,7 +3066,7 @@ function _nrrOpenSlideover(cfg) {
   document.getElementById('nrr-slideover-search').value = '';
   document.getElementById('nrr-slideover-title').textContent = cfg.title;
   document.getElementById('nrr-slideover-sub').textContent = cfg.sub || '';
-  nrrRenderSlideoverChips(cfg.showMvChips, cfg.showKamChips);
+  nrrRenderSlideoverChips(cfg.showMvChips, cfg.showKamChips, cfg.showMomentumChips);
   nrrRenderSlideoverBody();
   document.getElementById('nrr-slideover-backdrop').classList.add('on');
   document.getElementById('nrr-slideover').classList.add('on');
@@ -3090,7 +3090,10 @@ function _nrrSlideoverRowMomentum(row) {
   return nrrMomentum(base, runRate);
 }
 
-function nrrRenderSlideoverChips(showMv, showKamChips) {
+// showMomentum defaults to showMv when not passed explicitly, so existing
+// callers (kam/team, both showMv:true) keep showing it exactly as before.
+function nrrRenderSlideoverChips(showMv, showKamChips, showMomentum) {
+  if (showMomentum == null) showMomentum = showMv;
   var mvEl = document.getElementById('nrr-slideover-chips');
   var kamWrap = document.getElementById('nrr-slideover-kamwrap');
   var momEl = document.getElementById('nrr-slideover-momentum-chips');
@@ -3111,11 +3114,19 @@ function nrrRenderSlideoverChips(showMv, showKamChips) {
         nrrRenderSlideoverBody();
       });
     });
+  } else {
+    mvEl.style.display = 'none'; mvEl.innerHTML = '';
+  }
 
-    // Up/down momentum filter — orthogonal to movement type (own toggle
-    // group, own state field): a shop can be "Core NRR" AND "trending up"
-    // at the same time, so this is an independent AND-condition, not a
-    // sibling option inside the movement-type chip row.
+  // Up/down momentum filter — orthogonal to movement type (own toggle
+  // group, own state field): a shop can be "Core NRR" AND "trending up"
+  // at the same time, so this is an independent AND-condition, not a
+  // sibling option inside the movement-type chip row. Decoupled from
+  // showMv (2026-07-14) so the single-movement-type drawer opened by
+  // clicking a graph-zone number (nrrOpenSlideoverMovement) can still
+  // offer this filter even though its movement-type chip row is redundant
+  // there (every row already shares the one type you clicked into).
+  if (showMomentum) {
     var upCount = 0, downCount = 0;
     nrrSlideoverOutlets.forEach(function (o) {
       var sig = _nrrSlideoverRowMomentum(o.row);
@@ -3138,7 +3149,6 @@ function nrrRenderSlideoverChips(showMv, showKamChips) {
       });
     });
   } else {
-    mvEl.style.display = 'none'; mvEl.innerHTML = '';
     momEl.style.display = 'none'; momEl.innerHTML = '';
   }
 

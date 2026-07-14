@@ -1091,7 +1091,7 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-price-toggle.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .nrr-price-row-spark { display: block; flex: none; }
 
-/* ══ Portfolio Pulse (v45) — TV/signage morning board ═══════════════════════
+/* ══ Portfolio Pulse (v65) — TV/signage morning board ═══════════════════════
    DELIBERATE exception to the app's "no fills / hairline-only" house rule:
    this view is meant to be read across a room off a lobby TV, so it uses big
    type + saturated color blocks. Scoped entirely under .nrr-pulseboard so it
@@ -1101,12 +1101,18 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    section), silently overriding its display/flex/gap/padding since v45
    shipped. Also given its OWN page container (`.nrr-pulse-page`, NOT
    `.nrr-page`) — that shared class caps every analyst view at 1020px, wrong
-   for a landscape TV board which should use the full screen. */
+   for a landscape TV board which should use the full screen.
+   v65: major redesign — was "3 heroes + 4 lists visible simultaneously on
+   one page" (~24+ rows at once, unreadable from across a room in a 2-3s
+   glance); now 4 rotating FULL-SCREEN SCENES (one idea per glance), built
+   once per data refresh and cross-faded via .nrr-pulse-scene.active, never
+   re-rendering innerHTML per rotation tick (see nrr_pulse.js's own header
+   comment + the plan doc for the design-thinking rationale). */
 .nrr-pulse-page { max-width: 1800px; margin: 0 auto; padding: 0 40px 60px; }
-.nrr-pulseboard { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 24px; }
+.nrr-pulseboard { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 24px; height: calc(100vh - 220px); min-height: 520px; }
 .nrr-pulse-loading { padding: 60px 0; text-align: center; color: var(--ink3); font-size: 16px; }
 
-.nrr-pulse-dateline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.nrr-pulse-dateline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex: none; }
 .nrr-pulse-dateline-main { font-size: 30px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
 /* v56: fs button now shares its corner with the new rotation-speed control —
    wrapped in one flex group so .nrr-pulse-dateline's own space-between still
@@ -1133,82 +1139,85 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-pulse-fs-active .nrr-appnav-div,
 .nrr-pulse-fs-active #nrr-subnav { display: none !important; }
 .nrr-pulse-fs-active .nrr-pulse-page { max-width: 100vw; padding: 28px 48px; }
+.nrr-pulse-fs-active .nrr-pulseboard { height: calc(100vh - 56px); }
 .nrr-pulse-dateline-sub { font-size: 14px; color: var(--ink3); font-weight: 600; }
 
-/* Hero row — three big glance blocks */
-.nrr-pulse-heroes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.nrr-pulse-hero { border-radius: var(--r-lg); padding: 22px 24px; color: #fff; min-height: 150px; display: flex; flex-direction: column; }
-.nrr-pulse-hero.green { background: var(--green); }
-.nrr-pulse-hero.up    { background: var(--green); }
-.nrr-pulse-hero.down  { background: var(--coral); }
-.nrr-pulse-hero.alert { background: var(--attention); }
-.nrr-pulse-hero.calm  { background: var(--ink2); }
-/* v57: label/num/sub used to be 3 direct children of the hero's own column
-   flex + justify-content:space-between. Wrapped in one .nrr-pulse-hero-main
-   so a hero WITH a list (.has-list) can switch to a row layout — main on
-   the left, list on the right, sharing the box's existing height — instead
-   of stacking the list full-width below (which just pushed the box taller
-   and left the whole right half of the stat area blank). flex:1 here makes
-   main fill all available space in the plain (no-list) case, same as
-   before; .has-list overrides this to flex:none below. */
-.nrr-pulse-hero-main { display: flex; flex-direction: column; justify-content: space-between; flex: 1; min-width: 0; }
-.nrr-pulse-hero-lbl { font-size: 15px; font-weight: 700; opacity: 0.92; }
-.nrr-pulse-hero-num { font-family: var(--font-num); font-size: 76px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.nrr-pulse-hero-sub { font-size: 14px; font-weight: 600; opacity: 0.92; }
-.nrr-pulse-today-chip { display: inline-block; background: rgba(255,255,255,0.24); border-radius: var(--r-pill); padding: 2px 10px; font-weight: 800; margin-left: 4px; }
-/* v56/v57: green hero's "มาใหม่วันนี้" list + orange hero's top-3 risk list
-   — one shared class for both since .nrr-pulse-hero already sets
-   color:#fff for every hero variant. Sits BESIDE .nrr-pulse-hero-main (not
-   stacked below it) via .has-list switching the box to a row: main keeps
-   its natural width (flex:none), the list takes the rest (flex:1) and
-   align-items:stretch (row default) makes both columns share the box's
-   full height — main's own space-between then spreads label/num/sub across
-   that height so it lines up with the list beside it, instead of leaving
-   the whole right side blank. No max-height anywhere in this chain — the
-   box is expected to grow a little if the list has more rows than the stat
-   block is tall; the middle "โมเมนตัมสุทธิ" hero (no list, unaffected) still
-   stretches to match via the heroes row's own grid align-items:stretch and
-   just shows extra blank space, confirmed acceptable. */
-.nrr-pulse-hero.has-list { flex-direction: row; align-items: stretch; gap: 22px; }
-.nrr-pulse-hero.has-list .nrr-pulse-hero-main { flex: none; }
-.nrr-pulse-hero-list {
-  display: flex; flex-direction: column; justify-content: center; gap: 3px;
-  flex: 1; min-width: 0; border-left: 1px solid rgba(255,255,255,0.28); padding-left: 22px;
+/* ── Scene area: every active scene's node is built up front and absolutely
+   stacked here; only the .active one is visible, cross-fading via opacity
+   (never re-rendering innerHTML per rotation tick — see nrr_pulse.js). ── */
+.nrr-pulse-scene-area { position: relative; flex: 1; min-height: 0; }
+.nrr-pulse-scene {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  justify-content: center; border-radius: var(--r-lg); padding: 40px 56px;
+  opacity: 0; pointer-events: none; transition: opacity 550ms ease;
 }
-.nrr-pulse-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 700; padding: 2px 0; }
-.nrr-pulse-hero-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.95; }
-.nrr-pulse-hero-row-amt { font-family: var(--font-num); font-weight: 800; flex: none; }
-.nrr-pulse-hero-row-more { font-size: 11px; font-weight: 700; opacity: 0.75; margin-top: 2px; }
+.nrr-pulse-scene.active { opacity: 1; pointer-events: auto; }
+.nrr-pulse-scene-lbl { font-size: 22px; font-weight: 700; opacity: 0.92; }
+.nrr-pulse-scene-num { font-family: var(--font-num); font-size: 148px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; margin: 6px 0; }
+.nrr-pulse-scene-sub { font-size: 20px; font-weight: 600; opacity: 0.92; }
+.nrr-pulse-scene-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 
-/* Blocks (arrivals, sku, risk) — saturated left-accent panels */
-.nrr-pulse-arrivals { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-/* v49: was 1fr 2fr (SKU block at 1/3 width) — widened per user feedback. */
-.nrr-pulse-lower { display: grid; grid-template-columns: 1fr 1.3fr; gap: 14px; }
-.nrr-pulse-block { border-radius: var(--r-md); padding: 18px 20px; background: var(--fill); border-left: 6px solid var(--ink3); min-width: 0; }
-.nrr-pulse-hero { min-width: 0; }
-.nrr-pulse-block.teal  { border-left-color: var(--mv-teal);     background: var(--mv-teal-soft); }
-.nrr-pulse-block.leaf  { border-left-color: var(--mv-green-lt);  background: var(--mv-green-lt-soft); }
-.nrr-pulse-block.sun   { border-left-color: var(--sun);          background: var(--sun-soft); }
-.nrr-pulse-block.coral { border-left-color: var(--coral);        background: var(--coral-soft); }
-.nrr-pulse-block.compact { display: flex; flex-direction: column; justify-content: center; }
-.nrr-pulse-block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.nrr-pulse-block-title { font-size: 17px; font-weight: 800; color: var(--ink); }
-.nrr-pulse-block-tally { font-size: 15px; font-weight: 700; color: var(--ink2); font-family: var(--font-num); }
-.nrr-pulse-block-caption { font-size: 12px; font-weight: 600; color: var(--ink3); margin: -6px 0 10px; line-height: 1.4; }
-.nrr-pulse-list { display: flex; flex-direction: column; }
-.nrr-pulse-empty { color: var(--ink3); font-size: 14px; padding: 10px 0; }
+/* Scene 2 — Today's wins: white canvas, cumulative stat up top + a
+   name-forward spotlight list below (the emotional core of the redesign).
+   v65 bugfix: the cumulative number originally reused the Vibe scene's full
+   148px .nrr-pulse-scene-num — fine for Vibe (one number, nothing else to
+   fit), but here it left too little vertical room for up to 3 spotlight
+   rows below it, which then silently overflowed .nrr-pulse-spotlight-list's
+   `overflow:hidden` and got clipped to a sliver of just the first row (user
+   report: "only 2 stores showing" — confirmed via DOM measurement, not a
+   data bug). Fix: scope a smaller number size + tighter spacing to THIS
+   scene only, sized so cumulative block + title + 3 rows genuinely fit
+   within the scene's real available height (measured ~355px inner content
+   area in the embedded, non-fullscreen admin view — the tightest case). */
+.nrr-pulse-scene-wins { background: var(--fill); color: var(--ink); justify-content: flex-start; padding-top: 28px; }
+.nrr-pulse-scene-cumul { text-align: center; margin-bottom: 14px; flex: none; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-lbl { color: var(--ink2); font-size: 15px; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-num { color: var(--green-deep); font-size: 60px; margin: 2px 0; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-sub { color: var(--ink3); font-size: 14px; }
+.nrr-pulse-spotlight-title { font-size: 14px; font-weight: 700; color: var(--ink3); text-align: center; margin-bottom: 8px; }
+.nrr-pulse-spotlight-list { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.nrr-pulse-spotlight-row {
+  display: flex; align-items: center; gap: 14px; background: #fff; border-radius: var(--r-md);
+  padding: 10px 20px; box-shadow: 0 1px 0 var(--line);
+}
+.nrr-pulse-spotlight-main { flex: 1; min-width: 0; }
+.nrr-pulse-spotlight-name { font-size: 24px; font-weight: 800; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-spotlight-amt { font-family: var(--font-num); font-size: 20px; font-weight: 800; color: var(--ink); flex: none; }
+/* Sales/Expansion source badge — same accent each source already uses
+   elsewhere on this board, so the tag reads consistent with the rest. */
+.nrr-pulse-source-tag {
+  flex: none; display: inline-block; padding: 5px 14px; border-radius: var(--r-pill);
+  font-size: 13px; font-weight: 800; color: #fff; white-space: nowrap;
+}
+.nrr-pulse-source-tag.sales      { background: var(--mv-teal); }
+.nrr-pulse-source-tag.expansion  { background: var(--mv-green-lt); }
+.nrr-pulse-hero-row-more { font-size: 13px; font-weight: 700; color: var(--ink3); text-align: center; margin-top: 4px; }
+
+/* Scenes 3/4 — full-screen block panels (SKU / risk), reusing the same
+   saturated left-accent look as the pre-v65 blocks, just larger rows now
+   that each scene owns the whole screen instead of sharing it with 6 others. */
+.nrr-pulse-scene-skus, .nrr-pulse-scene-risk { background: var(--fill); border-left: 10px solid var(--ink3); color: var(--ink); }
+.nrr-pulse-scene-skus { border-left-color: var(--sun); background: var(--sun-soft); }
+.nrr-pulse-scene-risk { border-left-color: var(--coral); background: var(--coral-soft); }
+.nrr-pulse-scene-skus .nrr-pulse-scene-num { color: var(--sun-deep); }
+.nrr-pulse-block-title { font-size: 24px; font-weight: 800; color: var(--ink); }
+.nrr-pulse-block-tally { font-size: 20px; font-weight: 700; color: var(--ink2); font-family: var(--font-num); }
+.nrr-pulse-block-caption { font-size: 14px; font-weight: 600; color: var(--ink3); margin: -2px 0 14px; line-height: 1.4; }
+.nrr-pulse-list { display: flex; flex-direction: column; overflow: hidden; }
+.nrr-pulse-empty { color: var(--ink3); font-size: 18px; padding: 10px 0; }
 
 /* v46: fixed row height (was auto — a row whose meta line happened to wrap
    to 2 lines made THAT rotation window taller than others, so the whole
-   box visibly resized as it cycled). Every row now clips to one line. */
-.nrr-pulse-arr-row { display: flex; align-items: center; gap: 12px; height: 44px; border-bottom: 1px solid var(--line); }
+   box visibly resized as it cycled). Every row now clips to one line.
+   v65: 44px -> 60px, 16px -> 20px, matching the full-screen scene scale. */
+.nrr-pulse-arr-row { display: flex; align-items: center; gap: 14px; height: 60px; border-bottom: 1px solid var(--line); }
 .nrr-pulse-arr-row:last-child { border-bottom: none; }
-.nrr-pulse-arr-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ink3); opacity: 0.4; flex: none; }
-.nrr-pulse-today-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--green-deep); flex: none; box-shadow: 0 0 0 0 rgba(0,128,101,0.6); animation: nrrPulseBeat 1.8s infinite; }
-@keyframes nrrPulseBeat { 0% { box-shadow: 0 0 0 0 rgba(0,128,101,0.55); } 70% { box-shadow: 0 0 0 8px rgba(0,128,101,0); } 100% { box-shadow: 0 0 0 0 rgba(0,128,101,0); } }
+.nrr-pulse-arr-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--ink3); opacity: 0.4; flex: none; }
+.nrr-pulse-today-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--green-deep); flex: none; box-shadow: 0 0 0 0 rgba(0,128,101,0.6); animation: nrrPulseBeat 1.8s infinite; }
+@keyframes nrrPulseBeat { 0% { box-shadow: 0 0 0 0 rgba(0,128,101,0.55); } 70% { box-shadow: 0 0 0 10px rgba(0,128,101,0); } 100% { box-shadow: 0 0 0 0 rgba(0,128,101,0); } }
 .nrr-pulse-arr-main { flex: 1; min-width: 0; }
-.nrr-pulse-arr-name { font-size: 16px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrr-pulse-arr-sub { font-size: 11.5px; font-weight: 600; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-arr-name { font-size: 20px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-arr-sub { font-size: 14px; font-weight: 600; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v50: was plain gray caption text — repurposed into a solid color-coded
    chip (color hashed per person in JS, _nrrPulseOwnerColor) so a KAM can
    learn "I'm this color" and spot their own rows across the whole board at
@@ -1221,22 +1230,22 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    edge nearest the ฿ figure, the one the eye actually tracks) lands in the
    same column every row while its left edge is free to vary with the name. */
 /* v54: width now set inline per-list (measured from real text, see
-   _nrrPulseOwnerSlotWidth in nrr_pulse.js) — not a guessed constant here. */
+   _nrrPulseOwnerSlotWidth in nrr_pulse.js) — not a guessed constant here.
+   v65: font-size bumped 12px -> 16px, MUST stay in sync with the default
+   font string in _nrrPulseTextWidth (nrr_pulse.js) or measured slot widths
+   go silently wrong — see that file's own comment on this exact bug class. */
 .nrr-pulse-owner-slot { flex: none; display: flex; justify-content: flex-end; }
 .nrr-pulse-owner-chip {
-  display: inline-block; padding: 4px 11px; border-radius: var(--r-pill);
-  font-size: 12px; font-weight: 800; color: #fff; letter-spacing: 0.01em;
+  display: inline-block; padding: 5px 13px; border-radius: var(--r-pill);
+  font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.01em;
   white-space: nowrap;
 }
-.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--ink); flex: none; }
-
-.nrr-pulse-sku-num { font-family: var(--font-num); font-size: 56px; font-weight: 800; line-height: 1; color: var(--sun-deep); margin: 4px 0 6px; }
-.nrr-pulse-sku-sub { font-size: 13.5px; font-weight: 600; color: var(--ink2); }
+.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 20px; font-weight: 800; color: var(--ink); flex: none; }
 
 /* v50: rebuilt to match .nrr-pulse-arr-row exactly (res_name primary /
    account_name secondary via .nrr-pulse-arr-main, owner chip) — only the
    trailing amount block stays risk-specific (฿ shortfall + its reason). */
-.nrr-pulse-risk-row { display: flex; align-items: center; gap: 12px; height: 44px; border-bottom: 1px solid var(--line); }
+.nrr-pulse-risk-row { display: flex; align-items: center; gap: 14px; height: 60px; border-bottom: 1px solid var(--line); }
 .nrr-pulse-risk-row:last-child { border-bottom: none; }
 /* v52: the chip fix (v51) wasn't the real cause — .nrr-pulse-risk-amt-wrap
    itself had NO fixed width (only `max-width` on the label inside it, which
@@ -1251,14 +1260,19 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    (v53). For any row shorter than the guess, right-aligned text left dead
    space right next to the chip, reading as "chip far from the number".
    Width now set inline per-list from real measured text
-   (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here. */
+   (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here.
+   v65: 16px/10.5px -> 22px/13px, MUST stay in sync with the font strings
+   inside _nrrPulseRiskAmtWidth (nrr_pulse.js) — same measure-don't-guess
+   discipline as the owner slot above. */
 .nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
-.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--coral); }
-.nrr-pulse-risk-amt-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 22px; font-weight: 800; color: var(--coral); }
+.nrr-pulse-risk-amt-lbl { font-size: 13px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 900px) {
-  .nrr-pulse-heroes, .nrr-pulse-arrivals, .nrr-pulse-lower { grid-template-columns: 1fr; }
-  .nrr-pulse-hero-num { font-size: 60px; }
+  .nrr-pulse-scene { padding: 28px 24px; }
+  .nrr-pulse-scene-num { font-size: 88px; }
+  .nrr-pulse-spotlight-name { font-size: 24px; }
+  .nrr-pulse-spotlight-amt { font-size: 20px; }
 }
 
 /* ── Account view loading skeleton — page-shaped, not a single bar ─────── */

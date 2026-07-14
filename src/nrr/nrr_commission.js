@@ -226,7 +226,10 @@ function nrrCommTierTable(role, email, period, pct) {
     return { min: t.min_value, max: t.max_value, payout: Number(t.payout_value || 0), label: t.payout_label || '',
       isCurrent: i === currentIdx, isNext: i === nextIdx };
   });
-  var gapPp = (nextIdx >= 0 && pct != null) ? Math.max(0, Math.ceil(Number(tiers[nextIdx].min_value) - pct)) : null;
+  // 1-decimal ceiling (was whole-pp) — "push at least this much more"
+  // stays a round-UP (never understate the ask), just finer-grained now
+  // that %NRR itself displays to 1 decimal everywhere else.
+  var gapPp = (nextIdx >= 0 && pct != null) ? Math.max(0, Math.ceil((Number(tiers[nextIdx].min_value) - pct) * 10) / 10) : null;
   return { tiers: rows, currentTier: currentIdx >= 0 ? rows[currentIdx] : null, nextTier: nextIdx >= 0 ? rows[nextIdx] : null, gapPp: gapPp };
 }
 window.nrrCommTierTable = nrrCommTierTable;
@@ -260,7 +263,7 @@ function nrrCommEstimateReceiptSteps(est) {
       meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + est.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
       drillKey: est.handover && est.handover.detail && est.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) + hoPay });
-    steps.push({ kind: 'multiply', label: 'NRR Gate (' + est.pct + '% ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
+    steps.push({ kind: 'multiply', label: 'NRR Gate (' + nrrFmtPct(est.pct) + ' ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
   } else {
     steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม (' + (est.upsell_pct != null ? est.upsell_pct.toFixed(1) : '0.0') + '% ของฐาน)', factor: est.multiplier, drillKey: 'mult' });
   }
@@ -276,7 +279,7 @@ window.nrrCommEstimateReceiptSteps = nrrCommEstimateReceiptSteps;
 // both look the same.
 function nrrCommSnapshotReceiptSteps(bd) {
   if (!bd) return [];
-  var steps = [{ kind: 'add', first: true, label: 'NRR (' + (bd.nrr_pct != null ? bd.nrr_pct + '%' : '—') + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];
+  var steps = [{ kind: 'add', first: true, label: 'NRR (' + nrrFmtPct(bd.nrr_pct) + ')', amount: bd.nrr_payout || 0, drillKey: 'nrr' }];
   if (bd.type === 'kam_full') {
     var sku = bd.upsell_sku || {};
     var upsell = ((sku.p1 && sku.p1.comm) || 0) + ((sku.p3 && sku.p3.comm) || 0) + ((bd.upsell_outlet && bd.upsell_outlet.commission) || 0);
@@ -296,7 +299,7 @@ function nrrCommSnapshotReceiptSteps(bd) {
       drillKey: bd.handover && bd.handover.detail && bd.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell + hoPay });
     var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
-    steps.push({ kind: 'multiply', label: 'NRR Gate' + (bd.nrr_pct != null ? ' (' + bd.nrr_pct + '%)' : ''), factor: gcap });
+    steps.push({ kind: 'multiply', label: 'NRR Gate' + (bd.nrr_pct != null ? ' (' + nrrFmtPct(bd.nrr_pct) + ')' : ''), factor: gcap });
   } else {
     var mult = bd.upsell_mult;
     steps.push({ kind: 'multiply', label: 'ตัวคูณ upsell ทีม', factor: typeof mult === 'object' ? mult.multiplier : parseFloat(mult) || 1, drillKey: 'mult' });

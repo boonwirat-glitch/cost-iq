@@ -148,7 +148,10 @@ function nrrFmtGMVExact(v) {
 }
 window.nrrFmtGMVExact = nrrFmtGMVExact;
 
-function nrrFmtPct(v) { return v != null ? v + '%' : '—'; }
+// 2026-07-14: always exactly 1 decimal place, e.g. "103.4%" not "103%" —
+// Number(v) first since locked commission snapshots (Supabase NUMERIC
+// columns, raw_nrr_pct/governed_nrr_pct) can come back as strings.
+function nrrFmtPct(v) { return v != null ? Number(v).toFixed(1) + '%' : '—'; }
 window.nrrFmtPct = nrrFmtPct;
 
 function nrrFmtDelta(v) {

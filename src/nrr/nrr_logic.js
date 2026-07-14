@@ -282,7 +282,12 @@ function _qnrrCompute(kamEmail, scope) {
       });
     }
 
-    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100) : null;
+    // 1-decimal precision (was whole-number) per 2026-07-14 user request —
+    // matches the real precision Supabase's locked commission snapshots
+    // already carry (raw_nrr_pct/governed_nrr_pct are NUMERIC(x,2)), so a
+    // client-side ESTIMATE for an unlocked period doesn't look artificially
+    // coarser than the real number that eventually locks in for it.
+    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 1000) / 10 : null;
 
     var total_gmv = MOVEMENTS
       .filter(function (m) { return m !== 'transfer_out' && m !== 'core_nrr_churn'; })
@@ -471,7 +476,9 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
       });
     }
 
-    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100) : null;
+    // 1-decimal precision — see the matching comment on _qnrrCompute's own
+    // nrr_pct line above; same rationale applies to the PM/Admin/VP pool.
+    var nrr_pct = effectiveBaseNorm > 0 ? Math.round(nrr_curr_norm / effectiveBaseNorm * 1000) / 10 : null;
 
     // v4 additive fields mirroring _qnrrCompute's month block, so the
     // shared movement chart/table + expansion components can consume both

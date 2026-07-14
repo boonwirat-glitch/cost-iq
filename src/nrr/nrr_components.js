@@ -254,7 +254,7 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
       '<div class="nrr-qcol-cap num" style="color:' + (isPartial ? 'var(--green-deep)' : 'var(--ink)') + '">' + (isPartial ? '~' : '') + nrrFmtGMV(runRate) + '</div>' +
       '<div class="nrr-qcol-stack">' + hatchHtml + upSegs + '</div>' +
       '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
-      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + pct + '%') + (waivedTag ? '<br>' + waivedTag : '') + '</div></div>';
+      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + nrrFmtPct(pct)) + (waivedTag ? '<br>' + waivedTag : '') + '</div></div>';
   }).join('');
   return '<div class="nrr-qchart">' + colsHtml + '</div>' +
     '<div class="micro" style="margin-top:10px">ลายเฉียง = ส่วนคาดการณ์ของเดือนที่ยังไม่จบ (run-rate − MTD) · churn ไม่รวมในความสูงแท่ง ดูที่ตารางด้านล่าง</div>';
