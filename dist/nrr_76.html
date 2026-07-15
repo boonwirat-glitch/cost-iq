@@ -8746,23 +8746,6 @@ function nrrPortfolioRiskSummaryHtml(kamEmail) {
 // state. Split from the shell (below) so typing in the search box only
 // repaints the grid, not the input itself (which would drop focus/cursor
 // position).
-// v_outletsearch (2026-07-14): lets both Portfolio search boxes (per-KAM
-// grid below, and the company-wide box further down) also match an
-// account's OUTLET/branch name, not just the account name. bulk_outlets.csv
-// (window.bulkOutletsData.byAccountId) shares portview.csv's exact
-// account_guid provenance (both derive account_id from
-// dim.user_master.account_guid) -- the same join _nrrOutletOptionsForAccount
-// already relies on for the waiver outlet picker, so this is a proven-safe
-// cross-reference, not a new/unverified join.
-// Known accepted gap (confirmed with the user before shipping): bulk_outlets.csv's
-// own SQL hardcodes a roster of ~15 KAM emails -- an account owned by a KAM
-// outside that roster has no rows here, so its outlet names won't be
-// searchable this way (its account name still will be, via the existing check).
-function _nrrAccountOutletNameMatches(accountId, query) {
-  var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
-  return rows.some(function (r) { return (r.outlet_name || '').toLowerCase().indexOf(query) > -1; });
-}
-
 function nrrPortfolioAcctGridHtml(email) {
   var pf = nrrPortfolioState.paceFilter;
   var anyPaceSelected = pf.ok || pf.warn || pf.danger;
@@ -8775,11 +8758,7 @@ function nrrPortfolioAcctGridHtml(email) {
       var gap = nrrSkuGapSeverity(item.row);
       if (!gap || gap.cls === 'quiet') return false;
     }
-    if (nrrPortfolioState.search) {
-      var q = nrrPortfolioState.search;
-      var matchesAccount = item.row.account_name.toLowerCase().indexOf(q) > -1;
-      if (!matchesAccount && !_nrrAccountOutletNameMatches(item.row.account_id, q)) return false;
-    }
+    if (nrrPortfolioState.search && item.row.account_name.toLowerCase().indexOf(nrrPortfolioState.search) === -1) return false;
     return true;
   });
   return filtered.length
@@ -8832,7 +8811,7 @@ function nrrPortfolioGlobalResultsHtml() {
   var pv = window.bulkPortviewData;
   if (!pv || !pv.loaded) return '';
   var matches = pv.allRows.filter(function (r) {
-    return (r.account_name || '').toLowerCase().indexOf(q) > -1 || _nrrAccountOutletNameMatches(r.account_id, q);
+    return (r.account_name || '').toLowerCase().indexOf(q) > -1;
   });
   if (!matches.length) {
     return '<div class="ds-empty" style="margin-top:8px"><div class="ds-empty-title">ไม่พบร้านที่ตรงกับ "' + nrrEsc(q) + '"</div></div>';
@@ -8914,26 +8893,6 @@ function nrrRenderPortfolioLayerView(route) {
     nrrPortfolioState.email = email;
     nrrRenderPortfolioBody();
   });
-  // v_outletsearch: fetched in the BACKGROUND, not awaited above -- it's a
-  // 3.1MB file only needed to let the two search boxes also match outlet/
-  // branch names (_nrrAccountOutletNameMatches), not to render the page
-  // itself. Blocking the whole Portfolio page on it would be a real, avoidable
-  // slowdown for a feature most page-loads never touch (the user never
-  // types a query). Re-render whichever search surface is visible once it
-  // lands, so outlet-name matches appear without the user needing to retype.
-  if (!window.bulkOutletsData || !window.bulkOutletsData.loaded) {
-    nrrFetchBulkOutletsCsv().then(function () {
-      if (nrrCurrentRoute && nrrCurrentRoute.view !== 'portfolio') return; // navigated away
-      if (nrrPortfolioState.search) {
-        var g = document.getElementById('nrr-port-acct-grid');
-        if (g) g.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
-      }
-      if (nrrPortfolioGlobalSearch) {
-        var r = document.getElementById('nrr-port-global-results');
-        if (r) r.innerHTML = nrrPortfolioGlobalResultsHtml();
-      }
-    });
-  }
 }
 
 // Delegated interaction handlers — bound once in nrrInitApp to the

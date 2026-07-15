@@ -326,7 +326,22 @@ function _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAd
         topLabel = '<span style="color:' + netCls + '">' + (triple.is_partial ? '~' : '') + (netChange >= 0 ? '+' : '−') + nrrFmtGMV(Math.abs(netChange)) + '</span>';
       }
       var activeOutlets = bm ? (bm.outlets.core_nrr || 0) : 0;
-      subLabel = activeOutlets + ' สาขา' + (triple && triple.is_partial ? ' · MTD ' + nrrFmtGMV(triple.mtd) : '');
+      // v_deltacount: was core_nrr-only -- every other segment's count sits in
+      // the same bm.outlets object, one key over, unused. Surface whichever
+      // ones are actually non-zero this month, same "Label N" shorthand,
+      // handover+new_sales combined into one bucket to match how the
+      // composition bar/movement table already group them as "Handover & New".
+      var otherCounts = bm ? [
+        ['core_nrr_churn', bm.outlets.core_nrr_churn || 0],
+        ['handover_new', (bm.outlets.handover || 0) + (bm.outlets.new_sales || 0)],
+        ['comeback', bm.outlets.comeback || 0],
+        ['expansion', bm.outlets.expansion || 0],
+        ['transfer_in', bm.outlets.transfer_in || 0],
+        ['transfer_out', bm.outlets.transfer_out || 0]
+      ].filter(function (pair) { return pair[1] > 0; })
+        .map(function (pair) { return (pair[0] === 'handover_new' ? 'Handover & New' : MV_LABEL[pair[0]]) + ' ' + pair[1]; }) : [];
+      subLabel = activeOutlets + ' สาขา' + (otherCounts.length ? ' · ' + otherCounts.join(' · ') : '') +
+        (triple && triple.is_partial ? ' · MTD ' + nrrFmtGMV(triple.mtd) : '');
       var waivedCount = (bm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
       if (waivedCount > 0) {
         subLabel += '<br><span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>';
@@ -386,8 +401,14 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
   // carry-forward afterwards, "—" before).
   var cohortModel = nrrHandoverCohorts(result);
 
-  function cellBtn(rowKey, cohort, month, cls, display) {
-    return '<td class="num-cell"><button class="nrr-cell-btn" data-mv="' + rowKey + '" data-cohort="' + nrrEsc(cohort || '') + '" data-month="' + nrrEsc(month) + '" style="color:var(--' + cls + ')">' + display + '</button></td>';
+  function cellBtn(rowKey, cohort, month, cls, display, count) {
+    // count was already being computed at every call site (to decide whether
+    // to render a real zero vs. a DASH) and then thrown away -- surface it as
+    // a small muted trailing number instead, same "secondary to the bold GMV"
+    // treatment used everywhere else on this page (team card sub-line, waived
+    // tag, composition bar legend).
+    var countHtml = count ? '<span class="nrr-cell-n">' + count.toLocaleString() + '</span>' : '';
+    return '<td class="num-cell"><button class="nrr-cell-btn" data-mv="' + rowKey + '" data-cohort="' + nrrEsc(cohort || '') + '" data-month="' + nrrEsc(month) + '" style="color:var(--' + cls + ')">' + display + countHtml + '</button></td>';
   }
   var DASH = '<td class="micro">—</td>';
 
@@ -413,7 +434,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       var n = bm ? (bm.outlets[row.key] || 0) : 0;
       if (v === 0 && n === 0) return DASH;
       var display = row.negative ? '−' + nrrFmtGMV(v) : nrrFmtGMV(v);
-      return cellBtn(row.key, '', c.month, row.cls, display);
+      return cellBtn(row.key, '', c.month, row.cls, display, n);
     }).join('');
     return '<tr data-mv-row="' + row.key + '"' + (row.sub ? ' class="nrr-table-subrow"' : '') + '><td>' + row.label + '</td>' + cells + '</tr>';
   }
@@ -427,7 +448,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       var v = bm ? (bm.segments.handover || 0) + (bm.segments.new_sales || 0) : 0;
       var n = bm ? (bm.outlets.handover || 0) + (bm.outlets.new_sales || 0) : 0;
       if (v === 0 && n === 0) return DASH;
-      return cellBtn('handover_new', '', c.month, 'mv-slate', nrrFmtGMV(v));
+      return cellBtn('handover_new', '', c.month, 'mv-slate', nrrFmtGMV(v), n);
     }).join('');
     var html = '<tr data-mv-row="handover_new"><td>Handover &amp; New</td>' + parentCells + '</tr>';
 
@@ -440,7 +461,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
         if (c.isBase) return handoverBase > 0 ? '<td class="num-cell">' + nrrFmtGMV(handoverBase) + '</td>' : DASH;
         var cm = cohortModel.handover.by_month[c.month];
         if (!cm || !cm.outlets.length) return DASH;
-        return cellBtn('handover_new', 'base', c.month, 'mv-slate', nrrFmtGMV(cm.gmv));
+        return cellBtn('handover_new', 'base', c.month, 'mv-slate', nrrFmtGMV(cm.gmv), cm.outlets.length);
       }).join('');
       html += '<tr data-mv-row="handover_new:base" class="nrr-table-subrow"><td>└ cohort ' + nrrEsc(baseLabel) + '</td>' + hovCells + '</tr>';
     }
@@ -452,7 +473,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
         if (c.isBase) return DASH;
         var cm = cohort.by_month[c.month];
         if (!cm || !cm.outlets.length) return DASH; // null before cohort month → "—"
-        return cellBtn('handover_new', cohort.cohort_month, c.month, 'mv-slate', nrrFmtGMV(cm.gmv));
+        return cellBtn('handover_new', cohort.cohort_month, c.month, 'mv-slate', nrrFmtGMV(cm.gmv), cm.outlets.length);
       }).join('');
       html += '<tr data-mv-row="handover_new:' + nrrEsc(cohort.cohort_month) + '" class="nrr-table-subrow"><td>└ cohort ' + nrrEsc(label) + '</td>' + cells + '</tr>';
     });
@@ -617,6 +638,14 @@ function _nrrCompoValue(segs, key) {
   if (key === 'handover_new') return (segs.handover || 0) + (segs.new_sales || 0);
   return segs[key] || 0;
 }
+// Same combine rule as _nrrCompoValue above, but reading the outlet-COUNT
+// object (by_month[month].outlets) that _qnrrCompute/nrrComputeRowsPool
+// already build in the same loop as segments — was computed all along,
+// just never read here.
+function _nrrCompoOutlets(outlets, key) {
+  if (key === 'handover_new') return (outlets.handover || 0) + (outlets.new_sales || 0);
+  return outlets[key] || 0;
+}
 
 function nrrCompositionBarHtml(result, period) {
   var bm = result && period ? result.by_month[period] : null;
@@ -632,8 +661,11 @@ function nrrCompositionBarHtml(result, period) {
   }).join('');
   var keyHtml = items.map(function (x) {
     var neg = x.key === 'core_nrr_churn' || x.key === 'transfer_out';
+    var n = _nrrCompoOutlets(bm.outlets, x.key);
     return '<span class="nrr-compo-k"><i style="background:' + _nrrCompoColor(x.key) + '"></i>' + nrrEsc(x.label) +
-      ' <b class="num">' + (neg ? '−' : '') + nrrFmtGMV(x.v) + '</b></span>';
+      ' <b class="num">' + (neg ? '−' : '') + nrrFmtGMV(x.v) + '</b>' +
+      (n ? '<span class="nrr-compo-k-n">' + n.toLocaleString() + ' ร้าน</span>' : '') +
+      '</span>';
   }).join('');
   var baseLabel = nrrFmtGMV(Math.round((result.base_norm || 0) * nrrBaseDays()));
   return '<div class="nrr-compo">' +

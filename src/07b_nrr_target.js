@@ -191,6 +191,22 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
     // there's no per-outlet split to apply it against in that data shape.
     const _waived = (acctId, oid) => periodMonth && typeof _nrrAccountWaivedForPeriod === 'function'
       && _nrrAccountWaivedForPeriod(acctId, periodMonth, oid);
+    // v_fallbackwaiver: the account-level fallback (bulkHistoryData/Q9 has no
+    // outlet_id column at all) cannot resolve an outlet-scoped nrr_exclusions
+    // row to a specific outlet's GMV -- there's no per-outlet split in this data
+    // shape to subtract just one outlet from. This checks ONLY for that specific
+    // unresolvable case: an approved waiver for this account+period that names a
+    // real outlet_id. Returns false for whole-account waivers (outlet_id null --
+    // those already work via the existing _waived(a.id, null) check).
+    const _nrrHasApprovedOutletWaiverForAccount = (accountId, pm) => {
+      if (!accountId || !pm) return false;
+      return (typeof _nrrExclusions !== 'undefined' ? (_nrrExclusions || []) : []).some(x =>
+        x.status === 'approved' &&
+        x.period_month === pm &&
+        x.account_id === accountId &&
+        !!x.outlet_id
+      );
+    };
     let prevGmvByOutlet={}, currGmvByOutlet={};
     // v_fdd: firstDollarMap tracks all-time first purchase date per outlet_id
     // Used for comeback vs expansion: comeback = first_dollar_date exists AND < prevMonthStart
@@ -237,6 +253,18 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
         if (_useFilter) return; // positive filter active → no account-level fallback rows
         if (_useExclude && excludeFilter.has(String(a.id))) return;
         if (_waived(a.id, null)) return; // whole-account waiver only -- no outlet grain here
+        // v_fallbackwaiver: bulkHistoryData (Q9) has no outlet_id column, so an
+        // APPROVED outlet-scoped waiver for this account+period can never be
+        // resolved to just that outlet's GMV here -- there is no per-outlet
+        // split in this data shape to subtract. Conservatively drop the WHOLE
+        // account from this group rather than silently ignore an
+        // admin-approved exclusion (an approved TL request going unheeded is
+        // worse than over-excluding for one month).
+        if (_nrrHasApprovedOutletWaiverForAccount(a.id, periodMonth)) {
+          console.warn('%c[Sense NRR] ⚠️ approx whole-account waiver (fallback, no outlet grain)','color:#f08000',
+            { accountId: a.id, acctName, periodMonth });
+          return;
+        }
         const hist=bulkHistoryData[a.id]||[];
         hist.filter(h=>moSort(h.m)<moSort(prevMonth)).forEach(()=>everSeen.add(a.id));
         const prevRow=hist.find(h=>h.m===prevMonth);
@@ -341,9 +369,36 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
 
   // v298: outlet filters per group. Core EXCLUDES moved outlets (negative filter);
   // transfer_in / new_sales INCLUDE only their moved outlets (positive filter).
-  const coreResult = _groupNRR(coreAccounts, null, movedOutlets);
+  let coreResult = _groupNRR(coreAccounts, null, movedOutlets);
   const transferInResult = _groupNRR(transferInAccounts, transferInOutlets);
   const newFromSalesResult = _groupNRR(newFromSalesAccounts, newFromSalesOutlets);
+
+  // v_TIFOLD (going-forward fix): fold transfer-in's own incoming base into the
+  // reported %NRR ratio, symmetric with _qnrrCompute's quarter-wide fold
+  // (07c_qnrr_view.js:207-243, 292). Before this, `nrr` came from `core.nrr`
+  // alone -- a transferred-in outlet's own baselinePrevGmv/cohortGmv (already
+  // computed by transferInResult above, already waiver-filtered via _waived()
+  // inside _groupNRR) never touched the ratio, only the separate
+  // `transferIn: {...}` reporting bucket below (untouched by this block --
+  // that bucket keeps reporting the exact same numbers as before). Deliberately
+  // does NOT touch cohortCount/cohortDetail (left core-only), mirroring
+  // _qnrrCompute's own "original cohort count" design (07c_qnrr_view.js:245) --
+  // avoids double-listing the same outlet in both cohortDetail and
+  // transferIn.cohortDetail in the drill-down sheet (_tgtShowCohortSheet).
+  if (transferInResult && (transferInResult.baselinePrevGmv || 0) > 0) {
+    if (!coreResult) {
+      coreResult = { cohortCount: 0, cohortGmv: 0, baselinePrevGmv: 0,
+        comebackGmv: 0, comebackCount: 0, expansionGmv: 0, expansionCount: 0,
+        cohortDetail: [], comebackDetail: [], expansionDetail: [] };
+    }
+    const _blendedPrev = (coreResult.baselinePrevGmv || 0) + (transferInResult.baselinePrevGmv || 0);
+    const _blendedCurr = (coreResult.cohortGmv || 0) + (transferInResult.cohortGmv || 0);
+    const _prevRate = prevDays > 0 ? _blendedPrev / prevDays : 0;
+    const _currRate = daysElapsed > 0 ? _blendedCurr / daysElapsed : 0;
+    coreResult.nrr = _prevRate > 0 ? _currRate / _prevRate : (coreResult.nrr ?? null);
+    coreResult.baselinePrevGmv = _blendedPrev;
+    coreResult.cohortGmv = _blendedCurr;
+  }
 
   // ── Transfer out: Q11 current_movements (fallback Q10) ──────────
   // v251: ใช้ Q11 transfer_out rows แทน Q10 Apr handover
