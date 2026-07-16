@@ -2117,15 +2117,284 @@ function getScopedSkus(groups){
 }
 
 // ════════════════════════════════════════
+// v92: SAVE deterministic pre-filter / veto / fallback layer
+//
+// Diagnosis (2026-07-16 investigation): SAVE's matching accuracy problem
+// was never "rule-based vs AI" — it was that NO deterministic layer of any
+// kind existed here at all. `04_sku_matcher.js` had zero jaccard/token/
+// normName functions (confirmed via exhaustive grep) despite this exact
+// codebase already having a proven one for a sibling feature, "SKU Verify"
+// (src/05_kam_view.js:~3093-3256) — a deterministic token-Jaccard +
+// family-key + form-conflict scorer used as BOTH a pre-score AND an
+// AI-failure fallback there. SAVE never adopted that pattern.
+//
+// This block ports that scorer's reusable core VERBATIM from
+// src/05_kam_view.js (confirmed domain-agnostic — every function takes
+// only product-name strings, no framing-specific knowledge), prefixed
+// `_saveSku*` to avoid collision, per this codebase's established
+// "twin-file-in-sync, not shared-module" convention (the SAME scorer was
+// already independently ported once before, into src/nrr/nrr_account.js
+// as `_nrrSku*`, deliberately diverging there with a stricter fallback
+// path + a magnitude gate that doesn't apply to SAVE's catalog-search
+// framing). A 3rd copy here is 1 more file to keep in sync, but is a much
+// smaller risk than either (a) leaving SAVE with no deterministic layer,
+// or (b) refactoring 2 already-working, already-battle-tested files into
+// a shared module in the same effort as this accuracy fix.
+//
+// Three integration points (see processItem() below):
+//  (a) post-LLM veto — catches a conflict the LLM missed on its own
+//      "verified" output; can only DEMOTE an approval, never invents one,
+//      so it strictly cannot make SAVE recommend something worse than today.
+//  (b) pre-filter — deprioritizes (never hard-deletes) candidates that fail
+//      before they occupy one of the 6 LLM-visible slots per SKU.
+//  (c) AI-failure fallback — on timeout/error/malformed JSON, returns a
+//      deterministic result instead of throwing, so a SKU no longer
+//      silently drops to zero alternatives (tagged 'done_fallback', not
+//      indistinguishable from a real AI pass).
+// ════════════════════════════════════════
+
+// ── Ported verbatim from src/05_kam_view.js (~3093-3160) ──────────────
+const _SAVE_SKU_TH_DIGITS={'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
+function _saveSkuToAsciiDigits(s){return String(s||'').replace(/[๐-๙]/g,d=>_SAVE_SKU_TH_DIGITS[d]||d);}
+function _saveSkuNormName(s){
+  return _saveSkuToAsciiDigits(s)
+    .toLowerCase()
+    .replace(/[()\[\]{}]/g,' ')
+    .replace(/[·•|,:;_\-/\\]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function _saveSkuCompact(s){return _saveSkuNormName(s).replace(/\s+/g,'');}
+function _saveSkuEggKey(name){
+  const n=_saveSkuNormName(name);
+  const c=_saveSkuCompact(name);
+  if(n.indexOf('ไข่')<0 && c.indexOf('egg')<0)return'';
+  let m=n.match(/เบอร์\s*(\d+)/)||c.match(/เบอร์(\d+)/)||n.match(/no\.?\s*(\d+)/)||c.match(/no(\d+)/);
+  if(m&&m[1])return'egg:no'+m[1];
+  if(c.indexOf('เบอร์หนึ่ง')>=0)return'egg:no1';
+  return'egg:unknown';
+}
+function _saveSkuFamilyKey(name,meta){
+  const e=_saveSkuEggKey(name);
+  if(e&&e!=='egg:unknown')return e;
+  const sub=_saveSkuNormName(meta&&(meta.subclass||meta.sc)||'');
+  if(sub)return'sub:'+sub;
+  return'';
+}
+// Same qualifier stopword list as src/05_kam_view.js / src/nrr/nrr_account.js
+// — generic preservation-state/quality/sourcing words that describe HOW a
+// product is kept/graded, not WHAT it is, so they must not count toward
+// name similarity (root-caused two real false positives on this exact
+// scorer elsewhere in this codebase: frozen chicken wing vs frozen chicken
+// leg via the shared word "แช่แข็ง"; quinoa vs chia via shared "ออแกนิค").
+// Curated, not provably complete — extend if more mismatches turn up.
+const _SAVE_SKU_QUALIFIER_STOPWORDS=['แช่แข็ง','frozen','แช่เย็น','chilled','สด','ทั้งตัว','คัดพิเศษ','เกรดเอ','เกรด','ออร์แกนิค','ออแกนิค','ตัดแต่ง','นำเข้า','เพียวเร่','คอนเซนเทรต'];
+// Brand tokens are PREFIX-matched, not exact — real product names fuse the
+// brand into one token ("ตรากรีนไลฟ์"), so an exact match on "ตรา" alone
+// never actually fires (this was a real bug, fixed the same way here from
+// the start rather than repeating it a 3rd time).
+const _SAVE_SKU_BRAND_PREFIX_RE=/^(ตรา|brand|ยี่ห้อ)/;
+function _saveSkuTokens(name){
+  return _saveSkuNormName(name).split(' ').filter(t=>t&&!/^\d+$/.test(t)&&!_SAVE_SKU_BRAND_PREFIX_RE.test(t)&&!_SAVE_SKU_QUALIFIER_STOPWORDS.includes(t));
+}
+function _saveSkuJaccard(a,b){
+  const A=new Set(_saveSkuTokens(a)),B=new Set(_saveSkuTokens(b));
+  if(!A.size||!B.size)return 0;
+  let inter=0;A.forEach(x=>{if(B.has(x))inter++;});
+  return inter/Math.max(1,A.size+B.size-inter);
+}
+function _saveSkuFormConflict(a,b){
+  const aa=_saveSkuCompact(a),bb=_saveSkuCompact(b);
+  const groups=[['บด','สับ'],['ชิ้น','แผ่น','สไลซ์'],['ผง'],['น้ำ'],['แช่แข็ง','frozen']];
+  for(const g of groups){
+    const ha=g.some(x=>aa.indexOf(x)>=0);
+    const hb=g.some(x=>bb.indexOf(x)>=0);
+    if((ha||hb)&&ha!==hb)return true;
+  }
+  return false;
+}
+
+// ── New for SAVE: exclusion categories the ported scorer above doesn't
+// cover, mirroring SAVE's own AI prompt rules #1/#3-7 (sharedCriteria,
+// below). Each is genuinely new curated-list work, not free reuse — same
+// "curated, not provably complete" caveat as the qualifier stopwords. Kept
+// as separate small functions rather than folded into the qualifier
+// stopword list, since most of these are ONE-DIRECTIONAL presence-mismatch
+// conflicts (the label's presence/absence IS the signal), structurally
+// different from a stopword-to-ignore. ──────────────────────────────────
+
+// Rule #1: unit-price ratio >5x ⇒ pack_size_issue. Pure arithmetic already
+// available on every candidate before the LLM is ever called — no reason
+// to have an LLM re-derive a ratio from numbers already in its own prompt.
+function _saveSkuPriceRatioIssue(sourcePrice,altPrice){
+  const s=Number(sourcePrice)||0,a=Number(altPrice)||0;
+  if(s<=0||a<=0)return false; // can't evaluate — don't block on missing data
+  return Math.max(s,a)/Math.min(s,a)>5;
+}
+
+// Rule #3: premium breed/origin label (Kurobuta, Wagyu, A5, Hokkaido, ...)
+// — one side having it and the other not is the conflict signal itself.
+const _SAVE_SKU_PREMIUM_LABELS=['คุโรบูตะ','kurobuta','wagyu','วากิว','อิเบริโก้','iberico','a5','hokkaido','ฮอกไกโด'];
+function _saveSkuPremiumLabelConflict(a,b){
+  const ca=_saveSkuCompact(a),cb=_saveSkuCompact(b);
+  const hasA=_SAVE_SKU_PREMIUM_LABELS.some(w=>ca.indexOf(w)>=0);
+  const hasB=_SAVE_SKU_PREMIUM_LABELS.some(w=>cb.indexOf(w)>=0);
+  return hasA!==hasB;
+}
+
+// Rule #4: explicit size variant (Baby/Mini/Cherry vs. base item). Kept
+// deliberately narrow — generic Thai "เล็ก"/"ใหญ่" (small/big) are common,
+// legitimate words on ordinary size-graded produce names and would
+// over-trigger if included; stuck to the loan-word-style variant markers
+// from SAVE's own prompt examples (Baby Cos ≠ Cos, Cherry Tomato ≠ Tomato).
+const _SAVE_SKU_SIZE_VARIANT_WORDS=['baby','mini','เบบี้','cherry','เชอร์รี่'];
+function _saveSkuSizeVariantConflict(a,b){
+  const ca=_saveSkuCompact(a),cb=_saveSkuCompact(b);
+  const hasA=_SAVE_SKU_SIZE_VARIANT_WORDS.some(w=>ca.indexOf(w)>=0);
+  const hasB=_SAVE_SKU_SIZE_VARIANT_WORDS.some(w=>cb.indexOf(w)>=0);
+  return hasA!==hasB;
+}
+
+// Rule #5: flavor/recipe variant. Hardest to enumerate exhaustively —
+// seeded from SAVE's own prompt examples only; likely needs the most
+// future extension of any list here (accept this category may still lean
+// on AI judgment even with this layer in place).
+const _SAVE_SKU_FLAVOR_VARIANT_WORDS=['สูตรกวางตุ้ง','สูตรไหหลำ','รสเผ็ด','ต้นตำรับ','สูตรดั้งเดิม'];
+function _saveSkuFlavorVariantConflict(a,b){
+  const ca=_saveSkuCompact(a),cb=_saveSkuCompact(b);
+  const hasA=_SAVE_SKU_FLAVOR_VARIANT_WORDS.some(w=>ca.indexOf(w)>=0);
+  const hasB=_SAVE_SKU_FLAVOR_VARIANT_WORDS.some(w=>cb.indexOf(w)>=0);
+  return hasA!==hasB;
+}
+
+// Rule #6: acid/vinegar TYPE mismatch — different shape from the others
+// above: not presence-vs-absence, but "both sides are typed, and the
+// types differ." Only fires when BOTH sides match a known type, so it
+// never triggers on unrelated products that happen to share no acid marker.
+const _SAVE_SKU_ACID_TYPE_GROUPS=['ไวน์แดง','ไวน์ขาว','แอปเปิ้ล','ปาล์ม','บัลซามิก'];
+function _saveSkuAcidType(name){
+  const c=_saveSkuCompact(name);
+  for(const g of _SAVE_SKU_ACID_TYPE_GROUPS){if(c.indexOf(g)>=0)return g;}
+  return null;
+}
+function _saveSkuAcidTypeConflict(a,b){
+  const ta=_saveSkuAcidType(a),tb=_saveSkuAcidType(b);
+  return!!(ta&&tb&&ta!==tb);
+}
+
+// Rule #7: alcoholic/branded beverage brand sensitivity — NOT a
+// name-similarity problem, a category gate: if the source's subclass looks
+// like an alcoholic/branded beverage, require an exact brand-token match,
+// full stop (subclass is guaranteed equal on both sides by Stage A's own
+// SQL join, so checking the source's subclass covers the pair).
+const _SAVE_SKU_BEVERAGE_SUBCLASS_MARKERS=['เบียร์','ไวน์','แอลกอฮอล์','สุรา','beer','wine','alcohol'];
+function _saveSkuBrandToken(name){
+  const toks=_saveSkuNormName(name).split(' ');
+  for(const t of toks){if(_SAVE_SKU_BRAND_PREFIX_RE.test(t))return t;}
+  return'';
+}
+function _saveSkuBeverageBrandConflict(subclass,srcName,altName,altBrand){
+  const subc=_saveSkuCompact(subclass||'');
+  const isBeverage=_SAVE_SKU_BEVERAGE_SUBCLASS_MARKERS.some(w=>subc.indexOf(w)>=0);
+  if(!isBeverage)return false;
+  const brandA=_saveSkuBrandToken(srcName);
+  const brandB=_saveSkuBrandToken(altName)||_saveSkuCompact(altBrand||'');
+  return!!(brandA&&brandB&&brandA!==brandB);
+}
+
+// General similarity floor — mirrors src/05_kam_view.js's pairScore()
+// exactly (same egg-key short-circuit, same familyKey+0.20 / bare-0.55
+// thresholds). Without this, _saveSkuJaccard/_saveSkuFamilyKey/_saveSkuEggKey
+// above were ported but never actually consulted by any veto check — the 3
+// documented production false positives that motivated QUALIFIER_STOPWORDS/
+// BRAND_PREFIX_RE in the first place (wing-vs-leg, quinoa-vs-chia, and
+// bare-flavor pairs like two Monin syrup flavors) share only a generic word
+// or a fused brand token, which none of the category checks above catch —
+// only a raw name-similarity floor does. SAVE's candidates already share
+// subclass by construction (Stage A's own SQL join), so the familyKey
+// branch's 0.20 floor — Sense's own proven-in-production threshold, not
+// tightened further since short 2-3 token Thai names structurally cap
+// around jaccard 0.33 even for a legitimate same-product/different-brand
+// pair — is the one that applies in practice; the bare 0.55 floor is a
+// fallback for the rare case subclass is missing on either side.
+function _saveSkuSimilarityConflict(g,alt){
+  const srcName=g.name||'',altName=alt.catalog_item_name||'';
+  const eggA=_saveSkuEggKey(srcName),eggB=_saveSkuEggKey(altName);
+  if(eggA&&eggB&&eggA===eggB)return false; // same egg spec — proven same-family signal, never veto here
+  const fkA=_saveSkuFamilyKey(srcName,{subclass:g.subclass}),fkB=_saveSkuFamilyKey(altName,{subclass:alt.subclass||g.subclass});
+  const sim=_saveSkuJaccard(srcName,altName);
+  if(fkA&&fkB&&fkA===fkB)return sim<0.20;
+  return sim<0.55;
+}
+
+// Unified reason-checker — used both as the pre-filter (2.2b, before the
+// LLM call) and the post-LLM veto (2.2a, after) so the two integration
+// points can never disagree about what counts as a conflict. Returns a
+// reason_code string (compatible with the AI prompt's own reason_code
+// enum, plus two new additions 'form_conflict'/'low_similarity') or null
+// if no conflict. Specific category reasons are checked before the general
+// similarity floor so a KAM sees the more actionable reason when both fire.
+function _saveSkuVetoReason(g,alt){
+  const srcName=g.name||'',altName=alt.catalog_item_name||'';
+  if(_saveSkuPriceRatioIssue(g.price,alt.catalog_price))return'pack_size';
+  if(_saveSkuFormConflict(srcName,altName))return'form_conflict';
+  if(_saveSkuPremiumLabelConflict(srcName,altName))return'premium_breed';
+  if(_saveSkuSizeVariantConflict(srcName,altName))return'size_variant';
+  if(_saveSkuFlavorVariantConflict(srcName,altName))return'flavor_variant';
+  if(_saveSkuAcidTypeConflict(srcName,altName))return'acid_type';
+  if(_saveSkuBeverageBrandConflict(g.subclass,srcName,altName,alt.catalog_brand))return'beverage_brand';
+  if(_saveSkuSimilarityConflict(g,alt))return'low_similarity';
+  return null;
+}
+
+// AI-failure fallback (2.2c) — mirrors judgePairsWithAI()'s shape from
+// src/05_kam_view.js: a non-empty, honestly-labeled result instead of a
+// thrown error. Can only claim 'medium' confidence (not 'high') since it
+// hasn't had the AI's more nuanced judgment — a candidate passing every
+// deterministic check here is plausible, not confirmed.
+function _saveSkuFallbackResult(g,alts){
+  const verified=[],excluded=[];
+  (alts||[]).forEach(a=>{
+    const reason=_saveSkuVetoReason(g,a);
+    if(reason){
+      excluded.push({catalog_item_id:a.catalog_item_id,catalog_item_name:a.catalog_item_name,reason_code:reason});
+    }else{
+      verified.push({
+        catalog_item_id:a.catalog_item_id,catalog_item_name:a.catalog_item_name,
+        catalog_price:a.catalog_price,pack_size:a.pack_size||'',
+        price_diff:a.price_diff||0,is_substitutable:true,confidence:'medium'
+      });
+    }
+  });
+  return{pack_size_issue:false,verified,excluded,summary_th:'AI ไม่พร้อมใช้งาน — ใช้การตรวจสอบแบบกฎเกณฑ์แทน'};
+}
+function _saveSkuApplyFallback(g,alts,warnMsg){
+  console.warn('[Matcher] AI unavailable for "'+g.name.slice(0,20)+'" — using deterministic fallback:',warnMsg);
+  const fb=_saveSkuFallbackResult(g,alts);
+  g.result={...fb,status:'done_fallback',ai_note:fb.summary_th};
+  g.status='done_fallback';
+  return g;
+}
+
+// ════════════════════════════════════════
 // MATCHER CORE — ported verbatim from matcher_artifact_v3.html
 // processItem: 1 API call per source SKU, top-6 alts, 30s timeout
 // ════════════════════════════════════════
 async function processItem(g, _retryLeft=1){
+  // v92 (2.2b): deterministic pre-filter — split candidates by
+  // _saveSkuVetoReason before the diversity sort, so the LLM's scarce
+  // 6-slot budget goes to genuinely-plausible candidates first. Never
+  // hard-deletes (mirrors the merge-back's own "never delete, only
+  // downgrade" philosophy below) — flagged candidates only backfill the
+  // pool if fewer than 6 pass on their own.
+  const _rawAlts=[...g.alternatives];
+  const _passed=_rawAlts.filter(a=>!_saveSkuVetoReason(g,a));
+  const _flagged=_rawAlts.filter(a=>_saveSkuVetoReason(g,a));
+  const _poolAlts=_passed.length>=6?_passed:[..._passed,..._flagged];
   // Diversity sort: mix high-confidence + high-savings for better AI coverage
-  const _allAlts=[...g.alternatives];
-  const _highConf=_allAlts.filter(a=>(a.grading||'').toLowerCase()==='a'||a.pack_size===g.pack_size).sort((a,b)=>b.price_diff-a.price_diff).slice(0,3);
+  const _highConf=_poolAlts.filter(a=>(a.grading||'').toLowerCase()==='a'||a.pack_size===g.pack_size).sort((a,b)=>b.price_diff-a.price_diff).slice(0,3);
   const _highConfIds=new Set(_highConf.map(a=>a.catalog_item_id));
-  const _highDiff=_allAlts.filter(a=>!_highConfIds.has(a.catalog_item_id)).sort((a,b)=>b.price_diff-a.price_diff).slice(0,3);
+  const _highDiff=_poolAlts.filter(a=>!_highConfIds.has(a.catalog_item_id)).sort((a,b)=>b.price_diff-a.price_diff).slice(0,3);
   const alts=[..._highConf,..._highDiff].slice(0,6);
   const _unitLabel=g.price_unit_label||(g.price_basis==='per_liter'?'ลิตร':(g.price_basis==='per_egg'?'ฟอง':'กก.'));
   const _priceLabel='฿/'+_unitLabel;
@@ -2190,23 +2459,48 @@ ${altLines}
       await new Promise(r=>setTimeout(r,2000));
       return processItem(g,_retryLeft-1);
     }
-    throw e;
+    // v92 (2.2c): was `throw e` — a non-retryable AI failure (timeout,
+    // network error, exhausted retry) silently dropped this SKU to zero
+    // alternatives. Fall back to the deterministic layer instead.
+    return _saveSkuApplyFallback(g,alts,msg);
   }
-  let jsonStr=text.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-  const st=jsonStr.indexOf('{');
-  if(st===-1)throw new Error('No JSON in response');
-  let depth=0,en=-1;
-  for(let i=st;i<jsonStr.length;i++){
-    if(jsonStr[i]==='{')depth++;
-    else if(jsonStr[i]==='}'){depth--;if(depth===0){en=i;break;}}
-  }
-  if(en===-1)throw new Error('Response truncated — ลอง process ใหม่');
-  jsonStr=jsonStr.slice(st,en+1);
   let parsed;
-  try{parsed=JSON.parse(jsonStr);}
-  catch(e){throw new Error('JSON parse error: '+e.message.slice(0,60));}
-  const hasConfirmed=parsed.verified?.length>0;
-  const isFlag=parsed.pack_size_issue||parsed.verified?.some(v=>v.confidence==='low');
+  try{
+    let jsonStr=text.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    const st=jsonStr.indexOf('{');
+    if(st===-1)throw new Error('No JSON in response');
+    let depth=0,en=-1;
+    for(let i=st;i<jsonStr.length;i++){
+      if(jsonStr[i]==='{')depth++;
+      else if(jsonStr[i]==='}'){depth--;if(depth===0){en=i;break;}}
+    }
+    if(en===-1)throw new Error('Response truncated — ลอง process ใหม่');
+    jsonStr=jsonStr.slice(st,en+1);
+    parsed=JSON.parse(jsonStr);
+  }catch(e){
+    // v92 (2.2c): malformed/truncated/non-JSON response — same fallback,
+    // not a throw, for the same reason as the AI-call-failure path above.
+    return _saveSkuApplyFallback(g,alts,'parse: '+e.message);
+  }
+  // v92 (2.2a): post-LLM veto — catch a conflict the LLM's own judgment
+  // missed. Can only demote an AI "verified" approval to rejected, never
+  // invent a new approval, so this strictly cannot make SAVE recommend
+  // something worse than today.
+  if(Array.isArray(parsed.verified)){
+    parsed.verified.forEach(v=>{
+      if(!v.is_substitutable)return; // already excluded by AI, nothing to veto
+      const alt=alts.find(a=>String(a.catalog_item_id)===String(v.catalog_item_id));
+      const reason=alt?_saveSkuVetoReason(g,alt):null;
+      if(reason){v.is_substitutable=false;v.reason_code=reason;}
+    });
+  }
+  // v92-fix: was `parsed.verified?.length>0` — counted array LENGTH, not
+  // how many entries are still is_substitutable after the veto above (the
+  // veto flips the flag in place, it doesn't shrink the array), so a SKU
+  // where the veto rejected every single AI approval would have still
+  // reported hasConfirmed=true and status='done_yes'.
+  const hasConfirmed=parsed.verified?.some(v=>v.is_substitutable);
+  const isFlag=parsed.pack_size_issue||parsed.verified?.some(v=>v.is_substitutable&&v.confidence==='low');
   g.result={...parsed,status:hasConfirmed?(isFlag?'done_flag':'done_yes'):'done_no',ai_note:parsed.summary_th||''};
   g.status=g.result.status;
   return g;

@@ -414,6 +414,10 @@
 .pb-conf-badge.high{color:var(--g700)}
 .pb-conf-badge.medium{color:#9a6500}
 .pb-conf-badge.unverified{color:var(--n400)}
+/* v92: was missing — a 'low' (AI explicitly rejected this alt) badge fell
+   back to no color styling at all, one more way it looked unremarkable
+   instead of like a rejection. */
+.pb-conf-badge.low{color:var(--tk-danger)}
 
 /* Sticky Plan Footer */
 .pb-footer{position:fixed;bottom:80px;left:16px;right:16px;margin:0 auto;max-width:408px;background:linear-gradient(135deg,var(--tk-bg-surface) 0%,var(--tk-bg-base) 100%);color:#fff;padding:11px 16px;z-index:210;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--tk-ok-border);box-shadow:0 -6px 28px rgba(0,96,80,.35);transition:transform .3s cubic-bezier(.34,1.4,.64,1),opacity .25s ease}

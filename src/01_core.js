@@ -1846,6 +1846,17 @@ function showToast(msg,icon='✓'){
   _toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 const getAlt=o=>{const idx=selAlt[o.id]??o.alts.findIndex(a=>a.recommended)??0;return o.alts[idx]||o.alts[0];};
+// v92: single source of truth for the SAVE confidence badge — was 3 independent
+// binary (high vs everything-else) ternaries across src/03_rendering.js, which
+// made an AI-REJECTED ('low') alt render with the exact same "— ทดลองก่อน" label
+// as a merely-unconfirmed ('unverified') one. 4-way, one definition, one place to
+// extend if a 5th confidence state is ever added.
+const confBadgeHtml=conf=>{
+  if(conf==='high')return{label:'✓ มั่นใจสูง',className:'high',color:'var(--tk-ok-text)'};
+  if(conf==='medium')return{label:'△ ควรตรวจสอบสเปค',className:'medium',color:'var(--amb)'};
+  if(conf==='low')return{label:'✕ AI ไม่แนะนำ',className:'low',color:'var(--tk-danger)'};
+  return{label:'— ยังไม่ตรวจสอบ',className:'unverified',color:'var(--n400)'};
+};
 const totalSel=()=>OPPS.filter(o=>sel.has(o.id)).reduce((s,o)=>s+getAlt(o).save,0);
 const totalAll=()=>OPPS.reduce((s,o)=>s+getAlt(o).save,0);
 // v207e: do not use SAMPLE fallback in live scoring/reporting. If account history is missing,

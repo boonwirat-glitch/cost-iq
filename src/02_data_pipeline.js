@@ -262,7 +262,10 @@ function computeOPPS(){
   const skuMap={};D.skus.forEach(s=>{skuMap[s.id]=s;});
   const grouped={};
   D.alts.forEach(p=>{const sid=String(p.source_item_id);if(!grouped[sid])grouped[sid]={pairs:[],sku:skuMap[sid]};grouped[sid].pairs.push(p);});
-  const confOrder={high:0,medium:1,low:2,unverified:3};
+  // v92-fix: was {high:0,medium:1,low:2,unverified:3} — ranked an AI-REJECTED
+  // ('low') alt ABOVE a never-checked ('unverified') one. An explicit AI
+  // rejection should sink to the bottom, not outrank "we just haven't looked".
+  const confOrder={high:0,medium:1,unverified:2,low:3};
   const newOpps=[];let oppId=1;
   Object.entries(grouped).forEach(([sid,{pairs,sku}])=>{
     if(!sku)return;
@@ -340,7 +343,12 @@ function computeOPPS(){
   if(validSel.length===0){
     selAlt={};
     // ── v52 C2 fix: auto-select VERIFIED opps only — never silently include unverified into plan ──
-    const verifiedOpps=OPPS.filter(o=>{const c=o.alts[0]?.conf;return c==='high'||c==='medium'||c==='low';});
+    // v92-fix: 'low' means AI explicitly said NOT substitutable — it must
+    // never qualify here. Before this fix, a batch with zero 'high' opps
+    // would auto-select every 'low' one too (same eligibility as genuinely
+    // 'medium'), silently pre-checking an AI-rejected alt into the KAM's
+    // default plan as if it were an ordinary suggestion.
+    const verifiedOpps=OPPS.filter(o=>{const c=o.alts[0]?.conf;return c==='high'||c==='medium';});
     const highConf=verifiedOpps.filter(o=>o.alts[0]?.conf==='high');
     if(highConf.length>0){highConf.forEach(o=>sel.add(o.id));currentPlanMode='high';}
     else if(verifiedOpps.length>0){verifiedOpps.forEach(o=>sel.add(o.id));currentPlanMode='all';}
