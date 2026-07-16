@@ -1649,7 +1649,7 @@ function nrrShellHtml() {
     '<div class="nrr-masthead">' +
     '  <div class="nrr-masthead-title">' +
     '    <div class="eyebrow">NRR ไตรมาส · ' + nrrEsc(QNRR_CFG.quarter.toUpperCase()) + '</div>' +
-    '    <div class="nrr-masthead-h">Portfolio Notebook</div>' +
+    '    <div class="nrr-masthead-h">Sense Dashboard</div>' +
     '  </div>' +
     '  <div class="nrr-masthead-nav">' +
     '  <nav class="nrr-appnav" id="nrr-appnav">' +
