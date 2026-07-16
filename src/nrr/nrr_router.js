@@ -104,12 +104,11 @@ function nrrHandleRoute() {
     a.classList.toggle('on', a.dataset.view === navFamily);
   });
 
-  // The scrollspy subnav (and its divider) only make sense inside the
-  // dashboard's long scroll.
-  var subnav = document.getElementById('nrr-subnav');
-  if (subnav) subnav.style.display = route.view === 'dashboard' ? '' : 'none';
-  var navDiv = document.querySelector('.nrr-appnav-div');
-  if (navDiv) navDiv.style.display = route.view === 'dashboard' ? '' : 'none';
+  // v_navfloat (2026-07-16): the scrollspy subnav used to need its own
+  // explicit show/hide here (it lived in the shared masthead, outside any
+  // .nrr-view) -- now it's part of #nrr-view-dashboard's own markup, so the
+  // generic .nrr-view[hidden] toggle above already covers it. No special
+  // case needed.
 
   nrrCurrentRoute = route;
   var fn = nrrRoutes[route.view];

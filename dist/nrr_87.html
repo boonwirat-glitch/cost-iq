@@ -312,17 +312,38 @@ html, body {
   padding: 2px 7px; margin-left: 2px;
 }
 
+/* Sub-nav shares .seg styling (nrr_base.css) for its pill look, plus its own
+   floating/sticky positioning below (v_navfloat). */
+/* v_navfloat (2026-07-16): this scrollspy pill used to sit inline inside
+   .nrr-masthead-nav, alongside .nrr-appnav — but it's TALLER than the plain
+   text tabs (~36-38px vs ~34px, from .seg's own track+button padding), and
+   since it only renders on the dashboard route, that shared flex row ended
+   up a few px taller on the dashboard than on every other route — the whole
+   page's content start position visibly shifted route to route (user
+   caught this comparing screenshots). Moved out of that row entirely (now
+   lives in the dashboard view's own markup, nrr_view.js) and floats instead:
+   right-aligned within the content column, `position:sticky` so it settles
+   just below the (already-sticky) masthead once scrolled past — genuinely
+   more useful too, since it's a jump-to-section control that's now still
+   reachable deep into the page, not just at the very top.
+   `--nrr-masthead-h` is measured live in JS (_nrrSyncMastheadHeight,
+   nrr_view.js) rather than guessed, since the masthead's real height varies
+   (narrow viewports wrap the title/actions to more lines). */
+.nrr-subnav {
+  align-self: flex-end;
+  position: sticky;
+  top: calc(var(--nrr-masthead-h, 74px) + 12px);
+  z-index: 40;
+  margin-bottom: 10px;
+}
 .nrr-month-capsule { white-space: nowrap; }
 
 /* App-level nav (Dashboard · Portfolio): plain text tabs answering "คุณอยู่
    หน้าไหน" with a Cabbage underline (place) — kept visually distinct from
    the .seg pill language ("มองผ่านเลนส์ไหน", filters/toggles within a page,
-   DESIGN LANGUAGE SPLIT 2026-07-09). v_navfloat (2026-07-16): this used to
-   share a flex row with a scrollspy .seg pill ("ภาพรวม/KAM/PM/Admin",
-   jump-to-section on the dashboard's long scroll) — removed entirely the
-   same day once spotted alongside the movement section's OWN pill with the
-   identical 4 labels (.nrr-mv-switch), which made the scrollspy read as
-   pure redundant clutter rather than useful navigation. */
+   DESIGN LANGUAGE SPLIT 2026-07-09). The two no longer share a flex row
+   (see .nrr-subnav's own comment above), but the visual-language split still
+   applies wherever a .seg control appears elsewhere in the app. */
 .nrr-masthead-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .nrr-appnav { display: flex; align-items: center; gap: 22px; }
 .nrr-appnav a {
@@ -1421,7 +1442,9 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    competing for space; only active while genuinely in the Fullscreen API
    state (toggled via #nrr-pulse-fs-btn), auto-reverts on Escape/exit since
    that fires the same `fullscreenchange` listener that sets this class. */
-.nrr-pulse-fs-active .nrr-masthead { display: none !important; }
+.nrr-pulse-fs-active .nrr-masthead,
+.nrr-pulse-fs-active .nrr-appnav-div,
+.nrr-pulse-fs-active #nrr-subnav { display: none !important; }
 .nrr-pulse-fs-active .nrr-pulse-page { max-width: 100vw; padding: 28px 48px; }
 .nrr-pulse-fs-active .nrr-pulseboard { height: calc(100vh - 56px); }
 .nrr-pulse-dateline-sub { font-size: 14px; color: var(--ink3); font-weight: 600; }
@@ -8809,9 +8832,27 @@ var nrrLastComparison = null;
 var nrrLastKamRows = null;
 var nrrLastTeamName = '';
 
+// v_navfloat (2026-07-16): .nrr-subnav's sticky top-offset needs the
+// masthead's REAL rendered height (not a guessed constant — this app just
+// spent a whole session re-learning that lesson the hard way on the Pulse
+// page) since it varies with viewport width (title/actions can wrap to more
+// lines on a narrow window). Re-measured on init, on resize, AND once
+// document.fonts.ready resolves -- the very first measurement right after
+// building the shell runs before Anuphan/Space Grotesk (loaded via
+// shell_nrr.html's <link>) have actually painted, so it silently captures
+// the FALLBACK font's shorter line-height (measured 79px vs the real
+// post-font-load 130px) and never gets corrected without this.
+function _nrrSyncMastheadHeight() {
+  var mh = document.querySelector('.nrr-masthead');
+  if (mh) document.documentElement.style.setProperty('--nrr-masthead-h', mh.offsetHeight + 'px');
+}
+window.addEventListener('resize', _nrrSyncMastheadHeight);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(_nrrSyncMastheadHeight);
+
 async function nrrInitApp() {
   var app = document.getElementById('nrr-app');
   app.innerHTML = nrrShellHtml();
+  _nrrSyncMastheadHeight();
   // Cover the just-built (still empty) shell while nrrRefresh() below fetches
   // real data -- otherwise the user briefly sees bare section headers with
   // no rows (the "half-broken" look reported live 2026-07-14).
@@ -8875,12 +8916,11 @@ async function nrrInitApp() {
   if (_slPage && typeof nrrHandleSalesClick === 'function') _slPage.addEventListener('click', nrrHandleSalesClick);
 
   // ── Router wiring — see nrr_router.js ──
-  // v_navfloat (2026-07-16): dashboard DOM stays rendered by nrrRenderAll();
-  // nothing to re-render on route entry (the scrollspy subnav this used to
-  // re-arm was removed the same day — redundant with .nrr-mv-switch's own
-  // ภาพรวม/KAM/PM/Admin pill on the movement section, spotted once both
-  // were visible on screen at once).
-  nrrRouterRegister('dashboard', function () {});
+  nrrRouterRegister('dashboard', function () {
+    // Dashboard DOM stays rendered by nrrRenderAll(); nothing to re-render
+    // on route entry. Re-arm the scrollspy in case sections re-appeared.
+    nrrInitScrollspy();
+  });
   nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
   nrrRouterRegister('account', nrrRenderAccountView);
 
@@ -10470,6 +10510,17 @@ function nrrShellHtml() {
     '</div>' +
     '<div class="nrr-view" id="nrr-view-dashboard">' +
     '<div class="nrr-page">' +
+    // v_navfloat (2026-07-16): moved out of .nrr-masthead-nav's shared flex
+    // row (see that class's own comment for why) -- it's dashboard-only
+    // scrollspy content anyway, so it belongs in this view's own markup, not
+    // the shared shell. `.nrr-view[hidden]` already hides/shows this whole
+    // block per route, so no extra router special-case is needed for it.
+    '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
+    '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
+    '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
+    '    <a href="#nrr-sec-pm" data-sec="nrr-sec-pm">PM</a>' +
+    '    <a href="#nrr-sec-admin" data-sec="nrr-sec-admin">Admin</a>' +
+    '  </nav>' +
     '  <div class="nrr-section" id="nrr-sec-pulse" style="animation-delay:.02s"><div class="nrr-panel-body" id="nrr-pulse-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-teams" style="animation-delay:.06s"><div class="nrr-takeaway micro" id="nrr-teams-takeaway"></div><div class="nrr-team-cards" id="nrr-team-cards"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-movement" style="animation-delay:.10s"><div class="nrr-panel-body">' +
@@ -10561,6 +10612,7 @@ function nrrRenderAll() {
   nrrRenderPortfolioSection('admin');
   nrrRenderCommissionSection();
   nrrBindLeaderboardControls();
+  nrrInitScrollspy();
 }
 
 function nrrRenderMastheadCapsule(result) {
@@ -11824,6 +11876,26 @@ function nrrCommUpsellListsHtml(upsell, bd) {
     reconHtml = '<div class="nrr-comm-recon-note">ผลรวมนี้คำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
   return { p1: p1Html + reconHtml, p3: p3Html };
+}
+
+// ── Scrollspy sub-nav ────────────────────────────────────────────────────
+var _nrrSpy = null;
+function nrrInitScrollspy() {
+  if (_nrrSpy) _nrrSpy.disconnect();
+  var links = document.querySelectorAll('#nrr-subnav a');
+  var map = { 'nrr-sec-pulse': 'nrr-sec-pulse', 'nrr-sec-teams': 'nrr-sec-pulse', 'nrr-sec-movement': 'nrr-sec-movement', 'nrr-sec-kams': 'nrr-sec-movement', 'nrr-sec-pm': 'nrr-sec-pm', 'nrr-sec-admin': 'nrr-sec-admin', 'nrr-sec-commission': 'nrr-sec-admin' };
+  _nrrSpy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var target = map[en.target.id];
+      if (!target) return;
+      links.forEach(function (a) { a.classList.toggle('on', a.dataset.sec === target); });
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  ['nrr-sec-pulse', 'nrr-sec-teams', 'nrr-sec-movement', 'nrr-sec-kams', 'nrr-sec-pm', 'nrr-sec-admin', 'nrr-sec-commission'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) _nrrSpy.observe(el);
+  });
 }
 
 // ── Slide-over (3 modes: kam / team / movement) ──────────────────────────

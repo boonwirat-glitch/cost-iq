@@ -26,9 +26,18 @@ var _nrrPulseRefreshTimer = null;
 var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
 var NRR_PULSE_REFRESH_MS = 10 * 60 * 1000;      // re-pull + re-render every 10 min
 var NRR_PULSE_SCENE_SUBROT_MS = 3500;           // internal list re-slice cadence within a scene (faster than full-scene rotation, so more names get airtime before the scene moves on)
-var NRR_PULSE_SCENE_SKU_MAX = 10;   // rows shown at once in the full-screen "new products" scene
-var NRR_PULSE_SCENE_RISK_MAX = 8;   // rows shown at once in the full-screen "needs attention" scene
-var NRR_PULSE_WINS_SPOTLIGHT_MAX = 3; // "today's wins" scene: how many first-order-today names to spotlight at once (see plan doc — this is inherently a small/sparse list, no rotation needed)
+// v_signage2 (2026-07-15): unified every rotating-list scene's cap at 5 per
+// screen, per explicit user request ("max สุดหน้าละ 5 ร้าน แต่ว่าค่อยๆ หมุนวนไป") —
+// was 8 for risk, 3 (no rotation) for wins. All of these now sub-rotate via
+// _nrrPulseArmSceneSubRotation, same mechanism SKUs already used.
+// v_signage3 (2026-07-15): 5 -> 6 for the two "store" scenes (wins/month) +
+// risk. v_signage4 (same day, follow-up): SKU scene also brought to 6 to
+// match, per explicit user request -- all four rotating-list scenes now
+// share the same cap.
+var NRR_PULSE_SCENE_SKU_MAX = 6;    // rows shown at once in the full-screen "new products" scene
+var NRR_PULSE_SCENE_RISK_MAX = 6;   // rows shown at once in the full-screen "needs attention" scene
+var NRR_PULSE_WINS_SPOTLIGHT_MAX = 6; // "today's wins" scene spotlight cap -- sub-rotates like every other list scene when there are more than 6
+var NRR_PULSE_SCENE_MONTH_MAX = 6;  // "new this month" scene spotlight cap (same convention)
 // v56: session-only rotation-speed choices (no localStorage — user's explicit
 // choice; no /nrr-local persistence precedent existed anyway). [ms, label].
 var NRR_PULSE_ROT_CHOICES = [['5000', '5s'], ['8000', '8s'], ['15000', '15s'], ['30000', '30s']];
@@ -37,8 +46,15 @@ var NRR_PULSE_ROT_CHOICES = [['5000', '5s'], ['8000', '8s'], ['15000', '15s'], [
 // left real leftover vertical space on a real TV — one more row fits fine in
 // fullscreen (masthead/nav hidden, page expands to 100vw), but the embedded
 // admin-nav view is tighter, so only bump the count while actually fullscreen.
+// v_signage7 (2026-07-15): removed the +1 bump. Fullscreen now spends its
+// extra room on a whole separate, much larger TYPE SCALE (see the
+// .nrr-pulse-fs-active rules in nrr_components.css + the mockup this was
+// designed from) rather than one more row at the same small size — at that
+// bigger scale there usually isn't room left for baseMax+1 anyway (verified
+// by DOM measurement: 6 rows already only clears the 1920×1080 canvas with
+// modest margin). Every scene's cap is the same in both tiers now.
 function _nrrPulseEffMax(baseMax) {
-  return document.fullscreenElement ? baseMax + 1 : baseMax;
+  return baseMax;
 }
 
 var _NRR_PULSE_TH_DOW = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
@@ -82,15 +98,37 @@ function _nrrPulseOwnerColor(nick) {
 // list's FULL item set (not just the rotating window) so the column width
 // never visibly resizes as rotation cycles through different names.
 var _nrrPulseMeasureCanvas = null;
+// v_signage8 (2026-07-16): every prior round (v65, v_signage5/6/7) had to
+// re-edit a HARDCODED font string here to stay in sync with whatever the
+// CSS currently says .nrr-pulse-owner-chip/.nrr-pulse-risk-amt/etc. are
+// sized at -- four rounds of the same forgotten-sync bug is four too many,
+// especially now that the fullscreen tier is `clamp()`-based (nrr_components
+// .css) and has no single fixed size to hardcode at all. Fixed properly:
+// an offscreen probe element wearing the SAME class gets inserted into
+// <body> once, and its REAL computed font/padding is read fresh every call
+// -- whatever the browser actually resolves (any tier, any viewport size,
+// any future CSS change to these classes) is what gets measured. No
+// constant to forget, ever again.
+var _nrrPulseFontProbes = {};
+function _nrrPulseProbe(className) {
+  var probe = _nrrPulseFontProbes[className];
+  if (!probe) {
+    probe = document.createElement('span');
+    probe.className = className;
+    probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:-9999px;white-space:nowrap;';
+    document.body.appendChild(probe);
+    _nrrPulseFontProbes[className] = probe;
+  }
+  return probe;
+}
+function _nrrPulseProbeFont(className) {
+  var cs = getComputedStyle(_nrrPulseProbe(className));
+  return cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+}
 function _nrrPulseTextWidth(text, font) {
   if (!_nrrPulseMeasureCanvas) _nrrPulseMeasureCanvas = document.createElement('canvas');
   var ctx = _nrrPulseMeasureCanvas.getContext('2d');
-  // v65: default bumped 12px -> 16px to match the new .nrr-pulse-owner-chip
-  // font-size (every list row is bigger now that each scene owns the full
-  // screen) — MUST stay in sync with that CSS rule or the measured slot
-  // width silently goes wrong (a hard-learned lesson from v51-v55, see the
-  // comments on _nrrPulseOwnerSlotWidth/_nrrPulseRiskAmtWidth below).
-  ctx.font = font || '800 16px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = font || _nrrPulseProbeFont('nrr-pulse-owner-chip');
   return ctx.measureText(text).width;
 }
 function _nrrPulseOwnerSlotWidth(items, ownerKey) {
@@ -101,7 +139,10 @@ function _nrrPulseOwnerSlotWidth(items, ownerKey) {
     var w = _nrrPulseTextWidth(nick);
     if (w > maxW) maxW = w;
   });
-  return maxW > 0 ? Math.ceil(maxW) + 22 : 0; // +22 = chip's own left+right padding
+  if (maxW <= 0) return 0;
+  var cs = getComputedStyle(_nrrPulseProbe('nrr-pulse-owner-chip'));
+  var pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight); // chip's own real left+right padding
+  return Math.ceil(maxW) + Math.ceil(pad);
 }
 // Same bug, same fix, one column over: .nrr-pulse-risk-amt-wrap used to be a
 // GUESSED fixed width (132px) so the wrap's width wouldn't depend on the
@@ -111,14 +152,14 @@ function _nrrPulseOwnerSlotWidth(items, ownerKey) {
 // left — directly next to the chip — which is exactly what reads as "the
 // chip is oddly far from the number." Fix: measure the two real lines
 // (amount + reason) actually in this list and use the true longest one,
-// same technique as the owner slot above.
+// same technique as the owner slot above -- now via the same probe pattern.
 function _nrrPulseRiskAmtWidth(items) {
   var maxW = 0;
+  var amtFont = _nrrPulseProbeFont('nrr-pulse-risk-amt');
+  var lblFont = _nrrPulseProbeFont('nrr-pulse-risk-amt-lbl');
   (items || []).forEach(function (it) {
-    // v65: 16px/10.5px -> 22px/13px, matching the new .nrr-pulse-risk-amt/
-    // .nrr-pulse-risk-amt-lbl font sizes (full-screen scene, bigger rows).
-    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), '800 22px "Space Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif');
-    var lblW = _nrrPulseTextWidth(it.reason || '', '700 13px -apple-system, "Helvetica Neue", Arial, sans-serif');
+    var amtW = _nrrPulseTextWidth('−' + nrrFmtGMV(it.risk), amtFont);
+    var lblW = _nrrPulseTextWidth(it.reason || '', lblFont);
     var w = Math.max(amtW, lblW);
     if (w > maxW) maxW = w;
   });
@@ -260,6 +301,11 @@ function nrrPulseModel() {
   var todayItems = salesItems.filter(function (x) { return x.isToday; })
     .concat(expItems.filter(function (x) { return x.isToday; }))
     .sort(function (a, b) { return b.todayGmv - a.todayGmv; });
+  // v_signage2 (2026-07-15): the SAME two sources' FULL-month lists (not just
+  // today's slice), for the new dedicated "New this month" scene — ranked by
+  // each item's own full-month gmv (unlike todayItems above, which ranks by
+  // todayGmv specifically).
+  var monthItems = salesItems.concat(expItems).sort(function (a, b) { return b.gmv - a.gmv; });
 
   // ── At-risk accounts, from portview + history (nrrPaceSignal) ──
   var pv = window.bulkPortviewData;
@@ -328,6 +374,7 @@ function nrrPulseModel() {
     newStoreGmv: salesGmv + expGmv,
     todayCount: todayCount,
     todayItems: todayItems,
+    monthItems: monthItems,
     sales: { count: salesItems.length, gmv: salesGmv, items: salesItems },
     expansion: { count: expItems.length, gmv: expGmv, items: expItems },
     newSkuAdded: newSkuAdded,
@@ -397,38 +444,50 @@ document.addEventListener('fullscreenchange', function () {
 
 // ── Scenes ───────────────────────────────────────────────────────────────
 // v65: each scene is a full-screen "moment," meant to be read in a single
-// 2-3s glance and never sharing the screen with another scene. Order is
-// fixed: wins -> skus -> risk. _nrrPulseActiveScenes(m) below decides which
-// of these actually get airtime on a given data refresh.
+// 2-3s glance and never sharing the screen with another scene.
+// v_signage2 (2026-07-15): order is fixed: wins -> month -> skus -> risk.
+// _nrrPulseActiveScenes(m) below decides which of these actually get airtime
+// on a given data refresh.
 // v76: dropped the "Vibe check" net-momentum scene per explicit user request
 // (removed, not hidden — no toggle to bring it back without re-adding this
 // function + its 'vibe' scene-key wiring + the .nrr-pulse-scene-vibe CSS).
 
+// Shared by Scene 1 (wins, today-only) and Scene 2 (month, the same two
+// sources' full-month list) — both are a name-forward spotlight list with an
+// owner chip + Sales/Expansion source tag per row. `amtKey` picks which ₿
+// figure to show per row (today's amount vs. the item's full-month amount);
+// items not from today (only possible in the month list) get a plain dot
+// instead of the pulsing "opened today" one. Slot width is measured from the
+// FULL item set (not just the visible window) so the column never resizes
+// as rotation cycles through different names — same convention as
+// _nrrPulseSkuRowsHtml/_nrrPulseRiskRowsHtml below.
+function _nrrPulseSpotlightRowsHtml(items, max, amtKey, emptyMsg) {
+  if (!items.length) return '<div class="nrr-pulse-empty" style="color:rgba(255,255,255,.85)">' + emptyMsg + '</div>';
+  var slotW = _nrrPulseOwnerSlotWidth(items, 'owner');
+  return _nrrPulseWindow(items, nrrPulseState.rotIdx, max).map(function (x) {
+    var sourceLabel = x.kind === 'sales' ? 'Sales' : 'Expansion';
+    var dotHtml = x.isToday
+      ? '<span class="nrr-pulse-today-dot" title="เปิดบิลแรกวันนี้"></span>'
+      : '<span class="nrr-pulse-arr-dot"></span>';
+    return '<div class="nrr-pulse-spotlight-row">' +
+      dotHtml +
+      '<div class="nrr-pulse-spotlight-main">' +
+      '<div class="nrr-pulse-spotlight-name">' + nrrEsc(x.name) + '</div>' +
+      (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
+      '</div>' +
+      '<span class="nrr-pulse-source-tag ' + x.kind + '">' + sourceLabel + '</span>' +
+      _nrrPulseOwnerChip(x.owner, slotW) +
+      '<div class="nrr-pulse-spotlight-amt">' + nrrFmtGMV(x[amtKey]) + '</div>' +
+      '</div>';
+  }).join('');
+}
+
 // Scene 1 — Today's wins: cumulative monthly count (the original "137" hero,
 // kept verbatim so the whole-month running total isn't lost) + a name-forward
-// spotlight of TODAY's specific first-order arrivals (small/sparse by nature
-// — see plan doc — so top-3, no internal rotation needed). Each spotlighted
-// name carries its existing owner chip AND a new Sales/Expansion source tag,
-// both from fields the item already has (`.owner`, `.kind`) — no new data.
+// spotlight of TODAY's specific first-order arrivals, now sub-rotating like
+// every other list scene when there are more than NRR_PULSE_WINS_SPOTLIGHT_MAX.
 function _nrrPulseSceneWinsHtml(m) {
-  var spotlight = m.todayItems.slice(0, NRR_PULSE_WINS_SPOTLIGHT_MAX);
-  var extra = m.todayItems.length - spotlight.length;
-  var slotW = _nrrPulseOwnerSlotWidth(spotlight, 'owner');
-  var rowsHtml = spotlight.length
-    ? spotlight.map(function (x) {
-        var sourceLabel = x.kind === 'sales' ? 'Sales' : 'Expansion';
-        return '<div class="nrr-pulse-spotlight-row">' +
-          '<span class="nrr-pulse-today-dot" title="เปิดบิลแรกวันนี้"></span>' +
-          '<div class="nrr-pulse-spotlight-main">' +
-          '<div class="nrr-pulse-spotlight-name">' + nrrEsc(x.name) + '</div>' +
-          (x.sub ? '<div class="nrr-pulse-arr-sub">' + nrrEsc(x.sub) + '</div>' : '') +
-          '</div>' +
-          '<span class="nrr-pulse-source-tag ' + x.kind + '">' + sourceLabel + '</span>' +
-          _nrrPulseOwnerChip(x.owner, slotW) +
-          '<div class="nrr-pulse-spotlight-amt">' + nrrFmtGMV(x.todayGmv) + '</div>' +
-          '</div>';
-      }).join('') + (extra > 0 ? '<div class="nrr-pulse-hero-row-more">+' + extra + ' ร้านอื่นๆวันนี้</div>' : '')
-    : '<div class="nrr-pulse-empty" style="color:rgba(255,255,255,.85)">— ยังไม่มีร้านใหม่วันนี้ —</div>';
+  var rowsHtml = _nrrPulseSpotlightRowsHtml(m.todayItems, _nrrPulseEffMax(NRR_PULSE_WINS_SPOTLIGHT_MAX), 'todayGmv', '— ยังไม่มีร้านใหม่วันนี้ —');
   return '<div class="nrr-pulse-scene nrr-pulse-scene-wins" data-scene="wins">' +
     '<div class="nrr-pulse-scene-cumul">' +
     '<div class="nrr-pulse-scene-lbl">ร้านใหม่สะสมเดือนนี้</div>' +
@@ -436,7 +495,24 @@ function _nrrPulseSceneWinsHtml(m) {
     '<div class="nrr-pulse-scene-sub">' + nrrFmtGMV(m.newStoreGmv) + '</div>' +
     '</div>' +
     '<div class="nrr-pulse-spotlight-title">วันนี้</div>' +
-    '<div class="nrr-pulse-spotlight-list">' + rowsHtml + '</div>' +
+    '<div class="nrr-pulse-spotlight-list" id="nrr-pulse-wins-list">' + rowsHtml + '</div>' +
+    '</div>';
+}
+
+// Scene 2 (new, v_signage2) — same cumulative monthly hero as Scene 1, but
+// the spotlight list below it is the FULL month's arrivals (not just today),
+// so a KAM who only catches the board once can still see the whole month's
+// story, not only whatever happened to land today.
+function _nrrPulseSceneMonthHtml(m) {
+  var rowsHtml = _nrrPulseSpotlightRowsHtml(m.monthItems, _nrrPulseEffMax(NRR_PULSE_SCENE_MONTH_MAX), 'gmv', '— ยังไม่มีร้านใหม่เดือนนี้ —');
+  return '<div class="nrr-pulse-scene nrr-pulse-scene-wins" data-scene="month">' +
+    '<div class="nrr-pulse-scene-cumul">' +
+    '<div class="nrr-pulse-scene-lbl">ร้านใหม่สะสมเดือนนี้</div>' +
+    '<div class="nrr-pulse-scene-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
+    '<div class="nrr-pulse-scene-sub">' + nrrFmtGMV(m.newStoreGmv) + '</div>' +
+    '</div>' +
+    '<div class="nrr-pulse-spotlight-title">เดือนนี้</div>' +
+    '<div class="nrr-pulse-spotlight-list" id="nrr-pulse-month-list">' + rowsHtml + '</div>' +
     '</div>';
 }
 
@@ -485,8 +561,9 @@ function _nrrPulseRiskRowsHtml(items, max) {
 }
 
 // Re-fill only the currently-active scene's rotating list container (called
-// on scene entry + by the scene's own sub-rotation timer) — the "skus"/"risk"
-// scenes are the only ones with a list that can outgrow its on-screen max.
+// on scene entry + by the scene's own sub-rotation timer) — every scene's
+// list can now outgrow its on-screen max (v_signage2 added sub-rotation to
+// wins/month, which previously had none).
 function _nrrPulseFillLists(sceneKey) {
   var m = nrrPulseState.model;
   if (!m) return;
@@ -496,14 +573,31 @@ function _nrrPulseFillLists(sceneKey) {
   } else if (sceneKey === 'risk') {
     var r = document.getElementById('nrr-pulse-risk-list');
     if (r) r.innerHTML = _nrrPulseRiskRowsHtml(m.risk, _nrrPulseEffMax(NRR_PULSE_SCENE_RISK_MAX));
+  } else if (sceneKey === 'wins') {
+    var w = document.getElementById('nrr-pulse-wins-list');
+    if (w) w.innerHTML = _nrrPulseSpotlightRowsHtml(m.todayItems, _nrrPulseEffMax(NRR_PULSE_WINS_SPOTLIGHT_MAX), 'todayGmv', '— ยังไม่มีร้านใหม่วันนี้ —');
+  } else if (sceneKey === 'month') {
+    var mo = document.getElementById('nrr-pulse-month-list');
+    if (mo) mo.innerHTML = _nrrPulseSpotlightRowsHtml(m.monthItems, _nrrPulseEffMax(NRR_PULSE_SCENE_MONTH_MAX), 'gmv', '— ยังไม่มีร้านใหม่เดือนนี้ —');
   }
 }
 
 // v65: which scenes actually get airtime this data refresh — an empty scene
 // (e.g. zero new SKUs some day) is hard-skipped from rotation, never shown
 // blank. Recomputed once per NRR_PULSE_REFRESH_MS tick, not per rotation tick.
+// v_signage8 (2026-07-16): briefly gated 'wins' the same way as the other
+// scenes (hide when m.todayItems is empty) -- reverted same day. Watching a
+// real, un-instrumented rotation confirmed the scene-cycling logic itself
+// was never broken (wins correctly appears first on load and wraps back
+// around every ~32s); "today" arrivals genuinely hit 0 on some data pulls,
+// and hiding the scene entirely on those reads as "did something break?"
+// just as much as showing an empty message did before. User's call: always
+// keep 'wins' in rotation (unconditional, like the original v65 design) and
+// let its own empty-state message ("— ยังไม่มีร้านใหม่วันนี้ —") communicate
+// "system's working, just nothing yet" instead of the scene vanishing.
 function _nrrPulseActiveScenes(m) {
   var scenes = ['wins'];
+  if (m.monthItems.length > 0) scenes.push('month');
   if (m.newSkuItems.length > 0 || m.newSkuAdded > 0) scenes.push('skus');
   if (m.risk.length > 0) scenes.push('risk');
   return scenes;
@@ -511,6 +605,14 @@ function _nrrPulseActiveScenes(m) {
 
 // Scene 3 — New products moving. Falls back to the bare count (no
 // new_skus_portfolio.csv uploaded yet) same as the pre-v65 page did.
+// v_signage3 (2026-07-15): new_skus_portfolio.sql redefined "new" from "new
+// to THAT ACCOUNT this month" to "genuinely new to Freshket, first sold
+// anywhere on the platform this month" -- caption below updated to match.
+// Requires a fresh BigQuery run + R2 re-upload of new_skus_portfolio.csv
+// before real numbers reflect this; the fallback branch (newSkuAdded, from
+// portview's per-account cur_sku_count diff) is a DIFFERENT, coarser proxy
+// and is unaffected by this SQL change -- its caption is left as-is since it
+// never claimed "new to Freshket" in the first place.
 function _nrrPulseSceneSkusHtml(m) {
   if (!m.newSkuItems.length) {
     return '<div class="nrr-pulse-scene nrr-pulse-scene-skus" data-scene="skus">' +
@@ -522,7 +624,7 @@ function _nrrPulseSceneSkusHtml(m) {
   return '<div class="nrr-pulse-scene nrr-pulse-scene-skus" data-scene="skus">' +
     '<div class="nrr-pulse-scene-head"><span class="nrr-pulse-block-title">สินค้าใหม่ที่ขายได้</span>' +
     '<span class="nrr-pulse-block-tally">' + m.newSkuCount + ' SKU · ' + nrrFmtGMV(m.newSkuGmv) + '</span></div>' +
-    '<div class="nrr-pulse-block-caption">สินค้าที่ร้านเริ่มซื้อเดือนนี้ — เดือนก่อนไม่เคยซื้อ และซื้อแล้วอย่างน้อย ฿1,000/ร้าน</div>' +
+    '<div class="nrr-pulse-block-caption">สินค้าที่ Freshket ขายได้เป็นครั้งแรกเดือนนี้ — ไม่เคยมีร้านไหนซื้อมาก่อนเลย</div>' +
     '<div class="nrr-pulse-list" id="nrr-pulse-sku-list"></div>' +
     '</div>';
 }
@@ -554,7 +656,7 @@ function _nrrPulseShowScene(idx) {
   area.querySelectorAll('.nrr-pulse-scene').forEach(function (el) {
     el.classList.toggle('active', el.dataset.scene === key);
   });
-  if (key === 'skus' || key === 'risk') {
+  if (key === 'skus' || key === 'risk' || key === 'wins' || key === 'month') {
     nrrPulseState.rotIdx = 0;
     _nrrPulseFillLists(key);
   }
@@ -566,16 +668,20 @@ function _nrrPulseShowScene(idx) {
   });
 }
 
-// Only "skus"/"risk" scenes can hold more rows than fit on screen at once —
-// re-slice their list at a faster cadence than the full-scene rotation so a
-// long risk list still gets real airtime before the board moves on, instead
-// of only ever showing its first N accounts forever.
+// Any scene whose list can hold more rows than fit on screen at once gets
+// re-sliced at a faster cadence than the full-scene rotation, so a long list
+// still gets real airtime before the board moves on, instead of only ever
+// showing its first N names forever. v_signage2 extended this from
+// skus/risk to also cover wins/month, now that all four caps are 5.
 function _nrrPulseArmSceneSubRotation(key) {
   if (_nrrPulseSceneSubTimer) { clearInterval(_nrrPulseSceneSubTimer); _nrrPulseSceneSubTimer = null; }
-  if (key !== 'skus' && key !== 'risk') return;
+  if (key !== 'skus' && key !== 'risk' && key !== 'wins' && key !== 'month') return;
   _nrrPulseSceneSubTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
-    var max = key === 'skus' ? NRR_PULSE_SCENE_SKU_MAX : NRR_PULSE_SCENE_RISK_MAX;
+    var max = key === 'skus' ? NRR_PULSE_SCENE_SKU_MAX
+      : key === 'risk' ? NRR_PULSE_SCENE_RISK_MAX
+      : key === 'wins' ? NRR_PULSE_WINS_SPOTLIGHT_MAX
+      : NRR_PULSE_SCENE_MONTH_MAX;
     nrrPulseState.rotIdx += _nrrPulseEffMax(max);
     _nrrPulseFillLists(key);
   }, NRR_PULSE_SCENE_SUBROT_MS);
@@ -624,7 +730,7 @@ function _nrrPulseRender() {
   // keep showing "the same moment" across a data refresh where possible,
   // clamped in case the previous scene got dropped for being empty now.
   var keepIdx = Math.min(nrrPulseState.sceneIdx, scenes.length - 1);
-  var sceneHtmlByKey = { wins: _nrrPulseSceneWinsHtml, skus: _nrrPulseSceneSkusHtml, risk: _nrrPulseSceneRiskHtml };
+  var sceneHtmlByKey = { wins: _nrrPulseSceneWinsHtml, month: _nrrPulseSceneMonthHtml, skus: _nrrPulseSceneSkusHtml, risk: _nrrPulseSceneRiskHtml };
   var sceneAreaHtml = scenes.map(function (key) { return sceneHtmlByKey[key](m); }).join('');
   page.innerHTML =
     '<div class="nrr-pulseboard">' +

@@ -312,17 +312,16 @@ html, body {
   padding: 2px 7px; margin-left: 2px;
 }
 
+/* Sub-nav shares .seg styling (nrr_base.css) — no extra track here. */
+.nrr-subnav { }
 .nrr-month-capsule { white-space: nowrap; }
 
-/* App-level nav (Dashboard · Portfolio): plain text tabs answering "คุณอยู่
-   หน้าไหน" with a Cabbage underline (place) — kept visually distinct from
-   the .seg pill language ("มองผ่านเลนส์ไหน", filters/toggles within a page,
-   DESIGN LANGUAGE SPLIT 2026-07-09). v_navfloat (2026-07-16): this used to
-   share a flex row with a scrollspy .seg pill ("ภาพรวม/KAM/PM/Admin",
-   jump-to-section on the dashboard's long scroll) — removed entirely the
-   same day once spotted alongside the movement section's OWN pill with the
-   identical 4 labels (.nrr-mv-switch), which made the scrollspy read as
-   pure redundant clutter rather than useful navigation. */
+/* App-level nav (Dashboard · Portfolio) + in-page scrollspy subnav sit
+   together; the router hides the subnav outside the dashboard view.
+   DESIGN LANGUAGE SPLIT (2026-07-09): the appnav answers "คุณอยู่หน้าไหน" —
+   text tabs with a Cabbage underline (place). The .seg pills answer
+   "มองผ่านเลนส์ไหน" — filters/toggles within a page. Never style one as
+   the other; the two must read as different kinds of control at a glance. */
 .nrr-masthead-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .nrr-appnav { display: flex; align-items: center; gap: 22px; }
 .nrr-appnav a {
@@ -337,6 +336,7 @@ html, body {
   content: ''; position: absolute; left: 0; right: 0; bottom: 0;
   height: 3px; border-radius: 2px; background: var(--green);
 }
+.nrr-appnav-div { width: 1px; height: 22px; background: var(--line); }
 
 /* Router views — siblings toggled with [hidden]; !important beats any
    display rule a child layout class might set later. */
@@ -1421,7 +1421,9 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    competing for space; only active while genuinely in the Fullscreen API
    state (toggled via #nrr-pulse-fs-btn), auto-reverts on Escape/exit since
    that fires the same `fullscreenchange` listener that sets this class. */
-.nrr-pulse-fs-active .nrr-masthead { display: none !important; }
+.nrr-pulse-fs-active .nrr-masthead,
+.nrr-pulse-fs-active .nrr-appnav-div,
+.nrr-pulse-fs-active #nrr-subnav { display: none !important; }
 .nrr-pulse-fs-active .nrr-pulse-page { max-width: 100vw; padding: 28px 48px; }
 .nrr-pulse-fs-active .nrr-pulseboard { height: calc(100vh - 56px); }
 .nrr-pulse-dateline-sub { font-size: 14px; color: var(--ink3); font-weight: 600; }
@@ -3670,11 +3672,12 @@ function nrrHandleRoute() {
     a.classList.toggle('on', a.dataset.view === navFamily);
   });
 
-  // v_navfloat (2026-07-16): the scrollspy subnav used to need its own
-  // explicit show/hide here (it lived in the shared masthead, outside any
-  // .nrr-view) -- now it's part of #nrr-view-dashboard's own markup, so the
-  // generic .nrr-view[hidden] toggle above already covers it. No special
-  // case needed.
+  // The scrollspy subnav (and its divider) only make sense inside the
+  // dashboard's long scroll.
+  var subnav = document.getElementById('nrr-subnav');
+  if (subnav) subnav.style.display = route.view === 'dashboard' ? '' : 'none';
+  var navDiv = document.querySelector('.nrr-appnav-div');
+  if (navDiv) navDiv.style.display = route.view === 'dashboard' ? '' : 'none';
 
   nrrCurrentRoute = route;
   var fn = nrrRoutes[route.view];
@@ -7779,18 +7782,14 @@ function _nrrPulseFillLists(sceneKey) {
 // v65: which scenes actually get airtime this data refresh — an empty scene
 // (e.g. zero new SKUs some day) is hard-skipped from rotation, never shown
 // blank. Recomputed once per NRR_PULSE_REFRESH_MS tick, not per rotation tick.
-// v_signage8 (2026-07-16): briefly gated 'wins' the same way as the other
-// scenes (hide when m.todayItems is empty) -- reverted same day. Watching a
-// real, un-instrumented rotation confirmed the scene-cycling logic itself
-// was never broken (wins correctly appears first on load and wraps back
-// around every ~32s); "today" arrivals genuinely hit 0 on some data pulls,
-// and hiding the scene entirely on those reads as "did something break?"
-// just as much as showing an empty message did before. User's call: always
-// keep 'wins' in rotation (unconditional, like the original v65 design) and
-// let its own empty-state message ("— ยังไม่มีร้านใหม่วันนี้ —") communicate
-// "system's working, just nothing yet" instead of the scene vanishing.
+// v_signage8 (2026-07-16): 'wins' used to be pushed unconditionally, unlike
+// every other scene here -- on a day with genuinely zero first-orders
+// "today" (a real, normal data state, not a bug), it still rotated in and
+// showed nothing but the empty-state message under the cumulative number,
+// which read as a broken/blank screen. Now gated the same way as the rest.
 function _nrrPulseActiveScenes(m) {
-  var scenes = ['wins'];
+  var scenes = [];
+  if (m.todayItems.length > 0) scenes.push('wins');
   if (m.monthItems.length > 0) scenes.push('month');
   if (m.newSkuItems.length > 0 || m.newSkuAdded > 0) scenes.push('skus');
   if (m.risk.length > 0) scenes.push('risk');
@@ -8875,12 +8874,11 @@ async function nrrInitApp() {
   if (_slPage && typeof nrrHandleSalesClick === 'function') _slPage.addEventListener('click', nrrHandleSalesClick);
 
   // ── Router wiring — see nrr_router.js ──
-  // v_navfloat (2026-07-16): dashboard DOM stays rendered by nrrRenderAll();
-  // nothing to re-render on route entry (the scrollspy subnav this used to
-  // re-arm was removed the same day — redundant with .nrr-mv-switch's own
-  // ภาพรวม/KAM/PM/Admin pill on the movement section, spotted once both
-  // were visible on screen at once).
-  nrrRouterRegister('dashboard', function () {});
+  nrrRouterRegister('dashboard', function () {
+    // Dashboard DOM stays rendered by nrrRenderAll(); nothing to re-render
+    // on route entry. Re-arm the scrollspy in case sections re-appeared.
+    nrrInitScrollspy();
+  });
   nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
   nrrRouterRegister('account', nrrRenderAccountView);
 
@@ -10455,6 +10453,13 @@ function nrrShellHtml() {
       ? '    <a href="#/waivers" data-view="waivers">Waivers</a>'
       : '') +
     '  </nav>' +
+    '  <span class="nrr-appnav-div"></span>' +
+    '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
+    '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
+    '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
+    '    <a href="#nrr-sec-pm" data-sec="nrr-sec-pm">PM</a>' +
+    '    <a href="#nrr-sec-admin" data-sec="nrr-sec-admin">Admin</a>' +
+    '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
     '    <span class="meta nrr-month-capsule" id="nrr-month-capsule">—</span>' +
@@ -10561,6 +10566,7 @@ function nrrRenderAll() {
   nrrRenderPortfolioSection('admin');
   nrrRenderCommissionSection();
   nrrBindLeaderboardControls();
+  nrrInitScrollspy();
 }
 
 function nrrRenderMastheadCapsule(result) {
@@ -11824,6 +11830,26 @@ function nrrCommUpsellListsHtml(upsell, bd) {
     reconHtml = '<div class="nrr-comm-recon-note">ผลรวมนี้คำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
   return { p1: p1Html + reconHtml, p3: p3Html };
+}
+
+// ── Scrollspy sub-nav ────────────────────────────────────────────────────
+var _nrrSpy = null;
+function nrrInitScrollspy() {
+  if (_nrrSpy) _nrrSpy.disconnect();
+  var links = document.querySelectorAll('#nrr-subnav a');
+  var map = { 'nrr-sec-pulse': 'nrr-sec-pulse', 'nrr-sec-teams': 'nrr-sec-pulse', 'nrr-sec-movement': 'nrr-sec-movement', 'nrr-sec-kams': 'nrr-sec-movement', 'nrr-sec-pm': 'nrr-sec-pm', 'nrr-sec-admin': 'nrr-sec-admin', 'nrr-sec-commission': 'nrr-sec-admin' };
+  _nrrSpy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var target = map[en.target.id];
+      if (!target) return;
+      links.forEach(function (a) { a.classList.toggle('on', a.dataset.sec === target); });
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  ['nrr-sec-pulse', 'nrr-sec-teams', 'nrr-sec-movement', 'nrr-sec-kams', 'nrr-sec-pm', 'nrr-sec-admin', 'nrr-sec-commission'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) _nrrSpy.observe(el);
+  });
 }
 
 // ── Slide-over (3 modes: kam / team / movement) ──────────────────────────

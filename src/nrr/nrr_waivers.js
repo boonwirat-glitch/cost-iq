@@ -11,7 +11,11 @@ function nrrRenderWaiversView(route) {
   // below) -- it's normally only fetched when the Account/Portfolio view
   // renders, so landing on #/waivers directly (without visiting either
   // first) previously showed raw UUIDs instead of names.
-  Promise.all([nrrFetchExclusions(), nrrFetchPortviewCsv()]).then(function () {
+  // v_outletname (2026-07-15): bulk_outlets.csv resolves outlet_id ->
+  // outlet_name (_nrrOutletNameFor below) for the SAME reason -- an
+  // outlet-scoped waiver used to show the raw outlet_id, same bug class as
+  // the account-name one above, just missed at the time.
+  Promise.all([nrrFetchExclusions(), nrrFetchPortviewCsv(), nrrFetchBulkOutletsCsv()]).then(function () {
     body.innerHTML = nrrWaiversPageHtml();
   });
 }
@@ -23,6 +27,12 @@ function _nrrAccountNameFor(accountId) {
   if (!pv || !pv.allRows) return accountId;
   var row = pv.allRows.find(function (r) { return r.account_id === accountId; });
   return row ? (row.account_name || accountId) : accountId;
+}
+
+function _nrrOutletNameFor(accountId, outletId) {
+  var rows = (window.bulkOutletsData && window.bulkOutletsData.byAccountId[accountId]) || [];
+  var row = rows.find(function (r) { return r.outlet_id === outletId; });
+  return row ? (row.outlet_name || outletId) : outletId;
 }
 
 function nrrWaiversPageHtml() {
@@ -70,7 +80,14 @@ function nrrWaiversPageHtml() {
 function nrrWaiverRowHtml(r, isAdmin) {
   var monthLabel = QNRR_CFG.months_th[r.period_month] || r.period_month;
   var acctName = _nrrAccountNameFor(r.account_id);
-  var scopeLabel = r.outlet_id ? ('สาขา ' + r.outlet_id) : 'ทั้ง account';
+  // v_scopepill (2026-07-15): whole-account vs. outlet-only used to be
+  // plain text ("ระดับ: ทั้ง account") -- easy to skim past when scanning a
+  // list of cards. A distinct pill per scope (muted = whole account, violet
+  // = one outlet only) reads at a glance, same convention as every other
+  // status pill on this page (.nrr-waiver-status) and elsewhere in /nrr.
+  var scopeTag = r.outlet_id
+    ? '<span class="tag mv-violet">เฉพาะสาขา ' + nrrEsc(_nrrOutletNameFor(r.account_id, r.outlet_id)) + '</span>'
+    : '<span class="tag muted">ทั้ง account</span>';
   var locked = nrrIsPeriodLocked(r.period_month);
   var actions = '';
   if (isAdmin && r.status === 'submitted') {
@@ -96,9 +113,12 @@ function nrrWaiverRowHtml(r, isAdmin) {
   return '<div class="nrr-waiver-card ' + r.status + '">' +
     '<div class="nrr-waiver-top">' +
     '<a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a>' +
+    '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+    scopeTag +
     '<span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span>' +
+    '</span>' +
     '</div>' +
-    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · ระดับ: ' + nrrEsc(scopeLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
+    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
     (r.target_tl_email ? ' · TL ' + nrrEsc(r.target_tl_email) : '') +
     (r.target_kam_email ? ' · KAM ' + nrrEsc(r.target_kam_email) : '') + '</div>' +
     (r.reason_text ? '<div class="micro" style="margin-top:4px;color:var(--ink2)">' + nrrEsc(r.reason_text) + '</div>' : '') +

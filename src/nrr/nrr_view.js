@@ -90,11 +90,12 @@ async function nrrInitApp() {
   if (_slPage && typeof nrrHandleSalesClick === 'function') _slPage.addEventListener('click', nrrHandleSalesClick);
 
   // ── Router wiring — see nrr_router.js ──
-  nrrRouterRegister('dashboard', function () {
-    // Dashboard DOM stays rendered by nrrRenderAll(); nothing to re-render
-    // on route entry. Re-arm the scrollspy in case sections re-appeared.
-    nrrInitScrollspy();
-  });
+  // v_navfloat (2026-07-16): dashboard DOM stays rendered by nrrRenderAll();
+  // nothing to re-render on route entry (the scrollspy subnav this used to
+  // re-arm was removed the same day — redundant with .nrr-mv-switch's own
+  // ภาพรวม/KAM/PM/Admin pill on the movement section, spotted once both
+  // were visible on screen at once).
+  nrrRouterRegister('dashboard', function () {});
   nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
   nrrRouterRegister('account', nrrRenderAccountView);
 
@@ -127,6 +128,13 @@ function nrrPortfolioSwitcherList() {
 
 function nrrPortfolioSwitcherHtml(list, selectedEmail) {
   if (nrrProfile.role === 'rep' || !list.length) return '';
+  // v_defaultlanding: when nothing is selected yet (admin/TL landing on bare
+  // #/portfolio), a plain <select> with no `selected` option would just
+  // default to showing its first real option highlighted -- looking like a
+  // choice was already made when it wasn't. A disabled placeholder makes the
+  // "nothing chosen yet" state honest in the dropdown too, not just in the
+  // page body below it.
+  var placeholderHtml = selectedEmail ? '' : '<option value="" disabled selected>— เลือก KAM —</option>';
   var optionsHtml;
   if (nrrProfile.role === 'admin') {
     var byTeam = {};
@@ -141,7 +149,7 @@ function nrrPortfolioSwitcherHtml(list, selectedEmail) {
       return '<option value="' + nrrEsc(k.email) + '"' + (k.email === selectedEmail ? ' selected' : '') + '>' + nrrEsc(k.name) + '</option>';
     }).join('');
   }
-  return '<select class="nrr-search" id="nrr-port-kam-select" style="cursor:pointer">' + optionsHtml + '</select>';
+  return '<select class="nrr-search" id="nrr-port-kam-select" style="cursor:pointer">' + placeholderHtml + optionsHtml + '</select>';
 }
 
 // Plain-language status word alongside pace% (Sense pattern, ported from
@@ -344,9 +352,18 @@ function nrrRenderPortfolioBody() {
   if (!body) return;
   var email = nrrPortfolioState.email;
   if (!email) {
+    // v_defaultlanding: two genuinely different reasons to land here with no
+    // email -- (a) admin/TL simply hasn't picked a KAM yet (list.length > 0,
+    // switcher shown so they can jump straight to one), vs (b) a TL whose
+    // team genuinely has zero KAMs (list.length === 0, the original message
+    // still applies as-is). Conflating these under one "no KAM" message would
+    // misleadingly tell an admin their whole company has no KAMs.
+    var list0 = nrrPortfolioSwitcherList();
+    var switcherHtml0 = list0.length ? '<div class="nrr-panel-head"><div class="h2">Portfolio</div>' + nrrPortfolioSwitcherHtml(list0, null) + '</div>' : '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>';
+    var emptyMsg = list0.length ? 'เลือก KAM จาก dropdown ด้านบน หรือค้นหาร้านค้าด้านบนนี้' : 'ยังไม่มี KAM ในทีมให้เลือกดู';
     body.innerHTML = nrrPortfolioGlobalSearchHtml() +
-      '<div class="nrr-panel-head"><div class="h2">Portfolio</div></div>' +
-      '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีมให้เลือกดู</div></div>';
+      switcherHtml0 +
+      '<div class="ds-empty"><div class="ds-empty-title">' + emptyMsg + '</div></div>';
     return;
   }
   var list = nrrPortfolioSwitcherList();
@@ -393,11 +410,16 @@ function nrrRenderPortfolioLayerView(route) {
   if (!body) return;
   body.innerHTML = '<div class="ds-skel" style="height:120px"></div>';
   Promise.all([nrrFetchPortviewCsv(), nrrFetchBulkHistoryCsv()]).then(function () {
-    var email = route.param || nrrProfile.email;
-    if (nrrProfile.role !== 'rep' && !route.param) {
-      var list = nrrPortfolioSwitcherList();
-      email = list.length ? list[0].email : null;
-    }
+    // v_defaultlanding (2026-07-15): admin/TL landing on bare #/portfolio
+    // (no KAM in the URL) used to auto-pick list[0] -- alphabetically first
+    // KAM company-wide for admin, or first KAM in their own team for a TL --
+    // deterministic but arbitrary-feeling (always the same one person,
+    // confirmed by user report: "ทำไมเข้ามาทีไรก็เจอ Bookbig ทุกที"). A rep
+    // has exactly one portfolio (their own) and is unaffected either way.
+    // Now: no auto-pick for admin/TL -- nrrRenderPortfolioBody's existing
+    // "no email selected" branch (below) shows the company-wide search box
+    // + a KAM switcher with no default choice, so the user picks explicitly.
+    var email = route.param || (nrrProfile.role === 'rep' ? nrrProfile.email : null);
     nrrPortfolioState.email = email;
     nrrRenderPortfolioBody();
   });
@@ -1648,13 +1670,6 @@ function nrrShellHtml() {
       ? '    <a href="#/waivers" data-view="waivers">Waivers</a>'
       : '') +
     '  </nav>' +
-    '  <span class="nrr-appnav-div"></span>' +
-    '  <nav class="seg nrr-subnav" id="nrr-subnav">' +
-    '    <a href="#nrr-sec-pulse" data-sec="nrr-sec-pulse" class="on">ภาพรวม</a>' +
-    '    <a href="#nrr-sec-movement" data-sec="nrr-sec-movement">KAM</a>' +
-    '    <a href="#nrr-sec-pm" data-sec="nrr-sec-pm">PM</a>' +
-    '    <a href="#nrr-sec-admin" data-sec="nrr-sec-admin">Admin</a>' +
-    '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
     '    <span class="meta nrr-month-capsule" id="nrr-month-capsule">—</span>' +
@@ -1761,7 +1776,6 @@ function nrrRenderAll() {
   nrrRenderPortfolioSection('admin');
   nrrRenderCommissionSection();
   nrrBindLeaderboardControls();
-  nrrInitScrollspy();
 }
 
 function nrrRenderMastheadCapsule(result) {
@@ -3025,26 +3039,6 @@ function nrrCommUpsellListsHtml(upsell, bd) {
     reconHtml = '<div class="nrr-comm-recon-note">ผลรวมนี้คำนวณจากอัตราปัจจุบันใน target_settings — อาจไม่ตรงกับยอดที่ล็อกไว้ (' + nrrFmtGMVExact(snapTotal) + ') เป๊ะ ถ้า Cockpit เปลี่ยนอัตราไปหลังจากงวดนี้ถูกคำนวณ</div>';
   }
   return { p1: p1Html + reconHtml, p3: p3Html };
-}
-
-// ── Scrollspy sub-nav ────────────────────────────────────────────────────
-var _nrrSpy = null;
-function nrrInitScrollspy() {
-  if (_nrrSpy) _nrrSpy.disconnect();
-  var links = document.querySelectorAll('#nrr-subnav a');
-  var map = { 'nrr-sec-pulse': 'nrr-sec-pulse', 'nrr-sec-teams': 'nrr-sec-pulse', 'nrr-sec-movement': 'nrr-sec-movement', 'nrr-sec-kams': 'nrr-sec-movement', 'nrr-sec-pm': 'nrr-sec-pm', 'nrr-sec-admin': 'nrr-sec-admin', 'nrr-sec-commission': 'nrr-sec-admin' };
-  _nrrSpy = new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) {
-      if (!en.isIntersecting) return;
-      var target = map[en.target.id];
-      if (!target) return;
-      links.forEach(function (a) { a.classList.toggle('on', a.dataset.sec === target); });
-    });
-  }, { rootMargin: '-40% 0px -55% 0px' });
-  ['nrr-sec-pulse', 'nrr-sec-teams', 'nrr-sec-movement', 'nrr-sec-kams', 'nrr-sec-pm', 'nrr-sec-admin', 'nrr-sec-commission'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) _nrrSpy.observe(el);
-  });
 }
 
 // ── Slide-over (3 modes: kam / team / movement) ──────────────────────────

@@ -32,16 +32,17 @@
   padding: 2px 7px; margin-left: 2px;
 }
 
-/* Sub-nav shares .seg styling (nrr_base.css) — no extra track here. */
-.nrr-subnav { }
 .nrr-month-capsule { white-space: nowrap; }
 
-/* App-level nav (Dashboard · Portfolio) + in-page scrollspy subnav sit
-   together; the router hides the subnav outside the dashboard view.
-   DESIGN LANGUAGE SPLIT (2026-07-09): the appnav answers "คุณอยู่หน้าไหน" —
-   text tabs with a Cabbage underline (place). The .seg pills answer
-   "มองผ่านเลนส์ไหน" — filters/toggles within a page. Never style one as
-   the other; the two must read as different kinds of control at a glance. */
+/* App-level nav (Dashboard · Portfolio): plain text tabs answering "คุณอยู่
+   หน้าไหน" with a Cabbage underline (place) — kept visually distinct from
+   the .seg pill language ("มองผ่านเลนส์ไหน", filters/toggles within a page,
+   DESIGN LANGUAGE SPLIT 2026-07-09). v_navfloat (2026-07-16): this used to
+   share a flex row with a scrollspy .seg pill ("ภาพรวม/KAM/PM/Admin",
+   jump-to-section on the dashboard's long scroll) — removed entirely the
+   same day once spotted alongside the movement section's OWN pill with the
+   identical 4 labels (.nrr-mv-switch), which made the scrollspy read as
+   pure redundant clutter rather than useful navigation. */
 .nrr-masthead-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .nrr-appnav { display: flex; align-items: center; gap: 22px; }
 .nrr-appnav a {
@@ -56,7 +57,6 @@
   content: ''; position: absolute; left: 0; right: 0; bottom: 0;
   height: 3px; border-radius: 2px; background: var(--green);
 }
-.nrr-appnav-div { width: 1px; height: 22px; background: var(--line); }
 
 /* Router views — siblings toggled with [hidden]; !important beats any
    display rule a child layout class might set later. */
@@ -1141,9 +1141,7 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    competing for space; only active while genuinely in the Fullscreen API
    state (toggled via #nrr-pulse-fs-btn), auto-reverts on Escape/exit since
    that fires the same `fullscreenchange` listener that sets this class. */
-.nrr-pulse-fs-active .nrr-masthead,
-.nrr-pulse-fs-active .nrr-appnav-div,
-.nrr-pulse-fs-active #nrr-subnav { display: none !important; }
+.nrr-pulse-fs-active .nrr-masthead { display: none !important; }
 .nrr-pulse-fs-active .nrr-pulse-page { max-width: 100vw; padding: 28px 48px; }
 .nrr-pulse-fs-active .nrr-pulseboard { height: calc(100vh - 56px); }
 .nrr-pulse-dateline-sub { font-size: 14px; color: var(--ink3); font-weight: 600; }
@@ -1175,29 +1173,64 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    scene only, sized so cumulative block + title + 3 rows genuinely fit
    within the scene's real available height (measured ~355px inner content
    area in the embedded, non-fullscreen admin view — the tightest case). */
-.nrr-pulse-scene-wins { background: var(--fill); color: var(--ink); justify-content: flex-start; padding-top: 28px; }
-.nrr-pulse-scene-cumul { text-align: center; margin-bottom: 14px; flex: none; }
-.nrr-pulse-scene-wins .nrr-pulse-scene-lbl { color: var(--ink2); font-size: 15px; }
-.nrr-pulse-scene-wins .nrr-pulse-scene-num { color: var(--green-deep); font-size: 60px; margin: 2px 0; }
-.nrr-pulse-scene-wins .nrr-pulse-scene-sub { color: var(--ink3); font-size: 14px; }
-.nrr-pulse-spotlight-title { font-size: 14px; font-weight: 700; color: var(--ink3); text-align: center; margin-bottom: 8px; }
-.nrr-pulse-spotlight-list { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.nrr-pulse-scene-wins { background: var(--fill); color: var(--ink); justify-content: flex-start; padding-top: 3px; }
+.nrr-pulse-scene-cumul { text-align: center; margin-bottom: 1px; flex: none; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-lbl { color: var(--ink2); font-size: 14px; }
+/* v_signage2/3 shrunk this hero block twice (60px->44px->38px) to make room
+   for more spotlight rows. v_signage4/5 shrunk it further (38px->34px->30px)
+   to buy back room for making the row text below match the app's normal
+   sizing. v_signage6 (2026-07-15, same day): user found the whole page had
+   ended up TOO SMALL to read as signage ("font เล็กหมดเลย เพิ่มทั้งหมดให้ใหญ่ขึ้น")
+   -- bumped every row-level font back up, and shrunk this hero number
+   (34px->30px->27px) plus padding/margin to make room. v_signage7 (same
+   day): giving .nrr-pulse-spotlight-row a genuinely FIXED height (see that
+   rule -- it was silently flex-shrinking before, since flex-shrink defaults
+   to 1 without `flex:none`) revealed the true cost was ~6px more than this
+   hero block had spare -- trimmed once more (27px->24px, tighter
+   padding/margin/list-gap) to cover it. Scene's real available height stays
+   ~419px in the embedded/non-fullscreen admin view (the tightest real case)
+   -- re-verified by DOM measurement after this change, not assumed. */
+.nrr-pulse-scene-wins .nrr-pulse-scene-num { color: var(--green-deep); font-size: 24px; margin: 1px 0; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-sub { color: var(--ink3); font-size: 11px; }
+.nrr-pulse-spotlight-title { font-size: 12px; font-weight: 700; color: var(--ink3); text-align: center; margin-bottom: 3px; }
+.nrr-pulse-spotlight-list { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+/* v_signage7 (2026-07-15): FIXED height, same bug class + same fix as the
+   v46 comment on .nrr-pulse-arr-row below -- this row used to be
+   content-driven (padding + whatever .nrr-pulse-spotlight-main happened to
+   contain), so a row with a secondary company-name line was taller than one
+   without, and the tag/chip/amount -- centered via align-items:center
+   against EACH row's own height -- landed on a different vertical position
+   row to row (user: "แต่ละ pill เรียงในแนวตั้ง...เบี้ยวไปเบี้ยวมา"). Fixed height,
+   sized for the worst case (name + sub, two lines), makes every row
+   identical regardless of content, so the pill/chip/amount always center
+   against the same number and land on one shared line. Matches
+   .nrr-pulse-arr-row/.nrr-pulse-risk-row's own height per tier (52px
+   embedded, see .nrr-pulse-fs-active override below for the 96px
+   fullscreen tier) -- all three row types share one height per tier now. */
 .nrr-pulse-spotlight-row {
-  display: flex; align-items: center; gap: 14px; background: #fff; border-radius: var(--r-md);
-  padding: 10px 20px; box-shadow: 0 1px 0 var(--line);
+  display: flex; flex: none; align-items: center; gap: 10px; background: #fff; border-radius: var(--r-md);
+  height: 52px; padding: 0 16px; box-shadow: 0 1px 0 var(--line);
 }
 .nrr-pulse-spotlight-main { flex: 1; min-width: 0; }
-.nrr-pulse-spotlight-name { font-size: 24px; font-weight: 800; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrr-pulse-spotlight-amt { font-family: var(--font-num); font-size: 20px; font-weight: 800; color: var(--ink); flex: none; }
-/* Sales/Expansion source badge — same accent each source already uses
-   elsewhere on this board, so the tag reads consistent with the rest. */
+/* v_signage4: name 15px/800 -> 15px/600, matching the app's standard
+   row-name typography. v_signage6 (2026-07-15): 15px -> 18px -- matching the
+   app's normal-row size made this unreadable as TV signage from a distance
+   (user feedback), so this scene keeps the 600 weight (still reads cleaner
+   than the old 700/800) but grows the SIZE back up past the plain in-app
+   standard, on purpose, for this signage-specific context. */
+.nrr-pulse-spotlight-name { font-size: 18px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v_signage5: weight 800 -> 700. v_signage6: size 13px -> 16px (same
+   "bigger for signage" pass as the name above). */
+.nrr-pulse-spotlight-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--ink); flex: none; }
+/* Sales/Expansion source badge — v_signage4 matched this to the app's
+   standard `.tag` size (12px/700). v_signage6: bumped to 14px/700, padding
+   5px 12px, to grow in step with the rest of this row's now-bigger text. */
 .nrr-pulse-source-tag {
-  flex: none; display: inline-block; padding: 5px 14px; border-radius: var(--r-pill);
-  font-size: 13px; font-weight: 800; color: #fff; white-space: nowrap;
+  flex: none; display: inline-block; padding: 5px 12px; border-radius: var(--r-pill);
+  font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap;
 }
 .nrr-pulse-source-tag.sales      { background: var(--mv-teal); }
 .nrr-pulse-source-tag.expansion  { background: var(--mv-green-lt); }
-.nrr-pulse-hero-row-more { font-size: 13px; font-weight: 700; color: var(--ink3); text-align: center; margin-top: 4px; }
 
 /* Scenes 3/4 — full-screen block panels (SKU / risk), reusing the same
    saturated left-accent look as the pre-v65 blocks, just larger rows now
@@ -1208,22 +1241,46 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-pulse-scene-skus .nrr-pulse-scene-num { color: var(--sun-deep); }
 .nrr-pulse-block-title { font-size: 24px; font-weight: 800; color: var(--ink); }
 .nrr-pulse-block-tally { font-size: 20px; font-weight: 700; color: var(--ink2); font-family: var(--font-num); }
-.nrr-pulse-block-caption { font-size: 14px; font-weight: 600; color: var(--ink3); margin: -2px 0 14px; line-height: 1.4; }
+/* v_signage7 (2026-07-15): margin-bottom 14px -> 10px. Giving
+   .nrr-pulse-arr-row/.nrr-pulse-risk-row `flex:none` (see those rules)
+   exposed a real ~3.6px overflow that flex-shrink had been silently
+   absorbing -- trimmed here rather than the row height itself, since the
+   rows are already sized to match .nrr-pulse-spotlight-row's own height. */
+.nrr-pulse-block-caption { font-size: 14px; font-weight: 600; color: var(--ink3); margin: -2px 0 10px; line-height: 1.4; }
 .nrr-pulse-list { display: flex; flex-direction: column; overflow: hidden; }
 .nrr-pulse-empty { color: var(--ink3); font-size: 18px; padding: 10px 0; }
 
 /* v46: fixed row height (was auto — a row whose meta line happened to wrap
    to 2 lines made THAT rotation window taller than others, so the whole
    box visibly resized as it cycled). Every row now clips to one line.
-   v65: 44px -> 60px, 16px -> 20px, matching the full-screen scene scale. */
-.nrr-pulse-arr-row { display: flex; align-items: center; gap: 14px; height: 60px; border-bottom: 1px solid var(--line); }
+   v65: 44px -> 60px, 16px -> 20px, matching the full-screen scene scale.
+   v_signage5 (2026-07-15): 60px -> 44px again -- this scene's whole type
+   scale shrunk to match the rest of the app (see .nrr-pulse-arr-name below),
+   so the old 60px row now looked oversized/sparse for much smaller text.
+   v_signage6 (same day): 44px -> 52px -- text grew back up (see below), too
+   small to read as signage per user feedback.
+   v_signage7: added `flex:none` -- without it a fixed `height` here is only
+   a flex-basis hint, and flex-shrink (default 1) silently compresses every
+   row equally whenever 6 rows don't quite fit the scene, which is exactly
+   the same bug .nrr-pulse-spotlight-row just got caught doing (self-audited
+   this row + risk-row for the same mistake once that turned up). */
+.nrr-pulse-arr-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--line); }
 .nrr-pulse-arr-row:last-child { border-bottom: none; }
 .nrr-pulse-arr-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--ink3); opacity: 0.4; flex: none; }
 .nrr-pulse-today-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--green-deep); flex: none; box-shadow: 0 0 0 0 rgba(0,128,101,0.6); animation: nrrPulseBeat 1.8s infinite; }
 @keyframes nrrPulseBeat { 0% { box-shadow: 0 0 0 0 rgba(0,128,101,0.55); } 70% { box-shadow: 0 0 0 10px rgba(0,128,101,0); } 100% { box-shadow: 0 0 0 0 rgba(0,128,101,0); } }
 .nrr-pulse-arr-main { flex: 1; min-width: 0; }
-.nrr-pulse-arr-name { font-size: 20px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrr-pulse-arr-sub { font-size: 14px; font-weight: 600; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v_signage5 (2026-07-15): 20px/700 -> 15px/600, matched to app-standard row
+   typography. v_signage6 (same day): 15px -> 18px -- across-the-board too
+   small for TV signage per user feedback; kept the 600 weight (still reads
+   cleaner than the pre-v_signage5 700/800) but grew the size, same as
+   .nrr-pulse-spotlight-name (Wins/Month use a separate class but the SAME
+   target size -- keep both in sync if either changes again). */
+.nrr-pulse-arr-name { font-size: 18px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v_signage3: 14px -> 12px. v_signage5: 12px/600 -> 13px/500, matching the
+   app's standard secondary-caption typography. v_signage6: 13px -> 15px,
+   same "bigger for signage" pass as the name above. */
+.nrr-pulse-arr-sub { font-size: 15px; font-weight: 500; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v50: was plain gray caption text — repurposed into a solid color-coded
    chip (color hashed per person in JS, _nrrPulseOwnerColor) so a KAM can
    learn "I'm this color" and spot their own rows across the whole board at
@@ -1239,19 +1296,38 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    _nrrPulseOwnerSlotWidth in nrr_pulse.js) — not a guessed constant here.
    v65: font-size bumped 12px -> 16px, MUST stay in sync with the default
    font string in _nrrPulseTextWidth (nrr_pulse.js) or measured slot widths
-   go silently wrong — see that file's own comment on this exact bug class. */
+   go silently wrong — see that file's own comment on this exact bug class.
+   v_signage5 (2026-07-15): 16px/800, padding 5px 13px -> 12px/700, padding
+   4px 10px -- matched to the app's standard `.tag` typography (nrr_base.css)
+   so this chip stops looking oversized next to the now-same-scale
+   Sales/Expansion tag it sits beside in Wins/Month rows.
+   v_signage6 (same day): 12px -> 14px, padding 4px 10px -> 5px 12px -- grew
+   back up in step with the rest of the row (too small per user feedback).
+   PAIRED EDIT REQUIRED: _nrrPulseTextWidth's default font string
+   (nrr_pulse.js) MUST also change to '700 14px ...' or measured slot widths
+   go silently wrong. */
 .nrr-pulse-owner-slot { flex: none; display: flex; justify-content: flex-end; }
 .nrr-pulse-owner-chip {
-  display: inline-block; padding: 5px 13px; border-radius: var(--r-pill);
-  font-size: 16px; font-weight: 800; color: #fff; letter-spacing: 0.01em;
+  display: inline-block; padding: 5px 12px; border-radius: var(--r-pill);
+  font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 0.01em;
   white-space: nowrap;
 }
-.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 20px; font-weight: 800; color: var(--ink); flex: none; }
+/* v_signage5: 20px/800 -> 13px/700, matching .nrr-pulse-spotlight-amt and
+   the app's standard trailing-number weight. v_signage6: 13px -> 16px, same
+   "bigger for signage" pass, kept in sync with .nrr-pulse-spotlight-amt. */
+.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--ink); flex: none; }
 
 /* v50: rebuilt to match .nrr-pulse-arr-row exactly (res_name primary /
    account_name secondary via .nrr-pulse-arr-main, owner chip) — only the
    trailing amount block stays risk-specific (฿ shortfall + its reason). */
-.nrr-pulse-risk-row { display: flex; align-items: center; gap: 14px; height: 60px; border-bottom: 1px solid var(--line); }
+/* v_signage3: 60px -> 50px, cap went 5 -> 6 rows (user request).
+   v_signage5: 50px -> 44px, matching .nrr-pulse-arr-row's own shrink now
+   that the text inside is much smaller (see .nrr-pulse-risk-amt below).
+   v_signage6: 44px -> 52px, matching .nrr-pulse-arr-row's own re-grow.
+   v_signage7: added `flex:none`, same fix + same reason as .nrr-pulse-arr-row
+   above -- a bare `height` inside a flex column is only a sizing hint and
+   silently flex-shrinks without this. */
+.nrr-pulse-risk-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--line); }
 .nrr-pulse-risk-row:last-child { border-bottom: none; }
 /* v52: the chip fix (v51) wasn't the real cause — .nrr-pulse-risk-amt-wrap
    itself had NO fixed width (only `max-width` on the label inside it, which
@@ -1269,16 +1345,87 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here.
    v65: 16px/10.5px -> 22px/13px, MUST stay in sync with the font strings
    inside _nrrPulseRiskAmtWidth (nrr_pulse.js) — same measure-don't-guess
-   discipline as the owner slot above. */
+   discipline as the owner slot above.
+   v_signage5 (2026-07-15): 22px/800 -> 13px/700 (color stays coral — user
+   confirmed dropping the deliberate "alarm" emphasis in favor of matching
+   every other number on the page). Reason label 13px/700 -> 13px/500,
+   matching the app's standard secondary-caption weight.
+   v_signage6 (same day): 13px -> 16px (amount) / 13px -> 15px (label), same
+   "bigger for signage" pass as every other row-level class. PAIRED EDIT
+   REQUIRED: _nrrPulseRiskAmtWidth's two hardcoded font strings (nrr_pulse.js)
+   MUST also update to match, or the amt-wrap column width goes silently
+   wrong. */
 .nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
-.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 22px; font-weight: 800; color: var(--coral); }
-.nrr-pulse-risk-amt-lbl { font-size: 13px; font-weight: 700; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--coral); }
+.nrr-pulse-risk-amt-lbl { font-size: 15px; font-weight: 500; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Fullscreen tier (v_signage7, 2026-07-15) ─────────────────────────────
+   Every rule above this point is the EMBEDDED tier — sized for the Pulse
+   page sitting inside the normal admin app chrome (roughly 1200×419px of
+   real scene area), which is what every screenshot in this chat shows.
+   Three rounds of "make it bigger" (v_signage5/6) kept tuning THAT tier and
+   it kept feeling too small, because the page's actual job is a TV in real
+   fullscreen (document.documentElement.requestFullscreen(), masthead/nav
+   hidden) — a completely different canvas, ~1920×1080 or larger, read from
+   across a room. Designed from a scaled 1920×1080 mockup (see the
+   conversation) and gated on .nrr-pulse-fs-active, the class the fullscreen
+   button already toggles on <body> — so the embedded preview stays close to
+   its current, already-tuned size, and only REAL fullscreen gets this much
+   larger scale. Row height, name, amount, tag, chip, and the two hero
+   numbers all get bigger together, same invariant as every prior round
+   (all 4 scenes share one scale per tier, never touched independently).
+   PAIRED EDIT: entering/exiting fullscreen changes which font this CSS
+   renders for the owner-chip/risk-amount — _nrrPulseTextWidth,
+   _nrrPulseOwnerSlotWidth and _nrrPulseRiskAmtWidth (nrr_pulse.js) all check
+   document.fullscreenElement and pick the matching font string/padding, or
+   the measured column widths go wrong the instant fullscreen toggles. */
+/* v_signage8 (2026-07-16): a real device (not this test harness's simulated
+   1920x1080) showed the last row clipped -- the prior round's fit left only
+   ~3px of spare at exactly 1920x1080, which is not a safety margin, it's an
+   exact-fit gamble. Testing a second, genuinely common resolution
+   (1440x900, a typical laptop's logical size) confirmed it: the same fixed
+   px values overflowed there by 46px. Real fullscreen viewports vary
+   (native resolution, OS display scaling, aspect ratio) and a fourth guess
+   at "the" resolution would just move the same problem to a different
+   screen size. Fixed properly instead: every value below is `clamp(min,
+   Nvh, max)` -- tied to the REAL viewport height (vh), so it naturally
+   scales down on a shorter screen and up on a taller one, rather than
+   assuming one fixed canvas. This only works because _nrrPulseTextWidth/
+   _nrrPulseOwnerSlotWidth/_nrrPulseRiskAmtWidth (nrr_pulse.js) no longer
+   hardcode a font string to match -- they read the REAL computed font off
+   a hidden probe element carrying these same classes, so whatever size the
+   browser actually resolves the clamp() to is what gets measured, on any
+   screen, permanently (no more per-round sync edits). */
+.nrr-pulse-fs-active .nrr-pulse-scene { padding: clamp(24px, 4vh, 40px) clamp(32px, 5vw, 56px); }
+.nrr-pulse-fs-active .nrr-pulse-scene-wins .nrr-pulse-scene-lbl { font-size: clamp(16px, 2.2vh, 24px); }
+.nrr-pulse-fs-active .nrr-pulse-scene-wins .nrr-pulse-scene-num { font-size: clamp(56px, 9vh, 100px); margin: 2px 0; }
+.nrr-pulse-fs-active .nrr-pulse-scene-wins .nrr-pulse-scene-sub { font-size: clamp(14px, 2vh, 22px); }
+.nrr-pulse-fs-active .nrr-pulse-spotlight-title { font-size: clamp(13px, 1.8vh, 20px); margin-bottom: 5px; }
+.nrr-pulse-fs-active .nrr-pulse-spotlight-list { gap: clamp(6px, 1vh, 10px); }
+.nrr-pulse-fs-active .nrr-pulse-spotlight-row { height: clamp(52px, 7vh, 84px); gap: clamp(12px, 1.6vw, 18px); padding: 0 clamp(16px, 2vw, 26px); }
+.nrr-pulse-fs-active .nrr-pulse-spotlight-name,
+.nrr-pulse-fs-active .nrr-pulse-arr-name { font-size: clamp(20px, 2.8vh, 34px); }
+.nrr-pulse-fs-active .nrr-pulse-arr-sub,
+.nrr-pulse-fs-active .nrr-pulse-risk-amt-lbl { font-size: clamp(13px, 1.6vh, 19px); }
+.nrr-pulse-fs-active .nrr-pulse-spotlight-amt,
+.nrr-pulse-fs-active .nrr-pulse-arr-gmv,
+.nrr-pulse-fs-active .nrr-pulse-risk-amt { font-size: clamp(17px, 2.4vh, 29px); }
+.nrr-pulse-fs-active .nrr-pulse-source-tag,
+.nrr-pulse-fs-active .nrr-pulse-owner-chip { font-size: clamp(12.5px, 1.5vh, 18px); padding: clamp(4px, 0.7vh, 7px) clamp(10px, 1.4vw, 18px); }
+.nrr-pulse-fs-active .nrr-pulse-arr-row,
+.nrr-pulse-fs-active .nrr-pulse-risk-row { height: clamp(52px, 7vh, 84px); gap: clamp(12px, 1.6vw, 18px); }
+.nrr-pulse-fs-active .nrr-pulse-block-title { font-size: clamp(22px, 3vh, 36px); }
+.nrr-pulse-fs-active .nrr-pulse-block-tally { font-size: clamp(18px, 2.4vh, 28px); }
+.nrr-pulse-fs-active .nrr-pulse-block-caption { font-size: clamp(13px, 1.7vh, 20px); margin: 0 0 16px; }
 
 @media (max-width: 900px) {
   .nrr-pulse-scene { padding: 28px 24px; }
   .nrr-pulse-scene-num { font-size: 88px; }
-  .nrr-pulse-spotlight-name { font-size: 24px; }
-  .nrr-pulse-spotlight-amt { font-size: 20px; }
+  /* v_signage3/6: kept in sync with the desktop base below -- must stay <=
+     that base or a narrow viewport would re-grow these past the size the
+     scenes were fit to. */
+  .nrr-pulse-spotlight-name { font-size: 18px; }
+  .nrr-pulse-spotlight-amt { font-size: 16px; }
 }
 
 /* ── Account view loading skeleton — page-shaped, not a single bar ─────── */
