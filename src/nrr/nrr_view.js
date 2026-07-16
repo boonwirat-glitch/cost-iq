@@ -2819,7 +2819,7 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
       '<div class="nrr-comm-cell-meta">' + nrrEsc((r.beneficiary_email || '').split('@')[0]) + '</div></td>' +
       '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
-      _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + ho.retention_pct + '%' : null) +
+      _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + nrrFmtPct(ho.retention_pct) : null) +
       _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMVExact(outlet.outlet_gmv) : null) +
       _nrrCommMoneyCell(p1.comm, p1.gmv ? 'จาก ' + nrrFmtGMVExact(p1.gmv) : null) +
       _nrrCommMoneyCell(p3.comm, p3.gmv_incremental ? 'จาก ' + nrrFmtGMVExact(p3.gmv_incremental) : null) +
@@ -2909,7 +2909,7 @@ function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
   var outletsForKam = nrrOutletsForKam(kamEmail, period);
   var nrrOutlets = outletsForKam.filter(function (o) { return ['core_nrr', 'comeback', 'transfer_in'].indexOf(o.movement) > -1; });
   var expOutlets = outletsForKam.filter(function (o) { return o.movement === 'expansion'; });
-  var handoverDetail = (bd && bd.handover && bd.handover.detail) || (est && est.handover && est.handover.detail) || [];
+  var handoverObj = (bd && bd.handover) || (est && est.handover) || {};
   var skel = '<div class="ds-skel" style="margin-bottom:8px"></div><div class="ds-skel" style="width:65%"></div>';
   // v861-fix: user flagged this note (sitting right under the "Upsell P1"/
   // "Upsell P3" headers, right next to P1/P3's own 1% rate) as reading
@@ -2923,7 +2923,7 @@ function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
     p1: p1p3Note + '<div id="' + p1ElId + '">' + skel + '</div>',
     p3: p1p3Note + '<div id="' + p3ElId + '">' + skel + '</div>',
     expansion: nrrCommOutletListHtml(expOutlets, 'ไม่มีร้านขยายใหม่เดือนนี้', 0.005),
-    handover: nrrCommHandoverListHtml(handoverDetail)
+    handover: nrrCommHandoverListHtml(handoverObj)
   };
   var expansionOutletIds = new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); }));
   return {
@@ -3001,12 +3001,34 @@ function nrrCommOutletListHtml(outlets, emptyText, commissionRate) {
     }).join('');
 }
 
-function nrrCommHandoverListHtml(detail) {
-  if (!detail || !detail.length) return '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
-  return detail.map(function (d) {
-    var pct = d.baseline > 0 ? Math.round(d.current / d.baseline * 100) : 0;
+// ho: the full handover result object (bd.handover or est.handover), not
+// just its .detail array — needed so this can show the KAM's matched
+// GMV tier + threshold ladder, mirroring the CDS summary (07b_cds.js).
+// Three states, same branching as _cdsRender_ho: matched tier (show label +
+// retention), configured-but-no-match (below the lowest gmv_min → ฿0), or
+// a pre-v91 locked snapshot with no gmv_bucket_gmv at all (legacy note).
+function nrrCommHandoverListHtml(ho) {
+  var detail = (ho && ho.detail) || [];
+  var isLegacySnapshot = !!ho && ho.gmv_bucket_gmv === undefined;
+  var gmvTiers = [];
+  try { gmvTiers = typeof nrrCommRateGetHandoverGmvTiers === 'function' ? nrrCommRateGetHandoverGmvTiers() : []; } catch (e) {}
+  var headerHtml = '';
+  if (ho && ho.gmv_tier_label) {
+    headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
+      '<span class="ds-row-name" style="color:rgba(188,215,255,.85)">GMV ' + nrrEsc(ho.gmv_tier_label) + '</span>' +
+      '<span class="ds-row-meta">retention ' + nrrFmtPct(ho.retention_pct) + '</span></div>';
+  } else if (isLegacySnapshot) {
+    headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
+      '<span class="ds-row-meta">อัตราเดิม (ก่อนแบ่ง GMV tier)</span></div>';
+  } else if (gmvTiers.length && ho && ho.gmv_bucket_gmv != null) {
+    headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
+      '<span class="ds-row-meta">ยอด handover ' + nrrFmtGMVExact(ho.gmv_bucket_gmv) + ' ต่ำกว่า tier ต่ำสุด → ฿0</span></div>';
+  }
+  if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
+  return headerHtml + detail.map(function (d) {
+    var pct = d.baseline > 0 ? (d.current / d.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via nrrFmtPct below
     return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(d.name || d.account_id) + '</span>' +
-      '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + pct + '%) · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
+      '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + nrrFmtPct(pct) + ') · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
   }).join('');
 }
 

@@ -1,4 +1,4 @@
-<!-- Freshket Sense v865: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v862: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v865',
+      version: 'v862',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -30501,10 +30501,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
-    // below (a real live-estimate payout decision, same class of bug as
-    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
-    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
@@ -30512,7 +30509,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
     // button was already a dead no-op click in production.
@@ -30537,10 +30534,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
-    // below (a real live-estimate payout decision, same class of bug as
-    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
-    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
@@ -30548,7 +30542,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
     // button was already a dead no-op click in production.
@@ -30574,10 +30568,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
-    // below (a real live-estimate payout decision, same class of bug as
-    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
-    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
+    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
     const _kamFinalC=_kpC?_kpC.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
@@ -30587,7 +30578,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-chip-bottom">
-          <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${_commFmtPct(nrrPct)}</span>`:''}</div>
+          <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
         </div>
       </div>
       ${nrrPct!==null?`<span class="tv-chip-comm">${_kpCUL?'<span class=\'skel\' style=\'display:inline-block;width:46px;height:14px;border-radius:3px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
@@ -35460,7 +35451,7 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
     } else {
       raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     }
-    rawPct      = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
+    rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     governedPct = _nrrGovernedPct(raw, kamEmail, null);
     pct         = governedPct !== null ? governedPct : rawPct;
 
@@ -35565,7 +35556,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     } else {
       raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
     }
-    const rawPct      = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
+    const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
     const pct         = governedPct !== null ? governedPct : rawPct;
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
@@ -36493,7 +36484,7 @@ function _tgtRenderTeamGovCard() {
     <div class="tv-signal-wrap">
       <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
         <div class="tv-signal-label">NRR</div>
-        <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${_commFmtPct(governedPct)}</div>
+        <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${governedPct !== null ? governedPct + '%' : '—'}</div>
         <div class="tv-signal-meta">${baseTxt}</div>
       </div>
       <div class="tv-signal-card commission" style="cursor:pointer" onclick="event.stopPropagation();_commOpenTlDetailSheet()">
@@ -36667,14 +36658,6 @@ function _commFmtPayout(n) {
   if (!n) return '฿0';
   return '฿' + Math.round(n).toLocaleString('en-US');
 }
-// v92: shared %NRR/retention% display formatter (mirrors /nrr's nrrFmtPct()).
-// Always 1 decimal — the underlying pct value itself is now UNROUNDED
-// through tier/gate decisions (see _nrrGovernedPct), so this is purely a
-// display concern, never a computation one.
-function _commFmtPct(v) {
-  return (v !== null && v !== undefined && !isNaN(v)) ? Number(v).toFixed(1) + '%' : '—';
-}
-window._commFmtPct = _commFmtPct;
 
 function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
@@ -36882,13 +36865,7 @@ function _nrrExclusionBaseImpact(kamEmail, tlEmail, periodMonth) {
 // still hook in without touching payout math.
 function _nrrGovernedPct(rawResult) {
   if (!rawResult || rawResult.nrr === null) return null;
-  // v92-fix: NO rounding here — this value feeds tier/gate threshold
-  // comparisons (_commMatchTierByCode/_commComputeGmvGate) downstream.
-  // Rounding to a whole number (or even 1 decimal) BEFORE that comparison
-  // can flip a real payout decision at a boundary (e.g. true 97.96% vs a
-  // gate at 98% — rounds to 98, wrongly clears the gate). Round only for
-  // DISPLAY/STORAGE, via _commFmtPct(), never before a threshold decision.
-  return rawResult.nrr * 100;
+  return Math.round(rawResult.nrr * 100);
 }
 // v865: read-only reporting helper -- "this month's %NRR excludes N waived
 // accounts totaling ฿X" -- must never feed back into payout math (that's
@@ -36900,7 +36877,7 @@ function _nrrWaivedAccountsSummary(kamEmail, tlEmail, periodMonth) {
 function _nrrGovernanceForVisibleTeam() {
   const scope = _commVisibleTeamScope();
   const raw = _tgtGetVisibleTeamNrrResult();
-  const rawPct = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
+  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
   const governedPct = _nrrGovernedPct(raw);
   const exclBase = _nrrExclusionBaseImpact(null, scope.tlEmail, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
@@ -36911,7 +36888,7 @@ function _nrrGovernanceForKam(kamEmail) {
   const raw = (_policy && _policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function')
     ? window._qnrrComputeForCommission(kamEmail, 'kam')
     : _tgtComputeKamNRR(kamEmail, null);
-  const rawPct = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
+  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
   const governedPct = _nrrGovernedPct(raw);
   const exclBase = _nrrExclusionBaseImpact(kamEmail, null, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
@@ -37181,7 +37158,7 @@ function _commBuildKamSelfCard() {
     </div>
   </div>`;
   }
-  const pctText = _commFmtPct(st.pct);
+  const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
     <div class="pv-comm-left">
@@ -37224,7 +37201,7 @@ function _commOpenKamSelfSheet() {
     ov.onclick = function(e){ if(e.target === ov) _commCloseKamSelfSheet(); };
     document.body.appendChild(ov);
   }
-  const pctText = _commFmtPct(st.pct);
+  const pctText = st.pct !== null ? `${st.pct}%` : '—';
   const tierRows = st.tiers.map((t, idx)=>{
     const on = st.tier && (idx === st.currentIdx);
     const isNext = st.next && String(t.id||idx) === String(st.next.id||st.tiers.indexOf(st.next));
@@ -37324,7 +37301,7 @@ function _commOpenTlDetailSheet(opts) {
     // resolve name: use portview display name
     const pvRow = (portviewBulkData||[]).find(p => p.kamEmail === (r.beneficiary_email||''));
     const name = (pvRow && pvRow.kamName) || bd.kam_name || r.beneficiary_email || '';
-    const nrr  = _commFmtPct(r.governed_nrr_pct);
+    const nrr  = r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct+'%' : '—';
     const detailParts = ['NRR '+fmtP(nrrP)];
     if (upsell > 0) detailParts.push('Uplift '+fmtP(upsell));
     if (ho > 0)     detailParts.push('HO '+fmtP(ho));
@@ -37362,7 +37339,7 @@ function _commOpenTlDetailSheet(opts) {
           <div class="pv-comm-sheet-kpi-val">${fmtP(summary.kamPayout)}</div>
         </div>
       </div>
-      <div class="pv-comm-sheet-sub">NRR ทีม ${_commFmtPct(tlPayout.nrr_pct)} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
+      <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
       ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
       <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
@@ -38217,7 +38194,7 @@ function renderCommAssignmentStep(body) {
 function _renderComponentRatesEditor() {
   const c = (k,p,d) => { try{ const v=_commGetConfig(k,p,d); return v!=null?v:d; }catch(e){return d;} };
   const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
-  const fP = n => (Math.round(Number(n||0)*1000)/10)+'%'; // v92-fix: was whole-number round (1.5% showed as "2%")
+  const fP = n => Math.round(Number(n||0)*100)+'%';
 
   function rateCard(title, color, fields, note) {
     const flds = fields.map(([lbl,k,p,def,step,unit]) => {
@@ -38837,7 +38814,7 @@ function renderCommLockStep(body) {
       </div>
       <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
       <div class="comm-kpis">
-        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:_commFmtPct(model.teamPct)}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
+        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:(model.teamPct!==null?model.teamPct+'%':'—')}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
         <div class="comm-kpi ${summary.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.tlPayout)}</div><div class="comm-kpi-sub">${summary.tlRows.length} TL rows</div></div>
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
@@ -38851,7 +38828,7 @@ function renderCommLockStep(body) {
         <div class="comm-preview-tl-left">
           <div class="comm-team-eyebrow">TEAM LEAD</div>
           <div class="comm-name">${_commEscapeHtml(t.tlName||t.tlEmail)}</div>
-          <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${_commFmtPct(t.teamNrr)}</div>
+          <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${t.teamNrr!==null?t.teamNrr+'%':'—'}</div>
           <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}</div>
         </div>
         <div class="comm-preview-tl-money"><span>Total payout</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
@@ -38868,7 +38845,7 @@ function renderCommLockStep(body) {
         return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
           <div>
             <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
-            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
+            <div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
           </div>
           <div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div>
         </div>`;
@@ -38880,7 +38857,7 @@ function renderCommLockStep(body) {
       const bd = r.breakdown || {};
       const isKam = r.beneficiary_role === 'kam';
       const name = _commEscapeHtml(bd.kam_name || bd.team_lead_name || r.beneficiary_email);
-      let sub = `NRR ${_commFmtPct(r.governed_nrr_pct)}`;
+      let sub = `NRR ${r.governed_nrr_pct??'—'}%`;
       if (isKam && bd.nrr_payout !== undefined) {
         const parts = [`NRR ${_commFmtPayout(bd.nrr_payout)}`];
         if (bd.upsell_sku && bd.upsell_sku.total_commission > 0) parts.push(`Upsell ${_commFmtPayout(bd.upsell_sku.total_commission)}`);
@@ -39154,7 +39131,7 @@ function renderCommissionLockTab() {
             <td><span class="tgt-snap-role ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</span></td>
             <td><div class="tgt-snap-name">${r.breakdown?.kam_name || r.breakdown?.team_lead_name || r.beneficiary_email}</div><div class="tgt-preview-meta">${r.beneficiary_email}</div></td>
             <td>${r.team_lead_email || '—'}</td>
-            <td class="tgt-snap-mono">${_commFmtPct(r.governed_nrr_pct)}</td>
+            <td class="tgt-snap-mono">${r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct + '%' : '—'}</td>
             <td class="tgt-snap-mono">${_commFmtPayout(r.payout_amount)}</td>
             <td><span class="tgt-snap-status ${r.snapshot_status||''}">${r.snapshot_status==='final'?'🔒':'Draft'}</span></td>
           </tr>`).join('')}
@@ -39194,7 +39171,7 @@ function renderCommissionPreviewTab() {
       <div class="tgt-preview-grid">
         <div class="tgt-preview-kpi">
           <div class="tgt-preview-kpi-label">Team NRR</div>
-          <div class="tgt-preview-kpi-val">${_commFmtPct(model.teamPct)}</div>
+          <div class="tgt-preview-kpi-val">${model.teamPct !== null ? model.teamPct + '%' : '—'}</div>
         </div>
         <div class="tgt-preview-kpi">
           <div class="tgt-preview-kpi-label">TL payout</div>
@@ -39222,7 +39199,7 @@ function renderCommissionPreviewTab() {
           <div class="tgt-preview-payout">${_commFmtPayout(r.payout)}</div>
         </div>
         <div class="tgt-preview-row-bottom">
-          <span class="tgt-preview-chip ${cls}">NRR ${_commFmtPct(r.pct)}</span>
+          <span class="tgt-preview-chip ${cls}">NRR ${r.pct !== null ? r.pct + '%' : '—'}</span>
           <span class="tgt-preview-chip">Tier ${r.tierLabel || '—'}</span>
           <span class="tgt-preview-chip">Pace ${r.pace !== null ? r.pace + '%' : '—'}</span>
         </div>
@@ -39588,7 +39565,7 @@ function _commRenderRetroactiveSection() {
     const nm = _commEscapeHtml(bd.kam_name||bd.team_lead_name||r.beneficiary_email);
     return '<tr><td><span class="tgt-snap-role ' + r.beneficiary_role + '">' + r.beneficiary_role.toUpperCase() + '</span></td>'
       + '<td><div class="tgt-snap-name">' + nm + '</div><div class="tgt-preview-meta">' + _commEscapeHtml(r.beneficiary_email) + '</div></td>'
-      + '<td class="tgt-snap-mono">' + _commFmtPct(r.governed_nrr_pct) + '</td>'
+      + '<td class="tgt-snap-mono">' + (r.governed_nrr_pct!=null?r.governed_nrr_pct+'%':'—') + '</td>'
       + '<td class="tgt-snap-mono">' + _commFmtPayout(r.payout_amount) + '</td>'
       + '<td><span class="tgt-snap-status ' + (r.snapshot_status||'') + '">' + (r.snapshot_status==='final'?'[L]':'Draft') + '</span></td>'
       + '</tr>';
@@ -40616,7 +40593,7 @@ async function renderPortviewTargetBar() {
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
 
   if (nrrResult && nrrResult.nrr !== null) {
-    nrrPct      = nrrResult.nrr * 100; // display-only widget, not the payout engine — full precision, format via _commFmtPct
+    nrrPct      = Math.round(nrrResult.nrr * 100);
     cohortGmv   = nrrResult.cohortGmv    || 0;
     cbGmv       = nrrResult.comebackGmv  || 0;
     exGmv       = nrrResult.expansionGmv || 0;
@@ -40654,7 +40631,7 @@ async function renderPortviewTargetBar() {
   const nrrLeg = !_outletsReady
     ? _nrrShimmer
     : (nrrPct !== null
-        ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${_commFmtPct(nrrPct)}</span></span>`
+        ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${nrrPct}%</span></span>`
         : '');
   const cbPct  = baselinePrevGmv>0&&cbGmv>0 ? '+'+Math.round(cbGmv/baselinePrevGmv*100)+'%' : null;
   const exPct  = baselinePrevGmv>0&&exGmv>0 ? '+'+Math.round(exGmv/baselinePrevGmv*100)+'%' : null;
@@ -40729,7 +40706,7 @@ async function renderPortviewTargetBar() {
   // ── Movement rows (v198) ─────────────────────────────────────
   const fmtK = v => v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+Math.round(v);
   const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'var(--tk-ok-bright)':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
-  const nrrPctStr = n => n===null?'—':_commFmtPct(n*100);
+  const nrrPctStr = n => n===null?'—':Math.round(n*100)+'%';
   const mvRows = [];
   if (nrrResult && nrrResult.transferIn && nrrResult.transferIn.count > 0) {
     const ti = nrrResult.transferIn;
@@ -40777,7 +40754,7 @@ async function renderPortviewTargetBar() {
       <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">เฉพาะร้านที่อยู่ในพอร์ตมาตั้งแต่เดือนก่อน</div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(prevNorm)}/เดือน</span></div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel} MTD</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(currNorm)}/เดือน</span></div>
-      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${_commFmtPct(nrrPct)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${nrrPct}%</span></div>
     </div>${mvDefSection}`;
   }
 
@@ -41467,15 +41444,15 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       ov.onclick=function(e){ if(e.target===ov) closeCompactSheet(); };
       document.body.appendChild(ov);
     }
-    var pctText=_commFmtPct(st.pct);
+    var pctText=st.pct!==null&&st.pct!==undefined?(st.pct+"%"):"—";
     var src=buildSources(st);
     if(!src) src={loading:false,nrr:Number(st&&st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st&&st.payout||0)};
     var finalAmt=src.loading?src.nrr:src.final;
 
     // Config-tied rule values
     function cfg(k,p,d){try{return typeof _commGetConfig==="function"?_commGetConfig(k,p,d):d;}catch(e){return d;}}
-    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
-    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*1000)/10;
+    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*100);
+    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*100);
     var p3Thresh=cfg("upsell_sku","p3_threshold_pct",2.00);
     var p3ThreshPct=Math.round((p3Thresh-1)*100);
     var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",5000)).toLocaleString("en-US");
@@ -41487,8 +41464,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var hoT3Bon=Number(cfg("handover","tier3_bonus",2500)).toLocaleString("en-US");
     var gT1=cfg("gmv_gate","threshold_1",95);
     var gT2=cfg("gmv_gate","threshold_2",90);
-    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*1000)/10;
-    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*1000)/10;
+    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*100);
+    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*100);
 
     // NRR tiers
     var tierRows=(st.tiers||[]).map(function(t,idx){
@@ -41561,7 +41538,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var hoHit2=hd.retention_pct>=hoT2;
       var hoHit3=hd.retention_pct>=hoT3;
       hoDetail=ruleBox([
-        ruleIndent("retention "+_commFmtPct(hd.retention_pct)+" ("+hd.accounts+" ร้าน) — "+money(hd.current_gmv)+" / "+money(hd.baseline_gmv)),
+        ruleIndent("retention "+hd.retention_pct+"% ("+hd.accounts+" ร้าน) — "+money(hd.current_gmv)+" / "+money(hd.baseline_gmv)),
         ruleLine(hoHit2,"≥"+hoT2+"% → ฿"+hoT2Pay,hoHit2?money(hd.payout>0?Math.min(hd.payout,Number(String(hoT2Pay).replace(/,/g,""))||2500):0):""),
         ruleLine(hoHit3,"≥"+hoT3+"% → +฿"+hoT3Bon+" (bonus)",hoHit3?money(Number(String(hoT3Bon).replace(/,/g,""))||2500):"")
       ]);
@@ -41619,7 +41596,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       var baseMon=hd.baseline_gmv>=1000?'฿'+(hd.baseline_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.baseline_gmv);
       var currMon=hd.current_gmv>=1000?'฿'+(hd.current_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.current_gmv);
       var tierPrefix=hd.gmv_tier_label?('GMV '+hd.gmv_tier_label+' · '):'';
-      return tierPrefix+hd.accounts+' ร้าน · '+baseMon+' → '+currMon+' ('+_commFmtPct(hd.retention_pct)+')';
+      return tierPrefix+hd.accounts+' ร้าน · '+baseMon+' → '+currMon+' ('+hd.retention_pct+'%)';
     })();
     var hoRowHtml=cRow('#bcd7ff','Handover',hoSub,src.handover,'#bcd7ff','_commDrillHandover()');
 
@@ -41627,7 +41604,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var gateOk2=!src.gate_active;
     var gateCardHtml='<div style="margin:0 18px 12px;background:'+(gateOk2?'var(--tk-ok-dim)':'rgba(240,80,0,.08)')+';border:1px solid '+(gateOk2?'var(--tk-ok-dim-2)':'rgba(240,80,0,.2)')+';border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">'
       +'<div><div style="font-size:12px;color:rgba(225,238,255,.78)">NRR Gate</div>'
-      +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct!=null?_commFmtPct(gPct):'—')+' '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
+      +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct||'—')+'% '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
       +'<span style="font-size:13px;font-weight:900;color:'+(gateOk2?'var(--tk-ok-bright)':'#ff6b3d')+';font-family:\'IBM Plex Mono\',monospace">× '+gCapPct+'% '+(gateOk2?'✓':'⚠')+'</span></div>';
 
     var heroHtml='<div style="padding:18px;text-align:center">'
@@ -42145,7 +42122,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       +'<div style="overflow-y:auto;flex:1;padding:14px 18px">'
       +(hd.accounts?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
         +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Accounts</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.accounts||0)+'</div></div>'
-        +'<div class="pv-comm-sheet-kpi '+(hit2?'val-good':'')+'"><div class="pv-comm-sheet-kpi-label">Retention</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+_commFmtPct(hd.retention_pct||0)+'</div></div>'
+        +'<div class="pv-comm-sheet-kpi '+(hit2?'val-good':'')+'"><div class="pv-comm-sheet-kpi-label">Retention</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.retention_pct||0)+'%</div></div>'
         +'</div>':'')
       +'<div style="background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
       +'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(188,215,255,.08)">'
@@ -42518,8 +42495,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 function _cdsFormulaContent(key) {
   function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
   var texts = {
-    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10)+'%',
-    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10)+'%',
+    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
+    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
     ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
@@ -42592,7 +42569,7 @@ window._cdsRenderL1 = function(src, st) {
   var finalAmt  = src.loading ? null : src.final;
   var gateOk    = !src.gate_active;
   var gatePct   = Math.round((src.gate_cap||1)*100);
-  var pctText   = _commFmtPct(st.pct);
+  var pctText   = (st.pct!==null&&st.pct!==undefined) ? (st.pct+'%') : '—';
   var nowStr    = (function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);})();
 
   // Row subtitles
@@ -42610,7 +42587,7 @@ window._cdsRenderL1 = function(src, st) {
   var _ht3Bon  = Number(_cfgQ('handover','tier3_bonus',2500)).toLocaleString('en-US');
   var expSub   = ed&&ed.outlet_gmv>0?'สาขาใหม่ × '+_orPct+'% · GMV '+fmt(ed.outlet_gmv):' สาขาใหม่/comeback × '+_orPct+'%';
   var hd       = src.handover_detail||{};
-  var hoSub    = hd.accounts?hd.accounts+' account · retention '+_commFmtPct(hd.retention_pct||0):'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
+  var hoSub    = hd.accounts?hd.accounts+' account · retention '+(hd.retention_pct||0)+'%':'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
 
   function srcRow(tabKey, dotColor, name, sub, amt) {
     var earned = amt > 0;
@@ -42706,7 +42683,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 1000) / 10;
+  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
   var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 5000));
   var fmt = h.fmt;
   var esc = h.esc;
@@ -42811,7 +42788,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 1000) / 10;
+  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 100);
   var p3Thresh    = cfg('upsell_sku', 'p3_threshold_pct', 2.00);
   var p3ThreshPct = Math.round((p3Thresh - 1) * 100);
   var p3MinIncr   = Number(cfg('upsell_sku', 'p3_min_incremental', 5000));
@@ -43107,7 +43084,7 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
     meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
       + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
       + (retPct >= primaryThresholdPct ? 'var(--tk-ok-bright)' : retPct >= (primaryThresholdPct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
-      + _commFmtPct(retPct) + '</b></span>'
+      + retPct + '%</b></span>'
       + '<span style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">' + tierHtml + '</span>'
       + '</div>';
   }
@@ -43116,7 +43093,7 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   var html = '';
 
   sorted.forEach(function(a, idx) {
-    var retA   = a.baseline > 0 ? (a.current / a.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via _commFmtPct below
+    var retA   = a.baseline > 0 ? Math.round(a.current / a.baseline * 100) : 0;
     var retCls = retA >= primaryThresholdPct ? 'v-green' : retA >= (primaryThresholdPct * 0.85) ? 'v-amber' : 'v-dim';
     var proofId = 'hor' + idx;
     html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'
@@ -43126,12 +43103,12 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
       + '</div>'
       + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
       + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
-      + '<span class="cds-val ' + retCls + '">' + _commFmtPct(retA) + '</span>'
+      + '<span class="cds-val ' + retCls + '">' + retA + '%</span>'
       + '</div>'
       + h.proof(proofId, [
           { label: 'Baseline GMV', result: fmt(a.baseline) },
           { label: 'MTD GMV',      result: fmt(a.current) },
-          { label: 'Retention',    result: _commFmtPct(retA), pass: retA >= primaryThresholdPct }
+          { label: 'Retention',    result: retA + '%', pass: retA >= primaryThresholdPct }
         ]);
   });
 
@@ -43182,7 +43159,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   } catch(e) { console.warn('[cds-nrr]', e); }
 
   var nrrPayout = Number(src.nrr || 0);
-  var pctText   = _commFmtPct(st.pct);
+  var pctText   = st.pct !== null && st.pct !== undefined ? (st.pct + '%') : '—';
 
   // ── Commission context card (uses .cds-nrr-ctx CSS) ──────────────────
   var isTopTier = !st.next && nrrPayout > 0;
@@ -43537,7 +43514,7 @@ window._cdsCopyTSV = function() {
       var bd=asObj(r.breakdown);
       var name=bd.kam_name||bd.team_lead_name||r.beneficiary_email;
       var rule=bd.rule_name||bd.payout_source||'';
-      return '<div class="comm-lock-row"><div class="comm-role-dot '+esc(benRole(r.beneficiary_role))+'">'+esc(roleLabelForRow(r.beneficiary_role))+'</div><div><div class="comm-person-name">'+esc(name)+'</div><div class="comm-person-sub">'+esc(rule)+' · Raw '+_commFmtPct(r.raw_nrr_pct)+' → NRR ที่ใช้คิด '+_commFmtPct(r.governed_nrr_pct)+'</div></div><div class="comm-row-money '+(Number(r.payout_amount||0)>0?'hit':'')+' '+(isLocked()?'locked':'')+'">'+money(r.payout_amount)+'</div></div>';
+      return '<div class="comm-lock-row"><div class="comm-role-dot '+esc(benRole(r.beneficiary_role))+'">'+esc(roleLabelForRow(r.beneficiary_role))+'</div><div><div class="comm-person-name">'+esc(name)+'</div><div class="comm-person-sub">'+esc(rule)+' · Raw '+(r.raw_nrr_pct??'—')+'% → NRR ที่ใช้คิด '+(r.governed_nrr_pct??'—')+'%</div></div><div class="comm-row-money '+(Number(r.payout_amount||0)>0?'hit':'')+' '+(isLocked()?'locked':'')+'">'+money(r.payout_amount)+'</div></div>';
     }).join('');
   }
   // ── [REMOVED v211a override] renderCommLockStep / exportCommissionSnapshotCsv / lockCommissionSnapshot ──
@@ -43611,8 +43588,8 @@ function openCommissionRulebook() {
   function fmtPctRaw(n){ return Number(n||0)+'%'; }
 
   // Live config params
-  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
-  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10;
+  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
+  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
   var p3Thresh  = cfg('upsell_sku','p3_threshold_pct',2.00);
   var p3GrowPct = Math.round((p3Thresh-1)*100); // v558: unified phrasing — multiplier AND growth-%
   var p1MinGmv  = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
@@ -43624,8 +43601,8 @@ function openCommissionRulebook() {
   var hoT3Total = fmtB(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500));
   var gT1       = cfg('gmv_gate','threshold_1',95);
   var gT2       = cfg('gmv_gate','threshold_2',90);
-  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*1000)/10;
-  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*1000)/10;
+  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
+  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
 
   // Get current user's plan tiers
   var role = typeof getCurrentRole==='function' ? getCurrentRole() : '';
@@ -43792,25 +43769,8 @@ function openCommissionRulebook() {
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
-  // v92: describe the GMV-tier structure when configured (Cockpit's Rules step
-  // → "+ เพิ่ม GMV tier"), fall back to the legacy flat 2-tier text when
-  // gmv_tiers is empty — mirrors the engine's own fallback in
-  // _commComputeHandoverRetention (07a_commission_engine.js), so this panel
-  // never describes a rule the engine isn't actually using.
-  var _hoGmvTiers = [];
-  try { _hoGmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
-  if (_hoGmvTiers.length) {
-    _hoGmvTiers.forEach(function(t){
-      var thresholds = (t.thresholds||[]).slice().sort(function(a,b){ return Number(a.min_retention_pct||0)-Number(b.min_retention_pct||0); });
-      var thLine = thresholds.map(function(th){ return '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout); }).join(' · ');
-      var floorPct = thresholds.length ? thresholds[0].min_retention_pct : 100;
-      html += detailRow('GMV '+_commEscapeHtml(t.label||''), thLine+(thLine?' · ':'')+'< '+floorPct+'% → ฿0');
-    });
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่) · GMV = ยอด handover รวมของ KAM ทั้งงวด (ไม่ใช่รายบัญชี) · ต่ำกว่า tier แรกสุด → ฿0');
-  } else {
-    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
-  }
+  html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+  html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
 
   html += secHdr('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.85)');
   html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');
@@ -43917,7 +43877,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
               || pRows.find(function(r){ return isTLRole(role)&&r.beneficiary_role==='tl'; })
               || pRows[0];
     var payout = myRow ? Number(myRow.payout_amount||0) : 0;
-    var nrr = myRow ? _commFmtPct(myRow.governed_nrr_pct) : '—';
+    var nrr = myRow ? (myRow.governed_nrr_pct!=null ? myRow.governed_nrr_pct+'%' : '—') : '—';
 
     if (!hasLock) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(188,215,255,.06)">'
@@ -44073,8 +44033,8 @@ window._commOpenHistoryDetail = function(period) {
     +'</div>'
     +'<div style="text-align:right">'
     +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tk-ok-glow);font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px">NRR</div>'
-    +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+_commFmtPct(focusRow.governed_nrr_pct)+'</div>'
-    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+_commFmtPct(focusRow.governed_nrr_pct)+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
+    +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+'</div>'
+    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
     +'</div>'
     +'</div>';
 
@@ -44094,7 +44054,7 @@ window._commOpenHistoryDetail = function(period) {
     bodyHtml += secLbl('ที่มาของค่าคอมฯ');
 
     // NRR row
-    var nrrSub = 'NRR '+_commFmtPct(focusRow.governed_nrr_pct);
+    var nrrSub = 'NRR '+( focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—' );
     if (nrrOutletCount) nrrSub += ' · '+nrrOutletCount+' outlets';
     // [quarterly] show base_month pin label; [monthly] show rolling label
     var _baseModeLbl = bd.commission_mode === 'quarterly'
@@ -44128,7 +44088,7 @@ window._commOpenHistoryDetail = function(period) {
     if (Number(ho.payout||0) > 0 || ho.accounts) {
       var hoSub = '';
       if (ho.accounts) hoSub += ho.accounts+' ร้าน';
-      if (ho.retention_pct) hoSub += (hoSub?' · ':'')+' Retention '+_commFmtPct(ho.retention_pct);
+      if (ho.retention_pct) hoSub += (hoSub?' · ':'')+' Retention '+ho.retention_pct+'%';
       if (ho.baseline_gmv) hoSub += (hoSub?' · ':'')+'Base '+moneyK(ho.baseline_gmv)+' → MTD '+moneyK(ho.current_gmv);
       bodyHtml += srcRow('Handover (รับโอนร้าน)', hoSub||null, moneyFull(ho.payout||0), '#bcd7ff');
     }
@@ -52993,14 +52953,8 @@ function _qnrrCompute(kamEmail, scope) {
 
     // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive,
     // และหัก waived-account base ของเดือนนี้)
-    // v92-fix: NO rounding — this flows into _qnrrComputeForCommission's
-    // `nrr` ratio (line ~493 below), which the commission engine's tier/gate
-    // threshold comparisons ultimately use. Rounding here before that
-    // decision was the quarterly-mode half of a real payout-rounding bug
-    // (see 07a_commission_engine.js's _nrrGovernedPct comment). Round only
-    // for display, via _commFmtPct(), never before a threshold decision.
     var nrr_pct = effectiveBaseNorm > 0
-      ? (nrr_curr_norm / effectiveBaseNorm * 100)
+      ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100)
       : null;
 
     var total_gmv = MOVEMENTS
@@ -53503,7 +53457,7 @@ function _qnrrRenderHero(){
       var bm  = _data.by_month[m];
       var pct = bm ? bm.nrr_pct : null;
       var color = _nrrColor(pct);
-      var label = _commFmtPct(pct);
+      var label = pct === null ? '—' : pct + '%';
       var isLast = (m === Q_MONTHS[Q_MONTHS.length - 1]);
       var moSuffix = (isLast && bm && bm.curr_days && bm.curr_days < 28) ? '~' : '';
       if (idx > 0) slots.push('<div class="qnrr-nrr-sep"></div>');

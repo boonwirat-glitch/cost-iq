@@ -267,15 +267,15 @@
       ov.onclick=function(e){ if(e.target===ov) closeCompactSheet(); };
       document.body.appendChild(ov);
     }
-    var pctText=st.pct!==null&&st.pct!==undefined?(st.pct+"%"):"—";
+    var pctText=_commFmtPct(st.pct);
     var src=buildSources(st);
     if(!src) src={loading:false,nrr:Number(st&&st.payout||0),upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1.0,gate_active:false,final:Number(st&&st.payout||0)};
     var finalAmt=src.loading?src.nrr:src.final;
 
     // Config-tied rule values
     function cfg(k,p,d){try{return typeof _commGetConfig==="function"?_commGetConfig(k,p,d):d;}catch(e){return d;}}
-    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*100);
-    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*100);
+    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
+    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*1000)/10;
     var p3Thresh=cfg("upsell_sku","p3_threshold_pct",2.00);
     var p3ThreshPct=Math.round((p3Thresh-1)*100);
     var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",5000)).toLocaleString("en-US");
@@ -287,8 +287,8 @@
     var hoT3Bon=Number(cfg("handover","tier3_bonus",2500)).toLocaleString("en-US");
     var gT1=cfg("gmv_gate","threshold_1",95);
     var gT2=cfg("gmv_gate","threshold_2",90);
-    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*100);
-    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*100);
+    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*1000)/10;
+    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*1000)/10;
 
     // NRR tiers
     var tierRows=(st.tiers||[]).map(function(t,idx){
@@ -361,7 +361,7 @@
       var hoHit2=hd.retention_pct>=hoT2;
       var hoHit3=hd.retention_pct>=hoT3;
       hoDetail=ruleBox([
-        ruleIndent("retention "+hd.retention_pct+"% ("+hd.accounts+" ร้าน) — "+money(hd.current_gmv)+" / "+money(hd.baseline_gmv)),
+        ruleIndent("retention "+_commFmtPct(hd.retention_pct)+" ("+hd.accounts+" ร้าน) — "+money(hd.current_gmv)+" / "+money(hd.baseline_gmv)),
         ruleLine(hoHit2,"≥"+hoT2+"% → ฿"+hoT2Pay,hoHit2?money(hd.payout>0?Math.min(hd.payout,Number(String(hoT2Pay).replace(/,/g,""))||2500):0):""),
         ruleLine(hoHit3,"≥"+hoT3+"% → +฿"+hoT3Bon+" (bonus)",hoHit3?money(Number(String(hoT3Bon).replace(/,/g,""))||2500):"")
       ]);
@@ -418,7 +418,8 @@
       var hd=src.handover_detail;
       var baseMon=hd.baseline_gmv>=1000?'฿'+(hd.baseline_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.baseline_gmv);
       var currMon=hd.current_gmv>=1000?'฿'+(hd.current_gmv/1000).toFixed(0)+'K':'฿'+Math.round(hd.current_gmv);
-      return hd.accounts+' ร้าน · '+baseMon+' → '+currMon+' ('+hd.retention_pct+'%)';
+      var tierPrefix=hd.gmv_tier_label?('GMV '+hd.gmv_tier_label+' · '):'';
+      return tierPrefix+hd.accounts+' ร้าน · '+baseMon+' → '+currMon+' ('+_commFmtPct(hd.retention_pct)+')';
     })();
     var hoRowHtml=cRow('#bcd7ff','Handover',hoSub,src.handover,'#bcd7ff','_commDrillHandover()');
 
@@ -426,7 +427,7 @@
     var gateOk2=!src.gate_active;
     var gateCardHtml='<div style="margin:0 18px 12px;background:'+(gateOk2?'var(--tk-ok-dim)':'rgba(240,80,0,.08)')+';border:1px solid '+(gateOk2?'var(--tk-ok-dim-2)':'rgba(240,80,0,.2)')+';border-radius:10px;padding:10px 13px;display:flex;align-items:center;justify-content:space-between">'
       +'<div><div style="font-size:12px;color:rgba(225,238,255,.78)">NRR Gate</div>'
-      +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct||'—')+'% '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
+      +'<div style="font-size:10px;color:rgba(225,238,255,.35);margin-top:2px">NRR '+(gPct!=null?_commFmtPct(gPct):'—')+' '+(gateOk2?'≥'+gT1+'% — ผ่าน':'— ถูก cap')+'</div></div>'
       +'<span style="font-size:13px;font-weight:900;color:'+(gateOk2?'var(--tk-ok-bright)':'#ff6b3d')+';font-family:\'IBM Plex Mono\',monospace">× '+gCapPct+'% '+(gateOk2?'✓':'⚠')+'</span></div>';
 
     var heroHtml='<div style="padding:18px;text-align:center">'
@@ -944,7 +945,7 @@
       +'<div style="overflow-y:auto;flex:1;padding:14px 18px">'
       +(hd.accounts?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
         +'<div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Accounts</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.accounts||0)+'</div></div>'
-        +'<div class="pv-comm-sheet-kpi '+(hit2?'val-good':'')+'"><div class="pv-comm-sheet-kpi-label">Retention</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+(hd.retention_pct||0)+'%</div></div>'
+        +'<div class="pv-comm-sheet-kpi '+(hit2?'val-good':'')+'"><div class="pv-comm-sheet-kpi-label">Retention</div><div class="pv-comm-sheet-kpi-val" style="font-size:20px">'+_commFmtPct(hd.retention_pct||0)+'</div></div>'
         +'</div>':'')
       +'<div style="background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
       +'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(188,215,255,.08)">'
@@ -1317,8 +1318,8 @@
 function _cdsFormulaContent(key) {
   function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
   var texts = {
-    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
-    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
+    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10)+'%',
+    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
     ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
@@ -1391,7 +1392,7 @@ window._cdsRenderL1 = function(src, st) {
   var finalAmt  = src.loading ? null : src.final;
   var gateOk    = !src.gate_active;
   var gatePct   = Math.round((src.gate_cap||1)*100);
-  var pctText   = (st.pct!==null&&st.pct!==undefined) ? (st.pct+'%') : '—';
+  var pctText   = _commFmtPct(st.pct);
   var nowStr    = (function(){var d=new Date();return d.getDate()+'/'+(d.getMonth()+1)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);})();
 
   // Row subtitles
@@ -1409,7 +1410,7 @@ window._cdsRenderL1 = function(src, st) {
   var _ht3Bon  = Number(_cfgQ('handover','tier3_bonus',2500)).toLocaleString('en-US');
   var expSub   = ed&&ed.outlet_gmv>0?'สาขาใหม่ × '+_orPct+'% · GMV '+fmt(ed.outlet_gmv):' สาขาใหม่/comeback × '+_orPct+'%';
   var hd       = src.handover_detail||{};
-  var hoSub    = hd.accounts?hd.accounts+' account · retention '+(hd.retention_pct||0)+'%':'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
+  var hoSub    = hd.accounts?hd.accounts+' account · retention '+_commFmtPct(hd.retention_pct||0):'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
 
   function srcRow(tabKey, dotColor, name, sub, amt) {
     var earned = amt > 0;
@@ -1505,7 +1506,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
+  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 1000) / 10;
   var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 5000));
   var fmt = h.fmt;
   var esc = h.esc;
@@ -1610,7 +1611,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 100);
+  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 1000) / 10;
   var p3Thresh    = cfg('upsell_sku', 'p3_threshold_pct', 2.00);
   var p3ThreshPct = Math.round((p3Thresh - 1) * 100);
   var p3MinIncr   = Number(cfg('upsell_sku', 'p3_min_incremental', 5000));
@@ -1838,18 +1839,12 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var t2Pct  = cfg('handover', 'tier2_pct',    100);
-  var t3Pct  = cfg('handover', 'tier3_pct',    120);
-  var t2Pay  = Number(cfg('handover', 'tier2_payout', 2500));
-  var t3Bon  = Number(cfg('handover', 'tier3_bonus',  2500));
   var fmt = h.fmt;
   var esc = h.esc;
 
   var hd = src.handover_detail || {};
   var detail = hd.detail || [];
   var retPct = hd.retention_pct || 0;
-  var hit2   = retPct >= t2Pct;
-  var hit3   = retPct >= t3Pct;
   var payout = Number(src.handover || 0);
 
   if (!hd.accounts) {
@@ -1859,20 +1854,61 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
     return;
   }
 
-  if (meta) {
-    var tierHtml =
-      '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+  // GMV-tier mode (v91): resolve the KAM's matched tier from LIVE config by
+  // bucket GMV (numeric — survives a tier being relabeled later), not by the
+  // persisted label string. Falls back to the legacy flat 2-tier display
+  // when gmv_tiers isn't configured, with an explicit note when this
+  // snapshot predates the feature entirely (no gmv_bucket_gmv on the
+  // breakdown at all — a pre-v91 locked period).
+  var gmvTiers = [];
+  try { gmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
+  var isLegacySnapshot = hd.gmv_bucket_gmv === undefined;
+  var matchedTier = (!isLegacySnapshot && gmvTiers.length && hd.gmv_bucket_gmv != null)
+    ? (gmvTiers.find(function(t){
+        return hd.gmv_bucket_gmv >= Number(t.gmv_min || 0) && (t.gmv_max == null || hd.gmv_bucket_gmv <= Number(t.gmv_max));
+      }) || null)
+    : null;
+
+  var tierHtml, primaryThresholdPct;
+  if (matchedTier) {
+    var thresholds = (matchedTier.thresholds || []).slice()
+      .sort(function(a, b) { return Number(a.min_retention_pct || 0) - Number(b.min_retention_pct || 0); });
+    primaryThresholdPct = thresholds.length ? Number(thresholds[0].min_retention_pct || 0) : 100;
+    tierHtml = '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;background:rgba(188,215,255,.10);color:rgba(188,215,255,.85)">GMV ' + esc(matchedTier.label || '') + '</span> '
+      + thresholds.map(function(th) {
+          var hit = retPct >= Number(th.min_retention_pct || 0);
+          return '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
+            + (hit ? 'background:var(--tk-ok-dim);color:var(--tk-ok-bright);' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
+            + '">≥' + th.min_retention_pct + '% ' + fmt(th.payout) + '</span>';
+        }).join(' ');
+  } else if (isLegacySnapshot) {
+    // Pre-v91 locked snapshot — no gmv_bucket_gmv persisted at all, so there
+    // is no tier to resolve regardless of what's configured live today.
+    primaryThresholdPct = cfg('handover', 'tier2_pct', 100);
+    tierHtml = '<span style="font-size:10px;color:rgba(188,215,255,.55)">อัตราเดิม (ก่อนแบ่ง GMV tier)</span>';
+  } else if (gmvTiers.length) {
+    // Configured, but this KAM's aggregate bucket GMV cleared no tier (below the lowest gmv_min).
+    primaryThresholdPct = 100;
+    tierHtml = '<span style="font-size:10px;color:rgba(255,120,80,.85)">ยอด handover ' + fmt(hd.gmv_bucket_gmv || 0) + ' ต่ำกว่า tier ต่ำสุด → ฿0</span>';
+  } else {
+    var t2Pct = cfg('handover', 'tier2_pct', 100), t3Pct = cfg('handover', 'tier3_pct', 120);
+    var t2Pay = Number(cfg('handover', 'tier2_payout', 2500)), t3Bon = Number(cfg('handover', 'tier3_bonus', 2500));
+    var hit2 = retPct >= t2Pct, hit3 = retPct >= t3Pct;
+    primaryThresholdPct = t2Pct;
+    tierHtml = '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
       + (hit2 ? 'background:var(--tk-ok-dim);color:var(--tk-ok-bright);' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
-      + '">≥' + t2Pct + '% ฿' + fmt(t2Pay) + '</span> '
+      + '">≥' + t2Pct + '% ' + fmt(t2Pay) + '</span> '
       + '<span style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:3px 8px;border-radius:999px;'
       + (hit3 ? 'background:var(--tk-ok-dim);color:var(--tk-ok-bright);' : 'background:rgba(255,255,255,.05);color:rgba(225,238,255,.3);')
-      + '">≥' + t3Pct + '% +฿' + fmt(t3Bon) + '</span>';
+      + '">≥' + t3Pct + '% +' + fmt(t3Bon) + '</span>';
+  }
 
+  if (meta) {
     meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
       + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
-      + (hit2 ? 'var(--tk-ok-bright)' : retPct >= (t2Pct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
-      + retPct + '%</b></span>'
-      + '<span style="display:flex;gap:5px;">' + tierHtml + '</span>'
+      + (retPct >= primaryThresholdPct ? 'var(--tk-ok-bright)' : retPct >= (primaryThresholdPct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
+      + _commFmtPct(retPct) + '</b></span>'
+      + '<span style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">' + tierHtml + '</span>'
       + '</div>';
   }
 
@@ -1880,8 +1916,8 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   var html = '';
 
   sorted.forEach(function(a, idx) {
-    var retA   = a.baseline > 0 ? Math.round(a.current / a.baseline * 100) : 0;
-    var retCls = retA >= t2Pct ? 'v-green' : retA >= (t2Pct * 0.85) ? 'v-amber' : 'v-dim';
+    var retA   = a.baseline > 0 ? (a.current / a.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via _commFmtPct below
+    var retCls = retA >= primaryThresholdPct ? 'v-green' : retA >= (primaryThresholdPct * 0.85) ? 'v-amber' : 'v-dim';
     var proofId = 'hor' + idx;
     html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'
       + '<div style="min-width:0">'
@@ -1890,12 +1926,12 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
       + '</div>'
       + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
       + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
-      + '<span class="cds-val ' + retCls + '">' + retA + '%</span>'
+      + '<span class="cds-val ' + retCls + '">' + _commFmtPct(retA) + '</span>'
       + '</div>'
       + h.proof(proofId, [
           { label: 'Baseline GMV', result: fmt(a.baseline) },
           { label: 'MTD GMV',      result: fmt(a.current) },
-          { label: 'Retention',    result: retA + '%', pass: retA >= t2Pct }
+          { label: 'Retention',    result: _commFmtPct(retA), pass: retA >= primaryThresholdPct }
         ]);
   });
 
@@ -1946,7 +1982,7 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   } catch(e) { console.warn('[cds-nrr]', e); }
 
   var nrrPayout = Number(src.nrr || 0);
-  var pctText   = st.pct !== null && st.pct !== undefined ? (st.pct + '%') : '—';
+  var pctText   = _commFmtPct(st.pct);
 
   // ── Commission context card (uses .cds-nrr-ctx CSS) ──────────────────
   var isTopTier = !st.next && nrrPayout > 0;
@@ -2301,7 +2337,7 @@ window._cdsCopyTSV = function() {
       var bd=asObj(r.breakdown);
       var name=bd.kam_name||bd.team_lead_name||r.beneficiary_email;
       var rule=bd.rule_name||bd.payout_source||'';
-      return '<div class="comm-lock-row"><div class="comm-role-dot '+esc(benRole(r.beneficiary_role))+'">'+esc(roleLabelForRow(r.beneficiary_role))+'</div><div><div class="comm-person-name">'+esc(name)+'</div><div class="comm-person-sub">'+esc(rule)+' · Raw '+(r.raw_nrr_pct??'—')+'% → NRR ที่ใช้คิด '+(r.governed_nrr_pct??'—')+'%</div></div><div class="comm-row-money '+(Number(r.payout_amount||0)>0?'hit':'')+' '+(isLocked()?'locked':'')+'">'+money(r.payout_amount)+'</div></div>';
+      return '<div class="comm-lock-row"><div class="comm-role-dot '+esc(benRole(r.beneficiary_role))+'">'+esc(roleLabelForRow(r.beneficiary_role))+'</div><div><div class="comm-person-name">'+esc(name)+'</div><div class="comm-person-sub">'+esc(rule)+' · Raw '+_commFmtPct(r.raw_nrr_pct)+' → NRR ที่ใช้คิด '+_commFmtPct(r.governed_nrr_pct)+'</div></div><div class="comm-row-money '+(Number(r.payout_amount||0)>0?'hit':'')+' '+(isLocked()?'locked':'')+'">'+money(r.payout_amount)+'</div></div>';
     }).join('');
   }
   // ── [REMOVED v211a override] renderCommLockStep / exportCommissionSnapshotCsv / lockCommissionSnapshot ──
@@ -2375,8 +2411,8 @@ function openCommissionRulebook() {
   function fmtPctRaw(n){ return Number(n||0)+'%'; }
 
   // Live config params
-  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
-  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
+  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
+  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10;
   var p3Thresh  = cfg('upsell_sku','p3_threshold_pct',2.00);
   var p3GrowPct = Math.round((p3Thresh-1)*100); // v558: unified phrasing — multiplier AND growth-%
   var p1MinGmv  = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
@@ -2388,8 +2424,8 @@ function openCommissionRulebook() {
   var hoT3Total = fmtB(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500));
   var gT1       = cfg('gmv_gate','threshold_1',95);
   var gT2       = cfg('gmv_gate','threshold_2',90);
-  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
-  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
+  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*1000)/10;
+  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*1000)/10;
 
   // Get current user's plan tiers
   var role = typeof getCurrentRole==='function' ? getCurrentRole() : '';
@@ -2556,8 +2592,25 @@ function openCommissionRulebook() {
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
-  html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
-  html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
+  // v92: describe the GMV-tier structure when configured (Cockpit's Rules step
+  // → "+ เพิ่ม GMV tier"), fall back to the legacy flat 2-tier text when
+  // gmv_tiers is empty — mirrors the engine's own fallback in
+  // _commComputeHandoverRetention (07a_commission_engine.js), so this panel
+  // never describes a rule the engine isn't actually using.
+  var _hoGmvTiers = [];
+  try { _hoGmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
+  if (_hoGmvTiers.length) {
+    _hoGmvTiers.forEach(function(t){
+      var thresholds = (t.thresholds||[]).slice().sort(function(a,b){ return Number(a.min_retention_pct||0)-Number(b.min_retention_pct||0); });
+      var thLine = thresholds.map(function(th){ return '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout); }).join(' · ');
+      var floorPct = thresholds.length ? thresholds[0].min_retention_pct : 100;
+      html += detailRow('GMV '+_commEscapeHtml(t.label||''), thLine+(thLine?' · ':'')+'< '+floorPct+'% → ฿0');
+    });
+    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่) · GMV = ยอด handover รวมของ KAM ทั้งงวด (ไม่ใช่รายบัญชี) · ต่ำกว่า tier แรกสุด → ฿0');
+  } else {
+    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
+  }
 
   html += secHdr('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.85)');
   html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');

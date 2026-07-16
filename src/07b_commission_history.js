@@ -53,7 +53,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
               || pRows.find(function(r){ return isTLRole(role)&&r.beneficiary_role==='tl'; })
               || pRows[0];
     var payout = myRow ? Number(myRow.payout_amount||0) : 0;
-    var nrr = myRow ? (myRow.governed_nrr_pct!=null ? myRow.governed_nrr_pct+'%' : '—') : '—';
+    var nrr = myRow ? _commFmtPct(myRow.governed_nrr_pct) : '—';
 
     if (!hasLock) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(188,215,255,.06)">'
@@ -209,8 +209,8 @@ window._commOpenHistoryDetail = function(period) {
     +'</div>'
     +'<div style="text-align:right">'
     +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tk-ok-glow);font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px">NRR</div>'
-    +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+'</div>'
-    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+(focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—')+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
+    +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+_commFmtPct(focusRow.governed_nrr_pct)+'</div>'
+    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+_commFmtPct(focusRow.governed_nrr_pct)+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
     +'</div>'
     +'</div>';
 
@@ -230,7 +230,7 @@ window._commOpenHistoryDetail = function(period) {
     bodyHtml += secLbl('ที่มาของค่าคอมฯ');
 
     // NRR row
-    var nrrSub = 'NRR '+( focusRow.governed_nrr_pct!=null?focusRow.governed_nrr_pct+'%':'—' );
+    var nrrSub = 'NRR '+_commFmtPct(focusRow.governed_nrr_pct);
     if (nrrOutletCount) nrrSub += ' · '+nrrOutletCount+' outlets';
     // [quarterly] show base_month pin label; [monthly] show rolling label
     var _baseModeLbl = bd.commission_mode === 'quarterly'
@@ -264,7 +264,7 @@ window._commOpenHistoryDetail = function(period) {
     if (Number(ho.payout||0) > 0 || ho.accounts) {
       var hoSub = '';
       if (ho.accounts) hoSub += ho.accounts+' ร้าน';
-      if (ho.retention_pct) hoSub += (hoSub?' · ':'')+' Retention '+ho.retention_pct+'%';
+      if (ho.retention_pct) hoSub += (hoSub?' · ':'')+' Retention '+_commFmtPct(ho.retention_pct);
       if (ho.baseline_gmv) hoSub += (hoSub?' · ':'')+'Base '+moneyK(ho.baseline_gmv)+' → MTD '+moneyK(ho.current_gmv);
       bodyHtml += srcRow('Handover (รับโอนร้าน)', hoSub||null, moneyFull(ho.payout||0), '#bcd7ff');
     }

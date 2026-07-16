@@ -961,7 +961,7 @@ async function renderPortviewTargetBar() {
   let cohortCount=0, cbCount=0, exCount=0, baselinePrevGmv=0;
 
   if (nrrResult && nrrResult.nrr !== null) {
-    nrrPct      = Math.round(nrrResult.nrr * 100);
+    nrrPct      = nrrResult.nrr * 100; // display-only widget, not the payout engine — full precision, format via _commFmtPct
     cohortGmv   = nrrResult.cohortGmv    || 0;
     cbGmv       = nrrResult.comebackGmv  || 0;
     exGmv       = nrrResult.expansionGmv || 0;
@@ -999,7 +999,7 @@ async function renderPortviewTargetBar() {
   const nrrLeg = !_outletsReady
     ? _nrrShimmer
     : (nrrPct !== null
-        ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${nrrPct}%</span></span>`
+        ? `<span class="tgt-pl-item"><span class="tgt-pl-dot nrr"></span><span class="tgt-pl-lbl">NRR</span>&thinsp;<span class="tgt-pl-val nrr">${_commFmtPct(nrrPct)}</span></span>`
         : '');
   const cbPct  = baselinePrevGmv>0&&cbGmv>0 ? '+'+Math.round(cbGmv/baselinePrevGmv*100)+'%' : null;
   const exPct  = baselinePrevGmv>0&&exGmv>0 ? '+'+Math.round(exGmv/baselinePrevGmv*100)+'%' : null;
@@ -1074,7 +1074,7 @@ async function renderPortviewTargetBar() {
   // ── Movement rows (v198) ─────────────────────────────────────
   const fmtK = v => v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+Math.round(v);
   const nrrColor = n => n===null?'rgba(255,255,255,.3)':n>=1?'var(--tk-ok-bright)':n>=0.9?'rgba(240,176,0,.9)':'rgba(255,100,100,.9)';
-  const nrrPctStr = n => n===null?'—':Math.round(n*100)+'%';
+  const nrrPctStr = n => n===null?'—':_commFmtPct(n*100);
   const mvRows = [];
   if (nrrResult && nrrResult.transferIn && nrrResult.transferIn.count > 0) {
     const ti = nrrResult.transferIn;
@@ -1122,7 +1122,7 @@ async function renderPortviewTargetBar() {
       <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:6px">เฉพาะร้านที่อยู่ในพอร์ตมาตั้งแต่เดือนก่อน</div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(prevNorm)}/เดือน</span></div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel} MTD</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(currNorm)}/เดือน</span></div>
-      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${nrrPct}%</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${_commFmtPct(nrrPct)}</span></div>
     </div>${mvDefSection}`;
   }
 

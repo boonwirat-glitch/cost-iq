@@ -112,6 +112,17 @@ function nrrCommRateGet(metricCode, paramName, fallback) {
 }
 window.nrrCommRateGet = nrrCommRateGet;
 
+// handover_params.gmv_tiers is an array, not a scalar — cannot go through
+// nrrCommRateGet above (no Number() coercion needed/wanted here, but keeping
+// it as a separate reader mirrors Sense's _commGetHandoverGmvTiers split for
+// the same reason: one helper per return shape). Empty/absent => caller
+// falls back to the legacy flat 2-tier logic.
+function nrrCommRateGetHandoverGmvTiers() {
+  var raw = nrrCommRatesCache && nrrCommRatesCache.byKey ? nrrCommRatesCache.byKey['handover_params'] : null;
+  return (raw && typeof raw === 'object' && Array.isArray(raw.gmv_tiers)) ? raw.gmv_tiers : [];
+}
+window.nrrCommRateGetHandoverGmvTiers = nrrCommRateGetHandoverGmvTiers;
+
 // ── Estimate engine v2 (2026-07-09) — mirrors the REAL payout structure ──
 // The v1 estimator (ported from the retired TL dashboard) was a
 // %-of-team-GMV scheme from an older Sales-TL plan — against today's
@@ -260,7 +271,7 @@ function nrrCommEstimateReceiptSteps(est) {
     // Handover is INSIDE the gate (engine 07a:691) — show it as a component
     // above the subtotal, then multiply the whole subtotal by the gate.
     steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
-      meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + est.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
+      meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + nrrFmtPct(est.handover.retention_pct) : 'ไม่มีเดือนนี้',
       drillKey: est.handover && est.handover.detail && est.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) + hoPay });
     steps.push({ kind: 'multiply', label: 'NRR Gate (' + nrrFmtPct(est.pct) + ' ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
@@ -295,7 +306,7 @@ function nrrCommSnapshotReceiptSteps(bd) {
     // Handover is INSIDE the gate (engine 07a:691) — component above the
     // subtotal, whole subtotal then ×gate to reach final_payout.
     steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
-      meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + bd.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
+      meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + nrrFmtPct(bd.handover.retention_pct) : 'ไม่มีเดือนนี้',
       drillKey: bd.handover && bd.handover.detail && bd.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell + hoPay });
     var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
@@ -409,10 +420,18 @@ function _nrrPrevMonthOf(period) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
 
-// Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail }
+// Returns { accounts, baseline_gmv, current_gmv, retention_pct, payout, detail,
+//           gmv_tier_label, gmv_bucket_gmv }
 // detail: [{ name, account_id, baseline, current, transfer_month }]
+// GMV-tier mode (v91): mirrors Sense's _commComputeHandoverRetention
+// (07a_commission_engine.js) byte-for-byte — the KAM's AGGREGATE normalized
+// baseline GMV (baselineNorm, summed across every handover account this
+// period, not per-account) picks one gmv_tiers[] bucket; that bucket's own
+// threshold ladder is applied to the KAM's blended retention %. This is the
+// SECOND place these two functions must match exactly (see the divergence-
+// bug note in nrrEstimateKamCommission below, from the first one).
 function nrrComputeHandoverForKam(kamEmail, period) {
-  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [] };
+  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [], gmv_tier_label: null, gmv_bucket_gmv: 0 };
   var qd = window.bulkQnrrData;
   var kamRows = (qd && qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
   var kamName = kamRows.length ? (kamRows[0].latest_staff_owner || '') : '';
@@ -434,15 +453,43 @@ function nrrComputeHandoverForKam(kamEmail, period) {
     baselineGmv += b; currentGmv += p;
     return { name: r.account_name || r.account_id, account_id: r.account_id, baseline: b, current: p, transfer_month: r.transfer_month };
   });
-  var retentionPct = baselineNorm > 0 ? Math.round(perfNorm / baselineNorm * 100) : 0;
+  // v91: rounded to 1 decimal (was Math.round to a whole %) — must match
+  // Sense's rounding exactly, or a KAM at e.g. 99.94% retention would round
+  // UP to 100% here but round to 99.9% in Sense, clearing a threshold in
+  // one engine but not the other. Pre-existing divergence, fixed here since
+  // GMV-tier "zero drift" is this feature's own completion bar.
+  var retentionPct = baselineNorm > 0 ? Math.round((perfNorm / baselineNorm * 100) * 10) / 10 : 0;
 
-  var t2Pct = nrrCommRateGet('handover', 'tier2_pct', 100);
-  var t3Pct = nrrCommRateGet('handover', 'tier3_pct', 120);
-  var t2Pay = nrrCommRateGet('handover', 'tier2_payout', 2500);
-  var t3Bonus = nrrCommRateGet('handover', 'tier3_bonus', 2500);
-  var payout = retentionPct >= t3Pct ? t2Pay + t3Bonus : retentionPct >= t2Pct ? t2Pay : 0;
+  var payout = 0, gmvTierLabel = null;
+  var gmvTiers = nrrCommRateGetHandoverGmvTiers();
+  if (gmvTiers.length) {
+    // GMV-tier mode: aggregate baseline GMV picks ONE bucket; no match
+    // (e.g. below the lowest configured gmv_min) => payout ฿0, intentional.
+    var matched = null;
+    for (var i = 0; i < gmvTiers.length; i++) {
+      var gt = gmvTiers[i];
+      if (baselineNorm >= Number(gt.gmv_min || 0) && (gt.gmv_max == null || baselineNorm <= Number(gt.gmv_max))) { matched = gt; break; }
+    }
+    if (matched) {
+      gmvTierLabel = matched.label || null;
+      var thresholds = (matched.thresholds || []).slice()
+        .sort(function (a, b) { return Number(b.min_retention_pct || 0) - Number(a.min_retention_pct || 0); });
+      for (var j = 0; j < thresholds.length; j++) {
+        if (retentionPct >= Number(thresholds[j].min_retention_pct || 0)) { payout = Number(thresholds[j].payout || 0); break; }
+      }
+    }
+  } else {
+    // Legacy flat 2-tier fallback — identical to Sense's fallback path,
+    // used until an admin populates gmv_tiers via the Cockpit.
+    var t2Pct = nrrCommRateGet('handover', 'tier2_pct', 100);
+    var t3Pct = nrrCommRateGet('handover', 'tier3_pct', 120);
+    var t2Pay = nrrCommRateGet('handover', 'tier2_payout', 2500);
+    var t3Bonus = nrrCommRateGet('handover', 'tier3_bonus', 2500);
+    payout = retentionPct >= t3Pct ? t2Pay + t3Bonus : retentionPct >= t2Pct ? t2Pay : 0;
+  }
 
-  return { accounts: rows.length, baseline_gmv: baselineGmv, current_gmv: currentGmv, retention_pct: retentionPct, payout: payout, detail: detail };
+  return { accounts: rows.length, baseline_gmv: baselineGmv, current_gmv: currentGmv, retention_pct: retentionPct,
+           payout: payout, detail: detail, gmv_tier_label: gmvTierLabel, gmv_bucket_gmv: Math.round(baselineNorm) };
 }
 window.nrrComputeHandoverForKam = nrrComputeHandoverForKam;
 
@@ -470,6 +517,11 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   // the formulas coincide, Dent handover=0 and Pop gate=1.0, so the
   // gate<1 AND handover>0 case was never actually exercised. Fixed
   // 2026-07-09 to match the engine that generates locked payroll.)
+  // v91: GMV-tier bucketing inside nrrComputeHandoverForKam is a SECOND
+  // place this port must match _commComputeHandoverRetention exactly —
+  // same aggregate-GMV bucketing, same best-match threshold scan, same
+  // 1-decimal retention rounding. No automated test guards this; verify
+  // manually side-by-side when either engine changes.
   var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
   var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
   var cap = 1.0;

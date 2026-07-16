@@ -301,6 +301,10 @@ function nrrPulseModel() {
   var todayItems = salesItems.filter(function (x) { return x.isToday; })
     .concat(expItems.filter(function (x) { return x.isToday; }))
     .sort(function (a, b) { return b.todayGmv - a.todayGmv; });
+  // v_signage9 (2026-07-16): today's own ฿ total, for the Wins scene's hero
+  // sub-line -- was showing the whole MONTH's GMV (newStoreGmv) directly
+  // under a "ร้านใหม่วันนี้" hero number, which didn't match.
+  var todayGmv = todayItems.reduce(function (s, x) { return s + x.todayGmv; }, 0);
   // v_signage2 (2026-07-15): the SAME two sources' FULL-month lists (not just
   // today's slice), for the new dedicated "New this month" scene — ranked by
   // each item's own full-month gmv (unlike todayItems above, which ranks by
@@ -373,6 +377,7 @@ function nrrPulseModel() {
     newStoreCount: salesItems.length + expItems.length,
     newStoreGmv: salesGmv + expGmv,
     todayCount: todayCount,
+    todayGmv: todayGmv,
     todayItems: todayItems,
     monthItems: monthItems,
     sales: { count: salesItems.length, gmv: salesGmv, items: salesItems },
@@ -482,17 +487,23 @@ function _nrrPulseSpotlightRowsHtml(items, max, amtKey, emptyMsg) {
   }).join('');
 }
 
-// Scene 1 — Today's wins: cumulative monthly count (the original "137" hero,
-// kept verbatim so the whole-month running total isn't lost) + a name-forward
-// spotlight of TODAY's specific first-order arrivals, now sub-rotating like
-// every other list scene when there are more than NRR_PULSE_WINS_SPOTLIGHT_MAX.
+// Scene 1 — Today's wins. v_signage9 (2026-07-16): the hero used to show the
+// cumulative MONTH count (the original "137"/"163" number) with a "วันนี้"
+// list title underneath carrying no count of its own — read as if that same
+// month-cumulative number were today's count (user: "ไม่บอกจำนวนให้ว่า วันนี้ มี
+// ใหม่มากี่ร้าน ตอนนี้ไปปนกับเดือนนี้"). First fix (same day) added a count next
+// to "วันนี้"; user then asked to go further and replace the hero itself with
+// TODAY's own count/฿ — the month-cumulative number belongs on the Month
+// scene (right below, "เดือนนี้"), not repeated here too. Hero is now
+// `m.todayCount`/`m.todayGmv`; list title reverts to a plain "วันนี้" since
+// the count is no longer duplicated below it.
 function _nrrPulseSceneWinsHtml(m) {
   var rowsHtml = _nrrPulseSpotlightRowsHtml(m.todayItems, _nrrPulseEffMax(NRR_PULSE_WINS_SPOTLIGHT_MAX), 'todayGmv', '— ยังไม่มีร้านใหม่วันนี้ —');
   return '<div class="nrr-pulse-scene nrr-pulse-scene-wins" data-scene="wins">' +
     '<div class="nrr-pulse-scene-cumul">' +
-    '<div class="nrr-pulse-scene-lbl">ร้านใหม่สะสมเดือนนี้</div>' +
-    '<div class="nrr-pulse-scene-num" data-count="' + m.newStoreCount + '">' + m.newStoreCount + '</div>' +
-    '<div class="nrr-pulse-scene-sub">' + nrrFmtGMV(m.newStoreGmv) + '</div>' +
+    '<div class="nrr-pulse-scene-lbl">ร้านใหม่วันนี้</div>' +
+    '<div class="nrr-pulse-scene-num" data-count="' + m.todayCount + '">' + m.todayCount + '</div>' +
+    '<div class="nrr-pulse-scene-sub">' + nrrFmtGMV(m.todayGmv) + '</div>' +
     '</div>' +
     '<div class="nrr-pulse-spotlight-title">วันนี้</div>' +
     '<div class="nrr-pulse-spotlight-list" id="nrr-pulse-wins-list">' + rowsHtml + '</div>' +

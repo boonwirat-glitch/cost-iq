@@ -1,4 +1,4 @@
-<!-- Freshket Sense v865: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v864: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v865',
+      version: 'v864',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -43792,25 +43792,8 @@ function openCommissionRulebook() {
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
-  // v92: describe the GMV-tier structure when configured (Cockpit's Rules step
-  // → "+ เพิ่ม GMV tier"), fall back to the legacy flat 2-tier text when
-  // gmv_tiers is empty — mirrors the engine's own fallback in
-  // _commComputeHandoverRetention (07a_commission_engine.js), so this panel
-  // never describes a rule the engine isn't actually using.
-  var _hoGmvTiers = [];
-  try { _hoGmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
-  if (_hoGmvTiers.length) {
-    _hoGmvTiers.forEach(function(t){
-      var thresholds = (t.thresholds||[]).slice().sort(function(a,b){ return Number(a.min_retention_pct||0)-Number(b.min_retention_pct||0); });
-      var thLine = thresholds.map(function(th){ return '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout); }).join(' · ');
-      var floorPct = thresholds.length ? thresholds[0].min_retention_pct : 100;
-      html += detailRow('GMV '+_commEscapeHtml(t.label||''), thLine+(thLine?' · ':'')+'< '+floorPct+'% → ฿0');
-    });
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่) · GMV = ยอด handover รวมของ KAM ทั้งงวด (ไม่ใช่รายบัญชี) · ต่ำกว่า tier แรกสุด → ฿0');
-  } else {
-    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
-  }
+  html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+  html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
 
   html += secHdr('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.85)');
   html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');

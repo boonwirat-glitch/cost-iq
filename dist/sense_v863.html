@@ -1,4 +1,4 @@
-<!-- Freshket Sense v865: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v863: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1174,7 +1174,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v865',
+      version: 'v863',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -38217,7 +38217,7 @@ function renderCommAssignmentStep(body) {
 function _renderComponentRatesEditor() {
   const c = (k,p,d) => { try{ const v=_commGetConfig(k,p,d); return v!=null?v:d; }catch(e){return d;} };
   const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
-  const fP = n => (Math.round(Number(n||0)*1000)/10)+'%'; // v92-fix: was whole-number round (1.5% showed as "2%")
+  const fP = n => Math.round(Number(n||0)*100)+'%';
 
   function rateCard(title, color, fields, note) {
     const flds = fields.map(([lbl,k,p,def,step,unit]) => {
@@ -41474,8 +41474,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
     // Config-tied rule values
     function cfg(k,p,d){try{return typeof _commGetConfig==="function"?_commGetConfig(k,p,d):d;}catch(e){return d;}}
-    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
-    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*1000)/10;
+    var p1Rate=Math.round(cfg("upsell_sku","p1_rate",0.03)*100);
+    var p3Rate=Math.round(cfg("upsell_sku","p3_rate",0.03)*100);
     var p3Thresh=cfg("upsell_sku","p3_threshold_pct",2.00);
     var p3ThreshPct=Math.round((p3Thresh-1)*100);
     var p3MinIncr=Number(cfg("upsell_sku","p3_min_incremental",5000)).toLocaleString("en-US");
@@ -41487,8 +41487,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var hoT3Bon=Number(cfg("handover","tier3_bonus",2500)).toLocaleString("en-US");
     var gT1=cfg("gmv_gate","threshold_1",95);
     var gT2=cfg("gmv_gate","threshold_2",90);
-    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*1000)/10;
-    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*1000)/10;
+    var gC1=Math.round(cfg("gmv_gate","cap_1",0.70)*100);
+    var gC2=Math.round(cfg("gmv_gate","cap_2",0.35)*100);
 
     // NRR tiers
     var tierRows=(st.tiers||[]).map(function(t,idx){
@@ -42518,8 +42518,8 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 function _cdsFormulaContent(key) {
   function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
   var texts = {
-    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10)+'%',
-    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10)+'%',
+    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p1_rate',0.03)*100)+'%',
+    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+Math.round(cfg('upsell_sku','p3_rate',0.03)*100)+'%',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
     exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
     ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
@@ -42706,7 +42706,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 1000) / 10;
+  var p1Rate    = Math.round(cfg('upsell_sku', 'p1_rate', 0.03) * 100);
   var p1MinGmv  = Number(cfg('upsell_sku', 'p1_min_gmv', 5000));
   var fmt = h.fmt;
   var esc = h.esc;
@@ -42811,7 +42811,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   function cfg(k, p, d) {
     try { return typeof _commGetConfig === 'function' ? _commGetConfig(k, p, d) : d; } catch(e) { return d; }
   }
-  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 1000) / 10;
+  var p3Rate      = Math.round(cfg('upsell_sku', 'p3_rate', 0.03) * 100);
   var p3Thresh    = cfg('upsell_sku', 'p3_threshold_pct', 2.00);
   var p3ThreshPct = Math.round((p3Thresh - 1) * 100);
   var p3MinIncr   = Number(cfg('upsell_sku', 'p3_min_incremental', 5000));
@@ -43611,8 +43611,8 @@ function openCommissionRulebook() {
   function fmtPctRaw(n){ return Number(n||0)+'%'; }
 
   // Live config params
-  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10; // v92-fix: was whole-number round (1.5% showed as "2%")
-  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10;
+  var p1Rate    = Math.round(cfg('upsell_sku','p1_rate',0.03)*100);
+  var p3Rate    = Math.round(cfg('upsell_sku','p3_rate',0.03)*100);
   var p3Thresh  = cfg('upsell_sku','p3_threshold_pct',2.00);
   var p3GrowPct = Math.round((p3Thresh-1)*100); // v558: unified phrasing — multiplier AND growth-%
   var p1MinGmv  = fmtB(cfg('upsell_sku','p1_min_gmv',5000));
@@ -43624,8 +43624,8 @@ function openCommissionRulebook() {
   var hoT3Total = fmtB(cfg('handover','tier2_payout',2500)+cfg('handover','tier3_bonus',2500));
   var gT1       = cfg('gmv_gate','threshold_1',95);
   var gT2       = cfg('gmv_gate','threshold_2',90);
-  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*1000)/10;
-  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*1000)/10;
+  var gC1       = Math.round(cfg('gmv_gate','cap_1',0.70)*100);
+  var gC2       = Math.round(cfg('gmv_gate','cap_2',0.35)*100);
 
   // Get current user's plan tiers
   var role = typeof getCurrentRole==='function' ? getCurrentRole() : '';
@@ -43792,25 +43792,8 @@ function openCommissionRulebook() {
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
-  // v92: describe the GMV-tier structure when configured (Cockpit's Rules step
-  // → "+ เพิ่ม GMV tier"), fall back to the legacy flat 2-tier text when
-  // gmv_tiers is empty — mirrors the engine's own fallback in
-  // _commComputeHandoverRetention (07a_commission_engine.js), so this panel
-  // never describes a rule the engine isn't actually using.
-  var _hoGmvTiers = [];
-  try { _hoGmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
-  if (_hoGmvTiers.length) {
-    _hoGmvTiers.forEach(function(t){
-      var thresholds = (t.thresholds||[]).slice().sort(function(a,b){ return Number(a.min_retention_pct||0)-Number(b.min_retention_pct||0); });
-      var thLine = thresholds.map(function(th){ return '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout); }).join(' · ');
-      var floorPct = thresholds.length ? thresholds[0].min_retention_pct : 100;
-      html += detailRow('GMV '+_commEscapeHtml(t.label||''), thLine+(thLine?' · ':'')+'< '+floorPct+'% → ฿0');
-    });
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่) · GMV = ยอด handover รวมของ KAM ทั้งงวด (ไม่ใช่รายบัญชี) · ต่ำกว่า tier แรกสุด → ฿0');
-  } else {
-    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
-    html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
-  }
+  html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+  html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
 
   html += secHdr('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.85)');
   html += detailRow('เกณฑ์', 'NRR ≥ '+gT1+'% → ×1.00 · '+gT2+'–'+gT1+'% → ×'+gC1+'% · < '+gT2+'% → ×'+gC2+'%');

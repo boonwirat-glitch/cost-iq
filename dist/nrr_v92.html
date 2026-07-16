@@ -4682,7 +4682,7 @@ function nrrCommEstimateReceiptSteps(est) {
     // Handover is INSIDE the gate (engine 07a:691) — show it as a component
     // above the subtotal, then multiply the whole subtotal by the gate.
     steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
-      meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + nrrFmtPct(est.handover.retention_pct) : 'ไม่มีเดือนนี้',
+      meta: est.handover && est.handover.accounts ? est.handover.accounts + ' ร้าน · retention ' + est.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
       drillKey: est.handover && est.handover.detail && est.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: est.nrr_payout + (est.upsell_comm || 0) + hoPay });
     steps.push({ kind: 'multiply', label: 'NRR Gate (' + nrrFmtPct(est.pct) + ' ' + (est.gate_cap >= 1 ? '≥' : '<') + ' ' + (est.gate_threshold || 98) + '%)', factor: est.gate_cap });
@@ -4717,7 +4717,7 @@ function nrrCommSnapshotReceiptSteps(bd) {
     // Handover is INSIDE the gate (engine 07a:691) — component above the
     // subtotal, whole subtotal then ×gate to reach final_payout.
     steps.push({ kind: 'add', label: 'Handover · retention', amount: hoPay,
-      meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + nrrFmtPct(bd.handover.retention_pct) : 'ไม่มีเดือนนี้',
+      meta: bd.handover && bd.handover.accounts ? bd.handover.accounts + ' ร้าน · retention ' + bd.handover.retention_pct + '%' : 'ไม่มีเดือนนี้',
       drillKey: bd.handover && bd.handover.detail && bd.handover.detail.length ? 'handover' : null });
     steps.push({ kind: 'subtotal', label: 'รวมก่อน Gate', amount: (bd.nrr_payout || 0) + upsell + hoPay });
     var gcap = bd.gmv_gate ? bd.gmv_gate.cap_multiplier : 1;
@@ -11667,7 +11667,7 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
       '<div class="nrr-comm-cell-meta">' + nrrEsc((r.beneficiary_email || '').split('@')[0]) + '</div></td>' +
       '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
-      _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + nrrFmtPct(ho.retention_pct) : null) +
+      _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + ho.retention_pct + '%' : null) +
       _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMVExact(outlet.outlet_gmv) : null) +
       _nrrCommMoneyCell(p1.comm, p1.gmv ? 'จาก ' + nrrFmtGMVExact(p1.gmv) : null) +
       _nrrCommMoneyCell(p3.comm, p3.gmv_incremental ? 'จาก ' + nrrFmtGMVExact(p3.gmv_incremental) : null) +
@@ -11864,7 +11864,7 @@ function nrrCommHandoverListHtml(ho) {
   if (ho && ho.gmv_tier_label) {
     headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
       '<span class="ds-row-name" style="color:rgba(188,215,255,.85)">GMV ' + nrrEsc(ho.gmv_tier_label) + '</span>' +
-      '<span class="ds-row-meta">retention ' + nrrFmtPct(ho.retention_pct) + '</span></div>';
+      '<span class="ds-row-meta">retention ' + (ho.retention_pct != null ? ho.retention_pct : 0) + '%</span></div>';
   } else if (isLegacySnapshot) {
     headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
       '<span class="ds-row-meta">อัตราเดิม (ก่อนแบ่ง GMV tier)</span></div>';
@@ -11874,9 +11874,9 @@ function nrrCommHandoverListHtml(ho) {
   }
   if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
   return headerHtml + detail.map(function (d) {
-    var pct = d.baseline > 0 ? (d.current / d.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via nrrFmtPct below
+    var pct = d.baseline > 0 ? Math.round(d.current / d.baseline * 100) : 0;
     return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(d.name || d.account_id) + '</span>' +
-      '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + nrrFmtPct(pct) + ') · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
+      '<span class="ds-row-meta">' + nrrFmtGMVExact(d.baseline || 0) + ' → ' + nrrFmtGMVExact(d.current || 0) + ' (' + pct + '%) · ' + nrrEsc(d.transfer_month || '') + '</span></div>';
   }).join('');
 }
 

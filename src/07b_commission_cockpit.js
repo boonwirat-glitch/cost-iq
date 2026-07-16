@@ -380,7 +380,7 @@ function renderCommAssignmentStep(body) {
 function _renderComponentRatesEditor() {
   const c = (k,p,d) => { try{ const v=_commGetConfig(k,p,d); return v!=null?v:d; }catch(e){return d;} };
   const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
-  const fP = n => Math.round(Number(n||0)*100)+'%';
+  const fP = n => (Math.round(Number(n||0)*1000)/10)+'%'; // v92-fix: was whole-number round (1.5% showed as "2%")
 
   function rateCard(title, color, fields, note) {
     const flds = fields.map(([lbl,k,p,def,step,unit]) => {
@@ -412,8 +412,6 @@ function _renderComponentRatesEditor() {
   const p3t = c('upsell_sku','p3_threshold_pct',2.00); const p1mg = c('upsell_sku','p1_min_gmv',5000);
   const p3mi = c('upsell_sku','p3_min_incremental',8000);
   const outr = c('upsell_outlet','rate',0.015);
-  const ht2 = c('handover','tier2_pct',100); const ht3 = c('handover','tier3_pct',120);
-  const ht2p = c('handover','tier2_payout',2500); const ht3b = c('handover','tier3_bonus',2500);
   const gt1 = c('gmv_gate','threshold_1',95); const gt2 = c('gmv_gate','threshold_2',90);
   const gc1 = c('gmv_gate','cap_1',0.70); const gc2 = c('gmv_gate','cap_2',0.35);
 
@@ -431,14 +429,7 @@ function _renderComponentRatesEditor() {
     ],
     `outlet ที่ไม่เคยซื้อมาก่อนเลย (first purchase date) → GMV ทั้งหมด × ${Math.round(outr*1000)/10}% · ไม่แบ่ง P1/P3`
   )
-  + rateCard('Handover (Sales → KAM)', '#bcd7ff', [
-      ['Retention เกณฑ์ tier 1 (%)','handover','tier2_pct',100,5,'pct-i'],
-      ['ได้รับ tier 1 (฿)','handover','tier2_payout',2500,500,'฿'],
-      ['Retention เกณฑ์ tier 2 (%)','handover','tier3_pct',120,5,'pct-i'],
-      ['ได้รับ tier 2 รวม (฿)','handover','tier3_bonus',2500,500,'฿'],
-    ],
-    `Retention < ${ht2}% = ฿0 · ≥ ${ht2}% = ${fB(ht2p)} · ≥ ${ht3}% = ${fB(ht2p+ht3b)} รวม`
-  )
+  + _renderHandoverGmvTierEditor()
   + rateCard('NRR Gate (KAM เท่านั้น)', 'rgba(255,107,61,.80)', [
       ['เกณฑ์ผ่าน full (%)','gmv_gate','threshold_1',95,1,'pct-i'],
       ['Cap เมื่อต่ำกว่าเกณฑ์ผ่าน','gmv_gate','cap_1',0.70,0.05,'mul'],
@@ -447,6 +438,185 @@ function _renderComponentRatesEditor() {
     ],
     `≥ ${gt1}% = ×1.00 · ${gt2}–${gt1}% = ×${gc1} · < ${gt2}% = ×${gc2} · คูณกับยอดรวมทั้งหมดก่อน lock`
   );
+}
+
+// ── Handover GMV-tier editor (v91) ────────────────────────────────────
+// Two-level: a card per GMV tier, each containing its own retention%→payout
+// threshold ladder. Replaces the old flat 4-scalar rate card (tier2_pct/
+// tier2_payout/tier3_pct/tier3_bonus) — those legacy keys stay in
+// target_settings untouched (engine falls back to them when gmv_tiers is
+// empty) so this is purely additive.
+//
+// Staged as a WHOLE ARRAY unit in _commComponentPending.handover.gmv_tiers
+// (see _commHandoverGmvTiersStage below) — NOT through _commSetComponentParam,
+// which does Number(value) per scalar field and would coerce an array to NaN.
+// Visually modeled on _renderCommRuleEditorByCode's tier cards (reuses the
+// same inpBase/inpPay input styles) but do NOT copy _renderTlUpsellTierRows'
+// wiring — that pattern is already broken/unused, kept only as a layout
+// reference elsewhere in this file.
+let _commHandoverGmvTiersDraft = null;
+
+function _commHandoverGmvTiersLive() {
+  try {
+    const raw = _tgtSettings && _tgtSettings['handover_params'];
+    const params = raw ? (typeof raw === 'object' ? raw : JSON.parse(raw)) : null;
+    return (params && Array.isArray(params.gmv_tiers)) ? params.gmv_tiers : [];
+  } catch(e) { return []; }
+}
+function _commHandoverGmvTiersGetDraft() {
+  if (_commHandoverGmvTiersDraft === null) {
+    const pending = _commComponentPending.handover && _commComponentPending.handover.gmv_tiers;
+    const src = pending || _commHandoverGmvTiersLive();
+    _commHandoverGmvTiersDraft = JSON.parse(JSON.stringify(src));
+  }
+  return _commHandoverGmvTiersDraft;
+}
+function _commHandoverGmvTiersStage() {
+  if (!_commComponentPending.handover) _commComponentPending.handover = {};
+  _commComponentPending.handover.gmv_tiers = _commHandoverGmvTiersDraft;
+  _commMarkChanged();
+}
+function _commAddHandoverGmvTier() {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  tiers.push({ tier_order: tiers.length + 1, gmv_min: 0, gmv_max: null, label: '',
+               thresholds: [{ min_retention_pct: 100, payout: 0 }] });
+  _commHandoverGmvTiersStage();
+  renderCommissionCockpit();
+}
+function _commRemoveHandoverGmvTier(tierIdx) {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  tiers.splice(tierIdx, 1);
+  _commHandoverGmvTiersStage();
+  renderCommissionCockpit();
+}
+function _commAddHandoverThreshold(tierIdx) {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  if (!tiers[tierIdx]) return;
+  if (!tiers[tierIdx].thresholds) tiers[tierIdx].thresholds = [];
+  tiers[tierIdx].thresholds.push({ min_retention_pct: 100, payout: 0 });
+  _commHandoverGmvTiersStage();
+  renderCommissionCockpit();
+}
+function _commRemoveHandoverThreshold(tierIdx, threshIdx) {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  if (!tiers[tierIdx] || !tiers[tierIdx].thresholds) return;
+  tiers[tierIdx].thresholds.splice(threshIdx, 1);
+  _commHandoverGmvTiersStage();
+  renderCommissionCockpit();
+}
+function _commSetHandoverField(tierIdx, threshIdx, field, value) {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  const t = tiers[tierIdx];
+  if (!t) return;
+  if (threshIdx === null || threshIdx === undefined) {
+    if (field === 'label') t.label = value;
+    else t[field] = value === '' ? null : Number(value);
+  } else {
+    const th = (t.thresholds || [])[threshIdx];
+    if (!th) return;
+    th[field] = value === '' ? null : Number(value);
+  }
+  _commHandoverGmvTiersStage();
+}
+window._commAddHandoverGmvTier = _commAddHandoverGmvTier;
+window._commRemoveHandoverGmvTier = _commRemoveHandoverGmvTier;
+window._commAddHandoverThreshold = _commAddHandoverThreshold;
+window._commRemoveHandoverThreshold = _commRemoveHandoverThreshold;
+window._commSetHandoverField = _commSetHandoverField;
+
+// Advisory-only checks (this file's save pipeline, saveCommissionComponentRates,
+// is shared across 4 unrelated metrics — hard-blocking it on a Handover typo
+// would also block saving unrelated Upsell/Gate edits, so these render as a
+// visible warning banner rather than a save-blocking gate).
+function _commValidateHandoverGmvTiers(tiers) {
+  const errs = [];
+  const sorted = tiers.map((t, i) => ({ t, i })).slice()
+    .sort((a, b) => Number(a.t.gmv_min || 0) - Number(b.t.gmv_min || 0));
+  for (let i = 0; i < sorted.length; i++) {
+    const t = sorted[i].t;
+    const label = t.label || ('Tier ' + (sorted[i].i + 1));
+    const min = Number(t.gmv_min || 0);
+    const max = (t.gmv_max === null || t.gmv_max === undefined || t.gmv_max === '') ? null : Number(t.gmv_max);
+    if (max != null && max <= min) errs.push(`"${label}": ค่า "ถึง" ต้องมากกว่า "ตั้งแต่"`);
+    const next = sorted[i + 1];
+    if (next && (max == null || max >= Number(next.t.gmv_min || 0))) {
+      errs.push(`"${label}" ทับซ้อนช่วง GMV กับ "${next.t.label || ('Tier ' + (next.i + 1))}"`);
+    }
+    const seen = {};
+    (t.thresholds || []).forEach(th => {
+      const key = Number(th.min_retention_pct || 0);
+      if (seen[key]) errs.push(`"${label}": มี threshold retention ≥${key}% ซ้ำกัน`);
+      seen[key] = true;
+    });
+  }
+  return errs;
+}
+
+function _renderHandoverGmvTierEditor() {
+  const tiers = _commHandoverGmvTiersGetDraft();
+  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:12px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpLbl  = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:12px;font-family:var(--tk-font-body),system-ui,sans-serif;text-align:left;outline:none;width:100%';
+  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:9px;padding:9px 11px;color:#ffe08a;font-size:13px;font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
+
+  const tierCards = tiers.map((t, ti) => {
+    const gmvMax = t.gmv_max;
+    const rangeLbl = gmvMax == null ? `≥ ${fB(t.gmv_min)}` : `${fB(t.gmv_min)}–${fB(gmvMax)}`;
+    const threshRows = (t.thresholds || []).map((th, thi) => `
+      <div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">Retention ตั้งแต่ (%)</div>
+          <input style="${inpBase}" value="${th.min_retention_pct ?? ''}" inputmode="decimal"
+            oninput="_commSetHandoverField(${ti},${thi},'min_retention_pct',this.value)">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:9px;font-weight:700;color:rgba(255,224,138,.85);margin-bottom:3px">ได้รับ (฿)</div>
+          <input style="${inpPay}" value="${th.payout ?? 0}" inputmode="numeric"
+            oninput="_commSetHandoverField(${ti},${thi},'payout',this.value)">
+        </div>
+        <button onclick="_commRemoveHandoverThreshold(${ti},${thi})" style="font-size:14px;color:rgba(255,255,255,.25);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
+      </div>`).join('');
+
+    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:11px;font-weight:800;color:rgba(188,215,255,.85);font-family:'IBM Plex Mono',monospace">GMV ${rangeLbl}</span>
+        <button onclick="_commRemoveHandoverGmvTier(${ti})" style="font-size:15px;color:rgba(255,255,255,.28);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">GMV ตั้งแต่ (฿)</div>
+          <input style="${inpBase}" value="${t.gmv_min ?? ''}" inputmode="numeric"
+            oninput="_commSetHandoverField(${ti},null,'gmv_min',this.value)">
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">ถึง (฿) — ว่าง=∞</div>
+          <input style="${inpBase}" value="${gmvMax ?? ''}" placeholder="∞" inputmode="numeric"
+            oninput="_commSetHandoverField(${ti},null,'gmv_max',this.value)">
+        </div>
+      </div>
+      <div style="margin-bottom:9px">
+        <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">ชื่อ tier</div>
+        <input style="${inpLbl}" value="${_commEscapeHtml(t.label||'')}" placeholder="เช่น 20,000–49,999"
+          oninput="_commSetHandoverField(${ti},null,'label',this.value)">
+      </div>
+      ${threshRows}
+      <button onclick="_commAddHandoverThreshold(${ti})" style="width:100%;padding:7px;border-radius:8px;background:rgba(188,215,255,.05);border:1px dashed rgba(188,215,255,.20);color:rgba(188,215,255,.65);font-size:11px;font-weight:700;cursor:pointer;margin-top:2px">+ เพิ่ม threshold</button>
+    </div>`;
+  }).join('');
+
+  const errs = _commValidateHandoverGmvTiers(tiers);
+  const errHtml = errs.length ? `<div style="font-size:10px;color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:8px;margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
+  const emptyNote = !tiers.length ? `<div style="font-size:10px;color:rgba(188,215,255,.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px;margin-bottom:9px;line-height:1.6">ยังไม่มี GMV tier — ระบบใช้อัตราเดิม (flat, ไม่มี GMV tier) จนกว่าจะเพิ่ม tier แรก</div>` : '';
+
+  return `<div style="border-radius:13px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+      <span style="width:3px;height:16px;border-radius:2px;background:#bcd7ff;flex-shrink:0"></span>
+      <span style="font-size:12px;font-weight:800;color:rgba(225,238,255,.85)">Handover (Sales → KAM) — แบ่งตาม GMV tier</span>
+    </div>
+    ${errHtml}${emptyNote}${tierCards}
+    <button onclick="_commAddHandoverGmvTier()" style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px">+ เพิ่ม GMV tier</button>
+    <div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px;line-height:1.6">ยอด handover ของ KAM (รวมทั้งหมดในงวดนั้น) ต่ำกว่า tier แรกสุด → ได้ ฿0 · Retention คิดจากยอดรวมของ KAM ไม่ใช่รายบัญชี</div>
+  </div>`;
 }
 
 
@@ -568,6 +738,7 @@ async function saveCommissionComponentRates() {
       _tgtSettings[row.metric_code + '_params'] = row.params;
     }
     _commComponentPending = {};
+    _commHandoverGmvTiersDraft = null; // re-derive from freshly-saved _tgtSettings next render
     _commSoftenPostSaveUi();
     showToast('Component rates saved', '✓');
     renderCommissionCockpit();
@@ -829,7 +1000,7 @@ function renderCommLockStep(body) {
       </div>
       <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
       <div class="comm-kpis">
-        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:(model.teamPct!==null?model.teamPct+'%':'—')}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
+        <div class="comm-kpi ${teamHit?'hit':'miss'}"><div class="comm-kpi-lbl">${(currentUserProfile&&currentUserProfile.role)==='admin'?'Teams':'Team NRR'}</div><div class="comm-kpi-val">${(currentUserProfile&&currentUserProfile.role)==='admin'?summary.teamCount:_commFmtPct(model.teamPct)}</div><div class="comm-kpi-sub">${(currentUserProfile&&currentUserProfile.role)==='admin'?'TL groups in snapshot':'Target '+threshold+'%'}</div></div>
         <div class="comm-kpi ${summary.tlPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">TL payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.tlPayout)}</div><div class="comm-kpi-sub">${summary.tlRows.length} TL rows</div></div>
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
@@ -843,7 +1014,7 @@ function renderCommLockStep(body) {
         <div class="comm-preview-tl-left">
           <div class="comm-team-eyebrow">TEAM LEAD</div>
           <div class="comm-name">${_commEscapeHtml(t.tlName||t.tlEmail)}</div>
-          <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${t.teamNrr!==null?t.teamNrr+'%':'—'}</div>
+          <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${_commFmtPct(t.teamNrr)}</div>
           <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}</div>
         </div>
         <div class="comm-preview-tl-money"><span>Total payout</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
@@ -860,7 +1031,7 @@ function renderCommLockStep(body) {
         return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
           <div>
             <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
-            <div class="comm-person-sub">NRR ${k.pct!==null?k.pct+'%':'—'} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
+            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
           </div>
           <div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div>
         </div>`;
@@ -872,7 +1043,7 @@ function renderCommLockStep(body) {
       const bd = r.breakdown || {};
       const isKam = r.beneficiary_role === 'kam';
       const name = _commEscapeHtml(bd.kam_name || bd.team_lead_name || r.beneficiary_email);
-      let sub = `NRR ${r.governed_nrr_pct??'—'}%`;
+      let sub = `NRR ${_commFmtPct(r.governed_nrr_pct)}`;
       if (isKam && bd.nrr_payout !== undefined) {
         const parts = [`NRR ${_commFmtPayout(bd.nrr_payout)}`];
         if (bd.upsell_sku && bd.upsell_sku.total_commission > 0) parts.push(`Upsell ${_commFmtPayout(bd.upsell_sku.total_commission)}`);
@@ -1146,7 +1317,7 @@ function renderCommissionLockTab() {
             <td><span class="tgt-snap-role ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</span></td>
             <td><div class="tgt-snap-name">${r.breakdown?.kam_name || r.breakdown?.team_lead_name || r.beneficiary_email}</div><div class="tgt-preview-meta">${r.beneficiary_email}</div></td>
             <td>${r.team_lead_email || '—'}</td>
-            <td class="tgt-snap-mono">${r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct + '%' : '—'}</td>
+            <td class="tgt-snap-mono">${_commFmtPct(r.governed_nrr_pct)}</td>
             <td class="tgt-snap-mono">${_commFmtPayout(r.payout_amount)}</td>
             <td><span class="tgt-snap-status ${r.snapshot_status||''}">${r.snapshot_status==='final'?'🔒':'Draft'}</span></td>
           </tr>`).join('')}
@@ -1186,7 +1357,7 @@ function renderCommissionPreviewTab() {
       <div class="tgt-preview-grid">
         <div class="tgt-preview-kpi">
           <div class="tgt-preview-kpi-label">Team NRR</div>
-          <div class="tgt-preview-kpi-val">${model.teamPct !== null ? model.teamPct + '%' : '—'}</div>
+          <div class="tgt-preview-kpi-val">${_commFmtPct(model.teamPct)}</div>
         </div>
         <div class="tgt-preview-kpi">
           <div class="tgt-preview-kpi-label">TL payout</div>
@@ -1214,7 +1385,7 @@ function renderCommissionPreviewTab() {
           <div class="tgt-preview-payout">${_commFmtPayout(r.payout)}</div>
         </div>
         <div class="tgt-preview-row-bottom">
-          <span class="tgt-preview-chip ${cls}">NRR ${r.pct !== null ? r.pct + '%' : '—'}</span>
+          <span class="tgt-preview-chip ${cls}">NRR ${_commFmtPct(r.pct)}</span>
           <span class="tgt-preview-chip">Tier ${r.tierLabel || '—'}</span>
           <span class="tgt-preview-chip">Pace ${r.pace !== null ? r.pace + '%' : '—'}</span>
         </div>
@@ -1580,7 +1751,7 @@ function _commRenderRetroactiveSection() {
     const nm = _commEscapeHtml(bd.kam_name||bd.team_lead_name||r.beneficiary_email);
     return '<tr><td><span class="tgt-snap-role ' + r.beneficiary_role + '">' + r.beneficiary_role.toUpperCase() + '</span></td>'
       + '<td><div class="tgt-snap-name">' + nm + '</div><div class="tgt-preview-meta">' + _commEscapeHtml(r.beneficiary_email) + '</div></td>'
-      + '<td class="tgt-snap-mono">' + (r.governed_nrr_pct!=null?r.governed_nrr_pct+'%':'—') + '</td>'
+      + '<td class="tgt-snap-mono">' + _commFmtPct(r.governed_nrr_pct) + '</td>'
       + '<td class="tgt-snap-mono">' + _commFmtPayout(r.payout_amount) + '</td>'
       + '<td><span class="tgt-snap-status ' + (r.snapshot_status||'') + '">' + (r.snapshot_status==='final'?'[L]':'Draft') + '</span></td>'
       + '</tr>';

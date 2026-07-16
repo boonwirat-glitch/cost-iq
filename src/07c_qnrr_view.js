@@ -329,8 +329,14 @@ function _qnrrCompute(kamEmail, scope) {
 
     // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive,
     // และหัก waived-account base ของเดือนนี้)
+    // v92-fix: NO rounding — this flows into _qnrrComputeForCommission's
+    // `nrr` ratio (line ~493 below), which the commission engine's tier/gate
+    // threshold comparisons ultimately use. Rounding here before that
+    // decision was the quarterly-mode half of a real payout-rounding bug
+    // (see 07a_commission_engine.js's _nrrGovernedPct comment). Round only
+    // for display, via _commFmtPct(), never before a threshold decision.
     var nrr_pct = effectiveBaseNorm > 0
-      ? Math.round(nrr_curr_norm / effectiveBaseNorm * 100)
+      ? (nrr_curr_norm / effectiveBaseNorm * 100)
       : null;
 
     var total_gmv = MOVEMENTS
@@ -833,7 +839,7 @@ function _qnrrRenderHero(){
       var bm  = _data.by_month[m];
       var pct = bm ? bm.nrr_pct : null;
       var color = _nrrColor(pct);
-      var label = pct === null ? '—' : pct + '%';
+      var label = _commFmtPct(pct);
       var isLast = (m === Q_MONTHS[Q_MONTHS.length - 1]);
       var moSuffix = (isLast && bm && bm.curr_days && bm.curr_days < 28) ? '~' : '';
       if (idx > 0) slots.push('<div class="qnrr-nrr-sep"></div>');

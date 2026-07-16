@@ -516,9 +516,32 @@ function _commQnrrDrillResult(email, scope) {
 }
 window._commQnrrDrillResult = _commQnrrDrillResult;
 
+// ── Handover GMV-tier config reader ──────────────────────────────
+// gmv_tiers lives in target_settings.handover_params alongside the legacy
+// flat scalar keys — an array, so it CANNOT go through _commGetConfig
+// (that helper does Number(params[paramName]) on every read, which would
+// coerce an array to NaN). Empty/absent => caller falls back to the
+// legacy flat 2-tier logic (v90 rollout safety: engine change is a safe
+// no-op until an admin populates gmv_tiers via the Cockpit).
+function _commGetHandoverGmvTiers() {
+  try {
+    const raw = _tgtSettings && _tgtSettings['handover_params'];
+    const params = raw ? (typeof raw === 'object' ? raw : JSON.parse(raw)) : null;
+    return (params && Array.isArray(params.gmv_tiers)) ? params.gmv_tiers : [];
+  } catch(e) { return []; }
+}
+
 // ── Handover Retention Engine ───────────────────────────────────
 // Uses bulkHandoverData.byNewKamName — accounts that transferred TO this KAM
-// Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout, detail[] }
+// Returns { accounts, baseline_gmv, current_gmv, retention_pct, tier, payout,
+//           detail[], gmv_tier_label, gmv_bucket_gmv }
+// GMV-tier mode (v91): the KAM's AGGREGATE baseline handover GMV (baselineNorm,
+// summed across every account handed over this period — not per-account)
+// picks one gmv_tiers[] bucket; that bucket's own threshold ladder is then
+// applied to the KAM's existing blended retention %. Mirrored byte-for-byte
+// in /nrr's nrrComputeHandoverForKam (nrr_commission.js) — keep both in sync,
+// this is the SECOND place these two functions must match exactly (see the
+// divergence-bug note there).
 function _commComputeHandoverRetention(kamEmail) {
   // V3 Tactic B:
   // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
@@ -527,7 +550,7 @@ function _commComputeHandoverRetention(kamEmail) {
   // - Current: perf_gmv (GMV เดือน M+1) normalize ÷ perfDays × 30
   // - Window: transfer_month = เดือนก่อน (M-1) เท่านั้น
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
-                  tier:0, payout:0, detail:[] };
+                  tier:0, payout:0, detail:[], gmv_tier_label:null, gmv_bucket_gmv:0 };
   try {
     const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
               ? bulkHandoverData : { byNewKamName:{} };
@@ -554,11 +577,6 @@ function _commComputeHandoverRetention(kamEmail) {
 
     if (!handoverRows.length) return EMPTY;
 
-    const t2Pct   = _commGetConfig('handover', 'tier2_pct',    100);
-    const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
-    const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
-    const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
-
     // Normalize: daily rate × 30 เพื่อให้จำนวนวันแฟร์ทั้งสองฝั่ง
     let baselineNorm = 0, perfNorm = 0;
     const detail = [];
@@ -581,18 +599,50 @@ function _commComputeHandoverRetention(kamEmail) {
       });
     });
 
-    const retentionPct = baselineNorm > 0 ? (perfNorm / baselineNorm * 100) : 0;
+    const retentionPct = baselineNorm > 0 ? Math.round((perfNorm / baselineNorm * 100) * 10) / 10 : 0;
 
-    let tier = 1, payout = 0;
-    if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
-    else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
+    let tier = 0, payout = 0, gmvTierLabel = null;
+    const gmvTiers = _commGetHandoverGmvTiers();
+    if (gmvTiers.length) {
+      // GMV-tier mode: aggregate baseline GMV picks ONE bucket, then a
+      // best-match scan (highest threshold cleared wins) over that
+      // bucket's own ladder. No match (e.g. below the lowest configured
+      // gmv_min) => payout ฿0 — an intentional gap, not a fallback.
+      const matched = gmvTiers.find(t =>
+        baselineNorm >= Number(t.gmv_min || 0) &&
+        (t.gmv_max === null || t.gmv_max === undefined || baselineNorm <= Number(t.gmv_max))
+      );
+      if (matched) {
+        gmvTierLabel = matched.label || null;
+        const thresholds = (matched.thresholds || []).slice()
+          .sort((a, b) => Number(b.min_retention_pct || 0) - Number(a.min_retention_pct || 0));
+        for (let i = 0; i < thresholds.length; i++) {
+          if (retentionPct >= Number(thresholds[i].min_retention_pct || 0)) {
+            payout = Number(thresholds[i].payout || 0);
+            tier = thresholds.length - i; // highest threshold cleared = highest tier number
+            break;
+          }
+        }
+      }
+    } else {
+      // Legacy flat 2-tier fallback — used until gmv_tiers is populated
+      // via the Cockpit (rollout safety: engine ships before the UI does).
+      const t2Pct   = _commGetConfig('handover', 'tier2_pct',    100);
+      const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
+      const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
+      const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
+      if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
+      else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
+    }
 
     return {
       accounts:       handoverRows.length,
       baseline_gmv:   Math.round(baselineNorm),
       current_gmv:    Math.round(perfNorm),
-      retention_pct:  Math.round(retentionPct * 10) / 10,
-      tier, payout, detail
+      retention_pct:  retentionPct,
+      tier, payout, detail,
+      gmv_tier_label: gmvTierLabel,
+      gmv_bucket_gmv: Math.round(baselineNorm)
     };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
@@ -727,7 +777,7 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
     } else {
       raw = _tgtComputeKamNRR(kamEmail, null, periodOverride);
     }
-    rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    rawPct      = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
     governedPct = _nrrGovernedPct(raw, kamEmail, null);
     pct         = governedPct !== null ? governedPct : rawPct;
 
@@ -832,7 +882,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     } else {
       raw = _tgtComputeKamNRR(null, tlEmail, periodOverride);
     }
-    const rawPct      = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+    const rawPct      = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
     const governedPct = _nrrGovernedPct(raw, null, tlEmail);
     const pct         = governedPct !== null ? governedPct : rawPct;
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
@@ -1760,7 +1810,7 @@ function _tgtRenderTeamGovCard() {
     <div class="tv-signal-wrap">
       <div class="tv-signal-card ${nrrOk ? 'ok' : 'warn'}">
         <div class="tv-signal-label">NRR</div>
-        <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${governedPct !== null ? governedPct + '%' : '—'}</div>
+        <div class="tv-signal-value ${nrrOk ? 'ok' : 'warn'}">${_commFmtPct(governedPct)}</div>
         <div class="tv-signal-meta">${baseTxt}</div>
       </div>
       <div class="tv-signal-card commission" style="cursor:pointer" onclick="event.stopPropagation();_commOpenTlDetailSheet()">
@@ -1934,6 +1984,14 @@ function _commFmtPayout(n) {
   if (!n) return '฿0';
   return '฿' + Math.round(n).toLocaleString('en-US');
 }
+// v92: shared %NRR/retention% display formatter (mirrors /nrr's nrrFmtPct()).
+// Always 1 decimal — the underlying pct value itself is now UNROUNDED
+// through tier/gate decisions (see _nrrGovernedPct), so this is purely a
+// display concern, never a computation one.
+function _commFmtPct(v) {
+  return (v !== null && v !== undefined && !isNaN(v)) ? Number(v).toFixed(1) + '%' : '—';
+}
+window._commFmtPct = _commFmtPct;
 
 function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
@@ -2141,7 +2199,13 @@ function _nrrExclusionBaseImpact(kamEmail, tlEmail, periodMonth) {
 // still hook in without touching payout math.
 function _nrrGovernedPct(rawResult) {
   if (!rawResult || rawResult.nrr === null) return null;
-  return Math.round(rawResult.nrr * 100);
+  // v92-fix: NO rounding here — this value feeds tier/gate threshold
+  // comparisons (_commMatchTierByCode/_commComputeGmvGate) downstream.
+  // Rounding to a whole number (or even 1 decimal) BEFORE that comparison
+  // can flip a real payout decision at a boundary (e.g. true 97.96% vs a
+  // gate at 98% — rounds to 98, wrongly clears the gate). Round only for
+  // DISPLAY/STORAGE, via _commFmtPct(), never before a threshold decision.
+  return rawResult.nrr * 100;
 }
 // v865: read-only reporting helper -- "this month's %NRR excludes N waived
 // accounts totaling ฿X" -- must never feed back into payout math (that's
@@ -2153,7 +2217,7 @@ function _nrrWaivedAccountsSummary(kamEmail, tlEmail, periodMonth) {
 function _nrrGovernanceForVisibleTeam() {
   const scope = _commVisibleTeamScope();
   const raw = _tgtGetVisibleTeamNrrResult();
-  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+  const rawPct = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
   const governedPct = _nrrGovernedPct(raw);
   const exclBase = _nrrExclusionBaseImpact(null, scope.tlEmail, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
@@ -2164,7 +2228,7 @@ function _nrrGovernanceForKam(kamEmail) {
   const raw = (_policy && _policy.commission_mode === 'quarterly' && typeof window._qnrrComputeForCommission === 'function')
     ? window._qnrrComputeForCommission(kamEmail, 'kam')
     : _tgtComputeKamNRR(kamEmail, null);
-  const rawPct = raw && raw.nrr !== null ? Math.round(raw.nrr * 100) : null;
+  const rawPct = raw && raw.nrr !== null ? raw.nrr * 100 : null; // v92-fix: unrounded, see _nrrGovernedPct
   const governedPct = _nrrGovernedPct(raw);
   const exclBase = _nrrExclusionBaseImpact(kamEmail, null, raw && raw.currentPeriod);
   return { raw, rawPct, governedPct, excludedBase: exclBase };
@@ -2262,7 +2326,9 @@ function _commBuildSnapshotRows(periodOverride) {
                     retention_pct: kamPayout.handover.retention_pct,
                     tier: kamPayout.handover.tier,
                     payout: kamPayout.handover.payout,
-                    detail: kamPayout.handover.detail },
+                    detail: kamPayout.handover.detail,
+                    gmv_tier_label: kamPayout.handover.gmv_tier_label,
+                    gmv_bucket_gmv: kamPayout.handover.gmv_bucket_gmv },
         components_subtotal: kamPayout.subtotal,
         gmv_gate: kamPayout.gate,
         final_payout: kamPayout.final_payout,
@@ -2432,7 +2498,7 @@ function _commBuildKamSelfCard() {
     </div>
   </div>`;
   }
-  const pctText = st.pct !== null ? `${st.pct}%` : '—';
+  const pctText = _commFmtPct(st.pct);
   const tierLabel = st.tier && st.tier.payout_label ? _commEscapeHtml(st.tier.payout_label) : st.status;
   return `<div class="pv-comm-strip ${st.cls}">
     <div class="pv-comm-left">
@@ -2475,7 +2541,7 @@ function _commOpenKamSelfSheet() {
     ov.onclick = function(e){ if(e.target === ov) _commCloseKamSelfSheet(); };
     document.body.appendChild(ov);
   }
-  const pctText = st.pct !== null ? `${st.pct}%` : '—';
+  const pctText = _commFmtPct(st.pct);
   const tierRows = st.tiers.map((t, idx)=>{
     const on = st.tier && (idx === st.currentIdx);
     const isNext = st.next && String(t.id||idx) === String(st.next.id||st.tiers.indexOf(st.next));
@@ -2575,7 +2641,7 @@ function _commOpenTlDetailSheet(opts) {
     // resolve name: use portview display name
     const pvRow = (portviewBulkData||[]).find(p => p.kamEmail === (r.beneficiary_email||''));
     const name = (pvRow && pvRow.kamName) || bd.kam_name || r.beneficiary_email || '';
-    const nrr  = r.governed_nrr_pct !== null && r.governed_nrr_pct !== undefined ? r.governed_nrr_pct+'%' : '—';
+    const nrr  = _commFmtPct(r.governed_nrr_pct);
     const detailParts = ['NRR '+fmtP(nrrP)];
     if (upsell > 0) detailParts.push('Uplift '+fmtP(upsell));
     if (ho > 0)     detailParts.push('HO '+fmtP(ho));
@@ -2613,7 +2679,7 @@ function _commOpenTlDetailSheet(opts) {
           <div class="pv-comm-sheet-kpi-val">${fmtP(summary.kamPayout)}</div>
         </div>
       </div>
-      <div class="pv-comm-sheet-sub">NRR ทีม ${tlPayout.nrr_pct!==null?tlPayout.nrr_pct+'%':'—'} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
+      <div class="pv-comm-sheet-sub">NRR ทีม ${_commFmtPct(tlPayout.nrr_pct)} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
       ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
       <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>

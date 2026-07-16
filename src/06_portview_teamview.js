@@ -2420,7 +2420,10 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
+    // below (a real live-estimate payout decision, same class of bug as
+    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
+    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
@@ -2428,7 +2431,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
     // button was already a dead no-op click in production.
@@ -2453,7 +2456,10 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
+    // below (a real live-estimate payout decision, same class of bug as
+    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
+    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     // v226: show final_payout (NRR+Upsell+Handover×Gate) not just NRR payout
     const _kp1=_getCachedKamPayout(g.kamEmail);
@@ -2461,7 +2467,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
     const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
-    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${nrrPct}%</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
+    const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
     // button was already a dead no-op click in production.
@@ -2487,7 +2493,10 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_getCachedKamNrr(g.kamEmail);
-    const nrrPct=_nrr&&_nrr.nrr!==null?Math.round(_nrr.nrr*100):null;
+    // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
+    // below (a real live-estimate payout decision, same class of bug as
+    // 07a_commission_engine.js's _nrrGovernedPct). Round only for display.
+    const nrrPct=_nrr&&_nrr.nrr!==null?(_nrr.nrr*100):null;
     const kamPlanCode=_commGetAssignmentPlan(_nrrExclusionCurrentPeriod(),'kam',g.kamEmail,'kam');
     const _kpC=_getCachedKamPayout(g.kamEmail);
     const _kamFinalC=_kpC?_kpC.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
@@ -2497,7 +2506,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
       <div class="tv-chip-main">
         <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-chip-bottom">
-          <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${nrrPct}%</span>`:''}</div>
+          <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${_commFmtPct(nrrPct)}</span>`:''}</div>
         </div>
       </div>
       ${nrrPct!==null?`<span class="tv-chip-comm">${_kpCUL?'<span class=\'skel\' style=\'display:inline-block;width:46px;height:14px;border-radius:3px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinalC)}</span>`:'<span class="tv-chip-comm">—</span>'}
