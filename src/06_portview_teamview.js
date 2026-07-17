@@ -264,16 +264,16 @@ function _injectSenseThemePicker(){
   const cur=(()=>{try{return localStorage.getItem(_SDT_KEY)||'light';}catch(e){return'light';}})();
   const wrap=document.createElement('div');
   wrap.id='sdt-picker-wrap';
-  wrap.style.cssText='margin-bottom:14px;padding:12px 14px;background:rgba(0,0,0,.03);border:1px solid var(--n200);border-radius:10px';
+  wrap.style.cssText='margin-bottom:14px;padding:12px 14px;background:rgba(0,0,0,.03);border:1px solid var(--n200);border-radius:var(--r-md)';
   wrap.innerHTML=`
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--n500);margin-bottom:10px">✦ Sense Dark Theme</div>
+    <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.8px;color:var(--n500);margin-bottom:10px">✦ Sense Dark Theme</div>
     <div style="display:flex;gap:7px">
       ${Object.entries(_SDT_THEMES).map(([k,t])=>`
-        <div class="sdt-opt" data-theme="${k}" onclick="setSenseDarkTheme('${k}')" style="flex:1;border-radius:10px;border:1.5px solid ${k===cur?'var(--g500)':'var(--n200)'};${k===cur?'box-shadow:inset 0 0 0 1px var(--tk-ok-border);':''}padding:9px 7px;cursor:pointer;background:var(--n50);text-align:center;transition:all .2s">
-          <div style="width:100%;height:16px;border-radius:5px;background:${t.card};margin-bottom:4px;border:1px solid rgba(0,0,0,.15)"></div>
-          <div style="width:100%;height:4px;border-radius:2px;background:${t.page};border:1px solid rgba(0,0,0,.1);margin-bottom:6px"></div>
-          <div style="font-size:10px;font-weight:700;color:var(--n700)">${t.name}</div>
-          ${k==='light'?'<div style="font-size:8px;color:var(--tk-ok-text);margin-top:2px">default</div>':''}
+        <div class="sdt-opt" data-theme="${k}" onclick="setSenseDarkTheme('${k}')" style="flex:1;border-radius:var(--r-md);border:1.5px solid ${k===cur?'var(--g500)':'var(--n200)'};${k===cur?'box-shadow:inset 0 0 0 1px var(--tk-ok-border);':''}padding:9px 7px;cursor:pointer;background:var(--n50);text-align:center;transition:all .2s">
+          <div style="width:100%;height:16px;border-radius:var(--r-5);background:${t.card};margin-bottom:4px;border:1px solid rgba(0,0,0,.15)"></div>
+          <div style="width:100%;height:4px;border-radius:var(--r-xxs);background:${t.page};border:1px solid rgba(0,0,0,.1);margin-bottom:6px"></div>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--n700)">${t.name}</div>
+          ${k==='light'?'<div style="font-size:var(--text-3xs);color:var(--tk-ok-text);margin-top:2px">default</div>':''}
         </div>
       `).join('')}
     </div>`;
@@ -980,7 +980,7 @@ function __legacyRenderPortviewListFallback(){
       // churnBadge=`<span class="portview-churn-badge">${a.churnedSkuCount||a.churnCount} SKU หาย</span>`;
     }
     const catBadge=(a.missingCatCount||0)>0?`<span class="portview-churn-badge" style="background:rgba(240,176,0,.2);color:var(--amb);border-color:rgba(240,176,0,.3)">${a.missingCatCount} cat</span>`:'';
-    const acctTypeBadge=a.accountType?`<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);margin-right:4px;letter-spacing:.3px">${a.accountType}</span>`:'';
+    const acctTypeBadge=a.accountType?`<span style="font-size:var(--text-3xs);font-weight:var(--fw-bold);padding:1px 5px;border-radius:var(--r-xs);background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);margin-right:4px;letter-spacing:.3px">${a.accountType}</span>`:'';
     return{churnBadge,catBadge,acctTypeBadge};
   }
 
@@ -1021,14 +1021,14 @@ function __legacyRenderPortviewListFallback(){
     const _cc=a._churnCounts;
     const catCount=a.missingCatCount||0;
     const parts=[];
-    if(_cc&&_cc.ordered>0)parts.push(`<span style="color:var(--tk-ok-bright);font-weight:600">สั่ง ${_cc.ordered}</span>`);
-    if(_cc&&_cc.gone>0)parts.push(`<span style="color:#ff9060;font-weight:600">หาย ${_cc.gone}</span>`);
-    if(_cc&&_cc.near>0)parts.push(`<span style="color:#f0c040;font-weight:600">เฝ้าดู ${_cc.near}</span>`);
+    if(_cc&&_cc.ordered>0)parts.push(`<span style="color:var(--tk-ok-bright);font-weight:var(--fw-semi)">สั่ง ${_cc.ordered}</span>`);
+    if(_cc&&_cc.gone>0)parts.push(`<span style="color:#ff9060;font-weight:var(--fw-semi)">หาย ${_cc.gone}</span>`);
+    if(_cc&&_cc.near>0)parts.push(`<span style="color:#f0c040;font-weight:var(--fw-semi)">เฝ้าดู ${_cc.near}</span>`);
     if(_cc&&_cc.total>0)parts.push(`<span style="color:rgba(255,255,255,.6)">/ ${_cc.total} SKU</span>`);
-    if(catCount>0)parts.push(`<span style="color:rgba(240,176,0,.85);font-weight:600">${catCount} cat</span>`);
+    if(catCount>0)parts.push(`<span style="color:rgba(240,176,0,.85);font-weight:var(--fw-semi)">${catCount} cat</span>`);
     if(!parts.length)return'';
     const dot=`<span style="color:rgba(255,255,255,.15)">·</span>`;
-    return`<span style="font-size:10px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
+    return`<span style="font-size:var(--text-xs);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
   }
 
   const _statusLabel=(cls,daysElapsed)=>{
@@ -1051,7 +1051,7 @@ function __legacyRenderPortviewListFallback(){
     const churnSegs=_buildChurnBadge(a);
     const spark=_buildSparkline(a,isNew?'new':cls);
     const handoffBadge=(a.daysWithCurrentKam!==null&&a.daysWithCurrentKam<=30)
-      ?`<span style="font-size:8px;font-weight:700;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;background:var(--tk-accent-dim-2);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:4px;padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
+      ?`<span style="font-size:var(--text-3xs);font-weight:var(--fw-bold);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;background:var(--tk-accent-dim-2);color:rgba(130,178,255,.8);border:1px solid var(--tk-accent-dim-3);border-radius:var(--r-xs);padding:1px 5px;flex-shrink:0">ใหม่ ${a.daysWithCurrentKam} วัน</span>`
       :'';
     if(isNew){
       return`<div class="portview-acct-card new" style="${_delay}" onclick="portviewSelectAccount('${a.id}')">
@@ -1640,13 +1640,13 @@ function __legacyRenderPortviewSummaryFallback(){
     paceBarEl.style.display='block';
     paceBarEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
       <div style="display:flex;align-items:baseline;gap:6px">
-        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
+        <span id="pv-pace-pct" style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:var(--fw-bold)" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
-          <span style="font-size:11px;color:rgba(255,255,255,.4)">Pro Rate พอร์ต</span>
-          <button onclick="(function(){const d=document.getElementById('pv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.45);font-size:9px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;transition:all .15s">i</button>
+          <span style="font-size:var(--text-sm);color:rgba(255,255,255,.4)">Pro Rate พอร์ต</span>
+          <button onclick="(function(){const d=document.getElementById('pv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--tk-text-muted);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:var(--fw-bold);transition:all .15s">i</button>
         </div>
       </div>
-      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;color:rgba(255,255,255,.3)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:9px;color:rgba(255,255,255,.25);text-align:right;margin-top:1px">baseline</div></div>`:''}
+      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:rgba(255,255,255,.3)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:var(--text-2xs);color:var(--tk-text-faint);text-align:right;margin-top:1px">baseline</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${ppCls}" style="width:${Math.min(portfolioPace,100)}%"></div></div>
     <div id="pv-formula-panel" style="display:none">
@@ -1661,11 +1661,11 @@ function __legacyRenderPortviewSummaryFallback(){
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">เกณฑ์ Pace รายร้าน</div>
         <div class="pace-formula-line" style="display:flex;flex-direction:column;gap:3px">
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:700">≥ 100%</span><span style="color:rgba(255,255,255,.45)">ดีเยี่ยม → ปกติ</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:700">≥ 95%</span><span style="color:rgba(255,255,255,.45)">ปลอดภัย → ปกติ</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#f6ad55;flex-shrink:0"></span><span style="color:#f6ad55;font-weight:700">≥ 90%</span><span style="color:rgba(255,255,255,.45)">เสี่ยง → เสี่ยง</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8888;flex-shrink:0"></span><span style="color:#ff8888;font-weight:700">&lt; 90%</span><span style="color:rgba(255,255,255,.45)">เสี่ยงมาก → เสี่ยงมาก</span></div>
-          <div style="margin-top:4px;font-size:9px;color:rgba(255,255,255,.25);line-height:1.5">baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา</div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:var(--fw-bold)">≥ 100%</span><span style="color:var(--tk-text-muted)">ดีเยี่ยม → ปกติ</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:var(--fw-bold)">≥ 95%</span><span style="color:var(--tk-text-muted)">ปลอดภัย → ปกติ</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#f6ad55;flex-shrink:0"></span><span style="color:#f6ad55;font-weight:var(--fw-bold)">≥ 90%</span><span style="color:var(--tk-text-muted)">เสี่ยง → เสี่ยง</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8888;flex-shrink:0"></span><span style="color:#ff8888;font-weight:var(--fw-bold)">&lt; 90%</span><span style="color:var(--tk-text-muted)">เสี่ยงมาก → เสี่ยงมาก</span></div>
+          <div style="margin-top:4px;font-size:var(--text-2xs);color:var(--tk-text-faint);line-height:1.5">baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา</div>
         </div>
       </div>
     </div>`;
@@ -1687,15 +1687,15 @@ function __legacyRenderPortviewSummaryFallback(){
   const _tierBox=(cls,pf,lbl,runRate,count,diffVal,diffLbl,diffColor,isDashed)=>{
     if(isDashed)return`<div class="portview-tier-box ${cls}${pf}" data-pf="${pf}" onclick="setPortviewFilter('${pf}')" style="border-style:dashed;align-items:center;justify-content:center;display:flex;gap:6px;flex-direction:row">
       <div class="portview-tier-lbl" style="opacity:.4;margin:0">${lbl}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.25)">0 ร้าน</div>
+      <div style="font-size:var(--text-xs);color:var(--tk-text-faint)">0 ร้าน</div>
     </div>`;
     return`<div class="portview-tier-box ${cls}${pf}" data-pf="${cls}" onclick="setPortviewFilter('${cls}')">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:4px">
         <div style="display:flex;align-items:baseline;gap:5px">
           <div class="portview-tier-lbl" style="margin:0">${lbl}</div>
-          <div style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${count} ร้าน</div>
+          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${count} ร้าน</div>
         </div>
-        ${diffVal>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${diffColor};flex-shrink:0;line-height:1">-${fmtGMV(diffVal)}</div>`:''}
+        ${diffVal>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${diffColor};flex-shrink:0;line-height:1">-${fmtGMV(diffVal)}</div>`:''}
       </div>
       <div class="portview-tier-val">${fmtGMV(runRate)}</div>
     </div>`;
@@ -1712,12 +1712,12 @@ function __legacyRenderPortviewSummaryFallback(){
       <div class="portview-tier-box safe${_pfOk}" data-pf="ok" onclick="setPortviewFilter('ok')">
         <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:4px">
           <div class="portview-tier-lbl" style="margin:0">ON TRACK</div>
-          <div style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${ok} ร้าน</div>
+          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${ok} ร้าน</div>
         </div>
         <div class="portview-tier-val">${fmtGMV(okRunRate)}</div>
         <div style="border-top:1px solid var(--tk-ok-dim-2);margin-top:8px;padding-top:7px;display:flex;align-items:baseline;gap:5px">
-          <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-bright)">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</span>
-          <span style="font-size:10px;color:rgba(255,255,255,.55)">เหนือ baseline</span>
+          <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-ok-bright)">${okSurplus>0?'+':''}${fmtGMV(okSurplus)}</span>
+          <span style="font-size:var(--text-xs);color:rgba(255,255,255,.55)">เหนือ baseline</span>
         </div>
       </div>
     </div>
@@ -2069,7 +2069,7 @@ function __legacyRenderTeamviewFallback(){
       // R2 in-flight — show silent skeleton, not error state
       if(_tvContent && !_tvContent._tvSkeletonShown){
         _tvContent._tvSkeletonShown = true;
-        _tvContent.innerHTML='<div style="padding:16px 0;opacity:.35"><div style="height:12px;background:rgba(255,255,255,.08);border-radius:6px;margin-bottom:10px;width:55%"></div><div style="height:8px;background:rgba(255,255,255,.05);border-radius:6px;width:100%"></div></div>';
+        _tvContent.innerHTML='<div style="padding:16px 0;opacity:.35"><div style="height:12px;background:rgba(255,255,255,.08);border-radius:var(--r-sm);margin-bottom:10px;width:55%"></div><div style="height:8px;background:rgba(255,255,255,.05);border-radius:var(--r-sm);width:100%"></div></div>';
       }
       if(titleEl)titleEl.textContent='ภาพรวมทีม';
       if(backWrap)backWrap.style.display='none';
@@ -2206,13 +2206,13 @@ function __legacyRenderTeamviewSummaryFallback(){
     const _prevPaceVal = _prevPacePct ? parseInt(_prevPacePct.textContent)||0 : 0;
     paceBarEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
       <div style="display:flex;align-items:baseline;gap:6px">
-        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:700" class="pace-pct-val ${teamPaceCls}">${teamPace}%</span>
+        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:var(--fw-bold)" class="pace-pct-val ${teamPaceCls}">${teamPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
-          <span style="font-size:11px;color:rgba(255,255,255,.65)">Pro Rate ทีม · ${groups.length} KAM</span>
-          <button onclick="(function(){const d=document.getElementById('tv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.55);font-size:9px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;transition:all .15s">i</button>
+          <span style="font-size:var(--text-sm);color:rgba(255,255,255,.65)">Pro Rate ทีม · ${groups.length} KAM</span>
+          <button onclick="(function(){const d=document.getElementById('tv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.55);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:var(--fw-bold);transition:all .15s">i</button>
         </div>
       </div>
-      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;color:rgba(255,255,255,.45)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:9px;color:rgba(255,255,255,.4);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
+      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:var(--tk-text-muted)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:var(--text-2xs);color:rgba(255,255,255,.4);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${teamPaceCls}" style="width:${Math.min(teamPace,100)}%"></div></div>
     <div id="tv-formula-panel" style="display:none">
@@ -2227,12 +2227,12 @@ function __legacyRenderTeamviewSummaryFallback(){
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">เกณฑ์ Pace รายร้าน</div>
         <div class="pace-formula-line" style="display:flex;flex-direction:column;gap:3px">
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#d8b4fe;flex-shrink:0"></span><span style="color:#d8b4fe;font-weight:700">≥ 105%</span><span style="color:rgba(255,255,255,.55)">เกินเป้า → ดาว</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:700">≥ 100%</span><span style="color:rgba(255,255,255,.55)">ดีเยี่ยม → ปกติ</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:700">≥ 95%</span><span style="color:rgba(255,255,255,.55)">ปลอดภัย → ปกติ</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#f6ad55;flex-shrink:0"></span><span style="color:#f6ad55;font-weight:700">≥ 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยง → เสี่ยง</span></div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8888;flex-shrink:0"></span><span style="color:#ff8888;font-weight:700">&lt; 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยงมาก → เสี่ยงมาก</span></div>
-          <div style="margin-top:4px;font-size:9px;color:rgba(255,255,255,.35);line-height:1.5">${_tvTeamTargetInfo.hasTarget?'target = target ที่ตั้งไว้; หากไม่มี KAM target จะ allocate จาก team target ตาม baseline share':'baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา'}</div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#d8b4fe;flex-shrink:0"></span><span style="color:#d8b4fe;font-weight:var(--fw-bold)">≥ 105%</span><span style="color:rgba(255,255,255,.55)">เกินเป้า → ดาว</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:var(--fw-bold)">≥ 100%</span><span style="color:rgba(255,255,255,.55)">ดีเยี่ยม → ปกติ</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:var(--fw-bold)">≥ 95%</span><span style="color:rgba(255,255,255,.55)">ปลอดภัย → ปกติ</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#f6ad55;flex-shrink:0"></span><span style="color:#f6ad55;font-weight:var(--fw-bold)">≥ 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยง → เสี่ยง</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8888;flex-shrink:0"></span><span style="color:#ff8888;font-weight:var(--fw-bold)">&lt; 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยงมาก → เสี่ยงมาก</span></div>
+          <div style="margin-top:4px;font-size:var(--text-2xs);color:rgba(255,255,255,.35);line-height:1.5">${_tvTeamTargetInfo.hasTarget?'target = target ที่ตั้งไว้; หากไม่มี KAM target จะ allocate จาก team target ตาม baseline share':'baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา'}</div>
         </div>
       </div>
     </div>`;
@@ -2251,10 +2251,10 @@ function __legacyRenderTeamviewSummaryFallback(){
   if(sumEl){
     const govCard = _tgtRenderTeamGovCard();
     sumEl.innerHTML=`${govCard}
-    <div class="portview-stat"><div class="portview-stat-val" style="color:#fff;font-size:20px">${allAccts.length}</div><div class="portview-stat-lbl" style="font-size:9px">${groups.length} KAM</div></div>
-    <div class="portview-stat ok"><div class="portview-stat-val" style="color:var(--tk-ok-bright);font-size:20px">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:var(--tk-ok-bright);margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
-    <div class="portview-stat ${warnAccts.length>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:20px">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
-    <div class="portview-stat ${dangerAccts.length>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:20px">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
+    <div class="portview-stat"><div class="portview-stat-val" style="color:var(--tk-text-primary);font-size:var(--text-2xl)">${allAccts.length}</div><div class="portview-stat-lbl" style="font-size:var(--text-2xs)">${groups.length} KAM</div></div>
+    <div class="portview-stat ok"><div class="portview-stat-val" style="color:var(--tk-ok-bright);font-size:var(--text-2xl)">${okAccts.length}</div>${okSurplus>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--tk-ok-bright);margin-top:3px">+฿${fmtSF(okSurplus)}</div>`:''}</div>
+    <div class="portview-stat ${warnAccts.length>0?'warn':'ok'}"><div class="portview-stat-val" style="font-size:var(--text-2xl)">${warnAccts.length}</div>${warnShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--amb);margin-top:3px">-฿${fmtSF(warnShort)}</div>`:''}</div>
+    <div class="portview-stat ${dangerAccts.length>0?'danger':'ok'}"><div class="portview-stat-val" style="font-size:var(--text-2xl)">${dangerAccts.length}</div>${dangerShort>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);font-weight:var(--fw-bold);color:#ff8888;margin-top:3px">-฿${fmtSF(dangerShort)}</div>`:''}</div>`;
   }
 }
 
@@ -2444,9 +2444,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   function fullCard(g){
     const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
     // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
     // below (a real live-estimate payout decision, same class of bug as
@@ -2458,14 +2458,14 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
-    const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
+    const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:var(--r-xs);vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
     // button was already a dead no-op click in production.
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
-        <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+        <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-full-pace ${g.paceCls}">${g.pace||'—'}%</div>
       </div>
       <div class="tv-full-bar"><div class="tv-full-fill ${g.paceCls}" style="width:${Math.min(g.pace||0,100)}%"></div></div>
@@ -2480,9 +2480,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const surplus=g.pace-100;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:400"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:9px;color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
     // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
     // below (a real live-estimate payout decision, same class of bug as
@@ -2494,7 +2494,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kamFinal1=_kp1?_kp1.final_payout:_commPayoutForPctByCode(kamPlanCode,'kam',nrrPct);
     const _teamUpsellReady=typeof bulkUpsellTeamData!=='undefined'&&bulkUpsellTeamData&&Object.keys(bulkUpsellTeamData).length>0;
     const _kp1UL=!_teamUpsellReady; // shimmer only until team summary loaded
-    const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:4px;vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
+    const _kamPillTxt=_kp1UL?'<span class=\'skel\' style=\'display:inline-block;width:52px;height:16px;border-radius:var(--r-xs);vertical-align:middle\'></span>':_commFmtPayout(_kamFinal1);
     const nrrPill=nrrPct!==null?`<span class="tv-nrr-pill ${nrrPct>=(_tgtSettings.nrr_threshold||98)?'ok':'warn'}">NRR ${_commFmtPct(nrrPct)}</span><span class="tv-payout-pill">${_kamPillTxt}</span>`:'';
     // v865: "ขอ exclude" moved to /nrr's account page + #/waivers (see nrr_waivers.js) --
     // the old modal this opened (#nrr-excl-overlay) never existed in shell.html, so this
@@ -2502,7 +2502,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
-          <div class="tv-full-name">${g.kamName}<span style="font-size:9px;font-weight:600;color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+          <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
           <span class="tv-star-badge">+${surplus}%</span>
         </div>
         <div class="tv-star-pace">${g.pace}%</div>
@@ -2518,7 +2518,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   function chipRow(g){
     const vm=getVisitMap(g.kamEmail||'');
     const visited=g.accounts.filter(a=>vm[a.id]).length;
-    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;font-weight:700;color:${color}">${n}</span></span>`:'';
+    const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_getCachedKamNrr(g.kamEmail);
     // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
@@ -2532,7 +2532,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kpCUL=!_teamUpsellReadyC; // shimmer only until team summary loaded
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
-        <div class="tv-chip-name">${g.kamName}<span style="font-size:9px;color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+        <div class="tv-chip-name">${g.kamName}<span style="font-size:var(--text-2xs);color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
         <div class="tv-chip-bottom">
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${_commFmtPct(nrrPct)}</span>`:''}</div>
         </div>
@@ -2549,10 +2549,10 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
   const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const _toggleRow=`<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 10px">
-    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
     <div style="display:flex;align-items:center;gap:2px">
-      <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
-      <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>
+      <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
+      <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>
     </div>
   </div>`;
   el.innerHTML=_toggleRow+sorted.map(_renderCard).join('');
@@ -3557,10 +3557,10 @@ function _updateRestSwipe(grp,idx,opts){
     const color = isFail ? 'rgba(240,176,0,.9)' : 'rgba(120,180,255,.95)';
     const border = isFail ? 'rgba(240,176,0,.28)' : 'rgba(100,170,255,.24)';
     const bg = isFail ? 'rgba(240,176,0,.07)' : 'var(--tk-accent-dim)';
-    const retry = isFail || isPending ? `<button type="button" onclick="window._v206eRetryCurrentBundle && window._v206eRetryCurrentBundle()" style="margin-top:9px;padding:7px 12px;border-radius:9px;border:1px solid ${border};background:rgba(255,255,255,.06);color:${color};font-family:var(--tk-font-body);font-size:11px;font-weight:700;cursor:pointer">${isFail?'Retry SKU intelligence':'โหลดตอนนี้'}</button>` : '';
+    const retry = isFail || isPending ? `<button type="button" onclick="window._v206eRetryCurrentBundle && window._v206eRetryCurrentBundle()" style="margin-top:9px;padding:7px 12px;border-radius:var(--r-9);border:1px solid ${border};background:rgba(255,255,255,.06);color:${color};font-family:var(--tk-font-body);font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer">${isFail?'Retry SKU intelligence':'โหลดตอนนี้'}</button>` : '';
     return `<div id="kam-bundle-state-card" class="kam-dc" style="margin-bottom:12px;border-color:${border};background:${bg}">
       <div class="kam-dc-head" style="border-bottom-color:rgba(255,255,255,.06)"><span class="kam-dc-head-label" style="color:${color}">${icon} ${title}</span></div>
-      <div class="kam-dc-body" style="font-size:12px;color:rgba(220,235,255,.82);line-height:1.65">${body}${retry}</div>
+      <div class="kam-dc-body" style="font-size:var(--text-md);color:rgba(220,235,255,.82);line-height:1.65">${body}${retry}</div>
     </div>`;
   }
   function updateDeepButtons(st){
@@ -3813,7 +3813,7 @@ function _updateRestSwipe(grp,idx,opts){
     }
     var body='';
     if(opts.loading){
-      body='<div class="pv-insight-loading"><div class="pv-insight-loading-star">'+insightStar()+'</div><div>Olive กำลังอ่านสัญญาณพอร์ต...</div><div style="font-size:11px;color:rgba(198,216,245,.62);margin-top:3px">จัดลำดับร้านที่ควรดูต่อให้ก่อน</div></div>';
+      body='<div class="pv-insight-loading"><div class="pv-insight-loading-star">'+insightStar()+'</div><div>Olive กำลังอ่านสัญญาณพอร์ต...</div><div style="font-size:var(--text-sm);color:rgba(198,216,245,.62);margin-top:3px">จัดลำดับร้านที่ควรดูต่อให้ก่อน</div></div>';
     }else if(opts.error){
       body='<div class="pv-insight-error">'+esc(opts.error)+'</div>';
     }else{

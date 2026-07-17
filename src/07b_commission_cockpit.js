@@ -26,7 +26,7 @@ function ensureCommissionCockpitOverlay() {
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
         <button class="comm-secondary" data-comm-close="1" onclick="window.closeCommissionCockpit&&window.closeCommissionCockpit()">Close</button>
-        <button class="comm-secondary" onclick="openCommissionRulebook()" style="color:rgba(225,238,255,.55)">กฎค่าคอมฯ</button>
+        <button class="comm-secondary" onclick="openCommissionRulebook()" style="color:rgba(var(--ink-blue-hi),.55)">กฎค่าคอมฯ</button>
         <button class="comm-save" onclick="saveCommissionCockpit()">Save changes</button>
       </div>
     </div>
@@ -307,13 +307,13 @@ function renderCommPolicyStep(body) {
         <div class="comm-field" style="grid-column:1/-1">
           <label>Mode</label>
           <div style="display:flex;gap:16px;margin-top:6px;align-items:center">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-base);color:rgba(255,255,255,.75)">
               <input type="radio" name="comm_mode_q3" value="monthly"
                 ${(_nrrGovGetQuarterlyMode()||'monthly')==='monthly'?'checked':''}
                 onchange="onNrrPolicyChangeMode('monthly')">
               Monthly (Rolling MoM)
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.75)">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-base);color:rgba(255,255,255,.75)">
               <input type="radio" name="comm_mode_q3" value="quarterly"
                 ${(_nrrGovGetQuarterlyMode()||'monthly')==='quarterly'?'checked':''}
                 onchange="onNrrPolicyChangeMode('quarterly')">
@@ -390,21 +390,21 @@ function _renderComponentRatesEditor() {
       const uLbl = isPctD?'%':unit==='pct-i'?'%':unit==='mul'?'×':'฿';
       const expr = isPctD?'this.value/100':'Number(this.value)';
       return `<div>
-        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:5px">${lbl}</div>
+        <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.78);margin-bottom:5px">${lbl}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:9px;padding:9px 11px;color:rgba(225,238,255,.90);font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
-            oninput="_commSetComponentParam('${k}','${p}',${expr});_commMarkChanged()" onfocus="this.style.borderColor='rgba(188,215,255,.35)'" onblur="this.style.borderColor='rgba(188,215,255,.12)'">
-          <span style="font-size:11px;color:rgba(188,215,255,.60);flex-shrink:0">${uLbl}</span>
+          <input style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(var(--ink-blue),.12);border-radius:var(--r-9);padding:9px 11px;color:rgba(var(--ink-blue-hi),.90);font-size:var(--text-md);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none" type="number" step="${step||'any'}" value="${disp}"
+            oninput="_commSetComponentParam('${k}','${p}',${expr});_commMarkChanged()" onfocus="this.style.borderColor='rgba(var(--ink-blue),.35)'" onblur="this.style.borderColor='rgba(var(--ink-blue),.12)'">
+          <span style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.60);flex-shrink:0">${uLbl}</span>
         </div>
       </div>`;
     }).join('');
-    return `<div style="border-radius:13px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
-        <span style="width:3px;height:16px;border-radius:2px;background:${color};flex-shrink:0"></span>
-        <span style="font-size:12px;font-weight:800;color:rgba(225,238,255,.85)">${title}</span>
+        <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:${color};flex-shrink:0"></span>
+        <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">${title}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${note?'10':'0'}px">${flds}</div>
-      ${note?`<div style="font-size:10px;color:rgba(188,215,255,.65);line-height:1.6;padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px">${note}</div>`:''}
+      ${note?`<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.65);line-height:1.6;padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8)">${note}</div>`:''}
     </div>`;
   }
 
@@ -554,9 +554,9 @@ function _commValidateHandoverGmvTiers(tiers) {
 
 function _renderHandoverGmvTierEditor() {
   const tiers = _commHandoverGmvTiersGetDraft();
-  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:12px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
-  const inpLbl  = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:12px;font-family:var(--tk-font-body),system-ui,sans-serif;text-align:left;outline:none;width:100%';
-  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:9px;padding:9px 11px;color:#ffe08a;font-size:13px;font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpLbl  = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:var(--tk-font-body),system-ui,sans-serif;text-align:left;outline:none;width:100%';
+  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:9px 11px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
   const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
 
   const tierCards = tiers.map((t, ti) => {
@@ -565,57 +565,57 @@ function _renderHandoverGmvTierEditor() {
     const threshRows = (t.thresholds || []).map((th, thi) => `
       <div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:6px">
         <div style="flex:1">
-          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">Retention ตั้งแต่ (%)</div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">Retention ตั้งแต่ (%)</div>
           <input style="${inpBase}" value="${th.min_retention_pct ?? ''}" inputmode="decimal"
             oninput="_commSetHandoverField(${ti},${thi},'min_retention_pct',this.value)">
         </div>
         <div style="flex:1">
-          <div style="font-size:9px;font-weight:700;color:rgba(255,224,138,.85);margin-bottom:3px">ได้รับ (฿)</div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">ได้รับ (฿)</div>
           <input style="${inpPay}" value="${th.payout ?? 0}" inputmode="numeric"
             oninput="_commSetHandoverField(${ti},${thi},'payout',this.value)">
         </div>
-        <button onclick="_commRemoveHandoverThreshold(${ti},${thi})" style="font-size:14px;color:rgba(255,255,255,.25);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
+        <button onclick="_commRemoveHandoverThreshold(${ti},${thi})" style="font-size:var(--text-lg);color:var(--tk-text-faint);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
       </div>`).join('');
 
-    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
+    return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-        <span style="font-size:11px;font-weight:800;color:rgba(188,215,255,.85);font-family:'IBM Plex Mono',monospace">GMV ${rangeLbl}</span>
-        <button onclick="_commRemoveHandoverGmvTier(${ti})" style="font-size:15px;color:rgba(255,255,255,.28);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
+        <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue),.85);font-family:'IBM Plex Mono',monospace">GMV ${rangeLbl}</span>
+        <button onclick="_commRemoveHandoverGmvTier(${ti})" style="font-size:var(--text-lg2);color:rgba(255,255,255,.28);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
         <div>
-          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">GMV ตั้งแต่ (฿)</div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">GMV ตั้งแต่ (฿)</div>
           <input style="${inpBase}" value="${t.gmv_min ?? ''}" inputmode="numeric"
             oninput="_commSetHandoverField(${ti},null,'gmv_min',this.value)">
         </div>
         <div>
-          <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">ถึง (฿) — ว่าง=∞</div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ถึง (฿) — ว่าง=∞</div>
           <input style="${inpBase}" value="${gmvMax ?? ''}" placeholder="∞" inputmode="numeric"
             oninput="_commSetHandoverField(${ti},null,'gmv_max',this.value)">
         </div>
       </div>
       <div style="margin-bottom:9px">
-        <div style="font-size:9px;font-weight:700;color:rgba(188,215,255,.70);margin-bottom:3px">ชื่อ tier</div>
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ชื่อ tier</div>
         <input style="${inpLbl}" value="${_commEscapeHtml(t.label||'')}" placeholder="เช่น 20,000–49,999"
           oninput="_commSetHandoverField(${ti},null,'label',this.value)">
       </div>
       ${threshRows}
-      <button onclick="_commAddHandoverThreshold(${ti})" style="width:100%;padding:7px;border-radius:8px;background:rgba(188,215,255,.05);border:1px dashed rgba(188,215,255,.20);color:rgba(188,215,255,.65);font-size:11px;font-weight:700;cursor:pointer;margin-top:2px">+ เพิ่ม threshold</button>
+      <button onclick="_commAddHandoverThreshold(${ti})" style="width:100%;padding:7px;border-radius:var(--r-8);background:rgba(var(--ink-blue),.05);border:1px dashed rgba(var(--ink-blue),.20);color:rgba(var(--ink-blue),.65);font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่ม threshold</button>
     </div>`;
   }).join('');
 
   const errs = _commValidateHandoverGmvTiers(tiers);
-  const errHtml = errs.length ? `<div style="font-size:10px;color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:8px;margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
-  const emptyNote = !tiers.length ? `<div style="font-size:10px;color:rgba(188,215,255,.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:8px;margin-bottom:9px;line-height:1.6">ยังไม่มี GMV tier — ระบบใช้อัตราเดิม (flat, ไม่มี GMV tier) จนกว่าจะเพิ่ม tier แรก</div>` : '';
+  const errHtml = errs.length ? `<div style="font-size:var(--text-xs);color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
+  const emptyNote = !tiers.length ? `<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">ยังไม่มี GMV tier — ระบบใช้อัตราเดิม (flat, ไม่มี GMV tier) จนกว่าจะเพิ่ม tier แรก</div>` : '';
 
-  return `<div style="border-radius:13px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
-      <span style="width:3px;height:16px;border-radius:2px;background:#bcd7ff;flex-shrink:0"></span>
-      <span style="font-size:12px;font-weight:800;color:rgba(225,238,255,.85)">Handover (Sales → KAM) — แบ่งตาม GMV tier</span>
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:#bcd7ff;flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">Handover (Sales → KAM) — แบ่งตาม GMV tier</span>
     </div>
     ${errHtml}${emptyNote}${tierCards}
-    <button onclick="_commAddHandoverGmvTier()" style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px">+ เพิ่ม GMV tier</button>
-    <div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px;line-height:1.6">ยอด handover ของ KAM (รวมทั้งหมดในงวดนั้น) ต่ำกว่า tier แรกสุด → ได้ ฿0 · Retention คิดจากยอดรวมของ KAM ไม่ใช่รายบัญชี</div>
+    <button onclick="_commAddHandoverGmvTier()" style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่ม GMV tier</button>
+    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px;line-height:1.6">ยอด handover ของ KAM (รวมทั้งหมดในงวดนั้น) ต่ำกว่า tier แรกสุด → ได้ ฿0 · Retention คิดจากยอดรวมของ KAM ไม่ใช่รายบัญชี</div>
   </div>`;
 }
 
@@ -639,33 +639,33 @@ function _renderTlUpsellTierRows() {
     const maxV = t.max_pct != null ? Number(t.max_pct) : null;
     const mult = Number(t.multiplier || 1.0);
     const isBase = mult <= 1.0;
-    const accentColor = isBase ? 'rgba(188,215,255,.30)' : mult >= 1.5 ? 'var(--tk-ok-bright)' : '#ffe08a';
+    const accentColor = isBase ? 'rgba(var(--ink-blue),.30)' : mult >= 1.5 ? 'var(--tk-ok-bright)' : '#ffe08a';
     const prevTxt = minV != null && maxV != null ? `Upsell ${minV}–${maxV}%`
                   : minV != null ? `Upsell ≥ ${minV}%` : `Upsell < ${maxV}%`;
-    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.09);background:rgba(255,255,255,.025);padding:12px;margin-bottom:8px">
+    return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="width:3px;height:14px;border-radius:2px;background:${accentColor};flex-shrink:0"></span>
-          <span style="font-size:11px;font-weight:800;color:rgba(225,238,255,.75)">${prevTxt} → ${fmtMult(mult)}</span>
+          <span style="width:3px;height:14px;border-radius:var(--r-xxs);background:${accentColor};flex-shrink:0"></span>
+          <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue-hi),.75)">${prevTxt} → ${fmtMult(mult)}</span>
         </div>
-        <button onclick="_commRemoveTlUpsellTier(${i})" style="font-size:14px;color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 5px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
+        <button onclick="_commRemoveTlUpsellTier(${i})" style="font-size:var(--text-lg);color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 5px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
-          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.78);margin-bottom:4px">Upsell ตั้งแต่ (%)</div>
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(var(--ink-blue),.10);border-radius:var(--r-8);padding:8px 9px;color:rgba(var(--ink-blue-hi),.88);font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${minV ?? ''}" placeholder="0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'min_pct',this.value);_commMarkChanged()">
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
-          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(188,215,255,.10);border-radius:8px;padding:8px 9px;color:rgba(225,238,255,.88);font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.78);margin-bottom:4px">ถึง (%) — ว่าง=∞</div>
+          <input style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(var(--ink-blue),.10);border-radius:var(--r-8);padding:8px 9px;color:rgba(var(--ink-blue-hi),.88);font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${maxV ?? ''}" placeholder="∞" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'max_pct',this.value);_commMarkChanged()">
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.78);margin-bottom:4px">Multiplier ×</div>
-          <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:8px;padding:8px 9px;color:#ffe08a;font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.78);margin-bottom:4px">Multiplier ×</div>
+          <input style="width:100%;background:rgba(255,224,138,.05);border:1px solid rgba(255,224,138,.18);border-radius:var(--r-8);padding:8px 9px;color:#ffe08a;font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;text-align:right;outline:none"
             value="${mult}" placeholder="1.0" inputmode="decimal"
             oninput="_commSetTlUpsellTier(${i},'multiplier',this.value);_commMarkChanged()">
         </div>
@@ -848,56 +848,56 @@ function _renderCommRuleEditorByCode(planCode, role) {
     const borderLeft = pay === 0 ? 'rgba(255,100,60,.50)' : pay >= 30000 ? 'var(--tk-ok-border)' : 'rgba(255,224,138,.40)';
 
     // Compact: range fields on one row, payout prominent below
-    const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(188,215,255,.18);border-radius:9px;padding:8px 11px;color:#e8eeff;font-size:13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
-    const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:9px;padding:10px 12px;color:#ffe08a;font-size:15px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+    const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-base);font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+    const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:10px 12px;color:#ffe08a;font-size:var(--text-lg2);font-weight:900;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
 
-    return `<div style="border-radius:12px;border:1px solid rgba(188,215,255,.12);background:rgba(255,255,255,.04);padding:12px;margin-bottom:7px${te.range||te.payout?';border-color:rgba(255,100,60,.40)':''}">
+    return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.12);background:rgba(255,255,255,.04);padding:12px;margin-bottom:7px${te.range||te.payout?';border-color:rgba(255,100,60,.40)':''}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;${pillStyle}">${pillLbl}</span>
-        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:16px;color:rgba(255,255,255,.30);background:none;border:none;cursor:pointer;padding:0 4px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.80)'" onmouseout="this.style.color='rgba(255,255,255,.30)'">×</button>
+        <span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;${pillStyle}">${pillLbl}</span>
+        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:var(--text-xl);color:rgba(255,255,255,.30);background:none;border:none;cursor:pointer;padding:0 4px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.80)'" onmouseout="this.style.color='rgba(255,255,255,.30)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">${pay===0?'NRR ต่ำกว่า (%)':'NRR ตั้งแต่ (%)'}</div>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.75);margin-bottom:4px">${pay===0?'NRR ต่ำกว่า (%)':'NRR ตั้งแต่ (%)'}</div>
           <input style="${inpBase}" value="${pay===0?(maxV??''):(minV??'')}" placeholder="—" inputmode="decimal"
             oninput="onRuleTierInput('${planCode}',${i},'${pay===0?'max_value':'min_value'}',this.value)">
         </div>
         <div>
-          <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">${pay===0?'\u00a0':'ถึง (%) — ว่าง=∞'}</div>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.75);margin-bottom:4px">${pay===0?'\u00a0':'ถึง (%) — ว่าง=∞'}</div>
           ${pay===0?'<div style="height:38px"></div>':`<input style="${inpBase}" value="${maxV??''}" placeholder="∞" inputmode="decimal" oninput="onRuleTierInput('${planCode}',${i},'max_value',this.value)">`}
         </div>
       </div>
       <div style="margin-bottom:8px">
-        <div style="font-size:10px;font-weight:700;color:rgba(188,215,255,.75);margin-bottom:4px">ได้รับ (฿)</div>
+        <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.75);margin-bottom:4px">ได้รับ (฿)</div>
         <input style="${inpPay}" value="${pay}" inputmode="numeric"
           oninput="onRuleTierInput('${planCode}',${i},'payout_value',this.value)">
       </div>
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;background:rgba(0,0,0,.25);border-left:2px solid ${borderLeft}">
-        <span style="font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(188,215,255,.65)">NRR ${rangeLbl} → <span style="font-weight:800;color:${previewColor}">${payLbl}</span></span>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--r-7);background:rgba(0,0,0,.25);border-left:2px solid ${borderLeft}">
+        <span style="font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(var(--ink-blue),.65)">NRR ${rangeLbl} → <span style="font-weight:800;color:${previewColor}">${payLbl}</span></span>
       </div>
-      ${te.range||te.payout?`<div style="font-size:10px;color:rgba(255,120,80,.90);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
+      ${te.range||te.payout?`<div style="font-size:var(--text-xs);color:rgba(255,120,80,.90);padding:5px 0 0">${_commEscapeHtml(te.range||te.payout)}</div>`:''}
     </div>`;
   }).join('');
 
-  const generalErr = err.general ? `<div style="font-size:11px;color:rgba(255,100,60,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:8px;margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
+  const generalErr = err.general ? `<div style="font-size:var(--text-sm);color:rgba(255,100,60,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
 
-  return `<div style="border-radius:14px;border:1px solid rgba(188,215,255,.12);background:rgba(255,255,255,.03);padding:14px;margin-bottom:8px">
+  return `<div style="border-radius:var(--r-lg);border:1px solid rgba(var(--ink-blue),.12);background:rgba(255,255,255,.03);padding:14px;margin-bottom:8px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px">
       <div>
-        <input style="background:transparent;border:none;border-bottom:1px solid rgba(188,215,255,.22);color:#fff;font-size:14px;font-weight:900;padding:2px 0;outline:none;width:210px;font-family:var(--tk-font-body),system-ui,sans-serif"
+        <input style="background:transparent;border:none;border-bottom:1px solid rgba(var(--ink-blue),.22);color:var(--tk-text-primary);font-size:var(--text-lg);font-weight:900;padding:2px 0;outline:none;width:210px;font-family:var(--tk-font-body),system-ui,sans-serif"
           value="${_commEscapeHtml(d.plan_name||'')}" placeholder="ชื่อ rule"
           oninput="onRuleHeaderInput('${planCode}','plan_name',this.value)">
-        ${_commRulePending[planCode]?'<span style="font-size:9px;color:#ffe08a;font-weight:800;margin-left:6px;vertical-align:middle">Unsaved</span>':''}
-        <div style="font-size:10px;color:rgba(188,215,255,.55);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;margin-top:5px">${planCode} · ใช้อยู่ ${used} คน</div>
+        ${_commRulePending[planCode]?'<span style="font-size:var(--text-2xs);color:#ffe08a;font-weight:800;margin-left:6px;vertical-align:middle">Unsaved</span>':''}
+        <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;margin-top:5px">${planCode} · ใช้อยู่ ${used} คน</div>
       </div>
       <button onclick="archiveCommissionRule('${planCode}')" ${isStandard?'disabled title="Standard rule ลบไม่ได้"':''}
-        style="font-size:10px;color:${isStandard?'rgba(188,215,255,.25)':'rgba(255,100,60,.70)'};background:none;border:1px solid ${isStandard?'rgba(188,215,255,.10)':'rgba(255,100,60,.28)'};border-radius:7px;padding:5px 10px;cursor:${isStandard?'default':'pointer'};white-space:nowrap">Archive</button>
+        style="font-size:var(--text-xs);color:${isStandard?'rgba(var(--ink-blue),.25)':'rgba(255,100,60,.70)'};background:none;border:1px solid ${isStandard?'rgba(var(--ink-blue),.10)':'rgba(255,100,60,.28)'};border-radius:var(--r-7);padding:5px 10px;cursor:${isStandard?'default':'pointer'};white-space:nowrap">Archive</button>
     </div>
     ${generalErr}
     ${tierCards}
     <button class="comm-add" onclick="addRuleTier('${planCode}')"
-      style="width:100%;padding:10px;border-radius:10px;background:rgba(188,215,255,.06);border:1px dashed rgba(188,215,255,.22);color:rgba(188,215,255,.70);font-size:12px;font-weight:700;cursor:pointer;margin-top:2px;font-family:var(--tk-font-body),system-ui,sans-serif">+ เพิ่ม tier</button>
-    <div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer ด้านล่าง</div>
+      style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px;font-family:var(--tk-font-body),system-ui,sans-serif">+ เพิ่ม tier</button>
+    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer ด้านล่าง</div>
   </div>`;
 }
 
@@ -1027,7 +1027,7 @@ function renderCommLockStep(body) {
         const upsellP = (bd.upsell_sku && bd.upsell_sku.total_commission !== undefined) ? _commFmtPayout(bd.upsell_sku.total_commission + ((bd.upsell_outlet && bd.upsell_outlet.commission)||0)) : null;
         const handoverP = bd.handover ? _commFmtPayout(bd.handover.payout||0) : null;
         const gateTxt = bd.gmv_gate && bd.gmv_gate.gate_active ? `⚠ gate×${bd.gmv_gate.cap}` : null;
-        const breakdown = nrrP ? `<span style="color:rgba(255,255,255,.5);font-size:10px"> NRR ${nrrP}${upsellP?' · Upsell '+upsellP:''}${handoverP?' · HO '+handoverP:''}${gateTxt?' · '+gateTxt:''}</span>` : '';
+        const breakdown = nrrP ? `<span style="color:rgba(255,255,255,.5);font-size:var(--text-xs)"> NRR ${nrrP}${upsellP?' · Upsell '+upsellP:''}${handoverP?' · HO '+handoverP:''}${gateTxt?' · '+gateTxt:''}</span>` : '';
         return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
           <div>
             <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
@@ -1297,7 +1297,7 @@ function renderCommissionLockTab() {
   body.innerHTML = `
     <div class="tgt-lock-hero">
       <div class="tgt-lock-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(188,215,255,.95)" stroke-width="2.3" stroke-linecap="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(var(--ink-blue),.95)" stroke-width="2.3" stroke-linecap="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         Period Lock & Snapshot
       </div>
       <div class="tgt-lock-sub">${period} · Compute เพื่อ freeze ตัวเลข → ตรวจ → Lock เพื่อ confirm จ่ายเงิน</div>
@@ -1335,7 +1335,7 @@ function renderCommissionPreviewTab() {
   if (!body) return;
   const model = _commBuildPreviewModel();
   if (!model.kamRows.length && model.teamPct === null) {
-    body.innerHTML = `<div class="tgt-preview-empty">ยังไม่มีข้อมูลพอสำหรับ preview<br><span style="font-size:10px;color:rgba(255,255,255,.32)">โหลด portview.csv / history ก่อน แล้วกลับมาที่หน้านี้</span></div>`;
+    body.innerHTML = `<div class="tgt-preview-empty">ยังไม่มีข้อมูลพอสำหรับ preview<br><span style="font-size:var(--text-xs);color:rgba(255,255,255,.32)">โหลด portview.csv / history ก่อน แล้วกลับมาที่หน้านี้</span></div>`;
     return;
   }
   const teamTier = _commMatchTier('tl', model.teamPct);
@@ -1743,7 +1743,7 @@ function _commRenderRetroactiveSection() {
   const locked  = sFinal.length > 0;
   const draft   = !locked && sDraft.length > 0;
   const stTxt   = locked ? 'Locked' : draft ? 'Draft' : 'ไม่มี snapshot';
-  const stClr   = locked ? '#ffe08a' : draft ? 'rgba(255,224,138,.55)' : 'rgba(225,238,255,.30)';
+  const stClr   = locked ? '#ffe08a' : draft ? 'rgba(255,224,138,.55)' : 'rgba(var(--ink-blue-hi),.30)';
   const tot     = disp.reduce((s,r)=>s+Number(r.payout_amount||0),0);
 
   const tRows = disp.map(r => {
@@ -1769,15 +1769,15 @@ function _commRenderRetroactiveSection() {
 
   // status badge
   const stBadge = locked
-    ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(255,224,138,.16);color:#ffe08a;border:1px solid rgba(255,224,138,.30)">Locked</span>'
+    ? '<span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(255,224,138,.16);color:#ffe08a;border:1px solid rgba(255,224,138,.30)">Locked</span>'
     : draft
-    ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(188,215,255,.10);color:rgba(188,215,255,.70);border:1px solid rgba(188,215,255,.20)">Draft</span>'
-    : '<span style="font-size:10px;color:rgba(225,238,255,.30)">ไม่มี snapshot</span>';
+    ? '<span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(var(--ink-blue),.10);color:rgba(var(--ink-blue),.70);border:1px solid rgba(var(--ink-blue),.20)">Draft</span>'
+    : '<span style="font-size:var(--text-xs);color:rgba(var(--ink-blue-hi),.30)">ไม่มี snapshot</span>';
 
   // row status badge
   const rowStatusBadge = (status) => status === 'final'
-    ? '<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.25)">Locked</span>'
-    : '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;background:rgba(188,215,255,.08);color:rgba(188,215,255,.55);border:1px solid rgba(188,215,255,.14)">Draft</span>';
+    ? '<span style="font-size:var(--text-2xs);font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(255,224,138,.14);color:#ffe08a;border:1px solid rgba(255,224,138,.25)">Locked</span>'
+    : '<span style="font-size:var(--text-2xs);font-weight:var(--fw-bold);padding:2px 7px;border-radius:99px;background:rgba(var(--ink-blue),.08);color:rgba(var(--ink-blue),.55);border:1px solid rgba(var(--ink-blue),.14)">Draft</span>';
 
   const tRows2 = disp.map(r => {
     const bd = r.breakdown || {};
@@ -1785,7 +1785,7 @@ function _commRenderRetroactiveSection() {
     return '<div class="comm-lock-row">'
       + '<div class="comm-role-dot ' + r.beneficiary_role + '">' + r.beneficiary_role.toUpperCase() + '</div>'
       + '<div style="flex:1;min-width:0"><div class="comm-person-name">' + nm + '</div>'
-      + '<div class="comm-person-sub" style="font-size:10px">' + _commEscapeHtml(r.beneficiary_email||'') + '</div></div>'
+      + '<div class="comm-person-sub" style="font-size:var(--text-xs)">' + _commEscapeHtml(r.beneficiary_email||'') + '</div></div>'
       + '<div style="text-align:right;flex-shrink:0">'
       + '<div class="comm-row-money ' + (Number(r.payout_amount||0)>0?'hit':'') + '">' + _commFmtPayout(r.payout_amount) + '</div>'
       + '<div style="margin-top:3px">' + rowStatusBadge(r.snapshot_status) + '</div>'
@@ -1800,7 +1800,7 @@ function _commRenderRetroactiveSection() {
   return '<div class="comm-section-title" style="margin-top:4px"><span>Retroactive Lock</span><em>ล็อคย้อนหลังสำหรับเดือนที่ผ่านไปแล้ว</em></div>'
     + '<div class="comm-card" style="padding:14px 16px;margin-bottom:8px">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
-    + '<label style="font-size:11px;color:rgba(188,215,255,.75);white-space:nowrap">Period</label>'
+    + '<label style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.75);white-space:nowrap">Period</label>'
     + '<select class="comm-select" style="flex:1" onchange="window._commRetroactivePeriod=this.value;renderCommissionCockpit()">' + opts + '</select>'
     + stBadge
     + '</div>'
@@ -1809,7 +1809,7 @@ function _commRenderRetroactiveSection() {
     + '<button class="tgt-lock-btn secondary" style="flex:1;min-width:100px"' + (!disp.length?' disabled':'') + ' onclick="exportCommissionSnapshotCsv(window._commRetroactivePeriod||\'' + sel.replace(/'/g,"\\'") + '\')">Export CSV</button>'
     + '<button class="tgt-lock-btn primary" style="flex:1;min-width:100px"' + (!draft&&!locked?' disabled':'') + ' onclick="lockCommissionSnapshot(window._commRetroactivePeriod||\'' + sel.replace(/'/g,"\\'") + '\')">' + (locked ? 'Re-lock' : 'Lock Final') + '</button>'
     + '</div>'
-    + (disp.length ? '<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:8px">' + disp.length + ' rows · ' + _commFmtPayout(tot) + '</div>' : '')
+    + (disp.length ? '<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px">' + disp.length + ' rows · ' + _commFmtPayout(tot) + '</div>' : '')
     + '</div>'
     + tHtml2
     + '<div class="tgt-rule-note" style="margin-top:8px">Backfill: BigQuery SQL → Compute → Lock Final</div>';

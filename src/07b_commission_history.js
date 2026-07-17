@@ -12,9 +12,9 @@ function openCommissionHistory() {
     document.body.appendChild(ov);
   }
   ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:440px;background:#0d1c34;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9201;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
-    + '<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
-    + '<div style="padding:14px 18px;font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
-    + '<div style="padding:24px;text-align:center;color:rgba(188,215,255,.55);font-size:13px">กำลังโหลด...</div>'
+    + '<div style="width:36px;height:4px;background:rgba(var(--ink-blue),.18);border-radius:var(--r-xxs);margin:10px auto 0"></div>'
+    + '<div style="padding:14px 18px;font-size:var(--text-lg2);font-weight:900;color:var(--tk-text-primary)">Commission ย้อนหลัง</div>'
+    + '<div style="padding:24px;text-align:center;color:rgba(var(--ink-blue),.55);font-size:var(--text-base)">กำลังโหลด...</div>'
     + '</div>';
   requestAnimationFrame(function(){
     ov.style.background='rgba(5,14,28,.75)';
@@ -56,27 +56,27 @@ function _commRenderHistoryList(ov, allRows, role, email) {
     var nrr = myRow ? _commFmtPct(myRow.governed_nrr_pct) : '—';
 
     if (!hasLock) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(188,215,255,.06)">'
-        +'<div><div style="font-size:13px;font-weight:600;color:rgba(225,238,255,.38)">'+fmtPeriod(p)+'</div>'
-        +'<div style="font-size:11px;color:rgba(225,238,255,.28);margin-top:2px">ไม่มี snapshot</div></div>'
-        +'<div style="font-size:12px;color:rgba(225,238,255,.28)">—</div>'
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(var(--ink-blue),.06)">'
+        +'<div><div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:rgba(var(--ink-blue-hi),.38)">'+fmtPeriod(p)+'</div>'
+        +'<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.28);margin-top:2px">ไม่มี snapshot</div></div>'
+        +'<div style="font-size:var(--text-md);color:rgba(var(--ink-blue-hi),.28)">—</div>'
         +'</div>';
     }
 
     var kamCount = isAdminRole(role) ? pRows.filter(function(r){return r.beneficiary_role==='kam';}).length : null;
     var sub = isAdminRole(role) ? (kamCount+' KAM') : ('NRR '+nrr);
 
-    return '<div onclick="_commOpenHistoryDetail(\''+p+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(188,215,255,.07);cursor:pointer;background:rgba(255,224,138,.02);-webkit-tap-highlight-color:rgba(255,224,138,.08)" onmouseenter="this.style.background=\'rgba(255,224,138,.06)\'" onmouseleave="this.style.background=\'rgba(255,224,138,.02)\'">'
+    return '<div onclick="_commOpenHistoryDetail(\''+p+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(var(--ink-blue),.07);cursor:pointer;background:rgba(255,224,138,.02);-webkit-tap-highlight-color:rgba(255,224,138,.08)" onmouseenter="this.style.background=\'rgba(255,224,138,.06)\'" onmouseleave="this.style.background=\'rgba(255,224,138,.02)\'">'
       +'<div>'
       +'<div style="display:flex;align-items:center;gap:7px">'
       +'<span style="width:5px;height:5px;border-radius:50%;background:#ffe08a;display:inline-block;flex-shrink:0"></span>'
-      +'<span style="font-size:14px;font-weight:800;color:rgba(225,238,255,.92)">'+fmtPeriod(p)+'</span>'
+      +'<span style="font-size:var(--text-lg);font-weight:800;color:rgba(var(--ink-blue-hi),.92)">'+fmtPeriod(p)+'</span>'
       +'</div>'
-      +'<div style="font-size:11px;color:rgba(188,215,255,.72);margin-top:4px;padding-left:12px">'+sub+' · ล็อกแล้ว</div>'
+      +'<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.72);margin-top:4px;padding-left:12px">'+sub+' · ล็อกแล้ว</div>'
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<span style="font-size:15px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(payout)+'</span>'
-      +'<span style="color:rgba(255,224,138,.40);font-size:16px">›</span>'
+      +'<span style="font-size:var(--text-lg2);font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(payout)+'</span>'
+      +'<span style="color:rgba(255,224,138,.40);font-size:var(--text-xl)">›</span>'
       +'</div></div>';
   }).join('');
 
@@ -93,26 +93,26 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   var _cmr=_cr.find(function(r){return isRepRole(role)?r.beneficiary_role==='kam':r.beneficiary_role==='tl';})||_cr[0];
   if(_cmr){_ca=Number(_cmr.payout_amount||0);_cn=_cmr.governed_nrr_pct;}
   var _cl=_cf?'🔒 ล็อกแล้ว':_cd?'Draft · รอ lock':'Live · ยังไม่ lock';
-  var _cc=_cf?'#ffe08a':_cd?'rgba(255,224,138,.60)':'rgba(188,215,255,.70)';
+  var _cc=_cf?'#ffe08a':_cd?'rgba(255,224,138,.60)':'rgba(var(--ink-blue),.70)';
   var _cns=_cn!=null?_cn+'%':'—';
-  var currentMonthHtml='<div style="padding:13px 18px 12px;border-bottom:2px solid rgba(188,215,255,.10);background:rgba(188,215,255,.04)">'
+  var currentMonthHtml='<div style="padding:13px 18px 12px;border-bottom:2px solid rgba(var(--ink-blue),.10);background:rgba(var(--ink-blue),.04)">'
     +'<div style="display:flex;align-items:center;justify-content:space-between">'
-    +'<div><div style="font-size:13px;font-weight:700;color:rgba(225,238,255,.88)">'+fmtPeriod(_cp)+'</div>'
-    +'<div style="font-size:11px;margin-top:3px;color:'+_cc+'">'+_cl+'</div></div>'
+    +'<div><div style="font-size:var(--text-base);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.88)">'+fmtPeriod(_cp)+'</div>'
+    +'<div style="font-size:var(--text-sm);margin-top:3px;color:'+_cc+'">'+_cl+'</div></div>'
     +'<div style="text-align:right">'
-    +(_ca!=null?'<div style="font-size:15px;font-weight:900;color:'+_cc+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(_ca)+'</div>':'<div style="font-size:13px;color:rgba(225,238,255,.30)">—</div>')
-    +(_cns!=='—'?'<div style="font-size:10px;color:rgba(188,215,255,.60);margin-top:2px">NRR '+_cns+'</div>':'')
+    +(_ca!=null?'<div style="font-size:var(--text-lg2);font-weight:900;color:'+_cc+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(_ca)+'</div>':'<div style="font-size:var(--text-base);color:rgba(var(--ink-blue-hi),.30)">—</div>')
+    +(_cns!=='—'?'<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.60);margin-top:2px">NRR '+_cns+'</div>':'')
     +'</div></div></div>';
 
   window._commHistoryAllRows = allRows;
 
   ov.innerHTML = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(0);width:100%;max-width:440px;background:#0d1c34;border-radius:18px 18px 0 0;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:9201;transition:transform .30s cubic-bezier(.34,1.1,.64,1)">'
-    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0"></div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0d1c34;z-index:1;border-bottom:1px solid rgba(188,215,255,.07)">'
-      +'<div style="font-size:15px;font-weight:900;color:#fff">Commission ย้อนหลัง</div>'
-      +'<button onclick="closeCommissionHistory()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(188,215,255,.14);color:rgba(225,238,255,.60);font-size:12px;cursor:pointer;font-family:inherit">✕</button>'
+    +'<div style="width:36px;height:4px;background:rgba(var(--ink-blue),.18);border-radius:var(--r-xxs);margin:10px auto 0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;position:sticky;top:0;background:#0d1c34;z-index:1;border-bottom:1px solid rgba(var(--ink-blue),.07)">'
+      +'<div style="font-size:var(--text-lg2);font-weight:900;color:var(--tk-text-primary)">Commission ย้อนหลัง</div>'
+      +'<button onclick="closeCommissionHistory()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(var(--ink-blue),.14);color:rgba(var(--ink-blue-hi),.60);font-size:var(--text-md);cursor:pointer;font-family:inherit">✕</button>'
     +'</div>'
-    +'<div style="font-size:10px;color:rgba(188,215,255,.55);padding:8px 18px 10px;font-family:\'IBM Plex Mono\',monospace">เดือนนี้ + 6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
+    +'<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 18px 10px;font-family:\'IBM Plex Mono\',monospace">เดือนนี้ + 6 เดือนย้อนหลัง · tap เพื่อดู reconcile</div>'
     +currentMonthHtml
     +listHtml
     +'<div style="height:24px"></div>'
@@ -136,7 +136,7 @@ window._commOpenHistoryDetail = function(period) {
   var myKam = pRows.find(function(r){return r.beneficiary_role==='kam';});
   var myTl  = pRows.find(function(r){return r.beneficiary_role==='tl';});
   var focusRow = myKam || myTl || pRows[0];
-  if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(188,215,255,.4)">ไม่มีข้อมูล</div>'; return; }
+  if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(var(--ink-blue),.4)">ไม่มีข้อมูล</div>'; return; }
 
   // v560: rates from the snapshot's frozen config (audit truth) → live cfg → engine default.
   // History must show the rates that were USED at lock time, not today's settings.
@@ -169,48 +169,48 @@ window._commOpenHistoryDetail = function(period) {
 
   // section label
   function secLbl(txt, color){
-    return '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:'+(color||'rgba(188,215,255,.45)')+';padding:12px 18px 5px;font-family:\'IBM Plex Mono\',monospace">'+txt+'</div>';
+    return '<div style="font-size:var(--text-2xs);font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:'+(color||'rgba(var(--ink-blue),.45)')+';padding:12px 18px 5px;font-family:\'IBM Plex Mono\',monospace">'+txt+'</div>';
   }
   // source row: label + sub + amount
   function srcRow(label, sub, amount, color, borderBottom){
-    var border = borderBottom!==false ? 'border-bottom:1px solid rgba(188,215,255,.06);' : '';
+    var border = borderBottom!==false ? 'border-bottom:1px solid rgba(var(--ink-blue),.06);' : '';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;'+border+'">'
       +'<div>'
-      +'<div style="font-size:12px;font-weight:700;color:rgba(225,238,255,.82)">'+label+'</div>'
-      +(sub?'<div style="font-size:10px;color:rgba(188,215,255,.55);margin-top:2px">'+sub+'</div>':'')
+      +'<div style="font-size:var(--text-md);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.82)">'+label+'</div>'
+      +(sub?'<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);margin-top:2px">'+sub+'</div>':'')
       +'</div>'
-      +'<div style="font-size:13px;font-weight:900;color:'+(color||'#ffe08a')+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.3px;flex-shrink:0;margin-left:12px">'+amount+'</div>'
+      +'<div style="font-size:var(--text-base);font-weight:900;color:'+(color||'#ffe08a')+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.3px;flex-shrink:0;margin-left:12px">'+amount+'</div>'
       +'</div>';
   }
   // gate row
   function gateRow(){
     if (!gateActive) {
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid rgba(188,215,255,.06)">'
-        +'<div style="font-size:11px;color:rgba(188,215,255,.45)">NRR Gate</div>'
-        +'<div style="font-size:11px;font-weight:700;color:var(--tk-ok-border);font-family:\'IBM Plex Mono\',monospace">×1.00 ผ่าน</div>'
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid rgba(var(--ink-blue),.06)">'
+        +'<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.45)">NRR Gate</div>'
+        +'<div style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--tk-ok-border);font-family:\'IBM Plex Mono\',monospace">×1.00 ผ่าน</div>'
         +'</div>';
     }
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid rgba(188,215,255,.06);background:rgba(255,80,60,.05)">'
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid rgba(var(--ink-blue),.06);background:rgba(255,80,60,.05)">'
       +'<div>'
-      +'<div style="font-size:12px;font-weight:700;color:rgba(255,120,80,.90)">NRR Gate ⚠</div>'
-      +'<div style="font-size:10px;color:rgba(255,120,80,.60);margin-top:1px">ถูกหักเหลือ '+Math.round(gateMult*100)+'%</div>'
+      +'<div style="font-size:var(--text-md);font-weight:var(--fw-bold);color:rgba(255,120,80,.90)">NRR Gate ⚠</div>'
+      +'<div style="font-size:var(--text-xs);color:rgba(255,120,80,.60);margin-top:1px">ถูกหักเหลือ '+Math.round(gateMult*100)+'%</div>'
       +'</div>'
-      +'<div style="font-size:13px;font-weight:900;color:rgba(255,120,80,.90);font-family:\'IBM Plex Mono\',monospace">×'+gateMult.toFixed(2)+'</div>'
+      +'<div style="font-size:var(--text-base);font-weight:900;color:rgba(255,120,80,.90);font-family:\'IBM Plex Mono\',monospace">×'+gateMult.toFixed(2)+'</div>'
       +'</div>';
   }
 
   var bodyHtml = '';
 
   // hero card
-  bodyHtml += '<div style="margin:8px 18px 4px;padding:14px 16px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.16);border-radius:14px;display:flex;align-items:center;justify-content:space-between">'
+  bodyHtml += '<div style="margin:8px 18px 4px;padding:14px 16px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.16);border-radius:var(--r-lg);display:flex;align-items:center;justify-content:space-between">'
     +'<div>'
-    +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,224,138,.55);font-family:\'IBM Plex Mono\',monospace;margin-bottom:5px">รวมทั้งหมด</div>'
+    +'<div style="font-size:var(--text-2xs);font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,224,138,.55);font-family:\'IBM Plex Mono\',monospace;margin-bottom:5px">รวมทั้งหมด</div>'
     +'<div style="font-size:26px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-1px">'+moneyFull(focusRow.payout_amount)+'</div>'
     +'</div>'
     +'<div style="text-align:right">'
-    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tk-ok-glow);font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px">NRR</div>'
-    +'<div style="font-size:22px;font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+_commFmtPct(focusRow.governed_nrr_pct)+'</div>'
-    +(bd.commission_mode?'<div style="font-size:10px;color:rgba(188,215,255,.45);margin-top:2px">NRR '+_commFmtPct(focusRow.governed_nrr_pct)+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
+    +'<div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.06em;color:var(--tk-ok-glow);font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px">NRR</div>'
+    +'<div style="font-size:var(--text-3xl);font-weight:900;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+_commFmtPct(focusRow.governed_nrr_pct)+'</div>'
+    +(bd.commission_mode?'<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:2px">NRR '+_commFmtPct(focusRow.governed_nrr_pct)+' · '+(bd.commission_mode==='quarterly'?'vs มิ.ย. (Q3 fixed)':('vs '+bd.prevMonth+' (rolling)'))+'</div>':'')
     +'</div>'
     +'</div>';
 
@@ -219,11 +219,11 @@ window._commOpenHistoryDetail = function(period) {
     bodyHtml += secLbl('ที่มาของค่าคอมฯ');
     bodyHtml += srcRow('NRR ทีม (รักษาฐาน)', null, moneyFull(bd.nrr_payout||0), 'var(--tk-ok-bright)');
     if (bd.upsell_mult) {
-      bodyHtml += srcRow('Upsell multiplier', bd.upsell_mult, '', 'rgba(188,215,255,.70)');
+      bodyHtml += srcRow('Upsell multiplier', bd.upsell_mult, '', 'rgba(var(--ink-blue),.70)');
     }
     bodyHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px;border-top:1px solid rgba(255,224,138,.15);margin-top:2px">'
-      +'<div style="font-size:13px;font-weight:800;color:rgba(225,238,255,.80)">รวม</div>'
-      +'<div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(focusRow.payout_amount)+'</div>'
+      +'<div style="font-size:var(--text-base);font-weight:800;color:rgba(var(--ink-blue-hi),.80)">รวม</div>'
+      +'<div style="font-size:var(--text-xl);font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(focusRow.payout_amount)+'</div>'
       +'</div>';
   } else {
     // KAM view — full breakdown
@@ -274,23 +274,23 @@ window._commOpenHistoryDetail = function(period) {
 
     // Total line
     bodyHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid rgba(255,224,138,.15);margin-top:2px">'
-      +'<div style="font-size:13px;font-weight:800;color:rgba(225,238,255,.80)">รวม</div>'
-      +'<div style="font-size:16px;font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(focusRow.payout_amount)+'</div>'
+      +'<div style="font-size:var(--text-base);font-weight:800;color:rgba(var(--ink-blue-hi),.80)">รวม</div>'
+      +'<div style="font-size:var(--text-xl);font-weight:900;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(focusRow.payout_amount)+'</div>'
       +'</div>';
   }
 
   // footer meta
-  bodyHtml += '<div style="padding:8px 18px 20px;font-size:10px;color:rgba(188,215,255,.28);font-family:\'IBM Plex Mono\',monospace">lock: '+(bd.lock_trigger||'—')+' · '+(bd.csv_data_as_of?bd.csv_data_as_of.split('T')[0]:period)+'</div>';
+  bodyHtml += '<div style="padding:8px 18px 20px;font-size:var(--text-xs);color:rgba(var(--ink-blue),.28);font-family:\'IBM Plex Mono\',monospace">lock: '+(bd.lock_trigger||'—')+' · '+(bd.csv_data_as_of?bd.csv_data_as_of.split('T')[0]:period)+'</div>';
 
   var _mxH = (window.innerHeight - 60) + 'px';
   var detailHtml = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;max-height:'+_mxH+';background:#0d1c34;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;z-index:9201">'
-    +'<div style="width:36px;height:4px;background:rgba(188,215,255,.18);border-radius:2px;margin:10px auto 0;flex-shrink:0"></div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px 8px;flex-shrink:0;border-bottom:1px solid rgba(188,215,255,.08)">'
+    +'<div style="width:36px;height:4px;background:rgba(var(--ink-blue),.18);border-radius:var(--r-xxs);margin:10px auto 0;flex-shrink:0"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px 8px;flex-shrink:0;border-bottom:1px solid rgba(var(--ink-blue),.08)">'
       +'<div>'
-        +'<div style="font-size:15px;font-weight:900;color:#fff">'+fmtPeriod(period)+'</div>'
-        +'<div style="font-size:9px;color:rgba(255,224,138,.45);font-family:\'IBM Plex Mono\',monospace;margin-top:2px;letter-spacing:.07em;text-transform:uppercase">LOCKED SNAPSHOT</div>'
+        +'<div style="font-size:var(--text-lg2);font-weight:900;color:var(--tk-text-primary)">'+fmtPeriod(period)+'</div>'
+        +'<div style="font-size:var(--text-2xs);color:rgba(255,224,138,.45);font-family:\'IBM Plex Mono\',monospace;margin-top:2px;letter-spacing:.07em;text-transform:uppercase">LOCKED SNAPSHOT</div>'
       +'</div>'
-      +'<button onclick="_commOpenHistoryList()" style="font-size:11px;color:rgba(188,215,255,.60);background:rgba(188,215,255,.06);border:1px solid rgba(188,215,255,.12);border-radius:8px;cursor:pointer;padding:5px 10px;font-family:inherit">‹ ย้อนหลัง</button>'
+      +'<button onclick="_commOpenHistoryList()" style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.60);background:rgba(var(--ink-blue),.06);border:1px solid rgba(var(--ink-blue),.12);border-radius:var(--r-8);cursor:pointer;padding:5px 10px;font-family:inherit">‹ ย้อนหลัง</button>'
     +'</div>'
     +'<div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">'
     + bodyHtml
@@ -453,7 +453,7 @@ window.closeCommissionHistory = closeCommissionHistory;
   function csvEscape(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;} function downloadRows(rows,name){var csv=rows.map(function(r){return r.map(csvEscape).join(',');}).join('\n');var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name||'portfolio-detail.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},200);}
   function render(mode){var nr=window._ncsLastNrrResult, kamLabel=window._ncsKamLabel||currentKamName(); if(!nr){try{showToast('ยังไม่มีข้อมูลพอร์ต','!');}catch(e){}return;} var activeMode=mode||'nrr'; window._ncsActiveMode=activeMode; var dom=ensure(), overlay=dom.overlay, sheet=dom.sheet; var isMovement=/^mv-|^ti$|^new$|^to$|transfer-in|transfer-out|new-sales/.test(activeMode); var title='รายละเอียด GMV', subtitle='ดูรายร้าน/สาขา โดยไม่ต้องปิด panel คำอธิบายหลัก', meta='', head='', body='', total='', totalColor='var(--tk-ok-bright)';
     if(isMovement){var mt=movementData(nr,activeMode);title='รายละเอียด '+mt.title;subtitle=mt.thai+' — '+esc(kamLabel);meta=metaFor(mt);total=fmtK(mt.gmv||0);totalColor=mt.color;if(mt.kind==='transferOut'){head='';body=renderTransferOutRows(mt);sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+esc(title)+'</div><div class="ncs-subtitle">'+esc(subtitle)+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span></div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(mt.title)+'</span><span class="ncs-total-val" style="color:'+totalColor+'">'+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}else{head='<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">เดือนก่อน</div><div class="ncs-th r">MTD</div>';body=renderMovementRows(mt);sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">'+esc(title)+'</div><div class="ncs-subtitle">'+esc(subtitle)+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+esc(meta)+'</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head ncs-mv2-cols">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(mt.title)+' <span class="ncs-subtle-note">MTD</span></span><span class="ncs-total-val" style="color:'+totalColor+'">'+total+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}}
-    else{var tabs=normalTabData(nr); if(!tabs.find(function(x){return x.key===activeMode;})) activeMode='nrr'; var t=tabs.find(function(x){return x.key===activeMode;})||tabs[0]; var tabsHtml=tabs.map(function(x){return '<button class="ncs-tab t-'+x.key+(x.key===activeMode?' on':'')+'" onclick="_ncsSetTab(\''+x.key+'\')">'+x.label+'<br><span style="font-size:9px;opacity:.75">'+(x.count||0)+' outlets</span></button>';}).join(''); head=t.key==='nrr'?'<div class="ncs-th">Outlet</div><div class="ncs-th r">ฐาน</div><div class="ncs-th r" style="color:var(--tk-ok-bright)">Run Rate</div><div class="ncs-th r">MTD</div>':'<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">MTD</div>'; body=renderNormalRows(t,nr); sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">รายละเอียด GMV — '+esc(kamLabel)+'</div><div class="ncs-subtitle">แยก NRR / Comeback / Expansion ให้ดูระดับ account และ outlet</div><div class="ncs-tabs">'+tabsHtml+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+(t.count||0)+' outlets · '+fmtK(t.gmv||0)+' MTD</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head '+(t.key==='nrr'?'nrr-cols':'simple-cols')+'">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(t.label)+'</span><span class="ncs-total-val" style="color:'+t.color+'">'+(t.key==='nrr'?'':'+')+fmtK(t.gmv||0)+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}
+    else{var tabs=normalTabData(nr); if(!tabs.find(function(x){return x.key===activeMode;})) activeMode='nrr'; var t=tabs.find(function(x){return x.key===activeMode;})||tabs[0]; var tabsHtml=tabs.map(function(x){return '<button class="ncs-tab t-'+x.key+(x.key===activeMode?' on':'')+'" onclick="_ncsSetTab(\''+x.key+'\')">'+x.label+'<br><span style="font-size:var(--text-2xs);opacity:.75">'+(x.count||0)+' outlets</span></button>';}).join(''); head=t.key==='nrr'?'<div class="ncs-th">Outlet</div><div class="ncs-th r">ฐาน</div><div class="ncs-th r" style="color:var(--tk-ok-bright)">Run Rate</div><div class="ncs-th r">MTD</div>':'<div class="ncs-th">Outlet / Account</div><div class="ncs-th r">MTD</div>'; body=renderNormalRows(t,nr); sheet.innerHTML='<div class="ncs-handle"><div></div></div><button class="ncs-close-x" onclick="_ncsClose()">×</button><div class="ncs-header"><div class="ncs-title">รายละเอียด GMV — '+esc(kamLabel)+'</div><div class="ncs-subtitle">แยก NRR / Comeback / Expansion ให้ดูระดับ account และ outlet</div><div class="ncs-tabs">'+tabsHtml+'</div></div><div class="ncs-meta"><span class="ncs-meta-text">'+(t.count||0)+' outlets · '+fmtK(t.gmv||0)+' MTD</span><button id="ncs-toggle-btn" class="ncs-sort-btn" onclick="_ncsToggleAll()">ย่อทั้งหมด</button></div><div class="ncs-tbl-head '+(t.key==='nrr'?'nrr-cols':'simple-cols')+'">'+head+'</div><div class="ncs-body" id="ncs-body">'+body+'</div><div class="ncs-total"><span class="ncs-total-lbl">รวม '+esc(t.label)+'</span><span class="ncs-total-val" style="color:'+t.color+'">'+(t.key==='nrr'?'':'+')+fmtK(t.gmv||0)+'</span></div><div class="ncs-footer"><button class="ncs-btn primary" onclick="_ncsExportCSV()">↓ ดาวน์โหลด CSV</button><button class="ncs-btn secondary" onclick="_ncsCopyTSV()">Copy TSV</button></div>';}
     var parent=document.getElementById('tgt-explain-sheet-overlay'); if(parent&&parent.classList.contains('on'))parent.classList.add('ncs-child-open'); requestAnimationFrame(function(){overlay.classList.add('on');sheet.classList.add('on');});
   }
   window._tgtShowCohortSheet=function(tab){render(tab||'nrr');};

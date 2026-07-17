@@ -1167,7 +1167,7 @@ function _tgtShowSkeleton() {
   if (titleWrap && !document.getElementById('tgt-loading-sub')) {
     const sub = document.createElement('div');
     sub.id = 'tgt-loading-sub';
-    sub.style.cssText = 'font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;display:flex;align-items:center;gap:5px;padding:0 16px 10px';
+    sub.style.cssText = 'font-size:var(--text-sm);color:rgba(255,255,255,.35);margin-top:2px;display:flex;align-items:center;gap:5px;padding:0 16px 10px';
     sub.innerHTML = '<span class="ai-thinking"><svg width="9" height="9" viewBox="0 0 10 10" fill="var(--tk-ok-bright)" style="animation:iq-spin 1.5s linear infinite;transform-origin:center;flex-shrink:0"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></span><span>กำลังดึงข้อมูล</span>';
     titleWrap.appendChild(sub);
   }
@@ -1218,7 +1218,7 @@ function tgtNavQuarter(dir) {
   const saveBtn = document.getElementById('tgt-save-btn');
   if (saveBtn) saveBtn.disabled = true;
   const body = document.getElementById('tgt-sheet-body');
-  if (body) body.innerHTML = '<div style="text-align:center;padding:32px;color:rgba(255,255,255,.4);font-size:13px">กำลังโหลด...</div>';
+  if (body) body.innerHTML = '<div style="text-align:center;padding:32px;color:rgba(255,255,255,.4);font-size:var(--text-base)">กำลังโหลด...</div>';
   // Use Promise chain — async function not supported in this script context
   loadTargets(_tgtActiveQuarter).then(function() {
     _tgtClearSkeleton();
@@ -1392,7 +1392,7 @@ function _renderTLKamBlocks(months, moLabels) {
   });
 
   if (!kams.length) {
-    html += `<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:13px">ไม่พบ KAM ในทีม<br><span style="font-size:11px">อัปโหลด portview.csv ก่อน</span></div>`;
+    html += `<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:var(--text-base)">ไม่พบ KAM ในทีม<br><span style="font-size:var(--text-sm)">อัปโหลด portview.csv ก่อน</span></div>`;
   }
   return html;
 }
@@ -1475,8 +1475,8 @@ function _renderTLSalesBlocks(months, moLabels) {
   });
 
   if (!reps.length) {
-    html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:13px">'
-      + 'ไม่พบ Sales rep ในทีม<br><span style="font-size:11px">ตรวจสอบว่า portview CSV upload แล้ว</span></div>';
+    html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:var(--text-base)">'
+      + 'ไม่พบ Sales rep ในทีม<br><span style="font-size:var(--text-sm)">ตรวจสอบว่า portview CSV upload แล้ว</span></div>';
   }
   return html;
 }
@@ -1497,14 +1497,14 @@ function renderTargetSettingsTab() {
           <input class="tgt-nrr-config-input" id="tgt-nrr-input" type="number" min="50" max="110" step="1"
             value="${threshold}"
             oninput="onTgtNrrInput(this.value)">
-          <span style="font-size:12px;color:rgba(255,255,255,.45)">%</span>
+          <span style="font-size:var(--text-md);color:var(--tk-text-muted)">%</span>
         </div>
       </div>
-      <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:8px">
+      <div style="font-size:var(--text-xs);color:rgba(255,255,255,.3);margin-top:8px">
         ค่าเริ่มต้น: 98% · ใช้กับ signal ปัจจุบันของทุก KAM / TL
       </div>
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 2px">
+    <div style="font-size:var(--text-sm);color:rgba(255,255,255,.3);padding:4px 2px">
       threshold นี้มีผลกับสี warning ในมุมมอง NRR ตอนนี้ ส่วน payout rule builder จะต่อยอดบน policy tab
     </div>`;
 }
@@ -2491,11 +2491,11 @@ function _commBuildKamSelfCard() {
       <div class="pv-comm-top">
         <div class="pv-comm-eyebrow">ค่าคอมฯ เดือนนี้</div>
       </div>
-      <div class="pv-comm-copyline"><span class="skel" style="display:inline-block;width:130px;height:12px;border-radius:4px;vertical-align:middle"></span></div>
-      <div class="pv-comm-next"><span class="skel" style="display:inline-block;width:90px;height:11px;border-radius:4px;vertical-align:middle"></span></div>
+      <div class="pv-comm-copyline"><span class="skel" style="display:inline-block;width:130px;height:12px;border-radius:var(--r-xs);vertical-align:middle"></span></div>
+      <div class="pv-comm-next"><span class="skel" style="display:inline-block;width:90px;height:11px;border-radius:var(--r-xs);vertical-align:middle"></span></div>
     </div>
     <div class="pv-comm-right">
-      <div class="pv-comm-main"><span class="skel" style="display:inline-block;width:56px;height:20px;border-radius:4px;vertical-align:middle"></span></div>
+      <div class="pv-comm-main"><span class="skel" style="display:inline-block;width:56px;height:20px;border-radius:var(--r-xs);vertical-align:middle"></span></div>
     </div>
   </div>`;
   }
@@ -2564,7 +2564,7 @@ function _commOpenKamSelfSheet() {
         <div class="pv-comm-sheet-kpi ${kpiCls}"><div class="pv-comm-sheet-kpi-label">ค่าคอมฯ ตอนนี้</div><div class="pv-comm-sheet-kpi-val">${_commFmtPayout(st.payout)}</div></div>
         <div class="pv-comm-sheet-kpi"><div class="pv-comm-sheet-kpi-label">Governed NRR</div><div class="pv-comm-sheet-kpi-val">${pctText}</div></div>
       </div>
-      <div class="pv-comm-sheet-sub"><strong style="color:#fff">Rule:</strong> ${_commEscapeHtml(st.ruleName)}</div>
+      <div class="pv-comm-sheet-sub"><strong style="color:var(--tk-text-primary)">Rule:</strong> ${_commEscapeHtml(st.ruleName)}</div>
       <div class="pv-comm-tier-table">${tierRows}</div>
       <div class="pv-comm-action-note">${_commEscapeHtml(action)}</div>
       <button class="pv-comm-sheet-close" onclick="_commCloseKamSelfSheet()">ปิด</button>
@@ -2598,7 +2598,7 @@ function _commOpenTlDetailSheet(opts) {
       _loadOv.onclick = function(e){ if(e.target===_loadOv) _commCloseTlDetailSheet(); };
       document.body.appendChild(_loadOv);
     }
-    _loadOv.innerHTML = '<div class="pv-comm-sheet"><div class="pv-comm-sheet-handle"></div><div class="pv-comm-sheet-body" style="display:flex;align-items:center;justify-content:center;min-height:160px"><div style="text-align:center;color:rgba(188,215,255,.7);font-size:13px">กำลังโหลดข้อมูล upsell...<br><span style="font-size:11px;opacity:.6">ใช้เวลาไม่กี่วินาที</span></div></div></div>';
+    _loadOv.innerHTML = '<div class="pv-comm-sheet"><div class="pv-comm-sheet-handle"></div><div class="pv-comm-sheet-body" style="display:flex;align-items:center;justify-content:center;min-height:160px"><div style="text-align:center;color:rgba(var(--ink-blue),.7);font-size:var(--text-base)">กำลังโหลดข้อมูล upsell...<br><span style="font-size:var(--text-sm);opacity:.6">ใช้เวลาไม่กี่วินาที</span></div></div></div>';
     requestAnimationFrame(function(){ _loadOv.classList.add('on'); });
     var _doFetch = typeof _fetchCloudflareFile === 'function' && typeof R2_SPECS !== 'undefined' && R2_SPECS && R2_SPECS['upsell_team'];
     var _fp = _doFetch ? _fetchCloudflareFile(R2_SPECS['upsell_team'], {force:true}) : Promise.resolve(false);
@@ -2649,8 +2649,8 @@ function _commOpenTlDetailSheet(opts) {
     // v228-fix: show — when upsell not loaded and NRR payout is 0
     const upsellNotLoaded = r.breakdown && r.breakdown.upsell_loading;
     const displayAmt = (upsellNotLoaded && nrrP === 0) ? null : finalAmt;
-    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:700' : 'color:rgba(255,255,255,.4)';
-    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.3);font-size:11px">— โหลด...</span>' : fmtP(displayAmt);
+    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:var(--fw-bold)' : 'color:rgba(255,255,255,.4)';
+    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.3);font-size:var(--text-sm)">— โหลด...</span>' : fmtP(displayAmt);
     return `<div class="pv-comm-tl-kam-row">
       <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
       <div class="pv-comm-tl-kam-nrr">${nrr}</div>
@@ -2661,8 +2661,8 @@ function _commOpenTlDetailSheet(opts) {
 
   const multSection = multLoaded
     ? `<div class="pv-comm-tl-mult">
-        <span style="color:#ffe08a;font-weight:700">×${um.multiplier.toFixed(2)} Upsell Mult</span>
-        <span style="color:rgba(255,255,255,.6);font-size:11px">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
+        <span style="color:#ffe08a;font-weight:var(--fw-bold)">×${um.multiplier.toFixed(2)} Upsell Mult</span>
+        <span style="color:rgba(255,255,255,.6);font-size:var(--text-sm)">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
        </div>`
     : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
 
@@ -2682,15 +2682,15 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-sheet-sub">NRR ทีม ${_commFmtPct(tlPayout.nrr_pct)} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
-      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:10px;background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:11px;color:rgba(225,238,255,.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:8px;background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:11px;font-weight:700;cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
+      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:var(--r-md);background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:var(--r-8);background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
       <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
-      <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">กำลังโหลด...</div>'}</div>
+      <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:var(--text-md);padding:8px">กำลังโหลด...</div>'}</div>
       <div style="display:flex;gap:6px;margin:0 18px 8px">
-        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:10px;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);color:var(--tk-ok-bright);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">History</button>
-        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:10px;background:rgba(188,215,255,.08);border:1px solid rgba(188,215,255,.22);color:rgba(225,238,255,.88);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--tk-font-body)">Rules</button>
+        <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:var(--r-md);background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);color:var(--tk-ok-bright);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;font-family:var(--tk-font-body)">History</button>
+        <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.08);border:1px solid rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue-hi),.88);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;font-family:var(--tk-font-body)">Rules</button>
       </div>
       <button class="pv-comm-sheet-close" onclick="_commCloseTlDetailSheet()">ปิด</button>
     </div>
@@ -2712,18 +2712,18 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
   const s = document.createElement('style');
   s.id = '_comm_tl_styles';
   s.textContent = `
-    .tv-mult-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
+    .tv-mult-badge{display:inline-flex;align-items:center;font-size:var(--text-xs);font-weight:var(--fw-bold);padding:1px 5px;border-radius:var(--r-xs);margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
     .tv-mult-badge.ok{background:rgba(255,224,138,.15);color:#ffe08a}
     .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
-    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.18);border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin:8px 0 0}
-    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
+    .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.18);border-radius:var(--r-8);font-size:var(--text-md);font-weight:var(--fw-semi);color:rgba(255,255,255,.85);margin:8px 0 0}
+    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
     .pv-comm-tl-kam-list{display:flex;flex-direction:column;max-height:320px;overflow-y:auto;margin-top:2px}
     .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 44px 76px;grid-template-rows:auto auto;gap:1px 4px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
     .pv-comm-tl-kam-row:last-child{border-bottom:none}
-    .pv-comm-tl-kam-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;grid-column:1}
-    .pv-comm-tl-kam-nrr{font-size:11px;color:rgba(255,255,255,.55);text-align:right;grid-row:1;grid-column:2}
-    .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;text-align:right;grid-row:1;grid-column:3}
-    .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:10px;color:rgba(255,255,255,.72);line-height:1.4}
+    .pv-comm-tl-kam-name{font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--tk-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1;grid-column:1}
+    .pv-comm-tl-kam-nrr{font-size:var(--text-sm);color:rgba(255,255,255,.55);text-align:right;grid-row:1;grid-column:2}
+    .pv-comm-tl-kam-pay{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);text-align:right;grid-row:1;grid-column:3}
+    .pv-comm-tl-kam-detail{grid-column:1/-1;grid-row:2;font-size:var(--text-xs);color:rgba(255,255,255,.72);line-height:1.4}
   `;
   (document.head || document.body).appendChild(s);
 })();

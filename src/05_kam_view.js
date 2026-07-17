@@ -338,7 +338,7 @@ function buildKamContext(){
 
 // Build consistent SKU movement HTML — 3 columns, period in group header
 function renderSkuMovementHtml(sm){
-  if(!sm)return'<div style="font-size:12px;color:rgba(255,255,255,.35)">ไม่มีข้อมูล SKU หลายเดือน</div>';
+  if(!sm)return'<div style="font-size:var(--text-md);color:rgba(255,255,255,.35)">ไม่มีข้อมูล SKU หลายเดือน</div>';
   // Short month label helper: "เม.ย. 2569" → "เม.ย."
   const _shortMo=m=>(m||'').split(' ')[0]||m;
   const _shortRange=(a,b)=>a===b?_shortMo(a):_shortMo(a)+'–'+_shortMo(b);
@@ -347,7 +347,7 @@ function renderSkuMovementHtml(sm){
     `<div class="kam-sku-row"><span class="kam-sku-ind ${cls}">${ind}</span><span class="kam-sku-name">${name}</span><span class="kam-sku-num">${fmt(gmv)}/เดือน${pct?` · ${pct}`:''}</span></div>`;
   // Group header with subtle period pill
   const grpHead=(label,period)=>
-    `<div class="kam-sku-group-label">${label}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:9px;font-weight:400;color:rgba(180,200,255,.45);margin-left:6px">${period}</span></div>`;
+    `<div class="kam-sku-group-label">${label}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-2xs);font-weight:var(--fw-normal);color:rgba(180,200,255,.45);margin-left:6px">${period}</span></div>`;
   let html='';
   if(sm.newSkus?.length){
     html+=`<div class="kam-sku-group">${grpHead(`เพิ่มใหม่ (${sm.newSkus.length})`,_shortMo(sm.recentMo))}`;
@@ -359,15 +359,15 @@ function renderSkuMovementHtml(sm){
     html+=sm.droppedSkus.map(s=>{
       const sub=skuSubstituteMapLM[s.name];
       if(sub){
-        return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0;background:var(--tk-accent-dim);border-radius:8px;padding:8px 10px;margin-bottom:4px">
+        return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0;background:var(--tk-accent-dim);border-radius:var(--r-8);padding:8px 10px;margin-bottom:4px">
           <span class="kam-sku-ind substituted" style="margin-top:2px">→</span>
           <div style="flex:1;min-width:0">
             <div class="kam-sku-name">${s.name}</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.32);margin-top:1px">${s.gmv?fmt(s.gmv)+'/เดือน':''}</div>
-            <div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:4px">→ ${sub.substituteName}</div>
-            <div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>
+            <div style="font-size:var(--text-xs);color:rgba(255,255,255,.32);margin-top:1px">${s.gmv?fmt(s.gmv)+'/เดือน':''}</div>
+            <div style="font-size:var(--text-sm);color:rgba(180,210,255,.8);margin-top:4px">→ ${sub.substituteName}</div>
+            <div style="font-size:var(--text-xs);color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>
           </div>
-          <span style="font-size:10px;font-weight:700;background:var(--tk-accent-dim-3);color:rgba(180,210,255,.95);border:1px solid var(--tk-subtab-active);border-radius:10px;padding:2px 8px;flex-shrink:0">สลับ</span>
+          <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);background:var(--tk-accent-dim-3);color:rgba(180,210,255,.95);border:1px solid var(--tk-subtab-active);border-radius:var(--r-md);padding:2px 8px;flex-shrink:0">สลับ</span>
         </div>`;
       }
       return row('−','neg',s.name,s.gmv,'');
@@ -384,7 +384,7 @@ function renderSkuMovementHtml(sm){
     html+=sm.declining.map(s=>row('↓','warn',s.name,s.gmv,`${s.changePct}%`)).join('');
     html+='</div>';
   }
-  return html||'<div style="font-size:12px;color:rgba(255,255,255,.35)">ไม่พบการเปลี่ยนแปลงที่มีนัยสำคัญ</div>';
+  return html||'<div style="font-size:var(--text-md);color:rgba(255,255,255,.35)">ไม่พบการเปลี่ยนแปลงที่มีนัยสำคัญ</div>';
 }
 
 // ── Shared header update (called by both tab renders) ──
@@ -449,7 +449,7 @@ function _renderKamZone1Status(){
   if(daysEl){
     if(_isEarlyMonth){
       const _updateDay = 6; // pace reliable after day 5, shows on day 6
-      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:9px;opacity:.85;color:rgba(140,180,255,.9)">· อัพเดทวันที่ ${_updateDay}</span>`;
+      daysEl.innerHTML=`${sig.daysElapsed} / ${sig.daysInMonth} วัน&ensp;<span style="font-size:var(--text-2xs);opacity:.85;color:rgba(140,180,255,.9)">· อัพเดทวันที่ ${_updateDay}</span>`;
     } else {
       daysEl.textContent=`${sig.daysElapsed} / ${sig.daysInMonth} วัน`;
     }
@@ -524,7 +524,7 @@ function _showSkuOutletTooltip(event,dataId){
   const tip=document.createElement('div');
   tip.id='_sku-outlet-tip';
   tip.dataset.src=dataId;
-  tip.innerHTML=`<div style="font-size:9px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:.6px;margin-bottom:6px;text-transform:uppercase">สาขา</div>${src.innerHTML}`;
+  tip.innerHTML=`<div style="font-size:var(--text-2xs);color:rgba(255,255,255,.4);font-weight:var(--fw-bold);letter-spacing:.6px;margin-bottom:6px;text-transform:uppercase">สาขา</div>${src.innerHTML}`;
   Object.assign(tip.style,{
     position:'fixed',zIndex:'9999',
     background:'rgba(18,22,32,.97)',
@@ -609,13 +609,13 @@ function __legacyRenderKamThisMonthFallback(){
       hiddenItems.push(`Outlet หาย: ${topDrop}`);
     }
     if(hiddenItems.length){
-      html+=`<div style="margin-bottom:12px;padding:11px 14px;background:rgba(240,176,0,.07);border:1px solid rgba(240,176,0,.3);border-radius:12px">
+      html+=`<div style="margin-bottom:12px;padding:11px 14px;background:rgba(240,176,0,.07);border:1px solid rgba(240,176,0,.3);border-radius:var(--r-card)">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(240,176,0,.8)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span style="font-size:10px;font-weight:700;color:rgba(240,176,0,.85);text-transform:uppercase;letter-spacing:.7px">ระวัง — Pace ดี แต่มีสัญญาณซ่อน</span>
+          <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(240,176,0,.85);text-transform:uppercase;letter-spacing:.7px">ระวัง — Pace ดี แต่มีสัญญาณซ่อน</span>
         </div>
-        ${hiddenItems.map(item=>`<div style="font-size:11px;color:rgba(255,220,100,.75);line-height:1.6;padding-left:21px">• ${item}</div>`).join('')}
-        <div style="font-size:10px;color:rgba(255,200,80,.55);padding-left:21px;margin-top:6px;line-height:1.5">อาจส่งผลต่อยอดเดือนหน้า — ควร verify ก่อนออกจากร้าน</div>
+        ${hiddenItems.map(item=>`<div style="font-size:var(--text-sm);color:rgba(255,220,100,.75);line-height:1.6;padding-left:21px">• ${item}</div>`).join('')}
+        <div style="font-size:var(--text-xs);color:rgba(255,200,80,.55);padding-left:21px;margin-top:6px;line-height:1.5">อาจส่งผลต่อยอดเดือนหน้า — ควร verify ก่อนออกจากร้าน</div>
       </div>`;
     }
   }
@@ -675,8 +675,8 @@ function __legacyRenderKamThisMonthFallback(){
     const _commBadge=(subclass)=>{
       if(!subclass)return'';
       const sc=subclass.toUpperCase();
-      if(_commNewSet.has(sc))return`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(80,220,160,.12);color:rgba(80,220,160,.85);border:0.5px solid rgba(80,220,160,.25);margin-left:5px;letter-spacing:.3px">new</span>`;
-      if(_commUpsellSet.has(sc))return`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(100,180,255,.1);color:rgba(100,180,255,.85);border:0.5px solid rgba(100,180,255,.25);margin-left:5px;letter-spacing:.3px">upsell</span>`;
+      if(_commNewSet.has(sc))return`<span style="font-size:var(--text-2xs);font-weight:var(--fw-bold);padding:1px 6px;border-radius:var(--r-xl);background:rgba(80,220,160,.12);color:rgba(80,220,160,.85);border:0.5px solid rgba(80,220,160,.25);margin-left:5px;letter-spacing:.3px">new</span>`;
+      if(_commUpsellSet.has(sc))return`<span style="font-size:var(--text-2xs);font-weight:var(--fw-bold);padding:1px 6px;border-radius:var(--r-xl);background:rgba(100,180,255,.1);color:rgba(100,180,255,.85);border:0.5px solid rgba(100,180,255,.25);margin-left:5px;letter-spacing:.3px">upsell</span>`;
       return'';
     };
     // v759: outlet tooltip helper
@@ -687,28 +687,28 @@ function __legacyRenderKamThisMonthFallback(){
       const tipHtml=`<div id="${_oid}" style="display:none" aria-hidden="true">${_od.map(o=>{
         const bought=o.this_month_orders>0;
         const dot=bought?'rgba(80,220,160,.9)':'rgba(255,130,130,.8)';
-        return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:12px;color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span></div>`;
+        return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:var(--text-md);color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span></div>`;
       }).join('')}</div>`;
-      return{html:tipHtml,chevron:'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>',onclick:`onclick="_showSkuOutletTooltip(event,'${_oid}')" style="cursor:pointer"`};
+      return{html:tipHtml,chevron:'<span style="font-size:var(--text-2xs);color:rgba(255,255,255,.3);margin-left:4px">⌄</span>',onclick:`onclick="_showSkuOutletTooltip(event,'${_oid}')" style="cursor:pointer"`};
     };
     if(newThisMonth.length){
-      html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">เพิ่งเริ่มสั่ง (${newThisMonth.length})</div>`;
+      html+=`<div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">เพิ่งเริ่มสั่ง (${newThisMonth.length})</div>`;
       html+=newThisMonth.map(s=>{
         const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
         const _sc=_subclassMap.get(String(s.item_id))||'';
         const _badge=_commBadge(_sc);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.item_name_th||'—'}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:13px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:10px;color:rgba(240,176,0,.55);font-weight:700;letter-spacing:.3px">MTD</span></div></div>`;
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.item_name_th||'—'}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:var(--text-base);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:var(--amb)">${fmt(s.gmv_to_date||0)}</span><span style="font-size:var(--text-xs);color:rgba(240,176,0,.55);font-weight:var(--fw-bold);letter-spacing:.3px">MTD</span></div></div>`;
       }).join('');
     }
     if(growing.length){
       if(newThisMonth.length)html+=`<div style="margin-top:8px"></div>`;
-      html+=`<div style="font-size:10px;font-weight:700;color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">สั่งเพิ่มขึ้น (${growing.length})</div>`;
+      html+=`<div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(80,220,160,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">สั่งเพิ่มขึ้น (${growing.length})</div>`;
       html+=growing.map(s=>{
         const projInc=Math.max(0,s.projGmv-s.lastGmv);
         const {html:tipHtml,chevron,onclick}=_posOutletTip(s.item_id,s.item_id);
         const _sc=_subclassMap.get(String(s.item_id))||'';
         const _badge=_commBadge(_sc);
-        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.name}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);font-weight:600;letter-spacing:.3px">proj.</span></div></div>`;
+        return`<div class="kam-sku-row"><span class="kam-sku-ind pos">↑</span><div style="flex:1;min-width:0"><div class="kam-sku-name" ${onclick}>${s.name}${chevron}${tipHtml}</div></div><div style="text-align:right;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px">${_badge}<span style="font-size:var(--text-md);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:rgba(80,220,160,.95)">+${fmt(projInc)}</span><span style="font-size:var(--text-2xs);color:rgba(80,220,160,.5);font-weight:var(--fw-semi);letter-spacing:.3px">proj.</span></div></div>`;
       }).join('');
     }
     html+=`</div></div>`;
@@ -725,7 +725,7 @@ function __legacyRenderKamThisMonthFallback(){
       <div class="kam-dc-head"><span class="kam-dc-head-label">Outlet · ${om.recentMo}</span></div>
       <div class="kam-dc-body" style="padding-top:8px">`;
     om.newOutlets.forEach(o=>{
-      html+=`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${o.name||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(255,255,255,.9)">${fmt(o.gmv||0)}</span><span style="font-size:9px;color:rgba(80,220,160,.5);margin-left:4px">ใหม่</span></div></div>`;
+      html+=`<div class="kam-sku-row"><span class="kam-sku-ind pos">+</span><span class="kam-sku-name">${o.name||'—'}</span><div style="text-align:right;flex-shrink:0;white-space:nowrap"><span style="font-size:var(--text-md);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:rgba(255,255,255,.9)">${fmt(o.gmv||0)}</span><span style="font-size:var(--text-2xs);color:rgba(80,220,160,.5);margin-left:4px">ใหม่</span></div></div>`;
     });
     om.droppedOutlets.forEach(o=>{
       const cycle=o.orders>=1?Math.round(daysInMo/Math.max(o.orders,1)):0;
@@ -735,9 +735,9 @@ function __legacyRenderKamThisMonthFallback(){
       const ind=hasCycle&&daysEl>cycle*1.5?'neg':'warn';
       if(hasCycle||isMonthly||o.orders===0){
         const cycleLabel=isMonthly
-          ?`<div style="font-size:10px;color:rgba(255,255,255,.28);margin-top:1px">ปกติ 1 ครั้ง/เดือน</div>`
+          ?`<div style="font-size:var(--text-xs);color:rgba(255,255,255,.28);margin-top:1px">ปกติ 1 ครั้ง/เดือน</div>`
           :o.orders===0?''
-          :`<div style="font-size:10px;color:rgba(255,255,255,.32);margin-top:1px">ปกติ ${o.orders} ครั้ง/เดือน · ผ่านมา ${daysEl} วันแล้ว</div>`;
+          :`<div style="font-size:var(--text-xs);color:rgba(255,255,255,.32);margin-top:1px">ปกติ ${o.orders} ครั้ง/เดือน · ผ่านมา ${daysEl} วันแล้ว</div>`;
         const statusClr=isMonthly?'rgba(255,255,255,.3)':o.orders===0?'rgba(255,255,255,.3)':clr;
         html+=`<div class="kam-sku-row" style="align-items:flex-start;padding:5px 0">
           <span class="kam-sku-ind ${isMonthly||o.orders===0?'neg':ind}" style="margin-top:2px">−</span>
@@ -746,8 +746,8 @@ function __legacyRenderKamThisMonthFallback(){
             ${cycleLabel}
           </div>
           <div style="text-align:right;flex-shrink:0;white-space:nowrap">
-            ${o.gmv?`<div style="font-size:12px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:700;color:rgba(255,255,255,.75)">${fmt(o.gmv)}</div>`:''}
-            <div style="font-size:11px;font-weight:700;color:${statusClr}">ยังไม่สั่ง</div>
+            ${o.gmv?`<div style="font-size:var(--text-md);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmt(o.gmv)}</div>`:''}
+            <div style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:${statusClr}">ยังไม่สั่ง</div>
           </div>
         </div>`;
       }
@@ -767,11 +767,11 @@ function __legacyRenderKamThisMonthFallback(){
     if(slowCount)badgeParts.push(slowCount+' ยอดลด');
     if(nearCount)badgeParts.push(nearCount+' เฝ้าดู');
     if(notYetCount)badgeParts.push(notYetCount+' ยังไม่ถึงรอบ');
-    const infoCard=skuSignalInfoOpen?`<div style="margin:8px 0 4px;padding:10px 12px;background:rgba(255,255,255,.05);border-radius:8px;border-left:2px solid rgba(100,170,255,.4)">
-      <div style="font-size:11px;font-weight:700;color:rgba(180,210,255,.9);margin-bottom:6px">SKU Signals คำนวณยังไง?</div>
-      <div style="font-size:11px;color:rgba(220,235,255,.7);line-height:1.75">ดูจากเดือนที่แล้วว่าแต่ละ SKU สั่งกี่ครั้ง แล้วคำนวณ "รอบปกติ" ว่าห่างกันกี่วัน</div>
-      <div style="margin:7px 0 5px;font-size:10px;font-weight:700;color:rgba(180,210,255,.6);letter-spacing:.5px">ตัวอย่าง: น้ำมันปาล์ม สั่ง 4 ครั้ง/เดือน จาก 2 สาขา</div>
-      <div style="font-size:11px;color:rgba(220,235,255,.55);line-height:1.8;padding-left:8px">→ แต่ละสาขาสั่ง 2 ครั้ง → รอบปกติ 15 วัน<br>วันที่ 16 ยังไม่สั่ง → เพิ่งเลยรอบ 1 วัน → <span style="color:rgba(240,176,0,.9);font-weight:700">เฝ้าดู</span><br>วันที่ 23 ยังไม่สั่ง → เลย 8 วัน (>50% ของรอบ) → <span style="color:rgba(255,130,130,.9);font-weight:700">ไม่มียอด</span><br>วันที่ 10 ยังไม่สั่ง → รออีก 5 วัน → <span style="color:rgba(255,255,255,.35);font-weight:700">ยังไม่ถึงรอบ</span></div>
+    const infoCard=skuSignalInfoOpen?`<div style="margin:8px 0 4px;padding:10px 12px;background:rgba(255,255,255,.05);border-radius:var(--r-8);border-left:2px solid rgba(100,170,255,.4)">
+      <div style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(180,210,255,.9);margin-bottom:6px">SKU Signals คำนวณยังไง?</div>
+      <div style="font-size:var(--text-sm);color:rgba(220,235,255,.7);line-height:1.75">ดูจากเดือนที่แล้วว่าแต่ละ SKU สั่งกี่ครั้ง แล้วคำนวณ "รอบปกติ" ว่าห่างกันกี่วัน</div>
+      <div style="margin:7px 0 5px;font-size:var(--text-xs);font-weight:var(--fw-bold);color:rgba(180,210,255,.6);letter-spacing:.5px">ตัวอย่าง: น้ำมันปาล์ม สั่ง 4 ครั้ง/เดือน จาก 2 สาขา</div>
+      <div style="font-size:var(--text-sm);color:rgba(220,235,255,.55);line-height:1.8;padding-left:8px">→ แต่ละสาขาสั่ง 2 ครั้ง → รอบปกติ 15 วัน<br>วันที่ 16 ยังไม่สั่ง → เพิ่งเลยรอบ 1 วัน → <span style="color:rgba(240,176,0,.9);font-weight:var(--fw-bold)">เฝ้าดู</span><br>วันที่ 23 ยังไม่สั่ง → เลย 8 วัน (>50% ของรอบ) → <span style="color:rgba(255,130,130,.9);font-weight:var(--fw-bold)">ไม่มียอด</span><br>วันที่ 10 ยังไม่สั่ง → รออีก 5 วัน → <span style="color:rgba(255,255,255,.35);font-weight:var(--fw-bold)">ยังไม่ถึงรอบ</span></div>
     </div>`:'';
     // SKU Verify button state
     const _verifyDone=skuSubstituteDone;
@@ -781,13 +781,13 @@ function __legacyRenderKamThisMonthFallback(){
     // v758: GMV filter
     if(typeof skuGmvFilter==='undefined')window.skuGmvFilter=3000; // v763: default <3K
     const _f1A=skuGmvFilter===1000,_f3A=skuGmvFilter===3000;
-    const _fBase='font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--tk-font-body);border:1px solid';
+    const _fBase='font-size:var(--text-xs);padding:2px 8px;border-radius:var(--r-xl);cursor:pointer;font-family:var(--tk-font-body);border:1px solid';
     const _f1S=_fBase+(_f1A?' rgba(100,180,255,.6);background:rgba(100,180,255,.12);color:rgba(100,180,255,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
     const _f3S=_fBase+(_f3A?' rgba(240,176,0,.6);background:rgba(240,176,0,.1);color:rgba(240,176,0,.9)':' rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.3)');
     html+=`<div class="kam-dc" style="margin-bottom:12px">
       <div class="kam-dc-head">
         <span class="kam-dc-head-label" style="color:rgba(255,130,130,.85)">SKU Signals</span>
-        <button onclick="skuSignalInfoOpen=!skuSignalInfoOpen;refreshAll()" style="width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.45);font-size:10px;font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;font-weight:700">i</button>
+        <button onclick="skuSignalInfoOpen=!skuSignalInfoOpen;refreshAll()" style="width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--tk-text-muted);font-size:var(--text-xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;font-weight:var(--fw-bold)">i</button>
         <span style="flex:1"></span>
         <button onclick="skuGmvFilter=skuGmvFilter===1000?0:1000;refreshAll()" style="${_f1S};margin-right:4px">&lt;฿1K</button>
         <button onclick="skuGmvFilter=skuGmvFilter===3000?0:3000;refreshAll()" style="${_f3S};margin-right:6px">&lt;฿3K</button>
@@ -806,8 +806,8 @@ function __legacyRenderKamThisMonthFallback(){
       const badge=isSub?'สลับ':s.type==='gone'?'ไม่มียอด':s.type==='slow'?'ยอดลด −'+s.gapPct+'%':s.type==='near'?'เฝ้าดู':s.type==='approaching'?'ใกล้ถึงรอบ · อีก '+s.daysUntil+' วัน':'ยังไม่ถึงรอบ';
       const story=isSub?'':skuStoryLine(s);
       const nameOp=dimmed?'opacity:.4':'';
-      const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?'เคยสั่ง '+fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
-      const subHtml=isSub?`<div style="font-size:11px;color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:10px;color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
+      const deptGmv=(s.type!=='not_yet'&&s.type!=='approaching'&&(s.dept||s.gmv>0))||(s.type==='approaching'&&(s.dept||s.gmv>0))?`<div style="font-size:var(--text-xs);color:rgba(255,255,255,.55);margin-top:1px">${s.dept||''}${s.dept&&s.gmv>0?' · ':''}<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${s.gmv>0?'เคยสั่ง '+fmt(s.gmv)+'/เดือน':''}</span></div>`:'';
+      const subHtml=isSub?`<div style="font-size:var(--text-sm);color:rgba(180,210,255,.8);margin-top:3px">→ ${sub.substituteName}</div><div style="font-size:var(--text-xs);color:rgba(140,180,255,.45);margin-top:1px">${sub.reason||''}</div>`:'';
       // outlet info — floating tooltip เมื่อ tap ชื่อ SKU
       const _outletData=(typeof bulkSkuOutletData!=='undefined'&&bulkSkuOutletData&&currentAccountId&&bulkSkuOutletData[currentAccountId])?bulkSkuOutletData[currentAccountId][String(s.id)]:null;
       const _hasOutlet=_outletData&&_outletData.length>=1&&(s.type==='gone'||s.type==='near'||s.type==='approaching'||s.type==='slow');
@@ -819,19 +819,19 @@ function __legacyRenderKamThisMonthFallback(){
             const ordered=o.this_month_orders>0;
             const hadLast=o.last_month_orders>0;
             const dot=ordered?'rgba(80,220,160,.9)':hadLast?'rgba(255,130,130,.8)':'rgba(255,255,255,.2)';
-            return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:12px;color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span></div>`;
+            return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span><span style="font-size:var(--text-md);color:rgba(255,255,255,.85);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.outlet_name||o.outlet_id}</span></div>`;
           }).join('')}
         </div>`:''
-      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700':'color:'+clr+';font-size:11px;font-weight:700';
+      const badgeColor=isSub?'color:rgba(180,210,255,.9);background:var(--tk-accent-dim-3);border:1px solid var(--tk-accent-dim-3);border-radius:var(--r-md);padding:1px 7px;font-size:var(--text-xs);font-weight:var(--fw-bold)':'color:'+clr+';font-size:var(--text-sm);font-weight:var(--fw-bold)';
       return`<div class="kam-sku-row" style="align-items:flex-start;padding:6px 0${dimmed?';opacity:.45':''}">
         <span class="kam-sku-ind ${ind}" style="margin-top:2px">${indSymbol}</span>
         <div style="flex:1;min-width:0">
-          <div class="kam-sku-name" ${_hasOutlet?`onclick="_showSkuOutletTooltip(event,'${_outletId}')" style="cursor:pointer"`:''}>${s.name}${_hasOutlet?'<span style="font-size:9px;color:rgba(255,255,255,.3);margin-left:4px">⌄</span>':''}</div>
+          <div class="kam-sku-name" ${_hasOutlet?`onclick="_showSkuOutletTooltip(event,'${_outletId}')" style="cursor:pointer"`:''}>${s.name}${_hasOutlet?'<span style="font-size:var(--text-2xs);color:rgba(255,255,255,.3);margin-left:4px">⌄</span>':''}</div>
           ${deptGmv}${subHtml}${outletTooltipHtml}
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:8px">
           <span style="${badgeColor}">${badge}</span>
-          ${story&&!isSub?`<span style="font-size:10px;color:${storyCl};white-space:nowrap">${story}</span>`:''}
+          ${story&&!isSub?`<span style="font-size:var(--text-xs);color:${storyCl};white-space:nowrap">${story}</span>`:''}
         </div>
       </div>`;
     };
@@ -841,22 +841,22 @@ function __legacyRenderKamThisMonthFallback(){
     const _goneSigs=filteredAct.filter(s=>s.type==='gone');
     const _watchSigs=filteredAct.filter(s=>s.type==='slow'||s.type==='near');
     const _apprSigs=filteredAct.filter(s=>s.type==='approaching');
-    const _secH=(lbl,n,c)=>`<div style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${c};padding:8px 0 3px;border-top:1px solid rgba(255,255,255,.05);margin-top:2px">${lbl} · ${n}</div>`;
+    const _secH=(lbl,n,c)=>`<div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.5px;text-transform:uppercase;color:${c};padding:8px 0 3px;border-top:1px solid rgba(255,255,255,.05);margin-top:2px">${lbl} · ${n}</div>`;
     if(_goneSigs.length){html+=_secH('ไม่มียอด',_goneSigs.length,'rgba(255,130,130,.5)');html+=_goneSigs.map(s=>renderSkuRow(s)).join('');}
     if(_watchSigs.length){html+=_secH('ต้องดูแล',_watchSigs.length,'rgba(240,176,0,.5)');html+=_watchSigs.map(s=>renderSkuRow(s)).join('');}
     if(_apprSigs.length){html+=_secH('ใกล้ถึงรอบ',_apprSigs.length,'rgba(100,180,255,.5)');html+=_apprSigs.map(s=>renderSkuRow(s)).join('');}
-    if(!filteredAct.length&&actionSigs.length)html+=`<div style="font-size:11px;color:rgba(255,255,255,.3);padding:8px 0;text-align:center">ไม่มี SKU ที่เข้าเกณฑ์ — <button onclick="skuGmvFilter=0;refreshAll()" style="background:none;border:none;color:rgba(100,180,255,.7);cursor:pointer;font-size:11px;text-decoration:underline">ล้าง filter</button></div>`;
+    if(!filteredAct.length&&actionSigs.length)html+=`<div style="font-size:var(--text-sm);color:rgba(255,255,255,.3);padding:8px 0;text-align:center">ไม่มี SKU ที่เข้าเกณฑ์ — <button onclick="skuGmvFilter=0;refreshAll()" style="background:none;border:none;color:rgba(100,180,255,.7);cursor:pointer;font-size:var(--text-sm);text-decoration:underline">ล้าง filter</button></div>`;
     const filteredNY=notYetSigs.filter(s=>(s.gmv||0)>=_gmvMin);
     if(filteredNY.length){
       const showNotYet=churnExpanded?filteredNY:filteredNY.slice(0,0);
       if(showNotYet.length)html+=showNotYet.map(s=>renderSkuRow(s,true)).join('');
-      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:11px;font-weight:600;font-family:var(--tk-font-body);cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+filteredNY.length+' รายการ — กดดู'}</button>`;
+      html+=`<button onclick="churnExpanded=!churnExpanded;refreshAll()" style="width:100%;margin-top:6px;padding:6px;border-radius:var(--r-8);border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.3);font-size:var(--text-sm);font-weight:var(--fw-semi);font-family:var(--tk-font-body);cursor:pointer;text-align:center">${churnExpanded?'▲ ซ่อน':'ยังไม่ถึงรอบ '+filteredNY.length+' รายการ — กดดู'}</button>`;
     }
     html+=`</div></div>`;
   } else if(D.sku_current&&D.sku_current.length&&!signals.length){
     html+=`<div class="kam-dc" style="margin-bottom:12px">
       <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:rgba(80,220,160,.85)">SKU Signals</span></div>
-      <div class="kam-dc-body" style="color:rgba(80,220,160,.6);font-size:12px">✓ ไม่พบ SKU ที่น่าเป็นห่วงเดือนนี้</div>
+      <div class="kam-dc-body" style="color:rgba(80,220,160,.6);font-size:var(--text-md)">✓ ไม่พบ SKU ที่น่าเป็นห่วงเดือนนี้</div>
     </div>`;
   }
 
@@ -874,9 +874,9 @@ function __legacyRenderKamThisMonthFallback(){
     const missingCats=prevCats.filter(c=>c.s>5000&&!curCatNames.has(c.n));
     if(missingCats.length){
       html+=`<div class="kam-dc" style="margin-bottom:12px;border-color:rgba(240,176,0,.2)">
-        <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:var(--amb)">Category ยังไม่สั่งเดือนนี้</span><span style="font-size:10px;color:rgba(255,255,255,.3);margin-left:auto">${missingCats.length} หมวด</span></div>
+        <div class="kam-dc-head"><span class="kam-dc-head-label" style="color:var(--amb)">Category ยังไม่สั่งเดือนนี้</span><span style="font-size:var(--text-xs);color:rgba(255,255,255,.3);margin-left:auto">${missingCats.length} หมวด</span></div>
         <div class="kam-dc-body" style="padding-top:8px">
-          ${missingCats.slice(0,5).map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:12px;color:rgba(255,255,255,.7)">${c.n}</span><span style="font-size:11px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${fmt(c.s)} เดือนก่อน</span></div>`).join('')}
+          ${missingCats.slice(0,5).map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:var(--text-md);color:var(--tk-text-secondary)">${c.n}</span><span style="font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:var(--amb)">${fmt(c.s)} เดือนก่อน</span></div>`).join('')}
         </div>
       </div>`;
     }
@@ -941,7 +941,7 @@ function __legacyRenderKamLastMonthFallback(){
     <div class="kam-dc">
       <div class="kam-dc-head"><span class="kam-dc-head-label">ยอดซื้อ · ${sp.month}</span></div>
       <div class="kam-dc-body">
-        <div class="kam-gmv-main">${fmt(sp.current)}<span style="font-size:13px;font-weight:400;color:rgba(220,235,255,.6)">/เดือน</span>${trendHtml}</div>
+        <div class="kam-gmv-main">${fmt(sp.current)}<span style="font-size:var(--text-base);font-weight:var(--fw-normal);color:rgba(220,235,255,.6)">/เดือน</span>${trendHtml}</div>
         <div class="kam-gmv-sub">${sp.orders} ออเดอร์${sp.prevMonth?' · เทียบจาก '+sp.prevMonth:''}</div>
       </div>
       <div class="kam-dc-insight" id="dc-insight-gmv" style="display:none"></div>
@@ -958,13 +958,13 @@ function __legacyRenderKamLastMonthFallback(){
     <div class="kam-dc">
       <div class="kam-dc-head"><span class="kam-dc-head-label">โอกาสลดต้นทุน</span></div>
       <div class="kam-dc-body">
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:18px;font-weight:700;color:var(--amb);margin-bottom:6px">${fmt(op.totalSaveMo)}<span style="font-size:11px;font-weight:400;color:rgba(220,235,255,.6)">/เดือน</span></div>
-        <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px">${op.total} รายการ · ${op.highConf} รายการใช้แทนได้ทันที</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xl3);font-weight:var(--fw-bold);color:var(--amb);margin-bottom:6px">${fmt(op.totalSaveMo)}<span style="font-size:var(--text-sm);font-weight:var(--fw-normal);color:rgba(220,235,255,.6)">/เดือน</span></div>
+        <div style="font-size:var(--text-sm);color:rgba(255,255,255,.5);margin-bottom:10px">${op.total} รายการ · ${op.highConf} รายการใช้แทนได้ทันที</div>
         ${top3Html}
       </div>
       <div class="kam-dc-insight" id="dc-insight-cost" style="display:none"></div>
       <div style="padding:0 14px 12px">
-        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:11px;font-weight:700;color:rgba(180,210,255,.85);background:var(--tk-accent-dim);border:1px solid var(--tk-accent-dim-3);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--tk-font-body);display:inline-flex;align-items:center;gap:5px">
+        <button onclick="closeDataPanel&&closeDataPanel();showScreen('opportunities')" style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(180,210,255,.85);background:var(--tk-accent-dim);border:1px solid var(--tk-accent-dim-3);border-radius:var(--r-8);padding:6px 14px;cursor:pointer;font-family:var(--tk-font-body);display:inline-flex;align-items:center;gap:5px">
           ดูทั้ง <span id="kam-opp-count-cta">—</span> รายการ →
         </button>
       </div>
@@ -1340,8 +1340,8 @@ Guardrails:
     if(_existSum)_existSum.remove();
     if(cards){
       const _labelClr={'Pace':'rgba(100,180,255,.8)','วัตถุดิบ':'var(--tk-ok-bright)','โอกาสต้นทุน':'rgba(240,176,0,.85)'};
-      const _insightRow=(label,txt)=>txt?`<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:${_labelClr[label]||'rgba(255,255,255,.4)'};margin-bottom:5px;border-bottom:1px solid ${_labelClr[label]||'rgba(255,255,255,.1)'};padding-bottom:3px">${label}</div><div style="font-size:12px;color:rgba(220,235,255,.88);line-height:1.7;font-style:italic">${txt}</div></div>`:'';
-      const bodyHtml=_insightRow('Pace',brief.paceInsight)+_insightRow('วัตถุดิบ',brief.skuInsight)+_insightRow('โอกาสต้นทุน',brief.costInsight)+(brief.summary?`<div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:rgba(220,235,255,.85);line-height:1.75">${brief.summary}</div>`:'');
+      const _insightRow=(label,txt)=>txt?`<div style="margin-bottom:12px"><div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.8px;text-transform:uppercase;color:${_labelClr[label]||'rgba(255,255,255,.4)'};margin-bottom:5px;border-bottom:1px solid ${_labelClr[label]||'rgba(255,255,255,.1)'};padding-bottom:3px">${label}</div><div style="font-size:var(--text-md);color:rgba(220,235,255,.88);line-height:1.7;font-style:italic">${txt}</div></div>`:'';
+      const bodyHtml=_insightRow('Pace',brief.paceInsight)+_insightRow('วัตถุดิบ',brief.skuInsight)+_insightRow('โอกาสต้นทุน',brief.costInsight)+(brief.summary?`<div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:var(--text-md);color:rgba(220,235,255,.85);line-height:1.75">${brief.summary}</div>`:'');
       if(bodyHtml){
         const sumCard=document.createElement('div');
         sumCard.className='kam-dc';sumCard.id='dc-tm-summary-card';
@@ -1480,7 +1480,7 @@ Guardrails:
     if(brief.summary){
       const sumCard=document.createElement('div');
       sumCard.className='kam-dc';sumCard.id='dc-lm-summary-card';
-      sumCard.innerHTML=`<div class="kam-dc-head"><span class="kam-dc-head-label">สรุปก่อนเข้าเยี่ยม</span></div><div class="kam-dc-body"><div style="font-size:12px;color:rgba(220,235,255,.85);line-height:1.75">${brief.summary}</div></div>`;
+      sumCard.innerHTML=`<div class="kam-dc-head"><span class="kam-dc-head-label">สรุปก่อนเข้าเยี่ยม</span></div><div class="kam-dc-body"><div style="font-size:var(--text-md);color:rgba(220,235,255,.85);line-height:1.75">${brief.summary}</div></div>`;
       lmSec.appendChild(sumCard);
     }
     clearInterval(stepTimer);
@@ -1665,7 +1665,7 @@ function _renderKnaRecentList(){
     .slice(0,3);
   if(visits.length===0){wrap.style.display='none';return;}
   wrap.style.display='block';
-  list.innerHTML=visits.map(v=>`<button class="kna-recent-card" onclick="portviewSelectAccount('${v.id}')"><span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${v.name}</span><span style="font-size:14px;color:rgba(255,255,255,.3);flex-shrink:0">›</span></button>`).join('');
+  list.innerHTML=visits.map(v=>`<button class="kna-recent-card" onclick="portviewSelectAccount('${v.id}')"><span style="font-size:var(--text-md);font-weight:var(--fw-semi);color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${v.name}</span><span style="font-size:var(--text-lg);color:rgba(255,255,255,.3);flex-shrink:0">›</span></button>`).join('');
 }
 
 // ── navPortHome: "พอร์ต" home button — routes to portview (KAM context) or scr-portfolio (standalone) ──
@@ -2679,7 +2679,7 @@ function renderSparkline(sid,moKeys,w,h){
   allPoints.sort((a,b)=>_moSortAsc(a.mo)-_moSortAsc(b.mo));
 
   const valid=allPoints.map(x=>x.p).filter(p=>p>0);
-  if(valid.length<2)return`<span style="font-size:9px;color:var(--n300)">—</span>`;
+  if(valid.length<2)return`<span style="font-size:var(--text-2xs);color:var(--n300)">—</span>`;
 
   // ── Y-axis: historical range from Q6B, else local normalize ──
   let mn,mx,rng;
@@ -2717,7 +2717,7 @@ function renderSparkline(sid,moKeys,w,h){
       <polyline points="${polyPts}" fill="none" stroke="${lc}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2.5" fill="${lc}" stroke="var(--n0)" stroke-width="1.2"/>
     </svg>
-    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:9px;font-weight:700;color:${pctC};line-height:1">${pctSign}${pct}%</span>
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-2xs);font-weight:var(--fw-bold);color:${pctC};line-height:1">${pctSign}${pct}%</span>
   </div>`;
 }
 
@@ -2789,7 +2789,7 @@ function closeSkuDetail(){
 
 // ── Full price trend content for detail sheet ──
 function renderSkuDetailContent(sku,priceData){
-  if(priceData.length<2)return`<div style="padding:28px;text-align:center;color:var(--n400);font-size:13px">ไม่มีข้อมูลราคาย้อนหลัง<br><span style="font-size:11px">ต้องใช้ข้อมูล Q3 หลายเดือน</span></div>`;
+  if(priceData.length<2)return`<div style="padding:28px;text-align:center;color:var(--n400);font-size:var(--text-base)">ไม่มีข้อมูลราคาย้อนหลัง<br><span style="font-size:var(--text-sm)">ต้องใช้ข้อมูล Q3 หลายเดือน</span></div>`;
   const prices=priceData.map(d=>d.price);
   const mn=Math.min(...prices),mx=Math.max(...prices),rng=mx-mn||mn*0.01||1;
   const first=priceData[0],last=priceData[priceData.length-1];
@@ -2850,13 +2850,13 @@ function renderSkuDetailContent(sku,priceData){
 
   // Opportunity info
   const opp=OPPS.find(o=>String(o.curId)===String(sku.id));
-  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--tk-ok-bg);border:1px solid var(--tk-ok-dim-2);border-radius:10px;padding:10px 12px">
-    <div style="font-size:10px;font-weight:700;color:var(--tk-ok-text);margin-bottom:4px">ประหยัดได้จากการเปลี่ยน SKU</div>
-    <div style="font-size:12px;color:var(--n700);margin-bottom:4px">
-      <span style="color:var(--n400);text-decoration:line-through;font-size:11px">${sku.n}</span><br>
+  const oppHtml=opp?`<div style="margin:10px 16px 0;background:var(--tk-ok-bg);border:1px solid var(--tk-ok-dim-2);border-radius:var(--r-md);padding:10px 12px">
+    <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--tk-ok-text);margin-bottom:4px">ประหยัดได้จากการเปลี่ยน SKU</div>
+    <div style="font-size:var(--text-md);color:var(--n700);margin-bottom:4px">
+      <span style="color:var(--n400);text-decoration:line-through;font-size:var(--text-sm)">${sku.n}</span><br>
       <strong>→ ${getAlt(opp).altName}</strong>
     </div>
-    <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:14px;font-weight:700;color:var(--amb)">${fmt(getAlt(opp).save)}/เดือน · −${getAlt(opp).pct}%</div>
+    <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:var(--amb)">${fmt(getAlt(opp).save)}/เดือน · −${getAlt(opp).pct}%</div>
   </div>`:'';
 
   const lastPr=last.price>=100?last.price.toFixed(0):last.price.toFixed(2);
@@ -2864,11 +2864,11 @@ function renderSkuDetailContent(sku,priceData){
   const mxStr=mx>=100?mx.toFixed(0):mx.toFixed(2);
   return`<div style="padding:12px 16px 0">
     <div style="display:flex;gap:14px;flex-wrap:wrap">
-      <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:700;color:var(--n900)">฿${lastPr}<span style="font-size:11px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/${sku.display_unit||'กก.'}</span></div>
-        ${sku.pack_size?`<div style="font-size:10px;color:var(--n400);margin-top:2px">${sku.pack_size}</div>`:''}</div>
-      <div><div style="font-size:9px;color:var(--n400);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${first.mo} – ${last.mo}</div>
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:700;color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
+      <div><div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:var(--fw-bold);color:var(--n900)">฿${lastPr}<span style="font-size:var(--text-sm);font-weight:var(--fw-normal);color:var(--n400);font-family:var(--tk-font-body)">/${sku.display_unit||'กก.'}</span></div>
+        ${sku.pack_size?`<div style="font-size:var(--text-xs);color:var(--n400);margin-top:2px">${sku.pack_size}</div>`:''}</div>
+      <div><div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">${first.mo} – ${last.mo}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:19px;font-weight:var(--fw-bold);color:${trendC}">${trendIcon} ${Math.abs(parseFloat(deltaPct))}%</div></div>
     </div>
   </div>
   <div style="padding:6px 4px 0">
@@ -2881,18 +2881,18 @@ function renderSkuDetailContent(sku,priceData){
       ${dotsSvg}${labelSvg}${moLabelSvg}
     </svg>
   </div>
-  <div style="display:flex;margin:6px 16px 0;border:1px solid var(--n100);border-radius:10px;overflow:hidden">
+  <div style="display:flex;margin:6px 16px 0;border:1px solid var(--n100);border-radius:var(--r-md);overflow:hidden">
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
-      <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">ต่ำสุด</div>
-      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">฿${mnStr}</div>
+      <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">ต่ำสุด</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-ok-text)">฿${mnStr}</div>
     </div>
     <div style="flex:1;padding:8px;text-align:center;border-right:1px solid var(--n100)">
-      <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">สูงสุด</div>
-      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:#9a6500">฿${mxStr}</div>
+      <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สูงสุด</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:#9a6500">฿${mxStr}</div>
     </div>
     <div style="flex:1;padding:8px;text-align:center">
-      <div style="font-size:9px;color:var(--n400);font-weight:600;margin-bottom:2px">สั่ง/เดือน</div>
-      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
+      <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สั่ง/เดือน</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
     </div>
   </div>
   ${oppHtml}
