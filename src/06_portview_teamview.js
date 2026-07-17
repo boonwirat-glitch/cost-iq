@@ -284,6 +284,52 @@ function _injectSenseThemePicker(){
   const saved=(()=>{try{return localStorage.getItem(_SDT_KEY)||'light';}catch(e){return'light';}})();
   setSenseDarkTheme(saved);
 })();
+
+// ── User text-size setting (v95, Phase 2b) ──────────────────────────────────
+// Three levels overriding the type-scale tokens (see styles_tokens.css
+// html[data-text-scale=...]). Persisted in localStorage; the actual attribute
+// is applied on <html> at first paint by the boot snippet in shell.html —
+// this only handles user CHANGES + the picker UI. 'standard' clears the
+// attribute (falls back to the :root Conservative scale).
+const _TXS_KEY='sense_text_scale';
+const _TXS_OPTS=[
+  {k:'compact',  name:'กะทัดรัด', hint:'แน่น เห็นเยอะ'},
+  {k:'standard', name:'มาตรฐาน',  hint:'แนะนำ'},
+  {k:'large',    name:'ใหญ่',      hint:'อ่านสบายตา'}
+];
+function _txsCurrent(){try{return localStorage.getItem(_TXS_KEY)||'standard';}catch(e){return'standard';}}
+function setSenseTextScale(v){
+  if(!_TXS_OPTS.some(o=>o.k===v))v='standard';
+  if(v==='standard')document.documentElement.removeAttribute('data-text-scale');
+  else document.documentElement.setAttribute('data-text-scale',v);
+  try{localStorage.setItem(_TXS_KEY,v);}catch(e){}
+  document.querySelectorAll('.txs-opt').forEach(el=>{
+    const on=el.dataset.scale===v;
+    el.style.borderColor=on?'var(--g500)':'var(--n200)';
+    el.style.boxShadow=on?'inset 0 0 0 1px var(--tk-ok-border)':'';
+  });
+}
+function _injectTextScalePicker(){
+  if(document.getElementById('txs-picker-wrap'))return;
+  const dpQuick=document.getElementById('dp-quick');
+  if(!dpQuick)return;
+  const cur=_txsCurrent();
+  const wrap=document.createElement('div');
+  wrap.id='txs-picker-wrap';
+  wrap.style.cssText='margin-bottom:14px;padding:12px 14px;background:rgba(0,0,0,.03);border:1px solid var(--n200);border-radius:var(--r-md)';
+  wrap.innerHTML=`
+    <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.8px;color:var(--n500);margin-bottom:10px">✦ ขนาดตัวอักษร</div>
+    <div style="display:flex;gap:7px">
+      ${_TXS_OPTS.map(o=>`
+        <div class="txs-opt" data-scale="${o.k}" onclick="setSenseTextScale('${o.k}')" style="flex:1;border-radius:var(--r-md);border:1.5px solid ${o.k===cur?'var(--g500)':'var(--n200)'};${o.k===cur?'box-shadow:inset 0 0 0 1px var(--tk-ok-border);':''}padding:10px 7px;cursor:pointer;background:var(--n50);text-align:center;transition:all .2s">
+          <div style="font-weight:var(--fw-bold);color:var(--n700);margin-bottom:2px;font-size:${o.k==='compact'?'12px':o.k==='standard'?'14px':'16px'}">ก</div>
+          <div style="font-size:var(--text-sm);font-weight:var(--fw-semi);color:var(--n700)">${o.name}</div>
+          <div style="font-size:var(--text-3xs);color:${o.k==='standard'?'var(--tk-ok-text)':'var(--n500)'};margin-top:2px">${o.hint}</div>
+        </div>
+      `).join('')}
+    </div>`;
+  dpQuick.insertBefore(wrap,dpQuick.firstChild);
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Plan Tray — two-stage bottom card (v190) ────────────────────────────────
 let _planTrayOpen=false;

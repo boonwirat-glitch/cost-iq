@@ -276,6 +276,16 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>Freshket Sense</title>
+<script>
+  // v95: apply the user's text-size choice on <html> before first paint, so
+  // the token overrides in styles_tokens.css (html[data-text-scale=...]) are
+  // active for the very first render — no flash of the default scale. Only
+  // 'compact'/'large' set an attribute; 'standard' (default) leaves it off so
+  // the :root Conservative scale applies. Kept tiny + inline + fail-safe.
+  (function(){try{var s=localStorage.getItem('sense_text_scale');
+    if(s==='compact'||s==='large')document.documentElement.setAttribute('data-text-scale',s);
+  }catch(e){}})();
+</script>
 <!-- Phase 2 safe modular baseline: security + extracted module references. Deployable output remains monolith-compatible. -->
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <style>

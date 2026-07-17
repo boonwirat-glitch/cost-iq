@@ -2220,6 +2220,7 @@ function _initSheetsInput(){} // no-op — UI inputs removed, using constants
 // ════════════════════════════════════════
 function openDataPanel(){
   _injectSenseThemePicker();
+  try{ if(typeof _injectTextScalePicker==='function') _injectTextScalePicker(); }catch(e){}
   setDpMode('quick');
   document.getElementById('dataPanel').classList.add('open');
   document.getElementById('dataOverlay').classList.add('on');

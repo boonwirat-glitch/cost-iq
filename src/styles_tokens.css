@@ -239,3 +239,34 @@
   --content-h:     calc(100dvh - var(--chrome-top) - var(--chrome-bottom));  /* scrollable area */
 
 }
+
+/* ══ USER TEXT-SIZE SETTING (Phase 2b) ══════════════════════════════════════
+   Three levels the user picks in Settings; persisted in localStorage
+   (sense_text_scale) and applied as data-text-scale on <html> before first
+   paint (boot snippet in shell.html). The default — no attribute — is the
+   :root "Conservative" scale above ("มาตรฐาน"/standard). These two blocks
+   only override the type scale + white-ink levels; they have higher
+   specificity than :root (html[attr] = 0,1,1 vs :root = 0,1,0), so they win.
+   Sizes are the dominant readability lever and the one fully driven by
+   tokens post-migration; blue-ink alpha stays literal at call sites until
+   the Phase 2c consolidation, so it isn't adjustable by this setting yet. */
+
+/* กะทัดรัด (compact) — restores the exact pre-retune sizes (today's density). */
+html[data-text-scale="compact"]{
+  --text-3xs:  8px;  --text-2xs:  9px;  --text-xs:   10px; --text-sm:   11px;
+  --text-md:   12px; --text-base: 13px; --text-lg:   14px; --text-lg2:  15px;
+  --text-xl:   16px; --text-xl2:  17px; --text-xl3:  18px; --text-2xl:  20px;
+  --text-3xl:  22px;
+  --tk-text-muted: rgba(255,255,255,.45);
+}
+
+/* ใหญ่ (large) — the mockup's "Bolder": +1px beyond standard, warmer inks. */
+html[data-text-scale="large"]{
+  --text-3xs:  10px; --text-2xs:  11px; --text-xs:   12px; --text-sm:   13px;
+  --text-md:   14px; --text-base: 15px; --text-lg:   16px; --text-lg2:  17px;
+  --text-xl:   18px; --text-xl2:  19px; --text-xl3:  20px; --text-2xl:  22px;
+  --text-3xl:  24px; --text-kpi:  30px;
+  --tk-text-secondary: rgba(255,255,255,.78);
+  --tk-text-muted:     rgba(255,255,255,.55);
+  --tk-text-faint:     rgba(255,255,255,.30);
+}
