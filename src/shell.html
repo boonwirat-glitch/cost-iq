@@ -2170,6 +2170,29 @@
               if(nw.state==='installed'&&navigator.serviceWorker.controller)_showUpdatePill();
             });
           });
+          // v93: periodic re-check. Without this, reg.update() only ever ran
+          // once at page load (line above) — a tab left open across a deploy
+          // had zero way to notice a new version short of the user manually
+          // reloading, since nothing re-invoked reg.update() afterward. Two
+          // triggers, both just call reg.update() (the actual browser-level
+          // "refetch sw.js, byte-compare, updatefound if different" check;
+          // _showUpdatePill firing is still fully gated on that comparison
+          // finding a real diff, same as the load-time check above):
+          //   1. every 20 min while the tab stays open
+          //   2. when the tab regains focus/visibility, if ≥2 min since the
+          //      last check — mirrors this codebase's existing dedup-gate
+          //      pattern (FreshketSenseResumeCoordinator's 60s gate).
+          var _lastSwCheckTs=Date.now();
+          function _maybeCheckForUpdate(minGapMs){
+            var now=Date.now();
+            if(now-_lastSwCheckTs<(minGapMs||0))return;
+            _lastSwCheckTs=now;
+            try{reg.update&&reg.update();}catch(e){}
+          }
+          setInterval(function(){_maybeCheckForUpdate(0);},20*60*1000);
+          document.addEventListener('visibilitychange',function(){
+            if(document.visibilityState==='visible')_maybeCheckForUpdate(2*60*1000);
+          });
         })
         .catch(err=>{
           window._freshketSwError={url:swUrl,message:err&&err.message||String(err),ts:Date.now()};
