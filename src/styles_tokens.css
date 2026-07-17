@@ -80,7 +80,8 @@
   /* ── TEXT (KAM dark theme) ───────────────────────────────── */
   --tk-text-primary:    #FFFFFF;
   --tk-text-secondary:  rgba(255,255,255,.70);
-  --tk-text-muted:      rgba(255,255,255,.45);
+  --tk-text-muted:      rgba(255,255,255,.50);  /* v94: was .45 — Conservative
+                          ink raise; muted text is real content, not decoration */
   --tk-text-faint:      rgba(255,255,255,.25);
 
   /* ── INK BLUE (KAM blue-tinted text ramp) ────────────────── */
@@ -160,23 +161,28 @@
   --sp-12:  48px;
 
   /* ── TYPOGRAPHY SCALE ────────────────────────────────────── */
-  --text-3xs:   8px;   /* v93 Tier B: added at current value for the tokenization
-                          migration — 41 existing hardcoded uses (micro badges,
-                          ON TRACK-style labels). Values retune in Phase 2a. */
-  --text-2xs:   9px;
-  --text-xs:    10px;
-  --text-sm:    11px;
-  --text-md:    12px;
-  --text-base:  13px;
-  --text-lg:    14px;
-  --text-lg2:   15px;  /* v93 Tier B: 81 uses (teamview values, body-large) */
-  --text-xl:    16px;
-  --text-xl2:   17px;  /* v93 Tier B: 19 uses */
-  --text-xl3:   18px;  /* v93 Tier B: 22 uses */
-  --text-2xl:   20px;
-  --text-3xl:   22px;  /* v93 Tier B: 22 uses */
-  --text-kpi:   28px;
-  --text-hero:  48px;
+  /* v94 "Conservative" retune (user-chosen from the interactive mockup,
+     _mockup_typescale.html / Artifact e1118fd8): every step +1px, floor
+     raised 8→9px, hero/kpi display sizes deliberately unchanged — the
+     readability pain was small text, not heroes; keeping heroes fixed
+     tightens hierarchy without growing the page. Pre-retune values in
+     trailing comments — they are also the exact values the "กะทัดรัด"
+     (compact) user setting restores (Phase 2b). */
+  --text-3xs:   9px;   /* was 8px — micro badges, ON TRACK-style labels */
+  --text-2xs:   10px;  /* was 9px */
+  --text-xs:    11px;  /* was 10px */
+  --text-sm:    12px;  /* was 11px */
+  --text-md:    13px;  /* was 12px */
+  --text-base:  14px;  /* was 13px */
+  --text-lg:    15px;  /* was 14px */
+  --text-lg2:   16px;  /* was 15px — body base rides this (styles_base.css) */
+  --text-xl:    17px;  /* was 16px */
+  --text-xl2:   18px;  /* was 17px */
+  --text-xl3:   19px;  /* was 18px */
+  --text-2xl:   21px;  /* was 20px */
+  --text-3xl:   23px;  /* was 22px */
+  --text-kpi:   28px;  /* unchanged by design */
+  --text-hero:  48px;  /* unchanged by design */
 
   /* ── FONT WEIGHT ─────────────────────────────────────────── */
   --fw-normal:  400;
@@ -198,10 +204,11 @@
   --r-xs:   4px;
   --r-xxs:  2px;
   --r-sm:   6px;
-  --r-md:   10px;
+  --r-md:   12px;  /* v94: was 10px — softer mid-size controls (user liked the
+                      rounder feel in the type-scale mockup) */
   --r-lg:   14px;
   --r-xl:   20px;
-  --r-card: 12px;
+  --r-card: 14px;  /* v94: was 12px — cards now match --r-lg's rounding */
   --r-pill: 999px;
   /* v93 Tier B radius steps: added at current values for the tokenization
      migration (each ≥15 hardcoded uses). Values retune in Phase 2a. */
