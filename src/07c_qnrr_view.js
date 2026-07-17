@@ -769,7 +769,7 @@ function _qnrrShowSkeleton(){
     list.innerHTML = [1,2,3].map(function(){
       return '<div class="qnrr-acct-row" style="pointer-events:none">' +
         '<div class="qnrr-mv-dot qnrr-skel"></div>' +
-        '<div class="qnrr-acct-left"><div class="qnrr-skel" style="height:12px;width:55%;border-radius:4px"></div></div>' +
+        '<div class="qnrr-acct-left"><div class="qnrr-skel" style="height:12px;width:55%;border-radius:var(--r-xs)"></div></div>' +
         '<div class="qnrr-acct-right"><div class="qnrr-skel" style="width:40px;height:20px;border-radius:3px"></div></div>' +
       '</div>';
     }).join('');
@@ -781,7 +781,7 @@ function _qnrrShowError(){
   var barsRow = _el('qnrr-bars-row');
   var dl      = _el('qnrr-drill-lbl');
   if (dl) dl.textContent = 'โหลดไม่สำเร็จ';
-  if (barsRow) barsRow.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,.20);font-size:11px">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:9px;opacity:.6">' + QNRR_CFG.csv_file + ' ยังไม่ได้อัปโหลด</span></div>';
+  if (barsRow) barsRow.innerHTML = '<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,.20);font-size:var(--text-sm)">ไม่พบไฟล์ข้อมูล Q<br><span style="font-size:var(--text-2xs);opacity:.6">' + QNRR_CFG.csv_file + ' ยังไม่ได้อัปโหลด</span></div>';
   if (list) list.innerHTML = '';
 }
 
@@ -861,7 +861,7 @@ function _qnrrRenderChart(){
   if (!barsRow) return;
 
   if (!_data) {
-    barsRow.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.2);font-size:11px;padding:36px 0">ไม่มีข้อมูล Q</div>';
+    barsRow.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.2);font-size:var(--text-sm);padding:36px 0">ไม่มีข้อมูล Q</div>';
     return;
   }
 
@@ -940,7 +940,7 @@ function _qnrrRenderChart(){
         ? _fmtM(adjBase) + '<span class="qnrr-base-adj-tag">adj</span>'
         : _fmtM(marBarTotal);
       topHtml = '<div class="qnrr-bar-top-label">' + baseLabel + '</div>' +
-                '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + _data.cohort_outlets + ' สาขา</div>';
+                '<div class="qnrr-bar-mar-sub" style="color:rgba(var(--ink-blue),.70);font-weight:800">' + _data.cohort_outlets + ' สาขา</div>';
     } else if (bm) {
       var activeOut = (bm.outlets && bm.outlets.core_nrr) ? bm.outlets.core_nrr : '';
       var outLabel  = '';
@@ -956,11 +956,11 @@ function _qnrrRenderChart(){
           '<div class="qnrr-bar-top-label">' + _fmtM(rawTotal) +
             '<span class="qnrr-top-actual-tag"> mtd</span></div>' +
           runrateLbl +
-          '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.55);font-weight:700">' +
+          '<div class="qnrr-bar-mar-sub" style="color:rgba(var(--ink-blue),.55);font-weight:var(--fw-bold)">' +
             bm.curr_days + '/' + bm.days_in_month + 'd</div>';
         topHtml = '<!-- partial -->' + topHtml;
       } else {
-        outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(188,215,255,.70);font-weight:800">' + activeOut + ' สาขา</div>' : '';
+        outLabel = activeOut ? '<div class="qnrr-bar-mar-sub" style="color:rgba(var(--ink-blue),.70);font-weight:800">' + activeOut + ' สาขา</div>' : '';
         topHtml = '<div class="qnrr-bar-top-label">' + _fmtM(bm.total_gmv) + '</div>' + outLabel;
       }
     }
@@ -1126,7 +1126,7 @@ function _qnrrRenderBreakdown(){
       var bm2 = _data.by_month[m];
       var isPartialCol = bm2 && bm2.is_partial;
       return '<th>' + MONTH_HDRS[i] + (isPartialCol ? '~' : '') +
-        '<br><span style="color:rgba(188,215,255,.35);font-size:9px;font-weight:600;text-transform:none;letter-spacing:0">'
+        '<br><span style="color:rgba(var(--ink-blue),.35);font-size:var(--text-2xs);font-weight:var(--fw-semi);text-transform:none;letter-spacing:0">'
         + outletHeaders[i] + '</span></th>';
     }).join('') +
     '</tr></thead><tbody>' + adjNoteHtml;
@@ -1424,7 +1424,7 @@ function _qnrrRenderDrill(){
 
   if (!_data || !_data.by_month[_selBar]) {
     if (lbl) lbl.textContent = 'ไม่มีข้อมูล';
-    list.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มีข้อมูลเดือนนี้</div>';
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,.2);font-size:var(--text-sm)">ไม่มีข้อมูลเดือนนี้</div>';
     return;
   }
 
@@ -1619,7 +1619,7 @@ window._qnrrToggleAll = _qnrrToggleAll;
 function _qnrrRenderList(){
   var wrap = _el('qnrr-acct-list');
   if (!wrap) return;
-  if (!_data) { wrap.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มีข้อมูล</div>'; return; }
+  if (!_data) { wrap.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:var(--text-sm)">ไม่มีข้อมูล</div>'; return; }
 
   var ALL_MONTHS = [QNRR_CFG.base_month].concat(QNRR_CFG.q_months);
   var MTH_SHORT  = QNRR_CFG.months_th;
@@ -1824,7 +1824,7 @@ function _qnrrRenderList(){
     html += '</tbody></table></div>';
   }); // end filteredAccts.forEach
 
-  if (!html) html = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:11px">ไม่มี outlet ใน filter นี้</div>';
+  if (!html) html = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.2);font-size:var(--text-sm)">ไม่มี outlet ใน filter นี้</div>';
   wrap.innerHTML = html;
 }
 window._qnrrRenderList = _qnrrRenderList;

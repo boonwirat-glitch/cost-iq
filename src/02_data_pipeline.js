@@ -2094,8 +2094,8 @@ async function loadFromCloudflareR2(){
       if(!_existingBanner){
         const _b=document.createElement('div');
         _b.id='offline-banner';
-        _b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:9998;background:rgba(220,60,0,.92);color:#fff;font-size:12px;font-family:"Noto Sans Thaiai",sans-serif;text-align:center;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(8px)';
-        _b.innerHTML='<span>⚠ ไม่สามารถโหลดข้อมูลได้ — ตรวจสอบการเชื่อมต่อ</span><button onclick="document.getElementById(\x27offline-banner\x27)?.remove();reloadFromGoogleSheets();" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">Retry</button>';
+        _b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:9998;background:rgba(220,60,0,.92);color:var(--tk-text-primary);font-size:var(--text-md);font-family:"Noto Sans Thaiai",sans-serif;text-align:center;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;backdrop-filter:blur(8px)';
+        _b.innerHTML='<span>⚠ ไม่สามารถโหลดข้อมูลได้ — ตรวจสอบการเชื่อมต่อ</span><button onclick="document.getElementById(\x27offline-banner\x27)?.remove();reloadFromGoogleSheets();" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:var(--tk-text-primary);border-radius:var(--r-sm);padding:4px 10px;font-size:var(--text-sm);cursor:pointer;font-family:inherit">Retry</button>';
         document.body.appendChild(_b);
         // Auto-dismiss banner when next successful load fires
         const _origRender=typeof renderPortview==='function'?renderPortview:null;
@@ -2305,7 +2305,7 @@ function _senseDataLog(){
     var rest=args.slice(1);
     var t=typeof performance!=='undefined'?Math.round(performance.now())+'ms':'';
     console.info.apply(console,
-      ['%c[Sense⚡ '+t+'] '+tag,'color:#00CC6A;font-weight:600;font-family:monospace'].concat(rest));
+      ['%c[Sense⚡ '+t+'] '+tag,'color:#00CC6A;font-weight:var(--fw-semi);font-family:monospace'].concat(rest));
   }catch(e){}
 }
 
@@ -2844,7 +2844,7 @@ async function triggerRestAI(){
   if(OPPS.length===0){
     if(standbyOv){
       const orig=standbyOv.innerHTML;
-      standbyOv.innerHTML='<span style="font-size:7.5px;color:var(--org);text-align:center;font-family:\'Noto Sans Thai\',sans-serif;font-weight:700;line-height:1.5">ยังไม่มีข้อมูล<br>อัปโหลดก่อน</span>';
+      standbyOv.innerHTML='<span style="font-size:7.5px;color:var(--org);text-align:center;font-family:\'Noto Sans Thai\',sans-serif;font-weight:var(--fw-bold);line-height:1.5">ยังไม่มีข้อมูล<br>อัปโหลดก่อน</span>';
       setTimeout(()=>{standbyOv.innerHTML=orig;},2200);
     }
     return;
@@ -2936,9 +2936,9 @@ function renderCatBars(cats,defaultShow){
   const rows=allCats.map((c,i)=>{
     const isEmpty=!!c.empty;
     const barColor=isEmpty?'rgba(240,176,0,.35)':catColor(i);
-    const nameStyle=isEmpty?'color:rgba(240,176,0,.85);font-weight:600':'';
+    const nameStyle=isEmpty?'color:rgba(240,176,0,.85);font-weight:var(--fw-semi)':'';
     const valHtml=isEmpty
-      ?`<span style="font-size:10px;color:rgba(240,176,0,.7);text-align:right;font-family:var(--mono)">ยังไม่สั่ง</span><span class="cbp" style="text-align:right;padding-left:2px;opacity:0"></span>`
+      ?`<span style="font-size:var(--text-xs);color:rgba(240,176,0,.7);text-align:right;font-family:var(--mono)">ยังไม่สั่ง</span><span class="cbp" style="text-align:right;padding-left:2px;opacity:0"></span>`
       :`<span class="cbv" style="text-align:right">${fmt(c.s)}</span><span class="cbp" style="text-align:right;padding-left:2px">${c.p}%</span>`;
     return`<div class="cbi" style="--cat-i:${i}"><div class="cbn" style="${nameStyle}">${c.n}</div><div class="cbt"><div class="cbf" style="width:${isEmpty?8:Math.min((c.p||0)/maxP*100,100)}%;background:${barColor};${isEmpty?'opacity:.4':''}"></div></div><div style="display:grid;grid-template-columns:62px 28px;flex-shrink:0">${valHtml}</div></div>`;
   }).join('');
