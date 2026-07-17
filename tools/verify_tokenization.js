@@ -134,12 +134,18 @@ function main() {
       console.error(`✗ ${rel}: cannot read baseline from ${baseRef}`);
       fails++; continue;
     }
+    // Detokenize BOTH sides: files that were already partially tokenized
+    // before this migration (styles_commission.css) have var() references
+    // in the baseline too. Since every mapped token equals its literal in
+    // Phase 1, f(migrated)==f(baseline) is exactly the "renders
+    // identically" equivalence — any real change still surfaces.
     const detok = detokenizeExact(migrated);
-    if (detok === baseline) {
+    const baseDetok = detokenizeExact(baseline);
+    if (detok === baseDetok) {
       console.log(`✓ ${rel}: byte-identical after detokenization`);
       continue;
     }
-    const aligned = alignColorTokens(detok, baseline, rel);
+    const aligned = alignColorTokens(detok, baseDetok, rel);
     if (aligned.ok) {
       console.log(`✓ ${rel}: identical after detokenization (+ ${aligned.subs} verified color-token site(s))`);
     } else {

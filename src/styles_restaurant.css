@@ -30,7 +30,7 @@ body:not(.kam-mode) #nav-report{display:none!important}
 #swipe-pill{
   position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-4px);
   z-index:102;display:flex;align-items:center;justify-content:center;
-  border-radius:999px;border:1px solid var(--tk-ok-border);
+  border-radius:var(--r-pill);border:1px solid var(--tk-ok-border);
   background:rgba(0,86,64,.72);color:rgba(255,255,255,.88);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   box-shadow:0 8px 24px rgba(0,48,38,.22),0 0 0 1px rgba(255,255,255,.04) inset;
@@ -55,17 +55,17 @@ body.restaurant-sheet.kam-mode #swipe-pill .sp-mini-arrow{color:rgba(0,50,30,.35
 body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-shadow:none}
 .sp-compact{display:flex;align-items:center;gap:7px}
 #swipe-pill.teach .sp-compact{display:none}
-.sp-teach-text{display:none;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.1px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.18)}
+.sp-teach-text{display:none;align-items:center;gap:7px;font-size:var(--text-md);font-weight:var(--fw-bold);letter-spacing:.1px;color:var(--tk-text-primary);text-shadow:0 1px 8px rgba(0,0,0,.18)}
 #swipe-pill.teach .sp-teach-text{display:flex}
-.sp-teach-icon{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tk-ok-border);color:#8dffc4;font-size:11px;flex-shrink:0}
-.sp-seg{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.48);padding:3px 8px;border-radius:999px;line-height:1.2;transition:all .2s}
-.sp-seg.on{color:#ffffff;background:var(--tk-ok-dim-2);box-shadow:0 0 0 1px var(--tk-ok-dim-2) inset}
+.sp-teach-icon{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tk-ok-border);color:#8dffc4;font-size:var(--text-sm);flex-shrink:0}
+.sp-seg{font-size:10.5px;font-weight:var(--fw-bold);color:rgba(255,255,255,.48);padding:3px 8px;border-radius:var(--r-pill);line-height:1.2;transition:all .2s}
+.sp-seg.on{color:var(--tk-text-primary);background:var(--tk-ok-dim-2);box-shadow:0 0 0 1px var(--tk-ok-dim-2) inset}
 .sp-dots{display:flex;gap:4px;align-items:center;padding:0 1px}
-.sp-dot{width:5px;height:5px;border-radius:999px;background:rgba(255,255,255,.28);transition:width .26s cubic-bezier(.34,1.56,.64,1),background .2s,opacity .2s}
+.sp-dot{width:5px;height:5px;border-radius:var(--r-pill);background:rgba(255,255,255,.28);transition:width .26s cubic-bezier(.34,1.56,.64,1),background .2s,opacity .2s}
 .sp-dot.on{width:14px;background:var(--g500);box-shadow:0 0 8px var(--tk-ok-border)}
-.sp-mini-arrow{font-size:11px;color:rgba(255,255,255,.42);margin-left:-2px;transition:transform .2s,color .2s}
+.sp-mini-arrow{font-size:var(--text-sm);color:rgba(255,255,255,.42);margin-left:-2px;transition:transform .2s,color .2s}
 #swipe-pill:hover .sp-mini-arrow{color:rgba(255,255,255,.78);transform:translateX(2px)}
-@media(max-width:360px){#swipe-pill{top:58px}.sp-seg{font-size:10px;padding:3px 6px}.sp-teach-text{font-size:11px}}
+@media(max-width:360px){#swipe-pill{top:58px}.sp-seg{font-size:var(--text-xs);padding:3px 6px}.sp-teach-text{font-size:var(--text-sm)}}
 @keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
 
@@ -100,13 +100,13 @@ body.restaurant-sheet.rest-closing #rest-sheet-body {
   display:flex; align-items:flex-start; justify-content:center;
   padding-top:10px;
 }
-.rsc-pill { width:36px; height:4px; background:rgba(255,255,255,.45); border-radius:2px; }
+.rsc-pill { width:36px; height:4px; background:rgba(255,255,255,.45); border-radius:var(--r-xxs); }
 #rest-sheet-close {
   position:absolute; right:12px; top:8px;
   width:28px; height:28px; border-radius:50%;
   background:rgba(0,0,0,.15); border:none; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  color:rgba(255,255,255,.8); font-size:14px; font-weight:600;
+  color:rgba(255,255,255,.8); font-size:var(--text-lg); font-weight:var(--fw-semi);
   pointer-events:auto; font-family:var(--tk-font-body);
   -webkit-tap-highlight-color:transparent;
 }

@@ -16,7 +16,7 @@ body.kam-mode #nav-restaurant .lb{line-height:1.15!important;margin-top:2px!impo
 body.kam-mode #nav-restaurant .nwrap{position:relative;border-radius:16px;overflow:visible;}
 body.kam-mode #nav-restaurant .nwrap:before{display:none!important;animation:none!important;}
 body.kam-mode #nav-restaurant.v213a-drill-glint .nwrap:after{
-  content:'';position:absolute;inset:-7px;border-radius:20px;pointer-events:none;
+  content:'';position:absolute;inset:-7px;border-radius:var(--r-xl);pointer-events:none;
   background:linear-gradient(105deg,transparent 10%,rgba(255,255,255,.42) 45%,rgba(120,210,255,.28) 52%,transparent 78%);
   transform:translateX(-115%) rotate(8deg);
   animation:v213a-nav-glint 1.05s ease-out 0s 2 both;
@@ -61,7 +61,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     padding:13px 16px 8px!important;min-width:0!important;flex-wrap:nowrap!important;
   }
   #scr-teamview #tv-title{
-    font-size:15px!important;line-height:1.18!important;max-width:none!important;
+    font-size:var(--text-lg2)!important;line-height:1.18!important;max-width:none!important;
     white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;flex:0 1 auto!important;
   }
   #scr-teamview #tv-action-btns{
@@ -72,13 +72,13 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   #scr-teamview #tv-portfolio-btn,
   #scr-teamview #tv-commission-btn,
   #scr-teamview .comm-btn{
-    height:32px!important;padding:6px 9px!important;border-radius:10px!important;
-    font-size:10px!important;line-height:1!important;white-space:nowrap!important;flex-shrink:0!important;
+    height:32px!important;padding:6px 9px!important;border-radius:var(--r-md)!important;
+    font-size:var(--text-xs)!important;line-height:1!important;white-space:nowrap!important;flex-shrink:0!important;
   }
   #scr-teamview #tv-target-btn svg,
   #scr-teamview #tv-portfolio-btn svg,
   #scr-teamview #tv-commission-btn svg{width:13px!important;height:13px!important;}
-  #scr-teamview .role-pill{height:24px!important;min-width:36px!important;padding:0 8px!important;font-size:10px!important;}
+  #scr-teamview .role-pill{height:24px!important;min-width:36px!important;padding:0 8px!important;font-size:var(--text-xs)!important;}
 
   /* Team pace hero: compact, desktop-like */
   #tv-pace-bar{margin:0 16px 10px!important;}
@@ -93,12 +93,12 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   }
   #tv-summary-row .tv-gov-card{grid-column:1 / -1!important;padding:0!important;background:transparent!important;border:none!important;box-shadow:none!important;}
   #tv-summary-row .tv-signal-wrap{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;width:100%!important;flex-wrap:wrap;}
-  #tv-summary-row .tv-signal-card{padding:9px 10px!important;border-radius:12px!important;min-height:66px!important;}
+  #tv-summary-row .tv-signal-card{padding:9px 10px!important;border-radius:var(--r-card)!important;min-height:66px!important;}
   #tv-summary-row .tv-signal-label{font-size:8.5px!important;line-height:1.15!important;letter-spacing:.04em!important;}
-  #tv-summary-row .tv-signal-value{font-size:17px!important;line-height:1.08!important;margin-top:5px!important;}
+  #tv-summary-row .tv-signal-value{font-size:var(--text-xl2)!important;line-height:1.08!important;margin-top:5px!important;}
   #tv-summary-row .tv-signal-meta{font-size:8.5px!important;line-height:1.25!important;margin-top:3px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
-  #tv-summary-row .portview-stat{padding:10px 6px!important;border-radius:12px!important;min-width:0!important;width:auto!important;}
-  #tv-summary-row .portview-stat-val{font-size:18px!important;line-height:1.05!important;}
+  #tv-summary-row .portview-stat{padding:10px 6px!important;border-radius:var(--r-card)!important;min-width:0!important;width:auto!important;}
+  #tv-summary-row .portview-stat-val{font-size:var(--text-xl3)!important;line-height:1.05!important;}
   #tv-summary-row .portview-stat-lbl{font-size:8.5px!important;line-height:1.2!important;}
 
   /* Team insight button spacing */
@@ -106,26 +106,26 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 
   /* KAM cards: hard undo v212a tall/grid card treatment. Restore compact desktop-like density. */
   .tv-full-card,.tv-star-card{
-    padding:12px 13px!important;border-radius:12px!important;margin-bottom:8px!important;overflow:hidden!important;
+    padding:12px 13px!important;border-radius:var(--r-card)!important;margin-bottom:8px!important;overflow:hidden!important;
   }
   .tv-full-top{
     display:flex!important;align-items:center!important;justify-content:space-between!important;
     gap:8px!important;margin-bottom:7px!important;min-width:0!important;
   }
   .tv-full-name{
-    font-size:13px!important;line-height:1.25!important;font-weight:800!important;min-width:0!important;
-    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#fff!important;
+    font-size:var(--text-base)!important;line-height:1.25!important;font-weight:800!important;min-width:0!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:var(--tk-text-primary)!important;
   }
   .tv-full-name span{
     display:inline!important;margin-left:6px!important;white-space:nowrap!important;
-    font-size:9px!important;color:rgba(255,255,255,.62)!important;font-weight:650!important;
+    font-size:var(--text-2xs)!important;color:rgba(255,255,255,.62)!important;font-weight:650!important;
   }
-  .tv-full-pace,.tv-star-pace{font-size:16px!important;line-height:1!important;min-width:36px!important;text-align:right!important;}
-  .tv-full-bar,.tv-star-bar{height:4px!important;border-radius:2px!important;margin:0 0 8px!important;background:rgba(255,255,255,.10)!important;}
-  .tv-full-fill,.tv-star-fill{height:100%!important;border-radius:2px!important;}
+  .tv-full-pace,.tv-star-pace{font-size:var(--text-xl)!important;line-height:1!important;min-width:36px!important;text-align:right!important;}
+  .tv-full-bar,.tv-star-bar{height:4px!important;border-radius:var(--r-xxs)!important;margin:0 0 8px!important;background:rgba(255,255,255,.10)!important;}
+  .tv-full-fill,.tv-star-fill{height:100%!important;border-radius:var(--r-xxs)!important;}
   .tv-full-meta{
     display:flex!important;align-items:center!important;justify-content:space-between!important;
-    gap:8px!important;font-size:10px!important;min-width:0!important;line-height:1.2!important;
+    gap:8px!important;font-size:var(--text-xs)!important;min-width:0!important;line-height:1.2!important;
   }
   .tv-risk-chips{
     display:flex!important;align-items:center!important;gap:4px!important;flex-wrap:nowrap!important;
@@ -133,17 +133,17 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
   }
   .tv-risk-chips > span{flex-shrink:0!important;}
   .tv-nrr-pill{
-    padding:3px 7px!important;border-radius:999px!important;font-size:9px!important;line-height:1!important;
+    padding:3px 7px!important;border-radius:var(--r-pill)!important;font-size:var(--text-2xs)!important;line-height:1!important;
     height:20px!important;display:inline-flex!important;align-items:center!important;white-space:nowrap!important;
   }
   .tv-payout-pill{
     min-width:62px!important;width:auto!important;height:22px!important;padding:0 8px!important;
-    font-size:10px!important;line-height:1!important;border-radius:999px!important;
+    font-size:var(--text-xs)!important;line-height:1!important;border-radius:var(--r-pill)!important;
     display:inline-flex!important;align-items:center!important;justify-content:center!important;white-space:nowrap!important;flex-shrink:0!important;
   }
   .tv-full-meta > span:not(.tv-nrr-pill):not(.tv-payout-pill){
     flex:0 0 auto!important;min-width:96px!important;text-align:right!important;white-space:nowrap!important;
-    font-size:10px!important;line-height:1.2!important;color:rgba(255,255,255,.68)!important;
+    font-size:var(--text-xs)!important;line-height:1.2!important;color:rgba(255,255,255,.68)!important;
   }
 
   /* List toggle row remains compact */
@@ -155,14 +155,14 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 }
 
 @media (max-width: 370px){
-  #scr-teamview #tv-title{font-size:14px!important;}
+  #scr-teamview #tv-title{font-size:var(--text-lg)!important;}
   #scr-teamview #tv-action-btns{gap:5px!important;}
   #scr-teamview #tv-target-btn,
   #scr-teamview #tv-portfolio-btn,
   #scr-teamview #tv-commission-btn,
   #scr-teamview .comm-btn{padding:6px 7px!important;font-size:9.5px!important;}
   #tv-summary-row .tv-signal-card{padding:8px 8px!important;}
-  .tv-full-name{font-size:12px!important;}
+  .tv-full-name{font-size:var(--text-md)!important;}
   .tv-full-name span{font-size:8.5px!important;margin-left:4px!important;}
   .tv-full-meta > span:not(.tv-nrr-pill):not(.tv-payout-pill){min-width:84px!important;font-size:9.5px!important;}
   .tv-payout-pill{min-width:56px!important;font-size:9.5px!important;}
@@ -266,12 +266,12 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 8px 18px rgba(0,0,0,.10)!important;
   }
   body.v213d-teamview-active #tv-summary-row .tv-signal-label{
-    font-size:8px!important;
+    font-size:var(--text-3xs)!important;
     line-height:1.15!important;
     letter-spacing:.045em!important;
   }
   body.v213d-teamview-active #tv-summary-row .tv-signal-value{
-    font-size:17px!important;
+    font-size:var(--text-xl2)!important;
     line-height:1.03!important;
     margin-top:5px!important;
     white-space:nowrap!important;
@@ -445,7 +445,7 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
     margin-left:0!important;
     margin-right:0!important;
     box-sizing:border-box!important;
-    border-radius:14px!important;
+    border-radius:var(--r-lg)!important;
   }
 
   /* The small “14 KAM + view toggles” row belongs to the card rail too. */
@@ -483,8 +483,8 @@ body:not(.sense-app-ready) #aifab{opacity:0!important;pointer-events:none!import
 }
 
 .comm-formula-note{
-  margin-top:6px;padding:6px 10px;border-radius:6px;
+  margin-top:6px;padding:6px 10px;border-radius:var(--r-sm);
   background:var(--ac-bg);border-left:2px solid var(--br-ac);
-  font-size:11px;color:var(--tx2);line-height:1.6;
+  font-size:var(--text-sm);color:var(--tx2);line-height:1.6;
   font-family:var(--tk-font-body);
 }
