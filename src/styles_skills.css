@@ -49,7 +49,7 @@
 /* ── Eyebrow label (Noto Sans Thai) ── */
 .sk-eyebrow {
   font-size: 8.5px;
-  font-weight: 600;
+  font-weight: var(--fw-semi);
   letter-spacing: .15em;
   text-transform: uppercase;
   color: var(--sk-muted);
@@ -72,21 +72,21 @@
 }
 .sk-big {
   font-size: 40px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   letter-spacing: -.04em;
   line-height: 1;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-denom {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-medium);
   color: var(--sk-muted);
   margin-bottom: 5px;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-label {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   margin-top: 3px;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -94,7 +94,7 @@
 .sk-next-block { text-align: right; }
 .sk-next-eye {
   font-size: 7.5px;
-  font-weight: 600;
+  font-weight: var(--fw-semi);
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--sk-muted);
@@ -102,14 +102,14 @@
   margin-bottom: 2px;
 }
 .sk-next-name {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-next-state {
-  font-size: 9px;
-  font-weight: 600;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semi);
   color: var(--sk-info);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
@@ -117,12 +117,12 @@
 .sk-track {
   height: 3px;
   background: var(--sk-hairline);
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   overflow: hidden;
 }
 .sk-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   background: var(--sk-ac);
   transition: width .4s ease;
 }
@@ -146,7 +146,7 @@
   flex-direction: column;
   gap: 0;
   margin: 0 14px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   border: 1px solid var(--sk-hairline);
 }
@@ -165,7 +165,7 @@
 .sk-mod-thumb {
   width: 64px;
   height: 64px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -174,20 +174,20 @@
   padding-bottom: 5px;
 }
 .sk-mod-sil {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
   opacity: .3;
 }
 .sk-mod-info { flex: 1; min-width: 0; }
 .sk-mod-name {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-mod-sub {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   margin-top: 1px;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -211,8 +211,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -241,8 +241,8 @@
   stroke-width: 2.2;
 }
 .sk-back-btn span {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--fw-semi);
   color: var(--sk-ac);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -250,7 +250,7 @@
 .sk-char-banner {
   margin: 10px 14px 12px;
   background: var(--sk-surface);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   display: flex;
   align-items: stretch;
   overflow: hidden;
@@ -264,8 +264,8 @@
   justify-content: space-between;
 }
 .sk-char-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-lg2);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -276,7 +276,7 @@
   padding: 0 14px 16px;
 }
 .sk-card {
-  border-radius: 12px;
+  border-radius: var(--r-card);
   overflow: hidden;
   cursor: pointer;
   background: var(--sk-surface);
@@ -303,8 +303,8 @@
   justify-content: center;
 }
 .sk-card-sil {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
   opacity: .3;
 }
@@ -411,8 +411,8 @@
 .state-mastered .sk-dot { background: var(--sk-warn); box-shadow: 0 0 5px rgba(255,149,0,.9), 0 0 10px rgba(255,149,0,.5); }
 
 .sk-state-label {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .08em;
   text-transform: uppercase;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -423,8 +423,8 @@
 .state-mastered .sk-state-label { color: var(--sk-warn); }
 
 .sk-card-name {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   line-height: 1.25;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -444,14 +444,14 @@
 }
 .sk-lock-ico svg {
   width: 10px; height: 10px;
-  color: #fff;
+  color: var(--tk-text-primary);
   stroke-width: 2.2;
 }
 .sk-card-wide {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  border-radius: 12px;
+  border-radius: var(--r-card);
   overflow: hidden;
   cursor: pointer;
   background: #1A1200;
@@ -510,8 +510,8 @@
 }
 .sk-detail-body::-webkit-scrollbar { display: none; }
 .sk-detail-code {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semi);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -525,10 +525,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 5px 13px;
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   letter-spacing: .06em;
   text-transform: uppercase;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -547,7 +547,7 @@
 
 .sk-skill-title {
   font-size: 21px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   margin-bottom: 14px;
   line-height: 1.2;
@@ -555,8 +555,8 @@
 }
 .sk-rubric-block { margin-bottom: 12px; }
 .sk-rubric-eye {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--sk-ac);
@@ -564,7 +564,7 @@
   margin-bottom: 6px;
 }
 .sk-rubric-text {
-  font-size: 14px;
+  font-size: var(--text-lg);
   color: var(--sk-body);
   line-height: 1.65;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -575,7 +575,7 @@
   margin: 12px 0;
 }
 .sk-rep-hint {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   text-align: center;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -584,14 +584,14 @@
 .sk-cta-btn {
   width: 100%;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 12px;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   cursor: pointer;
   font-family: 'Noto Sans Thai', sans-serif;
 }
-.sk-cta-primary { background: var(--sk-ac); color: #fff; }
+.sk-cta-primary { background: var(--sk-ac); color: var(--tk-text-primary); }
 .sk-cta-outline {
   background: #fff;
   color: var(--sk-ac);
@@ -600,8 +600,8 @@
 
 /* ══ LOG HISTORY ════════════════════════════════════════ */
 .sk-log-eye {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--sk-muted);
@@ -626,13 +626,13 @@
 .sk-log-dot.unlocked { background: var(--sk-ok); }
 .sk-log-dot.mastered { background: var(--sk-warn); }
 .sk-log-state {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-log-meta {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
@@ -642,7 +642,7 @@
 .sk-tl-hero {
   margin: 10px 14px 0;
   background: var(--sk-surface);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   padding: 13px 14px;
   position: relative;
   overflow: hidden;
@@ -659,31 +659,31 @@
   border-radius: 12px 12px 0 0;
 }
 .sk-tl-squad {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-tl-sub {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
 }
 .sk-tl-pend-count {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--sk-ac);
   font-family: 'Noto Sans Thai', sans-serif;
   line-height: 1;
   text-align: right;
 }
 .sk-tl-role-chip {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
   color: #7C3AED;
   background: rgba(124,58,237,.09);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px 9px;
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -693,7 +693,7 @@
   display: flex;
   margin: 10px 14px 0;
   background: var(--sk-surface);
-  border-radius: 9px;
+  border-radius: var(--r-9);
   padding: 3px;
   gap: 3px;
 }
@@ -701,10 +701,10 @@
   flex: 1;
   text-align: center;
   padding: 7px 0;
-  border-radius: 7px;
+  border-radius: var(--r-7);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
 }
@@ -720,9 +720,9 @@
   width: 16px; height: 16px;
   border-radius: 50%;
   background: var(--sk-ac);
-  color: #fff;
-  font-size: 8px;
-  font-weight: 700;
+  color: var(--tk-text-primary);
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-left: 4px;
   vertical-align: middle;
@@ -748,26 +748,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
   margin-top: 1px;
 }
 .sk-pend-name {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-pend-skill {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--sk-body);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
 }
 .sk-pend-date {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
@@ -783,10 +783,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px 9px;
   font-size: 8.5px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   letter-spacing: .06em;
   text-transform: uppercase;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -810,14 +810,14 @@
   color: var(--sk-hairline);
 }
 .sk-empty-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 4px;
 }
 .sk-empty-sub {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   line-height: 1.5;
@@ -828,7 +828,7 @@
   display: flex;
   margin: 10px 14px 0;
   background: var(--sk-surface);
-  border-radius: 8px;
+  border-radius: var(--r-8);
   padding: 3px;
   gap: 3px;
 }
@@ -836,10 +836,10 @@
   flex: 1;
   text-align: center;
   padding: 6px 0;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   letter-spacing: .04em;
@@ -855,7 +855,7 @@
 .sk-ov-hero {
   margin: 10px 14px 0;
   background: var(--sk-surface);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   padding: 14px;
   position: relative;
   overflow: hidden;
@@ -876,40 +876,40 @@
 }
 .sk-ov-big {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   letter-spacing: -.03em;
   line-height: 1;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-denom {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--fw-medium);
   color: var(--sk-muted);
   margin-bottom: 3px;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-label {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 2px;
 }
 .sk-ov-pct {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--text-3xl);
+  font-weight: var(--fw-bold);
   color: var(--sk-ac);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-ov-track {
   height: 3px;
   background: var(--sk-hairline);
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   overflow: hidden;
 }
 .sk-ov-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   background: var(--sk-ac);
 }
 .sk-ov-meta {
@@ -940,14 +940,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-rep-name {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
   display: flex;
@@ -969,19 +969,19 @@
   flex: 1;
   height: 3px;
   background: var(--sk-hairline);
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   overflow: hidden;
 }
 .sk-rep-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
 }
 .sk-rep-fill-ok  { background: var(--sk-ok); }
 .sk-rep-fill-mid { background: var(--sk-warn); }
 .sk-rep-fill-low { background: var(--sk-ac); }
 .sk-rep-count {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   flex-shrink: 0;
@@ -991,8 +991,8 @@
 .sk-skill-list { padding: 0 14px; }
 .sk-skill-mod-hd {
   padding: 12px 0 4px;
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .15em;
   text-transform: uppercase;
   color: var(--sk-muted);
@@ -1015,15 +1015,15 @@
 .sk-warn-dot-ac   { background: var(--sk-ac); }
 .sk-skill-info { flex: 1; min-width: 0; }
 .sk-skill-code {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-skill-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--fw-semi);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -1037,16 +1037,16 @@
   flex: 1;
   height: 3px;
   background: var(--sk-hairline);
-  border-radius: 2px;
+  border-radius: var(--r-xxs);
   overflow: hidden;
 }
-.sk-skill-fill { height: 100%; border-radius: 2px; }
+.sk-skill-fill { height: 100%; border-radius: var(--r-xxs); }
 .sk-skill-fill-ok   { background: var(--sk-ok); }
 .sk-skill-fill-low  { background: var(--sk-warn); }
 .sk-skill-fill-zero { background: var(--sk-hairline); }
 .sk-skill-count {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   flex-shrink: 0;
@@ -1057,13 +1057,13 @@
 /* TL eval zone */
 .sk-tl-zone {
   background: var(--sk-surface);
-  border-radius: 12px;
+  border-radius: var(--r-card);
   padding: 13px;
   margin: 8px 0;
 }
 .sk-tl-eye {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--sk-ac);
@@ -1086,19 +1086,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-tl-rep-name {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-tl-rep-meta {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -1107,7 +1107,7 @@
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 6px;
-  font-weight: 600;
+  font-weight: var(--fw-semi);
   letter-spacing: .1em;
   text-transform: uppercase;
 }
@@ -1119,7 +1119,7 @@
 .sk-tl-btn {
   flex: 1;
   border: 1.5px solid var(--sk-hairline);
-  border-radius: 8px;
+  border-radius: var(--r-8);
   padding: 9px 2px 8px;
   background: #fff;
   cursor: pointer;
@@ -1142,8 +1142,8 @@
   width: 16px; height: 16px;
 }
 .sk-tl-btn-label {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   color: var(--sk-muted);
   letter-spacing: .02em;
@@ -1164,9 +1164,9 @@
 .sk-tl-note {
   width: 100%;
   border: 1px solid var(--sk-hairline);
-  border-radius: 8px;
+  border-radius: var(--r-8);
   padding: 9px 10px;
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
   resize: none;
@@ -1179,12 +1179,12 @@
   width: 100%;
   margin-top: 8px;
   background: var(--sk-ac);
-  color: #fff;
+  color: var(--tk-text-primary);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 11px;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   cursor: pointer;
   font-family: 'Noto Sans Thai', sans-serif;
 }
@@ -1205,19 +1205,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
 }
 .sk-rep-det-name {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-rep-det-meta {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   margin-top: 1px;
@@ -1230,12 +1230,12 @@
   border-bottom: 1px solid var(--sk-hairline);
 }
 .sk-fpill {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   color: var(--sk-muted);
   background: var(--sk-surface);
   border: 1px solid var(--sk-hairline);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px 10px;
   cursor: pointer;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -1255,8 +1255,8 @@
   cursor: pointer;
 }
 .sk-det-skill-mod {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
   flex-shrink: 0;
@@ -1264,14 +1264,14 @@
 }
 .sk-det-skill-name {
   flex: 1;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semi);
   color: var(--sk-ink);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-det-state {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .06em;
   text-transform: uppercase;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -1304,12 +1304,12 @@
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: rgba(34,34,34,.92);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--tk-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
   padding: 10px 20px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   opacity: 0;
   pointer-events: none;
   transition: opacity .2s, transform .2s;
@@ -1343,13 +1343,13 @@
 }
 .sk-echo-strip svg { color: var(--sk-ac); flex-shrink: 0; }
 .sk-echo-date {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-echo-score {
-  font-size: 9px;
-  font-weight: 600;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semi);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 
@@ -1368,24 +1368,24 @@
 }
 .sk-echo-row-top svg { color: var(--sk-ac); flex-shrink: 0; }
 .sk-echo-row-date {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-echo-row-score {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-echo-row-ev {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--sk-body);
   line-height: 1.5;
   font-family: 'Noto Sans Thai', sans-serif;
   margin-bottom: 3px;
 }
 .sk-echo-row-note {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-ac);
   font-style: italic;
   line-height: 1.4;
@@ -1408,13 +1408,13 @@
   background: linear-gradient(transparent, rgba(0,0,0,.52));
 }
 .sk-cg-banner-name {
-  font-size: 17px;
-  font-weight: 700;
-  color: #fff;
+  font-size: var(--text-xl2);
+  font-weight: var(--fw-bold);
+  color: var(--tk-text-primary);
   line-height: 1.2;
 }
 .sk-cg-banner-sub {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: rgba(255,255,255,.75);
   margin-top: 2px;
   font-family: 'IBM Plex Mono', monospace;
@@ -1436,14 +1436,14 @@
   background: linear-gradient(transparent, rgba(0,0,0,.55));
 }
 .sk-cg-banner-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
+  font-size: var(--text-xl3);
+  font-weight: var(--fw-bold);
+  color: var(--tk-text-primary);
   line-height: 1.2;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-cg-banner-sub {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: rgba(255,255,255,.72);
   margin-top: 3px;
   font-family: 'IBM Plex Mono', monospace;
@@ -1477,17 +1477,17 @@
   margin-top: 5px;
 }
 .sk-pend-echo-date {
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--sk-muted);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-pend-echo-score {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .sk-pend-echo-ev {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--sk-body);
   line-height: 1.45;
   font-family: 'Noto Sans Thai', sans-serif;
@@ -1534,16 +1534,16 @@
   padding: 12px 16px;
 }
 .mod-album-eye {
-  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  font-size: var(--text-2xs); font-weight: var(--fw-bold); letter-spacing: .1em;
   color: rgba(255,255,255,.6); text-transform: uppercase;
   font-family: 'IBM Plex Mono', monospace;
 }
 .mod-album-name {
-  font-size: 17px; font-weight: 700; color: #fff;
+  font-size: var(--text-xl2); font-weight: var(--fw-bold); color: var(--tk-text-primary);
   margin-top: 2px; font-family: 'Noto Sans Thai', sans-serif;
 }
 .mod-album-sub {
-  font-size: 11px; color: rgba(255,255,255,.65);
+  font-size: var(--text-sm); color: rgba(255,255,255,.65);
   margin-top: 2px; font-family: 'Noto Sans Thai', sans-serif;
 }
 .mod-album-ring {
@@ -1552,7 +1552,7 @@
 .mod-album-ring svg { width: 36px; height: 36px; }
 .mod-album-echo {
   background: rgba(255,255,255,.15) !important;
-  color: #fff !important;
+  color: var(--tk-text-primary) !important;
   backdrop-filter: blur(4px);
 }
 
@@ -1714,13 +1714,13 @@
 }
 .sk-skel-thumb {
   width: 88px; height: 88px;
-  border-radius: 8px;
+  border-radius: var(--r-8);
   flex-shrink: 0;
 }
 .sk-skel-body { flex: 1; }
 .sk-skel-line {
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   margin-bottom: 8px;
 }
 .sk-skel-line.w70 { width: 70%; }
@@ -1820,17 +1820,17 @@
 }
 .s3-back {
   display: inline-flex; align-items: center; gap: 5px;
-  color: #fff; font-size: 13px; font-weight: 600;
+  color: var(--tk-text-primary); font-size: var(--text-base); font-weight: var(--fw-semi);
   background: rgba(0,0,0,.32); border: none;
-  border-radius: 999px; padding: 6px 13px;
+  border-radius: var(--r-pill); padding: 6px 13px;
   backdrop-filter: blur(8px); cursor: pointer;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .s3-code-pill {
-  color: rgba(255,255,255,.85); font-size: 11px;
+  color: rgba(255,255,255,.85); font-size: var(--text-sm);
   font-family: 'IBM Plex Mono', monospace;
   background: rgba(0,0,0,.28); padding: 5px 11px;
-  border-radius: 999px; backdrop-filter: blur(8px);
+  border-radius: var(--r-pill); backdrop-filter: blur(8px);
 }
 
 /* Sheet: absolute, anchored to bottom, expands upward */
@@ -1864,7 +1864,7 @@
   padding: 0 16px 12px;
 }
 .s3-teaser {
-  font-size: 13px;
+  font-size: var(--text-base);
   color: rgba(20,20,20,0.72);
   line-height: 1.45;
   margin-top: 3px;
@@ -1877,7 +1877,7 @@
   transition: transform .3s ease;
 }
 .s3-peek-title {
-  font-size: 18px;
+  font-size: var(--text-xl3);
   font-weight: 800;
   color: var(--sk-ink);
   line-height: 1.2;
@@ -1946,8 +1946,8 @@
   text-align: center;
 }
 .sk-row-eye {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--text-3xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .13em;
   text-transform: uppercase;
   color: var(--sk-muted);
@@ -1955,14 +1955,14 @@
   margin-bottom: 3px;
 }
 .sk-row-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-lg2);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
   line-height: 1.2;
   margin-bottom: 2px;
 }
 .sk-row-sub {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--sk-muted);
   margin-bottom: 5px;
 }
@@ -1973,8 +1973,8 @@
   flex-wrap: wrap;
 }
 .sk-row-badge {
-  font-size: 9px;
-  font-weight: 600;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semi);
   padding: 2px 7px;
   border-radius: 99px;
 }
@@ -2016,16 +2016,16 @@
   z-index: 10;
 }
 .s2-back {
-  color: #fff !important;
+  color: var(--tk-text-primary) !important;
   background: rgba(0,0,0,.32) !important;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 6px 13px;
   backdrop-filter: blur(8px);
   border: none;
 }
 .s2-cg-mod-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-lg2);
+  font-weight: var(--fw-bold);
   color: var(--sk-ink);
 }
 .s2-banner {
@@ -2056,8 +2056,8 @@
   pointer-events: none;
 }
 .s2-banner-mod-eye {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: rgba(255,255,255,.75);
@@ -2065,14 +2065,14 @@
   margin-bottom: 3px;
 }
 .s2-banner-title {
-  font-size: 22px;
+  font-size: var(--text-3xl);
   font-weight: 800;
-  color: #fff;
+  color: var(--tk-text-primary);
   line-height: 1.15;
   font-family: 'Noto Sans Thai', sans-serif;
 }
 .s2-banner-sub {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: rgba(255,255,255,.72);
   margin-top: 2px;
   font-family: 'Noto Sans Thai', sans-serif;
