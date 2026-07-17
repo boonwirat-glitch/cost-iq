@@ -83,6 +83,24 @@
   --tk-text-muted:      rgba(255,255,255,.45);
   --tk-text-faint:      rgba(255,255,255,.25);
 
+  /* ── INK BLUE (KAM blue-tinted text ramp) ────────────────── */
+  /* v93: the commission/KAM screens use a blue-tinted white text ramp
+     (rgba(188,215,255,α) and rgba(225,238,255,α)) in ~540 hardcoded
+     places at dozens of ad-hoc alphas — it predates this token file and
+     was never captured here. Channel-triplet tokens let the tokenization
+     migration replace `rgba(188,215,255,` → `rgba(var(--ink-blue),`
+     byte-exactly at ANY alpha, giving Phase 2 central control of the hue
+     while preserving each call site's alpha in Phase 1. */
+  --ink-blue:     188,215,255;
+  --ink-blue-hi:  225,238,255;
+  /* Semantic ramp (defined now, mass-applied in Phase 2c consolidation —
+     do not bulk-migrate call sites onto these until then): */
+  --tk-blue-text-primary:   rgba(var(--ink-blue-hi),.88);
+  --tk-blue-text-secondary: rgba(var(--ink-blue),.70);
+  --tk-blue-text-tertiary:  rgba(var(--ink-blue),.55);
+  --tk-blue-text-muted:     rgba(var(--ink-blue-hi),.40);
+  --tk-blue-text-faint:     rgba(var(--ink-blue),.28);
+
   /* ── BORDER (KAM dark theme) ─────────────────────────────── */
   --tk-border:          rgba(255,255,255,.10);
   --tk-border-strong:   rgba(255,255,255,.18);
@@ -142,14 +160,21 @@
   --sp-12:  48px;
 
   /* ── TYPOGRAPHY SCALE ────────────────────────────────────── */
+  --text-3xs:   8px;   /* v93 Tier B: added at current value for the tokenization
+                          migration — 41 existing hardcoded uses (micro badges,
+                          ON TRACK-style labels). Values retune in Phase 2a. */
   --text-2xs:   9px;
   --text-xs:    10px;
   --text-sm:    11px;
   --text-md:    12px;
   --text-base:  13px;
   --text-lg:    14px;
+  --text-lg2:   15px;  /* v93 Tier B: 81 uses (teamview values, body-large) */
   --text-xl:    16px;
+  --text-xl2:   17px;  /* v93 Tier B: 19 uses */
+  --text-xl3:   18px;  /* v93 Tier B: 22 uses */
   --text-2xl:   20px;
+  --text-3xl:   22px;  /* v93 Tier B: 22 uses */
   --text-kpi:   28px;
   --text-hero:  48px;
 
@@ -178,6 +203,12 @@
   --r-xl:   20px;
   --r-card: 12px;
   --r-pill: 999px;
+  /* v93 Tier B radius steps: added at current values for the tokenization
+     migration (each ≥15 hardcoded uses). Values retune in Phase 2a. */
+  --r-5:    5px;   /* 19 uses */
+  --r-7:    7px;   /* 21 uses */
+  --r-8:    8px;   /* 61 uses */
+  --r-9:    9px;   /* 33 uses */
 
   /* ── BORDER WIDTH ────────────────────────────────────────── */
   --bw-thin:    1px;
