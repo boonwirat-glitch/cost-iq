@@ -73,7 +73,7 @@ const CI = (() => {
     if (typeof m === 'string') return m;
     if (!m) return '';
     if (m.quote) {
-      const ts = m.ts ? `<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;color:var(--tx3,#AEAEB2)">${m.ts}</span> ` : '';
+      const ts = m.ts ? `<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);color:var(--tx3,#AEAEB2)">${m.ts}</span> ` : '';
       const note = m.note ? ` <span style="color:var(--tx3,#AEAEB2)">— ${m.note}</span>` : '';
       return `${ts}&ldquo;${m.quote}&rdquo;${note}`;
     }
@@ -130,8 +130,8 @@ const CI = (() => {
 }
 .notch{width:126px;height:37px;background:var(--bg);border-radius:0 0 22px 22px;margin:0 auto;position:relative;z-index:10;}
 .sbar{display:flex;justify-content:space-between;align-items:center;padding:12px 28px 0;position:relative;z-index:2;}
-.sbar-t{font-size:15px;font-weight:500;color:var(--tx);letter-spacing:-.02em;}
-.sbar-r{font-size:13px;color:var(--tx2);}
+.sbar-t{font-size:var(--text-lg2);font-weight:var(--fw-medium);color:var(--tx);letter-spacing:-.02em;}
+.sbar-r{font-size:var(--text-base);color:var(--tx2);}
 
 /* ── SCREENS ── */
 #ci-fullsheet .scr{display:none;flex-direction:column;min-height:780px;}
@@ -139,10 +139,10 @@ const CI = (() => {
 
 /* ── TOPBAR ── */
 #ci-fullsheet .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px 10px;background:transparent;}
-.tb-act{font-size:15px;font-weight:400;color:var(--tx2);cursor:pointer;padding:6px 0;}
+.tb-act{font-size:var(--text-lg2);font-weight:var(--fw-normal);color:var(--tx2);cursor:pointer;padding:6px 0;}
 .tb-act:hover{color:var(--tx);}
-.tb-lbl{font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;}
-.tb-rec{font-size:12px;font-weight:500;color:var(--ac);display:flex;align-items:center;gap:5px;font-family:'Noto Sans Thai',sans-serif;}
+.tb-lbl{font-size:var(--text-xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;}
+.tb-rec{font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--ac);display:flex;align-items:center;gap:5px;font-family:'Noto Sans Thai',sans-serif;}
 .rec-dot{width:5px;height:5px;border-radius:50%;background:var(--danger);opacity:0;transition:opacity .3s;}
 .rec-dot.on{opacity:1;animation:blink 1.3s ease-in-out infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
@@ -151,8 +151,8 @@ const CI = (() => {
 /* ── CHIP ── */
 #ci-fullsheet .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;background:rgba(0,0,0,.04);}
 #ci-fullsheet .chip-dot{width:5px;height:5px;border-radius:50%;background:var(--ac);flex-shrink:0;}
-#ci-fullsheet .chip-txt{font-size:13px;color:var(--tx2);letter-spacing:-.01em;}
-#ci-fullsheet .chip-seg{font-size:10px;font-weight:500;color:var(--ac);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;}
+#ci-fullsheet .chip-txt{font-size:var(--text-base);color:var(--tx2);letter-spacing:-.01em;}
+#ci-fullsheet .chip-seg{font-size:var(--text-xs);font-weight:var(--fw-medium);color:var(--ac);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;}
 
 /* ── RECORD CENTER ── */
 #ci-fullsheet .rec-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:0 24px;}
@@ -198,7 +198,7 @@ const CI = (() => {
 /* ── TIMER ── */
 #ci-fullsheet .timer-block{text-align:center;}
 #ci-fullsheet .timer-val{font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums;}
-#ci-fullsheet .timer-hint{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
+#ci-fullsheet .timer-hint{font-size:var(--text-sm);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
 .is-rec .timer-hint{color:rgba(255,255,255,.18);}
 
 /* ── WAVEFORM ── */
@@ -221,41 +221,41 @@ const CI = (() => {
 .orb-checkin-ok{animation:orb-ok-flash .9s ease-out 1;}
 
 /* ── CHECK-IN BAR ── */
-.ci-checkin-bar{display:none;margin:0 24px 4px;background:rgba(52,199,89,.06);border:0.5px solid rgba(52,199,89,.2);border-radius:12px;padding:8px 12px;align-items:center;gap:8px;}
+.ci-checkin-bar{display:none;margin:0 24px 4px;background:rgba(52,199,89,.06);border:0.5px solid rgba(52,199,89,.2);border-radius:var(--r-card);padding:8px 12px;align-items:center;gap:8px;}
 .ci-checkin-bar.show{display:flex;}
 .ci-checkin-icon{width:18px;height:18px;border-radius:50%;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ci-checkin-txt{font-size:12px;font-weight:500;color:#1C1C1E;}
-.ci-checkin-sub{font-size:10px;color:#8e8e93;}
+.ci-checkin-txt{font-size:var(--text-md);font-weight:var(--fw-medium);color:#1C1C1E;}
+.ci-checkin-sub{font-size:var(--text-xs);color:#8e8e93;}
 
 /* ── COVISIT LIST (TL screen) ── */
 .cv-list-wrap{flex:1;overflow-y:auto;padding:0 0 max(32px,calc(env(safe-area-inset-bottom,0px)+80px));-webkit-overflow-scrolling:touch;}
-.cv-section-hd{font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:12px 24px 6px;}
+.cv-section-hd{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:12px 24px 6px;}
 .cv-row{display:flex;align-items:center;gap:10px;padding:10px 24px;border-bottom:0.5px solid #E5E5EA;}
 .cv-row:last-child{border-bottom:none;}
-.cv-avatar{width:30px;height:30px;border-radius:50%;background:rgba(255,56,92,.1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#FF385C;flex-shrink:0;}
-.cv-name{font-size:13px;font-weight:500;color:#1C1C1E;}
-.cv-sub{font-size:10px;color:#AEAEB2;margin-top:1px;font-family:'Noto Sans Thai',sans-serif;}
-.cv-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:100px;font-size:9px;font-weight:500;white-space:nowrap;}
+.cv-avatar{width:30px;height:30px;border-radius:50%;background:rgba(255,56,92,.1);display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);font-weight:var(--fw-semi);color:#FF385C;flex-shrink:0;}
+.cv-name{font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E;}
+.cv-sub{font-size:var(--text-xs);color:#AEAEB2;margin-top:1px;font-family:'Noto Sans Thai',sans-serif;}
+.cv-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:100px;font-size:var(--text-2xs);font-weight:var(--fw-medium);white-space:nowrap;}
 .cv-badge-ready{background:rgba(52,199,89,.1);color:#1A7A3A;}
 .cv-badge-wait{background:rgba(255,149,0,.1);color:#995500;}
 .cv-badge-done{background:rgba(52,199,89,.1);color:#1A7A3A;}
 .cv-badge-expired{background:rgba(255,59,48,.08);color:#CC2200;}
-.cv-verify-btn{display:block;margin:12px 24px 4px;width:calc(100% - 48px);padding:14px;border-radius:14px;border:none;background:#FF385C;color:#fff;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.02em;cursor:pointer;transition:opacity 80ms;}
+.cv-verify-btn{display:block;margin:12px 24px 4px;width:calc(100% - 48px);padding:14px;border-radius:var(--r-lg);border:none;background:#FF385C;color:var(--tk-text-primary);font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg2);font-weight:var(--fw-medium);letter-spacing:-.02em;cursor:pointer;transition:opacity 80ms;}
 .cv-verify-btn:disabled{background:#E5E5EA;color:#AEAEB2;cursor:not-allowed;}
 .cv-verify-btn:active{opacity:.85;}
-.cv-note{text-align:center;font-size:10px;color:#AEAEB2;padding:4px 24px 16px;line-height:1.5;font-family:'Noto Sans Thai',sans-serif;}
+.cv-note{text-align:center;font-size:var(--text-xs);color:#AEAEB2;padding:4px 24px 16px;line-height:1.5;font-family:'Noto Sans Thai',sans-serif;}
 
 /* ── RECORD BOTTOM ── */
 .rec-bottom{padding:8px 24px 40px;display:flex;flex-direction:column;gap:10px;}
 #ci-fullsheet .btn-stop{
-  width:100%;padding:15px;border-radius:14px;border:none;
+  width:100%;padding:15px;border-radius:var(--r-lg);border:none;
   background:rgba(0,0,0,.055);color:var(--tx2);
-  font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.02em;
+  font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg2);font-weight:var(--fw-medium);letter-spacing:-.02em;
   cursor:pointer;transition:background 120ms,color 120ms,transform 60ms linear;
 }
 #ci-fullsheet .btn-stop:hover{background:rgba(0,0,0,.08);color:var(--tx);}
 #ci-fullsheet .btn-stop:active{transform:scale(.98);}
-#ci-fullsheet .stop-hint{text-align:center;font-size:11px;color:#8e8e93;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;}
+#ci-fullsheet .stop-hint{text-align:center;font-size:var(--text-sm);color:#8e8e93;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;}
 
 /* ── PROCESSING SCREEN ── */
 #ci-fullsheet .proc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 24px;}
@@ -264,21 +264,21 @@ const CI = (() => {
 #ci-fullsheet .proc-dot:nth-child(2){animation-delay:.2s;}
 #ci-fullsheet .proc-dot:nth-child(3){animation-delay:.4s;}
 @keyframes dbreathe{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
-#ci-fullsheet .proc-step{font-size:15px;font-weight:400;color:var(--tx);letter-spacing:-.02em;text-align:center;}
-#ci-fullsheet .proc-sub{font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-top:3px;text-align:center;}
+#ci-fullsheet .proc-step{font-size:var(--text-lg2);font-weight:var(--fw-normal);color:var(--tx);letter-spacing:-.02em;text-align:center;}
+#ci-fullsheet .proc-sub{font-size:var(--text-xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-top:3px;text-align:center;}
 #ci-fullsheet .proc-line{width:148px;height:1px;background:var(--n-100);border-radius:1px;margin-top:24px;overflow:hidden;}
 #ci-fullsheet .proc-fill{height:100%;background:var(--ac);width:0%;transition:width .65s var(--ease);}
 
 /* ── RESULT SCREEN ── */
 #ci-fullsheet .result-hdr{padding:20px 24px 0;}
 #ci-fullsheet .result-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-#ci-fullsheet .result-acct{font-size:16px;font-weight:500;letter-spacing:-.02em;color:var(--tx);}
-.dur-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:100px;background:rgba(0,0,0,.04);font-family:'Noto Sans Thai',sans-serif;font-size:12px;color:var(--tx3);letter-spacing:.02em;}
+#ci-fullsheet .result-acct{font-size:var(--text-xl);font-weight:var(--fw-medium);letter-spacing:-.02em;color:var(--tx);}
+.dur-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:100px;background:rgba(0,0,0,.04);font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-md);color:var(--tx3);letter-spacing:.02em;}
 
 /* ── TAB BAR — sliding pill ── */
-#ci-fullsheet .tab-bar{position:relative;display:flex;background:rgba(0,0,0,.042);border-radius:10px;padding:3px;gap:0;margin-bottom:18px;}
-#ci-fullsheet .tab-pill{position:absolute;top:3px;bottom:3px;background:var(--n-0);border-radius:7px;box-shadow:0 1px 4px rgba(0,0,0,.10);pointer-events:none;transition:left 120ms var(--ease),width 120ms var(--ease);}
-#ci-fullsheet .tab-btn{flex:1;padding:8px 6px;font-size:12px;font-weight:500;color:var(--tx3);background:transparent;border:none;border-radius:7px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.01em;transition:color 120ms;position:relative;z-index:1;white-space:nowrap;}
+#ci-fullsheet .tab-bar{position:relative;display:flex;background:rgba(0,0,0,.042);border-radius:var(--r-md);padding:3px;gap:0;margin-bottom:18px;}
+#ci-fullsheet .tab-pill{position:absolute;top:3px;bottom:3px;background:var(--n-0);border-radius:var(--r-7);box-shadow:0 1px 4px rgba(0,0,0,.10);pointer-events:none;transition:left 120ms var(--ease),width 120ms var(--ease);}
+#ci-fullsheet .tab-btn{flex:1;padding:8px 6px;font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx3);background:transparent;border:none;border-radius:var(--r-7);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.01em;transition:color 120ms;position:relative;z-index:1;white-space:nowrap;}
 #ci-fullsheet .tab-btn.on{color:var(--tx);}
 
 /* ── RESULT BODY ── */
@@ -289,10 +289,10 @@ const CI = (() => {
 
 /* PIPC */
 .pipc-track{display:flex;gap:4px;margin-bottom:6px;}
-.pipc-seg{flex:1;height:2px;border-radius:2px;background:var(--n-100);transition:background 220ms;}
+.pipc-seg{flex:1;height:2px;border-radius:var(--r-xxs);background:var(--n-100);transition:background 220ms;}
 .pipc-seg.done{background:var(--ac);}
 .pipc-labels{display:flex;justify-content:space-between;margin-bottom:24px;}
-.pipc-lbl{font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
+.pipc-lbl{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
 .pipc-lbl.done{color:var(--ac);}
 
 /* SKILL ROWS */
@@ -309,15 +309,15 @@ const CI = (() => {
 .sk-dot.no{background:var(--n-100);}
 .sk-body{flex:1;min-width:0;}
 .sk-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px;}
-.sk-name{font-size:13px;font-weight:500;color:var(--tx);letter-spacing:-.02em;}
-.sk-badge{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;font-family:'Noto Sans Thai',sans-serif;}
+.sk-name{font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx);letter-spacing:-.02em;}
+.sk-badge{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.08em;text-transform:uppercase;font-family:'Noto Sans Thai',sans-serif;}
 .sk-badge.pass{color:var(--success);}
 .sk-badge.dev{color:var(--warning);}
 .sk-badge.no{color:var(--tx3);}
-.sk-note{font-size:12px;color:var(--tx2);line-height:1.5;letter-spacing:-.005em;}
+.sk-note{font-size:var(--text-md);color:var(--tx2);line-height:1.5;letter-spacing:-.005em;}
 
 /* eyebrow */
-#ci-fullsheet .eyebrow{font-size:9px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:12px;}
+#ci-fullsheet .eyebrow{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:12px;}
 
 /* BUYER CARD */
 .buyer-card{
@@ -326,10 +326,10 @@ const CI = (() => {
   box-shadow:inset 0 1px 0 var(--glass-spec),0 4px 20px rgba(0,0,0,.05);
   padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:24px;
 }
-.buyer-icon-wrap{width:46px;height:46px;border-radius:12px;background:var(--n-50);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.buyer-lbl{font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px;}
-.buyer-type{font-size:20px;font-weight:300;letter-spacing:-.03em;color:var(--tx);line-height:1.1;}
-.buyer-ev{font-size:11px;color:var(--tx3);margin-top:2px;letter-spacing:-.005em;}
+.buyer-icon-wrap{width:46px;height:46px;border-radius:var(--r-card);background:var(--n-50);display:flex;align-items:center;justify-content:center;font-size:var(--text-3xl);flex-shrink:0;}
+.buyer-lbl{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:4px;}
+.buyer-type{font-size:var(--text-2xl);font-weight:300;letter-spacing:-.03em;color:var(--tx);line-height:1.1;}
+.buyer-ev{font-size:var(--text-sm);color:var(--tx3);margin-top:2px;letter-spacing:-.005em;}
 
 /* PAIN ROWS */
 #ci-fullsheet .pain-row{display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--br);}
@@ -339,29 +339,29 @@ const CI = (() => {
 #ci-fullsheet .pain-dot.md{background:var(--warning);}
 #ci-fullsheet .pain-dot.op{background:var(--ac);}
 .pain-body{flex:1;}
-#ci-fullsheet .pain-dim{font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;}
-#ci-fullsheet .pain-txt{font-size:12px;color:var(--tx2);line-height:1.5;}
+#ci-fullsheet .pain-dim{font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;}
+#ci-fullsheet .pain-txt{font-size:var(--text-md);color:var(--tx2);line-height:1.5;}
 
 /* ACTION CARDS */
 .action-card{
   background:var(--glass-0);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border-radius:14px;border:0.5px solid var(--glass-border);
+  border-radius:var(--r-lg);border:0.5px solid var(--glass-border);
   box-shadow:inset 0 1px 0 var(--glass-spec),0 3px 16px rgba(0,0,0,.045);
   padding:14px 16px;margin-bottom:8px;
 }
 .action-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
-#ci-fullsheet .action-n{font-size:10px;font-weight:500;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.08em;}
-.urg{font-size:9px;font-weight:500;padding:3px 8px;border-radius:100px;letter-spacing:.06em;text-transform:uppercase;font-family:'Noto Sans Thai',sans-serif;}
+#ci-fullsheet .action-n{font-size:var(--text-xs);font-weight:var(--fw-medium);color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.08em;}
+.urg{font-size:var(--text-2xs);font-weight:var(--fw-medium);padding:3px 8px;border-radius:100px;letter-spacing:.06em;text-transform:uppercase;font-family:'Noto Sans Thai',sans-serif;}
 .urg.hi{background:var(--danger-bg);color:var(--danger);}
 .urg.md{background:var(--warning-bg);color:var(--warning);}
-#ci-fullsheet .action-txt{font-size:12px;color:var(--tx);line-height:1.5;margin-bottom:5px;letter-spacing:-.01em;}
-#ci-fullsheet .action-who{font-size:10px;color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;}
+#ci-fullsheet .action-txt{font-size:var(--text-md);color:var(--tx);line-height:1.5;margin-bottom:5px;letter-spacing:-.01em;}
+#ci-fullsheet .action-who{font-size:var(--text-xs);color:var(--tx3);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;}
 
 /* RESULT CTA */
 .result-cta{display:flex;gap:8px;padding:14px 24px max(40px,calc(env(safe-area-inset-bottom,0px) + 20px));}
-.btn{flex:1;padding:14px;border-radius:14px;border:none;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;letter-spacing:-.02em;cursor:pointer;transition:opacity 60ms linear,transform 60ms linear;}
+.btn{flex:1;padding:14px;border-radius:var(--r-lg);border:none;font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg2);font-weight:var(--fw-medium);letter-spacing:-.02em;cursor:pointer;transition:opacity 60ms linear,transform 60ms linear;}
 .btn:active{transform:scale(.97);opacity:.85;}
-.btn-primary{background:var(--ac);color:#fff;}
+.btn-primary{background:var(--ac);color:var(--tk-text-primary);}
 .btn-primary:hover{background:var(--ac-h);}
 .btn-ghost{background:rgba(0,0,0,.045);color:var(--tx2);}
 .btn-ghost:hover{background:rgba(0,0,0,.07);}
@@ -408,33 +408,33 @@ body:not(.echo-active) { background:unset; }
 #ci-fullsheet .scr { display:none; flex-direction:column; flex:1; min-height:0; }
 #ci-fullsheet .scr.on { display:flex; }
 /* ── Picker sheet items ── */
-.ci-pk-item{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:10px;border:none;background:rgba(0,0,0,.03);cursor:pointer;width:100%;text-align:left;transition:background .15s;margin-bottom:2px;}
+.ci-pk-item{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:var(--r-md);border:none;background:rgba(0,0,0,.03);cursor:pointer;width:100%;text-align:left;transition:background .15s;margin-bottom:2px;}
 .ci-pk-item:active{background:rgba(255,56,92,.08);}
-.ci-pk-name{font-size:13px;color:#1C1C1E;font-weight:500;flex:1;text-align:left;}
-.ci-pk-seg{font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;margin-left:8px;}
+.ci-pk-name{font-size:var(--text-base);color:#1C1C1E;font-weight:var(--fw-medium);flex:1;text-align:left;}
+.ci-pk-seg{font-size:var(--text-xs);font-weight:var(--fw-semi);color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;margin-left:8px;}
 /* ── Readability overrides ── */
-.sk-name{font-size:13px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em}
-.sk-note{font-size:12px;color:#636366;line-height:1.55;letter-spacing:-.005em}
-.sk-badge{font-size:10px;letter-spacing:.08em}
-.buyer-type{font-size:20px;font-weight:300;letter-spacing:-.03em;color:#1C1C1E}
-.buyer-ev{font-size:12px;color:#636366;line-height:1.5}
-.buyer-lbl{font-size:9px;letter-spacing:.14em;color:#6C6C70;margin-bottom:4px}
-#ci-fullsheet .pain-txt{font-size:12px;color:#636366;line-height:1.55}
-#ci-fullsheet .pain-dim{font-size:10px;color:#6C6C70;letter-spacing:.13em}
-#ci-fullsheet .action-txt{font-size:13px;color:#1C1C1E;line-height:1.5}
-#ci-fullsheet .action-who{font-size:11px;color:#6C6C70}
-#ci-fullsheet .action-n{font-size:10px;color:#6C6C70;letter-spacing:.08em}
-#ci-fullsheet .eyebrow{font-size:10px;color:#6C6C70;letter-spacing:.16em}
-#ci-fullsheet .tab-btn{font-size:13px;font-weight:400;color:#6C6C70}
-#ci-fullsheet .tab-btn.on{color:#1C1C1E;font-weight:500}
-#ci-fullsheet .proc-step{font-size:15px;color:#1C1C1E}
-#ci-fullsheet .proc-sub{font-size:11px;color:#6C6C70}
+.sk-name{font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E;letter-spacing:-.02em}
+.sk-note{font-size:var(--text-md);color:#636366;line-height:1.55;letter-spacing:-.005em}
+.sk-badge{font-size:var(--text-xs);letter-spacing:.08em}
+.buyer-type{font-size:var(--text-2xl);font-weight:300;letter-spacing:-.03em;color:#1C1C1E}
+.buyer-ev{font-size:var(--text-md);color:#636366;line-height:1.5}
+.buyer-lbl{font-size:var(--text-2xs);letter-spacing:.14em;color:#6C6C70;margin-bottom:4px}
+#ci-fullsheet .pain-txt{font-size:var(--text-md);color:#636366;line-height:1.55}
+#ci-fullsheet .pain-dim{font-size:var(--text-xs);color:#6C6C70;letter-spacing:.13em}
+#ci-fullsheet .action-txt{font-size:var(--text-base);color:#1C1C1E;line-height:1.5}
+#ci-fullsheet .action-who{font-size:var(--text-sm);color:#6C6C70}
+#ci-fullsheet .action-n{font-size:var(--text-xs);color:#6C6C70;letter-spacing:.08em}
+#ci-fullsheet .eyebrow{font-size:var(--text-xs);color:#6C6C70;letter-spacing:.16em}
+#ci-fullsheet .tab-btn{font-size:var(--text-base);font-weight:var(--fw-normal);color:#6C6C70}
+#ci-fullsheet .tab-btn.on{color:#1C1C1E;font-weight:var(--fw-medium)}
+#ci-fullsheet .proc-step{font-size:var(--text-lg2);color:#1C1C1E}
+#ci-fullsheet .proc-sub{font-size:var(--text-sm);color:#6C6C70}
 #ci-fullsheet .timer-val{color:#1C1C1E}
-#ci-fullsheet .timer-hint{font-size:11px;color:#6C6C70}
-#ci-fullsheet .stop-hint{font-size:11px;color:#6C6C70}
-#ci-fullsheet .btn-stop{font-size:15px;color:#1C1C1E;background:rgba(0,0,0,.055)}
-#ci-fullsheet .chip-txt{font-size:13px;color:#636366}
-#ci-fullsheet .chip-seg{font-size:10px;color:#FF385C}
+#ci-fullsheet .timer-hint{font-size:var(--text-sm);color:#6C6C70}
+#ci-fullsheet .stop-hint{font-size:var(--text-sm);color:#6C6C70}
+#ci-fullsheet .btn-stop{font-size:var(--text-lg2);color:#1C1C1E;background:rgba(0,0,0,.055)}
+#ci-fullsheet .chip-txt{font-size:var(--text-base);color:#636366}
+#ci-fullsheet .chip-seg{font-size:var(--text-xs);color:#FF385C}
 `;
 
   // ── Mount / unmount sheet ──────────────────────────────────────────────────
@@ -568,7 +568,7 @@ body:not(.echo-active) { background:unset; }
 <div id="ci-s-record" class="scr on">
   <div class="topbar">
     <span class="tb-act" id="ci-topbar-left" onclick="CI._topbarLeft()" style="display:flex;align-items:center;gap:4px;">
-      <span id="ci-topbar-left-icon" style="font-size:16px;line-height:1">←</span>
+      <span id="ci-topbar-left-icon" style="font-size:var(--text-xl);line-height:1">←</span>
       <span id="ci-topbar-left-label">ยกเลิก</span>
     </span>
     <span class="tb-lbl">Echo</span>
@@ -591,24 +591,24 @@ body:not(.echo-active) { background:unset; }
       </div>
       <div id="ci-checkin-pill" style="display:none;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;background:rgba(52,199,89,.1);border:0.5px solid rgba(52,199,89,.25)">
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        <span style="font-size:10px;font-weight:500;color:#1A7A3A;font-family:'Noto Sans Thai',sans-serif">เช็คอิน <span id="ci-checkin-time">—</span></span>
+        <span style="font-size:var(--text-xs);font-weight:var(--fw-medium);color:#1A7A3A;font-family:'Noto Sans Thai',sans-serif">เช็คอิน <span id="ci-checkin-time">—</span></span>
       </div>
     </div>
   </div>
   <!-- visit hero — hide during picker state, show after account selected -->
   <div id="ci-visit-hero" style="padding:0 24px 10px;${_showPicker?'display:none':''}">
-    <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:14px;padding:12px 14px;transition:background .7s ease,border-color .7s ease">
+    <div id="ci-vh-card" style="background:rgba(255,56,92,.04);border:0.5px solid rgba(255,56,92,.13);border-radius:var(--r-lg);padding:12px 14px;transition:background .7s ease,border-color .7s ease">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div>
-          <div id="ci-vh-wlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">สัปดาห์นี้</div>
-          <div id="ci-vh-wnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
-          <div id="ci-vh-wsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+          <div id="ci-vh-wlabel" style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">สัปดาห์นี้</div>
+          <div id="ci-vh-wnum" style="font-size:var(--text-3xl);font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-wsub" style="font-size:var(--text-xs);color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
         </div>
         <div id="ci-vh-div" style="width:0.5px;background:rgba(255,56,92,.12);align-self:stretch;transition:background .7s ease"></div>
         <div style="text-align:right">
-          <div id="ci-vh-qlabel" style="font-size:9px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">ไตรมาสนี้</div>
-          <div id="ci-vh-qnum" style="font-size:22px;font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
-          <div id="ci-vh-qsub" style="font-size:10px;color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
+          <div id="ci-vh-qlabel" style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.13em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px;transition:color .7s ease">ไตรมาสนี้</div>
+          <div id="ci-vh-qnum" style="font-size:var(--text-3xl);font-weight:300;color:#1C1C1E;letter-spacing:-.03em;line-height:1.1;transition:color .7s ease">—</div>
+          <div id="ci-vh-qsub" style="font-size:var(--text-xs);color:#AEAEB2;margin-top:1px;transition:color .7s ease">visits</div>
         </div>
       </div>
       <div id="ci-vh-dots" style="display:flex;gap:5px;align-items:center"></div>
@@ -643,7 +643,7 @@ body:not(.echo-active) { background:unset; }
   <!-- TL covisit panel — shown for TL/Admin instead of orb -->
   <div id="ci-covisit-panel" style="display:none;flex:1;flex-direction:column;overflow:hidden">
     <div class="cv-list-wrap" id="ci-cv-list-body">
-      <div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+      <div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>
     </div>
     <div id="ci-cv-verify-wrap" style="display:none">
       <button class="cv-verify-btn" id="ci-cv-verify-btn" onclick="CI._covisitVerify()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>ยืนยัน Co-visit</button>
@@ -662,13 +662,13 @@ body:not(.echo-active) { background:unset; }
       <button id="ci-stop-btn" onclick="CI.stopRecording()"
         style="padding:11px 32px;border:0.5px solid rgba(255,255,255,.38);border-radius:100px;
                background:transparent;color:rgba(255,255,255,.72);
-               font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
+               font-size:var(--text-md);font-weight:var(--fw-medium);letter-spacing:.05em;text-transform:uppercase;
                font-family:'Noto Sans Thai',sans-serif;cursor:pointer;
                transition:background .7s ease,color .7s ease,border-color .7s ease">
         จบ &amp; วิเคราะห์
       </button>
       <button onclick="CI.cancel()"
-        style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;cursor:pointer;
+        style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:var(--r-card);cursor:pointer;
                background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);
                display:flex;align-items:center;justify-content:center;
                transition:background .7s ease,color .7s ease" title="ยกเลิก session">
@@ -679,7 +679,7 @@ body:not(.echo-active) { background:unset; }
   <!-- inline history panel — shown when tab=history -->
   <div id="ci-inline-hist" style="display:none;flex:1;overflow-y:auto;padding:0 24px max(32px,calc(env(safe-area-inset-bottom,0px) + 80px));-webkit-overflow-scrolling:touch">
     <div id="ci-inline-hist-body" style="padding-top:8px">
-      <div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>
+      <div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>
     </div>
   </div>
 </div>
@@ -693,11 +693,11 @@ body:not(.echo-active) { background:unset; }
     <p class="proc-sub" id="ci-psub">Gemini · ฟัง audio ทั้งหมด</p>
     <div class="proc-line"><div class="proc-fill" id="ci-pfill"></div></div>
     <div style="display:flex;gap:8px;margin-top:12px;justify-content:center" id="ci-proc-steps">
-      <div id="ci-proc-s1" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,56,92,.15);color:#FF385C;border:1px solid rgba(255,56,92,.3);font-family:'Noto Sans Thai',sans-serif">1 · Transcript</div>
-      <div id="ci-proc-s2" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">2 · สรุป</div>
-      <div id="ci-proc-s3" style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">3 · ทักษะ</div>
+      <div id="ci-proc-s1" style="font-size:var(--text-xs);padding:3px 10px;border-radius:var(--r-xl);background:rgba(255,56,92,.15);color:#FF385C;border:1px solid rgba(255,56,92,.3);font-family:'Noto Sans Thai',sans-serif">1 · Transcript</div>
+      <div id="ci-proc-s2" style="font-size:var(--text-xs);padding:3px 10px;border-radius:var(--r-xl);background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">2 · สรุป</div>
+      <div id="ci-proc-s3" style="font-size:var(--text-xs);padding:3px 10px;border-radius:var(--r-xl);background:rgba(255,255,255,.06);color:var(--tx3,#AEAEB2);border:1px solid rgba(255,255,255,.1);font-family:'Noto Sans Thai',sans-serif">3 · ทักษะ</div>
     </div>
-    <p style="font-size:11px;color:var(--tx3,#AEAEB2);margin-top:10px;font-family:'Noto Sans Thai',sans-serif" id="ci-pelapsed"></p>
+    <p style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);margin-top:10px;font-family:'Noto Sans Thai',sans-serif" id="ci-pelapsed"></p>
   </div>
 </div>
 
@@ -724,8 +724,8 @@ body:not(.echo-active) { background:unset; }
     <button class="btn btn-primary" onclick="CI._save()">บันทึก</button>
   </div>
   <div id="ci-tl-actions" style="display:none;padding:0 24px 12px;gap:8px;flex-shrink:0">
-    <button onclick="CI._openDebrief()" style="flex:1;padding:10px;border-radius:12px;border:0.5px solid rgba(83,74,183,.3);background:rgba(83,74,183,.07);color:#534AB7;font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',-apple-system,sans-serif">Debrief</button>
-    <button onclick="CI._openHistory()" style="flex:1;padding:10px;border-radius:12px;border:0.5px solid rgba(0,0,0,.12);background:rgba(0,0,0,.04);color:var(--tx2,#636366);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',-apple-system,sans-serif">ประวัติ</button>
+    <button onclick="CI._openDebrief()" style="flex:1;padding:10px;border-radius:var(--r-card);border:0.5px solid rgba(83,74,183,.3);background:rgba(83,74,183,.07);color:#534AB7;font-size:var(--text-base);font-weight:var(--fw-medium);cursor:pointer;font-family:'Noto Sans Thai',-apple-system,sans-serif">Debrief</button>
+    <button onclick="CI._openHistory()" style="flex:1;padding:10px;border-radius:var(--r-card);border:0.5px solid rgba(0,0,0,.12);background:rgba(0,0,0,.04);color:var(--tx2,#636366);font-size:var(--text-base);font-weight:var(--fw-medium);cursor:pointer;font-family:'Noto Sans Thai',-apple-system,sans-serif">ประวัติ</button>
   </div>
 </div>`;
   }
@@ -860,13 +860,13 @@ body:not(.echo-active) { background:unset; }
     if (!scr || document.getElementById('ci-recover-banner')) return;
     const div = document.createElement('div');
     div.id = 'ci-recover-banner';
-    div.style.cssText = 'margin:4px 24px 8px;padding:12px 14px;border-radius:14px;background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.25)';
+    div.style.cssText = 'margin:4px 24px 8px;padding:12px 14px;border-radius:var(--r-lg);background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.25)';
     div.innerHTML = `
-      <div style="font-size:12px;font-weight:600;color:#995500;margin-bottom:2px;font-family:'Noto Sans Thai',sans-serif">พบการบันทึกค้าง ${_fmt(secs)} นาที</div>
-      <div style="font-size:11px;color:#8e8e93;margin-bottom:8px;font-family:'Noto Sans Thai',sans-serif">${meta.account_name || 'ไม่ระบุร้าน'} · แอพถูกปิดก่อนวิเคราะห์เสร็จ</div>
+      <div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:#995500;margin-bottom:2px;font-family:'Noto Sans Thai',sans-serif">พบการบันทึกค้าง ${_fmt(secs)} นาที</div>
+      <div style="font-size:var(--text-sm);color:#8e8e93;margin-bottom:8px;font-family:'Noto Sans Thai',sans-serif">${meta.account_name || 'ไม่ระบุร้าน'} · แอพถูกปิดก่อนวิเคราะห์เสร็จ</div>
       <div style="display:flex;gap:8px">
-        <button onclick="CI._recoverBuffer()" style="flex:1;padding:9px;border:none;border-radius:10px;background:#FF9500;color:#fff;font-size:12px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;cursor:pointer">วิเคราะห์ต่อ</button>
-        <button onclick="CI._discardBuffer()" style="padding:9px 14px;border:0.5px solid rgba(0,0,0,.12);border-radius:10px;background:transparent;color:#8e8e93;font-size:12px;font-family:'Noto Sans Thai',sans-serif;cursor:pointer">ทิ้ง</button>
+        <button onclick="CI._recoverBuffer()" style="flex:1;padding:9px;border:none;border-radius:var(--r-md);background:#FF9500;color:var(--tk-text-primary);font-size:var(--text-md);font-weight:var(--fw-semi);font-family:'Noto Sans Thai',sans-serif;cursor:pointer">วิเคราะห์ต่อ</button>
+        <button onclick="CI._discardBuffer()" style="padding:9px 14px;border:0.5px solid rgba(0,0,0,.12);border-radius:var(--r-md);background:transparent;color:#8e8e93;font-size:var(--text-md);font-family:'Noto Sans Thai',sans-serif;cursor:pointer">ทิ้ง</button>
       </div>`;
     const anchor = document.getElementById('ci-chip-wrap');
     if (anchor && anchor.parentElement === scr) scr.insertBefore(div, anchor);
@@ -1831,7 +1831,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
   function _loadingPanel(msg, isDone) {
     // isDone=true → แสดง "ไม่มีข้อมูล" แทน spinner
     if (isDone) {
-      return '<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ไม่มีข้อมูลในส่วนนี้</div>';
+      return '<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ไม่มีข้อมูลในส่วนนี้</div>';
     }
     return '<div style="padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:12px">'
       + '<div style="display:flex;gap:5px;align-items:center">'
@@ -1839,7 +1839,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       + '<span style="width:5px;height:5px;border-radius:50%;background:#AEAEB2;animation:ci-dot-pulse 1.2s ease-in-out .2s infinite"></span>'
       + '<span style="width:5px;height:5px;border-radius:50%;background:#AEAEB2;animation:ci-dot-pulse 1.2s ease-in-out .4s infinite"></span>'
       + '</div>'
-      + '<div style="font-size:12px;color:#AEAEB2;letter-spacing:.04em">' + (msg||'กำลังประมวลผล...') + '</div>'
+      + '<div style="font-size:var(--text-md);color:#AEAEB2;letter-spacing:.04em">' + (msg||'กำลังประมวลผล...') + '</div>'
       + '</div>';
   }
 
@@ -1860,8 +1860,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
             <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
             <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
-          <div style="font-size:15px;font-weight:600;color:var(--tx,#1C1C1E)">ไม่พบเสียงการสนทนา</div>
-          <div style="font-size:13px;color:var(--tx2,#636366);line-height:1.6;max-width:260px">
+          <div style="font-size:var(--text-lg2);font-weight:var(--fw-semi);color:var(--tx,#1C1C1E)">ไม่พบเสียงการสนทนา</div>
+          <div style="font-size:var(--text-base);color:var(--tx2,#636366);line-height:1.6;max-width:260px">
             Audio ที่ส่งไปไม่มีเสียงพูด หรือเสียงเบาเกินไป<br>กรุณาลองบันทึกใหม่ และตรวจสอบว่าไมโครโฟนทำงานได้
           </div>
         </div>`;
@@ -1921,11 +1921,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
       };
       const rows = segments.map(seg => {
         const color = speakerColor(seg.speaker);
-        const ts = seg.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#AEAEB2;margin-right:6px;flex-shrink:0">${seg.ts}</span>` : '';
-        const spk = seg.speaker ? `<span style="font-size:10px;font-weight:600;color:${color};margin-right:6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em">${seg.speaker}</span>` : '';
+        const ts = seg.ts ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:var(--text-xs);color:#AEAEB2;margin-right:6px;flex-shrink:0">${seg.ts}</span>` : '';
+        const spk = seg.speaker ? `<span style="font-size:var(--text-xs);font-weight:var(--fw-semi);color:${color};margin-right:6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em">${seg.speaker}</span>` : '';
         return `<div style="display:flex;align-items:baseline;gap:0;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">
           <div style="display:flex;align-items:baseline;gap:0;flex-shrink:0;width:120px">${ts}${spk}</div>
-          <div style="font-size:13px;color:#1C1C1E;line-height:1.6;flex:1">${seg.text||''}</div>
+          <div style="font-size:var(--text-base);color:#1C1C1E;line-height:1.6;flex:1">${seg.text||''}</div>
         </div>`;
       }).join('');
       transcriptHtml = `<div class="sd2-lbl">บทสนทนา · ${segments.length} segments</div>
@@ -1939,11 +1939,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
       notesHtml = '<div class="sd2-lbl">บันทึกการสนทนา</div>';
       notesHtml += notes.map(n => {
         const bullets = (n.bullets||[]).map(b =>
-          '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;color:#1C1C1E;line-height:1.6">'
+          '<div style="display:flex;gap:8px;padding:4px 0;font-size:var(--text-base);color:#1C1C1E;line-height:1.6">'
           + '<span style="color:#AEAEB2;flex-shrink:0">•</span><span>' + b + '</span></div>'
         ).join('');
         return '<div style="margin-bottom:14px">'
-          + (n.heading ? '<div style="font-size:12px;font-weight:600;color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
+          + (n.heading ? '<div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:#636366;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + n.heading + '</div>' : '')
           + bullets + '</div>';
       }).join('');
     } else if (segments && segments.length) {
@@ -1963,9 +1963,9 @@ OCPB (customer intel จากเสียงเท่านั้น):
       customerSaidHtml = '<div class="sd2-lbl">ลูกค้าบอกว่า</div>';
       customerSaidHtml += customerSaid.map(c =>
         '<div style="padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,.06)">'
-        + '<div style="font-size:13px;color:#1C1C1E;line-height:1.6;margin-bottom:2px">' + (c.point||'') + '</div>'
+        + '<div style="font-size:var(--text-base);color:#1C1C1E;line-height:1.6;margin-bottom:2px">' + (c.point||'') + '</div>'
         + (c.quote ? '<div class="sd2-sev">&ldquo;' + c.quote + '&rdquo;'
-          + (c.ts ? ' <span style="font-family:var(--mono);font-size:11px;color:#8E8E93">' + c.ts + '</span>' : '')
+          + (c.ts ? ' <span style="font-family:var(--mono);font-size:var(--text-sm);color:#8E8E93">' + c.ts + '</span>' : '')
           + '</div>' : '')
         + '</div>'
       ).join('');
@@ -1977,11 +1977,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   function _skillsPanel(d) {
     const shortBanner = (d?._short_transcript)
-      ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:12px;margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
+      ? `<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:rgba(255,149,0,.08);border-radius:var(--r-card);margin-bottom:16px;border:0.5px solid rgba(255,149,0,.2)">
           <div style="flex-shrink:0;display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning,#FF9500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
           <div>
-            <div style="font-size:12px;font-weight:500;color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
-            <div style="font-size:11px;color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
+            <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:#FF9500;margin-bottom:2px">Transcript สั้น (${d._word_count||'?'} คำ)</div>
+            <div style="font-size:var(--text-sm);color:var(--tx2,#636366);line-height:1.5">Skill analysis ต้องการอย่างน้อย 80 คำ — บันทึกนานขึ้นเพื่อผลที่แม่นยำกว่านี้</div>
           </div>
         </div>`
       : '';
@@ -2014,7 +2014,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       </div>`;
     }).join('');
 
-    return shortBanner + summary + (rows || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มีการประเมินทักษะ</div>`);
+    return shortBanner + summary + (rows || `<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีการประเมินทักษะ</div>`);
   }
 
   function _customerPanel(d) {
@@ -2046,16 +2046,16 @@ OCPB (customer intel จากเสียงเท่านั้น):
       // มิติที่ไม่มีใครแตะ — ยุบเหลือบรรทัดเดียว ไม่กินสายตา (ช่องว่างคือคำตอบ ไม่ใช่ความผิด)
       if (!fs.length && stKey === 'not_asked') {
         return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 0;border-bottom:0.5px solid #ECECF0">
-          <span style="font-size:13px;color:#AEAEB2">${dim} — ${label}</span>
+          <span style="font-size:var(--text-base);color:#AEAEB2">${dim} — ${label}</span>
           <span class="sd2-sstate no">${st[0]}</span>
         </div>`;
       }
       const rows = fs.map(f => {
         const quote = (f.quote && String(f.quote).trim())
-          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;color:#8E8E93">${f.ts}</span>` : ''}</div>`
+          ? `<div class="sd2-sev">&ldquo;${f.quote}&rdquo;${f.ts ? ` <span style="font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:var(--text-sm);color:#8E8E93">${f.ts}</span>` : ''}</div>`
           : '';
         return `<div style="padding:8px 0 8px 2px">
-          <div style="font-size:14px;color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
+          <div style="font-size:var(--text-lg);color:#1C1C1E;line-height:1.7">${f.summary || '-'}</div>
           ${quote}
         </div>`;
       }).join('');
@@ -2063,7 +2063,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
         `<div style="font-size:12.5px;color:#8E8E93;padding:6px 0 6px 2px">rep ถามแล้ว แต่ยังไม่ได้คำตอบจากลูกค้า</div>`;
       return `<div style="padding:11px 0;border-bottom:0.5px solid #ECECF0">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <span style="font-size:14px;font-weight:600;color:#1C1C1E">${dim} — ${label}</span>
+          <span style="font-size:var(--text-lg);font-weight:var(--fw-semi);color:#1C1C1E">${dim} — ${label}</span>
           <span class="sd2-sstate ${st[1]}">${st[0]}</span>
         </div>
         ${rows}${empty}
@@ -2073,14 +2073,14 @@ OCPB (customer intel จากเสียงเท่านั้น):
     // Next Steps — ต่อท้าย pane ลูกค้า (mirror session detail)
     const nexts = (d?.next_actions||[]).map((a,i) => {
       const ul = a.urgency==='3_days'?'ภายใน 3 วัน':a.urgency==='this_week'?'สัปดาห์นี้':'visit ถัดไป';
-      return `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><div><div>${a.action||''}</div><div style="font-size:12px;color:#8E8E93;margin-top:3px">${a.owner||''} · ${ul}${a.reason?` — ${a.reason}`:''}</div></div></div>`;
+      return `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><div><div>${a.action||''}</div><div style="font-size:var(--text-md);color:#8E8E93;margin-top:3px">${a.owner||''} · ${ul}${a.reason?` — ${a.reason}`:''}</div></div></div>`;
     }).join('');
     const nextsHtml = nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : '';
 
     const hasIntel = facts.length || Object.keys(status).length;
     const intelHtml = hasIntel
       ? `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>${blocks}`
-      : (nextsHtml ? '' : `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
+      : (nextsHtml ? '' : `<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
     return intelHtml + nextsHtml;
   }
 
@@ -2093,10 +2093,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const allM = (tone?.key_moments||[]).map(m => _kmText(m)).filter(Boolean);
     const momentsHtml = allM.length
       ? `<div class="sd2-lbl">Key Moments ทั้งหมด · ${allM.length} จุด</div>`
-        + allM.map(x => `<div style="font-size:14px;color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
+        + allM.map(x => `<div style="font-size:var(--text-lg);color:#1C1C1E;line-height:1.7;padding:8px 0;border-bottom:0.5px solid #ECECF0">${x}</div>`).join('')
       : '';
     return (summaryHtml + momentsHtml)
-      || `<div style="padding:24px;text-align:center;font-size:13px;color:#AEAEB2">ยังไม่มี transcript จาก session นี้</div>`;
+      || `<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ยังไม่มี transcript จาก session นี้</div>`;
   }
 
 
@@ -2134,9 +2134,9 @@ OCPB (customer intel จากเสียงเท่านั้น):
   padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);
   flex-shrink:0;
 }
-.db-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.db-title { font-size:var(--text-lg2);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
 .db-role-chip {
-  font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;
   font-family:'Noto Sans Thai',sans-serif;
   padding:3px 8px;border-radius:100px;
   background:rgba(83,74,183,.1);color:#534AB7;
@@ -2151,20 +2151,20 @@ OCPB (customer intel จากเสียงเท่านั้น):
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:8px;gap:10px;
 }
-.db-skill-name { font-size:13px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em;flex:1; }
+.db-skill-name { font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.02em;flex:1; }
 .db-ai-badge {
-  font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.08em;text-transform:uppercase;
   font-family:'Noto Sans Thai',sans-serif;
   padding:2px 7px;border-radius:100px;flex-shrink:0;
 }
 .db-ai-badge.pass { background:rgba(52,199,89,.12);color:#1a7a38; }
 .db-ai-badge.dev  { background:rgba(255,149,0,.12);color:#a05800; }
 .db-ai-badge.no   { background:rgba(0,0,0,.06);color:#888; }
-.db-evidence { font-size:11px;color:var(--n-400,#636366);line-height:1.5;margin-bottom:8px; }
+.db-evidence { font-size:var(--text-sm);color:var(--n-400,#636366);line-height:1.5;margin-bottom:8px; }
 .db-override-row { display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap; }
 .db-pill {
   padding:5px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.12);
-  font-size:11px;font-weight:500;font-family:'Noto Sans Thai',sans-serif;
+  font-size:var(--text-sm);font-weight:var(--fw-medium);font-family:'Noto Sans Thai',sans-serif;
   letter-spacing:.04em;cursor:pointer;background:rgba(0,0,0,.03);
   color:var(--n-400,#636366);transition:background 100ms,color 100ms,border-color 100ms;
 }
@@ -2174,8 +2174,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
 .db-pill.sel-na     { background:rgba(0,0,0,.04);color:#aaa;border-color:rgba(0,0,0,.1); }
 .db-note {
   width:100%;box-sizing:border-box;
-  border:0.5px solid rgba(0,0,0,.14);border-radius:10px;
-  padding:9px 12px;font-size:12px;font-family:'Noto Sans Thai',sans-serif;
+  border:0.5px solid rgba(0,0,0,.14);border-radius:var(--r-md);
+  padding:9px 12px;font-size:var(--text-md);font-family:'Noto Sans Thai',sans-serif;
   color:var(--n-900,#1C1C1E);background:rgba(255,255,255,.7);
   resize:none;min-height:52px;outline:none;line-height:1.5;
   transition:border-color 150ms;
@@ -2187,16 +2187,16 @@ OCPB (customer intel จากเสียงเท่านั้น):
   border-top:0.5px solid var(--n-100,#E5E5EA);
 }
 .db-btn {
-  flex:1;padding:13px;border-radius:14px;border:none;
-  font-family:'Noto Sans Thai',sans-serif;font-size:15px;
-  font-weight:500;letter-spacing:-.02em;cursor:pointer;
+  flex:1;padding:13px;border-radius:var(--r-lg);border:none;
+  font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg2);
+  font-weight:var(--fw-medium);letter-spacing:-.02em;cursor:pointer;
   transition:opacity 60ms,transform 60ms;
 }
 .db-btn:active { transform:scale(.97);opacity:.85; }
-.db-btn-primary { background:#FF385C;color:#fff; }
+.db-btn-primary { background:#FF385C;color:var(--tk-text-primary); }
 .db-btn-primary:hover { background:#e02d50; }
 .db-btn-ghost { background:rgba(0,0,0,.045);color:var(--n-400,#636366); }
-.db-saving { text-align:center;font-size:12px;color:var(--n-200,#AEAEB2);padding:4px 0; }
+.db-saving { text-align:center;font-size:var(--text-md);color:var(--n-200,#AEAEB2);padding:4px 0; }
 `;
   }
 
@@ -2376,24 +2376,24 @@ OCPB (customer intel จากเสียงเท่านั้น):
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);flex-shrink:0;
 }
-.hist-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
-.hist-close { font-size:15px;color:var(--n-400,#636366);cursor:pointer;padding:4px; }
+.hist-title { font-size:var(--text-lg2);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.hist-close { font-size:var(--text-lg2);color:var(--n-400,#636366);cursor:pointer;padding:4px; }
 .hist-body { flex:1;overflow-y:auto;padding:12px 24px 24px;-webkit-overflow-scrolling:touch; }
 .hist-body::-webkit-scrollbar { display:none; }
-.hist-empty { text-align:center;padding:48px 0;font-size:13px;color:var(--n-200,#AEAEB2); }
+.hist-empty { text-align:center;padding:48px 0;font-size:var(--text-base);color:var(--n-200,#AEAEB2); }
 .hist-session {
   background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border-radius:14px;border:0.5px solid rgba(255,255,255,.55);
+  border-radius:var(--r-lg);border:0.5px solid rgba(255,255,255,.55);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);
   padding:14px 16px;margin-bottom:10px;
 }
 .hist-session-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
-.hist-date { font-size:12px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.01em; }
-.hist-rep  { font-size:10px;color:var(--n-400,#636366);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.03em; }
+.hist-date { font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.01em; }
+.hist-rep  { font-size:var(--text-xs);color:var(--n-400,#636366);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.03em; }
 .hist-skills { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px; }
 .hist-skill-dot {
   display:flex;align-items:center;gap:4px;
-  font-size:10px;font-family:'Noto Sans Thai',sans-serif;
+  font-size:var(--text-xs);font-family:'Noto Sans Thai',sans-serif;
   color:var(--n-400,#636366);letter-spacing:.03em;
 }
 .hsd { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
@@ -2401,11 +2401,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
 .hsd.dev  { background:#FF9500; }
 .hsd.no   { background:#AEAEB2; }
 .hist-coaching {
-  font-size:11px;color:var(--ac,#FF385C);font-style:italic;line-height:1.5;
+  font-size:var(--text-sm);color:var(--ac,#FF385C);font-style:italic;line-height:1.5;
   border-top:0.5px solid rgba(255,56,92,.12);padding-top:6px;margin-top:6px;
 }
 .hist-tl-note {
-  font-size:11px;color:#534AB7;font-style:italic;line-height:1.5;
+  font-size:var(--text-sm);color:#534AB7;font-style:italic;line-height:1.5;
   border-top:0.5px solid rgba(83,74,183,.12);padding-top:6px;margin-top:4px;
 }
 `;
@@ -2535,26 +2535,26 @@ OCPB (customer intel จากเสียงเท่านั้น):
   display:flex;align-items:center;justify-content:space-between;
   padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);flex-shrink:0;
 }
-.trend-title { font-size:15px;font-weight:500;color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
-.trend-close { font-size:15px;color:var(--n-400,#636366);cursor:pointer;padding:4px; }
+.trend-title { font-size:var(--text-lg2);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.trend-close { font-size:var(--text-lg2);color:var(--n-400,#636366);cursor:pointer;padding:4px; }
 .trend-body { flex:1;overflow-y:auto;overflow-x:auto;padding:16px 24px 24px;-webkit-overflow-scrolling:touch; }
 .trend-body::-webkit-scrollbar { display:none; }
 .trend-rep-row { margin-bottom:20px; }
-.trend-rep-name { font-size:12px;font-weight:500;color:var(--n-900,#1C1C1E);margin-bottom:8px;letter-spacing:-.01em; }
+.trend-rep-name { font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);margin-bottom:8px;letter-spacing:-.01em; }
 .trend-grid { display:flex;flex-wrap:wrap;gap:5px; }
 .trend-cell {
-  width:44px;padding:5px 4px;border-radius:7px;text-align:center;
-  font-size:9px;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;
+  width:44px;padding:5px 4px;border-radius:var(--r-7);text-align:center;
+  font-size:var(--text-2xs);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em;
 }
-.trend-cell-code { font-weight:500;margin-bottom:2px;line-height:1.2; }
-.trend-cell-score { font-size:8px;opacity:.75; }
+.trend-cell-code { font-weight:var(--fw-medium);margin-bottom:2px;line-height:1.2; }
+.trend-cell-score { font-size:var(--text-3xs);opacity:.75; }
 .trend-cell.pass { background:rgba(52,199,89,.14);color:#1a7a38; }
 .trend-cell.dev  { background:rgba(255,149,0,.14);color:#a05800; }
 .trend-cell.no   { background:rgba(0,0,0,.05);color:#888; }
 .trend-cell.none { background:rgba(0,0,0,.03);color:#ccc; }
 .trend-legend { display:flex;gap:14px;margin-bottom:16px; }
 .tl-dot { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px; }
-.tl-legend-item { display:flex;align-items:center;font-size:10px;color:var(--n-400,#636366); }
+.tl-legend-item { display:flex;align-items:center;font-size:var(--text-xs);color:var(--n-400,#636366); }
 `;
   }
 
@@ -2577,7 +2577,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
         <span class="trend-close" onclick="CI._closeTrend()">ปิด</span>
       </div>
       <div class="trend-body" id="ci-trend-body">
-        <div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+        <div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>
       </div>`;
     document.body.appendChild(sheet);
     requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
@@ -2602,7 +2602,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     if (!body) return;
 
     if (rows.length === 0) {
-      body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูล</div>';
+      body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีข้อมูล</div>';
       return;
     }
 
@@ -2755,7 +2755,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
           {key:'all', label:'ทั้งหมด'}
         ].map(({key, label}) =>
           `<button onclick="CI._histFilter('${key}')" id="ci-hf-${key}"
-            style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
+            style="font-size:var(--text-sm);font-weight:var(--fw-medium);padding:4px 12px;border-radius:100px;border:0.5px solid rgba(0,0,0,.14);background:${key==='week'?'var(--ac,#FF385C)':'rgba(0,0,0,.04)'};color:${key==='week'?'#fff':'var(--tx2,#636366)'};cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`
         ).join('');
         const histBody = document.getElementById('ci-inline-hist-body');
         if (histBody) histPanel.insertBefore(bar, histBody);
@@ -2767,9 +2767,9 @@ OCPB (customer intel จากเสียงเท่านั้น):
   async function _loadInlineHistory() {
     const body = document.getElementById('ci-inline-hist-body');
     if (!body) return;
-    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>';
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">กำลังโหลด...</div>';
     const email = currentUserProfile?.email;
-    if (!email) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ไม่พบผู้ใช้งาน</div>'; return; }
+    if (!email) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">ไม่พบผู้ใช้งาน</div>'; return; }
     try {
       const isTL = _canDebrief();
       let q = supa.from('ci_sessions')
@@ -2817,7 +2817,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       });
       if (!data || !data.length) {
         const emptyMsg = _histFilterMode === 'week' ? 'ยังไม่มี visit สัปดาห์นี้' : _histFilterMode === 'month' ? 'ยังไม่มี visit เดือนนี้' : 'ยังไม่มีประวัติ Echo';
-        body.innerHTML = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">${emptyMsg}</div>`;
+        body.innerHTML = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">${emptyMsg}</div>`;
         return;
       }
       body.innerHTML = isTL ? _renderTLTeamFeed(data) : _renderInlineHistory(data);
@@ -2826,7 +2826,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       const rows = await _loadHistory();
       const sessions = _groupHistoryBySessions(rows);
       if (!sessions.length) {
-        body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ</div>';
+        body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">ยังไม่มีประวัติ</div>';
         return;
       }
       body.innerHTML = _renderLegacyHistory(sessions);
@@ -2860,7 +2860,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
 
   // ── TL Team Feed ──────────────────────────────────────────────────────────
   function _renderTLTeamFeed(sessions) {
-    if (!sessions.length) return '<div style="text-align:center;padding:48px 0;font-size:13px;color:var(--tx3,#AEAEB2)">ยังไม่มี session</div>';
+    if (!sessions.length) return '<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">ยังไม่มี session</div>';
 
     return sessions.map(s => {
       const repName  = s.owner_email ? s.owner_email.split('@')[0] : '—';
@@ -2882,30 +2882,30 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (s.tone_signals?.rep_confidence) {
         const c = s.tone_signals.rep_confidence;
         const col = c==='high'?'#34C759':c==='medium'?'#FF9500':'#FF3B30';
-        toneBadge = `<span style="font-size:9px;font-weight:500;color:${col};background:${col}18;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em">${c==='high'?'Confident':c==='medium'?'Steady':'Hesitant'}</span>`;
+        toneBadge = `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:${col};background:${col}18;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em">${c==='high'?'Confident':c==='medium'?'Steady':'Hesitant'}</span>`;
       }
 
       // Review badge
       const reviewBadge = reviewed
-        ? `<span style="font-size:9px;font-weight:500;color:#34C759;background:#34C75918;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">✓ รีวิวแล้ว</span>`
-        : `<span style="font-size:9px;font-weight:500;color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif">รอรีวิว</span>`;
+        ? `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#34C759;background:#34C75918;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif">✓ รีวิวแล้ว</span>`
+        : `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif">รอรีวิว</span>`;
 
       // Co-visit badge
       const cvBadge = s.covisit_verified
-        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;background:#34C75918;padding:2px 7px;border-radius:6px;font-family:'Noto Sans Thai',sans-serif"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>`
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#34C759;background:#34C75918;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>`
         : '';
 
-      return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 12px rgba(0,0,0,.04);padding:12px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+      return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:var(--r-lg);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 12px rgba(0,0,0,.04);padding:12px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
     <div style="display:flex;align-items:center;gap:7px">
-      <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,56,92,.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--ac,#FF385C);flex-shrink:0">${repName.slice(0,2).toUpperCase()}</div>
+      <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,56,92,.12);display:flex;align-items:center;justify-content:center;font-size:var(--text-2xs);font-weight:var(--fw-semi);color:var(--ac,#FF385C);flex-shrink:0">${repName.slice(0,2).toUpperCase()}</div>
       <div>
-        <div style="font-size:12px;font-weight:500;color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
-        <div style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel}</div>
+        <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
+        <div style="font-size:var(--text-xs);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel}</div>
       </div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:10px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${date}${dur?' · '+dur:''}</div>
+      <div style="font-size:var(--text-xs);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${date}${dur?' · '+dur:''}</div>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -2914,7 +2914,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     ${cvBadge}
     ${reviewBadge}
   </div>
-  ${s.tl_note ? `<div style="font-size:10px;color:#534AB7;font-style:italic;line-height:1.5;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(83,74,183,.12);font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div>` : ''}
+  ${s.tl_note ? `<div style="font-size:var(--text-xs);color:#534AB7;font-style:italic;line-height:1.5;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(83,74,183,.12);font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div>` : ''}
 </div>`;
     }).join('');
   }
@@ -2933,33 +2933,33 @@ OCPB (customer intel จากเสียงเท่านั้น):
 #ci-sess-detail { position:fixed;top:0;bottom:0;left:50%;width:100%;max-width:440px;transform:translateX(-50%) translateY(100%);z-index:10001;padding-top:env(safe-area-inset-top,44px);background:#FFFFFF;font-family:'Noto Sans Thai',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:transform 380ms cubic-bezier(0.16,1,0.3,1);overflow:hidden; }
 #ci-sess-detail.open { transform:translateX(-50%) translateY(0); }
 .sd-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:0.5px solid #E5E5EA;flex-shrink:0; }
-.sd-title { font-size:15px;font-weight:500;color:#1C1C1E;letter-spacing:-.02em; }
-.sd-close { font-size:15px;color:#636366;cursor:pointer;padding:4px 0 4px 12px; }
+.sd-title { font-size:var(--text-lg2);font-weight:var(--fw-medium);color:#1C1C1E;letter-spacing:-.02em; }
+.sd-close { font-size:var(--text-lg2);color:#636366;cursor:pointer;padding:4px 0 4px 12px; }
 .sd-body { flex:1;overflow-y:auto;padding:16px 20px 24px;-webkit-overflow-scrolling:touch; }
 .sd2-transcript { font-size:12.5px;color:#48484A;line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border:0.5px solid rgba(255,56,92,.12);border-radius:11px;letter-spacing:-.005em; }
 .sd-body::-webkit-scrollbar { display:none; }
-.sd-section-hd { font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:16px 0 8px; }
+.sd-section-hd { font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin:16px 0 8px; }
 .sd-skill-row { display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid #F2F2F7; }
 .sd-skill-row:last-child { border-bottom:none; }
 .sd-skill-dot { width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0; }
-.sd-skill-name { font-size:12px;font-weight:500;color:#1C1C1E;margin-bottom:2px; }
-.sd-skill-ev { font-size:11px;color:#636366;line-height:1.5; }
-.sd-skill-note { font-size:11px;color:#FF385C;margin-top:3px;font-style:italic;line-height:1.4; }
+.sd-skill-name { font-size:var(--text-md);font-weight:var(--fw-medium);color:#1C1C1E;margin-bottom:2px; }
+.sd-skill-ev { font-size:var(--text-sm);color:#636366;line-height:1.5; }
+.sd-skill-note { font-size:var(--text-sm);color:#FF385C;margin-top:3px;font-style:italic;line-height:1.4; }
 .sd-tone-row { display:flex;gap:10px;margin-bottom:12px; }
-.sd-tone-card { flex:1;padding:10px 12px;background:#F7F7F7;border-radius:10px; }
-.sd-tone-label { font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px; }
-.sd-tone-val { font-size:13px;font-weight:500; }
-.sd-tone-note { font-size:10px;color:#AEAEB2;margin-top:2px;line-height:1.4; }
-.sd-summary { font-size:12px;color:#636366;line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border-radius:10px;border:0.5px solid rgba(255,56,92,.12); }
-.sd-review-btn { width:100%;padding:14px;border-radius:14px;border:none;background:var(--ac,#FF385C);color:#fff;font-family:'Noto Sans Thai',sans-serif;font-size:15px;font-weight:500;cursor:pointer;letter-spacing:-.02em;transition:opacity 80ms; }
+.sd-tone-card { flex:1;padding:10px 12px;background:#F7F7F7;border-radius:var(--r-md); }
+.sd-tone-label { font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.1em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;margin-bottom:3px; }
+.sd-tone-val { font-size:var(--text-base);font-weight:var(--fw-medium); }
+.sd-tone-note { font-size:var(--text-xs);color:#AEAEB2;margin-top:2px;line-height:1.4; }
+.sd-summary { font-size:var(--text-md);color:#636366;line-height:1.7;padding:12px 14px;background:rgba(255,56,92,.05);border-radius:var(--r-md);border:0.5px solid rgba(255,56,92,.12); }
+.sd-review-btn { width:100%;padding:14px;border-radius:var(--r-lg);border:none;background:var(--ac,#FF385C);color:var(--tk-text-primary);font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg2);font-weight:var(--fw-medium);cursor:pointer;letter-spacing:-.02em;transition:opacity 80ms; }
 .sd-review-btn:active { opacity:.8; }
 .sd-review-btn.done { background:#34C759; }
 .sd-review-footer { padding:12px 20px 32px;flex-shrink:0;border-top:0.5px solid #E5E5EA; }
 /* ── v568 redesign (approved mockup): readable type scale + tabs + collapsible states ── */
-.sd2-name { font-size:17px;font-weight:600;color:#1C1C1E;letter-spacing:-.02em; }
-.sd2-meta { font-size:13px;color:#48484A;margin-top:3px;line-height:1.55; }
+.sd2-name { font-size:var(--text-xl2);font-weight:var(--fw-semi);color:#1C1C1E;letter-spacing:-.02em; }
+.sd2-meta { font-size:var(--text-base);color:#48484A;margin-top:3px;line-height:1.55; }
 .sd2-chips { display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap; }
-.sd2-chip { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;letter-spacing:.01em; }
+.sd2-chip { display:inline-flex;align-items:center;gap:5px;font-size:var(--text-md);font-weight:var(--fw-semi);padding:5px 12px;border-radius:var(--r-pill);letter-spacing:.01em; }
 .sd2-chip svg { flex-shrink:0; }
 .sd2-chip.bad { color:#C73E3E;background:rgba(255,59,48,.08); }
 .sd2-chip.dev { color:#B26A00;background:rgba(255,149,0,.09); }
@@ -2967,47 +2967,47 @@ OCPB (customer intel จากเสียงเท่านั้น):
 .sd2-chip.cv { color:#34C759;background:rgba(52,199,89,.07); }
 .sd2-chip.rev { color:#534AB7;background:rgba(83,74,183,.07); }
 .sd2-whywrap { position:relative;margin-top:10px; }
-.sd2-why { font-size:13.5px;color:#48484A;line-height:1.7;padding:12px 38px 12px 14px;background:#F7F7F8;border-radius:12px;transition:all .2s; }
+.sd2-why { font-size:13.5px;color:#48484A;line-height:1.7;padding:12px 38px 12px 14px;background:#F7F7F8;border-radius:var(--r-card);transition:all .2s; }
 .sd2-why.collapsed { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
-.sd2-whytg { position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8E8E93;transition:transform .2s; }
+.sd2-whytg { position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:var(--r-8);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8E8E93;transition:transform .2s; }
 .sd2-whytg.flip { transform:rotate(180deg); }
-.sd2-tabs { display:flex;gap:4px;margin-top:16px;background:#F7F7F8;border-radius:12px;padding:4px; }
-.sd2-tab { flex:1;text-align:center;font-size:13.5px;font-weight:600;color:#8E8E93;padding:9px 0;border-radius:9px;cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent; }
+.sd2-tabs { display:flex;gap:4px;margin-top:16px;background:#F7F7F8;border-radius:var(--r-card);padding:4px; }
+.sd2-tab { flex:1;text-align:center;font-size:13.5px;font-weight:var(--fw-semi);color:#8E8E93;padding:9px 0;border-radius:var(--r-9);cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent; }
 .sd2-tab.on { background:#FFF;color:#1C1C1E;box-shadow:0 1px 4px rgba(0,0,0,.07); }
 .sd2-pane { display:none;padding-top:16px; }
 .sd2-pane.on { display:block;animation:sd2fade .22s ease; }
 @keyframes sd2fade { from { opacity:0;transform:translateY(4px); } to { opacity:1;transform:none; } }
-.sd2-lbl { font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8E8E93;margin:18px 0 10px;font-family:'Noto Sans Thai',sans-serif; }
+.sd2-lbl { font-size:var(--text-sm);font-weight:var(--fw-semi);letter-spacing:.12em;text-transform:uppercase;color:#8E8E93;margin:18px 0 10px;font-family:'Noto Sans Thai',sans-serif; }
 .sd2-lbl:first-child { margin-top:0; }
 .sd2-tone { display:flex;gap:10px; }
-.sd2-tcard { flex:1;padding:13px 14px;background:#F7F7F8;border-radius:12px; }
-.sd2-tcard .k { font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8E8E93; }
-.sd2-tcard .v { font-size:15px;font-weight:600;margin-top:4px; }
+.sd2-tcard { flex:1;padding:13px 14px;background:#F7F7F8;border-radius:var(--r-card); }
+.sd2-tcard .k { font-size:var(--text-sm);font-weight:var(--fw-semi);letter-spacing:.1em;text-transform:uppercase;color:#8E8E93; }
+.sd2-tcard .v { font-size:var(--text-lg2);font-weight:var(--fw-semi);margin-top:4px; }
 .sd2-tcard .n { font-size:12.5px;color:#48484A;margin-top:4px;line-height:1.6; }
-.sd2-sum { font-size:14px;color:#1C1C1E;line-height:1.8;padding:14px 16px;background:rgba(255,56,92,.03);border:0.5px solid rgba(255,56,92,.1);border-radius:12px; }
+.sd2-sum { font-size:var(--text-lg);color:#1C1C1E;line-height:1.8;padding:14px 16px;background:rgba(255,56,92,.03);border:0.5px solid rgba(255,56,92,.1);border-radius:var(--r-card); }
 .sd2-srow { display:flex;gap:12px;padding:13px 0;border-bottom:0.5px solid #ECECF0; }
 .sd2-srow:last-child { border:none; }
 .sd2-sdot { width:8px;height:8px;border-radius:50%;margin-top:7px;flex-shrink:0; }
-.sd2-scode { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:10px;font-weight:500;color:#8E8E93;letter-spacing:.04em; }
-.sd2-sname { font-size:14px;font-weight:600;color:#1C1C1E;margin-top:1px; }
+.sd2-scode { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:var(--text-xs);font-weight:var(--fw-medium);color:#8E8E93;letter-spacing:.04em; }
+.sd2-sname { font-size:var(--text-lg);font-weight:var(--fw-semi);color:#1C1C1E;margin-top:1px; }
 .sd2-sev { font-size:13.5px;color:#48484A;line-height:1.7;margin-top:4px; }
-.sd2-snote { font-size:13px;color:#C73E3E;line-height:1.65;margin-top:5px;padding-left:10px;border-left:2px solid rgba(255,59,48,.2); }
-.sd2-sstate { margin-left:auto;flex-shrink:0;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;height:fit-content;white-space:nowrap; }
+.sd2-snote { font-size:var(--text-base);color:#C73E3E;line-height:1.65;margin-top:5px;padding-left:10px;border-left:2px solid rgba(255,59,48,.2); }
+.sd2-sstate { margin-left:auto;flex-shrink:0;font-size:var(--text-sm);font-weight:var(--fw-semi);padding:3px 9px;border-radius:var(--r-pill);height:fit-content;white-space:nowrap; }
 .sd2-sstate.no { color:#8E8E93;background:#F7F7F8; }
 .sd2-sstate.dev { color:#B26A00;background:rgba(255,149,0,.08); }
 .sd2-sstate.ok { color:#1F8A43;background:rgba(52,199,89,.08); }
 .sd2-iline { display:flex;gap:12px;padding:11px 0;border-bottom:0.5px solid #ECECF0; }
 .sd2-iline:last-child { border:none; }
-.sd2-ik { flex-shrink:0;width:64px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8E8E93;padding-top:3px; }
-.sd2-iv { font-size:14px;color:#1C1C1E;line-height:1.7; }
-.sd2-iv .sub { color:#48484A;font-size:13px; }
-.sd2-ipoint { display:flex;gap:9px;padding:7px 0;font-size:14px;color:#1C1C1E;line-height:1.7; }
+.sd2-ik { flex-shrink:0;width:64px;font-size:var(--text-sm);font-weight:var(--fw-semi);letter-spacing:.08em;text-transform:uppercase;color:#8E8E93;padding-top:3px; }
+.sd2-iv { font-size:var(--text-lg);color:#1C1C1E;line-height:1.7; }
+.sd2-iv .sub { color:#48484A;font-size:var(--text-base); }
+.sd2-ipoint { display:flex;gap:9px;padding:7px 0;font-size:var(--text-lg);color:#1C1C1E;line-height:1.7; }
 .sd2-ipoint::before { content:'';width:5px;height:5px;border-radius:50%;background:var(--ac,#FF385C);margin-top:9px;flex-shrink:0; }
-.sd2-next { display:flex;gap:10px;padding:11px 13px;background:rgba(83,74,183,.03);border:0.5px solid rgba(83,74,183,.12);border-radius:11px;margin-bottom:8px;font-size:14px;color:#1C1C1E;line-height:1.65; }
-.sd2-next .num { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:11px;font-weight:500;color:#534AB7;padding-top:3px;flex-shrink:0; }
+.sd2-next { display:flex;gap:10px;padding:11px 13px;background:rgba(83,74,183,.03);border:0.5px solid rgba(83,74,183,.12);border-radius:11px;margin-bottom:8px;font-size:var(--text-lg);color:#1C1C1E;line-height:1.65; }
+.sd2-next .num { font-family:var(--mono,'IBM Plex Mono','Noto Sans Thai',monospace);font-size:var(--text-sm);font-weight:var(--fw-medium);color:#534AB7;padding-top:3px;flex-shrink:0; }
 .sd2-notebar { display:flex;align-items:center;gap:9px;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent; }
-.sd2-notebar .t { flex:1;min-width:0;font-size:13.5px;font-weight:600;color:#534AB7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-.sd2-notebar .t .pv { font-weight:400;color:#48484A; }
+.sd2-notebar .t { flex:1;min-width:0;font-size:13.5px;font-weight:var(--fw-semi);color:#534AB7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.sd2-notebar .t .pv { font-weight:var(--fw-normal);color:#48484A; }
 .sd2-notebar .ch { color:#8E8E93;transition:transform .2s;flex-shrink:0; }
 .sd2-notebar.open .ch { transform:rotate(180deg); }
 .sd2-note-editor { display:none;padding:0 16px 4px; }
@@ -3026,7 +3026,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
         <span class="sd-close" onclick="CI._closeSessionDetail()">ปิด</span>
       </div>
       <div class="sd-body" id="sd-body-inner">
-        <div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>
+        <div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>
       </div>
       <div class="sd-review-footer" id="sd-review-footer" style="display:none"></div>`;
     document.body.appendChild(sheet);
@@ -3053,7 +3053,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       _renderSessionDetailContent(data);
     } catch(e) {
       const b = document.getElementById('sd-body-inner');
-      if (b) b.innerHTML = `<div style="text-align:center;padding:48px 0;font-size:13px;color:#AEAEB2">โหลดไม่สำเร็จ: ${e.message}</div>`;
+      if (b) b.innerHTML = `<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">โหลดไม่สำเร็จ: ${e.message}</div>`;
     }
   }
 
@@ -3154,11 +3154,11 @@ OCPB (customer intel จากเสียงเท่านั้น):
 </div>
 <div class="sd2-note-editor" id="sd2-note-editor">
   <textarea id="sd-tl-note" placeholder="บันทึก coaching note สำหรับ session นี้ (optional)" rows="3"
-    style="width:100%;padding:11px 13px;border:0.5px solid rgba(83,74,183,.3);border-radius:11px;background:rgba(83,74,183,.04);color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;font-size:14px;line-height:1.65;resize:none;-webkit-appearance:none;outline:none"
+    style="width:100%;padding:11px 13px;border:0.5px solid rgba(83,74,183,.3);border-radius:11px;background:rgba(83,74,183,.04);color:#1C1C1E;font-family:'Noto Sans Thai',sans-serif;font-size:var(--text-lg);line-height:1.65;resize:none;-webkit-appearance:none;outline:none"
     onfocus="this.style.borderColor='rgba(83,74,183,.55)'" onblur="this.style.borderColor='rgba(83,74,183,.3)'"
   >${existingNote}</textarea>
   <button class="sd-review-btn" id="sd-save-note-btn"
-    style="margin-top:10px;background:#534AB7;font-size:15px;font-weight:600"
+    style="margin-top:10px;background:#534AB7;font-size:var(--text-lg2);font-weight:var(--fw-semi)"
     onclick="CI._saveTLSessionNote('${s.id}', ${reviewed})">
     ${reviewed ? 'อัปเดต Note' : 'บันทึก + รีวิว'}
   </button>
@@ -3299,32 +3299,32 @@ OCPB (customer intel จากเสียงเท่านั้น):
         return `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block" title="${code}"></span>`;
       }).join('');
       const actions = (s.next_actions||[]).slice(0,2).map(a=>
-        `<span style="font-size:10px;color:var(--ac,#FF385C);background:rgba(255,56,92,.07);padding:3px 8px;border-radius:6px;font-weight:500">${a.action||a}</span>`
+        `<span style="font-size:var(--text-xs);color:var(--ac,#FF385C);background:rgba(255,56,92,.07);padding:3px 8px;border-radius:var(--r-sm);font-weight:var(--fw-medium)">${a.action||a}</span>`
       ).join('');
       const titleLeft = opts?.showAccount ? acctLabel : ((_accountGuid || _groupBySales) ? date : acctLabel);
       const titleRight = opts?.showAccount ? date + (dur?' · '+dur:'') : ((_accountGuid || _groupBySales) ? dur : date + (dur?' · '+dur:''));
       // TL coaching note — purple dot indicator + read-only note (rep sees this)
       const hasTLNote = !!(s.tl_note && s.tl_note.trim());
       const tlNoteDot = hasTLNote
-        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:500;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">` +
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:var(--text-xs);font-weight:var(--fw-medium);color:#534AB7;font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">` +
           `<span style="width:5px;height:5px;border-radius:50%;background:#534AB7;flex-shrink:0"></span>TL note</span>` : '';
       // v569: boxed style replaced with hairline-quote — matches Skills/Echo design
       // language (hairline accents over filled boxes) instead of the generic look
       const tlNoteHtml = hasTLNote
         ? `<div style="margin-top:8px;padding:2px 0 2px 10px;border-left:2px solid rgba(83,74,183,.35)">` +
-          `<div style="font-size:10px;font-weight:600;letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:2px">TL NOTE</div>` +
-          `<div style="font-size:13px;color:#48484A;line-height:1.65;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
+          `<div style="font-size:var(--text-xs);font-weight:var(--fw-semi);letter-spacing:.1em;color:#534AB7;font-family:'Noto Sans Thai',sans-serif;margin-bottom:2px">TL NOTE</div>` +
+          `<div style="font-size:var(--text-base);color:#48484A;line-height:1.65;font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div></div>` : '';
       // Co-visit badge — shown when TL has verified proximity
       const cvDot = s.covisit_verified
-        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:#34C759;font-family:'Noto Sans Thai',sans-serif">` +
+        ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#34C759;font-family:'Noto Sans Thai',sans-serif">` +
           `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit</span>` : '';
-      return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+      return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:var(--r-lg);border:0.5px solid ${hasTLNote?'rgba(83,74,183,.2)':'rgba(255,255,255,.55)'};box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:600;color:var(--tx,#1C1C1E);min-width:0;padding-right:8px">${titleLeft}</span>
+          <span style="font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tx,#1C1C1E);min-width:0;padding-right:8px">${titleLeft}</span>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap">
             ${cvDot}
             ${tlNoteDot}
-            <span style="font-size:11px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${titleRight}</span>
+            <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${titleRight}</span>
           </div>
         </div>
         ${skillDots ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${(actions||hasTLNote)?'8px':'0'}">${skillDots}</div>` : ''}
@@ -3343,7 +3343,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       });
       return Object.entries(byAccount).map(([,grp]) => {
         const items = grp.items.map(s => _renderSessionCard(s, { showAccount: false })).join('');
-        return `<div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'Noto Sans Thai',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
+        return `<div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'Noto Sans Thai',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
       }).join('');
     }
 
@@ -3357,7 +3357,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     });
     return Object.entries(byMonth).map(([,grp]) => {
       const items = grp.items.map(s => _renderSessionCard(s)).join('');
-      return `<div style="font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'Noto Sans Thai',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
+      return `<div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:var(--tx3,#AEAEB2);font-family:var(--mono,'Noto Sans Thai',monospace);margin:12px 0 8px">${grp.label}</div>${items}`;
     }).join('');
   }
 
@@ -3367,10 +3367,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
       const skillDots = sess.skills.map(sk => {
         const sc = sk.tl_override||sk.score;
         const col = sc==='pass'?'var(--success,#34C759)':sc==='developing'?'var(--warning,#FF9500)':'var(--n-100,#E5E5EA)';
-        return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${col};font-family:'Noto Sans Thai',sans-serif"><span style="width:5px;height:5px;border-radius:50%;background:${col}"></span>${sk.skill_code}</span>`;
+        return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:var(--text-2xs);color:${col};font-family:'Noto Sans Thai',sans-serif"><span style="width:5px;height:5px;border-radius:50%;background:${col}"></span>${sk.skill_code}</span>`;
       }).join('');
-      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);border-radius:14px;border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:600;color:var(--tx,#1C1C1E);margin-bottom:8px">${dateLabel}</div>
+      return `<div style="background:rgba(255,255,255,.72);backdrop-filter:blur(24px);border-radius:var(--r-lg);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 16px rgba(0,0,0,.045);padding:12px 14px;margin-bottom:8px">
+        <div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--tx,#1C1C1E);margin-bottom:8px">${dateLabel}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${skillDots}</div>
       </div>`;
     }).join('');
@@ -3404,19 +3404,19 @@ OCPB (customer intel จากเสียงเท่านั้น):
           const _g = r.id || r.account_guid || '';
           const _s = r.accountType || r.account_type || '';
           return `
-          <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
+          <button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:var(--r-lg);border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
             onclick="CI._pickerConfirmKam('${_g}','${_n.replace(/'/g,"\\'")}','${_s}')">
-            <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${_n}</span>
-            <span style="font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em">${_s}</span>
+            <span style="font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E;flex:1">${_n}</span>
+            <span style="font-size:var(--text-xs);font-weight:var(--fw-semi);color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em">${_s}</span>
           </button>`;
         }).join('');
       }
     } catch(e) {}
-    const emptyMsg = recentRows ? '' : '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">ยังไม่มีข้อมูลร้านค้า</div>';
+    const emptyMsg = recentRows ? '' : '<div style="text-align:center;padding:24px 0;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีข้อมูลร้านค้า</div>';
     return `
-      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">กำลังคุยกับร้านไหน?</div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">กำลังคุยกับร้านไหน?</div>
       <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:var(--r-card);font-size:var(--text-lg);outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
         oninput="CI._pickerSearchInline(this.value)"
         onfocus="CI._pickerSearchInline(this.value)" />
       <div id="ci-pk-list-inline" style="display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto">
@@ -3436,19 +3436,19 @@ OCPB (customer intel จากเสียงเท่านั้น):
       .slice(0, 5)
       .map(r => _salesAcctRow(r)).join('');
     const acctSection = own.length ? `
-      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านในพอร์ตของคุณ</div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านในพอร์ตของคุณ</div>
       <input id="ci-sales-acct-search" type="search" placeholder="ค้นหาร้านในพอร์ต..." autocomplete="off"
-        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        style="width:100%;padding:12px 16px;border:1px solid #E5E5EA;border-radius:var(--r-card);font-size:var(--text-lg);outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
         oninput="CI._salesPickerSearch(this.value)" />
       <div id="ci-sales-acct-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto">${ownRows}</div>
-      <div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="flex:1;height:0.5px;background:#E5E5EA"></div><span style="font-size:10px;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif">หรือ</span><div style="flex:1;height:0.5px;background:#E5E5EA"></div></div>` : '';
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0"><div style="flex:1;height:0.5px;background:#E5E5EA"></div><span style="font-size:var(--text-xs);color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif">หรือ</span><div style="flex:1;height:0.5px;background:#E5E5EA"></div></div>` : '';
     return acctSection + `
-      <div style="font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านใหม่ / Lead</div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.14em;text-transform:uppercase;color:#AEAEB2;font-family:'Noto Sans Thai',sans-serif;padding:4px 0 8px">ร้านใหม่ / Lead</div>
       <input id="ci-sales-name-inline" type="text" placeholder="พิมพ์ชื่อร้านใหม่..." autocomplete="off"
-        style="width:100%;padding:13px 16px;border:1.5px solid #FF385C;border-radius:12px;font-size:15px;outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
+        style="width:100%;padding:13px 16px;border:1.5px solid #FF385C;border-radius:var(--r-card);font-size:var(--text-lg2);outline:none;font-family:'Noto Sans Thai',sans-serif;background:#fff;color:#1C1C1E;-webkit-appearance:none"
         onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
       <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name-inline').value)"
-        style="width:100%;padding:14px;border:none;border-radius:14px;background:#FF385C;color:#fff;font-size:15px;font-weight:500;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.02em">
+        style="width:100%;padding:14px;border:none;border-radius:var(--r-lg);background:#FF385C;color:var(--tk-text-primary);font-size:var(--text-lg2);font-weight:var(--fw-medium);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;letter-spacing:-.02em">
         เริ่มบันทึก (Lead)
       </button>`;
   }
@@ -3457,10 +3457,10 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const _n = r.name || r.res_name || '-';
     const _g = r.id || r.account_guid || '';
     const _s = r.accountType || r.account_type || 'SA';
-    return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:0.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
+    return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:var(--r-lg);border:0.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left"
       onclick="CI._pickerConfirmKam('${_g}','${_n.replace(/'/g,"\\'")}','${_s}')">
-      <span style="font-size:13px;font-weight:500;color:#1C1C1E;flex:1">${_n}</span>
-      <span style="font-size:10px;font-weight:600;color:#FF385C;letter-spacing:.06em">${_s}</span>
+      <span style="font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E;flex:1">${_n}</span>
+      <span style="font-size:var(--text-xs);font-weight:var(--fw-semi);color:#FF385C;letter-spacing:.06em">${_s}</span>
     </button>`;
   }
 
@@ -3479,7 +3479,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
     ).slice(0, 8);
     list.innerHTML = filtered.length
       ? filtered.map(r => _salesAcctRow(r)).join('')
-      : '<div style="text-align:center;padding:16px 0;font-size:12px;color:#AEAEB2">ไม่พบในพอร์ต — ใช้ช่อง Lead ด้านล่าง</div>';
+      : '<div style="text-align:center;padding:16px 0;font-size:var(--text-md);color:#AEAEB2">ไม่พบในพอร์ต — ใช้ช่อง Lead ด้านล่าง</div>';
   }
 
   // ── Build outlet index from bulkOutletsData ─────────────────────────────────
@@ -3552,7 +3552,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       }
 
       if (!filtered.length) {
-        list.innerHTML = '<div style="text-align:center;padding:24px 0;font-size:13px;color:#AEAEB2">' +
+        list.innerHTML = '<div style="text-align:center;padding:24px 0;font-size:var(--text-base);color:#AEAEB2">' +
           (src.length ? 'ไม่พบร้านค้า' : 'กำลังโหลดข้อมูล...') + '</div>';
         return;
       }
@@ -3564,15 +3564,15 @@ OCPB (customer intel จากเสียงเท่านั้น):
         const safeName = name.replace(/'/g,"\'").replace(/"/g,'&quot;');
         // Outlet match hint — show outlet name in small text below account name
         const hint  = _matchLabel
-          ? `<div style="font-size:11px;color:#6C6C70;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">outlet: ${_matchLabel}</div>`
+          ? `<div style="font-size:var(--text-sm);color:#6C6C70;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">outlet: ${_matchLabel}</div>`
           : '';
-        return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:14px;border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left;margin-bottom:6px"
+        return `<button style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:var(--r-lg);border:none;background:rgba(255,255,255,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:0.5px solid rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.04);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;text-align:left;margin-bottom:6px"
           onclick="CI._pickerConfirmKam('${guid}','${safeName}','${seg}')">
           <div style="flex:1;min-width:0;text-align:left">
-            <div style="font-size:13px;font-weight:500;color:#1C1C1E">${name}</div>
+            <div style="font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E">${name}</div>
             ${hint}
           </div>
-          <span style="font-size:10px;font-weight:600;color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;flex-shrink:0;margin-left:8px">${seg}</span>
+          <span style="font-size:var(--text-xs);font-weight:var(--fw-semi);color:#FF385C;font-family:'Noto Sans Thai',sans-serif;letter-spacing:.06em;flex-shrink:0;margin-left:8px">${seg}</span>
         </button>`;
       }).join('');
     } catch(e) { console.warn('[CI picker search]', e); }
@@ -3806,28 +3806,28 @@ OCPB (customer intel จากเสียงเท่านั้น):
       }
     } catch(e) {}
     return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
-      <div style="width:36px;height:4px;border-radius:2px;background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
-      <div style="font-size:13px;font-weight:600;color:#1C1C1E;margin-bottom:4px;">เลือกร้านค้า</div>
-      <div style="font-size:12px;color:#636366;margin-bottom:16px;">หรือค้นหาด้านล่าง</div>
+      <div style="width:36px;height:4px;border-radius:var(--r-xxs);background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
+      <div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:#1C1C1E;margin-bottom:4px;">เลือกร้านค้า</div>
+      <div style="font-size:var(--text-md);color:#636366;margin-bottom:16px;">หรือค้นหาด้านล่าง</div>
       <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:11px 14px;border:1px solid #E5E5EA;border-radius:12px;font-size:14px;outline:none;margin-bottom:12px;box-sizing:border-box;"
+        style="width:100%;padding:11px 14px;border:1px solid #E5E5EA;border-radius:var(--r-card);font-size:var(--text-lg);outline:none;margin-bottom:12px;box-sizing:border-box;"
         oninput="CI._pickerSearch(this.value)" />
       <div id="ci-pk-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">${recents}</div>
-      <button onclick="CI._dismissPicker()" style="margin-top:16px;width:100%;padding:12px;border:none;border-radius:12px;background:rgba(0,0,0,.06);font-size:14px;color:#636366;cursor:pointer;">ยกเลิก</button>
+      <button onclick="CI._dismissPicker()" style="margin-top:16px;width:100%;padding:12px;border:none;border-radius:var(--r-card);background:rgba(0,0,0,.06);font-size:var(--text-lg);color:#636366;cursor:pointer;">ยกเลิก</button>
     </div>`;
   }
 
   function _buildSalesPickerHTML() {
     return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
-      <div style="width:36px;height:4px;border-radius:2px;background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
-      <div style="font-size:13px;font-weight:600;color:#1C1C1E;margin-bottom:4px;">คุณกำลังคุยกับร้านไหน?</div>
-      <div style="font-size:12px;color:#636366;margin-bottom:16px;">พิมพ์ชื่อร้าน ใช้สำหรับเก็บประวัติการสนทนา</div>
+      <div style="width:36px;height:4px;border-radius:var(--r-xxs);background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
+      <div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:#1C1C1E;margin-bottom:4px;">คุณกำลังคุยกับร้านไหน?</div>
+      <div style="font-size:var(--text-md);color:#636366;margin-bottom:16px;">พิมพ์ชื่อร้าน ใช้สำหรับเก็บประวัติการสนทนา</div>
       <input id="ci-sales-name" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:13px 14px;border:1.5px solid #FF385C;border-radius:12px;font-size:15px;outline:none;margin-bottom:12px;box-sizing:border-box;"
+        style="width:100%;padding:13px 14px;border:1.5px solid #FF385C;border-radius:var(--r-card);font-size:var(--text-lg2);outline:none;margin-bottom:12px;box-sizing:border-box;"
         onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
       <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name').value)"
-        style="width:100%;padding:13px;border:none;border-radius:12px;background:#FF385C;color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">เริ่มบันทึก</button>
-      <button onclick="CI._dismissPicker()" style="width:100%;padding:12px;border:none;border-radius:12px;background:rgba(0,0,0,.06);font-size:14px;color:#636366;cursor:pointer;">ยกเลิก</button>
+        style="width:100%;padding:13px;border:none;border-radius:var(--r-card);background:#FF385C;color:var(--tk-text-primary);font-size:var(--text-lg2);font-weight:var(--fw-semi);cursor:pointer;margin-bottom:8px;">เริ่มบันทึก</button>
+      <button onclick="CI._dismissPicker()" style="width:100%;padding:12px;border:none;border-radius:var(--r-card);background:rgba(0,0,0,.06);font-size:var(--text-lg);color:#636366;cursor:pointer;">ยกเลิก</button>
     </div>`;
   }
 
@@ -4046,8 +4046,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
       }
       // Add count label after dots
       const countLabel = wCount > 5
-        ? `<span style="font-size:10px;color:#FFB300;font-weight:500;margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} visits</span>`
-        : `<span style="font-size:10px;color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} / 5</span>`;
+        ? `<span style="font-size:var(--text-xs);color:#FFB300;font-weight:var(--fw-medium);margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} visits</span>`
+        : `<span style="font-size:var(--text-xs);color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif;transition:color .7s ease" class="ci-vh-count-lbl">${wCount} / 5</span>`;
       dots.innerHTML = dotsHtml + countLabel;
     } catch(e) {
       console.warn('[CI hero]', e.message);
@@ -4089,7 +4089,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
         else if (i > 5 && i <= wCount) dotsHtml += '<div style="width:8px;height:8px;border-radius:50%;background:#FFB300;flex-shrink:0"></div>';
         else dotsHtml += '<div style="width:8px;height:8px;border-radius:50%;background:rgba(255,56,92,.15);flex-shrink:0"></div>';
       }
-      dots.innerHTML = dotsHtml + `<span style="font-size:10px;color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif">${wCount} co-visits</span>`;
+      dots.innerHTML = dotsHtml + `<span style="font-size:var(--text-xs);color:#AEAEB2;margin-left:4px;font-family:'Noto Sans Thai',sans-serif">${wCount} co-visits</span>`;
     } catch(e) { console.warn('[CI covisit hero]', e.message); }
   }
 
@@ -4119,12 +4119,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
   async function _loadCovisitList() {
     const body = document.getElementById('ci-cv-list-body');
     if (!body) return;
-    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">กำลังโหลด...</div>';
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>';
     _cvSelected = null;
     _updateCvVerifyBtn();
     try {
       const teamEmails = _getTeamEmails();
-      if (!teamEmails.length) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">ไม่พบน้องในทีม</div>'; return; }
+      if (!teamEmails.length) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">ไม่พบน้องในทีม</div>'; return; }
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const { data, error } = await supa.from('ci_sessions')
         .select('id,owner_email,account_name,checked_in_at,rep_lat,rep_lng,covisit_verified')
@@ -4150,12 +4150,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
       body.innerHTML = _renderCovisitList(merged);
     } catch(e) {
       console.warn('[CI covisit list]', e.message);
-      body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">โหลดไม่สำเร็จ</div>';
+      body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">โหลดไม่สำเร็จ</div>';
     }
   }
 
   function _renderCovisitList(rows) {
-    if (!rows.length) return '<div style="text-align:center;padding:40px 0;font-size:13px;color:#AEAEB2">ยังไม่มีน้องเช็คอินวันนี้</div>';
+    if (!rows.length) return '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีน้องเช็คอินวันนี้</div>';
     const now = Date.now();
     const WINDOW_MS = 90 * 60 * 1000;
     return `<div class="cv-section-hd">วันนี้</div>` + rows.map(s => {
@@ -4312,7 +4312,7 @@ OCPB (customer intel จากเสียงเท่านั้น):
       if (btn && btn.id === 'sd-covisit-btn') {
         btn.remove();
         if (badge) {
-          badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
+          badge.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:var(--text-sm);font-weight:var(--fw-medium);color:#34C759;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:10px';
           badge.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Co-visit ยืนยันแล้ว`;
         }
       }
@@ -4445,13 +4445,13 @@ function echoExpand() {
   window.admLoadSkills = async function(force) {
     if (_admLoaded && !force) { _admRender(); return; }
     const el = document.getElementById('adm-skill-list');
-    if (el) el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:12px">กำลังโหลด...</div>';
+    if (el) el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:var(--text-md)">กำลังโหลด...</div>';
     try {
       _admSkills = await _supaReq('skill_definitions', { filter: '?select=*&order=skill_code.asc' });
       _admLoaded = true;
       _admRender();
     } catch(e) {
-      if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:#FF3B30;font-size:12px">โหลดไม่ได้: ${e.message}</div>`;
+      if (el) el.innerHTML = `<div style="text-align:center;padding:24px;color:#FF3B30;font-size:var(--text-md)">โหลดไม่ได้: ${e.message}</div>`;
     }
   };
 
@@ -4465,16 +4465,16 @@ function echoExpand() {
 
     const el = document.getElementById('adm-skill-list');
     if (!el) return;
-    if (!_admSkills.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:12px">ยังไม่มี Skill — กด เพิ่ม Skill ใหม่</div>'; return; }
+    if (!_admSkills.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--n400,#AEAEB2);font-size:var(--text-md)">ยังไม่มี Skill — กด เพิ่ม Skill ใหม่</div>'; return; }
 
     el.innerHTML = _admSkills.map(s => `
       <div onclick="admOpenModal('${s.id}')" style="display:grid;grid-template-columns:80px 1fr 56px;gap:8px;align-items:center;padding:10px 12px;background:#fff;cursor:pointer;border-bottom:0.5px solid var(--n100,#E5E5EA);transition:background .12s" onmouseover="this.style.background='#F7F7F7'" onmouseout="this.style.background='#fff'">
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:600;color:#FF385C">${s.skill_code||'—'}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-semi);color:#FF385C">${s.skill_code||'—'}</div>
         <div>
-          <div style="font-size:12px;font-weight:500;color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
-          <div style="font-size:10px;color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
+          <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
+          <div style="font-size:var(--text-xs);color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
         </div>
-        <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
+        <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:var(--text-xs);font-weight:var(--fw-semi);${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
       </div>`).join('');
   }
 
@@ -4487,44 +4487,44 @@ function echoExpand() {
     div.onclick = e => { if (e.target === div) admCloseModal(); };
     div.innerHTML = `
       <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;padding:18px;box-sizing:border-box">
-        <div style="font-size:15px;font-weight:600;color:var(--n900,#1C1C1E);margin-bottom:2px" id="adm-m-title">เพิ่ม Skill ใหม่</div>
-        <div style="font-size:11px;color:var(--n400,#AEAEB2);margin-bottom:18px" id="adm-m-sub">กรอกข้อมูลแล้วกด บันทึก</div>
+        <div style="font-size:var(--text-lg2);font-weight:var(--fw-semi);color:var(--n900,#1C1C1E);margin-bottom:2px" id="adm-m-title">เพิ่ม Skill ใหม่</div>
+        <div style="font-size:var(--text-sm);color:var(--n400,#AEAEB2);margin-bottom:18px" id="adm-m-sub">กรอกข้อมูลแล้วกด บันทึก</div>
 
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Skill Code</div>
-          <input id="adm-f-code" placeholder="C06_NEW" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:'IBM Plex Mono','Noto Sans Thai',monospace" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Skill Code</div>
+          <input id="adm-f-code" placeholder="C06_NEW" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;font-family:'IBM Plex Mono','Noto Sans Thai',monospace" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px">
           <div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ EN</div>
-            <input id="adm-f-en" placeholder="Rapport Building" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+            <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ EN</div>
+            <input id="adm-f-en" placeholder="Rapport Building" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ TH</div>
-            <input id="adm-f-th" placeholder="สร้างความไว้วางใจ" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
+            <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ชื่อ TH</div>
+            <input id="adm-f-th" placeholder="สร้างความไว้วางใจ" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;font-family:inherit" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"/>
           </div>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">หลักการ (Principle)</div>
-          <textarea id="adm-f-principle" rows="3" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">หลักการ (Principle)</div>
+          <textarea id="adm-f-principle" rows="3" placeholder="ทำไม skill นี้สำคัญต่อ visit..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">การฝึก (Practice) <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— คั่นด้วย |</span></div>
-          <textarea id="adm-f-practice" rows="3" placeholder="FKT Value 3 ระดับ: สิ่งที่ซัพฯ ทุกเจ้ามี | สิ่งที่ FKT ทำได้ดีกว่า | สิ่งที่ FKT เท่านั้นมี" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">การฝึก (Practice) <span style="font-weight:var(--fw-normal);color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— คั่นด้วย |</span></div>
+          <textarea id="adm-f-practice" rows="3" placeholder="FKT Value 3 ระดับ: สิ่งที่ซัพฯ ทุกเจ้ามี | สิ่งที่ FKT ทำได้ดีกว่า | สิ่งที่ FKT เท่านั้นมี" style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:13px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">เกณฑ์ผ่าน (Pass Test)</div>
-          <textarea id="adm-f-pass" rows="3" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">เกณฑ์ผ่าน (Pass Test)</div>
+          <textarea id="adm-f-pass" rows="3" placeholder="Role play: TL ทดสอบ... Pass: ..." style="width:100%;padding:8px 11px;border:0.5px solid #E5E5EA;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#E5E5EA'"></textarea>
         </div>
         <div style="margin-bottom:15px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Echo Observable Hint <span style="font-weight:400;color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
-          <textarea id="adm-f-obs" rows="3" placeholder="ฟัง: rep หยุดก่อนตอบไหม? น้ำเสียง defensive หรือ acknowledge ก่อน? ลูกค้า engage มากขึ้นหลังจาก rep ตอบไหม?" style="width:100%;padding:8px 11px;border:0.5px solid #FFB3BF;border-radius:9px;font-size:13px;color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5;background:rgba(255,56,92,.03)" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#FFB3BF'"></textarea>
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Echo Observable Hint <span style="font-weight:var(--fw-normal);color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
+          <textarea id="adm-f-obs" rows="3" placeholder="ฟัง: rep หยุดก่อนตอบไหม? น้ำเสียง defensive หรือ acknowledge ก่อน? ลูกค้า engage มากขึ้นหลังจาก rep ตอบไหม?" style="width:100%;padding:8px 11px;border:0.5px solid #FFB3BF;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5;background:rgba(255,56,92,.03)" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#FFB3BF'"></textarea>
         </div>
         <!-- Echo toggle -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:#F7F7F7;border-radius:10px;border:0.5px solid #E5E5EA;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:#F7F7F7;border-radius:var(--r-md);border:0.5px solid #E5E5EA;margin-bottom:18px">
           <div>
-            <div style="font-size:13px;font-weight:500;color:#1C1C1E">ส่งให้ Echo วิเคราะห์</div>
-            <div style="font-size:11px;color:#AEAEB2;margin-top:1px">ปิด = Gemini จะข้าม skill นี้</div>
+            <div style="font-size:var(--text-base);font-weight:var(--fw-medium);color:#1C1C1E">ส่งให้ Echo วิเคราะห์</div>
+            <div style="font-size:var(--text-sm);color:#AEAEB2;margin-top:1px">ปิด = Gemini จะข้าม skill นี้</div>
           </div>
           <label style="position:relative;width:44px;height:26px;flex-shrink:0;cursor:pointer">
             <input type="checkbox" id="adm-f-echo" checked style="opacity:0;width:0;height:0"/>
@@ -4535,8 +4535,8 @@ function echoExpand() {
         </div>
         <!-- Footer -->
         <div style="display:flex;gap:8px" id="adm-m-footer">
-          <button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button>
-          <button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>
+          <button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:var(--r-md);font-size:var(--text-base);cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button>
+          <button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:var(--tk-text-primary);border:none;border-radius:var(--r-md);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;font-family:inherit">บันทึก</button>
         </div>
       </div>`;
     document.body.appendChild(div);
@@ -4578,8 +4578,8 @@ function echoExpand() {
 
     // Footer — add Delete button if editing
     document.getElementById('adm-m-footer').innerHTML = s
-      ? `<button onclick="admDeleteSkill('${s.id}','${(s.skill_code||'').replace(/'/g,"\\'")}' )" style="flex:1;padding:10px;border:0.5px solid #FF3B30;border-radius:10px;font-size:13px;cursor:pointer;background:transparent;color:#FF3B30;font-family:inherit">ลบ</button><button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>`
-      : `<button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:10px;font-size:13px;cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">บันทึก</button>`;
+      ? `<button onclick="admDeleteSkill('${s.id}','${(s.skill_code||'').replace(/'/g,"\\'")}' )" style="flex:1;padding:10px;border:0.5px solid #FF3B30;border-radius:var(--r-md);font-size:var(--text-base);cursor:pointer;background:transparent;color:#FF3B30;font-family:inherit">ลบ</button><button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:var(--r-md);font-size:var(--text-base);cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:var(--tk-text-primary);border:none;border-radius:var(--r-md);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;font-family:inherit">บันทึก</button>`
+      : `<button onclick="admCloseModal()" style="flex:1;padding:10px;border:0.5px solid #E5E5EA;border-radius:var(--r-md);font-size:var(--text-base);cursor:pointer;background:#fff;color:#1C1C1E;font-family:inherit">ยกเลิก</button><button onclick="admSaveSkill()" id="adm-save-btn" style="flex:2;padding:10px;background:#FF385C;color:var(--tk-text-primary);border:none;border-radius:var(--r-md);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;font-family:inherit">บันทึก</button>`;
 
     document.getElementById('adm-modal-bg').style.display = 'flex';
   };
@@ -4641,7 +4641,7 @@ function echoExpand() {
     let t = document.getElementById('adm-toast');
     if (!t) { t = document.createElement('div'); t.id='adm-toast'; document.body.appendChild(t); }
     t.textContent = msg;
-    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 18px;border-radius:100px;font-size:13px;font-weight:500;z-index:9999;color:#fff;white-space:nowrap;transition:opacity .3s;background:${type==='ok'?'#34C759':type==='warn'?'#FF9500':'#FF3B30'}`;
+    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 18px;border-radius:100px;font-size:var(--text-base);font-weight:var(--fw-medium);z-index:9999;color:var(--tk-text-primary);white-space:nowrap;transition:opacity .3s;background:${type==='ok'?'#34C759':type==='warn'?'#FF9500':'#FF3B30'}`;
     t.style.opacity='1';
     clearTimeout(t._t);
     t._t = setTimeout(() => { t.style.opacity='0'; }, 2500);
