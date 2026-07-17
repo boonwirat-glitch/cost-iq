@@ -347,7 +347,7 @@ function setAiProvider(p){
       progEl.innerHTML = keys
         .map(k=>specMap[k])
         .filter(Boolean)
-        .map(f=>`<span id="sp-${f.tab}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`)
+        .map(f=>`<span id="sp-${f.tab}" style="font-size:var(--text-xs);font-weight:var(--fw-semi);padding:2px 8px;border-radius:var(--r-8);background:rgba(0,0,0,.06);color:var(--n500)">${f.tab}</span>`)
         .join('');
     }
   }
@@ -2082,14 +2082,14 @@ function updateMatcherPreStatus(){
 
     if(unverifiedSrc===0){
       // All verified state
-      setStatus(`<span style="color:var(--g700);font-weight:600">✓ Verified ครบ ${verifiedSrc} SKU</span>${meta.verified_at?` · เมื่อ ${new Date(meta.verified_at).toLocaleDateString('th-TH')}`:''}`)
+      setStatus(`<span style="color:var(--g700);font-weight:var(--fw-semi)">✓ Verified ครบ ${verifiedSrc} SKU</span>${meta.verified_at?` · เมื่อ ${new Date(meta.verified_at).toLocaleDateString('th-TH')}`:''}`)
       setBtn('✓ Verified ครบ',true);
       setReVerify(true);
     } else {
       // Has unverified — show scope
       const scopeLabel=matcherScope==='all'?'':(matcherScope==='custom'?` (กำหนดเอง ${scoped.length})`:` (Top ${matcherScope})`);
       const gmvTxt=scopedGmv>0?` · ยอดซื้อรวม <strong>${fmt(scopedGmv)}/เดือน</strong>`:'';
-      const partialTxt=verifiedSrc>0?` <span style="color:var(--g700);font-size:11px">(verified ${verifiedSrc} แล้ว)</span>`:'';
+      const partialTxt=verifiedSrc>0?` <span style="color:var(--g700);font-size:var(--text-sm)">(verified ${verifiedSrc} แล้ว)</span>`:'';
       setStatus(`${scoped.length}${scopeLabel} SKU ยังไม่ verify · ${scopedPairs} คู่${scoped.length<unverifiedSrc?' จาก '+unverifiedSrc+' ใหม่':''}${gmvTxt}${partialTxt}`);
       const btnText=verifiedSrc>0?`เทียบสเปคเพิ่ม ${scoped.length} SKU`:`ให้ Sense เทียบสเปค ${scoped.length} SKU`;
       setBtn(btnText,false);
@@ -2917,21 +2917,21 @@ function appendSkuLog(name, altCount, status, excluded, packSizeIssue, vsMode=fa
   const row=document.createElement('div');
   row.className='gen-sku-row '+(isErr?'skip':ok?'ok':'skip');
   const icon=isErr?'✕':isFlag?'⚑':ok?'✓':'—';
-  const packNote=packSizeIssue?'<span style="font-size:9px;color:var(--amb);font-weight:700;margin-left:4px">pack⚠</span>':'';
-  row.innerHTML=`<span style="font-size:10px">${icon}</span><span class="gsr-name">${name}${packNote}</span>${ok?`<span class="gsr-count">${altCount} ตัวเลือก</span>`:isErr?`<span class="gsr-count" style="color:var(--org)">${status}</span>`:'<span class="gsr-count" style="color:var(--n400)">ไม่พบ</span>'}`;
+  const packNote=packSizeIssue?'<span style="font-size:var(--text-2xs);color:var(--amb);font-weight:var(--fw-bold);margin-left:4px">pack⚠</span>':'';
+  row.innerHTML=`<span style="font-size:var(--text-xs)">${icon}</span><span class="gsr-name">${name}${packNote}</span>${ok?`<span class="gsr-count">${altCount} ตัวเลือก</span>`:isErr?`<span class="gsr-count" style="color:var(--org)">${status}</span>`:'<span class="gsr-count" style="color:var(--n400)">ไม่พบ</span>'}`;
   wrap.appendChild(row);
   // Excluded sub-rows
   if(excluded?.length){
     excluded.slice(0,3).forEach(ex=>{
       const sub=document.createElement('div');
-      sub.style.cssText='display:flex;align-items:center;gap:5px;font-size:9px;color:var(--n400);padding:1px 0 1px 14px';
+      sub.style.cssText='display:flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--n400);padding:1px 0 1px 14px';
       const reason=ex.reason_code||ex.reason_th||'excluded';
       sub.innerHTML=`<span>✕</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ex.catalog_item_name}</span><span style="flex-shrink:0;font-style:italic">${reason.split('|')[0]}</span>`;
       wrap.appendChild(sub);
     });
     if(excluded.length>3){
       const more=document.createElement('div');
-      more.style.cssText='font-size:9px;color:var(--n400);padding:1px 0 1px 14px';
+      more.style.cssText='font-size:var(--text-2xs);color:var(--n400);padding:1px 0 1px 14px';
       more.textContent=`+ ${excluded.length-3} อีก excluded`;
       wrap.appendChild(more);
     }
@@ -2971,7 +2971,7 @@ function showMatcherResults(groups,totalPairs,vsMode=false){
   if(!dlBtn){
     dlBtn=document.createElement('button');
     dlBtn.id='gen-dl-btn';
-    dlBtn.style.cssText='width:100%;margin-top:10px;padding:10px;border-radius:10px;border:1.5px solid var(--g500);background:var(--g50);color:var(--g700);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px';
+    dlBtn.style.cssText='width:100%;margin-top:10px;padding:10px;border-radius:var(--r-md);border:1.5px solid var(--g500);background:var(--g50);color:var(--g700);font-size:var(--text-base);font-weight:var(--fw-bold);font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px';
     resultEl.appendChild(dlBtn);
   }
   dlBtn.onclick=downloadAlternatives;
@@ -2982,7 +2982,7 @@ function showMatcherResults(groups,totalPairs,vsMode=false){
   if(!navBtn){
     navBtn=document.createElement('button');
     navBtn.id='gen-nav-opps-btn';
-    navBtn.style.cssText='width:100%;margin-top:8px;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px';
+    navBtn.style.cssText='width:100%;margin-top:8px;padding:12px;border-radius:var(--r-md);border:none;background:linear-gradient(135deg,#1a4a3a,#0d3328);color:var(--tk-text-primary);font-size:var(--text-base);font-weight:var(--fw-bold);font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px';
     navBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"/></svg> ดูรายการที่เพิ่งตรวจ ${withAlts.length} SKU →`;
     navBtn.onclick=()=>{closeDataPanel();showScreen('opportunities');};
     resultEl.appendChild(navBtn);
@@ -3268,7 +3268,7 @@ function _sgRevealScore(){
   }
   // Score in ring — SENSE SCORE label underneath
   if(scoreNum){scoreNum.style.color='#ffffff';scoreNum.textContent='0';}
-  if(scoreUnit){scoreUnit.textContent='SAVE SCORE';scoreUnit.style.cssText='font-size:8px;color:rgba(160,255,200,.6);font-family:\'Noto Sans Thai\',sans-serif;margin-top:5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;';}
+  if(scoreUnit){scoreUnit.textContent='SAVE SCORE';scoreUnit.style.cssText='font-size:var(--text-3xs);color:rgba(160,255,200,.6);font-family:\'Noto Sans Thai\',sans-serif;margin-top:5px;font-weight:var(--fw-bold);letter-spacing:1.5px;text-transform:uppercase;';}
   requestAnimationFrame(()=>{
     if(scoreWrap)scoreWrap.classList.add('visible');
     if(scoreNum){
@@ -3289,7 +3289,7 @@ function _sgRevealScore(){
   setTimeout(()=>{
     if(doneLabel){
       doneLabel.textContent='มี '+OPPS.length+' รายการที่ราคาคุ้มกว่า';
-      doneLabel.style.cssText='font-size:15px;font-weight:700;color:#fff;text-align:center;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:4px;';
+      doneLabel.style.cssText='font-size:var(--text-lg2);font-weight:var(--fw-bold);color:var(--tk-text-primary);text-align:center;font-family:\'Noto Sans Thai\',sans-serif;margin-bottom:4px;';
     }
     if(doneDesc){
       doneDesc.textContent='ประหยัดได้ '+(savYr>0?fmt(savYr):'—')+' / ปี';
@@ -3350,7 +3350,7 @@ function toggleScoreTooltip(){
       const nOpps=OPPS.length;
       const savAmt=totalAll();
       if(nOpps>0&&savAmt>0){
-        whyEl.innerHTML=`Sense สแกนแล้วพบ <strong style="color:#fff">${nOpps} รายการ</strong> วัตถุดิบที่มีราคาคุ้มกว่าใน catalog Freshket — ประหยัดได้ <strong style="color:var(--amb)">${fmt(savAmt)}/เดือน</strong> หรือ <strong style="color:var(--amb)">${fmt(savAmt*12)}/ปี</strong><br><span style="font-size:11px;color:rgba(255,255,255,.45);margin-top:4px;display:block">Score สูง = พอร์ตเรียบร้อยดีแล้ว · Score ต่ำ = Sense เจอวัตถุดิบราคาคุ้มกว่ามาก</span>`;
+        whyEl.innerHTML=`Sense สแกนแล้วพบ <strong style="color:var(--tk-text-primary)">${nOpps} รายการ</strong> วัตถุดิบที่มีราคาคุ้มกว่าใน catalog Freshket — ประหยัดได้ <strong style="color:var(--amb)">${fmt(savAmt)}/เดือน</strong> หรือ <strong style="color:var(--amb)">${fmt(savAmt*12)}/ปี</strong><br><span style="font-size:var(--text-sm);color:var(--tk-text-muted);margin-top:4px;display:block">Score สูง = พอร์ตเรียบร้อยดีแล้ว · Score ต่ำ = Sense เจอวัตถุดิบราคาคุ้มกว่ามาก</span>`;
       }else{
         whyEl.textContent='ยังไม่มีข้อมูลวิเคราะห์ SKU — อัปโหลด alternatives.json เพื่อดูโอกาสประหยัด';
       }

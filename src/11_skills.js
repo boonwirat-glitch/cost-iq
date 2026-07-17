@@ -83,7 +83,7 @@ function _skImgTag(def, opts = {}) {
   const bg = MODULE_BG[def ? def.module : 'A'];
   const code = def ? def.skill_code.split('_')[0] : '';
   return `<div class="${cls}" style="width:${w};height:${h};background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-    <span style="font-size:10px;font-weight:600;font-family:'Noto Sans Thai',sans-serif;opacity:.3;">${code}</span>
+    <span style="font-size:var(--text-xs);font-weight:var(--fw-semi);font-family:'Noto Sans Thai',sans-serif;opacity:.3;">${code}</span>
   </div>`;
 }
 
@@ -573,10 +573,10 @@ function _renderTLContent() {
 // ── TL Visit Tracker ───────────────────────────────────────
 async function _renderTLVisitContent(container) {
   if (!container) return;
-  const _loadingMsg = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">กำลังโหลด...</div>`;
-  const _emptyTeam  = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">ไม่พบข้อมูลทีม</div>`;
-  const _noData     = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">ยังไม่มี visit ที่บันทึกไว้</div>`;
-  const _errMsg     = `<div style="text-align:center;padding:40px 0;font-size:13px;color:var(--sk-muted);font-family:var(--font,sans-serif);">โหลดข้อมูลไม่สำเร็จ</div>`;
+  const _loadingMsg = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--sk-muted);font-family:var(--font,sans-serif);">กำลังโหลด...</div>`;
+  const _emptyTeam  = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--sk-muted);font-family:var(--font,sans-serif);">ไม่พบข้อมูลทีม</div>`;
+  const _noData     = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--sk-muted);font-family:var(--font,sans-serif);">ยังไม่มี visit ที่บันทึกไว้</div>`;
+  const _errMsg     = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--sk-muted);font-family:var(--font,sans-serif);">โหลดข้อมูลไม่สำเร็จ</div>`;
   container.innerHTML = _loadingMsg;
 
   try {
@@ -644,19 +644,19 @@ async function _renderTLVisitContent(container) {
     let html = `
 <div style="padding:14px 14px 10px;flex-shrink:0;">
   <div class="sk-eyebrow sk-eyebrow-ac" style="margin-bottom:3px;">VISITS · สัปดาห์นี้</div>
-  <div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${todayStr}</div>
+  <div style="font-size:var(--text-xs);color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${todayStr}</div>
 </div>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 14px;">
-  <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
-    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${totalThis}</div>
+  <div style="background:var(--sk-surface);border-radius:var(--r-8);padding:10px 12px;">
+    <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${totalThis}</div>
     <div class="sk-eyebrow" style="margin-top:3px;">visits/week</div>
   </div>
-  <div style="background:var(--sk-surface);border-radius:8px;padding:10px 12px;">
-    <div style="font-size:20px;font-weight:700;color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${avgThis}</div>
+  <div style="background:var(--sk-surface);border-radius:var(--r-8);padding:10px 12px;">
+    <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--sk-ink);line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${avgThis}</div>
     <div class="sk-eyebrow" style="margin-top:3px;">avg/rep</div>
   </div>
-  <div style="background:${lowCount > 0 ? 'rgba(255,56,92,.07)' : 'var(--sk-surface)'};border-radius:8px;padding:10px 12px;${lowCount > 0 ? 'border:1px solid rgba(255,56,92,.18);' : ''}">
-    <div style="font-size:20px;font-weight:700;color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${lowCount}</div>
+  <div style="background:${lowCount > 0 ? 'rgba(255,56,92,.07)' : 'var(--sk-surface)'};border-radius:var(--r-8);padding:10px 12px;${lowCount > 0 ? 'border:1px solid rgba(255,56,92,.18);' : ''}">
+    <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:${lowCount > 0 ? 'var(--sk-ac)' : 'var(--sk-ok)'};line-height:1;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${lowCount}</div>
     <div class="sk-eyebrow" style="margin-top:3px;color:${lowCount > 0 ? 'var(--sk-ac)' : ''};">ไม่ครบ ${qLabel}</div>
   </div>
 </div>`;
@@ -684,19 +684,19 @@ async function _renderTLVisitContent(container) {
         : '—';
       html += `
 <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--sk-hairline);">
-  <div style="width:28px;height:28px;border-radius:50%;background:var(--sk-ac-dim);border:1px solid rgba(255,56,92,.2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--sk-ac);flex-shrink:0;letter-spacing:-.02em;">${nick}</div>
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--sk-ac-dim);border:1px solid rgba(255,56,92,.2);display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--sk-ac);flex-shrink:0;letter-spacing:-.02em;">${nick}</div>
   <div style="flex:1;min-width:0;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:3px;">
-      <div style="font-size:12px;font-weight:600;color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rawName}</div>
-      ${acctTgt > 0 ? `<div style="font-size:10px;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
+      <div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--sk-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rawName}</div>
+      ${acctTgt > 0 ? `<div style="font-size:var(--text-xs);color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;flex-shrink:0;">${d.thisQuarter}/${acctTgt}</div>` : ''}
     </div>
-    <div style="height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
-      <div style="height:100%;width:${qPct}%;background:${barColor};border-radius:2px;transition:width .3s;"></div>
+    <div style="height:3px;background:var(--sk-hairline);border-radius:var(--r-xxs);overflow:hidden;">
+      <div style="height:100%;width:${qPct}%;background:${barColor};border-radius:var(--r-xxs);transition:width .3s;"></div>
     </div>
   </div>
   <div style="text-align:right;flex-shrink:0;min-width:28px;">
-    <div style="font-size:14px;font-weight:700;color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono','Noto Sans Thai',monospace;line-height:1;">${d.thisWeek}</div>
-    <div style="font-size:10px;color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
+    <div style="font-size:var(--text-lg);font-weight:var(--fw-bold);color:${isLow ? 'var(--sk-ac)' : 'var(--sk-ink)'};font-family:'IBM Plex Mono','Noto Sans Thai',monospace;line-height:1;">${d.thisWeek}</div>
+    <div style="font-size:var(--text-xs);color:${isToday ? 'var(--sk-ok)' : 'var(--sk-muted)'};margin-top:2px;">${isToday ? '●วันนี้' : lastStr}</div>
   </div>
 </div>`;
     });
@@ -930,7 +930,7 @@ async function _doOpenDetail(skillId) {
     _skillsRole === 'sales_tl' || _skillsRole === 'tl' ||
     _skillsRole === 'admin'    || _skillsRole === 'ad_tl');
   if (_isTLBrowse) {
-    cta = `<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:100px;background:var(--sk-surface);font-size:10px;font-weight:600;color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.08em;text-transform:uppercase;">READ ONLY</div>`;
+    cta = `<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:100px;background:var(--sk-surface);font-size:var(--text-xs);font-weight:var(--fw-semi);color:var(--sk-muted);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.08em;text-transform:uppercase;">READ ONLY</div>`;
   } else if (state === 'locked') {
     cta = `<button class="sk-cta-btn sk-cta-primary" onclick="skillsStartTraining(${skillId})">เริ่มฝึก</button>`;
   } else if (state === 'training') {
@@ -961,9 +961,9 @@ async function _doOpenDetail(skillId) {
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
             <div class="sk-state-pill pill-${state}"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
-            <span class="sk-detail-code" style="font-size:11px;color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
+            <span class="sk-detail-code" style="font-size:var(--text-sm);color:#6A6A6A;">${def.skill_name_en} · ${modCode}</span>
           </div>
-          <div style="font-size:18px;font-weight:800;color:var(--sk-ink);line-height:1.2;margin-bottom:10px;font-family:'Noto Sans Thai',sans-serif;">${def.skill_name_th || def.skill_name_en}</div>
+          <div style="font-size:var(--text-xl3);font-weight:800;color:var(--sk-ink);line-height:1.2;margin-bottom:10px;font-family:'Noto Sans Thai',sans-serif;">${def.skill_name_th || def.skill_name_en}</div>
           ${def.principle_th ? `
           <div class="sk-rubric-eye" style="margin-bottom:5px;">Principle — ทำไมสกิลนี้สำคัญ</div>
           <div class="sk-rubric-text" style="white-space:pre-wrap;">${def.principle_th}</div>` : ''}
@@ -985,7 +985,7 @@ async function _doOpenDetail(skillId) {
   ${def.practice_th ? `
   <div class="sk-rubric-block">
     <div class="sk-rubric-eye">Practice — ต้องทำอะไร</div>
-    <div class="sk-rubric-text">${(def.practice_th.includes('\n') ? def.practice_th.split('\n') : def.practice_th.split('|')).map(t => t.trim()).filter(Boolean).map(t => t.startsWith('#') ? '<span style="font-weight:600;color:var(--sk-ink);display:block;margin-top:8px;margin-bottom:2px">' + t.slice(1).trim() + '</span>' : '<span style="display:block;padding-left:10px">• ' + t + '</span>').join('')}</div>
+    <div class="sk-rubric-text">${(def.practice_th.includes('\n') ? def.practice_th.split('\n') : def.practice_th.split('|')).map(t => t.trim()).filter(Boolean).map(t => t.startsWith('#') ? '<span style="font-weight:var(--fw-semi);color:var(--sk-ink);display:block;margin-top:8px;margin-bottom:2px">' + t.slice(1).trim() + '</span>' : '<span style="display:block;padding-left:10px">• ' + t + '</span>').join('')}</div>
   </div>
   <div class="sk-divider"></div>` : ''}
 
@@ -1296,13 +1296,13 @@ function _renderTLOverviewContent() {
   return `
 <div style="padding:12px 14px 0;display:flex;align-items:flex-end;justify-content:space-between;">
   <div>
-    <div style="font-size:28px;font-weight:700;color:var(--sk-ink);letter-spacing:-.03em;line-height:1;">${unlocked}<span style="font-size:13px;font-weight:500;color:var(--sk-muted);">/${total}</span></div>
+    <div style="font-size:var(--text-kpi);font-weight:var(--fw-bold);color:var(--sk-ink);letter-spacing:-.03em;line-height:1;">${unlocked}<span style="font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--sk-muted);">/${total}</span></div>
     <div style="font-size:10.5px;color:var(--sk-muted);margin-top:2px;">ทีม unlock แล้ว</div>
   </div>
-  <div style="font-size:20px;font-weight:700;color:var(--sk-ac);">${pct}%</div>
+  <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--sk-ac);">${pct}%</div>
 </div>
-<div style="margin:8px 14px 0;height:3px;background:var(--sk-hairline);border-radius:2px;overflow:hidden;">
-  <div style="height:100%;border-radius:2px;background:var(--sk-ac);width:${pct}%;"></div>
+<div style="margin:8px 14px 0;height:3px;background:var(--sk-hairline);border-radius:var(--r-xxs);overflow:hidden;">
+  <div style="height:100%;border-radius:var(--r-xxs);background:var(--sk-ac);width:${pct}%;"></div>
 </div>
 <div style="display:flex;justify-content:space-between;margin:3px 14px 0;font-size:7.5px;color:var(--sk-muted);">
   <span>${unlocked} UNLOCKED</span><span>${total-unlocked} REMAINING</span>
@@ -1360,15 +1360,15 @@ async function skillsTLOpenEval(userId, skillId) {
   ${_skImgTag(def, { w:'100%', h:'260px', cls:'sk-img-lazy' })}
   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.42) 0%,transparent 45%,rgba(0,0,0,.58) 100%);pointer-events:none;"></div>
   <div style="position:absolute;top:0;left:0;right:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;z-index:10;">
-    <button onclick="_skSetView('pending');_renderSkillsScreen()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.32);border:none;border-radius:999px;padding:6px 12px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
+    <button onclick="_skSetView('pending');_renderSkillsScreen()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.32);border:none;border-radius:var(--r-pill);padding:6px 12px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
-      <span style="font-size:12px;font-weight:600;color:#fff;">รอประเมิน</span>
+      <span style="font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--tk-text-primary);">รอประเมิน</span>
     </button>
-    <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(124,58,237,.45);border-radius:999px;padding:3px 9px;font-family:'Noto Sans Thai',sans-serif;backdrop-filter:blur(4px);">TL</div>
+    <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.85);background:rgba(124,58,237,.45);border-radius:var(--r-pill);padding:3px 9px;font-family:'Noto Sans Thai',sans-serif;backdrop-filter:blur(4px);">TL</div>
   </div>
   <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 16px 18px;">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${modCode}</div>
-    <div style="font-size:20px;font-weight:700;color:#fff;line-height:1.2;margin-top:2px;">${def.skill_name_en}</div>
+    <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.12em;text-transform:uppercase;color:var(--tk-text-secondary);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;">${modCode}</div>
+    <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--tk-text-primary);line-height:1.2;margin-top:2px;">${def.skill_name_en}</div>
     <div class="sk-state-pill pill-${state}" style="margin-top:8px;display:inline-flex;"><div class="sk-pill-dot"></div>${SKILL_STATE_LABEL_TH[state]}</div>
   </div>
 </div>
@@ -1562,7 +1562,7 @@ function skillsTLOpenRepDetail(userId) {
         ${ringPct>0?`<circle cx="18" cy="18" r="15" fill="none" stroke="var(--sk-ac)" stroke-width="2.5"
           stroke-dasharray="94.25" stroke-dashoffset="${ringOff.toFixed(2)}" stroke-linecap="round"/>`:''}
       </svg>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--sk-ac);font-family:'Noto Sans Thai',sans-serif;">${uCount}/${uTotal}</div>
     </div>
   </div>
   <div class="sk-filter-row">
@@ -1698,9 +1698,9 @@ function _buildEchoSparkSection(userId) {
     const def = Array.isArray(_skillDefs) ? _skillDefs.find(d => d.skill_code === code || d.skill_code.startsWith(code + '_')) : null;
     const skillLabel = def ? (def.skill_name_th || def.skill_name_en || shortCode) : shortCode;
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #F7F7F7">
-  <span style="font-size:11px;font-weight:500;color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillLabel}</span>
+  <span style="font-size:var(--text-sm);font-weight:var(--fw-medium);color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillLabel}</span>
   <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
-  <span style="font-size:10px;font-weight:500;color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'ผ่าน':latestScore==='developing'?'กำลังพัฒนา':'—'}</span>
+  <span style="font-size:var(--text-xs);font-weight:var(--fw-medium);color:${latestCol};font-family:'Noto Sans Thai',sans-serif;min-width:52px;text-align:right">${latestScore==='pass'?'ผ่าน':latestScore==='developing'?'กำลังพัฒนา':'—'}</span>
 </div>`;
   }).join('');
 
@@ -1709,15 +1709,15 @@ function _buildEchoSparkSection(userId) {
     const d = new Date(day);
     return d.toLocaleDateString('th-TH', { day:'numeric', month:'short' });
   }).reverse().map(l =>
-    `<span style="font-size:9px;color:#8E8E93;font-family:'Noto Sans Thai',sans-serif;flex:1;text-align:center;overflow:hidden">${l}</span>`
+    `<span style="font-size:var(--text-2xs);color:#8E8E93;font-family:'Noto Sans Thai',sans-serif;flex:1;text-align:center;overflow:hidden">${l}</span>`
   ).join('');
 
   return `
 <div style="margin-top:16px;padding:0 14px;">
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--sk-hairline,#EBEBEB);">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--sk-ac,#FF385C)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/></svg>
-    <span style="font-size:11px;font-weight:600;color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.01em;">Echo Skill Trend</span>
-    <span style="font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;">${sessions.length} sessions ล่าสุด</span>
+    <span style="font-size:var(--text-sm);font-weight:var(--fw-semi);color:var(--sk-ink,#222);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.01em;">Echo Skill Trend</span>
+    <span style="font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;">${sessions.length} sessions ล่าสุด</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;padding:0 0 4px;padding-left:104px;">
     ${sessionLabels}
@@ -1725,8 +1725,8 @@ function _buildEchoSparkSection(userId) {
   </div>
   ${sparkRows}
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--sk-hairline,#EBEBEB);">
-    ${['A','B','C','D'].map(m => `<span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:${MODULE_META[m].color};display:inline-block"></span>${MODULE_META[m].name.replace('The ','')}</span>`).join('')}
-    <span style="font-size:10px;color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;margin-left:auto">สีเต็ม = ผ่าน · สีจาง = ยังไม่ผ่าน</span>
+    ${['A','B','C','D'].map(m => `<span style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:${MODULE_META[m].color};display:inline-block"></span>${MODULE_META[m].name.replace('The ','')}</span>`).join('')}
+    <span style="font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;margin-left:auto">สีเต็ม = ผ่าน · สีจาง = ยังไม่ผ่าน</span>
   </div>
 </div>`;
 }

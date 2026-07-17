@@ -606,7 +606,7 @@ function showSenseSplash(onDone){
   );
   // Boot version stamp — always visible at top of console
   const _appVer = (typeof FreshketSenseConfig!=='undefined'&&FreshketSenseConfig.app&&FreshketSenseConfig.app.version)||'unknown';
-  console.log('%c[Sense] v'+_appVer+' boot','color:#fff;background:#006050;padding:2px 8px;border-radius:4px;font-weight:bold',
+  console.log('%c[Sense] v'+_appVer+' boot','color:var(--tk-text-primary);background:#006050;padding:2px 8px;border-radius:var(--r-xs);font-weight:bold',
     {cache_state: _cacheWarm?'WARM':_idbPreloaded?'IDB':_isWarmBoot?'WARM-BOOT':'COLD',
      user_agent: navigator.userAgent.split(' ').slice(-1)[0]});
   // v219: _idbPreloaded → MAX_SHOW=1500ms (> tSetup 900ms → routing fires before force-fade)
@@ -862,8 +862,8 @@ function hideLoginOverlay() {
     s.id=_SHIMMER_CSS_ID;
     s.textContent=[
       '@keyframes sense-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}',
-      '.sense-shimmer-line{border-radius:6px;background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:sense-shimmer 1.4s ease infinite;}',
-      '.sense-shimmer-card{background:rgba(255,255,255,.03);border-radius:12px;padding:16px;margin-bottom:10px;}',
+      '.sense-shimmer-line{border-radius:var(--r-sm);background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:sense-shimmer 1.4s ease infinite;}',
+      '.sense-shimmer-card{background:rgba(255,255,255,.03);border-radius:var(--r-card);padding:16px;margin-bottom:10px;}',
     ].join('');
     document.head.appendChild(s);
   }

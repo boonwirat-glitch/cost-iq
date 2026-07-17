@@ -250,10 +250,10 @@ function renderSalesHome(el, outlets, pipeline) {
       <div class="sv-hero-eye">Runrate ในมือ</div>
       <div><span class="sv-hero-num">฿${_sv_fmt(heroRunrate)}</span></div>
       <div class="sv-hero-sub">
-        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
+        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);color:#6A6A6A">MTD ฿${_sv_fmt(outlets.reduce((s,o)=>s+(o.gmvToDate||0),0))}</span>
         <span style="color:#EBEBEB">·</span>
         <span>${outlets.filter(o=>o.gmvToDate>0).length} / ${outlets.length} active</span>
-        ${target === 0 ? '<span style="font-size:12px;color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>' : ''}
+        ${target === 0 ? '<span style="font-size:var(--text-md);color:#FF9500">ยังไม่มี target (TL กรุณาตั้ง)</span>' : ''}
       </div>
       ${target > 0 ? `<div class="sv-tbar">
         <div class="sv-tbar-track"><div class="sv-tbar-fill ${tbarClass}" style="width:${Math.min(100,targetPct)}%"></div></div>
@@ -332,12 +332,12 @@ function renderSalesPortview() {
     if (!outlets.length) {
       const allRows = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
       const note = document.createElement('div');
-      note.style.cssText = "margin:14px 16px 4px;padding:14px 16px;background:#F7F7F7;border-radius:14px;font-family:'Noto Sans Thai',sans-serif";
+      note.style.cssText = "margin:14px 16px 4px;padding:14px 16px;background:#F7F7F7;border-radius:var(--r-lg);font-family:'Noto Sans Thai',sans-serif";
       note.innerHTML = allRows.length > 0
-        ? '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px">ยังเชื่อมพอร์ตของคุณไม่สำเร็จ</div>'
-          + '<div style="font-size:12px;color:rgba(34,34,34,.55);line-height:1.6">ไฟล์ข้อมูลชุดล่าสุดไม่มีข้อมูลเจ้าของพอร์ตของ ' + (email || 'บัญชีนี้') + ' — ระบบบันทึกแจ้งทีมข้อมูลแล้ว ข้อมูลจะกลับมาหลังรอบอัปเดตถัดไป</div>'
-        : '<div style="font-size:14px;font-weight:700;color:#222;margin-bottom:4px">กำลังโหลดข้อมูลพอร์ต</div>'
-          + '<div style="font-size:12px;color:rgba(34,34,34,.55);line-height:1.6">ถ้าหน้านี้ค้างนานกว่า 1 นาที ลองปิดแล้วเปิดแอพใหม่อีกครั้ง</div>';
+        ? '<div style="font-size:var(--text-lg);font-weight:var(--fw-bold);color:#222;margin-bottom:4px">ยังเชื่อมพอร์ตของคุณไม่สำเร็จ</div>'
+          + '<div style="font-size:var(--text-md);color:rgba(34,34,34,.55);line-height:1.6">ไฟล์ข้อมูลชุดล่าสุดไม่มีข้อมูลเจ้าของพอร์ตของ ' + (email || 'บัญชีนี้') + ' — ระบบบันทึกแจ้งทีมข้อมูลแล้ว ข้อมูลจะกลับมาหลังรอบอัปเดตถัดไป</div>'
+        : '<div style="font-size:var(--text-lg);font-weight:var(--fw-bold);color:#222;margin-bottom:4px">กำลังโหลดข้อมูลพอร์ต</div>'
+          + '<div style="font-size:var(--text-md);color:rgba(34,34,34,.55);line-height:1.6">ถ้าหน้านี้ค้างนานกว่า 1 นาที ลองปิดแล้วเปิดแอพใหม่อีกครั้ง</div>';
       el.appendChild(note);
       if (allRows.length > 0 && window.SenseSentinel && typeof window.SenseSentinel.report === 'function') {
         window.SenseSentinel.report('data_quality', 'sales portview empty for ' + email + ' (' + allRows.length + ' bulk rows present)');
@@ -690,7 +690,7 @@ window._salesOpenAccount = function(accountId, accountName) {
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:#FF385C;font-size:9px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:var(--text-2xs)">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
         '</div>';
       })() : '') +
       '</div>' +
@@ -707,7 +707,7 @@ window._salesOpenAccount = function(accountId, accountName) {
             '<div class="sv-b ghost"></div>' +
             '<div class="sv-b-mtd-fill" style="height:' + Math.min(100,Math.round((acct.gmvToDate||0)/(acct.runrate||1)*100)) + '%"></div>' +
           '</div>' +
-          '<div class="sv-bl" style="color:#FF385C;font-size:9px">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
+          '<div class="sv-bl" style="color:#FF385C;font-size:var(--text-2xs)">MTD ฿' + _sv_fmt(acct.gmvToDate||0) + '</div>' +
         '</div>' +
       '</div>' +
       '</div>'
@@ -749,8 +749,8 @@ window._salesOpenAccount = function(accountId, accountName) {
       '<div class="sv-cat-list">' +
       allCats.map(c => {
         const barW = totalCatGmv > 0 ? Math.round((c.s||0)/totalCatGmv*100) : 0;
-        const gmvLabel = c.empty ? '<span style="font-size:11px;color:#EBEBEB;font-family:\'IBM Plex Mono\',monospace">—</span>' :
-          '<span style="font-size:12px;font-weight:700;color:#222222;font-family:\'IBM Plex Mono\',monospace">฿' + _sv_fmt(c.s||0) + '</span>';
+        const gmvLabel = c.empty ? '<span style="font-size:var(--text-sm);color:#EBEBEB;font-family:\'IBM Plex Mono\',monospace">—</span>' :
+          '<span style="font-size:var(--text-md);font-weight:var(--fw-bold);color:#222222;font-family:\'IBM Plex Mono\',monospace">฿' + _sv_fmt(c.s||0) + '</span>';
         return '<div class="sv-cat-row">' +
           '<span class="sv-cat-name' + (c.empty?' sv-cat-empty':'') + '">' + (c.n||'—') + '</span>' +
           '<div class="sv-cat-bar-wrap"><div class="sv-cat-fill" style="width:' + barW + '%;background:' + (c.c||'#EBEBEB') + ';opacity:' + (c.empty?'0.3':'0.65') + '"></div></div>' +
@@ -767,7 +767,7 @@ window._salesOpenAccount = function(accountId, accountName) {
       '<div class="sv-page-hd" style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;">' +
         '<button onclick="renderSalesPortview()" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;">' +
           '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF385C" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>' +
-          '<span style="font-size:14px;font-weight:600;color:#FF385C;font-family:\'Noto Sans Thai\',sans-serif">พอร์ต</span>' +
+          '<span style="font-size:var(--text-lg);font-weight:var(--fw-semi);color:#FF385C;font-family:\'Noto Sans Thai\',sans-serif">พอร์ต</span>' +
         '</button>' +
       '</div>' +
       '<div style="padding:0 16px 12px;">' +
@@ -1121,19 +1121,19 @@ function renderSalesTeamview() {
       (teamTarget > 0
         ? '<span class="sv-gap-badge' + (teamPct >= 100 ? ' ok' : '') + '">' +
             (teamPct >= 100 ? '+' : '−') + '฿' + _sv_fmt(Math.abs(teamRunrate - teamTarget)) + ' vs target</span>'
-        : '<span style="font-size:12px;color:#FF9500">ยังไม่มี team target</span>') +
+        : '<span style="font-size:var(--text-md);color:#FF9500">ยังไม่มี team target</span>') +
     '</div>' +
     (teamTarget > 0
       ? '<div class="sv-tbar"><div class="sv-tbar-track"><div class="sv-tbar-fill ' + tbarCls + '" style="width:' + Math.min(100,teamPct) + '%"></div></div>' +
         '<div class="sv-tbar-meta"><span>' + teamPct + '% of target</span><span>Target ฿' + _sv_fmt(teamTarget) + '</span></div></div>'
       : '') +
     (teamHandover > 0
-      ? '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,56,92,.06);border-radius:8px;border-left:2.5px solid #FF385C;display:flex;justify-content:space-between;align-items:center;">' +
+      ? '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,56,92,.06);border-radius:var(--r-8);border-left:2.5px solid #FF385C;display:flex;justify-content:space-between;align-items:center;">' +
           '<div>' +
-            '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#FF385C;font-family:IBM Plex Mono,monospace;">Handover ออกเดือนนี้</div>' +
-            '<div style="font-size:11px;color:#6A6A6A;margin-top:1px;">' + teamHandoverCt + ' ร้าน กำลัง handover ให้ KAM</div>' +
+            '<div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.1em;text-transform:uppercase;color:#FF385C;font-family:IBM Plex Mono,monospace;">Handover ออกเดือนนี้</div>' +
+            '<div style="font-size:var(--text-sm);color:#6A6A6A;margin-top:1px;">' + teamHandoverCt + ' ร้าน กำลัง handover ให้ KAM</div>' +
           '</div>' +
-          '<div style="font-size:15px;font-weight:700;color:#FF385C;font-family:IBM Plex Mono,monospace;">−฿' + _sv_fmt(teamHandover) + '</div>' +
+          '<div style="font-size:var(--text-lg2);font-weight:var(--fw-bold);color:#FF385C;font-family:IBM Plex Mono,monospace;">−฿' + _sv_fmt(teamHandover) + '</div>' +
         '</div>'
       : '') +
     '</div>';
@@ -1151,7 +1151,7 @@ function renderSalesTeamview() {
       const repName = rep.name.split('@')[0];
       // handover badge ต่อ rep
       const hovBadge = rep.handoverOut > 0
-        ? '<span style="font-size:8.5px;font-weight:700;color:#FF385C;font-family:IBM Plex Mono,monospace;background:rgba(255,56,92,.08);border-radius:999px;padding:1px 6px;">−฿' + _sv_fmt(rep.handoverOut) + ' HO</span>'
+        ? '<span style="font-size:8.5px;font-weight:var(--fw-bold);color:#FF385C;font-family:IBM Plex Mono,monospace;background:rgba(255,56,92,.08);border-radius:var(--r-pill);padding:1px 6px;">−฿' + _sv_fmt(rep.handoverOut) + ' HO</span>'
         : '';
       html += '<div class="sv-ol-row" onclick="window._salesTLDrillRep(\'' + rep.email + '\')">' +
         '<div class="sv-ol-top">' +
@@ -1239,7 +1239,7 @@ window._salesTLDrillRep = function(repEmail) {
       (repTarget > 0
         ? '<span class="sv-gap-badge' + (repPct>=100?' ok':'') + '">' +
             (repPct>=100?'+':'−') + '฿' + _sv_fmt(Math.abs(repRunrate-repTarget)) + ' vs target</span>'
-        : '<span style="font-size:12px;color:#FF9500">ยังไม่มี target</span>') +
+        : '<span style="font-size:var(--text-md);color:#FF9500">ยังไม่มี target</span>') +
     '</div>' +
     (repTarget > 0
       ? '<div class="sv-tbar"><div class="sv-tbar-track"><div class="sv-tbar-fill ' + tbarCls + '" style="width:' + Math.min(100,repPct) + '%"></div></div>' +

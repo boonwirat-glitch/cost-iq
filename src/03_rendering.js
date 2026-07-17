@@ -41,7 +41,7 @@ window.shimmerHTML = function shimmerHTML(rows, opts){
   var html = '<div style="padding:12px 0;display:flex;flex-direction:column;gap:'+gap+'">';
   for(var i=0; i<(rows||3); i++){
     var w = ws[i % ws.length];
-    html += '<div class="sense-shimmer" style="height:'+h+';width:'+w+';border-radius:4px;background:var(--n100,rgba(255,255,255,.06));position:relative;overflow:hidden">'
+    html += '<div class="sense-shimmer" style="height:'+h+';width:'+w+';border-radius:var(--r-xs);background:var(--n100,rgba(255,255,255,.06));position:relative;overflow:hidden">'
           + '<div class="sense-shimmer-inner"></div>'
           + '</div>';
   }
@@ -129,8 +129,8 @@ function __legacyRenderOverviewFallback(){
   const _showGhost=_cm&&_rr>_cm.gmv_to_date*1.05&&_actH>0;
   const _rrH=_showGhost?Math.min(Math.round((_rr/mx)*50),52):_actH;
   const _rrGap=_rrH-_actH;
-  const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:700">${fmtK(_cm.gmv_to_date)}</span>`:'';
-  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--tk-ok-bright);font-size:10px;font-weight:700;font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--tk-ok-text);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--tk-ok-text);font-weight:700">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
+  const _actInnerLeg=_actH>=16?`<span style="position:absolute;top:3px;left:0;right:0;text-align:center;font-size:var(--text-3xs);font-family:monospace;color:rgba(0,0,0,.7);line-height:1;font-weight:var(--fw-bold)">${fmtK(_cm.gmv_to_date)}</span>`:'';
+  const _cmBar=_cm&&_cm.gmv_to_date>0?`<div class="tbw" id="bar-cm" style="cursor:pointer" onclick="selectCurrentMonth()"><span class="tba" style="color:var(--tk-ok-bright);font-size:var(--text-xs);font-weight:var(--fw-bold);font-family:monospace">${_showGhost?fmtK(_rr):fmtK(_cm.gmv_to_date)}</span>${_showGhost?`<div style="position:relative;height:${_rrH}px;width:100%;flex-shrink:0"><div style="position:absolute;inset:0;background:var(--tk-ok-dim);border:1.5px dashed var(--tk-ok-border);border-radius:4px 4px 0 0;box-sizing:border-box"></div><div style="position:absolute;bottom:0;left:0;right:0;height:${_actH}px;background:var(--g500);opacity:.65;border-radius:4px 4px 0 0;overflow:hidden">${_actInnerLeg}</div></div>`:`<div class="tb" style="--bh:${_actH}px;--bar-i:${hist.length};height:${_actH}px;background:var(--g500);opacity:.5;border:1.5px dashed var(--tk-ok-text);box-sizing:border-box"></div>`}<span class="tbl" style="color:var(--tk-ok-text);font-weight:var(--fw-bold)">${(_cm.month_label||'').split(' ')[0]}</span></div>`:'';
 
   document.getElementById('tbars').innerHTML=hist.map((h,i)=>`<div class="tbw" id="bar-${i}" onclick="selectMonth(${i})"><span class="tba" id="tba-${i}">${fmtK(h.s)}</span><div class="tb" id="tb-${i}" style="--bh:${Math.round((h.s/mx)*50)}px;--bar-i:${i};height:${Math.round((h.s/mx)*50)}px;background:var(--n200)"></div><span class="tbl">${h.m.split(' ')[0]}</span></div>`).join('')+_cmBar;
   // ── Hero: lock to current month if available ──
@@ -536,13 +536,13 @@ function __legacyRenderPortfolioFallback(){
   const prevHistRow=histIdx>0?hist[histIdx-1]:hist.length>=2?hist[hist.length-2]:null;
   const momDelta=prevHistRow&&prevHistRow.s>0?((last.s-prevHistRow.s)/prevHistRow.s*100):null;
   const momStr=momDelta!==null
-    ?`<span style="color:${momDelta<=0?'var(--g500)':'#f0b000'};font-weight:700">${momDelta>0?'▲':'▼'} ${Math.abs(momDelta).toFixed(1)}%</span> vs เดือนก่อน`
+    ?`<span style="color:${momDelta<=0?'var(--g500)':'#f0b000'};font-weight:var(--fw-bold)">${momDelta>0?'▲':'▼'} ${Math.abs(momDelta).toFixed(1)}%</span> vs เดือนก่อน`
     :`${last.orders} ออเดอร์`;
   const avgOrd=Math.round(last.s/ords);
   const prevAvgOrd=prevHistRow?Math.round(prevHistRow.s/Math.max(prevHistRow.orders,1)):null;
   const avgDelta=prevAvgOrd&&prevAvgOrd>0?((avgOrd-prevAvgOrd)/prevAvgOrd*100):null;
   const avgStr=avgDelta!==null
-    ?`<span style="color:${avgDelta<=0?'var(--g500)':'#9a6500'};font-weight:700">${avgDelta>0?'▲':'▼'} ${Math.abs(avgDelta).toFixed(1)}%</span> vs เดือนก่อน`
+    ?`<span style="color:${avgDelta<=0?'var(--g500)':'#9a6500'};font-weight:var(--fw-bold)">${avgDelta>0?'▲':'▼'} ${Math.abs(avgDelta).toFixed(1)}%</span> vs เดือนก่อน`
     :(hist[hist.length-1]?.m||'');
 
   // ── Price movement for selected portfolioMonth ──
@@ -574,7 +574,7 @@ function __legacyRenderPortfolioFallback(){
     const conTextColor=topPctNum>70?'#9a6500':topPctNum<50?'var(--tk-ok-text)':'var(--n600)';
     const conNumColor=topPctNum>70?'var(--amb)':topPctNum<50?'var(--g500)':'var(--n400)';
     topSkuEl.style.cssText=`background:${conBg};border-left:3px solid ${conBorder};border-radius:0 var(--rs) var(--rs) 0;padding:10px 12px;margin-bottom:12px;display:block;box-shadow:none`;
-    topSkuEl.innerHTML=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;font-weight:700;color:${conNumColor}">${top5pct}%</span></div><div style="font-size:12px;color:${conTextColor};line-height:1.5;font-weight:500">${conInterp}</div>`;
+    topSkuEl.innerHTML=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="font-size:var(--text-xs);font-weight:var(--fw-bold);letter-spacing:.5px;color:var(--n400);text-transform:uppercase">Top 5</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);font-weight:var(--fw-bold);color:${conNumColor}">${top5pct}%</span></div><div style="font-size:var(--text-md);color:${conTextColor};line-height:1.5;font-weight:var(--fw-medium)">${conInterp}</div>`;
   }
   // ── Category pills only ──
   const depts=['ทั้งหมด',...new Set(skus.map(s=>s.d))];
@@ -675,7 +675,7 @@ function __legacyRenderSKUListFallback(passedSkus){
       </div>`;
     }
     return`<div class="skrow"><div class="skrk ${rankClass}">${origRank}</div><div style="flex:1;min-width:0"><div class="skn">${s.n}</div><div class="skc">${s.d}${s.pack_size?' · '+s.pack_size:''} · ฿${(s.display_price||s.u||0).toFixed(s.display_price>=100?0:2)}/${s.display_unit||'กก.'}</div>${badgeRow}</div><div style="flex-shrink:0"><div class="sksp">${fmt(s.s)}</div><div class="skpc">${s.p}%</div></div></div>`;
-  }).join('')||'<div style="padding:20px;text-align:center;color:var(--n400);font-size:13px">ไม่พบสินค้า</div>';
+  }).join('')||'<div style="padding:20px;text-align:center;color:var(--n400);font-size:var(--text-base)">ไม่พบสินค้า</div>';
 }
 function filterSKUs(){renderSKUList();}
 function setSkuFilter(cat,btn){
@@ -830,10 +830,10 @@ function renderPlanBuilder(opps){
   // Tab content panel: changes based on active plan
   const tabPanel=isHigh
     ?`<div class="ptc-desc">Sense คัดสเปคใกล้เคียงไว้แล้ว · ลองเทียบกับเมนูของร้านก่อนสั่ง</div>
-      <div class="ptc-nums">${allHigh.length} รายการ · <span class="plan-save">${fmt(highSave)}</span><span style="font-size:9px;opacity:.7">/เดือน</span></div>
+      <div class="ptc-nums">${allHigh.length} รายการ · <span class="plan-save">${fmt(highSave)}</span><span style="font-size:var(--text-2xs);opacity:.7">/เดือน</span></div>
       <div class="ptc-rerun" onclick="openVerifySheet()">✦ เทียบสเปคเพิ่ม</div>`
     :`<div class="ptc-desc">บางตัวควรเทสกับเมนูก่อน</div>
-      <div class="ptc-nums">${opps.length} รายการ · <span class="plan-save">${fmt(allSave)}</span><span style="font-size:9px;opacity:.7">/เดือน</span></div>`;
+      <div class="ptc-nums">${opps.length} รายการ · <span class="plan-save">${fmt(allSave)}</span><span style="font-size:var(--text-2xs);opacity:.7">/เดือน</span></div>`;
   // Filter pills HTML (dynamic, replaces static HTML)
   const _f=oppFilter||'all';
   const _ni=typeof oppNInput!=='undefined'?oppNInput:0;
@@ -846,7 +846,7 @@ function renderPlanBuilder(opps){
     <button class="pill ${_f==='custom'?'on':''}" onclick="setOppFilter('custom',this)">กำหนดเอง</button>
   </div>
   <div id="opp-custom-row" style="display:${_f==='custom'?'block':'none'};margin:4px 0 8px">
-    <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:20px;font-size:13px;font-family:var(--tk-font-body);outline:none" oninput="renderOpps()">
+    <input type="number" id="opp-n-input" min="1" value="${_customVal}" placeholder="จำนวน SKU" style="width:100%;padding:7px 12px;border:1.5px solid var(--n200);border-radius:var(--r-xl);font-size:var(--text-base);font-family:var(--tk-font-body);outline:none" oninput="renderOpps()">
   </div>
 `;
 
@@ -854,7 +854,7 @@ function renderPlanBuilder(opps){
     <div class="plan-sel-title">เลือกแผนของคุณ</div>
     <div class="plan-tabs">
       <div class="plan-tab ${isAll?'active':''}" onclick="smartSelect('all',event)">
-        <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:400;color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
+        <div class="plan-tab-row"><span class="plan-tab-title">${'คุ้มที่สุดที่ Sense หาได้'}<span style="font-weight:var(--fw-normal);color:var(--n400);margin-left:5px">· ${opps.length} รายการ</span></span><span class="plan-tab-val ${isAll?'on':''}">${fmt(allSave)+'/เดือน'}</span></div>
         <div class="plan-tab-sub" style="text-align:right;color:var(--n700)">ประมาณการเบื้องต้น จากราคาเดือน ${_priceMo} — ควรตรวจสเปคก่อนนำเสนอลูกค้า</div>
       </div>
       <div class="plan-tab sense-tab ${isHigh?'active':''}${!verifyDone?' cta-mode':''}" onclick="${verifyDone?'smartSelect(\'high\',event)':'openVerifySheet()'}">
@@ -1070,7 +1070,7 @@ function renderSingleCard(o){
     const isSel=i===selIdx;
     const hasNote=a.note&&a.note.length>3;
     const _cb=confBadgeHtml(a.conf);
-    return`<div class="oalt-row ${isSel?'selected':''}" onclick="selectAlt(event,${o.id},${i})"><div class="oalt-radio"><div class="oalt-radio-dot"></div></div><div class="oalt-info"><div class="oalt-name">${a.altName}${a.recommended?`<span class="oalt-rec">★ แนะนำ</span>`:''} <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:10px;color:var(--n400);font-weight:400">#${a.altId}</span></div><div class="oalt-spec">${a.altSpec||''}${a.altSpec?' · ':''}<span style="font-size:9px;font-weight:700;color:${_cb.color}">${_cb.label}</span></div>${hasNote?`<div class="oalt-note">${a.note}</div>`:''}</div><div class="oalt-right"><div class="oalt-price">฿${(a.altP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div><div class="oalt-save${a.conf!=='high'?' med':''}">${'−'+a.pct+'%'}</div></div></div>`;
+    return`<div class="oalt-row ${isSel?'selected':''}" onclick="selectAlt(event,${o.id},${i})"><div class="oalt-radio"><div class="oalt-radio-dot"></div></div><div class="oalt-info"><div class="oalt-name">${a.altName}${a.recommended?`<span class="oalt-rec">★ แนะนำ</span>`:''} <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);color:var(--n400);font-weight:var(--fw-normal)">#${a.altId}</span></div><div class="oalt-spec">${a.altSpec||''}${a.altSpec?' · ':''}<span style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:${_cb.color}">${_cb.label}</span></div>${hasNote?`<div class="oalt-note">${a.note}</div>`:''}</div><div class="oalt-right"><div class="oalt-price">฿${(a.altP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div><div class="oalt-save${a.conf!=='high'?' med':''}">${'−'+a.pct+'%'}</div></div></div>`;
   }).join('');
   // v92: confTag was computed here but never referenced anywhere in this
   // function's returned template — confirmed dead code (grep found zero
@@ -1079,11 +1079,11 @@ function renderSingleCard(o){
   return`<div style="padding:8px 13px 10px;border-bottom:1px solid var(--n100)">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
       <div style="min-width:0;flex:1">
-        <div style="font-size:12px;color:var(--n500);font-weight:500">${o.curSpec}</div>
+        <div style="font-size:var(--text-md);color:var(--n500);font-weight:var(--fw-medium)">${o.curSpec}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;color:var(--n500);margin-top:3px;white-space:nowrap">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} ${_qtyUnit}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--n400);text-decoration:line-through;white-space:nowrap">฿${(o.curP||0).toLocaleString('th-TH')}/${o.priceUnitLabel||'kg'}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);color:var(--n500);margin-top:3px;white-space:nowrap">${fmt(o.monthlyGmv)}/เดือน · ${o.monthlyQty||'?'} ${_qtyUnit}</div>
       </div>
     </div>
   </div>
@@ -1100,7 +1100,7 @@ function renderSingleCard(o){
   </div>
   ${chosen.caveat?`<div class="onote" style="color:var(--amb);border-top:1px solid var(--n100);padding-top:8px">▲ ${chosen.caveat}</div>`:''}
   <div style="padding:12px 13px 4px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--tk-ok-bg)':'var(--n0)'};color:${ck?'var(--tk-ok-text)':'var(--n700)'};font-size:13px;font-weight:700;font-family:var(--tk-font-body);cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
+    <button id="sheet-plan-btn-${o.id}" style="flex:1;padding:11px;border-radius:var(--r-md);border:1.5px solid ${ck?'var(--g500)':'var(--n200)'};background:${ck?'var(--tk-ok-bg)':'var(--n0)'};color:${ck?'var(--tk-ok-text)':'var(--n700)'};font-size:var(--text-base);font-weight:var(--fw-bold);font-family:var(--tk-font-body);cursor:pointer;transition:all .2s" onclick="sheetTogglePlan(${o.id})">${ck?'✓ อยู่ในแผนแล้ว':'+ เพิ่มเข้าแผน'}</button>
   </div>`;
 }
 
@@ -1115,9 +1115,9 @@ function renderOppTable(opps){
       const altRows=exp?o.alts.map((alt,ai)=>{
         const isSe=(selAlt[o.id]??o.alts.findIndex(x=>x.recommended)??0)===ai;
         const _cb=confBadgeHtml(alt.conf);
-        return`<div class="ot-expand-row ${isSe?'ot-exp-sel':''}" onclick="selectAlt(event,${o.id},${ai})"><div style="width:14px;height:14px;border-radius:50%;border:2px solid ${isSe?'var(--g500)':'var(--n300)'};background:${isSe?'var(--g500)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:28px">${isSe?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':''}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${alt.altName}${alt.recommended?' <span style="font-size:9px;background:var(--tk-ok-bg);color:var(--g800);border-radius:10px;padding:2px 6px;font-weight:700">★</span>':''}</div><div style="font-size:11px;font-weight:600;color:${_cb.color};margin-top:1px">${_cb.label}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700;color:${_cb.color};font-family:'IBM Plex Mono','Noto Sans Thai',monospace">${fmt(alt.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:2px">${fmt(alt.save*12)+'/ปี <span style="font-family:IBM Plex Mono,monospace;font-weight:700">−'+alt.pct+'%</span>'}</div></div></div>`;
+        return`<div class="ot-expand-row ${isSe?'ot-exp-sel':''}" onclick="selectAlt(event,${o.id},${ai})"><div style="width:14px;height:14px;border-radius:50%;border:2px solid ${isSe?'var(--g500)':'var(--n300)'};background:${isSe?'var(--g500)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:28px">${isSe?'<div style="width:5px;height:5px;border-radius:50%;background:#fff"></div>':''}</div><div style="flex:1;min-width:0"><div style="font-size:var(--text-md);font-weight:var(--fw-semi)">${alt.altName}${alt.recommended?' <span style="font-size:var(--text-2xs);background:var(--tk-ok-bg);color:var(--g800);border-radius:var(--r-md);padding:2px 6px;font-weight:var(--fw-bold)">★</span>':''}</div><div style="font-size:var(--text-sm);font-weight:var(--fw-semi);color:${_cb.color};margin-top:1px">${_cb.label}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:var(--text-base);font-weight:var(--fw-bold);color:${_cb.color};font-family:'IBM Plex Mono','Noto Sans Thai',monospace">${fmt(alt.save)}</div><div style="font-size:var(--text-sm);color:var(--n600);font-weight:var(--fw-medium);margin-top:2px">${fmt(alt.save*12)+'/ปี <span style="font-family:IBM Plex Mono,monospace;font-weight:var(--fw-bold)">−'+alt.pct+'%</span>'}</div></div></div>`;
       }).join(''):'';
-      return`<div class="ot-row-wrap${i>0?' ot-border-top':''}" id="otr-${o.id}"><div class="ot-main-row" onclick="toggleExpand(${o.id})"><div style="font-size:11px;color:var(--n600);font-weight:600;width:18px;flex-shrink:0">${i+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.curName}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${o.cat} · ${fmt(o.monthlyGmv)}/เดือน</div></div><div style="text-align:right;flex-shrink:0;margin-right:8px"><div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:13px;font-weight:700;color:var(--tk-ok-text)">${fmt(a.save)}</div><div style="font-size:11px;color:var(--n600);font-weight:500;margin-top:1px">${fmt(a.save*12)}/ปี · <strong style='font-family:IBM Plex Mono,monospace'>−${a.pct}%</strong></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="font-size:14px;color:var(--n400);transition:transform .2s;transform:rotate(${exp?180:0}deg)">▾</div><div class="ot-chk ${ck?'on':''}" onclick="event.stopPropagation();toggleOpp(${o.id})">${ck?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div></div></div>${exp?`<div class="ot-expand-body">${altRows}</div>`:''}</div>`;
+      return`<div class="ot-row-wrap${i>0?' ot-border-top':''}" id="otr-${o.id}"><div class="ot-main-row" onclick="toggleExpand(${o.id})"><div style="font-size:var(--text-sm);color:var(--n600);font-weight:var(--fw-semi);width:18px;flex-shrink:0">${i+1}</div><div style="flex:1;min-width:0"><div style="font-size:var(--text-md);font-weight:var(--fw-semi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.curName}</div><div style="font-size:var(--text-sm);color:var(--n600);font-weight:var(--fw-medium);margin-top:1px">${o.cat} · ${fmt(o.monthlyGmv)}/เดือน</div></div><div style="text-align:right;flex-shrink:0;margin-right:8px"><div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-ok-text)">${fmt(a.save)}</div><div style="font-size:var(--text-sm);color:var(--n600);font-weight:var(--fw-medium);margin-top:1px">${fmt(a.save*12)}/ปี · <strong style='font-family:IBM Plex Mono,monospace'>−${a.pct}%</strong></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="font-size:var(--text-lg);color:var(--n400);transition:transform .2s;transform:rotate(${exp?180:0}deg)">▾</div><div class="ot-chk ${ck?'on':''}" onclick="event.stopPropagation();toggleOpp(${o.id})">${ck?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div></div></div>${exp?`<div class="ot-expand-body">${altRows}</div>`:''}</div>`;
     }).join('')+'</div>';
 }
 
@@ -1252,7 +1252,7 @@ function __legacyRenderReportFallback(){
       const _oppsLen=(typeof OPPS!=='undefined'?OPPS.length:0);
       const _selSz=(typeof sel!=='undefined'&&sel&&typeof sel.size==='number'?sel.size:0);
       const _msg=_oppsLen===0?'กำลังสแกนราคาวัตถุดิบ — กลับมาอีกครั้งหลังสแกนเสร็จ':_selSz===0?'ยังไม่ได้เลือกรายการ — กลับไปหน้า Sense เพื่อเลือก':'ไม่พบรายการที่เลือก — ลองกดรีเฟรช';
-      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:12px">'+_msg+'</td></tr>';
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(160,255,200,.55);font-size:var(--text-md)">'+_msg+'</td></tr>';
     } else {
       const catMap={};const catOrder=[];
       selItems.forEach(o=>{const cat=o.cat||'อื่นๆ';if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}catMap[cat].push(o);});
@@ -2643,23 +2643,23 @@ function renderOutletCard(){
     const shipAmt=o.shipping||0;
     // Row 2: tier dot + basket · shipping · timeslot
     const shipStr=shipAmt>0
-      ?`<span style="color:var(--amb);font-weight:600">ค่าส่ง ${fmt(shipAmt)}</span>`
+      ?`<span style="color:var(--amb);font-weight:var(--fw-semi)">ค่าส่ง ${fmt(shipAmt)}</span>`
       :'<span style="color:var(--tk-ok-text)">ค่าส่งฟรี</span>';
     const slotStr=slot
-      ?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:9px;color:var(--n400)">${slot}</span>`
+      ?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-2xs);color:var(--n400)">${slot}</span>`
       :'';
     return`<div style="padding:9px 0;border-bottom:1px solid var(--n100)">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">
-        <div style="font-size:12px;font-weight:600;color:var(--n900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${o.outlet_name}</div>
-        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:12px;font-weight:600;color:var(--n900);flex-shrink:0">${fmt(o.gmv)}<span style="font-size:9px;font-weight:400;color:var(--n400);font-family:var(--tk-font-body)">/เดือน</span></div>
+        <div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--n900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${o.outlet_name}</div>
+        <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--n900);flex-shrink:0">${fmt(o.gmv)}<span style="font-size:var(--text-2xs);font-weight:var(--fw-normal);color:var(--n400);font-family:var(--tk-font-body)">/เดือน</span></div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:10px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs)">
         <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${tier.color};flex-shrink:0;box-shadow:0 0 0 2px ${tier.color}22"></span>
-        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:11px;font-weight:700;color:${tier.color}">${fmt(o.basket)}</span>
-        <span style="color:var(--n300);font-size:10px">/ออเดอร์</span>
-        <span style="color:var(--n200);font-size:10px">·</span>
+        <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${tier.color}">${fmt(o.basket)}</span>
+        <span style="color:var(--n300);font-size:var(--text-xs)">/ออเดอร์</span>
+        <span style="color:var(--n200);font-size:var(--text-xs)">·</span>
         ${shipStr}
-        ${slot?`<span style="color:var(--n200);font-size:10px">·</span>${slotStr}`:''}
+        ${slot?`<span style="color:var(--n200);font-size:var(--text-xs)">·</span>${slotStr}`:''}
       </div>
     </div>`;
   }).join('');
