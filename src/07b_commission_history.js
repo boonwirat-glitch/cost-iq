@@ -361,7 +361,7 @@ window.closeCommissionHistory = closeCommissionHistory;
       var perfDays=parseInt(p[14])||30, baselineDays=parseInt(p[15])||30;
       var outletId=(p[16]||'').trim();  // v300: user_id (res_id) — outlet-level handover exclude
       if(!kamName || !accountId) return;
-      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays};
+      var row={kamName:kamName,accountId:accountId,accountName:accountName,accountType:accountType,lastMonthGmv:lastMonthGmv,curMonthGmv:curMonthGmv,newOwnerType:newOwnerType,newKamName:newKamName,transferBasis:transferBasis,lastOrderDate:lastOrderDate,prevOwner:prevOwner,transferMonth:transferMonth,baselineGmv:baselineGmv,perfGmv:perfGmv,perfDays:perfDays,baselineDays:baselineDays,outletId:outletId};
       rows.push(row);
       // v300: outlet-level index so app can exclude handover outlets from NRR core
       if(outletId){ byOutletId[outletId]={kamName:kamName,accountId:accountId,accountName:accountName,prevOwner:prevOwner,newKamName:newKamName}; }

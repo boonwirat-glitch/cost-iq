@@ -111,15 +111,24 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
-.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px);overflow:visible;}
+/* v92: overflow-anchor:none on header/collapsible/strip — these 3 boxes'
+   height mutates every rAF tick (collapsible, JS-driven) or CSS transition
+   tick (strip), which was triggering the browser's default CSS Scroll
+   Anchoring to silently correct scrollY as content above the fold changed
+   height mid-scroll — the corrected scrollY then got read as further user
+   scroll by _frame() next tick, shrinking the header more, compensating
+   more: a tight per-frame feedback loop that showed up as #portview-list's
+   padding-top oscillating between 2 values at high frequency while
+   scrolling. See src/06_portview_teamview.js's _pvInitCollapseObserver(). */
+.portview-header{padding:16px 16px 12px;background:var(--tk-pv-header-bg);margin-bottom:4px;position:sticky;top:var(--topbar-h);z-index:10;backdrop-filter:blur(8px);overflow:visible;overflow-anchor:none;}
 
 /* ── Collapsible summary block ── */
-.pv-collapsible{overflow:hidden}
+.pv-collapsible{overflow:hidden;overflow-anchor:none}
 .pv-collapsible.expanded{opacity:1}
 .pv-collapsible.collapsed{opacity:0;pointer-events:none}
 
 /* ── Compact strip (shown when collapsed) ── */
-.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
+.pv-compact-strip{display:flex;align-items:center;gap:6px;overflow:hidden;overflow-anchor:none;transition:max-height 300ms cubic-bezier(0.0,0,0.2,1),opacity 250ms cubic-bezier(0.0,0,0.2,1);margin-bottom:0}
 .pv-compact-strip.hidden{max-height:0;opacity:0;pointer-events:none;margin:0}
 .pv-compact-strip.visible{max-height:72px;opacity:1;margin-bottom:8px}
 .pv-cs-pace{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:0 10px 0 0;border-right:1px solid rgba(255,255,255,.1);margin-right:2px}

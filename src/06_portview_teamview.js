@@ -1469,7 +1469,28 @@ function _pvInitCollapseObserver(){
       collapsible.style.opacity=String(opacity);
       collapsible.style.pointerEvents=collapsed?'none':'';
       // v671a: sync list padding-top every time header height changes
-      _pvSyncListOffset();
+      // v92: DEFERRED to next rAF tick (was a direct synchronous call here).
+      // _pvSyncListOffset()'s two getBoundingClientRect() reads force a
+      // layout pass — calling it synchronously, same-tick as the maxHeight
+      // write above, forced an early mid-script layout on every frame of
+      // the collapse gesture. That extra forced layout was a second
+      // trigger point (beyond the frame's own natural paint-time layout)
+      // for the browser's CSS Scroll Anchoring to fire against — since
+      // .pv-collapsible's shrinking height is in-flow above #portview-list,
+      // anchoring silently corrected scrollY to compensate, which the next
+      // _frame() tick read back as further user scroll, shrinking the
+      // header more, compensating more: a per-frame feedback loop that
+      // showed up as padding-top oscillating between 2 values at high
+      // frequency while scrolling. Deferring by 1 rAF tick lets this
+      // frame's write flush through the browser's normal render pipeline
+      // first. (overflow-anchor:none, added alongside this fix in
+      // styles_portview.css/styles_base.css, disables the anchoring
+      // reaction itself — this deferral removes the other half of the
+      // problem, the redundant forced-early-layout trigger.)
+      requestAnimationFrame(function(){
+        if(_myGen!==_pvObsGen)return; // stale generation — no-op, matches this function's other guards
+        _pvSyncListOffset();
+      });
     }
 
     _applyStrip(collapsed);
@@ -1504,13 +1525,20 @@ function _pvInitCollapseObserver(){
   },600);
 
   window.addEventListener('scroll',_onScroll,{passive:true});
-  document.addEventListener('scroll',_onScroll,{capture:true,passive:true});
+  // v92: removed the redundant document-capture registration that used to
+  // be here (`document.addEventListener('scroll',_onScroll,{capture:true,
+  // passive:true})`) — verified it was a true no-op duplicate, not a
+  // needed second source: the only other in-page scroller near this screen
+  // is #detailSheet/#skuDetailSheet, both DOM SIBLINGS of #scr-portview
+  // (not descendants), and _scrollTop() below never reads their scrollTop
+  // — so even when that listener fired from a detail-sheet scroll, every
+  // downstream branch in _frame() was already a no-op. Kept only the
+  // window-level registration.
   window.addEventListener('resize',_onScroll,{passive:true});
 
   _pvCollapseObserver={disconnect:function(){
     if(rafId){cancelAnimationFrame(rafId);rafId=0;}
     window.removeEventListener('scroll',_onScroll);
-    document.removeEventListener('scroll',_onScroll,true);
     window.removeEventListener('resize',_onScroll);
     // v671c: preserve collapse state on disconnect — don't reset maxHeight
     // so reinit (search/sort/filter) keeps header collapsed if user scrolled it

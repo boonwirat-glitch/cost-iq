@@ -337,13 +337,13 @@
       p1g=d.p1&&d.p1.groups?d.p1.groups:[];
       p3g=d.p3&&d.p3.groups?d.p3.groups:[];
       window._pvCommP1Groups=p1g; window._pvCommP3Groups=p3g; // store for drill
-      p1Detail=[ruleLine(p1g.length>0,"กลุ่มสินค้าใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"%",money(d.p1?d.p1.comm:0))];
+      p1Detail=[ruleLine(p1g.length>0,"กลุ่มสินค้าใหม่ (GMV ≥฿"+p1MinGmv+") × "+p1Rate+"% · จ่ายทั้งไตรมาส",money(d.p1?d.p1.comm:0))];
       if(p1g.length) p1Detail.push(ruleIndent("<span onclick=\"_commOpenUpsellDrill('p1')\" style=\"color:#bcd7ff;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:2px\">"+p1g.length+" รายการ — ดูทั้งหมด ›</span>"));
-      p3Detail=[ruleLine(p3g.length>0,"ยอดเติบโต >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"%",money(d.p3?d.p3.comm:0))];
+      p3Detail=[ruleLine(p3g.length>0,"ยอดเติบโต >"+p3ThreshPct+"% & incr ≥฿"+p3MinIncr+" × "+p3Rate+"% · จ่ายทั้งไตรมาส",money(d.p3?d.p3.comm:0))];
       if(p3g.length) p3Detail.push(ruleIndent("<span onclick=\"_commOpenUpsellDrill('p3')\" style=\"color:#bcd7ff;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:2px\">"+p3g.length+" รายการ — ดูทั้งหมด ›</span>"));
     }
     var upsellSkuDetail=p1Detail.length||p3Detail.length?ruleBox(p1Detail.concat(p3Detail)):"";
-    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","กลุ่มสินค้าใหม่ + ยอดเติบโต","กลุ่มสินค้าใหม่ "+p1Rate+"% · ยอดเติบโต >"+p3ThreshPct+"% → "+p3Rate+"%",money(src.upsell_sku),upsellSkuDetail);
+    var upsellSkuRow=srcRow(src.upsell_sku>0?"paid":"","กลุ่มสินค้าใหม่ + ยอดเติบโต","กลุ่มสินค้าใหม่ "+p1Rate+"% · ยอดเติบโต >"+p3ThreshPct+"% → "+p3Rate+"% · จ่ายทั้งไตรมาส",money(src.upsell_sku),upsellSkuDetail);
 
     // Upsell Outlet row
     var outDetail="";
@@ -352,7 +352,7 @@
       outDetail=ruleBox([ruleLine(od.outlet_gmv>0,"ใหม่ "+money(od.new_gmv)+" · comeback "+money(od.comeback_gmv)," × "+outRate+"%"),
                           ruleIndent("ไม่นับ item ที่ได้ P1 ไปแล้ว")]);
     }
-    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Expansion","สาขาใหม่/comeback × "+outRate+"%",money(src.upsell_outlet),outDetail);
+    var upsellOutRow=srcRow(src.upsell_outlet>0?"paid":"","Expansion","สาขาใหม่/comeback × "+outRate+"% · จ่ายทั้งไตรมาส",money(src.upsell_outlet),outDetail);
 
     // Handover row — 2-line tier breakdown
     var hoDetail="";
@@ -406,10 +406,11 @@
 
     var upsellSub=(p1g&&p1g.length?'กลุ่มสินค้าใหม่ '+p1g.length+' รายการ':'')+(p1g&&p1g.length&&p3g&&p3g.length?' · ':'')+(p3g&&p3g.length?'ยอดเติบโต '+p3g.length+' รายการ':'');
     if(!upsellSub)upsellSub='กลุ่มสินค้าใหม่ '+p1Rate+'% · ยอดเติบโต >'+p3ThreshPct+'% → '+p3Rate+'%';
+    upsellSub+=' · จ่ายทั้งไตรมาส';
     var upsellHasDrill=!!(p1g&&p1g.length||p3g&&p3g.length);
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
-    var ncSub='สาขาใหม่ × '+outRate+'%'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
+    var ncSub='สาขาใหม่ × '+outRate+'% · จ่ายทั้งไตรมาส'+(src.upsell_outlet_detail&&src.upsell_outlet_detail.outlet_gmv>0?' · GMV '+money(src.upsell_outlet_detail.outlet_gmv):'');
     var ncRowHtml=cRow('rgba(255,224,138,.8)','Expansion',ncSub,src.upsell_outlet,'#ffe08a','_commDrillExpansion()');
 
     // v239-fix: hoSub แสดง baseline + current + retention เพื่อ reconcile ได้
@@ -1318,10 +1319,16 @@
 function _cdsFormulaContent(key) {
   function cfg(k, p, d) { try { return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){return d;} }
   var texts = {
-    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10)+'%',
-    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10)+'%',
+    // v92: appended "จ่ายทั้งไตรมาส" to p1/p3/exp — these 3 tiers accumulate
+    // across every qualifying month of the quarter (_commComputeUpsellSku's
+    // streak-sum, _commComputeUpsellOutlet's v860-fix cumulative model),
+    // unlike a plain "X% of this month's GMV" reading of the same text.
+    // nrr/ho deliberately untouched — different accrual model (nrr is a
+    // point-in-time tier lookup, ho is a one-time-per-handover retention check).
+    p1: 'สินค้าใหม่ที่ไม่เคยซื้อใน 3 เดือน · GMV ≥ ฿'+Number(cfg('upsell_sku','p1_min_gmv',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p1_rate',0.03)*1000)/10)+'% · จ่ายทั้งไตรมาส',
+    p3: 'สินค้าเดิม ยอดเกิน '+cfg('upsell_sku','p3_threshold_pct',2.00).toFixed(1)+'× baseline (เพิ่ม >'+Math.round((cfg('upsell_sku','p3_threshold_pct',2.00)-1)*100)+'%) · Incr ≥ ฿'+Number(cfg('upsell_sku','p3_min_incremental',5000)).toLocaleString('en-US')+' · × '+(Math.round(cfg('upsell_sku','p3_rate',0.03)*1000)/10)+'% · จ่ายทั้งไตรมาส',
     nrr: 'สาขาเดิมรักษายอดไว้ได้แค่ไหนเทียบ baseline · tier-based payout จาก NRR%',
-    exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'%',
+    exp: 'สาขาใหม่ หรือ comeback ในรอบ 6 เดือน · GMV × '+(Math.round(cfg('upsell_outlet','rate',0.015)*1000)/10)+'% · จ่ายทั้งไตรมาส',
     ho:  'ร้านจาก Sales เดือนก่อน วัด performance เดือนนี้ (normalize)<br>≥'+cfg('handover','tier2_pct',100)+'% ได้ ฿'+Number(cfg('handover','tier2_payout',2500)).toLocaleString('en-US')+' · ≥'+cfg('handover','tier3_pct',120)+'% ได้ +฿'+(Number(cfg('handover','tier2_payout',2500))+Number(cfg('handover','tier3_bonus',2500))).toLocaleString('en-US')
   };
   return '<div class="cds-formula-dot"></div><div class="cds-formula-text">'+(texts[key]||'')+'</div>';
@@ -1906,33 +1913,78 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   if (meta) {
     meta.innerHTML = '<div class="cds-meta" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">'
       + '<span class="cds-meta-text">' + hd.accounts + ' account · retention <b style="color:'
-      + (retPct >= primaryThresholdPct ? 'var(--tk-ok-bright)' : retPct >= (primaryThresholdPct * 0.9) ? '#ffe08a' : 'rgba(225,238,255,.6)') + '">'
+      // v92: was 3-tier (green/amber-at-90%/gray) — amber meant "close but not
+      // there yet," which read as if the KAM were already earning on it. Gold
+      // now means ONLY "cleared the real payout threshold," matching retCls below.
+      + (retPct >= primaryThresholdPct ? 'var(--tk-ok-bright)' : 'rgba(225,238,255,.6)') + '">'
       + _commFmtPct(retPct) + '</b></span>'
       + '<span style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">' + tierHtml + '</span>'
+      + '<button class="cds-toggle-btn" id="cds-toggle-btn" onclick="_cdsToggleAll()" title="ขยาย/ย่อ"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor"/></svg></button>'
       + '</div>';
   }
 
-  var sorted = detail.slice().sort(function(a, b) { return (b.current || 0) - (a.current || 0); });
-  var html = '';
+  // v92: group by account_id (mirrors the P1 tab's chip-row/sub-rows pattern,
+  // _cdsRender_p1 above) — one account can hand over several outlets at once,
+  // and each used to render as its own top-level row repeating the full
+  // account name. Outlet display names aren't in this CSV (only a raw
+  // outlet_id, res_id) — resolved the same way P1 does, via _pvOutletName().
+  var byAcct = {}; var acctOrder = [];
+  detail.forEach(function(a) {
+    var aid = a.account_id || a.name || '_unknown';
+    if (!byAcct[aid]) { byAcct[aid] = { account_id: a.account_id, name: a.name, outlets: [], baseline: 0, current: 0 }; acctOrder.push(aid); }
+    byAcct[aid].outlets.push(a);
+    byAcct[aid].baseline += a.baseline || 0;
+    byAcct[aid].current  += a.current  || 0;
+  });
+  acctOrder.sort(function(x, y) { return (byAcct[y].current || 0) - (byAcct[x].current || 0); });
 
-  sorted.forEach(function(a, idx) {
-    var retA   = a.baseline > 0 ? (a.current / a.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via _commFmtPct below
-    var retCls = retA >= primaryThresholdPct ? 'v-green' : retA >= (primaryThresholdPct * 0.85) ? 'v-amber' : 'v-dim';
-    var proofId = 'hor' + idx;
-    html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'
-      + '<div style="min-width:0">'
-      + '<div class="cds-outlet-name">' + esc(String(a.name || a.account_id || '—').slice(0, 36)) + '</div>'
-      + (a.oldKamName ? '<div class="cds-outlet-meta">มาจาก: ' + esc(a.oldKamName) + '</div>' : '')
+  var html = '';
+  var proofIdx = 0;
+
+  acctOrder.forEach(function(aid, ai) {
+    var acct = byAcct[aid];
+    var acctRetA = acct.baseline > 0 ? (acct.current / acct.baseline * 100) : 0;
+    // v92: was 3-tier (green/amber-at-85%/gray) — amber meant "close but not
+    // there yet," which read as if the KAM were already earning on it. Gold
+    // now means ONLY "cleared the real payout threshold" (matches the meta
+    // header badge above and the pass/fail proof card below).
+    var acctRetCls = acctRetA >= primaryThresholdPct ? 'v-green' : 'v-dim';
+    var chipId = 'hoa' + ai;
+    var open = ai < 3;
+
+    html += '<div class="cds-chip-row' + (open ? ' open' : '') + '" id="' + chipId + '" onclick="_cdsToggleRow(\'' + chipId + '\')">'
+      + '<span class="cds-chip-chev">&#8250;</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="cds-chip-name">' + esc(String(acct.name || acct.account_id || '—').slice(0, 36)) + '</div>'
+      + '<div class="cds-chip-meta">' + acct.outlets.length + ' outlet' + (acct.outlets.length > 1 ? 's' : '') + '</div>'
       + '</div>'
-      + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
-      + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
-      + '<span class="cds-val ' + retCls + '">' + _commFmtPct(retA) + '</span>'
+      + '<span class="cds-chip-gmv cds-chip-val v-muted">' + fmt(acct.current) + '</span>'
+      + '<span class="cds-chip-val ' + acctRetCls + '">' + _commFmtPct(acctRetA) + '</span>'
       + '</div>'
-      + h.proof(proofId, [
-          { label: 'Baseline GMV', result: fmt(a.baseline) },
-          { label: 'MTD GMV',      result: fmt(a.current) },
-          { label: 'Retention',    result: _commFmtPct(retA), pass: retA >= primaryThresholdPct }
-        ]);
+      + '<div class="cds-sub-rows' + (open ? ' open' : '') + '" id="' + chipId + '-sub">';
+
+    acct.outlets.forEach(function(a) {
+      var retA   = a.baseline > 0 ? (a.current / a.baseline * 100) : 0; // display-only (not a payout decision) — 1-decimal via _commFmtPct below
+      var retCls = retA >= primaryThresholdPct ? 'v-green' : 'v-dim';
+      var proofId = 'hor' + (proofIdx++);
+      var outletName = (typeof _pvOutletName === 'function' && a.outlet_id) ? _pvOutletName(a.outlet_id, a.account_id) : '';
+      html += '<div class="cds-sub-row ho-cols" style="cursor:pointer" data-hoid="' + proofId + '">'
+        + '<div style="min-width:0">'
+        + '<div class="cds-outlet-name">' + esc(String(outletName || a.name || a.account_id || '—').slice(0, 36)) + '</div>'
+        + (a.oldKamName ? '<div class="cds-outlet-meta">มาจาก: ' + esc(a.oldKamName) + '</div>' : '')
+        + '</div>'
+        + '<span class="cds-val v-muted">' + fmt(a.baseline) + '</span>'
+        + '<span class="cds-val v-blue">'  + fmt(a.current)  + '</span>'
+        + '<span class="cds-val ' + retCls + '">' + _commFmtPct(retA) + '</span>'
+        + '</div>'
+        + h.proof(proofId, [
+            { label: 'Baseline GMV', result: fmt(a.baseline) },
+            { label: 'MTD GMV',      result: fmt(a.current) },
+            { label: 'Retention',    result: _commFmtPct(retA), pass: retA >= primaryThresholdPct }
+          ]);
+    });
+
+    html += '</div>'; // cds-sub-rows
   });
 
   body.innerHTML = html;
@@ -2587,9 +2639,9 @@ function openCommissionRulebook() {
 
   // Component rates — all roles see this
   html += secHdr('Upsell', '#ffe08a');
-  html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × กลุ่มสินค้า · min '+p1MinGmv);
-  html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · ยอดเกิน '+p3Thresh+'× baseline (เพิ่ม >'+p3GrowPct+'%) · incremental ขั้นต่ำ '+p3MinIncr);
-  html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต)');
+  html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × กลุ่มสินค้า · min '+p1MinGmv+' · จ่ายทั้งไตรมาส');
+  html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · ยอดเกิน '+p3Thresh+'× baseline (เพิ่ม >'+p3GrowPct+'%) · incremental ขั้นต่ำ '+p3MinIncr+' · จ่ายทั้งไตรมาส');
+  html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต) · จ่ายทั้งไตรมาส');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');
   // v92: describe the GMV-tier structure when configured (Cockpit's Rules step
@@ -2600,15 +2652,24 @@ function openCommissionRulebook() {
   var _hoGmvTiers = [];
   try { _hoGmvTiers = typeof _commGetHandoverGmvTiers === 'function' ? _commGetHandoverGmvTiers() : []; } catch(e) {}
   if (_hoGmvTiers.length) {
+    // v92: was one crammed row per tier ("≥100% → ฿1,000 · ≥120% → ฿2,000 ·
+    // <100% → ฿0") — split into one row per retention threshold so each
+    // payout step reads on its own line.
     _hoGmvTiers.forEach(function(t){
       var thresholds = (t.thresholds||[]).slice().sort(function(a,b){ return Number(a.min_retention_pct||0)-Number(b.min_retention_pct||0); });
-      var thLine = thresholds.map(function(th){ return '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout); }).join(' · ');
       var floorPct = thresholds.length ? thresholds[0].min_retention_pct : 100;
-      html += detailRow('GMV '+_commEscapeHtml(t.label||''), thLine+(thLine?' · ':'')+'< '+floorPct+'% → ฿0');
+      var tierKey = 'GMV '+_commEscapeHtml(t.label||'');
+      thresholds.forEach(function(th){
+        html += detailRow(tierKey, '≥ '+th.min_retention_pct+'% → '+fmtB(th.payout));
+      });
+      html += detailRow(tierKey, '< '+floorPct+'% → ฿0');
     });
     html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่) · GMV = ยอด handover รวมของ KAM ทั้งงวด (ไม่ใช่รายบัญชี) · ต่ำกว่า tier แรกสุด → ฿0');
   } else {
-    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay+' · ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม · < '+hoT2Pct+'% → ฿0');
+    // v92: was one crammed "Tier" row for both thresholds — split into 2 rows + a floor row.
+    html += detailRow('Tier', 'Retention ≥ '+hoT2Pct+'% → '+hoT2Pay);
+    html += detailRow('Tier', 'Retention ≥ '+hoT3Pct+'% → '+hoT3Total+' รวม');
+    html += detailRow('Tier', '< '+hoT2Pct+'% → ฿0');
     html += detailRow('วัดยังไง', 'Retention = (perf ÷ days) ÷ (baseline ÷ days) × 100 (normalize ทั้งคู่)');
   }
 

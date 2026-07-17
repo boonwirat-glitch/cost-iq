@@ -595,7 +595,8 @@ function _commComputeHandoverRetention(kamEmail) {
         baseline:       Math.round(bNorm),
         current:        Math.round(pNorm),
         baseline_raw:   r.baselineGmv || 0,
-        perf_raw:       r.perfGmv || 0
+        perf_raw:       r.perfGmv || 0,
+        outlet_id:      r.outletId || ''
       });
     });
 

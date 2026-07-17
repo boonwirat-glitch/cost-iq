@@ -28,7 +28,13 @@
   --kam:var(--tk-accent);--kam-dark:var(--tk-accent-dark);--kam-bg:var(--tk-bg-base);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}html{overflow-x:clip}
+/* v92: overflow-anchor:none at the root scrolling box — belt-and-suspenders
+   to the same rule on .portview-header/.pv-collapsible/.pv-compact-strip in
+   styles_portview.css (see that file for the full root-cause writeup); this
+   covers ambiguity in which box an engine treats as the anchoring-relevant
+   scroller, since window/document (not any element) is the real scroll
+   source everywhere in this app. */
+html,body{height:100%;overflow-anchor:none}html{overflow-x:clip}
 body{font-family:var(--tk-font-body);}
 /* phase-0A: KAM/AD locked to IBM Plex Sans Thai */
 body.kam-mode,body.kad-mode{font-family:'IBM Plex Sans Thai',sans-serif;}
