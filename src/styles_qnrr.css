@@ -51,7 +51,7 @@
   padding: 10px 0 4px; flex-shrink: 0; cursor: ns-resize;
 }
 .qnrr-handle-pill {
-  width: 40px; height: 5px; border-radius: 999px;
+  width: 40px; height: 5px; border-radius: var(--r-pill);
   background: rgba(255,255,255,.18); transition: background .2s;
 }
 .qnrr-handle-row:hover .qnrr-handle-pill { background: rgba(255,255,255,.32); }
@@ -63,9 +63,9 @@
   flex-shrink: 0;
 }
 .qnrr-eyebrow {
-  font-size: 10px; font-weight: 700;
+  font-size: var(--text-xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .09em;
-  color: rgba(188,215,255,.68); margin-bottom: 4px;
+  color: rgba(var(--ink-blue),.68); margin-bottom: 4px;
 }
 /* Hero row: base block LEFT, NRR cluster RIGHT */
 .qnrr-hero-row {
@@ -79,15 +79,15 @@
   font-family: var(--tk-font-mono); line-height: 1.05;
 }
 .qnrr-base-sub {
-  font-size: 12px; color: rgba(188,215,255,.85);
-  margin-top: 3px; font-weight: 600;
+  font-size: var(--text-md); color: rgba(var(--ink-blue),.85);
+  margin-top: 3px; font-weight: var(--fw-semi);
 }
 /* NRR cluster: 3 slots with separators */
 .qnrr-nrr-right {}
 .qnrr-nrr-eyebrow {
-  font-size: 10px; font-weight: 700;
+  font-size: var(--text-xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .08em;
-  color: rgba(188,215,255,.80); margin-bottom: 4px;
+  color: rgba(var(--ink-blue),.80); margin-bottom: 4px;
   text-align: right;
 }
 .qnrr-nrr-cluster {
@@ -105,9 +105,9 @@
   font-family: var(--tk-font-mono); letter-spacing: -.03em; line-height: 1;
 }
 .qnrr-nrr-mo {
-  font-size: 10px; font-weight: 700;
+  font-size: var(--text-xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .04em;
-  color: rgba(188,215,255,.75); font-family: var(--tk-font-mono);
+  color: rgba(var(--ink-blue),.75); font-family: var(--tk-font-mono);
 }
 /* Scope chip */
 .qnrr-title-row {
@@ -115,20 +115,20 @@
   margin-bottom: 6px;
 }
 .qnrr-title {
-  font-size: 13px; font-weight: 800;
-  color: rgba(188,215,255,.75); letter-spacing: .01em;
+  font-size: var(--text-base); font-weight: 800;
+  color: rgba(var(--ink-blue),.75); letter-spacing: .01em;
 }
 .qnrr-scope-chip {
   display: flex; align-items: center; gap: 5px;
   background: var(--tk-accent-dim);
   border: 1px solid var(--tk-accent-dim-2);
-  border-radius: 8px; padding: 4px 9px;
-  font-size: 10px; font-weight: 700; color: #bcd7ff;
+  border-radius: var(--r-8); padding: 4px 9px;
+  font-size: var(--text-xs); font-weight: var(--fw-bold); color: #bcd7ff;
   cursor: pointer; font-family: var(--tk-font-mono);
   transition: all .15s; -webkit-tap-highlight-color: transparent;
 }
 .qnrr-scope-chip:active { transform: scale(.95); }
-.qnrr-scope-arr { font-size: 9px; opacity: .5; }
+.qnrr-scope-arr { font-size: var(--text-2xs); opacity: .5; }
 
 /* ── Zone B: Chart zone with toggle ── */
 .qnrr-chart-zone {
@@ -151,7 +151,7 @@
   display: flex; align-items: center;
   width: 72px; height: 28px;
   background: rgba(255,255,255,.08);
-  border-radius: 8px;
+  border-radius: var(--r-8);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -159,7 +159,7 @@
   position: absolute; top: 2px; left: 2px;
   width: calc(50% - 2px); height: calc(100% - 4px);
   background: rgba(255,255,255,.18);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   transition: transform .22s cubic-bezier(.34,1.3,.64,1);
   pointer-events: none;
 }
@@ -178,7 +178,7 @@
   width: 30px; height: 28px;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,.07); border: none;
-  border-radius: 7px; cursor: pointer;
+  border-radius: var(--r-7); cursor: pointer;
   color: rgba(255,255,255,.65);
   transition: color .15s, background .15s, opacity .2s;
   -webkit-tap-highlight-color: transparent;
@@ -194,12 +194,12 @@
 }
 .qnrr-ref-line {
   position: absolute; left: 0; right: 0;
-  border-top: 1px dashed rgba(188,215,255,.17);
+  border-top: 1px dashed rgba(var(--ink-blue),.17);
 }
 .qnrr-ref-label {
   position: absolute; right: 0;
-  font-size: 8px; font-family: var(--tk-font-mono); font-weight: 700;
-  color: rgba(188,215,255,.30); transform: translateY(-10px);
+  font-size: var(--text-3xs); font-family: var(--tk-font-mono); font-weight: var(--fw-bold);
+  color: rgba(var(--ink-blue),.30); transform: translateY(-10px);
 }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
@@ -214,14 +214,14 @@
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; align-items: center;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  border-radius: 6px; transition: background .13s; padding: 0 1px;
+  border-radius: var(--r-sm); transition: background .13s; padding: 0 1px;
 }
 .qnrr-bar-col.base-col { cursor: default; opacity: .85; }
 .qnrr-bar-col:not(.base-col):hover,
 .qnrr-bar-col.active { background: rgba(255,255,255,.04); }
 .qnrr-bar-col.active .qnrr-bar-lbl {
-  color: rgba(188,215,255,.85);
-  border-bottom: 2px solid rgba(188,215,255,.45);
+  color: rgba(var(--ink-blue),.85);
+  border-bottom: 2px solid rgba(var(--ink-blue),.45);
   padding-bottom: 2px;
 }
 /* top label area — v6-uxfix: was fixed 32px, grew to 44px to fit an always-visible
@@ -238,26 +238,26 @@
 /* v6-uxfix: partial-month top-wrap now genuinely has 3 lines (mtd, run-rate, days) —
    see .qnrr-bar-top-wrap height change above and .qnrr-bar-runrate-label below */
 .qnrr-bar-top-label {
-  font-size: 11px; font-weight: 800;
+  font-size: var(--text-sm); font-weight: 800;
   font-family: var(--tk-font-mono); letter-spacing: -.01em;
   white-space: nowrap; color: rgba(255,255,255,.95); text-align: center;
   animation: qnrrCountIn .5s ease both;
 }
 .qnrr-bar-mar-sub {
-  font-size: 9px; font-weight: 700;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.80);
+  font-size: var(--text-2xs); font-weight: var(--fw-bold);
+  font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.80);
   text-align: center; width: 100%; white-space: nowrap;
 }
 /* v6-uxfix: always-visible run-rate line for the partial (current) month — previously
    this number only existed in a title= tooltip, which does not show on tap on most
    mobile browsers, so it was effectively invisible there even before the overflow bug. */
 .qnrr-bar-runrate-label {
-  font-size: 8px; font-weight: 600;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.50);
+  font-size: var(--text-3xs); font-weight: var(--fw-semi);
+  font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.50);
   text-align: center; width: 100%; white-space: nowrap;
 }
 .qnrr-bar-runrate-label.low-conf {
-  color: rgba(188,215,255,.32); font-style: italic;
+  color: rgba(var(--ink-blue),.32); font-style: italic;
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
@@ -320,9 +320,9 @@
      (was opacity:.45) this multiplied down to an effective ~18% visibility, invisible
      against the dark background. Confirmed via live DOM inspect: element rendered at
      the correct height/position (no more overflow) but was simply too faint to see. */
-  border: 1.5px dashed rgba(188,215,255,.70);
+  border: 1.5px dashed rgba(var(--ink-blue),.70);
   border-bottom: none;
-  background: rgba(188,215,255,.10);
+  background: rgba(var(--ink-blue),.10);
   animation: qnrrGhostPulse 3s ease-in-out infinite;
 }
 /* v6-uxfix: when the real projection is taller than the chart area allows, fade the
@@ -335,7 +335,7 @@
 }
 .qnrr-ghost-top-clipped::after {
   content: '⋯'; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
-  font-size: 10px; line-height: 1; color: rgba(188,215,255,.55);
+  font-size: var(--text-xs); line-height: 1; color: rgba(var(--ink-blue),.55);
 }
 /* v6-uxfix: early-month projections (<7 days of data) are noisy — dim + tighter dash
    to visually signal "still settling", separate from a normal-confidence projection */
@@ -349,7 +349,7 @@
 /* run-rate ≈ actual: thin line at projection level */
 .qnrr-ghost-line {
   position: absolute; left: 2px; right: 2px; height: 2px;
-  background: rgba(188,215,255,.50); border-radius: 1px;
+  background: rgba(var(--ink-blue),.50); border-radius: 1px;
   pointer-events: none; z-index: 3;
   animation: qnrrGhostPulse 3s ease-in-out infinite;
 }
@@ -358,7 +358,7 @@
 @keyframes qnrrGhostPulse { 0%,100%{opacity:.75} 50%{opacity:1} }
 /* bar bottom label */
 .qnrr-bar-lbl {
-  font-size: 10px; font-weight: 700;
+  font-size: var(--text-xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .04em;
   color: rgba(255,255,255,.78); margin-top: 4px;
   font-family: var(--tk-font-mono); transition: color .2s;
@@ -377,29 +377,29 @@
   font-family: var(--tk-font-mono);
 }
 .qnrr-bk-table th {
-  font-size: 12px; font-weight: 700;
+  font-size: var(--text-md); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .05em;
-  color: rgba(188,215,255,.70); padding: 6px 6px 7px;
+  color: rgba(var(--ink-blue),.70); padding: 6px 6px 7px;
   text-align: right; border-bottom: 1px solid rgba(255,255,255,.12);
   white-space: nowrap;
 }
 .qnrr-bk-table th:first-child { text-align: left; min-width: 90px; }
 .qnrr-bk-table td {
-  font-size: 13px; font-weight: 700; padding: 7px 6px;
+  font-size: var(--text-base); font-weight: var(--fw-bold); padding: 7px 6px;
   text-align: right; color: rgba(255,255,255,.92);
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
 .qnrr-bk-table td:first-child { text-align: left; }
 .qnrr-bk-mv-cell { display: flex; align-items: center; gap: 5px; }
-.qnrr-bk-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.qnrr-bk-dot { width: 7px; height: 7px; border-radius: var(--r-xxs); flex-shrink: 0; }
 .qnrr-bk-mv-name {
-  font-size: 12px; font-weight: 700;
+  font-size: var(--text-md); font-weight: var(--fw-bold);
   color: rgba(255,255,255,.92); font-family: var(--tk-font-mono);
   white-space: nowrap;
 }
 /* sub-rows: churn + net core indented under Core NRR */
 .qnrr-bk-table tr.bk-subrow td {
-  font-size: 12px; padding: 4px 6px 4px 8px;
+  font-size: var(--text-md); padding: 4px 6px 4px 8px;
   border-bottom: none; color: rgba(255,255,255,.78);
 }
 .qnrr-bk-table tr.bk-subrow td:first-child { padding-left: 16px; }
@@ -408,7 +408,7 @@
 .qnrr-bk-mv-name.sub { color: rgba(255,255,255,.55); }
 /* net core row */
 .qnrr-bk-table tr.bk-net-row td {
-  font-size: 12px; padding: 4px 6px 6px 8px;
+  font-size: var(--text-md); padding: 4px 6px 6px 8px;
   border-bottom: 1px solid rgba(255,255,255,.08);
   color: rgba(255,255,255,.72);
 }
@@ -418,14 +418,14 @@
 .qnrr-bk-table .bk-neut  { color: rgba(96,165,250,.75) !important; }
 .qnrr-bk-table tr.bk-total td {
   border-top: 1px solid rgba(255,255,255,.15); border-bottom: none;
-  color: rgba(255,255,255,.95); padding-top: 8px; font-size: 13px;
+  color: rgba(255,255,255,.95); padding-top: 8px; font-size: var(--text-base);
 }
 
 /* ── Transfer out callout card (v776 — clearer) ── */
 .qnrr-tout-card {
   margin: 8px 18px 0;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   /* v807: neutral muted — transfer-out is informational, not alarming */
   border: 1px solid rgba(140,180,255,.20);
   background: rgba(140,180,255,.06);
@@ -433,12 +433,12 @@
 }
 .qnrr-tout-card.show { display: flex; }
 .qnrr-tout-icon {
-  font-size: 16px; line-height: 1; flex-shrink: 0; margin-top: 2px;
+  font-size: var(--text-xl); line-height: 1; flex-shrink: 0; margin-top: 2px;
   color: rgba(140,180,255,.60);
 }
 .qnrr-tout-body { flex: 1; min-width: 0; }
 .qnrr-tout-card-label {
-  font-size: 9px; font-weight: 700;
+  font-size: var(--text-2xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .10em;
   color: rgba(140,180,255,.55);
   font-family: var(--tk-font-mono); margin-bottom: 4px;
@@ -447,24 +447,24 @@
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .qnrr-tout-card-desc {
-  font-size: 13px; font-weight: 600; color: rgba(255,255,255,.90);
+  font-size: var(--text-base); font-weight: var(--fw-semi); color: rgba(255,255,255,.90);
 }
 .qnrr-tout-card-val {
-  font-size: 15px; font-weight: 800;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.95); flex-shrink: 0;
+  font-size: var(--text-lg2); font-weight: 800;
+  font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.95); flex-shrink: 0;
 }
 .qnrr-tout-card-note {
-  font-size: 10px; color: rgba(255,255,255,.50); margin-top: 4px; line-height: 1.5;
+  font-size: var(--text-xs); color: rgba(255,255,255,.50); margin-top: 4px; line-height: 1.5;
 }
 /* ── Transfer out chip in list filter — v807: neutral, not alarming ── */
 .qnrr-tout-chip {
   border-color: rgba(140,180,255,.30) !important;
-  color: rgba(188,215,255,.70) !important;
+  color: rgba(var(--ink-blue),.70) !important;
 }
 .qnrr-tout-chip.on {
   background: rgba(140,180,255,.12) !important;
   border-color: rgba(140,180,255,.45) !important;
-  color: rgba(188,215,255,.95) !important;
+  color: rgba(var(--ink-blue),.95) !important;
 }
 /* ── Ghost segment on Mar base bar (transfer_out หัก) ── */
 .qnrr-base-tout-seg {
@@ -485,7 +485,7 @@
 }
 /* ── Base adjusted tag ── */
 .qnrr-base-adj-tag {
-  font-size: 8px; font-weight: 700; font-family: var(--tk-font-mono);
+  font-size: var(--text-3xs); font-weight: var(--fw-bold); font-family: var(--tk-font-mono);
   background: rgba(248,113,113,.25); color: rgba(248,113,113,.90);
   border-radius: 3px; padding: 1px 4px;
   margin-left: 3px; vertical-align: middle; text-transform: uppercase;
@@ -498,13 +498,13 @@
 .qnrr-base-adj-note {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px;
-  font-size: 10px; color: rgba(140,180,255,.60);
+  font-size: var(--text-xs); color: rgba(140,180,255,.60);
   background: rgba(140,180,255,.05);
   border-bottom: 1px solid rgba(140,180,255,.12);
   font-family: var(--tk-font-mono);
 }
 .qnrr-base-adj-icon {
-  font-size: 13px; flex-shrink: 0;
+  font-size: var(--text-base); flex-shrink: 0;
 }
 
 /* ── Legend ── */
@@ -517,10 +517,10 @@
 }
 .qnrr-leg {
   display: flex; align-items: center; gap: 4px;
-  font-size: 9px; font-weight: 600; color: rgba(255,255,255,.38);
+  font-size: var(--text-2xs); font-weight: var(--fw-semi); color: rgba(255,255,255,.38);
   letter-spacing: .02em;
 }
-.qnrr-leg-sq { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+.qnrr-leg-sq { width: 6px; height: 6px; border-radius: var(--r-xxs); flex-shrink: 0; }
 .qnrr-leg.ghost .qnrr-leg-sq {
   border: 1px dashed rgba(255,255,255,.28); background: transparent;
 }
@@ -531,23 +531,23 @@
   padding: 8px 18px 5px; flex-shrink: 0; gap: 8px;
 }
 .qnrr-drill-lbl {
-  font-size: 8px; font-weight: 700;
+  font-size: var(--text-3xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .08em;
-  color: rgba(188,215,255,.36); white-space: nowrap; flex-shrink: 0;
+  color: rgba(var(--ink-blue),.36); white-space: nowrap; flex-shrink: 0;
 }
 .qnrr-mv-filters { display: flex; gap: 3px; flex-wrap: wrap; }
 .qnrr-mv-btn {
-  font-size: 11px; font-weight: 700; padding: 6px 13px;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.10);
-  background: transparent; color: rgba(255,255,255,.45);
+  font-size: var(--text-sm); font-weight: var(--fw-bold); padding: 6px 13px;
+  border-radius: var(--r-pill); border: 1px solid rgba(255,255,255,.10);
+  background: transparent; color: var(--tk-text-muted);
   cursor: pointer; font-family: var(--tk-font-mono);
   transition: all .16s; -webkit-tap-highlight-color: transparent; letter-spacing: .02em;
   min-height: 32px;
 }
 .qnrr-mv-btn:active { transform: scale(.94); }
 .qnrr-mv-btn.on {
-  border-color: rgba(188,215,255,.36);
-  background: rgba(188,215,255,.07); color: #bcd7ff;
+  border-color: rgba(var(--ink-blue),.36);
+  background: rgba(var(--ink-blue),.07); color: #bcd7ff;
 }
 
 /* ── Account list ── */
@@ -567,10 +567,10 @@
 .qnrr-acct-row:nth-child(5){animation-delay:.19s}
 @keyframes qnrrFadeSlide { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 .qnrr-acct-row:active, .qnrr-acct-row.open { background: rgba(255,255,255,.03); }
-.qnrr-mv-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.qnrr-mv-dot { width: 7px; height: 7px; border-radius: var(--r-xxs); flex-shrink: 0; }
 .qnrr-acct-left { flex: 1; min-width: 0; }
 .qnrr-acct-name {
-  font-size: 12px; font-weight: 700;
+  font-size: var(--text-md); font-weight: var(--fw-bold);
   color: rgba(255,255,255,.95); letter-spacing: -.01em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -578,12 +578,12 @@
 .qnrr-spark-col { display: flex; flex-direction: column; align-items: flex-end; }
 .qnrr-spark-row { display: flex; align-items: flex-end; gap: 4px; }
 .qnrr-slbl-base {
-  font-size: 9px; font-weight: 700;
+  font-size: var(--text-2xs); font-weight: var(--fw-bold);
   font-family: var(--tk-font-mono); white-space: nowrap;
-  line-height: 1; padding-bottom: 1px; color: rgba(255,255,255,.45);
+  line-height: 1; padding-bottom: 1px; color: var(--tk-text-muted);
 }
 .qnrr-slbl-curr {
-  font-size: 11px; font-weight: 800;
+  font-size: var(--text-sm); font-weight: 800;
   font-family: var(--tk-font-mono); white-space: nowrap; line-height: 1;
 }
 .qnrr-spark {
@@ -600,21 +600,21 @@
   position: absolute; bottom: 26px; left: 50%;
   transform: translateX(-50%);
   background: #060f1e; border: 1px solid rgba(140,180,255,.2);
-  border-radius: 7px; padding: 4px 8px;
+  border-radius: var(--r-7); padding: 4px 8px;
   white-space: nowrap; pointer-events: none;
   opacity: 0; transition: opacity .12s; z-index: 20;
 }
 .qnrr-spark:hover .qnrr-sp-tt { opacity: 1; }
 .qnrr-tt-mo {
-  font-size: 8px; font-weight: 700; text-transform: uppercase;
+  font-size: var(--text-3xs); font-weight: var(--fw-bold); text-transform: uppercase;
   color: var(--tk-text-muted); font-family: var(--tk-font-mono); letter-spacing: .05em;
 }
 .qnrr-tt-v {
-  font-size: 12px; font-weight: 900;
-  font-family: var(--tk-font-mono); color: #fff; letter-spacing: -.02em;
+  font-size: var(--text-md); font-weight: 900;
+  font-family: var(--tk-font-mono); color: var(--tk-text-primary); letter-spacing: -.02em;
 }
 .qnrr-chev {
-  font-size: 12px; color: rgba(255,255,255,.16);
+  font-size: var(--text-md); color: rgba(255,255,255,.16);
   transition: transform .2s, color .2s; flex-shrink: 0;
 }
 .qnrr-acct-row.open .qnrr-chev { transform: rotate(90deg); color: rgba(255,255,255,.32); }
@@ -633,14 +633,14 @@
 }
 .qnrr-out-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 .qnrr-out-name {
-  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.52);
+  font-size: var(--text-xs); font-weight: var(--fw-semi); color: rgba(255,255,255,.52);
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .qnrr-out-spark-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .qnrr-out-spark { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
 .qnrr-osb { width: 7px; border-radius: 2px 2px 0 0; }
 .qnrr-out-spark-lbl {
-  display: flex; gap: 6px; font-size: 8px; font-weight: 700;
+  display: flex; gap: 6px; font-size: var(--text-3xs); font-weight: var(--fw-bold);
   font-family: var(--tk-font-mono); color: rgba(255,255,255,.30);
 }
 
@@ -652,7 +652,7 @@
   border-radius: 3px; display: inline-block;
 }
 .qnrr-skel-bar {
-  width: 100%; border-radius: 6px;
+  width: 100%; border-radius: var(--r-sm);
   background: linear-gradient(90deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.05) 100%);
   background-size: 200% 100%;
   animation: qnrrSkelPulse 1.6s ease-in-out infinite;
@@ -685,13 +685,13 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   position: sticky; top: 0; z-index: 4;
 }
 .qnrr-acct-hdr-name {
-  font-size: 12px; font-weight: 800;
+  font-size: var(--text-md); font-weight: 800;
   color: rgba(255,255,255,.96); letter-spacing: -.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0;
 }
 .qnrr-acct-hdr-tot {
-  font-size: 11px; font-weight: 700;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.72);
+  font-size: var(--text-sm); font-weight: var(--fw-bold);
+  font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.72);
   flex-shrink: 0; padding-left: 8px;
 }
 /* outlet row — indented, dot shows movement */
@@ -700,20 +700,20 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   padding: 5px 14px 5px 28px;
   border-bottom: 1px solid rgba(255,255,255,.03);
 }
-.qnrr-ol-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; margin-top: 4px; margin-right: 8px; }
+.qnrr-ol-dot { width: 6px; height: 6px; border-radius: var(--r-xxs); flex-shrink: 0; margin-top: 4px; margin-right: 8px; }
 .qnrr-ol-left { flex: 1; min-width: 0; }
 .qnrr-ol-name {
-  font-size: 11px; font-weight: 600;
+  font-size: var(--text-sm); font-weight: var(--fw-semi);
   color: rgba(255,255,255,.80); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .qnrr-ol-mv {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  font-size: var(--text-xs); font-weight: var(--fw-bold); text-transform: uppercase;
   letter-spacing: .04em; margin-top: 2px;
 }
 /* 4-month GMV mini-table per outlet */
 .qnrr-ol-gmv-row {
   display: flex; gap: 0; flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,.06); border-radius: 4px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.06); border-radius: var(--r-xs); overflow: hidden;
 }
 .qnrr-ol-gmv-cell {
   display: flex; flex-direction: column; align-items: flex-end;
@@ -723,12 +723,12 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-ol-gmv-cell:last-child { border-right: none; }
 .qnrr-ol-gmv-cell.base { background: rgba(38,96,200,.12); }
 .qnrr-ol-gmv-mo {
-  font-size: 9px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .04em; color: rgba(188,215,255,.58);
+  font-size: var(--text-2xs); font-weight: var(--fw-bold); text-transform: uppercase;
+  letter-spacing: .04em; color: rgba(var(--ink-blue),.58);
   font-family: var(--tk-font-mono);
 }
 .qnrr-ol-gmv-val {
-  font-size: 11px; font-weight: 700;
+  font-size: var(--text-sm); font-weight: var(--fw-bold);
   font-family: var(--tk-font-mono); color: rgba(255,255,255,.80);
   white-space: nowrap;
 }
@@ -743,7 +743,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-acct-hdr { gap: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .qnrr-acct-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .qnrr-hdr-chev {
-  color: rgba(188,215,255,.40); transition: transform .18s;
+  color: rgba(var(--ink-blue),.40); transition: transform .18s;
   flex-shrink: 0;
 }
 .qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
@@ -773,12 +773,12 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 /* pill — ล้อ .portview-fpill */
 .qnrr-pill {
   flex-shrink: 0; white-space: nowrap;
-  padding: 3px 9px; border-radius: 20px;
-  font-size: 10px; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--r-xl);
+  font-size: var(--text-xs); font-weight: var(--fw-semi);
   font-family: var(--tk-font-body);
   border: 1.5px solid rgba(255,255,255,.15);
   background: transparent;
-  color: rgba(255,255,255,.45);
+  color: var(--tk-text-muted);
   cursor: pointer;
   transition: background 220ms ease, color 220ms ease, border-color 220ms ease, transform 150ms ease;
   -webkit-tap-highlight-color: transparent;
@@ -786,7 +786,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-pill.on {
   border-color: var(--tk-accent-solid);
   background: var(--tk-accent-dim-2);
-  color: #fff; transform: scale(1.03);
+  color: var(--tk-text-primary); transform: scale(1.03);
 }
 .qnrr-pill:active { transform: scale(.95); }
 
@@ -811,7 +811,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-chip {
   flex-shrink: 0; white-space: nowrap;
   padding: 7px 8px;
-  font-size: 11px; font-weight: 600;
+  font-size: var(--text-sm); font-weight: var(--fw-semi);
   font-family: var(--tk-font-body);
   border: none; background: transparent;
   color: rgba(255,255,255,.58);
@@ -822,8 +822,8 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   line-height: 1;
 }
 .qnrr-chip.on {
-  color: rgba(188,215,255,.90);
-  border-bottom-color: rgba(188,215,255,.60);
+  color: rgba(var(--ink-blue),.90);
+  border-bottom-color: rgba(var(--ink-blue),.60);
 }
 .qnrr-chip:active { opacity: .7; }
 
@@ -841,9 +841,9 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 }
 .qnrr-list-mo-hdr-cell {
   font-family: var(--tk-font-mono);
-  font-size: 11px; font-weight: 700;
+  font-size: var(--text-sm); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .06em;
-  color: rgba(188,215,255,.80);
+  color: rgba(var(--ink-blue),.80);
   width: 42px; flex-shrink: 0; text-align: right; padding-right: 4px;
 }
 
@@ -859,17 +859,17 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   -webkit-tap-highlight-color: transparent;
 }
 .qnrr-acct-hdr-name {
-  font-size: 11px; font-weight: 800;
+  font-size: var(--text-sm); font-weight: 800;
   color: rgba(255,255,255,.88);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex: 1; min-width: 0;
 }
 .qnrr-acct-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .qnrr-acct-hdr-tot {
-  font-size: 10px; font-weight: 700;
-  font-family: var(--tk-font-mono); color: rgba(188,215,255,.45);
+  font-size: var(--text-xs); font-weight: var(--fw-bold);
+  font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.45);
 }
-.qnrr-hdr-chev { color: rgba(188,215,255,.35); transition: transform .18s; flex-shrink: 0; }
+.qnrr-hdr-chev { color: rgba(var(--ink-blue),.35); transition: transform .18s; flex-shrink: 0; }
 .qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
 
 /* outlet rows wrapper */
@@ -884,8 +884,8 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 /* thead row: month labels */
 .qnrr-acct-tbl-hdr { display: none; }
 .qnrr-acct-tbl-hdr td {
-  font-size: 8px; font-weight: 700; text-transform: uppercase;
-  color: rgba(188,215,255,.40); letter-spacing: .03em;
+  font-size: var(--text-3xs); font-weight: var(--fw-bold); text-transform: uppercase;
+  color: rgba(var(--ink-blue),.40); letter-spacing: .03em;
   padding: 4px 4px 3px; text-align: right;
 }
 .qnrr-acct-tbl-hdr td:first-child { text-align: left; padding-left: 28px; }
@@ -894,7 +894,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   border-bottom: 1px solid rgba(255,255,255,.03);
 }
 .qnrr-acct-tbl tbody td {
-  font-size: 11px; font-weight: 700;
+  font-size: var(--text-sm); font-weight: var(--fw-bold);
   padding: 5px 4px; text-align: right;
   color: rgba(255,255,255,.78);
 }
@@ -905,16 +905,16 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   text-align: left;
 }
 .qnrr-ol-dot2 {
-  width: 6px; height: 6px; border-radius: 2px;
+  width: 6px; height: 6px; border-radius: var(--r-xxs);
   flex-shrink: 0; display: inline-block;
 }
 .qnrr-ol-name2 {
-  font-size: 11px; font-weight: 600;
+  font-size: var(--text-sm); font-weight: var(--fw-semi);
   color: rgba(255,255,255,.82);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* cell color classes */
-.qnrr-acct-tbl td.base-col { color: rgba(188,215,255,.45); }
+.qnrr-acct-tbl td.base-col { color: rgba(var(--ink-blue),.45); }
 .qnrr-acct-tbl td.zero-col { color: rgba(248,113,113,.55); }
 .qnrr-acct-tbl td.hi-col   { color: rgba(74,222,128,.72); }
 
@@ -922,8 +922,8 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 
 /* ── Partial bar top labels (v794) ── */
 .qnrr-top-actual-tag {
-  color: rgba(188,215,255,.50);
-  font-size: 8px; font-weight: 600;
+  color: rgba(var(--ink-blue),.50);
+  font-size: var(--text-3xs); font-weight: var(--fw-semi);
 }
 
 /* (superseded by v6-uxfix top-wrap height change above — partial top-wrap is now 44px like every other column, not 32px) */
