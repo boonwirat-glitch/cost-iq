@@ -331,7 +331,7 @@ function renderCommPolicyStep(body) {
         </div>
         <div class="comm-field" style="grid-column:1/-1">
           <label>Handover</label>
-          <div class="comm-input" style="color:rgba(255,255,255,.30)">&#128274; Monthly เสมอ — ไม่ขึ้นกับ mode (by design)</div>
+          <div class="comm-input" style="color:rgba(255,255,255,.52)">&#128274; Monthly เสมอ — ไม่ขึ้นกับ mode (by design)</div>
         </div>
       </div>
     </div>`;
@@ -580,7 +580,7 @@ function _renderHandoverGmvTierEditor() {
     return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
         <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue),.85);font-family:'IBM Plex Mono',monospace">GMV ${rangeLbl}</span>
-        <button onclick="_commRemoveHandoverGmvTier(${ti})" style="font-size:var(--text-lg2);color:rgba(255,255,255,.28);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
+        <button onclick="_commRemoveHandoverGmvTier(${ti})" style="font-size:var(--text-lg2);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
         <div>
@@ -648,7 +648,7 @@ function _renderTlUpsellTierRows() {
           <span style="width:3px;height:14px;border-radius:var(--r-xxs);background:${accentColor};flex-shrink:0"></span>
           <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue-hi),.75)">${prevTxt} → ${fmtMult(mult)}</span>
         </div>
-        <button onclick="_commRemoveTlUpsellTier(${i})" style="font-size:var(--text-lg);color:rgba(255,255,255,.20);background:none;border:none;cursor:pointer;padding:2px 5px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
+        <button onclick="_commRemoveTlUpsellTier(${i})" style="font-size:var(--text-lg);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:2px 5px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.20)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
         <div>
@@ -854,7 +854,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.12);background:rgba(255,255,255,.04);padding:12px;margin-bottom:7px${te.range||te.payout?';border-color:rgba(255,100,60,.40)':''}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;${pillStyle}">${pillLbl}</span>
-        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:var(--text-xl);color:rgba(255,255,255,.30);background:none;border:none;cursor:pointer;padding:0 4px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.80)'" onmouseout="this.style.color='rgba(255,255,255,.30)'">×</button>
+        <button onclick="removeRuleTier('${planCode}',${i})" style="font-size:var(--text-xl);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:0 4px;line-height:1" onmouseover="this.style.color='rgba(255,80,60,.80)'" onmouseout="this.style.color='rgba(255,255,255,.30)'">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">
         <div>
@@ -1335,7 +1335,7 @@ function renderCommissionPreviewTab() {
   if (!body) return;
   const model = _commBuildPreviewModel();
   if (!model.kamRows.length && model.teamPct === null) {
-    body.innerHTML = `<div class="tgt-preview-empty">ยังไม่มีข้อมูลพอสำหรับ preview<br><span style="font-size:var(--text-xs);color:rgba(255,255,255,.32)">โหลด portview.csv / history ก่อน แล้วกลับมาที่หน้านี้</span></div>`;
+    body.innerHTML = `<div class="tgt-preview-empty">ยังไม่มีข้อมูลพอสำหรับ preview<br><span style="font-size:var(--text-xs);color:rgba(255,255,255,.52)">โหลด portview.csv / history ก่อน แล้วกลับมาที่หน้านี้</span></div>`;
     return;
   }
   const teamTier = _commMatchTier('tl', model.teamPct);
@@ -1372,7 +1372,7 @@ function renderCommissionPreviewTab() {
     </div>
     <div class="tgt-preview-section-title">
       <span>KAM payout estimate</span>
-      <span style="font-family:monospace;color:rgba(255,255,255,.42)">${model.kamRows.length} KAM</span>
+      <span style="font-family:monospace;color:rgba(255,255,255,.52)">${model.kamRows.length} KAM</span>
     </div>
     ${model.kamRows.map(r => {
       const cls = r.pct === null ? '' : (r.pct >= (_tgtSettings.nrr_threshold || 98) ? 'ok' : 'warn');
@@ -1772,7 +1772,7 @@ function _commRenderRetroactiveSection() {
     ? '<span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(255,224,138,.16);color:#ffe08a;border:1px solid rgba(255,224,138,.30)">Locked</span>'
     : draft
     ? '<span style="font-size:var(--text-xs);font-weight:800;padding:3px 9px;border-radius:99px;background:rgba(var(--ink-blue),.10);color:rgba(var(--ink-blue),.70);border:1px solid rgba(var(--ink-blue),.20)">Draft</span>'
-    : '<span style="font-size:var(--text-xs);color:rgba(var(--ink-blue-hi),.30)">ไม่มี snapshot</span>';
+    : '<span style="font-size:var(--text-xs);color:rgba(var(--ink-blue-hi),.52)">ไม่มี snapshot</span>';
 
   // row status badge
   const rowStatusBadge = (status) => status === 'final'

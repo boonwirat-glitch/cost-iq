@@ -199,7 +199,7 @@ const CI = (() => {
 #ci-fullsheet .timer-block{text-align:center;}
 #ci-fullsheet .timer-val{font-size:52px;font-weight:200;letter-spacing:-.04em;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums;}
 #ci-fullsheet .timer-hint{font-size:var(--text-sm);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;color:#8e8e93;margin-top:5px;font-family:'Noto Sans Thai',sans-serif;transition:color 220ms;}
-.is-rec .timer-hint{color:rgba(255,255,255,.18);}
+.is-rec .timer-hint{color:rgba(255,255,255,.52);}
 
 /* ── WAVEFORM ── */
 .waveform{display:flex;align-items:center;gap:2.5px;height:44px;padding:0 28px;width:100%;}

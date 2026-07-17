@@ -227,7 +227,7 @@
 .kav-dept-kam{font-size:var(--text-xs);font-weight:var(--fw-semi);color:rgba(140,180,255,.65);letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
 /* micro-toggle */
 .kav-micro-toggle{display:flex;background:rgba(255,255,255,.07);border-radius:var(--r-7);padding:2px;gap:1px;flex-shrink:0}
-.kav-mt-btn{padding:4px 11px;border-radius:var(--r-5);border:none;background:transparent;font-family:var(--tk-font-body);font-size:var(--text-sm);font-weight:var(--fw-semi);color:rgba(255,255,255,.38);cursor:pointer;transition:all .18s;white-space:nowrap}
+.kav-mt-btn{padding:4px 11px;border-radius:var(--r-5);border:none;background:transparent;font-family:var(--tk-font-body);font-size:var(--text-sm);font-weight:var(--fw-semi);color:rgba(255,255,255,.52);cursor:pointer;transition:all .18s;white-space:nowrap}
 .kav-mt-btn.on{background:var(--tk-accent-solid);color:var(--tk-text-primary);box-shadow:0 1px 4px rgba(0,0,0,.35)}
 /* account name — hero */
 .kav-acct-name{font-size:var(--text-xl2);font-weight:var(--fw-bold);color:var(--tk-text-primary);line-height:1.25;margin-bottom:10px;letter-spacing:-.2px}
@@ -255,7 +255,7 @@
 .kav-ring-zone{display:flex;align-items:center;gap:14px;padding:4px 0 2px}
 .kav-ring-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
 .kav-ring-days-below{text-align:center}
-.kav-ring-days-below .kav-days-lbl{font-size:var(--text-xs);color:rgba(255,255,255,.4);font-family:"IBM Plex Mono",monospace}
+.kav-ring-days-below .kav-days-lbl{font-size:var(--text-xs);color:rgba(255,255,255,.52);font-family:"IBM Plex Mono",monospace}
 .kav-rr-hero{font-family:"IBM Plex Mono",monospace;font-size:var(--text-lg2)!important;font-weight:var(--fw-bold)}
 .kav-ring-wrap{position:relative;width:92px;height:92px;flex-shrink:0}
 .kav-ring-svg{display:block;overflow:visible}
@@ -290,9 +290,9 @@
 .kav-stat-label{font-size:var(--text-xs);font-weight:var(--fw-semi);color:var(--tk-text-muted);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
 .kav-stat-val{font-family:"IBM Plex Mono",monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.88)}
 .kav-stat-fcst-row{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
-.kav-stat-sep{font-size:var(--text-sm);color:rgba(255,255,255,.2);font-family:"IBM Plex Mono",monospace}
-.kav-base-dim{color:rgba(255,255,255,.4)!important;font-size:var(--text-md)!important}
-.kav-i-btn{width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.35);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:2px;transition:all .15s;font-weight:var(--fw-bold);padding:0;line-height:1}
+.kav-stat-sep{font-size:var(--text-sm);color:rgba(255,255,255,.52);font-family:"IBM Plex Mono",monospace}
+.kav-base-dim{color:rgba(255,255,255,.52)!important;font-size:var(--text-md)!important}
+.kav-i-btn{width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.52);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:2px;transition:all .15s;font-weight:var(--fw-bold);padding:0;line-height:1}
 .kav-i-btn:hover{border-color:rgba(255,255,255,.5);color:var(--tk-text-secondary)}
 
 /* Formula expand panel */

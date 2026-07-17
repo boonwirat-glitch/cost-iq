@@ -95,12 +95,15 @@
   --ink-blue:     188,215,255;
   --ink-blue-hi:  225,238,255;
   /* Semantic ramp (defined now, mass-applied in Phase 2c consolidation —
-     do not bulk-migrate call sites onto these until then): */
+     do not bulk-migrate call sites onto these until then).
+     v95 (Phase 2c ink floor): muted/faint were below the .45 floor applied
+     to every real call site (tools/inkfloor_codemod.js) — raised to .52 so
+     they don't embed a stale sub-floor value if ever adopted later. */
   --tk-blue-text-primary:   rgba(var(--ink-blue-hi),.88);
   --tk-blue-text-secondary: rgba(var(--ink-blue),.70);
   --tk-blue-text-tertiary:  rgba(var(--ink-blue),.55);
-  --tk-blue-text-muted:     rgba(var(--ink-blue-hi),.40);
-  --tk-blue-text-faint:     rgba(var(--ink-blue),.28);
+  --tk-blue-text-muted:     rgba(var(--ink-blue-hi),.52);
+  --tk-blue-text-faint:     rgba(var(--ink-blue),.52);
 
   /* ── BORDER (KAM dark theme) ─────────────────────────────── */
   --tk-border:          rgba(255,255,255,.10);

@@ -168,7 +168,7 @@
   flex: 1; height: 100%;
   display: flex; align-items: center; justify-content: center;
   background: none; border: none; cursor: pointer; padding: 0;
-  color: rgba(255,255,255,.32);
+  color: rgba(255,255,255,.52);
   transition: color .18s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -199,7 +199,7 @@
 .qnrr-ref-label {
   position: absolute; right: 0;
   font-size: var(--text-3xs); font-family: var(--tk-font-mono); font-weight: var(--fw-bold);
-  color: rgba(var(--ink-blue),.30); transform: translateY(-10px);
+  color: rgba(var(--ink-blue),.52); transform: translateY(-10px);
 }
 .qnrr-bars-row {
   display: flex; align-items: stretch; gap: 6px;
@@ -257,7 +257,7 @@
   text-align: center; width: 100%; white-space: nowrap;
 }
 .qnrr-bar-runrate-label.low-conf {
-  color: rgba(var(--ink-blue),.32); font-style: italic;
+  color: rgba(var(--ink-blue),.52); font-style: italic;
 }
 /* bar chart area — takes remaining height */
 .qnrr-bar-chart-area {
@@ -517,7 +517,7 @@
 }
 .qnrr-leg {
   display: flex; align-items: center; gap: 4px;
-  font-size: var(--text-2xs); font-weight: var(--fw-semi); color: rgba(255,255,255,.38);
+  font-size: var(--text-2xs); font-weight: var(--fw-semi); color: rgba(255,255,255,.52);
   letter-spacing: .02em;
 }
 .qnrr-leg-sq { width: 6px; height: 6px; border-radius: var(--r-xxs); flex-shrink: 0; }
@@ -533,7 +533,7 @@
 .qnrr-drill-lbl {
   font-size: var(--text-3xs); font-weight: var(--fw-bold);
   text-transform: uppercase; letter-spacing: .08em;
-  color: rgba(var(--ink-blue),.36); white-space: nowrap; flex-shrink: 0;
+  color: rgba(var(--ink-blue),.52); white-space: nowrap; flex-shrink: 0;
 }
 .qnrr-mv-filters { display: flex; gap: 3px; flex-wrap: wrap; }
 .qnrr-mv-btn {
@@ -614,10 +614,10 @@
   font-family: var(--tk-font-mono); color: var(--tk-text-primary); letter-spacing: -.02em;
 }
 .qnrr-chev {
-  font-size: var(--text-md); color: rgba(255,255,255,.16);
+  font-size: var(--text-md); color: rgba(255,255,255,.52);
   transition: transform .2s, color .2s; flex-shrink: 0;
 }
-.qnrr-acct-row.open .qnrr-chev { transform: rotate(90deg); color: rgba(255,255,255,.32); }
+.qnrr-acct-row.open .qnrr-chev { transform: rotate(90deg); color: rgba(255,255,255,.52); }
 
 /* ── Outlet rows ── */
 .qnrr-outlet-wrap {
@@ -641,7 +641,7 @@
 .qnrr-osb { width: 7px; border-radius: 2px 2px 0 0; }
 .qnrr-out-spark-lbl {
   display: flex; gap: 6px; font-size: var(--text-3xs); font-weight: var(--fw-bold);
-  font-family: var(--tk-font-mono); color: rgba(255,255,255,.30);
+  font-family: var(--tk-font-mono); color: rgba(255,255,255,.52);
 }
 
 /* ── Skeleton ── */
@@ -743,7 +743,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-acct-hdr { gap: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .qnrr-acct-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .qnrr-hdr-chev {
-  color: rgba(var(--ink-blue),.40); transition: transform .18s;
+  color: rgba(var(--ink-blue),.52); transition: transform .18s;
   flex-shrink: 0;
 }
 .qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
@@ -869,7 +869,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
   font-size: var(--text-xs); font-weight: var(--fw-bold);
   font-family: var(--tk-font-mono); color: rgba(var(--ink-blue),.45);
 }
-.qnrr-hdr-chev { color: rgba(var(--ink-blue),.35); transition: transform .18s; flex-shrink: 0; }
+.qnrr-hdr-chev { color: rgba(var(--ink-blue),.52); transition: transform .18s; flex-shrink: 0; }
 .qnrr-acct-hdr.expanded .qnrr-hdr-chev { transform: rotate(180deg); }
 
 /* outlet rows wrapper */
@@ -885,7 +885,7 @@ body.sales-tl-mode #portview-pace-bar { cursor: default; }
 .qnrr-acct-tbl-hdr { display: none; }
 .qnrr-acct-tbl-hdr td {
   font-size: var(--text-3xs); font-weight: var(--fw-bold); text-transform: uppercase;
-  color: rgba(var(--ink-blue),.40); letter-spacing: .03em;
+  color: rgba(var(--ink-blue),.52); letter-spacing: .03em;
   padding: 4px 4px 3px; text-align: right;
 }
 .qnrr-acct-tbl-hdr td:first-child { text-align: left; padding-left: 28px; }

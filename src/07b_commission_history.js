@@ -57,9 +57,9 @@ function _commRenderHistoryList(ov, allRows, role, email) {
 
     if (!hasLock) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(var(--ink-blue),.06)">'
-        +'<div><div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:rgba(var(--ink-blue-hi),.38)">'+fmtPeriod(p)+'</div>'
-        +'<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.28);margin-top:2px">ไม่มี snapshot</div></div>'
-        +'<div style="font-size:var(--text-md);color:rgba(var(--ink-blue-hi),.28)">—</div>'
+        +'<div><div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:rgba(var(--ink-blue-hi),.52)">'+fmtPeriod(p)+'</div>'
+        +'<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.52);margin-top:2px">ไม่มี snapshot</div></div>'
+        +'<div style="font-size:var(--text-md);color:rgba(var(--ink-blue-hi),.52)">—</div>'
         +'</div>';
     }
 
@@ -100,7 +100,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
     +'<div><div style="font-size:var(--text-base);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.88)">'+fmtPeriod(_cp)+'</div>'
     +'<div style="font-size:var(--text-sm);margin-top:3px;color:'+_cc+'">'+_cl+'</div></div>'
     +'<div style="text-align:right">'
-    +(_ca!=null?'<div style="font-size:var(--text-lg2);font-weight:900;color:'+_cc+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(_ca)+'</div>':'<div style="font-size:var(--text-base);color:rgba(var(--ink-blue-hi),.30)">—</div>')
+    +(_ca!=null?'<div style="font-size:var(--text-lg2);font-weight:900;color:'+_cc+';font-family:\'IBM Plex Mono\',monospace;letter-spacing:-.5px">'+moneyFull(_ca)+'</div>':'<div style="font-size:var(--text-base);color:rgba(var(--ink-blue-hi),.52)">—</div>')
     +(_cns!=='—'?'<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.60);margin-top:2px">NRR '+_cns+'</div>':'')
     +'</div></div></div>';
 
@@ -136,7 +136,7 @@ window._commOpenHistoryDetail = function(period) {
   var myKam = pRows.find(function(r){return r.beneficiary_role==='kam';});
   var myTl  = pRows.find(function(r){return r.beneficiary_role==='tl';});
   var focusRow = myKam || myTl || pRows[0];
-  if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(var(--ink-blue),.4)">ไม่มีข้อมูล</div>'; return; }
+  if (!focusRow) { ov.querySelector('div').innerHTML += '<div style="padding:20px;text-align:center;color:rgba(var(--ink-blue),.52)">ไม่มีข้อมูล</div>'; return; }
 
   // v560: rates from the snapshot's frozen config (audit truth) → live cfg → engine default.
   // History must show the rates that were USED at lock time, not today's settings.
@@ -280,7 +280,7 @@ window._commOpenHistoryDetail = function(period) {
   }
 
   // footer meta
-  bodyHtml += '<div style="padding:8px 18px 20px;font-size:var(--text-xs);color:rgba(var(--ink-blue),.28);font-family:\'IBM Plex Mono\',monospace">lock: '+(bd.lock_trigger||'—')+' · '+(bd.csv_data_as_of?bd.csv_data_as_of.split('T')[0]:period)+'</div>';
+  bodyHtml += '<div style="padding:8px 18px 20px;font-size:var(--text-xs);color:rgba(var(--ink-blue),.52);font-family:\'IBM Plex Mono\',monospace">lock: '+(bd.lock_trigger||'—')+' · '+(bd.csv_data_as_of?bd.csv_data_as_of.split('T')[0]:period)+'</div>';
 
   var _mxH = (window.innerHeight - 60) + 'px';
   var detailHtml = '<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;max-height:'+_mxH+';background:#0d1c34;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;z-index:9201">'

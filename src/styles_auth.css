@@ -37,7 +37,7 @@
   animation:iq-pulse 3.5s ease-in-out infinite;
 }
 .lgi-badge svg{width:8px;height:8px;flex-shrink:0;animation:iq-spin 8s linear infinite;transform-origin:center;}
-.lgi-sub{font-size:var(--text-md);color:rgba(255,255,255,.35);margin-top:3px;font-family:var(--tk-font-body);letter-spacing:.2px;}
+.lgi-sub{font-size:var(--text-md);color:rgba(255,255,255,.52);margin-top:3px;font-family:var(--tk-font-body);letter-spacing:.2px;}
 .lgi-field{margin-bottom:14px;}
 .lgi-label{
   display:block;font-size:var(--text-sm);font-weight:var(--fw-bold);
@@ -54,7 +54,7 @@
   outline:none;transition:border-color .2s,background .2s;
   -webkit-font-smoothing:antialiased;
 }
-.lgi-input::placeholder{color:rgba(255,255,255,.22);}
+.lgi-input::placeholder{color:rgba(255,255,255,.52);}
 .lgi-input:focus{border-color:var(--tk-ok-border);background:var(--tk-ok-dim);}
 .lgi-err{
   display:none;
@@ -89,14 +89,14 @@
 .lgi-chk-dots span:nth-child(3){animation-delay:.44s;}
 .lgi-foot{
   text-align:center;margin-top:24px;
-  font-size:var(--text-sm);color:rgba(255,255,255,.18);
+  font-size:var(--text-sm);color:rgba(255,255,255,.52);
   font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.4px;
 }
 .lgi-divider{
   display:flex;align-items:center;gap:12px;margin:28px 0 24px;
 }
 .lgi-divider::before,.lgi-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08);}
-.lgi-divider span{font-size:var(--text-sm);color:rgba(255,255,255,.2);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.6px;}
+.lgi-divider span{font-size:var(--text-sm);color:rgba(255,255,255,.52);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.6px;}
 /* ── PASSWORD RECOVERY FLOW ── */
 .pw-reset-area{display:none;}
 #login-overlay.password-recovery .lgi-form-area{display:none!important;}
@@ -109,7 +109,7 @@
 .pw-reset-status.err{display:block;background:rgba(229,62,62,.12);border:1px solid rgba(229,62,62,.25);color:#fc8181;}
 .pw-reset-status.ok{display:block;background:var(--tk-ok-dim);border:1px solid var(--tk-ok-border);color:var(--tk-ok-bright);}
 .lgi-err.ok{display:block;background:var(--tk-ok-dim);border-color:var(--tk-ok-border);color:var(--tk-ok-bright);}
-.pw-reset-note{font-size:var(--text-sm);color:rgba(255,255,255,.32);line-height:1.6;margin-top:12px;text-align:center;}
+.pw-reset-note{font-size:var(--text-sm);color:rgba(255,255,255,.52);line-height:1.6;margin-top:12px;text-align:center;}
 
 
 /* ── SECTION 3: Sense splash CSS ── */
@@ -129,7 +129,7 @@
 /* Brand */
 .spl-brand{text-align:center;margin-bottom:24px;opacity:0;animation:spl-fadein .38s ease .38s both;}
 .spl-wordmark{font-family:var(--tk-font-body);font-size:var(--text-3xl);font-weight:var(--fw-bold);color:var(--tk-text-primary);letter-spacing:-.3px;display:flex;align-items:center;justify-content:center;}
-.spl-sub{font-size:var(--text-sm);color:rgba(255,255,255,.3);margin-top:5px;font-family:var(--tk-font-body);letter-spacing:.2px;}
+.spl-sub{font-size:var(--text-sm);color:rgba(255,255,255,.52);margin-top:5px;font-family:var(--tk-font-body);letter-spacing:.2px;}
 /* Ticker */
 .spl-ticker-wrap{height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:40px;}
 #spl-ticker{font-size:var(--text-md);color:var(--tk-ok-bright);font-family:var(--tk-font-body);font-weight:var(--fw-medium);transition:opacity .2s ease;opacity:0;animation:spl-fadein .3s ease .65s both;}

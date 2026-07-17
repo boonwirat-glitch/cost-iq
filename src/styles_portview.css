@@ -103,11 +103,11 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .pace-bar-fill.star{background:linear-gradient(90deg,#a855f7,#c084fc)}
 .pace-meta-row{display:flex;gap:16px}
 .pace-meta-item{flex:1}
-.pace-meta-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.pace-meta-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.52);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
 .pace-meta-val{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-text-primary)}
 .pace-info-btn{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.28);background:transparent;color:rgba(255,255,255,.5);font-size:var(--text-xs);font-weight:var(--fw-bold);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;padding:0;line-height:1;transition:all .15s;flex-shrink:0;font-style:italic}
 .pace-info-btn:hover{border-color:rgba(255,255,255,.65);color:rgba(255,255,255,.9);background:rgba(255,255,255,.1)}
-.pace-meta-sub{font-size:var(--text-2xs);color:rgba(255,255,255,.4);margin-top:1px}
+.pace-meta-sub{font-size:var(--text-2xs);color:rgba(255,255,255,.52);margin-top:1px}
 
 /* ══ PORTVIEW (Tab 6) ══ */
 .portview-screen{padding-bottom:100px}
@@ -229,14 +229,14 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .pv-sku-ok{background:var(--tk-ok-dim);color:var(--tk-ok-bright);border-color:var(--tk-ok-border)}
 .pv-sku-gone{background:rgba(240,80,0,.12);color:#ff9060;border-color:rgba(240,80,0,.28)}
 .pv-sku-watch{background:rgba(240,176,0,.12);color:#f0c040;border-color:rgba(240,176,0,.26)}
-.pv-sku-total{background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.1)}
+.pv-sku-total{background:rgba(255,255,255,.05);color:rgba(255,255,255,.52);border-color:rgba(255,255,255,.1)}
 /* Confidence badge — shown in portview list when histMonths < 3 */
 .pace-conf-badge{font-size:var(--text-3xs);font-weight:var(--fw-bold);padding:1px 5px;border-radius:var(--r-5);letter-spacing:.3px;flex-shrink:0;opacity:.75}
 .pace-conf-badge.low{background:rgba(240,176,0,.18);color:var(--amb)}
 .pace-conf-badge.medium{background:rgba(240,176,0,.1);color:rgba(240,176,0,.7)}
 /* Pace formula row in detail card */
 .pace-formula-row{margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:var(--r-8);border:1px solid rgba(255,255,255,.07)}
-.pace-formula-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.3);margin-bottom:5px}
+.pace-formula-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.52);margin-bottom:5px}
 .pace-formula-line{font-size:var(--text-sm);color:var(--tk-text-secondary);line-height:1.6;font-family:'IBM Plex Mono','Noto Sans Thai',monospace}
 .pace-formula-line strong{color:rgba(255,255,255,.8);font-weight:var(--fw-bold)}
 
@@ -272,7 +272,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-rep-name{font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-text-primary)}
 .portview-rep-meta{display:flex;gap:10px;font-size:var(--text-sm)}
 .portview-rep-stat{display:flex;align-items:center;gap:5px}
-.portview-rep-stat .lbl{color:rgba(255,255,255,.4)}
+.portview-rep-stat .lbl{color:rgba(255,255,255,.52)}
 /* ── Teamview variable-density cards ── */
 .tv-section-lbl{font-size:var(--text-sm);font-weight:var(--fw-bold);letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.78);padding:0 2px;margin:14px 0 8px}
 .tv-section-lbl:first-child{margin-top:4px}
@@ -309,7 +309,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .tv-chip-name{flex:1;font-size:var(--text-md);font-weight:var(--fw-semi);color:rgba(255,255,255,.85);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tv-chip-pace{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--tk-ok-bright);margin-right:8px;flex-shrink:0}
 .tv-chip-visit{font-size:var(--text-xs);color:var(--tk-ok-bright);font-weight:var(--fw-bold);margin-right:8px;flex-shrink:0;white-space:nowrap}
-.tv-chip-arrow{font-size:var(--text-base);color:rgba(255,255,255,.2);flex-shrink:0}
+.tv-chip-arrow{font-size:var(--text-base);color:rgba(255,255,255,.52);flex-shrink:0}
 
 /* ── Portview compact chip — single-row account card ── */
 .pv-chip{display:flex;align-items:center;gap:8px;border-radius:var(--r-9);border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);margin-bottom:5px;cursor:pointer;transition:all .15s;overflow:hidden;height:40px;padding:0 12px;position:relative;animation:card-reveal 240ms ease-out both}
@@ -334,7 +334,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 @keyframes badge-reveal{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes card-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes tgtFadeIn{from{opacity:0}to{opacity:1}}
-.pv-chip-arrow{font-size:var(--text-base);color:rgba(255,255,255,.22);flex-shrink:0}
+.pv-chip-arrow{font-size:var(--text-base);color:rgba(255,255,255,.52);flex-shrink:0}
 
 /* Portview view-toggle row */
 .pv-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:0 0 10px}
@@ -343,7 +343,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .pv-toggle-btn{width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:var(--tk-text-faint);transition:color .15s}
 .pv-toggle-btn.on{color:rgba(255,255,255,.9)}
 .pv-sort-divider{width:1px;height:16px;background:rgba(255,255,255,.12);margin:0 4px}
-.pv-sort-btn{height:24px;padding:0 7px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.38);font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.3px;cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;white-space:nowrap}
+.pv-sort-btn{height:24px;padding:0 7px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.52);font-size:var(--text-2xs);font-weight:var(--fw-bold);letter-spacing:.3px;cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;white-space:nowrap}
 .pv-sort-btn.on{background:var(--tk-accent-dim-2);border-color:rgba(100,160,255,.38);color:rgba(160,200,255,.95)}
 /* star card (≥105%) */
 .tv-star-card{border-radius:var(--r-card);padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;transition:all .2s;overflow:hidden;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.4);box-shadow:0 0 18px rgba(168,85,247,.18),0 0 4px rgba(168,85,247,.1)}
@@ -382,7 +382,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-no-data{padding:40px 20px;text-align:center}
 .portview-no-data-icon{font-size:32px;margin-bottom:10px;opacity:.4}
 .portview-no-data-text{font-size:var(--text-base);font-weight:var(--fw-bold);color:rgba(255,255,255,.5);margin-bottom:4px}
-.portview-no-data-sub{font-size:var(--text-sm);color:rgba(255,255,255,.3);line-height:1.6}
+.portview-no-data-sub{font-size:var(--text-sm);color:rgba(255,255,255,.52);line-height:1.6}
 
 /* ══ CURRENT MONTH CSV SLOT ══ */
 
@@ -536,11 +536,11 @@ body.kam-mode #kam-nav-handle{display:none;}
 /* ── NRR Movement rows (v198) ── */
 .tgt-mv-wrap{border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding:6px 0 2px}
 .tgt-mv-header{display:flex;align-items:center;gap:6px;padding:0 0 4px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:3px}
-.tgt-mv-header .tgt-mv-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.3)}
+.tgt-mv-header .tgt-mv-label{font-size:var(--text-2xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.52)}
 .tgt-mv-header .tgt-mv-count,.tgt-mv-header .tgt-mv-gmv,.tgt-mv-header .tgt-mv-nrr{font-size:var(--text-2xs);color:var(--tk-text-faint);font-weight:var(--fw-semi)}
 .tgt-mv-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--text-sm);font-family:var(--tk-font-body)}
 .tgt-mv-label{flex:1;color:rgba(255,255,255,.55);font-weight:var(--fw-semi);min-width:80px}
-.tgt-mv-count{color:rgba(255,255,255,.4);font-size:var(--text-xs);min-width:44px}
+.tgt-mv-count{color:rgba(255,255,255,.52);font-size:var(--text-xs);min-width:44px}
 .tgt-mv-gmv{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:rgba(255,255,255,.8);min-width:50px;text-align:right}
 .tgt-mv-nrr{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);min-width:36px;text-align:right}
 .tgt-mv-out .tgt-mv-label{color:rgba(255,140,100,.65)}

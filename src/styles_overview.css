@@ -25,7 +25,7 @@
 .hero::before{content:'';position:absolute;right:-50px;top:-50px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.03);pointer-events:none}
 .h-sub{font-size:var(--text-base);color:rgba(255,255,255,.65);font-weight:var(--fw-medium);margin-bottom:1px}
 #h-acct-name{font-size:var(--text-2xl);font-weight:800;color:var(--tk-text-primary);letter-spacing:-.2px;line-height:1.25;margin-bottom:4px}
-.h-id{font-size:var(--text-sm);color:rgba(255,255,255,.3);margin-bottom:12px}
+.h-id{font-size:var(--text-sm);color:rgba(255,255,255,.52);margin-bottom:12px}
 .h-mo{font-size:var(--text-sm);color:var(--amb);font-weight:var(--fw-semi);letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:5px}
 /* Frame 1: FACTUAL — ที่จ่ายไป */
 .hero-fact{margin-bottom:0}
@@ -35,9 +35,9 @@
 /* Hero main row: spend + forecast */
 .hero-main-row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:10px}
 .hero-forecast{text-align:right;flex-shrink:0}
-.hero-fc-lbl{font-size:var(--text-2xs);color:rgba(255,255,255,.4);font-weight:var(--fw-semi);letter-spacing:.4px;margin-bottom:2px}
+.hero-fc-lbl{font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-weight:var(--fw-semi);letter-spacing:.4px;margin-bottom:2px}
 .hero-fc-num{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xl);font-weight:var(--fw-bold);color:rgba(255,255,255,.85);line-height:1.1}
-.hero-fc-base{font-size:var(--text-2xs);color:rgba(255,255,255,.3);margin-top:2px}
+.hero-fc-base{font-size:var(--text-2xs);color:rgba(255,255,255,.52);margin-top:2px}
 /* Pace bar */
 .hero-pace-track{height:3px;background:rgba(255,255,255,.12);border-radius:var(--r-xxs);overflow:hidden;margin-bottom:5px}
 .hero-pace-fill{height:100%;border-radius:var(--r-xxs);background:var(--g500);width:0;transition:width 1s cubic-bezier(.34,1.2,.64,1)}
@@ -74,7 +74,7 @@
 .hero-action{background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);border-radius:14px 14px 0 0;padding:16px 16px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .hero-action .hero-frame-label{color:rgba(255,255,255,.5);margin-bottom:5px}
 .hero-action .hero-yr{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:36px;font-weight:var(--fw-bold);color:var(--amb);letter-spacing:-1.5px;line-height:1;margin-bottom:2px}
-.hero-action .hero-yr-lbl{font-size:var(--text-sm);color:rgba(255,255,255,.3);margin-bottom:5px}
+.hero-action .hero-yr-lbl{font-size:var(--text-sm);color:rgba(255,255,255,.52);margin-bottom:5px}
 .hero-action .hero-mo{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-medium);color:var(--tk-text-muted)}
 .scta{background:var(--amb);color:var(--g900);border:none;border-radius:var(--r-md);padding:10px 14px;font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;font-family:var(--tk-font-body);white-space:nowrap;flex-shrink:0;transition:opacity .2s}
 .scta:hover{opacity:.88}
@@ -117,7 +117,7 @@
 .sense-card .dval{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:40px;font-weight:var(--fw-bold);line-height:1}
 .sense-card .dsc{font-size:var(--text-md);color:rgba(190,255,220,.72);line-height:1.55;margin-top:4px}
 /* Dial info btn on dark bg */
-.dial-info-btn{width:20px;height:20px;border-radius:50%;background:transparent;border:1.5px solid rgba(255,255,255,.2);cursor:pointer;font-size:var(--text-sm);font-weight:var(--fw-normal);color:rgba(255,255,255,.35);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s;vertical-align:middle;line-height:1}
+.dial-info-btn{width:20px;height:20px;border-radius:50%;background:transparent;border:1.5px solid rgba(255,255,255,.2);cursor:pointer;font-size:var(--text-sm);font-weight:var(--fw-normal);color:rgba(255,255,255,.52);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s;vertical-align:middle;line-height:1}
 .dial-info-btn:hover{border-color:rgba(255,255,255,.5);color:var(--tk-text-secondary)}
 /* Score tooltip */
 .score-tooltip{background:#0a2a1e;border:1px solid var(--tk-ok-dim-2);border-radius:var(--r-card);padding:16px;margin-top:12px;color:var(--tk-text-primary);font-size:var(--text-base);line-height:1.65;display:none}

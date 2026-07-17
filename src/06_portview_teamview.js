@@ -1017,7 +1017,7 @@ function __legacyRenderPortviewListFallback(){
       const orderedPart=_cc.ordered>0?`<span style="color:var(--tk-ok-bright)">${_cc.ordered} สั่งแล้ว</span>`:'';
       const gonePart=_cc.gone>0?`<span style="color:var(--org)">${orderedPart?' · ':''}${_cc.gone} หาย</span>`:'';
       const nearPart=_cc.near>0?`<span style="color:var(--amb)">${(orderedPart||gonePart)?' · ':''}${_cc.near} เฝ้าดู</span>`:'';
-      const totalPart=`<span style="color:rgba(255,255,255,.35)"> / ${_cc.total} SKU</span>`;
+      const totalPart=`<span style="color:rgba(255,255,255,.52)"> / ${_cc.total} SKU</span>`;
       if(orderedPart||gonePart||nearPart){
         churnBadge=`<span class="portview-churn-badge" style="background:rgba(240,80,0,.06);border-color:rgba(240,80,0,.18);gap:0;padding:2px 8px">${orderedPart}${gonePart}${nearPart}${totalPart}</span>`;
       }
@@ -1073,7 +1073,7 @@ function __legacyRenderPortviewListFallback(){
     if(_cc&&_cc.total>0)parts.push(`<span style="color:rgba(255,255,255,.6)">/ ${_cc.total} SKU</span>`);
     if(catCount>0)parts.push(`<span style="color:rgba(240,176,0,.85);font-weight:var(--fw-semi)">${catCount} cat</span>`);
     if(!parts.length)return'';
-    const dot=`<span style="color:rgba(255,255,255,.15)">·</span>`;
+    const dot=`<span style="color:rgba(255,255,255,.52)">·</span>`;
     return`<span style="font-size:var(--text-xs);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;display:inline-flex;gap:5px;align-items:center">${parts.join(dot)}</span>`;
   }
 
@@ -1688,11 +1688,11 @@ function __legacyRenderPortviewSummaryFallback(){
       <div style="display:flex;align-items:baseline;gap:6px">
         <span id="pv-pace-pct" style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:24px;font-weight:var(--fw-bold)" class="pace-pct-val ${ppCls}">${portfolioPace}%</span>
         <div style="display:flex;align-items:center;gap:5px">
-          <span style="font-size:var(--text-sm);color:rgba(255,255,255,.4)">Pro Rate พอร์ต</span>
+          <span style="font-size:var(--text-sm);color:rgba(255,255,255,.52)">Pro Rate พอร์ต</span>
           <button onclick="(function(){const d=document.getElementById('pv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--tk-text-muted);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:var(--fw-bold);transition:all .15s">i</button>
         </div>
       </div>
-      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:rgba(255,255,255,.3)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:var(--text-2xs);color:var(--tk-text-faint);text-align:right;margin-top:1px">baseline</div></div>`:''}
+      ${totalBaseline>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.8)">${fmtGMV(totalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:rgba(255,255,255,.52)"> / ${fmtGMV(totalBaseline)}</span><div style="font-size:var(--text-2xs);color:var(--tk-text-faint);text-align:right;margin-top:1px">baseline</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${ppCls}" style="width:${Math.min(portfolioPace,100)}%"></div></div>
     <div id="pv-formula-panel" style="display:none">
@@ -1702,7 +1702,7 @@ function __legacyRenderPortviewSummaryFallback(){
       </div>
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">วิธีคิด Baseline (รวมพอร์ต)</div>
-        <div class="pace-formula-line">${(()=>{const agg={};acctWithPace.forEach(a=>{if(!a.paceSignal.monthsDetail||!a.paceSignal.monthsDetail.length)return;a.paceSignal.monthsDetail.forEach(d=>{if(!agg[d.m])agg[d.m]={m:d.m,gmv:0,days:d.days,n:0};agg[d.m].gmv+=d.gmv;agg[d.m].n++;});});const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const rows=Object.values(agg).sort((a,b)=>{const p=m=>{const s=m.split(' ');return parseInt(s[1]||0)*12+mo.indexOf(s[0]);};return p(a.m)-p(b.m);});const avgDaily=rows.length?Math.round(rows.reduce((s,d)=>s+d.gmv/d.days,0)/rows.length):0;return rows.map(d=>`${d.m}: ${fmtGMV(d.gmv)} ÷ ${d.days}วัน = <strong>${fmtGMV(Math.round(d.gmv/d.days))}/วัน</strong> <span style="color:rgba(255,255,255,.35)">(${d.n} ร้าน)</span>`).join('<br>')+'<br>avg = <strong>'+fmtGMV(avgDaily)+'/วัน</strong> × '+_pvDays+' วัน = <strong>'+fmtGMV(_totalExp)+'</strong>';})()}</div>
+        <div class="pace-formula-line">${(()=>{const agg={};acctWithPace.forEach(a=>{if(!a.paceSignal.monthsDetail||!a.paceSignal.monthsDetail.length)return;a.paceSignal.monthsDetail.forEach(d=>{if(!agg[d.m])agg[d.m]={m:d.m,gmv:0,days:d.days,n:0};agg[d.m].gmv+=d.gmv;agg[d.m].n++;});});const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const rows=Object.values(agg).sort((a,b)=>{const p=m=>{const s=m.split(' ');return parseInt(s[1]||0)*12+mo.indexOf(s[0]);};return p(a.m)-p(b.m);});const avgDaily=rows.length?Math.round(rows.reduce((s,d)=>s+d.gmv/d.days,0)/rows.length):0;return rows.map(d=>`${d.m}: ${fmtGMV(d.gmv)} ÷ ${d.days}วัน = <strong>${fmtGMV(Math.round(d.gmv/d.days))}/วัน</strong> <span style="color:rgba(255,255,255,.52)">(${d.n} ร้าน)</span>`).join('<br>')+'<br>avg = <strong>'+fmtGMV(avgDaily)+'/วัน</strong> × '+_pvDays+' วัน = <strong>'+fmtGMV(_totalExp)+'</strong>';})()}</div>
       </div>
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">เกณฑ์ Pace รายร้าน</div>
@@ -1739,7 +1739,7 @@ function __legacyRenderPortviewSummaryFallback(){
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:4px">
         <div style="display:flex;align-items:baseline;gap:5px">
           <div class="portview-tier-lbl" style="margin:0">${lbl}</div>
-          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${count} ร้าน</div>
+          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-family:var(--tk-font-body)">${count} ร้าน</div>
         </div>
         ${diffVal>0?`<div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${diffColor};flex-shrink:0;line-height:1">-${fmtGMV(diffVal)}</div>`:''}
       </div>
@@ -1758,7 +1758,7 @@ function __legacyRenderPortviewSummaryFallback(){
       <div class="portview-tier-box safe${_pfOk}" data-pf="ok" onclick="setPortviewFilter('ok')">
         <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:4px">
           <div class="portview-tier-lbl" style="margin:0">ON TRACK</div>
-          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body)">${ok} ร้าน</div>
+          <div style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-family:var(--tk-font-body)">${ok} ร้าน</div>
         </div>
         <div class="portview-tier-val">${fmtGMV(okRunRate)}</div>
         <div style="border-top:1px solid var(--tk-ok-dim-2);margin-top:8px;padding-top:7px;display:flex;align-items:baseline;gap:5px">
@@ -2258,7 +2258,7 @@ function __legacyRenderTeamviewSummaryFallback(){
           <button onclick="(function(){const d=document.getElementById('tv-formula-panel');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';this.style.background=open?'transparent':'rgba(255,255,255,.15)';}).call(this)" style="width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.55);font-size:var(--text-2xs);font-style:italic;font-family:Georgia,serif;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:var(--fw-bold);transition:all .15s">i</button>
         </div>
       </div>
-      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:var(--tk-text-muted)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:var(--text-2xs);color:rgba(255,255,255,.4);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
+      ${_tvDenominator>0?`<div style="text-align:right;line-height:1.4"><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(255,255,255,.85)">${_tvFmtG(_tvTotalRunRate)}</span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-md);color:var(--tk-text-muted)"> / ${_tvFmtG(_tvDenominator)}</span><div style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);text-align:right;margin-top:1px">${_tvDenomLabelTxt}</div></div>`:''}
     </div>
     <div class="pace-bar-wrap"><div class="pace-bar-fill ${teamPaceCls}" style="width:${Math.min(teamPace,100)}%"></div></div>
     <div id="tv-formula-panel" style="display:none">
@@ -2268,7 +2268,7 @@ function __legacyRenderTeamviewSummaryFallback(){
       </div>
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">วิธีคิด Baseline (รวมทีม)</div>
-        <div class="pace-formula-line">${(()=>{const agg={};withPace.forEach(a=>{if(!a.paceSignal.monthsDetail||!a.paceSignal.monthsDetail.length)return;a.paceSignal.monthsDetail.forEach(d=>{if(!agg[d.m])agg[d.m]={m:d.m,gmv:0,days:d.days,n:0};agg[d.m].gmv+=d.gmv;agg[d.m].n++;});});const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const rows=Object.values(agg).sort((a,b)=>{const p=m=>{const s=m.split(' ');return parseInt(s[1]||0)*12+mo.indexOf(s[0]);};return p(a.m)-p(b.m);});const avgDaily=rows.length?Math.round(rows.reduce((s,d)=>s+d.gmv/d.days,0)/rows.length):0;return rows.map(d=>`${d.m}: ${_tvFmtG(d.gmv)} ÷ ${d.days}วัน = <strong>${_tvFmtG(Math.round(d.gmv/d.days))}/วัน</strong> <span style="color:rgba(255,255,255,.35)">(${d.n} ร้าน)</span>`).join('<br>')+'<br>avg = <strong>'+_tvFmtG(avgDaily)+'/วัน</strong> × '+_tvDays+' วัน = <strong>'+_tvFmtG(_tvTotalExp)+'</strong>';})()}</div>
+        <div class="pace-formula-line">${(()=>{const agg={};withPace.forEach(a=>{if(!a.paceSignal.monthsDetail||!a.paceSignal.monthsDetail.length)return;a.paceSignal.monthsDetail.forEach(d=>{if(!agg[d.m])agg[d.m]={m:d.m,gmv:0,days:d.days,n:0};agg[d.m].gmv+=d.gmv;agg[d.m].n++;});});const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const rows=Object.values(agg).sort((a,b)=>{const p=m=>{const s=m.split(' ');return parseInt(s[1]||0)*12+mo.indexOf(s[0]);};return p(a.m)-p(b.m);});const avgDaily=rows.length?Math.round(rows.reduce((s,d)=>s+d.gmv/d.days,0)/rows.length):0;return rows.map(d=>`${d.m}: ${_tvFmtG(d.gmv)} ÷ ${d.days}วัน = <strong>${_tvFmtG(Math.round(d.gmv/d.days))}/วัน</strong> <span style="color:rgba(255,255,255,.52)">(${d.n} ร้าน)</span>`).join('<br>')+'<br>avg = <strong>'+_tvFmtG(avgDaily)+'/วัน</strong> × '+_tvDays+' วัน = <strong>'+_tvFmtG(_tvTotalExp)+'</strong>';})()}</div>
       </div>
       <div class="pace-formula-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
         <div class="pace-formula-label">เกณฑ์ Pace รายร้าน</div>
@@ -2278,7 +2278,7 @@ function __legacyRenderTeamviewSummaryFallback(){
           <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--tk-ok-bright);flex-shrink:0"></span><span style="color:var(--tk-ok-bright);font-weight:var(--fw-bold)">≥ 95%</span><span style="color:rgba(255,255,255,.55)">ปลอดภัย → ปกติ</span></div>
           <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#f6ad55;flex-shrink:0"></span><span style="color:#f6ad55;font-weight:var(--fw-bold)">≥ 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยง → เสี่ยง</span></div>
           <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8888;flex-shrink:0"></span><span style="color:#ff8888;font-weight:var(--fw-bold)">&lt; 90%</span><span style="color:rgba(255,255,255,.55)">เสี่ยงมาก → เสี่ยงมาก</span></div>
-          <div style="margin-top:4px;font-size:var(--text-2xs);color:rgba(255,255,255,.35);line-height:1.5">${_tvTeamTargetInfo.hasTarget?'target = target ที่ตั้งไว้; หากไม่มี KAM target จะ allocate จาก team target ตาม baseline share':'baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา'}</div>
+          <div style="margin-top:4px;font-size:var(--text-2xs);color:rgba(255,255,255,.52);line-height:1.5">${_tvTeamTargetInfo.hasTarget?'target = target ที่ตั้งไว้; หากไม่มี KAM target จะ allocate จาก team target ตาม baseline share':'baseline = avg daily GMV ย้อน 1–3 เดือน × วันที่ผ่านมา'}</div>
         </div>
       </div>
     </div>`;
@@ -2492,7 +2492,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const visited=g.accounts.filter(a=>vm[a.id]).length;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
     // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
     // below (a real live-estimate payout decision, same class of bug as
@@ -2528,7 +2528,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const surplus=g.pace-100;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
-    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.35);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
+    const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
     const _nrr=_getCachedKamNrr(g.kamEmail);
     // v92-fix: unrounded — this feeds _commPayoutForPctByCode's tier lookup
     // below (a real live-estimate payout decision, same class of bug as
@@ -2595,7 +2595,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   const _iconFull=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="14" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="14" height="6" rx="1.5" fill="currentColor"/></svg>`;
   const _iconCompact=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="2.5" x2="14" y2="2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="0" y1="11.5" x2="14" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const _toggleRow=`<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 10px">
-    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);color:rgba(255,255,255,.35)">${sorted.length} KAM</span>
+    <span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);color:rgba(255,255,255,.52)">${sorted.length} KAM</span>
     <div style="display:flex;align-items:center;gap:2px">
       <button onclick="setTvView('full')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:${tvViewMode==='full'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconFull}</button>
       <button onclick="setTvView('compact')" style="width:30px;height:28px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:${tvViewMode==='compact'?'rgba(255,255,255,.9)':'rgba(255,255,255,.25)'};transition:color .15s">${_iconCompact}</button>

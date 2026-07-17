@@ -92,11 +92,11 @@
 .rpt2-logo-box{width:26px;height:26px;background:var(--g500);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
 .rpt2-logo-box img{width:26px;height:26px;object-fit:cover;display:block;}
 .rpt2-wordmark{font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--tk-text-primary);display:flex;align-items:center;letter-spacing:-.2px;}
-.rpt2-sub{font-size:7px;color:rgba(255,255,255,.38);margin-top:2px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.5px;text-transform:uppercase;}
+.rpt2-sub{font-size:7px;color:rgba(255,255,255,.52);margin-top:2px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;letter-spacing:.5px;text-transform:uppercase;}
 .rpt2-info{text-align:right;min-width:0;overflow:hidden;}
 .rpt2-acct{font-size:10.5px;font-weight:var(--fw-bold);color:var(--tk-text-primary);word-break:break-word;}
-.rpt2-date{font-size:7.5px;color:rgba(255,255,255,.4);margin-top:2px;}
-.rpt2-kam{font-size:7.5px;color:rgba(255,255,255,.35);margin-top:1px;}
+.rpt2-date{font-size:7.5px;color:rgba(255,255,255,.52);margin-top:2px;}
+.rpt2-kam{font-size:7.5px;color:rgba(255,255,255,.52);margin-top:1px;}
 /* KPI strip */
 .rpt2-kpi-strip{display:flex;border-bottom:1px solid #e4ebe4;min-width:0;overflow:hidden;}
 .rpt2-kpi{flex:1;padding:8px 8px;border-right:0.5px solid #e4ebe4;min-width:0;overflow:hidden;}
@@ -206,7 +206,7 @@
 /* ── GROUP A: HERO ADDITIONS ── */
 .h-kam-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .h-kam-dot{width:14px;height:14px;border-radius:50%;background:var(--g500);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.h-kam-text{font-size:var(--text-xs);color:rgba(255,255,255,.4);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-kam-text{font-size:var(--text-xs);color:rgba(255,255,255,.52);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .h-kam-name{color:rgba(255,255,255,.68);font-weight:var(--fw-semi)}
 .hero-mom{display:flex;align-items:center;gap:4px;margin-top:5px;font-size:var(--text-sm);color:rgba(255,255,255,.65);font-weight:var(--fw-medium)}
 .mom-delta{font-weight:var(--fw-bold);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs)}

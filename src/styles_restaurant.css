@@ -63,7 +63,7 @@ body.restaurant-sheet.kam-mode #swipe-pill .sp-teach-text{color:#0a3020;text-sha
 .sp-dots{display:flex;gap:4px;align-items:center;padding:0 1px}
 .sp-dot{width:5px;height:5px;border-radius:var(--r-pill);background:rgba(255,255,255,.28);transition:width .26s cubic-bezier(.34,1.56,.64,1),background .2s,opacity .2s}
 .sp-dot.on{width:14px;background:var(--g500);box-shadow:0 0 8px var(--tk-ok-border)}
-.sp-mini-arrow{font-size:var(--text-sm);color:rgba(255,255,255,.42);margin-left:-2px;transition:transform .2s,color .2s}
+.sp-mini-arrow{font-size:var(--text-sm);color:rgba(255,255,255,.52);margin-left:-2px;transition:transform .2s,color .2s}
 #swipe-pill:hover .sp-mini-arrow{color:rgba(255,255,255,.78);transform:translateX(2px)}
 @media(max-width:360px){#swipe-pill{top:58px}.sp-seg{font-size:var(--text-xs);padding:3px 6px}.sp-teach-text{font-size:var(--text-sm)}}
 @keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}

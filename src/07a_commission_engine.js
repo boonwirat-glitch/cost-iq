@@ -1167,7 +1167,7 @@ function _tgtShowSkeleton() {
   if (titleWrap && !document.getElementById('tgt-loading-sub')) {
     const sub = document.createElement('div');
     sub.id = 'tgt-loading-sub';
-    sub.style.cssText = 'font-size:var(--text-sm);color:rgba(255,255,255,.35);margin-top:2px;display:flex;align-items:center;gap:5px;padding:0 16px 10px';
+    sub.style.cssText = 'font-size:var(--text-sm);color:rgba(255,255,255,.52);margin-top:2px;display:flex;align-items:center;gap:5px;padding:0 16px 10px';
     sub.innerHTML = '<span class="ai-thinking"><svg width="9" height="9" viewBox="0 0 10 10" fill="var(--tk-ok-bright)" style="animation:iq-spin 1.5s linear infinite;transform-origin:center;flex-shrink:0"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"/></svg><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></span><span>กำลังดึงข้อมูล</span>';
     titleWrap.appendChild(sub);
   }
@@ -1218,7 +1218,7 @@ function tgtNavQuarter(dir) {
   const saveBtn = document.getElementById('tgt-save-btn');
   if (saveBtn) saveBtn.disabled = true;
   const body = document.getElementById('tgt-sheet-body');
-  if (body) body.innerHTML = '<div style="text-align:center;padding:32px;color:rgba(255,255,255,.4);font-size:var(--text-base)">กำลังโหลด...</div>';
+  if (body) body.innerHTML = '<div style="text-align:center;padding:32px;color:rgba(255,255,255,.52);font-size:var(--text-base)">กำลังโหลด...</div>';
   // Use Promise chain — async function not supported in this script context
   loadTargets(_tgtActiveQuarter).then(function() {
     _tgtClearSkeleton();
@@ -1392,7 +1392,7 @@ function _renderTLKamBlocks(months, moLabels) {
   });
 
   if (!kams.length) {
-    html += `<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:var(--text-base)">ไม่พบ KAM ในทีม<br><span style="font-size:var(--text-sm)">อัปโหลด portview.csv ก่อน</span></div>`;
+    html += `<div style="text-align:center;padding:24px;color:rgba(255,255,255,.52);font-size:var(--text-base)">ไม่พบ KAM ในทีม<br><span style="font-size:var(--text-sm)">อัปโหลด portview.csv ก่อน</span></div>`;
   }
   return html;
 }
@@ -1475,7 +1475,7 @@ function _renderTLSalesBlocks(months, moLabels) {
   });
 
   if (!reps.length) {
-    html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);font-size:var(--text-base)">'
+    html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.52);font-size:var(--text-base)">'
       + 'ไม่พบ Sales rep ในทีม<br><span style="font-size:var(--text-sm)">ตรวจสอบว่า portview CSV upload แล้ว</span></div>';
   }
   return html;
@@ -1500,11 +1500,11 @@ function renderTargetSettingsTab() {
           <span style="font-size:var(--text-md);color:var(--tk-text-muted)">%</span>
         </div>
       </div>
-      <div style="font-size:var(--text-xs);color:rgba(255,255,255,.3);margin-top:8px">
+      <div style="font-size:var(--text-xs);color:rgba(255,255,255,.52);margin-top:8px">
         ค่าเริ่มต้น: 98% · ใช้กับ signal ปัจจุบันของทุก KAM / TL
       </div>
     </div>
-    <div style="font-size:var(--text-sm);color:rgba(255,255,255,.3);padding:4px 2px">
+    <div style="font-size:var(--text-sm);color:rgba(255,255,255,.52);padding:4px 2px">
       threshold นี้มีผลกับสี warning ในมุมมอง NRR ตอนนี้ ส่วน payout rule builder จะต่อยอดบน policy tab
     </div>`;
 }
@@ -2649,8 +2649,8 @@ function _commOpenTlDetailSheet(opts) {
     // v228-fix: show — when upsell not loaded and NRR payout is 0
     const upsellNotLoaded = r.breakdown && r.breakdown.upsell_loading;
     const displayAmt = (upsellNotLoaded && nrrP === 0) ? null : finalAmt;
-    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:var(--fw-bold)' : 'color:rgba(255,255,255,.4)';
-    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.3);font-size:var(--text-sm)">— โหลด...</span>' : fmtP(displayAmt);
+    const amberStyle = (displayAmt !== null && displayAmt > 0) ? 'color:#ffe08a;font-weight:var(--fw-bold)' : 'color:rgba(255,255,255,.52)';
+    const payText = displayAmt === null ? '<span style="color:rgba(255,255,255,.52);font-size:var(--text-sm)">— โหลด...</span>' : fmtP(displayAmt);
     return `<div class="pv-comm-tl-kam-row">
       <div class="pv-comm-tl-kam-name">${_commEscapeHtml(name)}</div>
       <div class="pv-comm-tl-kam-nrr">${nrr}</div>
@@ -2664,7 +2664,7 @@ function _commOpenTlDetailSheet(opts) {
         <span style="color:#ffe08a;font-weight:var(--fw-bold)">×${um.multiplier.toFixed(2)} Upsell Mult</span>
         <span style="color:rgba(255,255,255,.6);font-size:var(--text-sm)">${um.team_upsell_pct.toFixed(1)}% upsell · T${um.tier}</span>
        </div>`
-    : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.4)">Upsell Mult — กำลังโหลด...</div>`;
+    : `<div class="pv-comm-tl-mult" style="color:rgba(255,255,255,.52)">Upsell Mult — กำลังโหลด...</div>`;
 
   ov.innerHTML = `<div class="pv-comm-sheet">
     <div class="pv-comm-sheet-handle"></div>
@@ -2687,7 +2687,7 @@ function _commOpenTlDetailSheet(opts) {
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
       </div>
-      <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.4);font-size:var(--text-md);padding:8px">กำลังโหลด...</div>'}</div>
+      <div class="pv-comm-tl-kam-list">${kamRows||'<div style="color:rgba(255,255,255,.52);font-size:var(--text-md);padding:8px">กำลังโหลด...</div>'}</div>
       <div style="display:flex;gap:6px;margin:0 18px 8px">
         <button onclick="typeof openCommissionHistory==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionHistory,80))" style="flex:1;padding:10px;border-radius:var(--r-md);background:var(--tk-ok-dim);border:1px solid var(--tk-ok-dim-2);color:var(--tk-ok-bright);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;font-family:var(--tk-font-body)">History</button>
         <button onclick="typeof openCommissionRulebook==='function'&&(_commCloseTlDetailSheet(),setTimeout(openCommissionRulebook,80))" style="flex:1;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.08);border:1px solid rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue-hi),.88);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;font-family:var(--tk-font-body)">Rules</button>
@@ -2714,9 +2714,9 @@ window._commCloseTlDetailSheet = _commCloseTlDetailSheet;
   s.textContent = `
     .tv-mult-badge{display:inline-flex;align-items:center;font-size:var(--text-xs);font-weight:var(--fw-bold);padding:1px 5px;border-radius:var(--r-xs);margin-left:4px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);vertical-align:middle}
     .tv-mult-badge.ok{background:rgba(255,224,138,.15);color:#ffe08a}
-    .tv-mult-badge.loading{color:rgba(255,255,255,.35)}
+    .tv-mult-badge.loading{color:rgba(255,255,255,.52)}
     .pv-comm-tl-mult{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,224,138,.07);border:1px solid rgba(255,224,138,.18);border-radius:var(--r-8);font-size:var(--text-md);font-weight:var(--fw-semi);color:rgba(255,255,255,.85);margin:8px 0 0}
-    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
+    .pv-comm-tl-kam-header{display:grid;grid-template-columns:1fr 44px 76px;gap:4px;padding:6px 0 4px;font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,255,255,.52);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:6px}
     .pv-comm-tl-kam-list{display:flex;flex-direction:column;max-height:320px;overflow-y:auto;margin-top:2px}
     .pv-comm-tl-kam-row{display:grid;grid-template-columns:1fr 44px 76px;grid-template-rows:auto auto;gap:1px 4px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
     .pv-comm-tl-kam-row:last-child{border-bottom:none}

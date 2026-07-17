@@ -807,7 +807,7 @@ async function renderPortviewTargetBar() {
   if (!_tgtLoaded) {
     const _calcEl=document.getElementById('tgt-nrr-bar');
     if(_calcEl&&!_calcEl.innerHTML.trim()){
-      _calcEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:rgba(255,255,255,.35);font-size:var(--text-sm)"><span class="spl-dot-pulse" style="display:inline-flex;gap:3px">'+'<span style="width:4px;height:4px;border-radius:50%;background:var(--tk-ok-border);animation:_dotBlink .9s ease-in-out infinite"></span>'.repeat(3)+'</span>กำลังคำนวณ NRR...</div>';
+      _calcEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;color:rgba(255,255,255,.52);font-size:var(--text-sm)"><span class="spl-dot-pulse" style="display:inline-flex;gap:3px">'+'<span style="width:4px;height:4px;border-radius:50%;background:var(--tk-ok-border);animation:_dotBlink .9s ease-in-out infinite"></span>'.repeat(3)+'</span>กำลังคำนวณ NRR...</div>';
     }
     await loadTargets(_tgtCurrentQuarter());
     if(_calcEl)_calcEl.innerHTML=''; // clear placeholder before real render
@@ -1086,7 +1086,7 @@ async function renderPortviewTargetBar() {
   }
   if (nrrResult && nrrResult.transferOut && nrrResult.transferOut.count > 0) {
     const to = nrrResult.transferOut;
-    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.3)">—</span></div>`);
+    mvRows.push(`<div class="tgt-mv-row tgt-mv-out"><span class="tgt-mv-label">Transfer out</span><span class="tgt-mv-count">${to.count} ร้าน</span><span class="tgt-mv-gmv tgt-mv-neg">−${fmtK(to.gmv)}</span><span class="tgt-mv-nrr" style="color:rgba(255,255,255,.52)">—</span></div>`);
   }
   const mvSection = mvRows.length ? `<div class="tgt-mv-wrap">
     <div class="tgt-mv-header"><span class="tgt-mv-label">การเคลื่อนไหวพอร์ต</span><span class="tgt-mv-count">ร้าน</span><span class="tgt-mv-gmv">GMV</span><span class="tgt-mv-nrr">NRR</span></div>
@@ -1106,20 +1106,20 @@ async function renderPortviewTargetBar() {
     const mvDefSection = hasMv ? `<div class="tgt-det-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="tgt-det-stitle" style="margin-bottom:0">นิยาม Portfolio Movement</div>
-        <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:var(--text-2xs);color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;padding:0;font-family:var(--tk-font-body)">▾ ดูนิยาม</button>
+        <button onclick="var d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=d.style.display==='none'?'▾ ดูนิยาม':'▴ ซ่อน'" style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:0;font-family:var(--tk-font-body)">▾ ดูนิยาม</button>
       </div>
       <div style="display:none">
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:var(--tk-ok-bright)">Core NRR</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">account ที่อยู่กับ KAM นี้ก่อนเดือนนี้ และไม่อยู่ใน transfer_in/handover list — วัด retention จริง</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(140,180,255,.9)">Transfer in</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">account ที่โอนมาจาก KAM อื่นในเดือนนี้ — วัด NRR ต่อเนื่องหลังรับโอน</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(0,200,176,.9)">New (Sales)</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">account ที่ Sales ปิดดีล แล้วโอนมา KAM เดือนนี้ — วัด onboarding success</span></div>
         <div class="tgt-fml-row" style="align-items:flex-start"><span class="tgt-fml-mo" style="color:rgba(255,140,100,.8)">Transfer out</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">account ที่ออกจากพอร์ตนี้ไปเดือนนี้ — GMV เดือนก่อนของ account เหล่านั้น</span></div>
-        <div class="tgt-fml-row" style="align-items:flex-start;margin-top:4px"><span class="tgt-fml-mo" style="color:rgba(255,255,255,.3)">Graduation</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">Transfer in / New จะกลายเป็น Core NRR อัตโนมัติเดือนหน้า โดยใช้ GMV เต็มเดือนนี้เป็น baseline</span></div>
+        <div class="tgt-fml-row" style="align-items:flex-start;margin-top:4px"><span class="tgt-fml-mo" style="color:rgba(255,255,255,.52)">Graduation</span><span class="tgt-fml-eq" style="font-size:var(--text-xs)">Transfer in / New จะกลายเป็น Core NRR อัตโนมัติเดือนหน้า โดยใช้ GMV เต็มเดือนนี้เป็น baseline</span></div>
       </div>
     </div>` : '';
     nrrSection = `<div class="tgt-det-section">
       <div class="tgt-det-stitle">Core NRR — วิธีคำนวณ</div>
       <div style="font-size:var(--text-sm);color:rgba(255,255,255,.65);margin-bottom:8px;line-height:1.5">NRR วัดว่าร้านเดิมยังซื้ออยู่มากน้อยแค่ไหนเทียบกับเดือนก่อน — โดยประมาณจากยอด MTD × ${daysInMonth} วัน</div>
-      <div style="font-size:var(--text-xs);color:rgba(255,255,255,.4);margin-bottom:6px">เฉพาะร้านที่อยู่ในพอร์ตมาตั้งแต่เดือนก่อน</div>
+      <div style="font-size:var(--text-xs);color:rgba(255,255,255,.52);margin-bottom:6px">เฉพาะร้านที่อยู่ในพอร์ตมาตั้งแต่เดือนก่อน</div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.prevMonth}</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.baselinePrevGmv)} ÷ ${nrrResult.prevDays}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(prevNorm)}/เดือน</span></div>
       <div class="tgt-fml-row"><span class="tgt-fml-mo">${nrrResult.currentMonthLabel} MTD</span><span class="tgt-fml-eq">${_tgtFmtM(nrrResult.cohortGmv)} ÷ ${nrrResult.daysElapsed}d × ${daysInMonth}d · ${nrrResult.cohortCount} outlets</span><span class="tgt-fml-res">~${_tgtFmtM(currNorm)}/เดือน</span></div>
       <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">~${_tgtFmtM(currNorm)} ÷ ~${_tgtFmtM(prevNorm)}</span><span class="tgt-fml-total-val">= Core NRR ${_commFmtPct(nrrPct)}</span></div>
