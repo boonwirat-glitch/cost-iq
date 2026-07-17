@@ -63,7 +63,11 @@ function alignColorTokens(migrated, baseline, fileLabel) {
     let matched = false;
     for (const [tok, lits] of Object.entries(COLOR_TOKEN_TO_LITERALS)) {
       if (migrated.startsWith(tok, i)) {
-        const lit = lits.find(l => baseline.startsWith(l, j));
+        // Longest literal first — '#fff' is a prefix of '#ffffff', so a
+        // shortest-first match would consume 4 of the baseline's 7 chars
+        // and report a bogus divergence 3 chars later.
+        const lit = lits.slice().sort((a, b) => b.length - a.length)
+          .find(l => baseline.startsWith(l, j));
         if (lit) { i += tok.length; j += lit.length; subs++; matched = true; break; }
       }
     }
