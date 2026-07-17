@@ -133,3 +133,24 @@ with open(path, 'w', encoding='utf-8') as f:
 lines = out.count('\n')
 kb    = len(out.encode()) // 1024
 print(f'Built {path}  ({lines:,}L · {kb:,}KB)')
+
+# ── sw.js CACHE_NAME sync ──
+# v92: was a manual companion commit every release ("chore: bump SW CACHE_NAME
+# to sense-vNNN") — silently stopped after v852 (2026-07-08), so 8+ releases
+# shipped with a byte-identical sw.js and the "new version available" pill
+# never fired for any of them (the browser's SW-update check only detects a
+# change when sw.js's own bytes differ). Doing this automatically, every
+# build, removes the "someone forgot the companion commit" failure mode
+# entirely instead of just fixing this one instance of it.
+import re
+SW_PATH = 'sw.js'
+with open(SW_PATH, encoding='utf-8') as f:
+    sw_src = f.read()
+new_cache_name = f"const CACHE_NAME = 'sense-{VERSION}';"
+sw_out, n = re.subn(r"const CACHE_NAME = '[^']*';", new_cache_name, sw_src, count=1)
+if n == 1:
+    with open(SW_PATH, 'w', encoding='utf-8') as f:
+        f.write(sw_out)
+    print(f"Synced {SW_PATH} CACHE_NAME -> sense-{VERSION}")
+else:
+    print(f"WARNING: could not find CACHE_NAME line in {SW_PATH} — sw.js NOT updated", file=sys.stderr)
