@@ -207,7 +207,7 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-filter-row{display:flex;gap:6px;margin-bottom:12px}
 .portview-fpill{padding:5px 12px;border-radius:var(--r-xl);font-size:var(--text-sm);font-weight:var(--fw-semi);font-family:var(--tk-font-body);border:1.5px solid rgba(255,255,255,.15);background:transparent;cursor:pointer;color:rgba(255,255,255,.5);transition:all .15s;white-space:nowrap}
 .portview-fpill.on{border-color:var(--tk-accent-solid);background:var(--tk-accent-dim-2);color:var(--tk-text-primary)}
-.portview-acct-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-left:3px solid rgba(255,255,255,.18);border-radius:0 12px 12px 0;padding:11px 12px 11px 11px;margin-bottom:6px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;animation:card-reveal 260ms ease-out both}
+.portview-acct-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-left:3px solid rgba(255,255,255,.18);border-radius:var(--r-lg);padding:11px 12px 11px 11px;margin-bottom:6px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;animation:card-reveal 260ms ease-out both}
 .portview-acct-card:hover{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.08)}
 .portview-acct-card.danger{border-left-color:#e53e3e}
 .portview-acct-card.warn{border-left-color:var(--amb)}
