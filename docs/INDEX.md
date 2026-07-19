@@ -186,17 +186,23 @@ Build log ของ Sales/Skills/Echo แต่ละเวอร์ชันถ
 | `sql/NOT_USE_skills_schema.sql`, `NOT_USE_skills_seed.sql` | 🗄 Archived 2026-07-19 — draft ก่อนหน้าที่ถูกแทนที่ด้วย `skills_p0_supabase.sql` ตั้งแต่ยังไม่ทันรัน |
 | `sql/NOT_USE_verify_pulse_new_from_sales.sql` | 🗄 Archived 2026-07-19 — one-off diagnostic query เดิม ไม่เคยอยู่ใน pipeline ไหน |
 
-### PM/AD roster rollout (active, ยังไม่ปิดงาน)
+### PM/AD roster rollout + 2026-07-19 commission-logic fixes (active, ยังไม่ปิดงาน)
 | ไฟล์ | สถานะ |
 |---|---|
-| `handoff_sql_pm_role/README.md` | **ACTIVE / IN PROGRESS** — runbook ให้ data team รัน 12 query เพิ่ม 4 คนใหม่ (Panitan/Sarawoot/Nichamon/Ornpreya) เข้า CSV ที่มีอยู่แล้ว — ยังไม่ยืนยันว่า data team รันครบหรือยัง |
+| `handoff_sql_2026-07-19/README.md` | **ACTIVE / IN PROGRESS** — รวมทุก runbook ที่ต้องให้ data team รัน (แทนที่ `handoff_sql_pm_role/` เดิม ซึ่งลบไปแล้ว): 11 ไฟล์เดิม+PM/AD roster, `pm_rep_view.sql`, และ 3 ไฟล์ที่แก้บั๊กวันนี้ (`q3_2026_movement_rep_view.sql` transfer_scope fix, `q3c_upsell_team_summary_v4.sql` single-month fix, 2 ไฟล์ `Quarterly_*_reconcile.sql` whole-outlet-handoff model) — ยังไม่ยืนยันว่า data team รันครบหรือยัง |
 | `sql/pm_rep_view.sql` | **ACTIVE, pending deploy** — query ใหม่สำหรับ `/nrr`, `src/nrr/nrr_data.js` fetch ไว้รอแล้ว |
+
+### Quarterly reconcile (active, 2026-07-19)
+| ไฟล์ | สถานะ |
+|---|---|
+| `sql/Quarterly_KAM_portfolio_reconcile.sql` | **ACTIVE** — ผู้สืบทอดระดับไตรมาสของ `May2026_KAM_portfolio_reconcile.sql` ด้านล่าง เดือนฐาน = เดือนก่อนหน้าไตรมาสเสมอ (มิ.ย. สำหรับ Q3) ไม่ใช่ "เดือนที่รัน" — auto-derive จาก `CURRENT_DATE` เหมือน `q3_2026_movement_rep_view.sql`. มี PM/AD roster 4 คน + v880-fix (whole-outlet-handoff model แทน dual-leg transfer_in/out) ตั้งแต่ 2026-07-19 — ดู `handoff_sql_2026-07-19/` |
+| `sql/Quarterly_upsell_reconcile.sql` | **ACTIVE** — เช่นเดียวกัน ผู้สืบทอดของ `upsell_May2026_v1.sql` ด้านล่าง เช่นเดียวกัน มี PM/AD roster + v880-fix |
 
 ### Kept active for future work (ไม่มี CSV consumer วันนี้ แต่ตัดสินใจเก็บไว้แล้ว — 2026-07-19)
 | ไฟล์ | หมายเหตุ |
 |---|---|
-| `sql/May2026_KAM_portfolio_reconcile.sql` | Foundation สำหรับงาน reconcile ระดับไตรมาสของ /nrr ที่จะตามมา (ใช้เดือนปัจจุบันเป็นเดือนฐานเดือนแรก) |
-| `sql/upsell_May2026_v1.sql` | เช่นเดียวกัน — ส่วน Upsell ของงาน reconcile เดียวกัน |
+| `sql/May2026_KAM_portfolio_reconcile.sql` | Backfill เดือนพฤษภาคม 2026 เดิม (ปิดงานแล้ว) — ถูกแทนที่ด้วย `Quarterly_KAM_portfolio_reconcile.sql` ด้านบนสำหรับงานที่ยังใช้งานต่อเนื่อง เก็บไว้เป็นประวัติ |
+| `sql/upsell_May2026_v1.sql` | เช่นเดียวกัน — ถูกแทนที่ด้วย `Quarterly_upsell_reconcile.sql` |
 
 ---
 

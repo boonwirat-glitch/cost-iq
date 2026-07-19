@@ -1,4 +1,4 @@
-<!-- Freshket Sense v897: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v898: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v897',
+      version: 'v898',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -35686,67 +35686,50 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
           // to month — matches the SQL's identical reasoning.
           const isP1 = !outletBaseline.has(groupKey);
 
-          // v836: classify EVERY evaluated month (just currLabel in monthly/rolling mode,
-          // every elapsed quarter month up to "today" in quarterly mode), then keep only
-          // the trailing unbroken qualifying streak ending at the last evaluated month.
-          const perMonth = evalLabels.map(lbl => {
-            const row = monthData[lbl];
-            if (!row) return { label: lbl, qualifies: false, contribution: 0 };
-            const rawTotalGmv = row.totalGmv || 0;
-            const rawExistingGmv = row.existingGmv || 0;
-            if (isP1) {
-              // P1: outlet × group_key ใหม่ — total GMV × rate
-              if (rawTotalGmv >= p1MinGmv) {
-                return { label: lbl, qualifies: true, contribution: rawTotalGmv };
-              }
-              return { label: lbl, qualifies: false, contribution: 0 };
-            }
-            // P3: existing outlet ซื้อเพิ่มจาก max_baseline — baseline window is ALWAYS the
-            // same frozen 3-month pool regardless of which elapsed month we're evaluating
-            // (matches the SQL fix: baseline never drifts within the quarter), so simply
-            // MAINTAINING (not growing further beyond) an already-qualifying level keeps
-            // passing this test every month.
-            let maxBaseline = 0, maxBaselineMonth = baseLabel;
-            const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
-            for (let i = 0; i < _p3Labels.length; i++) {
-              const l = _p3Labels[i];
-              const lRow = monthData[l];
-              if (!lRow) continue;
-              const d = _commDaysInLabel(l);
-              const norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-              if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
-            }
-            if (rawExistingGmv > maxBaseline * p3Thresh) {
-              const incremental = rawExistingGmv - maxBaseline;
-              if (incremental >= p3MinIncr) {
-                return { label: lbl, qualifies: true, contribution: incremental,
-                         existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth };
-              }
-            }
-            return { label: lbl, qualifies: false, contribution: 0 };
-          });
-
-          // Streak = every month AFTER the most recent gap (a month that failed to
-          // qualify, or had no purchase row at all). No gap ever → streak starts at the
-          // first evaluated month. In monthly/rolling mode evalLabels has exactly 1
-          // entry, so this always degenerates to the original single-month behavior.
-          let lastGapIdx = -1;
-          perMonth.forEach((m, i) => { if (!m.qualifies) lastGapIdx = i; });
-          const streak = perMonth.slice(lastGapIdx + 1);
-          if (streak.length === 0) return;
-
-          const cumAmount = streak.reduce((s, m) => s + m.contribution, 0);
-          const last = streak[streak.length - 1];
+          // v880-fix: was classifying EVERY evaluated month then summing a
+          // trailing "streak" of qualifying months together (v836) — Bush's
+          // worked example (Avo/Mango/Apple, 2026-07-19) confirmed this is
+          // wrong: an item stays ELIGIBLE for the rest of the quarter once it
+          // first qualifies, but each month's commission is that month's OWN
+          // current GMV alone, never summed with prior months (e.g. Mango
+          // drops to 0 in Aug — it doesn't "keep" July's 40k contribution).
+          // Only the current (last evaluated) month is tested/used now — in
+          // monthly/rolling mode evalLabels already has exactly 1 entry, so
+          // this is a no-op there.
+          const lbl = evalLabels[evalLabels.length - 1];
+          const row = monthData[lbl];
+          if (!row) return;
+          const rawTotalGmv = row.totalGmv || 0;
+          const rawExistingGmv = row.existingGmv || 0;
 
           if (isP1) {
-            p1Groups.push({ accountId, outletId, groupKey, total_gmv: cumAmount, commission: cumAmount * p1Rate });
-          } else {
-            p3Groups.push({ accountId, outletId, groupKey,
-              existing_curr: last.existing_curr,
-              max_baseline: last.max_baseline,
-              max_baseline_month: last.max_baseline_month,
-              incremental: cumAmount, commission: cumAmount * p3Rate });
+            // P1: outlet × group_key ใหม่ — this month's own total GMV × rate
+            if (rawTotalGmv < p1MinGmv) return;
+            p1Groups.push({ accountId, outletId, groupKey, total_gmv: rawTotalGmv, commission: rawTotalGmv * p1Rate });
+            return;
           }
+
+          // P3: existing outlet ซื้อเพิ่มจาก max_baseline — baseline window is
+          // ALWAYS the same frozen 3-month pool regardless of which elapsed
+          // month we're evaluating (baseline never drifts within the quarter).
+          let maxBaseline = 0, maxBaselineMonth = baseLabel;
+          const _p3Labels = _commBaseMonthLabels(baseMonthOverride, 3);
+          for (let i = 0; i < _p3Labels.length; i++) {
+            const l = _p3Labels[i];
+            const lRow = monthData[l];
+            if (!lRow) continue;
+            const d = _commDaysInLabel(l);
+            const norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
+            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
+          }
+          if (rawExistingGmv <= maxBaseline * p3Thresh) return;
+          const incremental = rawExistingGmv - maxBaseline;
+          if (incremental < p3MinIncr) return;
+          p3Groups.push({ accountId, outletId, groupKey,
+            existing_curr: rawExistingGmv,
+            max_baseline: maxBaseline,
+            max_baseline_month: maxBaselineMonth,
+            incremental: incremental, commission: incremental * p3Rate });
         });
       });
     });
@@ -35794,33 +35777,25 @@ function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride, planCode, p
     const rate = outletTier ? Number(outletTier.payout_value) : _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
 
     if (qnrrRaw) {
-      // v860-fix: was reading only qnrrRaw.currentPeriod's single month — the
-      // one tier in the quarterly system that never accumulated across the
-      // quarter like P1/P3 do (found during a repo-wide commission-alignment
-      // audit, 2026-07-13; user decision: make it cumulative to match P1/P3's
-      // model). No per-item "does it still qualify" streak-break check is
-      // needed here the way P1/P3 has one — expansion status is a categorical
-      // per-row tag from the NRR movement classification, not a threshold
-      // test, so every elapsed month an outlet is tagged 'expansion' its GMV
-      // simply counts. Reuses qnrrRaw.by_month's own availability (already
-      // established elsewhere in this file, see _qnrrComputeForCommission's
-      // "period data not yet available" handling) as the elapsed-months
-      // list, rather than re-deriving elapsed dates separately — by_month
-      // only ever has entries for months that have actually started.
-      const periods = (qnrrRaw.by_month && QNRR_CFG.q_months)
-        ? QNRR_CFG.q_months.filter(m => !!qnrrRaw.by_month[m])
-        : (qnrrRaw.currentPeriod ? [qnrrRaw.currentPeriod] : []);
+      // v880-fix: v860-fix (2026-07-13) made this cumulative across every
+      // elapsed quarter month to "match P1/P3's model" — but confirmed wrong
+      // via Bush's own worked example (2026-07-19): a new outlet's Expansion
+      // commission each month is that month's OWN current GMV alone (can go
+      // up or down month to month — proven since a true cumulative running
+      // total could never decrease, and Bush's example has Sep < Aug). The
+      // outlet stays ELIGIBLE for Expansion all quarter (that part of "stays
+      // in scope" was correct), but the GMV itself must never be summed
+      // across months. Reverted to reading only qnrrRaw.currentPeriod's own
+      // rows, matching pre-v860 behavior.
+      const monthData = qnrrRaw.by_month ? qnrrRaw.by_month[qnrrRaw.currentPeriod] : null;
+      const rows = (monthData && monthData.rows) || [];
       const expansionIds = new Set();
       let expansionGmv = 0;
-      periods.forEach(p => {
-        const monthData = qnrrRaw.by_month[p];
-        const rows = (monthData && monthData.rows) || [];
-        rows.forEach(r => {
-          if (r.movement_type === 'expansion') {
-            if (r.outlet_id) expansionIds.add(String(r.outlet_id));
-            expansionGmv += parseFloat(r.curr_gmv) || 0;
-          }
-        });
+      rows.forEach(r => {
+        if (r.movement_type === 'expansion') {
+          if (r.outlet_id) expansionIds.add(String(r.outlet_id));
+          expansionGmv += parseFloat(r.curr_gmv) || 0;
+        }
       });
       return {
         outlet_gmv: expansionGmv,

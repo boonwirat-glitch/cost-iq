@@ -1,34 +1,42 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Q3 2026 Movement — KAM Rep View (v3)
--- sql/q3_2026_movement_rep_view.sql
--- (header was stale "Q2" — file was evolved from the Q2 version but the comment
---  was never updated; does not affect results since v828-auto derives the actual
---  quarter from CURRENT_DATE regardless of what this header says)
+-- Q3 2026 Movement — PM Rep View (v1, 2026-07-18)
+-- sql/pm_rep_view.sql
 --
--- Goal: ดู performance ของ KAM แต่ละคน วัดจาก outlet ที่ถืออยู่ล่าสุด
+-- NEW FILE — mirrors sql/q3_2026_movement_rep_view.sql exactly, with "self"
+-- swapped from KAM to PM. Built so PM/AD staff can use /nrr (Sense Dashboard)
+-- the same way a KAM does — /nrr's whole Portfolio page is driven by ONE
+-- CSV (kam_rep_view.csv) parsed by fixed COLUMN POSITION (src/nrr/nrr_data.js),
+-- so this query's output uses the EXACT SAME 29-column shape/order as the
+-- original — its rows just get appended into the SAME kam_rep_view.csv,
+-- zero app-code changes needed.
 --
--- Design:
+-- Does NOT touch q3_2026_movement_rep_view.sql or any existing KAM data —
+-- this is a separate, additive query. KAM commission math is untouched.
+--
+-- Why a separate file instead of editing rep_view.sql in place: that file's
+-- classification logic (core_nrr/expansion/handover/new_sales/comeback/
+-- transfer_in/transfer_out) hardcodes KAM as "self" and treats PM/ADMIN as
+-- "the other portfolio" for cross-transfer bookkeeping (mar_pm_admin_staff /
+-- pm_admin_mar_cohort). Making PM a second "self" in the same query would
+-- collapse that bookkeeping (an outlet could look like both "mine" and
+-- "transferred from the other side" simultaneously) and would also pull in
+-- every OTHER PM-tagged outlet company-wide, not just these 4 people's.
+-- Mirroring into a separate file with KAM/ADMIN as the new "other side"
+-- avoids both problems entirely.
+--
+-- Goal: ดู performance ของ PM แต่ละคน วัดจาก outlet ที่ถืออยู่ล่าสุด (เหมือน KAM rep view)
+--
+-- Design (เหมือน rep_view ทุกอย่าง สลับ self=KAM → self=PM):
 --   grain     = outlet × period_month × latest_staff_owner
 --   base_gmv  = Mar GMV ของ outlet — ติดกับ latest_staff_owner
 --   curr_gmv  = GMV จริงรายเดือน
---   movement  = classification ตาม TL view (ไม่เปลี่ยน logic)
---
---   Fang ส่ง outlet ให้ Nitcha → outlet ทั้งหมดขึ้นใน Nitcha ไม่ใช่ Fang
---   Fang ออกไปแล้ว → ไม่มีใน output
---
--- Reconcile:
---   GROUP BY latest_staff_owner → base_gmv รวมต้องไม่ซ้ำซ้อน
---   curr_gmv รวมทุก KAM ต้องตรงกับ TL view
+--   "other side" สำหรับ transfer_in/out tracking = KAM/ADMIN (สลับจาก PM/ADMIN เดิม)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- v828-auto: quarter anchors AUTO-DERIVE from CURRENT_DATE — no manual edit
 -- needed each new quarter. Run as a BigQuery SCRIPT (DECLARE/SET then SELECT),
--- not pasted as a plain view body. m1/m2/m3 = the 3 months of whichever
--- quarter we're currently in (Jul/Aug/Sep for Q3, Oct/Nov/Dec for Q4, etc.);
--- base = 1 month before the quarter starts (Jun for Q3, Sep for Q4, etc.).
--- Day-1 lag applied before quarter-truncation so day 1 of a new quarter still
--- reports the just-closed quarter until its own data is confirmed complete.
+-- not pasted as a plain view body. Identical to rep_view.sql's date logic.
 -- ══════════════════════════════════════════════════════════════════════════
 DECLARE v_base_start DATE;
 DECLARE v_base_end   DATE;
@@ -56,10 +64,6 @@ SET v_m1_end     = DATE_SUB(v_m2_start, INTERVAL 1 DAY);
 SET v_m3_start   = DATE_ADD(v_m1_start, INTERVAL 2 MONTH);
 SET v_m2_end     = DATE_SUB(v_m3_start, INTERVAL 1 DAY);
 SET v_m3_end     = DATE_SUB(DATE_ADD(v_m3_start, INTERVAL 1 MONTH), INTERVAL 1 DAY);
--- v830: days-elapsed clamped per-month so the export is correct whenever it's run during
--- the quarter (start/mid/end) -- was previously hardcoded to always treat m3 as the only
--- MTD month, which broke completely (inverted date range, zero rows) when run early in
--- the quarter instead of at quarter-end.
 SET v_m1_days = LEAST(DATE_DIFF(v_m1_end, v_m1_start, DAY) + 1,
                  GREATEST(DATE_DIFF(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), v_m1_start, DAY) + 1, 0));
 SET v_m2_days = LEAST(DATE_DIFF(v_m2_end, v_m2_start, DAY) + 1,
@@ -73,26 +77,14 @@ SET v_m3_str     = FORMAT_DATE('%Y-%m', v_m3_start);
 
 WITH
 
--- ── 1. Email/TL map ───────────────────────────────────────────────────────────
+-- ── 1. Email/TL map — ONLY the 4 PM/AD people (this file's whole job is to
+--      produce THEIR rows; unlike rep_view.sql's full 19-KAM roster) ───────
 staff_email_map AS (
   SELECT kam_name, kam_email, tl_email, tl_name FROM UNNEST([
-    STRUCT('Anusorn (Bookbig) Khamphasuk'         AS kam_name, 'anusorn.k@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Chaklid (Dent) Nimraor'               AS kam_name, 'chaklid.n@freshket.co'      AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Duangruedee (Ning) Bulalom'           AS kam_name, 'duangruedee.bu@freshket.co' AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Napat (To) Kaikaew'                   AS kam_name, 'napat.k@freshket.co'        AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Nuttawan (Kwang) Mahaporn'            AS kam_name, 'nuttawan.ma@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Ploynitcha (Nitcha) Rujipiromthagoon' AS kam_name, 'ploynitcha.r@freshket.co'   AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Rinlaphat (Mild) Setthasiriwuti'      AS kam_name, 'rinlaphat.s@freshket.co'    AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Guntinun (Monet) Thanoochan'          AS kam_name, 'guntinun.t@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Intuon (Jane) Yanakit'                AS kam_name, 'intuon.y@freshket.co'       AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Natchita (Foam) Bunkong'              AS kam_name, 'natchita.b@freshket.co'     AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Niracha (Cream) Sangka'               AS kam_name, 'niracha.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Puttipong (Tape) Wanithaweewat'       AS kam_name, 'puttipong.w@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Siriprapa (Pop) Piapeng'              AS kam_name, 'siriprapa.p@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Treerak (May) Sangjua'                AS kam_name, 'treerak.s@freshket.co'      AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Warissara (Ply) Chanaboon'            AS kam_name, 'warissara.c@freshket.co'    AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
-    STRUCT('Nutkamol (Fang) Siladam'              AS kam_name, CAST(NULL AS STRING)         AS kam_email, 'nitipat.s@freshket.co'   AS tl_email, 'Name' AS tl_name),
-    STRUCT('Sojirat (May) Charoensuk'             AS kam_name, CAST(NULL AS STRING)         AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name)
+    STRUCT('Panitan (Aom) Promta'     AS kam_name, 'panitan.p@freshket.co'  AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
+    STRUCT('Sarawoot (Oh) Kaewkhao'   AS kam_name, 'sarawoot.k@freshket.co' AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
+    STRUCT('Nichamon (Ninew) Kanghae' AS kam_name, 'nichamon.k@freshket.co' AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
+    STRUCT('Ornpreya (Ice) Sukthai'   AS kam_name, 'ornpreya.s@freshket.co' AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name)
   ])
 ),
 
@@ -106,7 +98,6 @@ params AS (
 ),
 
 -- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
--- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
 user_account_type AS (
   SELECT
     CAST(res_id AS STRING) AS outlet_id,
@@ -115,8 +106,6 @@ user_account_type AS (
 ),
 
 -- ── 3. Latest staff owner (ณ วันที่ดึงข้อมูล) ───────────────────────────────
--- Key column สำหรับ grain ของ rep view
--- outlet ทุกตัว assigned ให้ KAM คนนี้คนเดียว ไม่ซ้ำซ้อน
 latest_own AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
@@ -131,12 +120,14 @@ latest_own AS (
 ),
 
 -- ── 4. First order info per outlet ───────────────────────────────────────────
+-- first_pm_date (was first_kam_date in rep_view.sql) — first order date under
+-- commercial_owner='PM' specifically (self = PM in this file).
 outlet_first_dollar AS (
   SELECT
     CAST(o.user_id AS STRING) AS outlet_id,
     MIN(DATE(o.delivery_date)) AS first_dollar_date,
-    MIN(CASE WHEN UPPER(TRIM(o.commercial_owner)) = 'KAM'
-             THEN DATE(o.delivery_date) END) AS first_kam_date,
+    MIN(CASE WHEN UPPER(TRIM(o.commercial_owner)) = 'PM'
+             THEN DATE(o.delivery_date) END) AS first_pm_date,
     ARRAY_AGG(
       UPPER(TRIM(o.commercial_owner))
       ORDER BY o.delivery_date ASC LIMIT 1
@@ -148,7 +139,7 @@ outlet_first_dollar AS (
   GROUP BY 1
 ),
 
--- ── 5. Last owner ก่อน first KAM order ──────────────────────────────────────
+-- ── 5. Last owner ก่อน first PM order ──────────────────────────────────────
 outlet_prev_owner AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
@@ -156,7 +147,7 @@ outlet_prev_owner AS (
   FROM `freshket-rn.dwh.order` o
   JOIN outlet_first_dollar ofd
     ON CAST(o.user_id AS STRING) = ofd.outlet_id
-   AND DATE(o.delivery_date) < ofd.first_kam_date
+   AND DATE(o.delivery_date) < ofd.first_pm_date
   WHERE o.user_id IS NOT NULL
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
   QUALIFY ROW_NUMBER() OVER (
@@ -177,7 +168,7 @@ outlet_exp_date AS (
   GROUP BY 1
 ),
 
--- ── 7. GMV per outlet per month ───────────────────────────────────────────────
+-- ── 7. GMV per outlet per month (curr months scoped to commercial_owner='PM') ─
 base_gmv AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
   FROM `freshket-rn.dwh.order` o CROSS JOIN params p
@@ -192,7 +183,7 @@ jul_gmv AS (
   WHERE o.delivery_date BETWEEN p.jul_start AND p.jul_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
+    AND UPPER(TRIM(o.commercial_owner)) = 'PM'
   GROUP BY 1
 ),
 aug_gmv AS (
@@ -201,7 +192,7 @@ aug_gmv AS (
   WHERE o.delivery_date BETWEEN p.aug_start AND p.aug_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
+    AND UPPER(TRIM(o.commercial_owner)) = 'PM'
   GROUP BY 1
 ),
 sep_gmv AS (
@@ -210,7 +201,7 @@ sep_gmv AS (
   WHERE o.delivery_date BETWEEN p.sep_start AND p.sep_end
     AND o.gmv_ex_vat > 0
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    AND UPPER(TRIM(o.commercial_owner)) = 'KAM'
+    AND UPPER(TRIM(o.commercial_owner)) = 'PM'
   GROUP BY 1
 ),
 
@@ -269,17 +260,16 @@ mar_handover_outlets AS (
     AND po.outlet_id IS NULL
 ),
 
--- ── 10. mar_cohort ────────────────────────────────────────────────────────────
--- ไม่ hardcode ชื่อ KAM — capture ทุก outlet ที่ Mar last = KAM
+-- ── 10. mar_cohort — self = PM (was KAM in rep_view.sql) ─────────────────────
 mar_cohort AS (
   SELECT mo.outlet_id, mo.account_id, mo.account_name, mo.res_name, mo.account_type,
     mo.staff_owner AS mar_staff_owner,
-    ofd.first_dollar_date, ofd.first_kam_date, ofd.first_dollar_owner,
+    ofd.first_dollar_date, ofd.first_pm_date, ofd.first_dollar_owner,
     COALESCE(bg.gmv, 0) AS base_gmv
   FROM mar_own mo
   LEFT JOIN base_gmv bg             ON mo.outlet_id = bg.outlet_id
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
-  WHERE UPPER(TRIM(mo.commercial_owner)) = 'KAM'
+  WHERE UPPER(TRIM(mo.commercial_owner)) = 'PM'
     AND COALESCE(bg.gmv, 0) > 0
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_handover_outlets)
 ),
@@ -295,9 +285,10 @@ mar_sale_owner AS (
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
 
--- ── 11b. PM/ADMIN staff ใน Mar ───────────────────────────────────────────────
--- ใช้แสดง base_staff_owner ของ transfer_in จาก PM/ADMIN
-mar_pm_admin_staff AS (
+-- ── 11b. KAM/ADMIN staff ใน Mar (was PM/ADMIN in rep_view.sql — "the other
+--         portfolio" flips since self=PM here) ─────────────────────────────
+-- ใช้แสดง base_staff_owner ของ transfer_in จาก KAM/ADMIN
+mar_kam_admin_staff AS (
   SELECT
     CAST(o.user_id AS STRING)       AS outlet_id,
     UPPER(TRIM(o.commercial_owner)) AS mar_portfolio,
@@ -305,7 +296,7 @@ mar_pm_admin_staff AS (
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN params p
   WHERE o.delivery_date BETWEEN p.base_start AND p.base_end
-    AND UPPER(TRIM(o.commercial_owner)) IN ('PM','ADMIN')
+    AND UPPER(TRIM(o.commercial_owner)) IN ('KAM','ADMIN')
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
     AND o.user_id IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (
@@ -313,29 +304,25 @@ mar_pm_admin_staff AS (
   ) = 1
 ),
 
--- ── 12. PM/ADMIN mar cohort ───────────────────────────────────────────────────
-pm_admin_mar_cohort AS (
+-- ── 12. KAM/ADMIN mar cohort (was "PM/ADMIN mar cohort" in rep_view.sql) ────
+kam_admin_mar_cohort AS (
   SELECT mo.outlet_id, mo.commercial_owner AS mar_portfolio
   FROM mar_own mo
   LEFT JOIN outlet_first_dollar ofd ON mo.outlet_id = ofd.outlet_id
   WHERE (
-    mo.commercial_owner IN ('PM','ADMIN')
+    mo.commercial_owner IN ('KAM','ADMIN')
     OR (
       UPPER(TRIM(mo.commercial_owner)) = 'SALE'
-      AND ofd.first_kam_date IS NOT NULL
-      AND ofd.first_kam_date < v_m1_start
-      AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('PM','ADMIN')
+      AND ofd.first_pm_date IS NOT NULL
+      AND ofd.first_pm_date < v_m1_start
+      AND UPPER(TRIM(ofd.first_dollar_owner)) IN ('KAM','ADMIN')
     )
   )
     AND mo.outlet_id NOT IN (SELECT outlet_id FROM mar_cohort)
 ),
 
 -- ── 13. Classification per outlet per month ───────────────────────────────────
--- เหมือน TL view ทุกอย่าง — ไม่เปลี่ยน logic
--- KEY: ไม่ join mar_cohort ด้วย staff_owner
---      → outlet ที่ย้าย KAM ยังได้ core_nrr (เหมือน TL view)
---      base_staff_owner และ latest_staff_owner จะต่างกันสำหรับ outlet ที่ย้าย
-
+-- เหมือน rep_view.sql ทุกอย่าง สลับ self=KAM → self=PM
 apr_classified AS (
   SELECT
     v_m1_str AS period_month,
@@ -358,7 +345,7 @@ apr_classified AS (
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(ag.gmv, 0)              AS curr_gmv,
     ofd.first_dollar_date,
-    ofd.first_kam_date,
+    ofd.first_pm_date,
     oed.new_user_exp_date,
     ofd.first_dollar_owner,
     CASE
@@ -366,8 +353,8 @@ apr_classified AS (
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
            IN (v_base_str,v_m1_str,v_m2_str,v_m3_str)
            THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-      WHEN ofd.first_kam_date IS NOT NULL
-           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      WHEN ofd.first_pm_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_pm_date)
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
@@ -375,7 +362,7 @@ apr_classified AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= v_m1_start
-       AND ofd.first_kam_date    >= v_m1_start
+       AND ofd.first_pm_date     >= v_m1_start
        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
        AND (oed.new_user_exp_date IS NULL
             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -387,12 +374,12 @@ apr_classified AS (
              IN (v_m1_str,v_m2_str,v_m3_str)
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'          THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN (v_m1_str,v_m2_str,v_m3_str)                             THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND bg.gmv IS NOT NULL
        AND COALESCE(po.prev_owner,'') = 'SALE'
        AND (oed.new_user_exp_date IS NULL
@@ -415,9 +402,9 @@ apr_classified AS (
   LEFT JOIN jul_gmv ag               ON ao.outlet_id = ag.outlet_id
   LEFT JOIN mar_sale_owner mso       ON ao.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON ao.outlet_id = bg.outlet_id
-  LEFT JOIN pm_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
-  LEFT JOIN mar_pm_admin_staff mpas  ON ao.outlet_id = mpas.outlet_id
-  WHERE UPPER(TRIM(ao.commercial_owner)) = 'KAM'
+  LEFT JOIN kam_admin_mar_cohort pamc ON ao.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_kam_admin_staff mpas  ON ao.outlet_id = mpas.outlet_id
+  WHERE UPPER(TRIM(ao.commercial_owner)) = 'PM'
 
   UNION ALL
 
@@ -427,15 +414,13 @@ apr_classified AS (
     mc.mar_staff_owner AS period_staff_owner,
     mc.mar_staff_owner AS base_staff_owner,
     mc.base_gmv, 0.0,
-    mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE) AS new_user_exp_date,
+    mc.first_dollar_date, mc.first_pm_date, CAST(NULL AS DATE) AS new_user_exp_date,
     CAST(NULL AS STRING) AS first_dollar_owner, v_base_str AS cohort_month, CAST(NULL AS STRING) AS transfer_scope,
     CAST(NULL AS STRING) AS mar_portfolio,
     'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM jul_own)
-    AND v_m1_days > 0  -- v6-fix: same guard as v831 (months 2,3) — skip silent-outlet
-                       -- fallback if month 1 hasn't started yet (avoids fabricating
-                       -- 100% churn if this ever runs right at the start of a quarter)
+    AND v_m1_days > 0
 ),
 
 may_classified AS (
@@ -459,15 +444,15 @@ may_classified AS (
     END AS base_staff_owner,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(mg.gmv, 0)              AS curr_gmv,
-    ofd.first_dollar_date, ofd.first_kam_date, oed.new_user_exp_date,
+    ofd.first_dollar_date, ofd.first_pm_date, oed.new_user_exp_date,
     ofd.first_dollar_owner,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN v_base_str
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
            IN (v_base_str,v_m1_str,v_m2_str,v_m3_str)
            THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-      WHEN ofd.first_kam_date IS NOT NULL
-           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      WHEN ofd.first_pm_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_pm_date)
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
@@ -475,7 +460,7 @@ may_classified AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= v_m1_start
-       AND ofd.first_kam_date    >= v_m1_start
+       AND ofd.first_pm_date     >= v_m1_start
        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
        AND (oed.new_user_exp_date IS NULL
             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -487,12 +472,12 @@ may_classified AS (
              IN (v_m1_str,v_m2_str,v_m3_str)
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'          THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN (v_m1_str,v_m2_str,v_m3_str)                             THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND bg.gmv IS NOT NULL
        AND COALESCE(po.prev_owner,'') = 'SALE'
        AND (oed.new_user_exp_date IS NULL
@@ -515,20 +500,20 @@ may_classified AS (
   LEFT JOIN aug_gmv mg               ON mo.outlet_id = mg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON mo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON mo.outlet_id = bg.outlet_id
-  LEFT JOIN pm_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
-  LEFT JOIN mar_pm_admin_staff mpas  ON mo.outlet_id = mpas.outlet_id
-  WHERE UPPER(TRIM(mo.commercial_owner)) = 'KAM'
+  LEFT JOIN kam_admin_mar_cohort pamc ON mo.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_kam_admin_staff mpas  ON mo.outlet_id = mpas.outlet_id
+  WHERE UPPER(TRIM(mo.commercial_owner)) = 'PM'
 
   UNION ALL
 
   SELECT
     v_m2_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_pm_date, CAST(NULL AS DATE),
     CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM aug_own)
-    AND v_m2_days > 0  -- v831: skip silent-outlet fallback if this month hasn't started yet (avoids fabricating 100% churn for a future month with no real data)
+    AND v_m2_days > 0
 ),
 
 jun_classified AS (
@@ -552,15 +537,15 @@ jun_classified AS (
     END AS base_staff_owner,
     COALESCE(mc.base_gmv, bg.gmv, 0) AS base_gmv,
     COALESCE(jg.gmv, 0)              AS curr_gmv,
-    ofd.first_dollar_date, ofd.first_kam_date, oed.new_user_exp_date,
+    ofd.first_dollar_date, ofd.first_pm_date, oed.new_user_exp_date,
     ofd.first_dollar_owner,
     CASE
       WHEN mc.outlet_id IS NOT NULL THEN v_base_str
       WHEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
            IN (v_base_str,v_m1_str,v_m2_str,v_m3_str)
            THEN FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
-      WHEN ofd.first_kam_date IS NOT NULL
-           THEN FORMAT_DATE('%Y-%m', ofd.first_kam_date)
+      WHEN ofd.first_pm_date IS NOT NULL
+           THEN FORMAT_DATE('%Y-%m', ofd.first_pm_date)
       ELSE NULL
     END AS cohort_month,
     CASE WHEN pamc.outlet_id IS NOT NULL THEN 'inter' ELSE NULL END AS transfer_scope,
@@ -568,7 +553,7 @@ jun_classified AS (
     CASE
       WHEN mc.outlet_id IS NOT NULL                                         THEN 'core_nrr'
       WHEN ofd.first_dollar_date >= v_m1_start
-       AND ofd.first_kam_date    >= v_m1_start
+       AND ofd.first_pm_date     >= v_m1_start
        AND COALESCE(ofd.first_dollar_owner,'') != 'SALE'
        AND (oed.new_user_exp_date IS NULL
             OR FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
@@ -580,12 +565,12 @@ jun_classified AS (
              IN (v_m1_str,v_m2_str,v_m3_str)
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'          THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND COALESCE(CASE WHEN ofd.first_dollar_owner = 'SALE' THEN 'SALE'
                          ELSE po.prev_owner END, 'SALE') = 'SALE'
        AND FORMAT_DATE('%Y-%m', oed.new_user_exp_date)
              IN (v_m1_str,v_m2_str,v_m3_str)                             THEN 'new_sales'
-      WHEN ofd.first_kam_date >= v_m1_start
+      WHEN ofd.first_pm_date >= v_m1_start
        AND bg.gmv IS NOT NULL
        AND COALESCE(po.prev_owner,'') = 'SALE'
        AND (oed.new_user_exp_date IS NULL
@@ -608,27 +593,26 @@ jun_classified AS (
   LEFT JOIN sep_gmv jg               ON jo.outlet_id = jg.outlet_id
   LEFT JOIN mar_sale_owner mso       ON jo.outlet_id = mso.outlet_id
   LEFT JOIN base_gmv bg              ON jo.outlet_id = bg.outlet_id
-  LEFT JOIN pm_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
-  LEFT JOIN mar_pm_admin_staff mpas  ON jo.outlet_id = mpas.outlet_id
-  WHERE UPPER(TRIM(jo.commercial_owner)) = 'KAM'
+  LEFT JOIN kam_admin_mar_cohort pamc ON jo.outlet_id = pamc.outlet_id
+  LEFT JOIN mar_kam_admin_staff mpas  ON jo.outlet_id = mpas.outlet_id
+  WHERE UPPER(TRIM(jo.commercial_owner)) = 'PM'
 
   UNION ALL
 
   SELECT
     v_m3_str, mc.outlet_id, mc.account_id, mc.account_name, mc.res_name, mc.account_type,
     mc.mar_staff_owner, mc.mar_staff_owner,
-    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_kam_date, CAST(NULL AS DATE),
+    mc.base_gmv, 0.0, mc.first_dollar_date, mc.first_pm_date, CAST(NULL AS DATE),
     CAST(NULL AS STRING), v_base_str, CAST(NULL AS STRING), CAST(NULL AS STRING), 'core_nrr'
   FROM mar_cohort mc
   WHERE mc.outlet_id NOT IN (SELECT outlet_id FROM sep_own)
-    AND v_m3_days > 0  -- v831: same guard for the 3rd quarter month
+    AND v_m3_days > 0
 ),
 
 
 -- ── transfer_out_rows ─────────────────────────────────────────────────────────
--- outlet ที่ Mar staff = KAM X แต่ latest_staff ≠ KAM X
--- ขึ้นใน output ของ KAM เดิม (Mar staff) เป็น transfer_out
--- curr_gmv = 0, base_gmv = Mar GMV → adjust denominator ของ KAM เดิม
+-- outlet ที่ Mar staff = PM X แต่ latest_staff ≠ PM X
+-- ขึ้นใน output ของ PM เดิม (Mar staff) เป็น transfer_out
 transfer_out_rows AS (
   SELECT
     period_month,
@@ -642,27 +626,18 @@ transfer_out_rows AS (
     mc.base_gmv,
     0.0                             AS curr_gmv,
     mc.first_dollar_date,
-    mc.first_kam_date,
+    mc.first_pm_date,
     CAST(NULL AS DATE)              AS new_user_exp_date,
     CAST(NULL AS STRING)            AS first_dollar_owner,
     v_base_str                      AS cohort_month,
-    -- v880-fix: was hardcoded NULL — the JS neutralization logic
-    -- (_effectiveMovement() in 07c_qnrr_view.js / nrr_logic.js) treats a
-    -- falsy transfer_scope as "assume same-team KAM<->KAM noise, don't
-    -- count it," but this leg by construction (WHERE clause below) only
-    -- ever fires on a genuine portfolio-TYPE exit (KAM -> PM/ADMIN/SALE),
-    -- never a same-type reassignment — so it must never be neutralized.
-    -- A NULL here silently understated company-wide NRR% (base stayed
-    -- inflated, current side lost the GMV, no offsetting adjustment)
-    -- from the day any KAM first lost an outlet to PM/Admin.
-    CASE WHEN lo.latest_commercial_owner IN ('PM','ADMIN') THEN 'inter' ELSE 'external' END AS transfer_scope,
+    CAST(NULL AS STRING)            AS transfer_scope,
     CAST(NULL AS STRING)            AS mar_portfolio,
     'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
   CROSS JOIN UNNEST([v_m1_str, v_m2_str, v_m3_str]) AS period_month
   -- เฉพาะ outlet ที่ latest_staff ≠ Mar staff
-  WHERE lo.latest_commercial_owner != 'KAM'
+  WHERE lo.latest_commercial_owner != 'PM'
 ),
 
 all_classified AS (
@@ -673,15 +648,15 @@ all_classified AS (
 )
 
 -- ── FINAL SELECT ──────────────────────────────────────────────────────────────
--- ใช้ latest_staff_owner เป็น grain หลัก
--- base_gmv ติดกับ latest_staff_owner — ไม่ซ้ำซ้อน
+-- SAME 29-column shape/order as q3_2026_movement_rep_view.sql — output rows
+-- get appended into the same kam_rep_view.csv, zero app-code changes needed.
 SELECT
   r.period_month,
   r.movement_type,
   r.transfer_scope,
   lo.latest_commercial_owner        AS current_portfolio,
   r.period_staff_owner               AS current_staff_owner,
-  COALESCE(r.mar_portfolio, 'KAM')  AS base_portfolio,
+  COALESCE(r.mar_portfolio, 'PM')   AS base_portfolio,
   r.base_staff_owner,
   r.outlet_id,
   r.account_id,
@@ -698,7 +673,7 @@ SELECT
     WHEN v_m3_str THEN p.sep_days
   END                               AS curr_days,
   ofd2.first_dollar_date,
-  ofd2.first_kam_date               AS first_portfolio_date,
+  ofd2.first_pm_date                AS first_portfolio_date,
   ofd2.first_dollar_owner,
   oed2.new_user_exp_date,
   -- rep-specific columns ต่อท้าย
@@ -714,15 +689,24 @@ SELECT
 FROM all_classified r
 CROSS JOIN params p
 JOIN latest_own lo                  ON r.outlet_id            = lo.outlet_id
-LEFT JOIN staff_email_map em_latest ON lo.latest_staff_owner  = em_latest.kam_name
-LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
+LEFT JOIN staff_email_map em_latest ON LOWER(TRIM(lo.latest_staff_owner)) = LOWER(TRIM(em_latest.kam_name))
+LEFT JOIN staff_email_map em_base   ON LOWER(TRIM(r.base_staff_owner))    = LOWER(TRIM(em_base.kam_name))
 LEFT JOIN outlet_first_dollar ofd2  ON r.outlet_id            = ofd2.outlet_id
 LEFT JOIN outlet_exp_date oed2      ON r.outlet_id            = oed2.outlet_id
 LEFT JOIN user_account_type um       ON r.outlet_id            = um.outlet_id
--- filter เฉพาะ outlet ที่ latest owner เป็น KAM
--- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
-WHERE lo.latest_commercial_owner = 'KAM'
-   OR r.movement_type = 'transfer_out'
+-- v878 fix: unlike the original file (WHERE = 'KAM' — the KAM tag and the
+-- KAM roster are effectively the same population, no meaningful orphans),
+-- commercial_owner='PM' company-wide covers MORE real people than just these
+-- 4 (confirmed in real BigQuery output — e.g. "Niwara (Nut) Buaon" also
+-- carries the PM tag). Without an explicit roster-membership check here,
+-- those orphan PM-tagged outlets would flow into src/nrr/nrr_pulse.js's
+-- admin-only Pulse feed (it iterates qd.allRows directly, not scoped by
+-- email) as unowned "new arrivals" that never appeared before this file
+-- existed. Scope strictly to the 4 named people: current-portfolio rows by
+-- em_latest (today's owner), transfer_out rows by em_base (the PM who HELD
+-- it before it left — that's whose report the row belongs to).
+WHERE (lo.latest_commercial_owner = 'PM' AND em_latest.kam_email IS NOT NULL)
+   OR (r.movement_type = 'transfer_out'  AND em_base.kam_email   IS NOT NULL)
 
 ORDER BY
   r.period_month,
@@ -730,4 +714,3 @@ ORDER BY
   lo.latest_staff_owner,
   r.movement_type,
   r.curr_gmv DESC
-

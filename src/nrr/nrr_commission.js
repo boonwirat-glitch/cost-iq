@@ -550,18 +550,20 @@ window.nrrEstimateKamCommission = nrrEstimateKamCommission;
 // the 0.5% outlet commission, excluded here — /nrr derives this for free
 // from its own already-loaded QNRR rows (movement_type === 'expansion'),
 // no extra fetch needed.
-// v860-fix (2026-07-13): was hardcoded to evaluate ONLY currLabel — no
-// cumulative-quarter logic existed here at all, unlike the real engine's
-// v836 fix (_commComputeUpsellSku + _commElapsedQuarterLabels,
-// 07a_commission_engine.js:177-194,294-340). A shop holding an elevated
-// purchase level for 3 months would show only 1 month's worth here while
-// Sense's own numbers (and the locked snapshot, once it exists) reflected
-// the full cumulative streak — found during a repo-wide commission-
-// alignment audit. Now mirrors that exact algorithm: classify EVERY
-// elapsed quarter month, keep only the trailing unbroken qualifying
-// streak, sum it. In non-quarterly use (baseMonthIso falsy — /nrr never
-// actually calls it that way today) evalLabels degenerates to exactly
-// [currLabel], i.e. the original single-month behavior, unchanged.
+// v7 (SUPERSEDED, kept for history): v860-fix (2026-07-13) made this
+// cumulative across every elapsed quarter month (streak-sum), to match the
+// real engine's v836 change. That change is now known to be WRONG.
+//
+// v880-fix (2026-07-19): confirmed via Bush's own worked examples (Ning/
+// Avo-Mango-Apple for P1, Ning/Coke for P3) that each month's commission
+// must be that month's OWN current GMV alone — an item/outlet stays
+// ELIGIBLE for the rest of the quarter once it first qualifies, but the
+// value itself is never summed across months (e.g. an item dropping out
+// one month doesn't "keep" a prior month's contribution once it requalifies
+// later). Mirrors the identical fix in _commComputeUpsellSku
+// (07a_commission_engine.js). In non-quarterly use (baseMonthIso falsy —
+// /nrr never actually calls it that way today) evalLabels degenerates to
+// exactly [currLabel], i.e. this was always a no-op there.
 function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
   var EMPTY = { p1: { gmv: 0, comm: 0, groups: [] }, p3: { gmv_incremental: 0, comm: 0, groups: [] },
                 total_comm: 0, total_gmv_eligible: 0 };
@@ -600,52 +602,34 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
         // per-month loop below is correct, not an approximation.
         var isP1 = !outletBaseline[groupKey];
 
-        var perMonth = evalLabels.map(function (lbl) {
-          var row = monthData[lbl];
-          if (!row) return { label: lbl, qualifies: false, contribution: 0 };
-          var rawTotalGmv = row.totalGmv || 0;
-          var rawExistingGmv = row.existingGmv || 0;
-          if (isP1) {
-            if (rawTotalGmv >= p1MinGmv) return { label: lbl, qualifies: true, contribution: rawTotalGmv };
-            return { label: lbl, qualifies: false, contribution: 0 };
-          }
-          var maxBaseline = 0, maxBaselineMonth = p3Labels[0];
-          p3Labels.forEach(function (l) {
-            var lRow = monthData[l];
-            if (!lRow) return;
-            var d = nrrDaysInLabel(l);
-            var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-            if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
-          });
-          if (rawExistingGmv > maxBaseline * p3Thresh) {
-            var incremental = rawExistingGmv - maxBaseline;
-            if (incremental >= p3MinIncr) {
-              return { label: lbl, qualifies: true, contribution: incremental,
-                       existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth };
-            }
-          }
-          return { label: lbl, qualifies: false, contribution: 0 };
-        });
-
-        // Streak = every month AFTER the most recent gap (a month that
-        // failed to qualify, or had no purchase row at all). No gap ever
-        // → streak starts at the first evaluated month. Degenerates to the
-        // single-entry perMonth array in non-quarterly use.
-        var lastGapIdx = -1;
-        perMonth.forEach(function (m, i) { if (!m.qualifies) lastGapIdx = i; });
-        var streak = perMonth.slice(lastGapIdx + 1);
-        if (streak.length === 0) return;
-
-        var cumAmount = streak.reduce(function (s, m) { return s + m.contribution; }, 0);
-        var last = streak[streak.length - 1];
+        // v880-fix: only the current (last evaluated) month is tested/used
+        // now — no more streak/gap tracking. See header comment above.
+        var lbl = evalLabels[evalLabels.length - 1];
+        var row = monthData[lbl];
+        if (!row) return;
+        var rawTotalGmv = row.totalGmv || 0;
+        var rawExistingGmv = row.existingGmv || 0;
 
         if (isP1) {
-          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: cumAmount, commission: cumAmount * p1Rate });
-        } else {
-          p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
-            existing_curr: last.existing_curr, max_baseline: last.max_baseline, max_baseline_month: last.max_baseline_month,
-            incremental: cumAmount, commission: cumAmount * p3Rate });
+          if (rawTotalGmv < p1MinGmv) return;
+          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: rawTotalGmv, commission: rawTotalGmv * p1Rate });
+          return;
         }
+
+        var maxBaseline = 0, maxBaselineMonth = p3Labels[0];
+        p3Labels.forEach(function (l) {
+          var lRow = monthData[l];
+          if (!lRow) return;
+          var d = nrrDaysInLabel(l);
+          var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
+          if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
+        });
+        if (rawExistingGmv <= maxBaseline * p3Thresh) return;
+        var incremental = rawExistingGmv - maxBaseline;
+        if (incremental < p3MinIncr) return;
+        p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
+          existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth,
+          incremental: incremental, commission: incremental * p3Rate });
       });
     });
   });
