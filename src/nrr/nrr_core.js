@@ -7,7 +7,9 @@
 // actual business logic, so letting them in would show meaningless numbers.
 // 'rep' (added Phase B, 2026-07-09) maps to scope 'kam' — reps only ever
 // see the Portfolio layer (nrr_router.js's guard confines them there),
-// never the tl/admin dashboard.
+// never the tl/admin dashboard. 'ad' and 'pm' (added 2026-07-17) are
+// normalized into 'rep' here too — same own-portfolio-only KAM scope,
+// no separate ad/pm semantics anywhere downstream.
 
 var SUPA_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co';
 var SUPA_KEY = 'sb_publishable_DRCzHd782Gry8Edu4ZIiHA_KuOgBIIG';
@@ -19,7 +21,13 @@ var nrrProfile = null;
 function nrrNormalizeRole(r) {
   var s = String(r || '').trim().toLowerCase();
   if (['team_lead', 'team lead', 'tl'].includes(s)) return 'tl';
-  if (['admin', 'ad'].includes(s)) return 'admin';
+  if (s === 'admin') return 'admin';
+  // ad (Account Development) and pm (Project/Portfolio Manager) use the same
+  // KAM data stack as rep in Sense — own-portfolio-only, never admin/tl
+  // scope. Fixed 2026-07-17: 'ad' used to collapse into 'admin' here, which
+  // silently gave any AD user full /nrr admin access instead of their own
+  // portfolio — folding into 'rep' scope instead fixes that bug too.
+  if (['rep', 'ad', 'pm'].includes(s)) return 'rep';
   return s || '';
 }
 

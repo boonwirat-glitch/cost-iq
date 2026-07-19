@@ -28,9 +28,10 @@ OUTPUT_DIR    = Path('output_bundles')
 
 # Input files (ผลจาก BQ export)
 FILES = {
-    'download_skus.csv':       'sense_skus_{key}.csv',      # SQL1
-    'download_alts.csv':       'sense_alts_{key}.csv',      # SQL2
-    'download_upsell_bulk.csv': 'sense_upsell_{key}.csv',   # q3c_bulk
+    'download_skus.csv':        'sense_skus_{key}.csv',        # SQL1
+    'download_alts.csv':        'sense_alts_{key}.csv',        # SQL2
+    'download_upsell_bulk.csv': 'sense_upsell_{key}.csv',      # q3c_bulk
+    'download_sku_outlet.csv':  'sense_sku_outlet_{key}.csv',  # Q12B
 }
 # ── Helpers ──────────────────────────────────────────────────
 def safe_key(email: str) -> str:

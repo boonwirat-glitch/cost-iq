@@ -6,7 +6,12 @@
 // including the 29-column order, so nrr_logic.js's ported _qnrrCompute
 // works unmodified against it.
 
-var R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+// ?localdata=1 — dev-only override, mirrors the same flag in src/shell.html:
+// serves CSVs from a `localtest/` folder next to this build's HTML file
+// instead of the real R2 bucket. Never affects production.
+var R2_BASE = (typeof location !== 'undefined' && location.search.indexOf('localdata=1') !== -1)
+  ? (location.origin + location.pathname.replace(/[^/]*$/, '') + 'localtest')
+  : 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
 
 window.bulkQnrrData = { loaded: false };
 
@@ -82,15 +87,46 @@ function _nrrParseQnrrCsv(text) {
   return { byKamEmail: byKamEmail, byTlEmail: byTlEmail, allRows: allRows };
 }
 
+// v878: pm_rep_view.csv (PM/AD roster, from sql/pm_rep_view.sql) is an
+// independent BigQuery output uploaded to R2 by data team separately from
+// kam_rep_view.csv — no merge step on their side. Optional: 404/missing is
+// fine, KAM data still loads. Mirrors the same fix in
+// src/02_data_pipeline.js's _fetchQnrrBundle (Sense side).
+async function _nrrFetchOptionalCsvText(filename) {
+  try {
+    // v878-fix: bound this fetch — it has no retry of its own, and an
+    // unbounded hang here would stall the whole dashboard even after the
+    // required KAM CSV already arrived successfully.
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 20000) : null;
+    var res = await fetch(R2_BASE + '/' + filename + '?cb=' + Date.now(), ctrl ? { signal: ctrl.signal } : undefined);
+    if (timer) clearTimeout(timer);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch (e) {
+    return null;
+  }
+}
+
 async function nrrFetchQnrrCsv(force) {
   if (window.bulkQnrrData && window.bulkQnrrData.loaded && !force) return window.bulkQnrrData;
   var url = R2_BASE + '/' + QNRR_CFG.csv_file + '?cb=' + Date.now();
   var lastErr = null;
+  // v878-fix: fire once, in parallel with the KAM fetch below (previously
+  // sequential — added latency on every load) and reuse across KAM retries
+  // (previously re-fetched pm_rep_view.csv up to 3x if only the KAM fetch
+  // needed a retry).
+  var pmTextPromise = _nrrFetchOptionalCsvText('pm_rep_view.csv');
   for (var attempt = 0; attempt < 3; attempt++) {
     try {
       var res = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var text = await res.text();
+      var pmText = await pmTextPromise;
+      if (pmText) {
+        var pmRows = pmText.trim().split('\n').slice(1).join('\n');
+        if (pmRows) text = text.trim() + '\n' + pmRows;
+      }
       var parsed = _nrrParseQnrrCsv(text);
       window.bulkQnrrData = {
         byKamEmail: parsed.byKamEmail,

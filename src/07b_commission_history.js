@@ -35,8 +35,13 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   // abbreviated for sub-labels only
   function moneyK(n){ var v=Number(n||0); if(!v)return'฿0'; if(v>=1e6)return'฿'+(v/1e6).toFixed(1)+'M'; if(v>=1000)return'฿'+Math.round(v/1000)+'K'; return'฿'+Math.round(v); }
 
+  // v878 (phase 8): match on the viewer's OWN engine-role bucket, not a
+  // hardcoded 'kam' — pm/ad/etc now get real snapshot rows tagged with their
+  // own beneficiary_role (see _commBuildSnapshotRows' otherRoster loop), so
+  // hardcoding 'kam' here would silently show them an empty list forever.
+  var _histRole = (typeof _commEngineRole==='function') ? _commEngineRole(role) : 'kam';
   var rows = allRows || [];
-  if (isRepRole(role)) rows = rows.filter(function(r){ return r.beneficiary_role==='kam'&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+  if (isRepRole(role)||isADRole(role)||isPMRole(role)) rows = rows.filter(function(r){ return r.beneficiary_role===_histRole&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
   else if (isTLRole(role)) rows = rows.filter(function(r){ return (r.team_lead_email||'').toLowerCase()===email.toLowerCase()||(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
 
   var byPeriod = {};
@@ -49,7 +54,7 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   var listHtml = periods.map(function(p){
     var pRows = byPeriod[p]||[];
     var hasLock = pRows.some(function(r){ return String(r.snapshot_status||'').toLowerCase()==='final'; });
-    var myRow = pRows.find(function(r){ return isRepRole(role)&&r.beneficiary_role==='kam'; })
+    var myRow = pRows.find(function(r){ return (isRepRole(role)||isADRole(role)||isPMRole(role))&&r.beneficiary_role==='kam'; })
               || pRows.find(function(r){ return isTLRole(role)&&r.beneficiary_role==='tl'; })
               || pRows[0];
     var payout = myRow ? Number(myRow.payout_amount||0) : 0;
@@ -85,12 +90,31 @@ function _commRenderHistoryList(ov, allRows, role, email) {
   var _cr=(allRows||[]).filter(function(r){return r.period_month===_cp;});
   var _cf=_cr.some(function(r){return r.snapshot_status==='final';});
   var _cd=!_cf&&_cr.some(function(r){return r.snapshot_status==='draft';});
+  var _cIsKamLike=isRepRole(role)||isADRole(role)||isPMRole(role);
+  // v878 (phase 8): the real engine-role bucket (pm/ad -> their own bucket,
+  // rep -> 'kam') — used both to resolve their own scheme below AND to match
+  // their own snapshot row (which is now tagged with this same bucket, not
+  // always 'kam').
+  var _cRole=(typeof _commEngineRole==='function')?_commEngineRole(role):role;
   var _ca=null,_cn=null;
   try{
-    if(isRepRole(role)&&typeof _commBuildKamPayout==='function'){var _zz=_commBuildKamPayout(email);if(_zz){_ca=_zz.final_payout;_cn=_zz.nrr_pct;}}
+    if(_cIsKamLike&&typeof _commBuildKamPayout==='function'){
+      // v878: pass the real engine role (pm/ad -> their own bucket, not
+      // 'kam') so their own assigned scheme resolves correctly instead of
+      // always looking up a scope='kam' assignment they'll never have.
+      var _zz=_commBuildKamPayout(email,undefined,_cRole);if(_zz){_ca=_zz.final_payout;_cn=_zz.nrr_pct;}
+    }
     else if(isTLRole(role)&&typeof _commBuildTlPayout==='function'){var _zz=_commBuildTlPayout(email);if(_zz){_ca=_zz.final_payout;_cn=_zz.nrr_pct;}}
   }catch(e){}
-  var _cmr=_cr.find(function(r){return isRepRole(role)?r.beneficiary_role==='kam':r.beneficiary_role==='tl';})||_cr[0];
+  // v878: own-email match required — was falling back to _cr[0] (any row) for
+  // pm/ad, leaking another KAM's/TL's current-month payout into the hero card.
+  // v878 (phase 8): match beneficiary_role===_cRole, not a hardcoded 'kam' —
+  // pm/ad's own row is now tagged with their real bucket.
+  var _cmr=_cr.find(function(r){
+    return _cIsKamLike
+      ? (r.beneficiary_role===_cRole&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase())
+      : isTLRole(role)&&((r.team_lead_email||'').toLowerCase()===email.toLowerCase()||(r.beneficiary_email||'').toLowerCase()===email.toLowerCase());
+  });
   if(_cmr){_ca=Number(_cmr.payout_amount||0);_cn=_cmr.governed_nrr_pct;}
   var _cl=_cf?'🔒 ล็อกแล้ว':_cd?'Draft · รอ lock':'Live · ยังไม่ lock';
   var _cc=_cf?'#ffe08a':_cd?'rgba(255,224,138,.60)':'rgba(var(--ink-blue),.70)';
@@ -126,7 +150,10 @@ window._commOpenHistoryDetail = function(period) {
   var role = getCurrentRole ? getCurrentRole() : '';
   var email = (currentUserProfile && currentUserProfile.email) || '';
   var pRows = allRows.filter(function(r){ return r.period_month===period; });
-  if (isRepRole(role)) pRows = pRows.filter(function(r){ return r.beneficiary_role==='kam'&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
+  // v878 (phase 8): match on the viewer's own engine-role bucket, not a
+  // hardcoded 'kam' — see the matching fix in _commRenderHistoryList above.
+  var _detailRole = (typeof _commEngineRole==='function') ? _commEngineRole(role) : 'kam';
+  if (isRepRole(role)||isADRole(role)||isPMRole(role)) pRows = pRows.filter(function(r){ return r.beneficiary_role===_detailRole&&(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
   else if (isTLRole(role)) pRows = pRows.filter(function(r){ return (r.team_lead_email||'').toLowerCase()===email.toLowerCase()||(r.beneficiary_email||'').toLowerCase()===email.toLowerCase(); });
 
   function fmtPeriod(p){ var pts=(p||'').split('-'); var mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(pts[1])-1]||pts[1]; return mo+' '+(parseInt(pts[0])+543); }

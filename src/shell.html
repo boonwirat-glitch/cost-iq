@@ -317,7 +317,13 @@
 
   const ICON_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
   const OLIVE_AVATAR_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
-  const R2_BASE = 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
+  // ?localdata=1 — dev-only override so a freshly-downloaded BigQuery CSV can be
+  // tested by dropping it next to this file (in a `localtest/` folder) instead of
+  // round-tripping through the real R2 bucket. Never affects production (flag must
+  // be explicitly present in the URL).
+  const R2_BASE = (typeof location !== 'undefined' && location.search.includes('localdata=1'))
+    ? (location.origin + location.pathname.replace(/[^/]*$/, '') + 'localtest')
+    : 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
 
   const config = Object.freeze({
     app: Object.freeze({

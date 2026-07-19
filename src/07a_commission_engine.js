@@ -58,6 +58,13 @@ let _tgtMode = null;          // "admin" | "tl"
 let _nrrGovPolicies = {};     // { "2026-07|all|all": {...} }
 let _nrrGovPending = {};      // { "2026-07|all|all": {...draft...} }
 let _commRuleConfig = {};     // { plans:{}, rules:{}, tiers:{} }
+// v878 (phase 8/9): roster of people in the 6 roles beyond tl/kam
+// (pm/admin/sales/sales_tl/ad/ad_tl), fetched from Supabase profiles (the
+// real source of truth for "who has this role" — portviewBulkData/
+// _buildKamGroups only ever contain kam/tl people). Populated by
+// loadTargets(), consumed by _commBuildSnapshotRows() to actually include
+// these people in a commission compute/lock pass.
+let _commOtherRoleRoster = [];
 let _commRulePending = {};    // editable payout rule draft by plan code
 let _nrrExclusions = [];       // loaded/requested NRR exclusions (request/approve UI lives in /nrr -- see nrr_waivers.js)
 let _commissionSnapshots = [];  // draft/final payout snapshots loaded from Supabase
@@ -107,6 +114,45 @@ function _commGetConfig(metricCode, paramName, defaultVal) {
     }
   } catch(e) {}
   return defaultVal !== undefined ? defaultVal : null;
+}
+
+// v878 (phase 3): resolves a non-NRR component's rule (+ its tiers/params/
+// tier_config) for a given scheme (plan_code), reading the new
+// componentRules map built in loadTargets(). Returns null if this scheme
+// has no rule row for this component yet — callers should fall back to
+// the legacy global target_settings blob via _commGetConfig in that case,
+// so an unconfigured scheme behaves exactly like today rather than
+// silently zeroing out a component nobody has migrated yet.
+function _commGetRuleForMetric(planCode, metricCode, metricVariant) {
+  const plan = (_commRuleConfig.plans || {})[planCode];
+  if (!plan || !plan.id) return null;
+  const key = `${plan.id}|${metricCode}|${metricVariant || ''}`;
+  const rule = (_commRuleConfig.componentRules || {})[key];
+  if (!rule) return null;
+  return {
+    rule,
+    active: rule.active !== false,
+    params: rule.params || {},
+    tiers: (_commRuleConfig.tiers && _commRuleConfig.tiers[rule.id]) || [],
+    tier_config: rule.tier_config || null
+  };
+}
+
+// v879 (Commission Setup redesign, phase 1): tries an injected preview
+// resolver first (the Setup UI's unsaved component drafts, keyed by
+// plan_code so a never-saved role can preview too), falling back to the
+// real, saved-only _commGetRuleForMetric otherwise. Every existing caller
+// passes no previewResolver, so their resolution is byte-identical to
+// before this function existed — real Compute/Lock never pass one. The
+// resolver may return `undefined` (no draft, use real resolution), `null`
+// (draft says: explicitly no rule), or a _commGetRuleForMetric-shaped
+// object (draft says: use this instead).
+function _commResolveRuleForMetric(planCode, metricCode, metricVariant, previewResolver) {
+  if (typeof previewResolver === 'function') {
+    const draft = previewResolver(planCode, metricCode, metricVariant);
+    if (draft !== undefined) return draft;
+  }
+  return _commGetRuleForMetric(planCode, metricCode, metricVariant);
 }
 
 // ── Thai month helpers ──────────────────────────────────────────
@@ -203,7 +249,7 @@ function _commElapsedQuarterLabels(baseMonthOverride) {
 // sql/q3c_upsell_team_summary_v4.sql (the two must be kept in sync). Monthly/rolling
 // mode (baseMonthOverride null) is UNCHANGED — evalLabels degenerates to exactly
 // [currLabel], i.e. the original single-month behavior.
-function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
+function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCode, previewResolver) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
   // baseMonthOverride (optional): '2026-06' for quarterly Q3 — pins P1/P3 3M lookback window.
@@ -236,12 +282,24 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
     console.log('%c[Sense Upsell] compute','color:#f0b000',
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, evalLabels, accounts:Object.keys(kamData).length});
 
-    // Config (admin-configurable, with spec defaults)
-    const p1Rate     = _commGetConfig('upsell_sku', 'p1_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01 (changed 2026-06-11, default never updated)
-    const p3Rate     = _commGetConfig('upsell_sku', 'p3_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01
-    const p3Thresh   = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
-    const p3MinIncr  = _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
-    const p1MinGmv   = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
+    // v878 (phase 4): Config — prefer the assigned scheme's own per-component
+    // rule (metric_code='upsell_gmv', metric_variant='p1_new_sku'/'p3_growth')
+    // when one exists; otherwise fall back to the legacy global target_settings
+    // blob exactly as before (this is the only path today until a scheme is
+    // migrated — see the phase-4 seed migration). P1's rate/min-gmv live on
+    // the tier row (min_value=gate, payout_value=rate); P3's rate lives on
+    // the tier row too, but threshold_pct/min_incremental aren't tier
+    // boundaries so they live in the rule's own `params` instead.
+    const p1Rule = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'p1_new_sku', previewResolver) : null;
+    const p3Rule = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'p3_growth', previewResolver) : null;
+    const p1Tier = (p1Rule && p1Rule.active && p1Rule.tiers[0]) ? p1Rule.tiers[0] : null;
+    const p3Tier = (p3Rule && p3Rule.active && p3Rule.tiers[0]) ? p3Rule.tiers[0] : null;
+
+    const p1Rate     = p1Tier ? Number(p1Tier.payout_value) : _commGetConfig('upsell_sku', 'p1_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01 (changed 2026-06-11, default never updated)
+    const p3Rate     = p3Tier ? Number(p3Tier.payout_value) : _commGetConfig('upsell_sku', 'p3_rate', 0.01);       // v835-fix: default was 0.03, live Supabase = 0.01
+    const p3Thresh   = (p3Rule && p3Rule.params.threshold_pct != null) ? Number(p3Rule.params.threshold_pct) : _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00); // 150% = 50% growth
+    const p3MinIncr  = (p3Rule && p3Rule.params.min_incremental != null) ? Number(p3Rule.params.min_incremental) : _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
+    const p1MinGmv   = (p1Tier && p1Tier.min_value != null) ? Number(p1Tier.min_value) : _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
     // MTD mode — commission on actual amounts, no projection
     // MTD mode — actual MTD vs full month baseline, no day scaling
@@ -378,7 +436,7 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride) {
 // ── Upsell Outlet Engine ────────────────────────────────────────
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
-function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
+function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride, planCode, previewResolver) {
   // v244: rewritten to use bulkOutletsData via _tgtComputeKamNRR (portview logic)
   // Expansion = outlet never seen in any historical data (consistent with portview Expansion tab)
   // Comeback excluded — irregular buying patterns shouldn't earn outlet commission
@@ -388,7 +446,10 @@ function _commComputeUpsellOutlet(kamEmail, qnrrRaw, periodOverride) {
   // meaning outlets got wrongly INCLUDED in P1/P3 instead of excluded (or vice versa).
   const EMPTY = { outlet_gmv:0, commission:0, expansion_gmv:0, expansion_outlets:[], _expansionIds: new Set() };
   try {
-    const rate = _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
+    // v878 (phase 4): prefer the assigned scheme's own rule when one exists.
+    const outletRule = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'outlet_expansion', previewResolver) : null;
+    const outletTier = (outletRule && outletRule.active && outletRule.tiers[0]) ? outletRule.tiers[0] : null;
+    const rate = outletTier ? Number(outletTier.payout_value) : _commGetConfig('upsell_outlet', 'rate', 0.005); // v835-fix: default was 0.015, live Supabase = 0.005
 
     if (qnrrRaw) {
       // v860-fix: was reading only qnrrRaw.currentPeriod's single month — the
@@ -542,7 +603,7 @@ function _commGetHandoverGmvTiers() {
 // in /nrr's nrrComputeHandoverForKam (nrr_commission.js) — keep both in sync,
 // this is the SECOND place these two functions must match exactly (see the
 // divergence-bug note there).
-function _commComputeHandoverRetention(kamEmail) {
+function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
   // V3 Tactic B:
   // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
   // - Filter: prevOwner === 'SALE' เท่านั้น (PM/ADMIN/KAM ไม่นับ)
@@ -603,7 +664,15 @@ function _commComputeHandoverRetention(kamEmail) {
     const retentionPct = baselineNorm > 0 ? Math.round((perfNorm / baselineNorm * 100) * 10) / 10 : 0;
 
     let tier = 0, payout = 0, gmvTierLabel = null;
-    const gmvTiers = _commGetHandoverGmvTiers();
+    // v878 (phase 5): prefer the assigned scheme's own 'handover' rule
+    // (nested GMV-tier ladder doesn't fit the flat commission_rule_tiers
+    // table, so it lives in the rule's tier_config jsonb column instead —
+    // see the phase-1 migration) when one exists; otherwise fall back to
+    // the legacy global target_settings blob exactly as before.
+    const handoverRule = planCode ? _commResolveRuleForMetric(planCode, 'handover', null, previewResolver) : null;
+    const gmvTiers = (handoverRule && handoverRule.active && handoverRule.tier_config && Array.isArray(handoverRule.tier_config.gmv_tiers))
+      ? handoverRule.tier_config.gmv_tiers
+      : _commGetHandoverGmvTiers();
     if (gmvTiers.length) {
       // GMV-tier mode: aggregate baseline GMV picks ONE bucket, then a
       // best-match scan (highest threshold cleared wins) over that
@@ -653,23 +722,33 @@ function _commComputeHandoverRetention(kamEmail) {
 
 // ── GMV Gate Engine ─────────────────────────────────────────────
 // Returns { ach_pct, cap_multiplier, gate_active }
-// KAM-only: TL does not have GMV Gate
-function _commComputeGmvGate(kamEmail, nrrPct) {
+// v878 (phase 3): planCode optional — when the assigned scheme has its own
+// 'portfolio_gate' rule (tiers keyed on %NRR, payout_value = multiplier),
+// use that; otherwise fall back to the legacy global target_settings blob
+// exactly as before (this is the only path today, since no scheme has been
+// migrated to a per-scheme gate rule yet — see the phase-3 seed migration).
+// No longer hardcoded KAM-only: the restriction now lives in whether a
+// role's assigned scheme includes this component at all, not in code.
+function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
   // Gate based on NRR% — same metric already computed in _commBuildKamPayout
   // nrrPct passed in directly (no need to recompute GMV separately)
   try {
-    const t1 = _commGetConfig('gmv_gate', 'threshold_1', 98); // v835-fix: default was 95, live Supabase = 98 — NRR% threshold
-    const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
-    const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
-    const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
-
     if (nrrPct === null || nrrPct === undefined) {
       return { ach_pct: null, cap_multiplier: 1.0, gate_active: false };
     }
 
     let cap = 1.0;
-    if (nrrPct < t2)      cap = c2;
-    else if (nrrPct < t1) cap = c1;
+    const tierMatch = planCode ? _commMatchComponentTier(planCode, 'portfolio_gate', null, nrrPct, previewResolver) : null;
+    if (tierMatch) {
+      cap = Number(tierMatch.payout_value ?? 1.0);
+    } else {
+      const t1 = _commGetConfig('gmv_gate', 'threshold_1', 98); // v835-fix: default was 95, live Supabase = 98 — NRR% threshold
+      const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
+      const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
+      const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
+      if (nrrPct < t2)      cap = c2;
+      else if (nrrPct < t1) cap = c1;
+    }
 
     return {
       ach_pct: nrrPct,
@@ -686,7 +765,7 @@ function _commComputeGmvGate(kamEmail, nrrPct) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride) {
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, planCode, previewResolver) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     const kamEmails = Array.from(new Set(
@@ -724,24 +803,35 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride) {
 
     const upsellPct = teamBaselineGmv > 0 ? (teamUpsellGmv / teamBaselineGmv * 100) : 0;
 
-    // Tier lookup from commission_rules tl_upsell_mult tiers
+    // v878 (phase 3): tier lookup — prefer the assigned scheme's own
+    // 'tl_upsell_mult' rule (commission_rule_tiers shape: min_value/
+    // max_value/payout_value, payout_value=multiplier) via
+    // _commMatchComponentTier; fall back to the exact same hardcoded
+    // default tiers as before when no scheme has this component configured
+    // yet. Previously read `_commRuleConfig.rules['tl_upsell_mult']`, a key
+    // that could never match (rules is keyed by plan_id, not metric_code) —
+    // always silently fell through to the hardcoded defaults below.
     // Default tiers per spec: <2%=1.0x, 2-2.9%=1.2x, 3-3.9%=1.35x, 4-4.9%=1.5x, ≥5%=1.8x
     let multiplier = 1.0, tier = 1;
     try {
-      const rules = (_commRuleConfig && _commRuleConfig.rules && _commRuleConfig.rules['tl_upsell_mult']) || [];
-      const tiers = (rules[0] && rules[0].tiers) ? rules[0].tiers : [
-        { min_pct:0, max_pct:1.99, multiplier:1.00 },
-        { min_pct:2, max_pct:2.99, multiplier:1.20 },
-        { min_pct:3, max_pct:3.99, multiplier:1.35 },
-        { min_pct:4, max_pct:4.99, multiplier:1.50 },
-        { min_pct:5, max_pct:null, multiplier:1.80 }
-      ];
-      tiers.sort((a,b) => Number(a.min_pct||0) - Number(b.min_pct||0));
-      for (let i = tiers.length - 1; i >= 0; i--) {
-        if (upsellPct >= Number(tiers[i].min_pct || 0)) {
-          multiplier = Number(tiers[i].multiplier || 1.0);
-          tier = i + 1;
-          break;
+      const tierMatch = planCode ? _commMatchComponentTier(planCode, 'tl_upsell_mult', null, upsellPct, previewResolver) : null;
+      if (tierMatch) {
+        multiplier = Number(tierMatch.payout_value ?? 1.0);
+        tier = tierMatch.tier_order || 1;
+      } else {
+        const tiers = [
+          { min_pct:0, max_pct:1.99, multiplier:1.00 },
+          { min_pct:2, max_pct:2.99, multiplier:1.20 },
+          { min_pct:3, max_pct:3.99, multiplier:1.35 },
+          { min_pct:4, max_pct:4.99, multiplier:1.50 },
+          { min_pct:5, max_pct:null, multiplier:1.80 }
+        ];
+        for (let i = tiers.length - 1; i >= 0; i--) {
+          if (upsellPct >= Number(tiers[i].min_pct || 0)) {
+            multiplier = Number(tiers[i].multiplier || 1.0);
+            tier = i + 1;
+            break;
+          }
         }
       }
     } catch(e) {}
@@ -757,7 +847,18 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride) {
 
 // ── KAM Full Payout Builder ─────────────────────────────────────
 // Returns complete breakdown for one KAM
-function _commBuildKamPayout(kamEmail, periodOverride) {
+// v878 (phase 8): planRole (optional, defaults to 'kam' — byte-identical to
+// before for every existing caller) is the REAL engine role bucket used
+// ONLY for commission-plan/tier resolution (_commGetAssignmentPlan/
+// _commPayoutForPctByCode) — this is what makes a pm/ad/etc person's own
+// assigned scheme apply instead of always resolving as if they were a kam.
+// The 'kam' literal passed to _qnrrComputeForCommission/_tgtComputeKamNRR
+// below is a DIFFERENT concept (data-scope: "this person's own portfolio,
+// not a team rollup") and correctly stays 'kam' regardless of planRole —
+// pm/ad people's own-portfolio NRR is still looked up by email the same
+// way, per the same bulkQnrrData index a KAM's is.
+function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver) {
+  const role = planRole || 'kam';
   try {
     const period  = periodOverride || _nrrExclusionCurrentPeriod();
     // v829: resolve policy for the PERIOD BEING COMPUTED, not always "today" — matters when
@@ -782,8 +883,8 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
     governedPct = _nrrGovernedPct(raw, kamEmail, null);
     pct         = governedPct !== null ? governedPct : rawPct;
 
-    const planCode  = _commGetAssignmentPlan(period, 'kam', kamEmail, 'kam');
-    const nrrPayout = _commPayoutForPctByCode(planCode, 'kam', pct);
+    const planCode  = _commGetAssignmentPlan(period, role, kamEmail, role);
+    const nrrPayout = _commPayoutForPctByCode(planCode, role, pct);
 
     // ── Upsell ────────────────────────────────────────────────────
     // [quarterly] Expansion GMV comes from qnrrResult (bulkQnrrData), Upsell SKU uses pin window
@@ -814,9 +915,16 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       // Fast path: use pre-computed totals from team summary (sense_upsell_team.csv)
       // v230fix2: return full p1/p3 sub-objects matching _commComputeUpsellSku structure
       // so _commBuildSnapshotRows can safely access .p1.gmv / .p3.gmv_incremental
-      const p1Rate  = _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
-      const p3Rate  = _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
-      const outRate = _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
+      // v878 (phase 4): same per-scheme-rule-first, blob-fallback resolution
+      // as the slow path below (_commComputeUpsellSku/_commComputeUpsellOutlet)
+      // — keeps the fast (team-summary CSV) path's rates consistent with the
+      // slow path's for any KAM who might hit either branch across sessions.
+      const _p1R = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'p1_new_sku', previewResolver) : null;
+      const _p3R = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'p3_growth', previewResolver) : null;
+      const _outR = planCode ? _commResolveRuleForMetric(planCode, 'upsell_gmv', 'outlet_expansion', previewResolver) : null;
+      const p1Rate  = (_p1R && _p1R.active && _p1R.tiers[0]) ? Number(_p1R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
+      const p3Rate  = (_p3R && _p3R.active && _p3R.tiers[0]) ? Number(_p3R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
+      const outRate = (_outR && _outR.active && _outR.tiers[0]) ? Number(_outR.tiers[0].payout_value) : _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
       const p1Comm  = _teamRow.p1_gmv   * p1Rate;
       const p3Comm  = _teamRow.p3_incr  * p3Rate;
       const outComm = _teamRow.outlet_gmv * outRate;
@@ -831,12 +939,12 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
       };
       upsellOutlet = { commission: outComm, outlet_gmv: _teamRow.outlet_gmv };
     } else {
-      upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride);
+      upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride, planCode, previewResolver);
       // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
-      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo);
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo, planCode, previewResolver);
     }
-    const handover = _commComputeHandoverRetention(kamEmail); // MoM always — do not touch
-    const gate     = _commComputeGmvGate(kamEmail, pct);
+    const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver); // MoM always — do not touch
+    const gate     = _commComputeGmvGate(kamEmail, pct, planCode, previewResolver);
 
     const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
     const finalPayout = Math.round(subtotal * gate.cap_multiplier);
@@ -867,7 +975,7 @@ function _commBuildKamPayout(kamEmail, periodOverride) {
 }
 
 // ── TL Full Payout Builder ──────────────────────────────────────
-function _commBuildTlPayout(tlEmail, periodOverride) {
+function _commBuildTlPayout(tlEmail, periodOverride, previewResolver) {
   try {
     const period = periodOverride || _nrrExclusionCurrentPeriod();
     // v829: resolve policy for the period being computed, not always "today" (see _commBuildKamPayout)
@@ -889,7 +997,7 @@ function _commBuildTlPayout(tlEmail, periodOverride) {
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
     const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ, baseMo);
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ, baseMo, planCode, previewResolver);
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
@@ -921,7 +1029,7 @@ async function loadTargets(quarter) {
     _tgtCache = { ...hit.cache };
     _tgtSettings = { ...hit.settings };
     _nrrGovPolicies = { ...(hit.nrrPolicies || {}) };
-    _commRuleConfig = JSON.parse(JSON.stringify(hit.commRules || {plans:{},rules:{},tiers:{}}));
+    _commRuleConfig = JSON.parse(JSON.stringify(hit.commRules || {plans:{},rules:{},tiers:{},componentRules:{}}));
     _nrrExclusions = JSON.parse(JSON.stringify(hit.nrrExclusions || []));
     _commissionSnapshots = JSON.parse(JSON.stringify(hit.commissionSnapshots || []));
     _tgtLoaded = true;
@@ -934,7 +1042,7 @@ async function loadTargets(quarter) {
   _tgtSettings = { nrr_threshold: 98 };
   _tgtSettingsLoadFailed = false; // v835-fix: reset each fresh load attempt
   _nrrGovPolicies = {};
-  _commRuleConfig = { plans:{}, rules:{}, tiers:{} };
+  _commRuleConfig = { plans:{}, rules:{}, tiers:{}, componentRules:{} };
   _nrrExclusions = [];
   _commissionSnapshots = [];
   try {
@@ -1010,16 +1118,36 @@ async function loadTargets(quarter) {
   }
 
   try {
+    // v878 (phase 8/9): roster of pm/admin/sales/sales_tl/ad/ad_tl people —
+    // profiles is the real source of truth for "who has this role" (unlike
+    // portviewBulkData/_buildKamGroups, which are kam/tl-only by construction).
+    const { data: otherRoleRows, error: otherRoleErr } = await supa.from('profiles')
+      .select('email,role,full_name')
+      .in('role', ['pm','admin','sales','sales_tl','ad','ad_tl']);
+    if (otherRoleErr) throw new Error(otherRoleErr.message);
+    _commOtherRoleRoster = (otherRoleRows || [])
+      .filter(p => p && p.email)
+      .map(p => ({ email: p.email, role: _commEngineRole(p.role), name: p.full_name || p.email }));
+  } catch (e) {
+    console.warn('[Commission other-role roster] load failed:', e.message);
+    _commOtherRoleRoster = [];
+  }
+
+  try {
     // v210c: load the full Rule Library, not only the two standard plans.
+    // v878 (phase 3): widened from ['tl','kam'] to all 8 canonical roles —
+    // additive only, existing tl/kam plans/behavior unaffected, just no
+    // longer hides plans an admin creates for pm/admin/ad/etc.
+    const _COMM_ALL_ROLES = ['tl','kam','pm','admin','sales','sales_tl','ad','ad_tl'];
     let { data: plans, error: planErr } = await supa.from('commission_plans')
       .select('id,plan_code,plan_name,beneficiary_role,status')
-      .in('beneficiary_role', ['tl','kam'])
+      .in('beneficiary_role', _COMM_ALL_ROLES)
       .neq('status', 'inactive')
       .order('created_at', { ascending:true });
     if (planErr && /created_at/.test(planErr.message || '')) {
       const fb = await supa.from('commission_plans')
         .select('id,plan_code,plan_name,beneficiary_role,status')
-        .in('beneficiary_role', ['tl','kam'])
+        .in('beneficiary_role', _COMM_ALL_ROLES)
         .neq('status', 'inactive');
       plans = fb.data; planErr = fb.error;
     }
@@ -1037,15 +1165,29 @@ async function loadTargets(quarter) {
     if (!planMap.TL_NRR_STD) planMap.TL_NRR_STD = { plan_code:'TL_NRR_STD', plan_name:'TL NRR Standard', beneficiary_role:'tl', status:'active' };
     if (!planMap.KAM_NRR_STD) planMap.KAM_NRR_STD = { plan_code:'KAM_NRR_STD', plan_name:'KAM NRR Standard', beneficiary_role:'kam', status:'active' };
 
-    let ruleMap = {}, tierMap = {};
+    let ruleMap = {}, tierMap = {}, componentRuleMap = {};
     if (planIds.length) {
+      // v878 (phase 3): fetch ALL metric_codes now (was .eq('metric_code','nrr')).
+      // NRR rows still land in ruleMap keyed by plan_id exactly as before — the
+      // existing Rule Library editor (_commGetDraft/_commSetDraft/
+      // saveCommissionRules) reads/writes that exact shape and is left
+      // untouched. Every OTHER metric_code (portfolio_gate, tl_upsell_mult,
+      // upsell_gmv, handover) goes into a NEW parallel componentRuleMap keyed
+      // by plan_id+metric_code+metric_variant, read only by the new
+      // _commGetRuleForMetric() — zero risk to the working NRR flow.
       const { data: rules, error: ruleErr } = await supa.from('commission_rules')
-        .select('id,plan_id,metric_code,measurement_scope,payout_type,stacking_mode,active')
-        .in('plan_id', planIds)
-        .eq('metric_code', 'nrr');
+        .select('id,plan_id,metric_code,metric_variant,measurement_scope,payout_type,stacking_mode,active,params,tier_config')
+        .in('plan_id', planIds);
       if (ruleErr) throw new Error(ruleErr.message);
       const ruleIds = [];
-      (rules || []).forEach(r => { ruleMap[r.plan_id] = r; ruleIds.push(r.id); });
+      (rules || []).forEach(r => {
+        ruleIds.push(r.id);
+        if (r.metric_code === 'nrr') {
+          ruleMap[r.plan_id] = r;
+        } else {
+          componentRuleMap[`${r.plan_id}|${r.metric_code}|${r.metric_variant || ''}`] = r;
+        }
+      });
       if (ruleIds.length) {
         const { data: tiers, error: tierErr } = await supa.from('commission_rule_tiers')
           .select('id,rule_id,tier_order,min_value,max_value,payout_value,payout_label')
@@ -1080,10 +1222,10 @@ async function loadTargets(quarter) {
       assignments = [];
     }
 
-    _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap, assignments };
+    _commRuleConfig = { plans: planMap, rules: ruleMap, tiers: tierMap, assignments, componentRules: componentRuleMap };
   } catch (e) {
     console.warn('[Commission rules] load failed (tables may not exist yet):', e.message);
-    _commRuleConfig = { plans: {}, rules: {}, tiers: {}, assignments: [] };
+    _commRuleConfig = { plans: {}, rules: {}, tiers: {}, assignments: [], componentRules: {} };
   }
 
   // v835-fix: never cache a quarter's state if target_settings failed to load —
@@ -1836,11 +1978,46 @@ function _commDefaultTiers(role) {
   // ป้องกัน stale tier (฿5,000/฿7,500 เก่า) flash ก่อน DB data มา
   return [];
 }
-function _commPlanCode(role) {
-  return role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
+// v878: maps profiles.role (normalizeRole() output: admin/tl/rep/sales/
+// sales_tl/ad/ad_tl/pm) to the commission engine's own beneficiary-role
+// bucket vocabulary ('kam' for 'rep', everything else passes through).
+// This is the ONLY place that vocabulary translation happens — nothing
+// downstream should special-case profiles.role strings again.
+function _commEngineRole(profileRole) {
+  const r = (typeof normalizeRole === 'function') ? normalizeRole(profileRole) : String(profileRole || '');
+  return r === 'rep' ? 'kam' : r;
 }
+window._commEngineRole = _commEngineRole;
+
+// v878: bootstrap seed plan per engine role bucket — used ONLY as the
+// last-resort fallback when no role_default/person assignment row exists
+// at all (see _commGetAssignmentPlan's 3-tier resolution). This is NOT
+// "the admin's current choice" — that lives in commission_plan_assignments
+// and always wins when present. kam/tl values are unchanged from before
+// this generalization; the rest have no real scheme configured yet, so
+// they resolve to a plan_code that doesn't exist in commission_plans —
+// harmless, since every per-component compute function treats "no rule
+// row found for this plan_code" as "component inactive," not an error.
+const _COMM_BOOTSTRAP_PLAN = {
+  kam: 'KAM_NRR_STD', tl: 'TL_NRR_STD',
+  pm: 'PM_NRR_STD', admin: 'ADMIN_NRR_STD',
+  sales: 'SALES_NRR_STD', sales_tl: 'SALES_TL_NRR_STD',
+  ad: 'AD_NRR_STD', ad_tl: 'AD_TL_NRR_STD'
+};
+function _commPlanCode(role) {
+  return _COMM_BOOTSTRAP_PLAN[role] || _COMM_BOOTSTRAP_PLAN.kam;
+}
+// v878 (phase 6): widened alongside _commPlanCode's bootstrap map — tl/kam
+// unchanged, other roles get a sensible default label until an admin
+// renames their scheme via the Cockpit.
+const _COMM_BOOTSTRAP_PLAN_NAME = {
+  kam: 'KAM NRR Standard', tl: 'TL NRR Standard',
+  pm: 'PM NRR Standard', admin: 'Admin NRR Standard',
+  sales: 'Sales NRR Standard', sales_tl: 'Sales TL NRR Standard',
+  ad: 'AD NRR Standard', ad_tl: 'AD TL NRR Standard'
+};
 function _commPlanName(role) {
-  return role === 'tl' ? 'TL NRR Standard' : 'KAM NRR Standard';
+  return _COMM_BOOTSTRAP_PLAN_NAME[role] || _COMM_BOOTSTRAP_PLAN_NAME.kam;
 }
 function _commGetDraft(role) {
   const code = _commPlanCode(role);
@@ -1901,9 +2078,11 @@ function _commSetDraftByCode(planCode, draft) {
   };
 }
 function _commCreateRule(role) {
-  const prefix = role === 'tl' ? 'TL_NRR_RULE' : 'KAM_NRR_RULE';
+  // v878 (phase 6): widened from the tl/kam-only ternary to any of the 8
+  // engine role buckets, mirroring _commPlanCode's bootstrap map.
+  const prefix = `${String(role || 'kam').toUpperCase()}_NRR_RULE`;
   const code = `${prefix}_${Date.now().toString().slice(-6)}`;
-  const name = role === 'tl' ? 'New TL NRR Rule' : 'New KAM NRR Rule';
+  const name = `New ${_commPlanName(role)}`;
   const draft = {
     role,
     plan_code: code,
@@ -1980,6 +2159,31 @@ function _commPayoutForPctByCode(planCode, role, pct) {
   const t = _commMatchTierByCode(planCode || _commPlanCode(role), role, pct);
   return t ? Number(t.payout_value || 0) : 0;
 }
+
+// v878 (phase 3): same min_value/max_value tier-matching algorithm as
+// _commMatchTierByCode (lowest-inclusive, highest-exclusive-unless-null),
+// but sourced from a component's own per-scheme rule (via
+// _commGetRuleForMetric) instead of the NRR-only rules/tiers maps
+// _commMatchTierByCode is hardwired to. Returns null if this scheme has no
+// rule row for this component yet — caller decides the legacy fallback.
+// v879: pure tier-match logic, taking an already-resolved `found` object
+// (same shape _commGetRuleForMetric returns) instead of resolving it
+// internally — lets the preview path inject a draft `found` object
+// (tiers included inline) without a second id-keyed tiers lookup.
+function _commMatchTierInRule(found, pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return null;
+  if (!found || !found.active || !found.tiers.length) return null;
+  const tiers = found.tiers.slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
+  for (const t of tiers) {
+    const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
+    const maxOk = (t.max_value === null || t.max_value === '' || pct < Number(t.max_value));
+    if (minOk && maxOk) return t;
+  }
+  return null;
+}
+function _commMatchComponentTier(planCode, metricCode, metricVariant, pct, previewResolver) {
+  return _commMatchTierInRule(_commResolveRuleForMetric(planCode, metricCode, metricVariant, previewResolver), pct);
+}
 function _commFmtPayout(n) {
   n = Number(n || 0);
   if (!n) return '฿0';
@@ -2001,7 +2205,12 @@ function _commPendingCount() {
   return Object.keys(_commRulePending || {}).length
        + Object.keys(_commAssignmentPending || {}).length
        + Object.keys(_nrrGovPending || {}).length
-       + Object.keys((typeof _commComponentPending !== 'undefined' ? _commComponentPending : {})).length;
+       + Object.keys((typeof _commComponentPending !== 'undefined' ? _commComponentPending : {})).length
+       // v879 (Commission Setup redesign): the new per-scheme component
+       // draft map (Gate/Upsell/Handover/TL-mult edited via the Setup tab)
+       // — without this, editing e.g. only a Handover tier on an already-
+       // active role would show "No changes" and block Save entirely.
+       + Object.keys((typeof _commComponentRulePending !== 'undefined' ? _commComponentRulePending : {})).length;
 }
 function _commHasPendingChanges() {
   return _commPendingCount() > 0;
@@ -2262,6 +2471,11 @@ function _commBuildSnapshotRows(periodOverride) {
   tls.filter(t => t.email).forEach(tl => {
     // v826: thread periodOverride so retroactive/auto-compute freezes the correct historical month
     const tlPayout = _commBuildTlPayout(tl.email, periodOverride);
+    // v878 (phase 7): resolve+freeze which scheme actually produced this
+    // payout — populates the previously-dead assigned_plan_id FK and gives
+    // TL rows a config_snapshot for the first time (previously none at all).
+    const tlPlanCode = _commGetAssignmentPlan(period, 'tl', tl.email, 'tl');
+    const tlPlanRowId = ((_commRuleConfig && _commRuleConfig.plans) || {})[tlPlanCode]?.id || null;
     rows.push({
       period_month: period,
       beneficiary_role: 'tl',
@@ -2271,6 +2485,7 @@ function _commBuildSnapshotRows(periodOverride) {
       governed_nrr_pct: tlPayout.nrr_pct,
       payout_amount: tlPayout.final_payout,
       snapshot_status: 'final',
+      assigned_plan_id: tlPlanRowId,
       breakdown: {
         version: 1,
         computed_at: new Date().toISOString(),
@@ -2282,7 +2497,12 @@ function _commBuildSnapshotRows(periodOverride) {
         nrr_payout: tlPayout.nrr_payout,
         upsell_mult: tlPayout.upsell_mult,
         final_payout: tlPayout.final_payout,
-        excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email)
+        excluded_base_gmv: _nrrExclusionBaseImpact(null, tl.email),
+        config_snapshot: {
+          assigned_plan_code: tlPlanCode,
+          assigned_plan_id: tlPlanRowId,
+          tl_upsell_mult_tier: tlPayout.upsell_mult
+        }
       },
       created_by: actor,
       updated_by: actor
@@ -2294,6 +2514,10 @@ function _commBuildSnapshotRows(periodOverride) {
     if (!g.kamEmail) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
     const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
+    // v878 (phase 7): resolve+freeze which scheme actually produced this
+    // payout — populates the previously-dead assigned_plan_id FK.
+    const kamPlanCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
+    const kamPlanRowId = ((_commRuleConfig && _commRuleConfig.plans) || {})[kamPlanCode]?.id || null;
     rows.push({
       period_month: period,
       beneficiary_role: 'kam',
@@ -2303,6 +2527,7 @@ function _commBuildSnapshotRows(periodOverride) {
       governed_nrr_pct: kamPayout.nrr_pct,
       payout_amount: kamPayout.final_payout,
       snapshot_status: 'final',
+      assigned_plan_id: kamPlanRowId,
       breakdown: {
         version: 1,
         computed_at: new Date().toISOString(),
@@ -2365,8 +2590,21 @@ function _commBuildSnapshotRows(periodOverride) {
         } catch(e){return []} })(),
         lock_trigger: 'manual',
         csv_data_as_of: new Date().toISOString(),
-        // Config snapshot — freeze param values at time of snapshot for audit
+        // Config snapshot — freeze param values at time of snapshot for audit.
+        // v878 (phase 7): added assigned_plan_code/id (which scheme actually
+        // computed this row — previously not recorded anywhere) and the
+        // Handover gmv_tiers ladder actually in effect (previously only the
+        // resolved tier/payout were frozen, never the ladder that produced
+        // them). The scalar rates below still read the legacy global blob
+        // directly — correct today because every currently-active
+        // per-scheme component rule was seeded to match those blob values
+        // exactly (see phases 3-5's seed migrations), but once the Cockpit
+        // gains a per-scheme component editor (deferred, phase 6 scope
+        // note) this must switch to reading the resolved values kamPayout
+        // actually used instead of re-reading global config after the fact.
         config_snapshot: {
+          assigned_plan_code:           kamPlanCode,
+          assigned_plan_id:             kamPlanRowId,
           upsell_sku_p1_rate:           _commGetConfig('upsell_sku','p1_rate',0.01),   // v835-fix: was 0.03
           upsell_sku_p3_rate:           _commGetConfig('upsell_sku','p3_rate',0.01),   // v835-fix: was 0.03
           upsell_sku_p3_threshold_pct:  _commGetConfig('upsell_sku','p3_threshold_pct',2.00),
@@ -2376,7 +2614,71 @@ function _commBuildSnapshotRows(periodOverride) {
           gmv_gate_threshold_1:         _commGetConfig('gmv_gate','threshold_1',98),   // v835-fix: was 95
           gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',95),   // v835-fix: was 90
           gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.3),        // v835-fix: was 0.70
-          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0)           // v835-fix: was 0.35
+          gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0),          // v835-fix: was 0.35
+          handover_gmv_tiers:           _commGetHandoverGmvTiers()
+        }
+      },
+      created_by: actor,
+      updated_by: actor
+    });
+  });
+
+  // v878 (phase 8): other-role roster (pm/admin/sales/sales_tl/ad/ad_tl),
+  // sourced from `profiles` via loadTargets() — mirrors the kam branch's
+  // breakdown shape (same _commBuildKamPayout return shape for any role)
+  // since none of these roles have a TL concept, team_lead_email stays null.
+  const otherRoster = role === 'admin'
+    ? _commOtherRoleRoster
+    : _commOtherRoleRoster.filter(p => p.email === actor);
+  otherRoster.forEach(person => {
+    const personPayout = _commBuildKamPayout(person.email, periodOverride, person.role);
+    const personPlanCode = _commGetAssignmentPlan(period, person.role, person.email, person.role);
+    const personPlanRowId = ((_commRuleConfig && _commRuleConfig.plans) || {})[personPlanCode]?.id || null;
+    rows.push({
+      period_month: period,
+      beneficiary_role: person.role,
+      beneficiary_email: person.email,
+      team_lead_email: null,
+      raw_nrr_pct: personPayout.nrr_pct,
+      governed_nrr_pct: personPayout.nrr_pct,
+      payout_amount: personPayout.final_payout,
+      snapshot_status: 'final',
+      assigned_plan_id: personPlanRowId,
+      breakdown: {
+        version: 1,
+        computed_at: new Date().toISOString(),
+        period,
+        baseline_month: (bulkUpsellData && bulkUpsellData.baselineLabel) || '',
+        type: 'kam_full',
+        role: person.role,
+        kam_name: person.name || person.email,
+        nrr_pct: personPayout.nrr_pct,
+        nrr_payout: personPayout.nrr_payout,
+        upsell_sku: {
+          total_commission: personPayout.upsell_sku.total_comm,
+          p1: { gmv: personPayout.upsell_sku.p1.gmv, comm: personPayout.upsell_sku.p1.comm,
+                groups: personPayout.upsell_sku.p1.groups },
+          p3: { gmv_incremental: personPayout.upsell_sku.p3.gmv_incremental,
+                comm: personPayout.upsell_sku.p3.comm, groups: personPayout.upsell_sku.p3.groups }
+        },
+        upsell_outlet: personPayout.upsell_outlet,
+        handover: { accounts: personPayout.handover.accounts,
+                    baseline_gmv: personPayout.handover.baseline_gmv,
+                    current_gmv: personPayout.handover.current_gmv,
+                    retention_pct: personPayout.handover.retention_pct,
+                    tier: personPayout.handover.tier,
+                    payout: personPayout.handover.payout,
+                    detail: personPayout.handover.detail,
+                    gmv_tier_label: personPayout.handover.gmv_tier_label,
+                    gmv_bucket_gmv: personPayout.handover.gmv_bucket_gmv },
+        components_subtotal: personPayout.subtotal,
+        gmv_gate: personPayout.gate,
+        final_payout: personPayout.final_payout,
+        excluded_base_gmv: _nrrExclusionBaseImpact(person.email, null),
+        account_count: 0,
+        config_snapshot: {
+          assigned_plan_code: personPlanCode,
+          assigned_plan_id: personPlanRowId
         }
       },
       created_by: actor,

@@ -66,6 +66,7 @@
       document.body.classList.toggle('role-sales-tl',  r==='sales_tl');
       document.body.classList.toggle('role-ad',        r==='ad');
       document.body.classList.toggle('role-ad-tl',     r==='ad_tl');
+      document.body.classList.toggle('role-pm',        r==='pm');
       document.body.setAttribute('data-role', r);
     }catch(e){}
     return r;

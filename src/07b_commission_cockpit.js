@@ -19,9 +19,10 @@ function ensureCommissionCockpitOverlay() {
       </div>
       <div class="comm-steps">
         <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
-        <button class="comm-step" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">2 Assignment</button>
-        <button class="comm-step" id="comm-step-rules" onclick="switchCommissionStep('rules')">3 Rules</button>
-        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">4 Preview<br>& Lock</button>
+        <button class="comm-step" id="comm-step-setup" onclick="switchCommissionStep('setup')">2 Setup</button>
+        <button class="comm-step comm-step-advanced" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">3 Assignment</button>
+        <button class="comm-step comm-step-advanced" id="comm-step-rules" onclick="switchCommissionStep('rules')">4 Rules</button>
+        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">5 Preview<br>& Lock</button>
       </div>
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
@@ -146,10 +147,31 @@ function _commAssignmentKey(period, scope, assignee) {
 function _commGetAssignmentPlan(period, scope, assignee, role) {
   const key = _commAssignmentKey(period, scope, assignee);
   if (_commAssignmentPending[key]) return _commActivePlanCode(_commAssignmentPending[key], role);
+
+  // Tier 1: person-level override (existing behavior, unchanged).
   const found = ((_commRuleConfig && _commRuleConfig.assignments) || []).find(a => a.period_month === period && a.assignment_scope === scope && a.assignee_key === assignee);
-  if (!found) return _commPlanCode(role);
-  const rawCode = found.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===found.plan_id)?.plan_code || _commPlanCode(role);
-  return _commActivePlanCode(rawCode, role);
+  if (found) {
+    const rawCode = found.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===found.plan_id)?.plan_code || _commPlanCode(role);
+    return _commActivePlanCode(rawCode, role);
+  }
+
+  // Tier 2 (v878): role-wide default, admin-configurable in the Cockpit's
+  // Assignment step (assignee_key holds the role bucket itself, not an
+  // email, for assignment_scope='role_default'). Falls through to the
+  // hardcoded bootstrap (tier 3) if no admin has set one yet — this makes
+  // tier 2 a true no-op for kam/tl until the Cockpit UI (phase 6) ships,
+  // since the phase-1 migration seeded role_default rows pointing at the
+  // exact same STD plan _commPlanCode already returns for them.
+  const roleDefaultKey = _commAssignmentKey(period, 'role_default', role);
+  if (_commAssignmentPending[roleDefaultKey]) return _commActivePlanCode(_commAssignmentPending[roleDefaultKey], role);
+  const roleDefault = ((_commRuleConfig && _commRuleConfig.assignments) || []).find(a => a.period_month === period && a.assignment_scope === 'role_default' && a.assignee_key === role);
+  if (roleDefault) {
+    const rawCode = roleDefault.plan_code || Object.values(((_commRuleConfig&&_commRuleConfig.plans)||{})).find(p=>p.id===roleDefault.plan_id)?.plan_code || _commPlanCode(role);
+    return _commActivePlanCode(rawCode, role);
+  }
+
+  // Tier 3: hardcoded bootstrap seed (last resort, never business-configured).
+  return _commPlanCode(role);
 }
 function _commSetAssignment(period, scope, assignee, planCode) {
   _commAssignmentPending[_commAssignmentKey(period, scope, assignee)] = planCode;
@@ -227,6 +249,82 @@ function _commBuildTeamPreviewGroups() {
   return Object.values(tlMap).sort((a,b)=>b.total-a.total);
 }
 
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_COMPONENT_DRAFTS (Commission Setup redesign, phase 1)
+// New per-scheme draft/preview layer for the 5 non-NRR components (Gate,
+// Upsell P1/P3/Expansion, Handover, TL-mult). Fully separate from the OLD
+// global-blob path (_commComponentPending/saveCommissionComponentRates,
+// which stays untouched and reachable only via the Advanced tab).
+//
+// Keyed by plan_code (not plan.id) — a brand-new, never-saved role's plan
+// has id:null, so keying by id would make previewing a new role's
+// components permanently impossible. Mirrors the proven NRR pattern
+// (_commRulePending is also plan_code-keyed).
+let _commComponentRulePending = {};
+
+function _commComponentDraftKey(planCode, metricCode, metricVariant) {
+  return `${planCode}|${metricCode}|${metricVariant || ''}`;
+}
+
+// Read the current value for an editor: pending draft first, else the real
+// saved rule (if this plan has been persisted), else null (unconfigured).
+function _commGetComponentDraft(planCode, metricCode, metricVariant) {
+  const key = _commComponentDraftKey(planCode, metricCode, metricVariant);
+  if (Object.prototype.hasOwnProperty.call(_commComponentRulePending, key)) return _commComponentRulePending[key];
+  return (typeof _commGetRuleForMetric === 'function') ? _commGetRuleForMetric(planCode, metricCode, metricVariant) : null;
+}
+
+// Lazily create a draft (cloned from the real saved rule if one exists,
+// else a sensible empty shape) so an editor has something to mutate.
+function _commEnsureComponentDraft(planCode, metricCode, metricVariant) {
+  const key = _commComponentDraftKey(planCode, metricCode, metricVariant);
+  if (!_commComponentRulePending[key]) {
+    const existing = (typeof _commGetRuleForMetric === 'function') ? _commGetRuleForMetric(planCode, metricCode, metricVariant) : null;
+    _commComponentRulePending[key] = existing
+      ? JSON.parse(JSON.stringify(existing))
+      : { active: true, params: {}, tiers: [], tier_config: null };
+  }
+  return _commComponentRulePending[key];
+}
+function _commSetComponentDraftActive(planCode, metricCode, metricVariant, active) {
+  const d = _commEnsureComponentDraft(planCode, metricCode, metricVariant);
+  d.active = !!active;
+  _commMarkChanged();
+}
+window._commGetComponentDraft = _commGetComponentDraft;
+window._commEnsureComponentDraft = _commEnsureComponentDraft;
+window._commSetComponentDraftActive = _commSetComponentDraftActive;
+
+// Builds the previewResolver closure threaded into _commBuildKamPayout/
+// _commBuildTlPayout's new optional last param (07a_commission_engine.js).
+// Not scoped to a single plan_code — _commBuildKamPayout/_commBuildTlPayout
+// resolve their own planCode internally (same as today, via
+// _commGetAssignmentPlan) and pass it to every _commCompute* call; the
+// resolver just answers "is there a staged draft for THIS (planCode,
+// metricCode, variant)" fresh each call, which is always the one planCode
+// actually in play for that build — no separate scoping needed. Returns
+// undefined (not the pending map's value) for anything with no staged
+// draft, so the real compute functions fall back to exactly today's
+// saved-state resolution — this is what keeps real Compute/Lock (which
+// never pass a resolver at all) provably unaffected.
+function _commComponentPreviewResolver() {
+  return function(planCode, metricCode, metricVariant) {
+    const key = _commComponentDraftKey(planCode, metricCode, metricVariant);
+    if (Object.prototype.hasOwnProperty.call(_commComponentRulePending, key)) return _commComponentRulePending[key];
+    return undefined;
+  };
+}
+// Preview-only wrappers — the new Setup UI's live-preview panel calls these;
+// real Compute/Lock (computeCommissionDraft/lockCommissionSnapshot) never do.
+function _commBuildKamPayoutPreview(kamEmail, role) {
+  return _commBuildKamPayout(kamEmail, undefined, role, _commComponentPreviewResolver());
+}
+function _commBuildTlPayoutPreview(tlEmail) {
+  return _commBuildTlPayout(tlEmail, undefined, _commComponentPreviewResolver());
+}
+window._commBuildKamPayoutPreview = _commBuildKamPayoutPreview;
+window._commBuildTlPayoutPreview = _commBuildTlPayoutPreview;
+
 window.debugCommissionRules = function(){
   const plans = Object.values((_commRuleConfig && _commRuleConfig.plans) || {});
   const assignments = ((_commRuleConfig && _commRuleConfig.assignments) || []);
@@ -250,6 +348,7 @@ function renderCommissionCockpit() {
   }
   let out;
   if (_commCockpitStep === 'policy') out = renderCommPolicyStep(body);
+  else if (_commCockpitStep === 'setup') out = renderCommSetupStep(body);
   else if (_commCockpitStep === 'assignment') out = renderCommAssignmentStep(body);
   else if (_commCockpitStep === 'rules') out = renderCommRulesStep(body);
   else out = renderCommLockStep(body);
@@ -336,6 +435,283 @@ function renderCommPolicyStep(body) {
       </div>
     </div>`;
 }
+// v878 (phase 6): role-wide default scheme selector for the 6 roles beyond
+// tl/kam (pm/admin/sales/sales_tl/ad/ad_tl) — no per-person roster source
+// exists client-side for these roles yet (portviewBulkData is KAM/TL-only),
+// so this section only exposes the ROLE-LEVEL default (assignment_scope=
+// 'role_default', assignee_key=the role bucket itself), not per-person
+// override — that stays a future enhancement once a people-by-role source
+// is wired in. A role default here is a real no-op today for kam/tl (their
+// existing per-person assignments always win first, per
+// _commGetAssignmentPlan's 3-tier resolution) and is the ONLY lever for the
+// other 6 roles until someone is individually assigned.
+const _COMM_OTHER_ROLES = ['pm','admin','sales','sales_tl','ad','ad_tl'];
+function _renderCommRoleDefaultsSection(period, isUnsaved) {
+  const cards = _COMM_OTHER_ROLES.map(role => {
+    const plans = _commRulesForRole(role, { activeOnly:true });
+    const currentCode = _commGetAssignmentPlan(period, 'role_default', role, role);
+    const unsaved = isUnsaved('role_default', role);
+    const label = _commPlanName(role).replace(' NRR Standard', '');
+    return `<div class="comm-card">
+      <div class="comm-card-top"><div><div class="comm-name">${label}${unsaved?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">Role default · ใช้ก็ต่อเมื่อคนนั้นไม่มี assignment ส่วนตัว</div></div><span class="comm-badge blue">${role.toUpperCase()}</span></div>
+      <div class="comm-field" style="margin-top:10px"><label>Default scheme สำหรับ role นี้</label>
+        <select class="comm-select" onchange="_commSetAssignment('${period}','role_default','${role}',this.value);this.classList.add('flash')">
+          ${plans.map(p=>`<option value="${p.plan_code}" ${currentCode===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
+        </select>
+      </div>
+      <div class="comm-assignment-summary">ยังไม่มี Rule เฉพาะสำหรับ role นี้? ไป Step 3 Rules → Create Rule แล้วกลับมาเลือกที่นี่</div>
+    </div>`;
+  }).join('');
+  return `<div class="comm-section-title">Role defaults — PM / Admin / Sales / AD</div>${cards}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP (Commission Setup redesign, phase 2)
+// Role-first home: one honest status per role, no synthesized-but-
+// real-looking placeholders. _commRulesForRole/_commGetDraftByCode both
+// inject a synthetic bootstrap entry for dropdown convenience (exactly the
+// pattern that confused Bush originally) — this section deliberately does
+// NOT reuse those for status detection; it checks real saved/pending state
+// directly instead.
+const _ALL_ROLES = ['kam', 'tl', ..._COMM_OTHER_ROLES];
+
+function _commRoleHasRealNrrTiers(planCode) {
+  const plan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode];
+  if (!plan || !plan.id) return false;
+  const rule = _commRuleConfig.rules && _commRuleConfig.rules[plan.id];
+  const tiers = rule && _commRuleConfig.tiers ? (_commRuleConfig.tiers[rule.id] || []) : [];
+  return tiers.length > 0;
+}
+const _COMM_SETUP_COMPONENT_METRICS = [
+  ['portfolio_gate', null], ['tl_upsell_mult', null],
+  ['upsell_gmv', 'p1_new_sku'], ['upsell_gmv', 'p3_growth'], ['upsell_gmv', 'outlet_expansion'],
+  ['handover', null],
+];
+function _commRoleHasAnySavedComponent(planCode) {
+  if (_commRoleHasRealNrrTiers(planCode)) return true;
+  return _COMM_SETUP_COMPONENT_METRICS.some(([mc, variant]) => {
+    const found = (typeof _commGetRuleForMetric === 'function') ? _commGetRuleForMetric(planCode, mc, variant) : null;
+    if (!found || found.active === false) return false;
+    return (Array.isArray(found.tiers) && found.tiers.length > 0) || !!found.tier_config;
+  });
+}
+function _commRoleHasAnyPendingComponent(planCode) {
+  if (_commRulePending && _commRulePending[planCode]) return true;
+  return Object.keys(_commComponentRulePending || {}).some(k => k.indexOf(planCode + '|') === 0);
+}
+// Real status for the role's OWN default scheme — 'active' only once a real
+// saved plan+component exists; 'draft' if something's staged but not saved;
+// 'not_set' otherwise. Never returns 'active' for the synthetic bootstrap
+// placeholder alone (matches _commPlanCode(role)'s fallback name but has no
+// real row) — that placeholder exists only so dropdowns aren't empty, not as
+// a signal that anything is actually configured.
+function _commRoleSetupStatus(role) {
+  const period = _nrrExclusionCurrentPeriod();
+  const planCode = _commGetAssignmentPlan(period, 'role_default', role, role);
+  const realPlan = ((_commRuleConfig && _commRuleConfig.plans) || {})[planCode];
+  const isRealSavedPlan = !!(realPlan && realPlan.id);
+  const rawStatus = isRealSavedPlan ? (realPlan.status || 'active') : null;
+  const isArchived = rawStatus === 'inactive' || rawStatus === 'archived';
+  const hasSaved = isRealSavedPlan && !isArchived && _commRoleHasAnySavedComponent(planCode);
+  const hasPending = _commRoleHasAnyPendingComponent(planCode);
+  let state = 'not_set';
+  if (hasSaved) state = 'active';
+  else if (hasPending) state = 'draft';
+  return { planCode, state };
+}
+function _commRolePeopleCount(role) {
+  if (role === 'kam') return (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []).length : 0;
+  if (role === 'tl') return (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []).length : 0;
+  return (_commOtherRoleRoster || []).filter(p => p.role === role).length;
+}
+const _COMM_ROLE_LABEL = { kam:'KAM', tl:'Team Lead', pm:'PM', admin:'Admin', sales:'Sales', sales_tl:'Sales TL', ad:'AD', ad_tl:'AD TL' };
+
+function renderCommSetupStep(body) {
+  if (_commSetupDetailRole) return renderCommRoleDetail(body, _commSetupDetailRole);
+  const cards = _ALL_ROLES.map(role => {
+    const { state } = _commRoleSetupStatus(role);
+    const people = _commRolePeopleCount(role);
+    const badgeClass = state === 'active' ? 'ok' : state === 'draft' ? 'warn' : '';
+    const badgeLabel = state === 'active' ? 'Active' : state === 'draft' ? 'Draft' : 'Not set up';
+    const peopleLbl = people === 1 ? '1 คน' : `${people} คน`;
+    return `<div class="comm-rule-item comm-role-card" onclick="_commOpenRoleDetail('${role}')">
+      <div class="comm-role-card-top">
+        <div class="comm-rule-item-name">${_COMM_ROLE_LABEL[role] || role.toUpperCase()}</div>
+        <span class="comm-badge ${badgeClass}">${badgeLabel}</span>
+      </div>
+      <div class="comm-rule-item-meta">${peopleLbl}${people === 0 ? ' — ยังไม่มีคนใน role นี้' : ''}</div>
+    </div>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div><div class="comm-hero-title">Commission Setup</div><div class="comm-hero-sub">เลือก role แล้วตั้งค่าว่าได้ค่าคอมฯ อะไรบ้าง — ครบในหน้าเดียว</div></div>
+      </div>
+    </div>
+    <div class="comm-role-grid">${cards}</div>
+  `;
+}
+window._commOpenRoleDetail = function(role) {
+  _commSetupDetailRole = role;
+  _commCockpitStep = 'setup';
+  renderCommissionCockpit();
+};
+window._commCloseRoleDetail = function() {
+  _commSetupDetailRole = null;
+  renderCommissionCockpit();
+};
+let _commSetupDetailRole = null;
+
+// Pick one real person currently in this role to preview against — first
+// match is enough (the goal is "does this look right", not a full roster
+// audit). Returns null if nobody is in the role yet (e.g. AD/AD TL today).
+function _commRolePreviewPerson(role) {
+  if (role === 'kam') {
+    const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+    const g = groups.find(x => x.kamEmail);
+    return g ? { email: g.kamEmail, name: g.kamName || g.kamEmail } : null;
+  }
+  if (role === 'tl') {
+    const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
+    const t = tls.find(x => x.email);
+    return t ? { email: t.email, name: t.name || t.email } : null;
+  }
+  const p = (_commOtherRoleRoster || []).find(x => x.email);
+  return p ? { email: p.email, name: p.name || p.email } : null;
+}
+// Draft-aware preview card — reuses _commBuildKamPayoutPreview/
+// _commBuildTlPayoutPreview (Phase 1) so this updates live as NRR tiers
+// (and, from Phase 4 onward, other components) are edited, before Save.
+function _renderRoleLivePreview(role, person) {
+  const isTl = role === 'tl';
+  let payout = null;
+  try {
+    payout = isTl ? _commBuildTlPayoutPreview(person.email) : _commBuildKamPayoutPreview(person.email, role);
+  } catch(e) { console.warn('[Commission Setup] preview failed', e); }
+  const amt = payout ? Number(payout.final_payout || 0) : 0;
+  const nrrPct = payout ? _commFmtPct(payout.nrr_pct) : '—';
+  return `<div class="comm-card comm-role-preview">
+    <div class="comm-role-preview-label">Live preview — คนจริง, อัตราที่ยังไม่ save</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div><div class="comm-name">${_commEscapeHtml(person.name)}</div><div class="comm-meta">NRR ${nrrPct}</div></div>
+      <div class="comm-role-preview-amt">${_commFmtPayout(amt)}</div>
+    </div>
+  </div>`;
+}
+// Master on/off toggle. Turning ON a role with nothing real/staged yet is a
+// pure staging operation (_commSetDraftByCode + _commSetAssignment),
+// deferred to the existing global "Save changes" button — mirrors how
+// _commCloneLocalPlan already stages a brand-new plan without any eager DB
+// write, so an abandoned edit never leaves an orphan row behind. Turning
+// OFF a real, already-saved scheme reuses the existing, tested
+// archiveCommissionRule() flow (confirm dialog + usage-count check) rather
+// than inventing a second, parallel deactivation path.
+function _commRoleSetupToggle(role, planCode) {
+  const { state } = _commRoleSetupStatus(role);
+  if (state === 'active') {
+    archiveCommissionRule(planCode);
+    return;
+  }
+  const draft = _commGetDraftByCode(planCode, role);
+  draft.beneficiary_role = role;
+  draft.plan_name = draft.plan_name || _commPlanName(role);
+  _commSetDraftByCode(planCode, draft);
+  _commSetAssignment(_nrrExclusionCurrentPeriod(), 'role_default', role, planCode);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+window._commRoleSetupToggle = _commRoleSetupToggle;
+
+// v879 (Commission Setup redesign, phase 7): "N people on a custom rate"
+// subordinate section — counts real per-person overrides (assignment_scope
+// === the role bucket itself, e.g. 'kam'/'pm' — the same scope
+// _commSetAssignment('kam', kamEmail, ...) already uses today), and deep-
+// links into the existing Advanced (Assignment) tab rather than rebuilding
+// a second per-person assignment UI. Zero new assignment logic — reuses
+// what's already there.
+function _commRoleOverrideCount(role) {
+  const period = _nrrExclusionCurrentPeriod();
+  return ((_commRuleConfig && _commRuleConfig.assignments) || [])
+    .filter(a => a.period_month === period && a.assignment_scope === role).length;
+}
+window._commGoToAdvancedAssignment = function() {
+  switchCommissionStep('assignment');
+};
+
+function renderCommRoleDetail(body, role) {
+  const { planCode, state } = _commRoleSetupStatus(role);
+  const people = _commRolePeopleCount(role);
+  const isOn = state === 'active' || state === 'draft';
+  const roleLabel = _COMM_ROLE_LABEL[role] || role.toUpperCase();
+  const previewPerson = isOn ? _commRolePreviewPerson(role) : null;
+  // v879: matches the ENGINE's actual branching (_commBuildTlPayout vs
+  // _commBuildKamPayout), not a role-name guess. Only the literal 'tl' role
+  // uses _commBuildTlPayout (NRR tiers + TL-mult only, no Gate/Handover/
+  // Upsell — that function never calls those compute functions at all).
+  // Every other role (including sales_tl/ad_tl, per Phase 8's design) goes
+  // through _commBuildKamPayout instead, which supports the full component
+  // set except TL-mult. Showing the wrong editor for a role would silently
+  // do nothing when saved — worse than the confusing-placeholder bug this
+  // whole redesign exists to fix.
+  const isTl = role === 'tl';
+
+  const gateBody = isOn
+    ? `${roleLabel} ได้ค่าคอมฯ — ตั้งค่า component ด้านล่าง`
+    : `ปิดอยู่ — ${roleLabel} ได้ ฿0 ทุกคนจนกว่าจะเปิด`;
+
+  body.innerHTML = `
+    <div class="comm-hero">
+      <div class="comm-hero-top">
+        <div>
+          <button class="comm-role-back-btn" onclick="_commCloseRoleDetail()" style="margin-bottom:8px">‹ Commission Setup</button>
+          <div class="comm-hero-title">${roleLabel}</div>
+          <div class="comm-hero-sub">${people} คนใน role นี้</div>
+        </div>
+      </div>
+    </div>
+    <div class="comm-card comm-role-gate">
+      <div><div class="comm-name">Role นี้ได้ค่าคอมฯ ไหม?</div><div class="comm-meta">${gateBody}</div></div>
+      <button class="comm-role-toggle ${isOn ? 'on' : ''}" onclick="_commRoleSetupToggle('${role}','${planCode}')"></button>
+    </div>
+    ${isOn ? `
+      <div class="comm-section-title">NRR tiers</div>
+      ${_renderCommRuleEditorByCode(planCode, role)}
+      ${isTl ? `
+        <div class="comm-section-title">TL Upsell Multiplier</div>
+        ${_renderRoleTierLadderEditor(planCode, 'tl_upsell_mult', {
+          title: 'TL Upsell Multiplier', unitLabel: 'Upsell%', accentColor: 'rgba(120,200,255,.85)',
+          emptyNote: 'ยังไม่มี tier — multiplier default ×1.0 เสมอ'
+        })}
+      ` : `
+        <div class="comm-section-title">Handover</div>
+        ${_renderRoleHandoverEditor(planCode)}
+        <div class="comm-section-title">NRR / GMV Gate</div>
+        ${_renderRoleTierLadderEditor(planCode, 'portfolio_gate', {
+          title: 'NRR / GMV Gate', unitLabel: 'NRR%', accentColor: 'rgba(255,140,110,.85)',
+          emptyNote: 'ยังไม่มี Gate tier — role นี้จะไม่ถูกหักค่าคอมฯ เลย (cap ×1.0 เสมอ) จนกว่าจะเพิ่ม tier'
+        })}
+        <div class="comm-section-title">Upsell — สินค้าใหม่ (P1)</div>
+        ${_renderRoleUpsellRateEditor(planCode, 'p1_new_sku', {
+          title: 'Upsell P1 — สินค้าใหม่', accentColor: 'rgba(255,224,138,.85)', showMinGmv: true
+        })}
+        <div class="comm-section-title">Upsell — ยอดเติบโต (P3)</div>
+        ${_renderRoleUpsellRateEditor(planCode, 'p3_growth', {
+          title: 'Upsell P3 — ยอดเติบโต', accentColor: 'rgba(255,224,138,.85)', showGrowthParams: true
+        })}
+        <div class="comm-section-title">Expansion (ร้านขยาย)</div>
+        ${_renderRoleUpsellRateEditor(planCode, 'outlet_expansion', {
+          title: 'Expansion — ร้านขยาย', accentColor: 'rgba(0,200,176,.85)'
+        })}
+      `}
+      ${previewPerson ? _renderRoleLivePreview(role, previewPerson) : `<div class="comm-empty">ยังไม่มีคนใน role นี้ให้ preview</div>`}
+      <div class="comm-role-override-row">
+        <div class="comm-meta">${_commRoleOverrideCount(role)} คนใช้ rate เฉพาะตัว (ไม่ใช้ default ของ role นี้)</div>
+        <button class="comm-role-override-link" onclick="_commGoToAdvancedAssignment()">+ ตั้งค่าเฉพาะคน ›</button>
+      </div>
+    ` : `<div class="comm-empty">เปิด role นี้เพื่อเริ่มตั้งค่า NRR tiers และดู live preview</div>`}
+  `;
+}
+
 function renderCommAssignmentStep(body) {
   const period = _nrrExclusionCurrentPeriod();
   const tls = _commGetTlListFromPortview();
@@ -351,6 +727,7 @@ function renderCommAssignmentStep(body) {
       </div>
       <div class="comm-readiness-bar ${Object.keys(_commAssignmentPending||{}).length?'warn':'ready'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${Object.keys(_commAssignmentPending||{}).length?'มี assignment change ที่ยังไม่ได้ save':'Assignments ใช้ active rules เท่านั้น · inactive rules ถูกซ่อนแล้ว'}</div></div>
     </div>
+    ${_renderCommRoleDefaultsSection(period, isUnsaved)}
     <div class="comm-section-title">Team Lead rules</div>
     ${tls.map(t=>`<div class="comm-card">
       <div class="comm-card-top"><div><div class="comm-name">${t.name||t.email}${isUnsaved('tl',t.email)?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">${t.email}</div></div><span class="comm-badge blue">TL</span></div>
@@ -619,6 +996,296 @@ function _renderHandoverGmvTierEditor() {
   </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_HANDOVER (Commission Setup redesign, phase 4)
+// Per-scheme Handover editor — visually identical to
+// _renderHandoverGmvTierEditor above (same markup/inputs/validation), but
+// data-sourced from the new per-scheme _commComponentRulePending draft
+// (writing tier_config, not the global target_settings blob). Deliberately
+// a SEPARATE function, not a parameterized version of the one above — that
+// one stays wired to the global blob for the "Advanced" tab, untouched.
+function _commRoleHandoverTiers(planCode) {
+  const d = _commEnsureComponentDraft(planCode, 'handover', null);
+  if (!d.tier_config || !Array.isArray(d.tier_config.gmv_tiers)) d.tier_config = { gmv_tiers: [] };
+  return d.tier_config.gmv_tiers;
+}
+function _commRoleAddHandoverGmvTier(planCode) {
+  const tiers = _commRoleHandoverTiers(planCode);
+  tiers.push({ tier_order: tiers.length + 1, gmv_min: 0, gmv_max: null, label: '',
+               thresholds: [{ min_retention_pct: 100, payout: 0 }] });
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleRemoveHandoverGmvTier(planCode, tierIdx) {
+  _commRoleHandoverTiers(planCode).splice(tierIdx, 1);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleAddHandoverThreshold(planCode, tierIdx) {
+  const tiers = _commRoleHandoverTiers(planCode);
+  if (!tiers[tierIdx]) return;
+  if (!tiers[tierIdx].thresholds) tiers[tierIdx].thresholds = [];
+  tiers[tierIdx].thresholds.push({ min_retention_pct: 100, payout: 0 });
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleRemoveHandoverThreshold(planCode, tierIdx, threshIdx) {
+  const tiers = _commRoleHandoverTiers(planCode);
+  if (!tiers[tierIdx] || !tiers[tierIdx].thresholds) return;
+  tiers[tierIdx].thresholds.splice(threshIdx, 1);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleSetHandoverField(planCode, tierIdx, threshIdx, field, value) {
+  const tiers = _commRoleHandoverTiers(planCode);
+  const t = tiers[tierIdx];
+  if (!t) return;
+  if (threshIdx === null || threshIdx === undefined) {
+    if (field === 'label') t.label = value;
+    else t[field] = value === '' ? null : Number(value);
+  } else {
+    const th = (t.thresholds || [])[threshIdx];
+    if (!th) return;
+    th[field] = value === '' ? null : Number(value);
+  }
+  _commMarkChanged();
+}
+window._commRoleAddHandoverGmvTier = _commRoleAddHandoverGmvTier;
+window._commRoleRemoveHandoverGmvTier = _commRoleRemoveHandoverGmvTier;
+window._commRoleAddHandoverThreshold = _commRoleAddHandoverThreshold;
+window._commRoleRemoveHandoverThreshold = _commRoleRemoveHandoverThreshold;
+window._commRoleSetHandoverField = _commRoleSetHandoverField;
+
+function _renderRoleHandoverEditor(planCode) {
+  // Read-only: must NOT stage a pending draft just from rendering, or
+  // merely opening this role's page would make "Save changes" write back
+  // an unedited/never-configured component (the exact ghost-row bug this
+  // redesign exists to eliminate). Staging only happens inside the actual
+  // mutators (_commRoleAdd/Remove/SetHandover*), via _commRoleHandoverTiers.
+  const draft = _commGetComponentDraft(planCode, 'handover', null);
+  const tiers = (draft && draft.tier_config && Array.isArray(draft.tier_config.gmv_tiers)) ? draft.tier_config.gmv_tiers : [];
+  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpLbl  = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:var(--tk-font-body),system-ui,sans-serif;text-align:left;outline:none;width:100%';
+  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:9px 11px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const fB = n => '฿'+Math.round(Number(n||0)).toLocaleString('en-US');
+
+  const tierCards = tiers.map((t, ti) => {
+    const gmvMax = t.gmv_max;
+    const rangeLbl = gmvMax == null ? `≥ ${fB(t.gmv_min)}` : `${fB(t.gmv_min)}–${fB(gmvMax)}`;
+    const threshRows = (t.thresholds || []).map((th, thi) => `
+      <div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">Retention ตั้งแต่ (%)</div>
+          <input style="${inpBase}" value="${th.min_retention_pct ?? ''}" inputmode="decimal"
+            oninput="_commRoleSetHandoverField('${planCode}',${ti},${thi},'min_retention_pct',this.value)">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">ได้รับ (฿)</div>
+          <input style="${inpPay}" value="${th.payout ?? 0}" inputmode="numeric"
+            oninput="_commRoleSetHandoverField('${planCode}',${ti},${thi},'payout',this.value)">
+        </div>
+        <button onclick="_commRoleRemoveHandoverThreshold('${planCode}',${ti},${thi})" style="font-size:var(--text-lg);color:var(--tk-text-faint);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
+      </div>`).join('');
+
+    return `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue),.85);font-family:'IBM Plex Mono',monospace">GMV ${rangeLbl}</span>
+        <button onclick="_commRoleRemoveHandoverGmvTier('${planCode}',${ti})" style="font-size:var(--text-lg2);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+        <div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">GMV ตั้งแต่ (฿)</div>
+          <input style="${inpBase}" value="${t.gmv_min ?? ''}" inputmode="numeric"
+            oninput="_commRoleSetHandoverField('${planCode}',${ti},null,'gmv_min',this.value)">
+        </div>
+        <div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ถึง (฿) — ว่าง=∞</div>
+          <input style="${inpBase}" value="${gmvMax ?? ''}" placeholder="∞" inputmode="numeric"
+            oninput="_commRoleSetHandoverField('${planCode}',${ti},null,'gmv_max',this.value)">
+        </div>
+      </div>
+      <div style="margin-bottom:9px">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ชื่อ tier</div>
+        <input style="${inpLbl}" value="${_commEscapeHtml(t.label||'')}" placeholder="เช่น 20,000–49,999"
+          oninput="_commRoleSetHandoverField('${planCode}',${ti},null,'label',this.value)">
+      </div>
+      ${threshRows}
+      <button onclick="_commRoleAddHandoverThreshold('${planCode}',${ti})" style="width:100%;padding:7px;border-radius:var(--r-8);background:rgba(var(--ink-blue),.05);border:1px dashed rgba(var(--ink-blue),.20);color:rgba(var(--ink-blue),.65);font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่ม threshold</button>
+    </div>`;
+  }).join('');
+
+  const errs = _commValidateHandoverGmvTiers(tiers);
+  const errHtml = errs.length ? `<div style="font-size:var(--text-xs);color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
+  const emptyNote = !tiers.length ? `<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">ยังไม่มี GMV tier — role นี้จะได้ Handover ฿0 จนกว่าจะเพิ่ม tier แรก</div>` : '';
+
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:#bcd7ff;flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">Handover — แบ่งตาม GMV tier</span>
+    </div>
+    ${errHtml}${emptyNote}${tierCards}
+    <button onclick="_commRoleAddHandoverGmvTier('${planCode}')" style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่ม GMV tier</button>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_TIER_LADDER (Commission Setup redesign, phase 5)
+// Generic per-scheme tier-ladder editor shared by Gate and TL-mult — both
+// are structurally identical (a multi-tier ladder keyed on a %, with
+// payout_value used as a multiplier rather than a flat ฿ amount), so one
+// parameterized editor covers both rather than duplicating the NRR-tier-
+// card pattern twice. metricVariant is always null for these two (only
+// Upsell uses variants, phase 6).
+function _commRoleComponentTiers(planCode, metricCode) {
+  const d = _commEnsureComponentDraft(planCode, metricCode, null);
+  if (!Array.isArray(d.tiers)) d.tiers = [];
+  return d.tiers;
+}
+function _commRoleAddComponentTier(planCode, metricCode) {
+  _commRoleComponentTiers(planCode, metricCode).push({ min_value: null, max_value: null, payout_value: 1.0, payout_label: '' });
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleRemoveComponentTier(planCode, metricCode, idx) {
+  _commRoleComponentTiers(planCode, metricCode).splice(idx, 1);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleSetComponentTier(planCode, metricCode, idx, field, value) {
+  const t = _commRoleComponentTiers(planCode, metricCode)[idx];
+  if (!t) return;
+  t[field] = (field === 'payout_label') ? value : (value === '' ? null : Number(value));
+  _commMarkChanged();
+}
+window._commRoleAddComponentTier = _commRoleAddComponentTier;
+window._commRoleRemoveComponentTier = _commRoleRemoveComponentTier;
+window._commRoleSetComponentTier = _commRoleSetComponentTier;
+
+function _renderRoleTierLadderEditor(planCode, metricCode, opts) {
+  // Read-only for the same reason as _renderRoleHandoverEditor above —
+  // staging happens only in the real mutators (_commRoleAdd/Remove/SetComponentTier).
+  const draft = _commGetComponentDraft(planCode, metricCode, null);
+  const tiers = (draft && Array.isArray(draft.tiers)) ? draft.tiers : [];
+  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:9px 11px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const fmtMult = v => Number(v||0).toFixed(2)+'×';
+
+  const tierCards = tiers.map((t, i) => `<div style="border-radius:var(--r-card);border:1px solid rgba(var(--ink-blue),.14);background:rgba(255,255,255,.03);padding:12px;margin-bottom:9px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:var(--text-sm);font-weight:800;color:rgba(var(--ink-blue),.85);font-family:'IBM Plex Mono',monospace">Tier ${i+1} — ${fmtMult(t.payout_value)}</span>
+        <button onclick="_commRoleRemoveComponentTier('${planCode}','${metricCode}',${i})" style="font-size:var(--text-lg2);color:rgba(255,255,255,.52);background:none;border:none;cursor:pointer;padding:0 4px" onmouseover="this.style.color='rgba(255,80,60,.75)'" onmouseout="this.style.color='rgba(255,255,255,.28)'">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+        <div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">${opts.unitLabel} ตั้งแต่</div>
+          <input style="${inpBase}" value="${t.min_value ?? ''}" inputmode="decimal"
+            oninput="_commRoleSetComponentTier('${planCode}','${metricCode}',${i},'min_value',this.value)">
+        </div>
+        <div>
+          <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ถึง — ว่าง=∞</div>
+          <input style="${inpBase}" value="${t.max_value ?? ''}" placeholder="∞" inputmode="decimal"
+            oninput="_commRoleSetComponentTier('${planCode}','${metricCode}',${i},'max_value',this.value)">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">Multiplier (×)</div>
+        <input style="${inpPay}" value="${t.payout_value ?? 1}" inputmode="decimal"
+          oninput="_commRoleSetComponentTier('${planCode}','${metricCode}',${i},'payout_value',this.value)">
+      </div>
+    </div>`).join('');
+
+  const emptyNote = !tiers.length ? `<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">${opts.emptyNote}</div>` : '';
+
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:${opts.accentColor || '#bcd7ff'};flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">${opts.title}</span>
+    </div>
+    ${emptyNote}${tierCards}
+    <button onclick="_commRoleAddComponentTier('${planCode}','${metricCode}')" style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่ม tier</button>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_UPSELL (Commission Setup redesign, phase 6)
+// Upsell P1/P3/Expansion editors — all 3 are the "1 tier row for a flat
+// rate" shape (never a real multi-tier ladder), so one shared single-rate
+// editor covers all 3 upsell_gmv variants. P3 additionally needs 2 scalar
+// params (threshold_pct, min_incremental) that don't fit a tier boundary —
+// those live in the rule's own params jsonb (see the target model table in
+// the Commission Setup plan).
+function _commRoleSingleRateTier(planCode, metricCode, metricVariant) {
+  const d = _commEnsureComponentDraft(planCode, metricCode, metricVariant);
+  if (!Array.isArray(d.tiers) || !d.tiers.length) d.tiers = [{ min_value: null, max_value: null, payout_value: 0, payout_label: '' }];
+  return d.tiers[0];
+}
+function _commRoleSetRatePercent(planCode, metricCode, metricVariant, value) {
+  const t = _commRoleSingleRateTier(planCode, metricCode, metricVariant);
+  t.payout_value = value === '' ? 0 : Number(value) / 100;
+  _commMarkChanged();
+}
+function _commRoleSetSingleRateField(planCode, metricCode, metricVariant, field, value) {
+  const t = _commRoleSingleRateTier(planCode, metricCode, metricVariant);
+  t[field] = value === '' ? null : Number(value);
+  _commMarkChanged();
+}
+function _commRoleSetComponentParam(planCode, metricCode, metricVariant, param, value) {
+  const d = _commEnsureComponentDraft(planCode, metricCode, metricVariant);
+  if (!d.params) d.params = {};
+  d.params[param] = value === '' ? null : Number(value);
+  _commMarkChanged();
+}
+window._commRoleSetRatePercent = _commRoleSetRatePercent;
+window._commRoleSetSingleRateField = _commRoleSetSingleRateField;
+window._commRoleSetComponentParam = _commRoleSetComponentParam;
+
+function _renderRoleUpsellRateEditor(planCode, metricVariant, opts) {
+  // Read-only for the same reason as _renderRoleHandoverEditor above —
+  // staging happens only in the real mutators (_commRoleSetRatePercent/
+  // SetSingleRateField/SetComponentParam).
+  const draft = _commGetComponentDraft(planCode, 'upsell_gmv', metricVariant);
+  const t = (draft && Array.isArray(draft.tiers) && draft.tiers[0]) ? draft.tiers[0] : { min_value: null, max_value: null, payout_value: 0, payout_label: '' };
+  const d = { params: (draft && draft.params) || {} };
+  const inpBase = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 11px;color:#e8eeff;font-size:var(--text-md);font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const inpPay  = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:9px 11px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const ratePct = (t.payout_value !== null && t.payout_value !== undefined) ? Math.round(Number(t.payout_value) * 10000) / 100 : '';
+
+  const rateField = `<div>
+    <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">Rate (%)</div>
+    <input style="${inpPay}" value="${ratePct}" inputmode="decimal"
+      oninput="_commRoleSetRatePercent('${planCode}','upsell_gmv','${metricVariant}',this.value)">
+  </div>`;
+
+  let extraFields = '';
+  if (opts.showMinGmv) {
+    extraFields = `<div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">Min GMV gate (฿)</div>
+      <input style="${inpBase}" value="${t.min_value ?? ''}" inputmode="numeric"
+        oninput="_commRoleSetSingleRateField('${planCode}','upsell_gmv','${metricVariant}','min_value',this.value)">
+    </div>`;
+  } else if (opts.showGrowthParams) {
+    const threshPct = d.params.threshold_pct ?? '';
+    const minIncr = d.params.min_incremental ?? '';
+    extraFields = `<div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">Growth threshold (%)</div>
+      <input style="${inpBase}" value="${threshPct}" inputmode="decimal"
+        oninput="_commRoleSetComponentParam('${planCode}','upsell_gmv','${metricVariant}','threshold_pct',this.value)">
+    </div>
+    <div>
+      <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">Min incremental (฿)</div>
+      <input style="${inpBase}" value="${minIncr}" inputmode="numeric"
+        oninput="_commRoleSetComponentParam('${planCode}','upsell_gmv','${metricVariant}','min_incremental',this.value)">
+    </div>`;
+  }
+
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:${opts.accentColor || '#bcd7ff'};flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">${opts.title}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rateField}${extraFields}</div>
+  </div>`;
+}
 
 function _renderTlUpsellTierRows() {
   let tiers = [];
@@ -780,8 +1447,12 @@ window._commSetTlUpsellTier = _commSetTlUpsellTier;
 function renderCommRulesStep(body) {
   const tlRules = _commRulesForRole('tl', { activeOnly:true });
   const kamRules = _commRulesForRole('kam', { activeOnly:true });
-  if (!_commSelectedRuleCode || ![...tlRules, ...kamRules].some(p => p.plan_code === _commSelectedRuleCode)) _commSelectedRuleCode = (tlRules[0] && tlRules[0].plan_code) || _commPlanCode('tl');
-  const selected = [...tlRules, ...kamRules].find(p => p.plan_code === _commSelectedRuleCode) || tlRules[0] || kamRules[0];
+  // v878 (phase 6): rules for the 6 roles beyond tl/kam, grouped together
+  // (each individually would mostly be empty until an admin creates one).
+  const otherRules = _COMM_OTHER_ROLES.flatMap(r => _commRulesForRole(r, { activeOnly:true }));
+  const allRules = [...tlRules, ...kamRules, ...otherRules];
+  if (!_commSelectedRuleCode || !allRules.some(p => p.plan_code === _commSelectedRuleCode)) _commSelectedRuleCode = (tlRules[0] && tlRules[0].plan_code) || _commPlanCode('tl');
+  const selected = allRules.find(p => p.plan_code === _commSelectedRuleCode) || tlRules[0] || kamRules[0];
   const role = selected?.beneficiary_role || 'tl';
   body.innerHTML = `
     <div class="comm-hero">
@@ -794,11 +1465,17 @@ function renderCommRulesStep(body) {
     <div class="comm-rule-actions">
       <button class="comm-create-rule-btn" onclick="_commCreateRule('tl')">+ Create TL Rule</button>
       <button class="comm-create-rule-btn" onclick="_commCreateRule('kam')">+ Create KAM Rule</button>
+      <select class="comm-select" id="comm-other-role-select" style="width:auto">
+        ${_COMM_OTHER_ROLES.map(r=>`<option value="${r}">${r.toUpperCase()}</option>`).join('')}
+      </select>
+      <button class="comm-create-rule-btn" onclick="_commCreateRule(document.getElementById('comm-other-role-select').value)">+ Create Rule</button>
     </div>
     <div class="comm-rule-group-title">TL Rules (NRR Tiers)</div>
     <div class="comm-rule-library">${tlRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
     <div class="comm-rule-group-title">KAM Rules</div>
     <div class="comm-rule-library">${kamRules.map(p=>_renderRuleLibraryItem(p)).join('')}</div>
+    <div class="comm-rule-group-title">Other roles (PM / Admin / Sales / AD)</div>
+    <div class="comm-rule-library">${otherRules.map(p=>_renderRuleLibraryItem(p)).join('') || `<div class="comm-empty">ยังไม่มี rule สำหรับ role อื่น — กด "+ Create Rule" ด้านบน</div>`}</div>
     <div class="comm-section-title">Edit selected rule</div>
     ${selected ? _renderCommRuleEditorByCode(selected.plan_code, role) : `<div class="comm-empty">ยังไม่มี rule ให้แก้</div>`}
   `;
@@ -1065,6 +1742,93 @@ function renderCommLockStep(body) {
   `;
 }
 
+// v879 (Commission Setup redesign, phase 4): generic save for the 5
+// non-NRR per-scheme components (Gate/TL-mult/Upsell P1/P3/Expansion/
+// Handover) staged in _commComponentRulePending. Handles both tier-shaped
+// metrics (draft.tiers -> commission_rule_tiers, like NRR) and Handover's
+// tier_config jsonb (no tier rows at all) uniformly. MUST run after
+// saveCommissionRules() in the save sequence — that's what guarantees
+// _commRuleConfig.plans[planCode].id is a real, persisted uuid by the time
+// this reads it (a brand-new role's plan has id:null until saved).
+const _COMM_METRIC_DEFAULTS = {
+  portfolio_gate: { measurement_scope:'governed_nrr', payout_type:'lock_percent' },
+  tl_upsell_mult: { measurement_scope:'team_upsell_pct', payout_type:'lock_percent' },
+  upsell_gmv:     { measurement_scope:'gmv_raw', payout_type:'rate_percent' },
+  handover:       { measurement_scope:'governed_nrr', payout_type:'flat_amount' },
+};
+async function saveCommissionComponentRulesByScheme() {
+  const keys = Object.keys(_commComponentRulePending || {});
+  if (!keys.length) return;
+  for (const key of keys) {
+    const parts = key.split('|');
+    const planCode = parts[0], metricCode = parts[1], metricVariant = parts[2] || null;
+    const plan = (_commRuleConfig.plans || {})[planCode];
+    if (!plan || !plan.id) {
+      console.warn('[Commission Setup] skipped component save — plan not persisted yet', key);
+      continue;
+    }
+    const draft = _commComponentRulePending[key];
+    const defaults = _COMM_METRIC_DEFAULTS[metricCode] || { measurement_scope:'governed_nrr', payout_type:'flat_amount' };
+
+    let existQuery = supa.from('commission_rules').select('id').eq('plan_id', plan.id).eq('metric_code', metricCode);
+    existQuery = metricVariant ? existQuery.eq('metric_variant', metricVariant) : existQuery.is('metric_variant', null);
+    const { data: existingRows, error: exErr } = await existQuery.limit(1);
+    if (exErr) throw new Error(exErr.message);
+    const existingId = existingRows && existingRows[0] && existingRows[0].id;
+
+    const rulePayload = {
+      plan_id: plan.id,
+      metric_code: metricCode,
+      metric_variant: metricVariant,
+      measurement_scope: draft.measurement_scope || defaults.measurement_scope,
+      payout_type: draft.payout_type || defaults.payout_type,
+      active: draft.active !== false,
+      params: draft.params || {},
+      tier_config: draft.tier_config || null,
+      updated_at: new Date().toISOString()
+    };
+
+    let ruleId;
+    if (existingId) {
+      const { error } = await supa.from('commission_rules').update(rulePayload).eq('id', existingId);
+      if (error) throw new Error(error.message);
+      ruleId = existingId;
+    } else {
+      const { data, error } = await supa.from('commission_rules').insert(rulePayload).select('id').single();
+      if (error) throw new Error(error.message);
+      ruleId = data.id;
+    }
+
+    if (Array.isArray(draft.tiers)) {
+      const { error: delErr } = await supa.from('commission_rule_tiers').delete().eq('rule_id', ruleId);
+      if (delErr) throw new Error(delErr.message);
+      const tierRows = draft.tiers.map((t, idx) => ({
+        rule_id: ruleId,
+        tier_order: idx + 1,
+        min_value: t.min_value === '' ? null : t.min_value,
+        max_value: t.max_value === '' ? null : t.max_value,
+        payout_value: Number(t.payout_value || 0),
+        payout_label: t.payout_label || ''
+      }));
+      if (tierRows.length) {
+        const { error: insErr } = await supa.from('commission_rule_tiers').insert(tierRows);
+        if (insErr) throw new Error(insErr.message);
+      }
+      if (!_commRuleConfig.tiers) _commRuleConfig.tiers = {};
+      _commRuleConfig.tiers[ruleId] = tierRows.map((t, idx) => ({ ...t, id: `local-${ruleId}-${idx}` }));
+    }
+
+    if (!_commRuleConfig.componentRules) _commRuleConfig.componentRules = {};
+    const cacheKey = `${plan.id}|${metricCode}|${metricVariant || ''}`;
+    _commRuleConfig.componentRules[cacheKey] = {
+      id: ruleId, plan_id: plan.id, metric_code: metricCode, metric_variant: metricVariant,
+      active: rulePayload.active, params: rulePayload.params, tier_config: rulePayload.tier_config
+    };
+  }
+  _commComponentRulePending = {};
+}
+window.saveCommissionComponentRulesByScheme = saveCommissionComponentRulesByScheme;
+
 async function saveCommissionRules() {
   const drafts = Object.values(_commRulePending || {});
   if (!drafts.length) return;
@@ -1182,6 +1946,7 @@ async function saveCommissionCockpit() {
   try {
     await saveCommissionPoliciesFromCockpit();
     await saveCommissionRules();
+    await saveCommissionComponentRulesByScheme();
     await saveCommissionAssignments();
     if (Object.keys(_commComponentPending||{}).length) await saveCommissionComponentRates();
     _commValidationErrors = {};

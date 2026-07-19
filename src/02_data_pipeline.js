@@ -1829,6 +1829,28 @@ window._fetchUpsellBundle=_fetchUpsellBundle;
 // quarterly rollover — only re-uploading with the same name.
 // IDB cache tab='qnrr' TTL=6h
 const _QNRR_QUARTER = (FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.qnrrQuarter) || '2026q3';
+
+// v878: fetch a CSV's raw text with the same IndexedDB cache-then-R2 pattern
+// as _fetchKamFile, but return the text instead of ingesting it — lets a
+// caller combine multiple CSVs' text before parsing once.
+async function _fetchCsvTextCached(url,tab){
+  try{
+    const cached=await _csvCacheGet(tab);
+    if(cached&&cached.ts&&(Date.now()-cached.ts)<_CSV_TTL&&cached.text!=='__INVALID__'){
+      return cached.text;
+    }
+  }catch(e){}
+  try{
+    const text=await _fetchTextWithTimeout(url,90000);
+    if(!text)return null;
+    await _csvCacheSet(tab,text);
+    return text;
+  }catch(e){
+    console.warn('[qnrr] fetch error:',url,e&&e.message?e.message:e);
+    return null;
+  }
+}
+
 let _qnrrFetchPromise = null; // global dedup — only one fetch ever
 async function _fetchQnrrBundle(){
   // Already loaded in memory
@@ -1849,15 +1871,39 @@ async function _fetchQnrrBundle(){
   }catch(e){}
   _qnrrFetchPromise=(async()=>{
     try{
-      const url=`${R2_BASE}/kam_rep_view.csv`;
-      console.log('%c[Sense qnrr] fetching single file','color:#4ddc97;font-weight:bold',url);
-      const ok=await _fetchKamFile({url,type:'bulk-qnrr-single',tab:'qnrr'});
+      const kamUrl=`${R2_BASE}/kam_rep_view.csv`;
+      const pmUrl=`${R2_BASE}/pm_rep_view.csv`;
+      console.log('%c[Sense qnrr] fetching KAM + PM files','color:#4ddc97;font-weight:bold',kamUrl,pmUrl);
+      // v878: kam_rep_view.csv (KAM roster, from q3_2026_movement_rep_view.sql)
+      // and pm_rep_view.csv (PM/AD roster, from pm_rep_view.sql) are independent
+      // BigQuery outputs, uploaded to R2 independently by data team — no merge
+      // step required on their side. The app fetches both and concatenates the
+      // rows here (dropping pm file's header line) before handing the combined
+      // text to the existing single-file parser unchanged. pm_rep_view.csv is
+      // optional: if it 404s or isn't uploaded yet, KAM data still loads fine.
+      const [kamText,pmText]=await Promise.all([
+        _fetchCsvTextCached(kamUrl,'qnrr'),
+        _fetchCsvTextCached(pmUrl,'qnrr-pm')
+      ]);
+      if(!kamText){
+        console.warn('[Sense qnrr] ⚠️ load failed — kam_rep_view.csv may not be uploaded yet');
+        return false;
+      }
+      let combined=kamText.trim();
+      if(pmText){
+        const pmRows=pmText.trim().split('\n').slice(1).join('\n');
+        if(pmRows)combined+='\n'+pmRows;
+        console.log('%c[Sense qnrr] ✓ pm_rep_view.csv merged in-memory','color:#4ddc97');
+      }else{
+        console.log('[Sense qnrr] pm_rep_view.csv not available yet — KAM-only this load');
+      }
+      const ok=await ingestCSVText('bulk-qnrr-single',combined,{timeoutMs:90000});
       if(ok){
         _qnrrBundleLoaded.add('single');
-        console.log('%c[Sense qnrr] ✓ single file loaded','color:#4ddc97',
+        console.log('%c[Sense qnrr] ✓ loaded','color:#4ddc97',
           Object.keys((window.bulkQnrrData||{}).byKamEmail||{}).length,'KAMs');
       }else{
-        console.warn('[Sense qnrr] ⚠️ load failed — CSV may not be uploaded yet');
+        console.warn('[Sense qnrr] ⚠️ ingest failed');
       }
       return ok;
     }catch(e){
@@ -2324,7 +2370,16 @@ async function _preloadFromIndexedDB(){
   var _isSalesPreload=(Object.keys(_salesR2Override).length>0)||
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   var CRITICAL=['portview','history','handover'];
-  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements','qnrr']; // v222+v226+v259+v753g: also preload — cache:true in IDB
+  // v878: 'qnrr' deliberately excluded from this generic IDB-direct fast path.
+  // Its IDB cache entry (tab='qnrr') now holds ONLY kam_rep_view.csv's raw text
+  // (_fetchQnrrBundle caches each of the two source files under its own tab,
+  // 'qnrr' + 'qnrr-pm', and merges them in memory) — ingesting it directly here
+  // would silently skip the PM/AD merge for up to the 6h cache TTL. The v849-fix
+  // block below already calls _prefetchQnrrIfNeeded() whenever 'qnrr' isn't in
+  // _cloudLoadedTabs, which is now always the case, so qnrr always routes
+  // through _fetchQnrrBundle()'s correct merge (still fast — each half has its
+  // own IDB cache).
+  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
   var TABS=_isSalesPreload
     ? [...CRITICAL,...EXTRA].filter(function(t){return t!=='portview'&&t!=='handover';})
     : [...CRITICAL,...EXTRA];

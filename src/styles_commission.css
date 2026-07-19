@@ -1040,6 +1040,79 @@ flex-wrap:wrap;}
   gap:var(--sp-2);
   margin-bottom:12px;
 }
+/* Commission Setup redesign — role-first home grid. Reuses .comm-rule-item's
+   existing card look (hover/active states, name/meta/badge layout) so role
+   cards match the Rule Library's established visual language for free. */
+.comm-role-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:var(--sp-2);
+  margin-bottom:12px;
+}
+@media (max-width:520px){ .comm-role-grid{ grid-template-columns:1fr; } }
+.comm-role-card{
+  grid-template-columns:1fr;
+  align-items:stretch;
+}
+.comm-role-card-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:var(--sp-2);
+  margin-bottom:4px;
+}
+/* Deliberately NOT .comm-secondary — a document-level capture-phase click
+   handler treats every .comm-secondary/.comm-close element as "close the
+   whole Cockpit", which would swallow this button's own onclick before it
+   ever fires (discovered live: it silently closed the entire overlay
+   instead of returning to the role grid). */
+.comm-role-back-btn{
+  border:1px solid rgba(255,255,255,.10);border-radius:13px;padding:9px 12px;
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.74);
+  font-weight:800;font-size:var(--text-sm);font-family:var(--tk-font-body);cursor:pointer;
+}
+.comm-role-back-btn:hover{background:rgba(255,255,255,.10);}
+.comm-role-gate{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;
+}
+.comm-role-toggle{
+  width:46px;height:26px;border-radius:20px;background:rgba(255,255,255,.14);position:relative;
+  cursor:pointer;border:none;flex-shrink:0;transition:background .15s;
+}
+.comm-role-toggle::after{
+  content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#0a1420;top:3px;left:3px;
+  transition:left .15s;
+}
+.comm-role-toggle.on{background:var(--tk-ok-bright);}
+.comm-role-toggle.on::after{left:23px;background:#06251d;}
+.comm-role-preview{
+  margin-top:10px;
+  background:linear-gradient(135deg,rgba(255,224,138,.08),rgba(0,200,176,.05));
+  border-color:rgba(255,224,138,.20);
+}
+.comm-role-preview-label{
+  font-family:'IBM Plex Mono',monospace;font-size:var(--text-2xs);font-weight:800;
+  text-transform:uppercase;letter-spacing:.06em;color:#ffe08a;margin-bottom:6px;
+}
+.comm-role-preview-amt{
+  font-family:'IBM Plex Mono',monospace;font-size:var(--text-xl);font-weight:900;color:#ffe08a;
+  flex-shrink:0;
+}
+.comm-role-override-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:rgba(255,255,255,.03);border:1px dashed rgba(var(--ink-blue),.20);border-radius:var(--r-md);
+  padding:11px 13px;margin-top:12px;
+}
+.comm-role-override-link{
+  font-size:var(--text-sm);font-weight:800;color:var(--tk-ok-bright);background:none;border:none;
+  cursor:pointer;white-space:nowrap;font-family:var(--tk-font-body),system-ui,sans-serif;
+}
+.comm-role-override-link:hover{text-decoration:underline;}
+/* Phase 7: de-emphasize the pre-existing Assignment/Rules tabs now that
+   Setup is the primary flow — same tabs, same logic, just visually
+   secondary (smaller/dimmer) so Setup reads as the obvious default. */
+.comm-step.comm-step-advanced{ opacity:.62; font-size:var(--text-xs); }
+.comm-step.comm-step-advanced.active{ opacity:1; }
 .comm-rule-group-title{
   margin:10px 2px 6px;
   font-size:var(--text-xs);

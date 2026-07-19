@@ -3608,7 +3608,8 @@ OCPB (customer intel จากเสียงเท่านั้น):
     // Detect owner type from profile
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     // v498: AD uses KAM picker (existing accounts) not Sales name-input
-    _ownerType = (role === 'sales') ? 'sales' : (role === 'ad' || role === 'ad_tl') ? 'ad' : 'kam';
+    // PM also uses KAM picker; tagged its own owner_type for tracking, no pm_tl variant
+    _ownerType = (role === 'sales') ? 'sales' : (role === 'ad' || role === 'ad_tl') ? 'ad' : (role === 'pm') ? 'pm' : 'kam';
 
     if (_ownerType === 'sales') {
       // Sales always sees name input first

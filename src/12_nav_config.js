@@ -47,6 +47,10 @@
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
       saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
+    'pm': {
+      tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
+      saveDisabledOn: ['portview', 'teamview', 'skills'],
+    },
     'ad_tl': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
       saveDisabledOn: ['portview', 'teamview', 'skills'],

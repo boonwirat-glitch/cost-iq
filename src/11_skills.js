@@ -187,7 +187,8 @@ async function skillsInit() {
 
   // Role guard: KAM/rep must not see skills — redirect back to portview
   // v498: rep=KAM IC, ad=Account Development, ad_tl=AD TL — all use Skills
-  const _allowedRoles = ['sales','sales_tl','tl','admin','rep','ad','ad_tl'];
+  // pm=Project/Portfolio Manager — same treatment as ad, no pm_tl variant
+  const _allowedRoles = ['sales','sales_tl','tl','admin','rep','ad','ad_tl','pm'];
   const _normRole = role ? role.toLowerCase() : '';
   const _isAllowed = _allowedRoles.some(r => _normRole.includes(r));
   if (!_isAllowed) {
@@ -328,7 +329,8 @@ async function _loadTLSquad() {
 
     // 2. Get all reps in same squad
     // v498: include ad/ad_tl in squad member query
-    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl,ad,ad_tl)`);
+    // pm also included, same squad-member treatment
+    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm)`);
     _tlSquadEmails = (repRows || [])
       .map(r => (r.email || '').toLowerCase())
       .filter(e => e && e !== tlEmail);
@@ -485,7 +487,8 @@ function _renderSkillsScreen() {
   if (!scr) return;
   const _r = (_skillsRole || '').toLowerCase();
   // v498: allow rep/ad/ad_tl (KAM stack users)
-  const _allowedToRender = _r.includes('sales') || _r === 'tl' || _r === 'admin' || _r === 'rep' || _r === 'ad' || _r === 'ad_tl';
+  // pm also allowed, same KAM-stack treatment as ad
+  const _allowedToRender = _r.includes('sales') || _r === 'tl' || _r === 'admin' || _r === 'rep' || _r === 'ad' || _r === 'ad_tl' || _r === 'pm';
   if (!_r || !_allowedToRender) {
     if (typeof showScreen === 'function') showScreen('portview');
     return;

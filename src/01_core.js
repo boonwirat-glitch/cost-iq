@@ -28,6 +28,10 @@ function normalizeRole(role){
   // v498: AD (Account Development) — uses KAM data stack, KAM UI
   if(r === 'ad' || r === 'account_development' || r === 'account development') return 'ad';
   if(r === 'ad_tl' || r === 'ad_lead' || r === 'ad_team_lead') return 'ad_tl';
+  // PM (Project/Portfolio Manager) — uses KAM data stack, KAM UI, own-portfolio-only.
+  // NOTE: 'pm' here is a Supabase Auth login role, unrelated to commercial_owner='PM'
+  // (sql/company_gmv.sql / nrr_company.js — that's an account-level GMV attribution tag).
+  if(r === 'pm' || r === 'project_manager' || r === 'project manager') return 'pm';
   return r || 'rep';
 }
 function getCurrentRole(){
@@ -43,7 +47,9 @@ function isSalesAny(role){ const r=normalizeRole(role); return r==='sales'||r===
 function isADRole(role){ return normalizeRole(role) === 'ad'; }
 function isADTLRole(role){ return normalizeRole(role) === 'ad_tl'; }
 function isADAny(role){ const r=normalizeRole(role); return r==='ad'||r==='ad_tl'; }
-function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'||r==='ad'||r==='ad_tl'; }
+// PM role helper (no pm_tl variant — see plan)
+function isPMRole(role){ return normalizeRole(role) === 'pm'; }
+function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'||r==='ad'||r==='ad_tl'||r==='pm'; }
 function roleLabel(role){
   const r = normalizeRole(role);
   if(r === 'rep') return 'KAM';
@@ -53,6 +59,7 @@ function roleLabel(role){
   if(r === 'sales_tl') return 'Sales TL';
   if(r === 'ad') return 'AD';
   if(r === 'ad_tl') return 'AD TL';
+  if(r === 'pm') return 'PM';
   return role || '';
 }
 function normalizeCurrentUserProfileRole(){
@@ -89,6 +96,7 @@ try{
   window.isADRole = isADRole;
   window.isADTLRole = isADTLRole;
   window.isADAny = isADAny;
+  window.isPMRole = isPMRole;
   window.isEchoUser = isEchoUser;
   window.roleLabel = roleLabel;
 }catch(e){}
@@ -835,8 +843,9 @@ function hideLoginOverlay() {
         if(typeof setMode==='function') setMode('kam');
         if(typeof showScreen==='function') showScreen('sales-portview');
       }
-      else if(_pf_role==='ad'||_pf_role==='ad_tl'){
+      else if(_pf_role==='ad'||_pf_role==='ad_tl'||_pf_role==='pm'){
         // v498: AD uses KAM data stack — same portview, same dark theme
+        // PM reuses the same kad-mode CSS hook — same KAM data stack/UI, no pm_tl variant
         document.body.classList.add('kad-mode');
         if(_pf_role==='ad_tl') document.body.classList.add('ad-tl-mode');
         document.documentElement.dataset.theme='dark'; // phase-0C
@@ -1014,7 +1023,7 @@ window._hideScreenSkeleton = function(screenId){
       if(_skipRole==='sales_tl') document.body.classList.add('sales-tl-mode');
       document.documentElement.dataset.theme='light';
       if(typeof showScreen==='function') try{ showScreen('sales-portview'); }catch(e){}
-    } else if(_skipRole==='ad'||_skipRole==='ad_tl'){
+    } else if(_skipRole==='ad'||_skipRole==='ad_tl'||_skipRole==='pm'){
       document.body.classList.add('kad-mode');
       document.documentElement.dataset.theme='dark';
       try { document.body.classList.add('kam-mode'); } catch(e) {}
@@ -1102,7 +1111,8 @@ function _autoRouteAfterLogin() {
   _senseLog('[v206d debug] _autoRouteAfterLogin:',role,currentUser&&currentUser.email);
   // v202 Fix 1: trigger bundle here — currentUser is guaranteed set at this point
   // v499: AD IC also uses KAM bundle (same portview data stack)
-  const _needsKamBundle = isRepRole(role) || (typeof isADRole==='function' && isADRole(role));
+  // PM also uses KAM bundle (same portview data stack, no pm_tl variant)
+  const _needsKamBundle = isRepRole(role) || (typeof isADRole==='function' && isADRole(role)) || (typeof isPMRole==='function' && isPMRole(role));
   if(_needsKamBundle&&currentUser&&currentUser.email){
     // v225: removed _bundlePreWarming flag — consistent with TL prewarm removal
     _fetchKamBundle(currentUser.email).catch(()=>{}).finally(()=>{
@@ -1125,8 +1135,9 @@ function _autoRouteAfterLogin() {
     document.documentElement.dataset.theme='light'; // phase-0C
     setMode('kam');
     showScreen('sales-portview');
-  } else if (isADAny && isADAny(role)) {
+  } else if ((isADAny && isADAny(role)) || (typeof isPMRole==='function' && isPMRole(role))) {
     // v498: AD — uses KAM data stack, KAM portview, KAM dark theme
+    // PM shares this exact branch — same KAM data stack/UI, no pm_tl variant
     // v499: clear any stale Sales IDB entries so AD never gets Sales CSVs from cache
     try{
       const _dbReq=indexedDB.open('ciq-csv-v1',1);
