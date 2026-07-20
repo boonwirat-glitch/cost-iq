@@ -1031,6 +1031,43 @@ function handleFileUpload(type,input){
     reader.readAsText(file);return;
   }
 
+  // ── bulk-upsell-team-groups (sense_upsell_team_groups.csv) ── v_catbonus
+  // Group-key-grain fast path: qualifying P1/P3 GMV per (kam, category,
+  // group_key). Lets the fast (no per-KAM-bundle) path apply per-category
+  // bonus rates. Columns: kam_email, category, group_key, p1_gmv, p3_incremental.
+  // Tiny (~150-300 rows). Absent → engine falls back to the flat team-scalar
+  // multiply, so this is additive/rollout-safe.
+  if(type==='bulk-upsell-team-groups'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        const byKam={};
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          const kamEmail=(p[0]||'').trim();
+          if(!kamEmail)return;
+          if(!byKam[kamEmail])byKam[kamEmail]=[];
+          byKam[kamEmail].push({
+            category:       (p[1]||'').trim(),
+            group_key:      (p[2]||'').trim(),
+            p1_gmv:         parseFloat(p[3])||0,
+            p3_incremental: parseFloat(p[4])||0
+          });
+        });
+        bulkUpsellTeamGroups=byKam;
+        try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        try{ if(typeof renderTeamview==='function' && !window._senseSplashActive)renderTeamview(); }catch(e){}
+      }catch(err){
+        console.warn('[Q3C team-groups] parse error',err);
+        bulkUpsellTeamGroups={};
+      }
+      _done();
+    };
+    reader.readAsText(file);return;
+  }
+
   // ── bulk-upsell-kam (sense_upsell_{safekey}.csv) ──
   // Per-KAM demand bundle: same 8-column structure, single KAM only
   // ── bulk-upsell (Q3C: sense_upsell_bulk.csv) ──  [legacy, not used in Option B]
@@ -1049,6 +1086,7 @@ function handleFileUpload(type,input){
         // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
+        const groupCategory={}; // v_catbonus: group_key → category_high_level (1:1), for per-category rate lookup
         const _now=new Date();const _lagU=new Date(_now);_lagU.setDate(_lagU.getDate()-1); // day-1 lag anchor
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
         const _baselineLabel=_thMonths[new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getMonth()]+' '+(new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getFullYear()+543);
@@ -1083,16 +1121,20 @@ function handleFileUpload(type,input){
         const _firstColIsEmail = !_bundleEmail || ((lines[0]||'').split(',')[0]||'').includes('@');
         lines.forEach(l=>{
           const p=parseCSVRow(l);
-          let kamEmail, accountId, outletId, monthLabel, groupKey, existingGmv, totalGmv;
+          let kamEmail, accountId, outletId, monthLabel, groupKey, existingGmv, totalGmv, category='';
           if(_firstColIsEmail){
-            // Legacy bulk format: kam_email, account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            // Legacy bulk format (unused in Option B — splitter always emits
+            // UUID-first per-KAM files). category not threaded here.
             kamEmail=(p[0]||'').trim();
             accountId=(p[1]||'').trim();
             if(_hasOutlet && _sampleCols<=7){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[6])||0;}
             else if(_hasOutlet){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[8])||0;}
             else{outletId='_all';monthLabel=(p[2]||'').trim();groupKey=(p[3]||'').trim();existingGmv=parseFloat(p[4])||0;totalGmv=parseFloat(p[7])||0;}
           } else {
-            // Per-KAM bundle: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            // Per-KAM bundle: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv, category
+            // v_catbonus: category appended as trailing p[6] by
+            // q3c_upsell_bulk_all_kams_v4.sql — p[0..5] positions unchanged,
+            // so this is backward-compatible with a pre-category CSV (p[6]='').
             kamEmail=_bundleEmail;
             accountId=(p[0]||'').trim();
             outletId=(p[1]||'').trim();
@@ -1100,8 +1142,10 @@ function handleFileUpload(type,input){
             groupKey=(p[3]||'').trim();
             existingGmv=parseFloat(p[4])||0;
             totalGmv=parseFloat(p[5])||0;
+            category=(p[6]||'').trim();
           }
           if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
+          if(category && !groupCategory[groupKey]) groupCategory[groupKey]=category; // v_catbonus
           // byKam: kamEmail → accountId → outletId → groupKey → monthLabel
           if(!byKam[kamEmail])byKam[kamEmail]={};
           if(!byKam[kamEmail][accountId])byKam[kamEmail][accountId]={};
@@ -1124,7 +1168,7 @@ function handleFileUpload(type,input){
           }
           rowCount++;
         });
-        bulkUpsellData={byKam,baselineGroups,loaded:true,baselineLabel:_baselineLabel};
+        bulkUpsellData={byKam,baselineGroups,groupCategory,loaded:true,baselineLabel:_baselineLabel};
         const kamCount=Object.keys(byKam).length;
         const b=document.getElementById('badge-bulk-upsell-kam');
         if(b){b.textContent='✓ '+kamCount+' KAMs / '+rowCount+' rows';b.className='dp-slot-badge ok';}
@@ -1370,7 +1414,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',current_movements:'portview_current_movements.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv'};
 // v738: R2_FILES comes from FRESHKET_APP_CONFIG which is Object.freeze()'d — direct mutation is
 // a silent no-op. _salesR2Override is a mutable local map; _getR2File() checks it first.
 var _salesR2Override = {}; // populated by _patchR2FilesForSales for Sales role
@@ -1427,6 +1471,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   qnrr:{type:'bulk-qnrr-single',tab:'qnrr',cache:true},
   // Q3C team summary: pre-computed P1/P3 totals per KAM for TL multiplier
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
+  // v_catbonus: group-key-grain P1/P3 for per-category bonus rates (fast path)
+  upsell_team_groups:{type:'bulk-upsell-team-groups',tab:'upsell_team_groups',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -1459,6 +1505,7 @@ const _csvSentinelSpec={
   outlets:{minCols:4},
   handover:{minCols:8},
   upsell_team:{minCols:5},
+  upsell_team_groups:{minCols:5},
   current_movements:{minCols:8},
   qnrr:{minCols:13}
 };
@@ -2076,7 +2123,7 @@ async function loadFromCloudflareR2(){
   // getCurrentRole() alone can be empty if profile not yet settled at this point
   const _isSalesMode=(Object.keys(_salesR2Override).length>0)||
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
   if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
@@ -2379,7 +2426,7 @@ async function _preloadFromIndexedDB(){
   // _cloudLoadedTabs, which is now always the case, so qnrr always routes
   // through _fetchQnrrBundle()'s correct merge (still fast — each half has its
   // own IDB cache).
-  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
+  var EXTRA=['categories','sku_current','outlets','upsell_team','upsell_team_groups','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
   var TABS=_isSalesPreload
     ? [...CRITICAL,...EXTRA].filter(function(t){return t!=='portview'&&t!=='handover';})
     : [...CRITICAL,...EXTRA];

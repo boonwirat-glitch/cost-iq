@@ -189,7 +189,7 @@ Build log ของ Sales/Skills/Echo แต่ละเวอร์ชันถ
 ### PM/AD roster rollout + 2026-07-19 commission-logic fixes (active, ยังไม่ปิดงาน)
 | ไฟล์ | สถานะ |
 |---|---|
-| `handoff_sql_2026-07-19/README.md` | **ACTIVE / IN PROGRESS** — รวมทุก runbook ที่ต้องให้ data team รัน (แทนที่ `handoff_sql_pm_role/` เดิม ซึ่งลบไปแล้ว): 11 ไฟล์เดิม+PM/AD roster, `pm_rep_view.sql`, และ 3 ไฟล์ที่แก้บั๊กวันนี้ (`q3_2026_movement_rep_view.sql` transfer_scope fix, `q3c_upsell_team_summary_v4.sql` single-month fix, 2 ไฟล์ `Quarterly_*_reconcile.sql` whole-outlet-handoff model) — ยังไม่ยืนยันว่า data team รันครบหรือยัง |
+| `handoff_sql_2026-07-19/README.md` | **ACTIVE / IN PROGRESS** — รวมทุก runbook ที่ต้องให้ data team รัน (แทนที่ `handoff_sql_pm_role/` เดิม ซึ่งลบไปแล้ว): 9 ไฟล์เดิม+PM/AD roster (ตัด `Q3B_bulk_skus.sql`/`Q4B_bulk_alternatives.sql` ออกแล้ว 2026-07-19 — เป็นแค่ fallback ที่แอปไม่ได้ใช้เป็น path หลักอีกต่อไป ดู `02_data_pipeline.js`'s `BACKGROUND=[]` comment), `pm_rep_view.sql`, และ 3 ไฟล์ที่แก้บั๊กวันนี้ (`q3_2026_movement_rep_view.sql` transfer_scope fix, `q3c_upsell_team_summary_v4.sql` single-month fix, 2 ไฟล์ `Quarterly_*_reconcile.sql` whole-outlet-handoff model) — ยังไม่ยืนยันว่า data team รันครบหรือยัง |
 | `sql/pm_rep_view.sql` | **ACTIVE, pending deploy** — query ใหม่สำหรับ `/nrr`, `src/nrr/nrr_data.js` fetch ไว้รอแล้ว |
 
 ### Quarterly reconcile (active, 2026-07-19)

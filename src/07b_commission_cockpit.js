@@ -702,6 +702,8 @@ function renderCommRoleDetail(body, role) {
         ${_renderRoleUpsellRateEditor(planCode, 'outlet_expansion', {
           title: 'Expansion — ร้านขยาย', accentColor: 'rgba(0,200,176,.85)'
         })}
+        <div class="comm-section-title">โบนัสตามกลุ่มสินค้า (P1 + P3)</div>
+        ${_renderRoleUpsellCategoryBonusEditor(planCode)}
       `}
       ${previewPerson ? _renderRoleLivePreview(role, previewPerson) : `<div class="comm-empty">ยังไม่มีคนใน role นี้ให้ preview</div>`}
       <div class="comm-role-override-row">
@@ -1286,6 +1288,166 @@ function _renderRoleUpsellRateEditor(planCode, metricVariant, opts) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rateField}${extraFields}</div>
   </div>`;
 }
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_UPSELL_CATEGORY_BONUS (v_catbonus, 2026-07-19)
+// Per-category / per-group_key Upsell bonus rates — ONE shared override map
+// applied to BOTH P1 and P3 (Bush's decision). Stored on a single
+// upsell_gmv/category_bonus rule's tier_config as {category_rates,
+// group_rates} (the shape the engine's _commResolveUpsellRateMap reads),
+// plus a `rows` working array for the editor (harmless extra jsonb, ignored
+// by the engine). Modeled on the handover gmv_tiers editor. An override
+// REPLACES the base rate (not additive); precedence group > category > base.
+// ══════════════════════════════════════════════════════════════
+const _COMM_CATEGORIES = ['Beverage Alcohol','Beverage Non-alcohol','DG Food','DG Non-food','Egg','Fish & Seafood','Fruit','Meat','Processed Food','Vegetable'];
+
+// Rebuild the engine-facing maps from the editor's rows (skip incomplete rows).
+function _commSyncBonusMaps(tc) {
+  const cat = {}, grp = {};
+  (tc.rows || []).forEach(r => {
+    if (!r || r.key == null || r.key === '' || r.rate == null || r.rate === '' || isNaN(r.rate)) return;
+    const frac = Number(r.rate) / 100;
+    if (r.level === 'group') grp[r.key] = frac; else cat[r.key] = frac;
+  });
+  tc.category_rates = cat;
+  tc.group_rates = grp;
+}
+// Ensure the draft's tier_config exists + has a rows working array. On first
+// open of a DB-saved scheme (which has category_rates/group_rates but no rows),
+// reconstruct rows from the maps so the editor shows existing overrides.
+function _commRoleBonusRows(planCode) {
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  if (!d.tier_config || typeof d.tier_config !== 'object') d.tier_config = {};
+  const tc = d.tier_config;
+  if (!Array.isArray(tc.rows)) {
+    const rows = [];
+    Object.keys(tc.category_rates || {}).forEach(k => rows.push({ level:'category', key:k, rate: Number(tc.category_rates[k]) * 100 }));
+    Object.keys(tc.group_rates || {}).forEach(k => rows.push({ level:'group', key:k, rate: Number(tc.group_rates[k]) * 100 }));
+    tc.rows = rows;
+  }
+  return tc.rows;
+}
+function _commRoleAddBonusRow(planCode) {
+  const rows = _commRoleBonusRows(planCode);
+  rows.push({ level:'category', key:'', rate:'' });
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleRemoveBonusRow(planCode, idx) {
+  const rows = _commRoleBonusRows(planCode);
+  rows.splice(idx, 1);
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  _commSyncBonusMaps(d.tier_config);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleSetBonusField(planCode, idx, field, value) {
+  const rows = _commRoleBonusRows(planCode);
+  if (!rows[idx]) return;
+  if (field === 'level') { rows[idx].level = value; rows[idx].key = ''; }       // reset key when switching level
+  else if (field === 'rate') rows[idx].rate = value;
+  else rows[idx].key = value;
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  _commSyncBonusMaps(d.tier_config);
+  _commMarkChanged();
+  if (field === 'level') renderCommissionCockpit(); // re-render to swap key input type
+}
+window._commRoleAddBonusRow = _commRoleAddBonusRow;
+window._commRoleRemoveBonusRow = _commRoleRemoveBonusRow;
+window._commRoleSetBonusField = _commRoleSetBonusField;
+
+// Distinct group_key list (with category) observed in the loaded fast-path
+// file — powers the group typeahead so admins pick real groups, not free text.
+function _commObservedGroupKeys() {
+  const out = [];
+  try {
+    const byKam = (typeof bulkUpsellTeamGroups !== 'undefined' && bulkUpsellTeamGroups) || {};
+    const seen = new Set();
+    Object.keys(byKam).forEach(k => (byKam[k] || []).forEach(r => {
+      if (r.group_key && !seen.has(r.group_key)) { seen.add(r.group_key); out.push(r.group_key); }
+    }));
+    out.sort();
+  } catch (e) {}
+  return out;
+}
+function _commValidateUpsellCategoryBonus(rows) {
+  const errs = [], notes = [];
+  const seen = {};
+  const catKeys = new Set(rows.filter(r => r.level === 'category' && r.key).map(r => r.key));
+  rows.forEach((r, i) => {
+    if (!r.key) return;
+    const id = r.level + '|' + r.key;
+    if (seen[id]) errs.push(`ซ้ำ: ${r.level==='group'?'กลุ่ม':'หมวด'} "${r.key}" มีมากกว่า 1 แถว`);
+    seen[id] = true;
+    if (r.rate === '' || r.rate == null || isNaN(r.rate) || Number(r.rate) < 0 || Number(r.rate) > 100)
+      errs.push(`เรตของ "${r.key}" ต้องอยู่ระหว่าง 0–100%`);
+  });
+  return { errs, notes };
+}
+
+function _renderRoleUpsellCategoryBonusEditor(planCode) {
+  // Read-only render (staging only in mutators — same ghost-row guard as the
+  // handover/upsell editors above).
+  const draft = _commGetComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  let rows = [];
+  if (draft && draft.tier_config) {
+    if (Array.isArray(draft.tier_config.rows)) rows = draft.tier_config.rows;
+    else {
+      Object.keys(draft.tier_config.category_rates || {}).forEach(k => rows.push({ level:'category', key:k, rate: Number(draft.tier_config.category_rates[k])*100 }));
+      Object.keys(draft.tier_config.group_rates || {}).forEach(k => rows.push({ level:'group', key:k, rate: Number(draft.tier_config.group_rates[k])*100 }));
+    }
+  }
+  const inpSel = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 9px;color:#e8eeff;font-size:var(--text-md);font-family:var(--tk-font-body),system-ui,sans-serif;outline:none;width:100%';
+  const inpKey = inpSel;
+  const inpPay = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:8px 9px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const groupKeys = _commObservedGroupKeys();
+  const dlId = 'comm-grpkeys-' + planCode.replace(/[^a-zA-Z0-9]/g,'');
+  const datalist = `<datalist id="${dlId}">${groupKeys.map(g=>`<option value="${_commEscapeHtml(g)}"></option>`).join('')}</datalist>`;
+
+  const rowCards = rows.map((r, i) => {
+    const catOpts = _COMM_CATEGORIES.map(c => `<option value="${c}" ${r.key===c?'selected':''}>${c}</option>`).join('');
+    const keyField = r.level === 'group'
+      ? `<input list="${dlId}" style="${inpKey}" value="${_commEscapeHtml(r.key||'')}" placeholder="พิมพ์/เลือกกลุ่มสินค้า"
+           oninput="_commRoleSetBonusField('${planCode}',${i},'key',this.value)">`
+      : `<select style="${inpSel}" onchange="_commRoleSetBonusField('${planCode}',${i},'key',this.value)">
+           <option value="">— เลือกหมวด —</option>${catOpts}</select>`;
+    return `<div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:7px">
+      <div style="width:96px">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ระดับ</div>
+        <select style="${inpSel}" onchange="_commRoleSetBonusField('${planCode}',${i},'level',this.value)">
+          <option value="category" ${r.level!=='group'?'selected':''}>หมวด</option>
+          <option value="group" ${r.level==='group'?'selected':''}>กลุ่มย่อย</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">${r.level==='group'?'กลุ่มย่อย (group_key)':'หมวด (category)'}</div>
+        ${keyField}
+      </div>
+      <div style="width:86px">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">เรต (%)</div>
+        <input style="${inpPay}" value="${r.rate ?? ''}" inputmode="decimal"
+          oninput="_commRoleSetBonusField('${planCode}',${i},'rate',this.value)">
+      </div>
+      <button onclick="_commRoleRemoveBonusRow('${planCode}',${i})" style="font-size:var(--text-lg);color:var(--tk-text-faint);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
+    </div>`;
+  }).join('');
+
+  const { errs } = _commValidateUpsellCategoryBonus(rows);
+  const errHtml = errs.length ? `<div style="font-size:var(--text-xs);color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
+  const emptyNote = !rows.length ? `<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">ยังไม่มีโบนัส — ทุกกลุ่มใช้เรต P1/P3 พื้นฐานด้านบน เพิ่มแถวเพื่อกำหนดเรตพิเศษต่อหมวด/กลุ่มสินค้า</div>` : '';
+
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    ${datalist}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:rgba(120,220,150,.85);flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">โบนัสตามกลุ่มสินค้า</span>
+    </div>
+    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.62);line-height:1.6;margin-bottom:10px">เรตพิเศษนี้ <b>แทนที่</b>เรต P1/P3 พื้นฐาน และใช้กับ<b>ทั้ง P1 และ P3</b> — ถ้าตั้งทั้งหมวดและกลุ่มย่อยที่ทับกัน กลุ่มย่อยจะชนะ</div>
+    ${errHtml}${emptyNote}${rowCards}
+    <button onclick="_commRoleAddBonusRow('${planCode}')" style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(120,220,150,.06);border:1px dashed rgba(120,220,150,.30);color:rgba(150,230,175,.85);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่มโบนัสกลุ่มสินค้า</button>
+  </div>`;
+}
+window._renderRoleUpsellCategoryBonusEditor = _renderRoleUpsellCategoryBonusEditor;
 
 function _renderTlUpsellTierRows() {
   let tiers = [];

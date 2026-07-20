@@ -575,10 +575,13 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
       var currLabel = nrrCommCurrentMonthLabel();
       var data = {};             // accountId -> outletId -> groupKey -> monthLabel -> {existingGmv,totalGmv}
       var baselineGroups = {};   // accountId -> outletId -> Set-like object of groupKey -> true
+      var groupCategory = {};    // v_catbonus: groupKey -> category_high_level (1:1)
 
       lines.forEach(function (l) {
         // Per-KAM bundle has NO kam_email column: account_id, outlet_id,
-        // month_label, group_key, existing_gmv, total_gmv (6 cols).
+        // month_label, group_key, existing_gmv, total_gmv, category (7 cols).
+        // v_catbonus: category appended as trailing p[6] — p[0..5] unchanged,
+        // so this stays backward-compatible with a pre-category CSV (p[6]='').
         var p = parseCSVRow(l);
         var accountId = (p[0] || '').trim();
         var outletId = (p[1] || '').trim();
@@ -586,7 +589,9 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
         var groupKey = (p[3] || '').trim();
         var existingGmv = parseFloat(p[4]) || 0;
         var totalGmv = parseFloat(p[5]) || 0;
+        var category = (p[6] || '').trim();
         if (!accountId || !outletId || !monthLabel || !groupKey) return;
+        if (category && !groupCategory[groupKey]) groupCategory[groupKey] = category;
 
         if (!data[accountId]) data[accountId] = {};
         if (!data[accountId][outletId]) data[accountId][outletId] = {};
@@ -608,7 +613,7 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
         }
       });
 
-      var bundle = { data: data, baselineGroups: baselineGroups, loaded: true, loadedAt: Date.now() };
+      var bundle = { data: data, baselineGroups: baselineGroups, groupCategory: groupCategory, loaded: true, loadedAt: Date.now() };
       nrrUpsellBundleCache[kamEmail] = bundle;
       return bundle;
     } catch (e) {

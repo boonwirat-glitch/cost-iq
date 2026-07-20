@@ -140,6 +140,7 @@ function resetRuntimeSessionState(){
   try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
   try { bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; } catch(e) {}  // Q3C: clear upsell index on logout
   try { bulkUpsellTeamData={}; } catch(e) {}  // clear team summary on logout
+  try { bulkUpsellTeamGroups={}; } catch(e) {}  // v_catbonus: clear group-grain fast path on logout
   try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
   try { senseActivated=false; } catch(e) {}
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
@@ -1700,6 +1701,7 @@ let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
 let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_{safekey}.csv — per-KAM demand bundle
 let bulkUpsellTeamData={}; // team summary: {[kamEmail]:{p1_gmv,p3_incr,outlet_gmv,tl_upsell_base}}
+let bulkUpsellTeamGroups={}; // v_catbonus: {[kamEmail]:[{category,group_key,p1_gmv,p3_incremental}]} — group-grain fast path
 let bulkSkuCurrentData={}; // Q7B: aid → [{item_id, orders_this_month, gmv_to_date, item_name_th, last_order_date}]
 let bulkAltsUnverified={}; // Q4B: aid → [unverified alt pairs]
 let bulkKamNames={};       // Q8E v2: aid → kam_name string (for TL grouping)

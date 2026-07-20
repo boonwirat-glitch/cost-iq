@@ -323,6 +323,33 @@ current_gmv_by_group AS (
   GROUP BY 1, 2, 3
 ),
 
+-- ── 8b. group_key → category_high_level lookup (v_catbonus, 2026-07-19) ─────
+-- category is 1:1 with group_key, so a single deduped lookup joined at the
+-- final SELECT gives the Google Sheet a category dimension to apply
+-- per-category bonus rates via its Parameters tab — without threading
+-- category through every group-gmv CTE. QUALIFY picks one category per
+-- group_key defensively (should already be 1:1; guards against a stray
+-- subclass_name string reused across categories duplicating output rows).
+group_category AS (
+  SELECT group_key, category FROM (
+    SELECT
+      CASE
+        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+             AND TRIM(COALESCE(i.item_family,'')) != ''
+        THEN i.item_family ELSE i.subclass_name
+      END AS group_key,
+      i.category_high_level AS category,
+      SUM(i.gmv_ex_vat) AS _gmv
+    FROM `freshket-rn.dwh.order` o
+    CROSS JOIN UNNEST(o.item) AS i
+    CROSS JOIN params p
+    WHERE o.delivery_date BETWEEN p.m1_start AND p.m3_end
+      AND i.gmv_ex_vat > 0
+    GROUP BY 1, 2
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY group_key ORDER BY _gmv DESC) = 1
+  )
+),
+
 -- ── 9. Baseline: group_key ที่เคยซื้อในหน้าต่าง 3 เดือนก่อน (FROZEN: base,
 --       base-1, base-2 — ไม่ขยับตามไตรมาส แม้รันเดือนหลังๆ ของไตรมาส) ───────
 baseline_groups AS (
@@ -466,11 +493,17 @@ SELECT
   --    real JOIN. ─────────────────────────────────────────────────────────
   ROUND(g1.gmv, 0) AS q_m1_gmv,
   CASE WHEN v_m2_days > 0 THEN ROUND(g2.gmv, 0) END AS q_m2_gmv,
-  CASE WHEN v_m3_days > 0 THEN ROUND(g3.gmv, 0) END AS q_m3_gmv
+  CASE WHEN v_m3_days > 0 THEN ROUND(g3.gmv, 0) END AS q_m3_gmv,
 
+  -- ── v_catbonus (position 26): category_high_level of this group_key, so
+  --    the Google Sheet can apply per-category bonus rates via Parameters.
+  --    Appended strictly after existing columns — Sheet formulas keyed to
+  --    columns 1-25 are unaffected. ──────────────────────────────────────
+  gc.category AS category
 FROM commission_items ci
 JOIN kam_list kl ON ci.kam_email = kl.kam_email
 LEFT JOIN m1_group_gmv g1 ON ci.outlet_id = g1.outlet_id AND ci.group_key = g1.group_key
 LEFT JOIN m2_group_gmv g2 ON ci.outlet_id = g2.outlet_id AND ci.group_key = g2.group_key
 LEFT JOIN m3_group_gmv g3 ON ci.outlet_id = g3.outlet_id AND ci.group_key = g3.group_key
+LEFT JOIN group_category gc ON ci.group_key = gc.group_key
 ORDER BY kl.tl_email, kl.kam_name, ci.outlet_id, ci.group_key

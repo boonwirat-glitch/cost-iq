@@ -1,4 +1,4 @@
-<!-- Freshket Sense v898: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v899: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v898',
+      version: 'v899',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12860,6 +12860,7 @@ function resetRuntimeSessionState(){
   try { portviewBulkData=[]; } catch(e) {}      // prevents splash from thinking cache=warm with old data
   try { bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; } catch(e) {}  // Q3C: clear upsell index on logout
   try { bulkUpsellTeamData={}; } catch(e) {}  // clear team summary on logout
+  try { bulkUpsellTeamGroups={}; } catch(e) {}  // v_catbonus: clear group-grain fast path on logout
   try { currentAccountId=null; } catch(e) {}    // prevents loadFromStorage restoring old account state
   try { senseActivated=false; } catch(e) {}
   try { _sgRunning=false; } catch(e) {}          // prevent stale gate blocking reset
@@ -14420,6 +14421,7 @@ let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
 let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_{safekey}.csv — per-KAM demand bundle
 let bulkUpsellTeamData={}; // team summary: {[kamEmail]:{p1_gmv,p3_incr,outlet_gmv,tl_upsell_base}}
+let bulkUpsellTeamGroups={}; // v_catbonus: {[kamEmail]:[{category,group_key,p1_gmv,p3_incremental}]} — group-grain fast path
 let bulkSkuCurrentData={}; // Q7B: aid → [{item_id, orders_this_month, gmv_to_date, item_name_th, last_order_date}]
 let bulkAltsUnverified={}; // Q4B: aid → [unverified alt pairs]
 let bulkKamNames={};       // Q8E v2: aid → kam_name string (for TL grouping)
@@ -15918,6 +15920,43 @@ function handleFileUpload(type,input){
     reader.readAsText(file);return;
   }
 
+  // ── bulk-upsell-team-groups (sense_upsell_team_groups.csv) ── v_catbonus
+  // Group-key-grain fast path: qualifying P1/P3 GMV per (kam, category,
+  // group_key). Lets the fast (no per-KAM-bundle) path apply per-category
+  // bonus rates. Columns: kam_email, category, group_key, p1_gmv, p3_incremental.
+  // Tiny (~150-300 rows). Absent → engine falls back to the flat team-scalar
+  // multiply, so this is additive/rollout-safe.
+  if(type==='bulk-upsell-team-groups'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+        const byKam={};
+        lines.forEach(l=>{
+          const p=parseCSVRow(l);
+          const kamEmail=(p[0]||'').trim();
+          if(!kamEmail)return;
+          if(!byKam[kamEmail])byKam[kamEmail]=[];
+          byKam[kamEmail].push({
+            category:       (p[1]||'').trim(),
+            group_key:      (p[2]||'').trim(),
+            p1_gmv:         parseFloat(p[3])||0,
+            p3_incremental: parseFloat(p[4])||0
+          });
+        });
+        bulkUpsellTeamGroups=byKam;
+        try{ var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+        try{ if(typeof renderTeamview==='function' && !window._senseSplashActive)renderTeamview(); }catch(e){}
+      }catch(err){
+        console.warn('[Q3C team-groups] parse error',err);
+        bulkUpsellTeamGroups={};
+      }
+      _done();
+    };
+    reader.readAsText(file);return;
+  }
+
   // ── bulk-upsell-kam (sense_upsell_{safekey}.csv) ──
   // Per-KAM demand bundle: same 8-column structure, single KAM only
   // ── bulk-upsell (Q3C: sense_upsell_bulk.csv) ──  [legacy, not used in Option B]
@@ -15936,6 +15975,7 @@ function handleFileUpload(type,input){
         // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
+        const groupCategory={}; // v_catbonus: group_key → category_high_level (1:1), for per-category rate lookup
         const _now=new Date();const _lagU=new Date(_now);_lagU.setDate(_lagU.getDate()-1); // day-1 lag anchor
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
         const _baselineLabel=_thMonths[new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getMonth()]+' '+(new Date(_lagU.getFullYear(),_lagU.getMonth()-1,1).getFullYear()+543);
@@ -15970,16 +16010,20 @@ function handleFileUpload(type,input){
         const _firstColIsEmail = !_bundleEmail || ((lines[0]||'').split(',')[0]||'').includes('@');
         lines.forEach(l=>{
           const p=parseCSVRow(l);
-          let kamEmail, accountId, outletId, monthLabel, groupKey, existingGmv, totalGmv;
+          let kamEmail, accountId, outletId, monthLabel, groupKey, existingGmv, totalGmv, category='';
           if(_firstColIsEmail){
-            // Legacy bulk format: kam_email, account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            // Legacy bulk format (unused in Option B — splitter always emits
+            // UUID-first per-KAM files). category not threaded here.
             kamEmail=(p[0]||'').trim();
             accountId=(p[1]||'').trim();
             if(_hasOutlet && _sampleCols<=7){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[6])||0;}
             else if(_hasOutlet){outletId=(p[2]||'').trim();monthLabel=(p[3]||'').trim();groupKey=(p[4]||'').trim();existingGmv=parseFloat(p[5])||0;totalGmv=parseFloat(p[8])||0;}
             else{outletId='_all';monthLabel=(p[2]||'').trim();groupKey=(p[3]||'').trim();existingGmv=parseFloat(p[4])||0;totalGmv=parseFloat(p[7])||0;}
           } else {
-            // Per-KAM bundle: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv
+            // Per-KAM bundle: account_id, outlet_id, month_label, group_key, existing_gmv, total_gmv, category
+            // v_catbonus: category appended as trailing p[6] by
+            // q3c_upsell_bulk_all_kams_v4.sql — p[0..5] positions unchanged,
+            // so this is backward-compatible with a pre-category CSV (p[6]='').
             kamEmail=_bundleEmail;
             accountId=(p[0]||'').trim();
             outletId=(p[1]||'').trim();
@@ -15987,8 +16031,10 @@ function handleFileUpload(type,input){
             groupKey=(p[3]||'').trim();
             existingGmv=parseFloat(p[4])||0;
             totalGmv=parseFloat(p[5])||0;
+            category=(p[6]||'').trim();
           }
           if(!kamEmail||!accountId||!monthLabel||!groupKey)return;
+          if(category && !groupCategory[groupKey]) groupCategory[groupKey]=category; // v_catbonus
           // byKam: kamEmail → accountId → outletId → groupKey → monthLabel
           if(!byKam[kamEmail])byKam[kamEmail]={};
           if(!byKam[kamEmail][accountId])byKam[kamEmail][accountId]={};
@@ -16011,7 +16057,7 @@ function handleFileUpload(type,input){
           }
           rowCount++;
         });
-        bulkUpsellData={byKam,baselineGroups,loaded:true,baselineLabel:_baselineLabel};
+        bulkUpsellData={byKam,baselineGroups,groupCategory,loaded:true,baselineLabel:_baselineLabel};
         const kamCount=Object.keys(byKam).length;
         const b=document.getElementById('badge-bulk-upsell-kam');
         if(b){b.textContent='✓ '+kamCount+' KAMs / '+rowCount+' rows';b.className='dp-slot-badge ok';}
@@ -16257,7 +16303,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',current_movements:'portview_current_movements.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv'};
 // v738: R2_FILES comes from FRESHKET_APP_CONFIG which is Object.freeze()'d — direct mutation is
 // a silent no-op. _salesR2Override is a mutable local map; _getR2File() checks it first.
 var _salesR2Override = {}; // populated by _patchR2FilesForSales for Sales role
@@ -16314,6 +16360,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   qnrr:{type:'bulk-qnrr-single',tab:'qnrr',cache:true},
   // Q3C team summary: pre-computed P1/P3 totals per KAM for TL multiplier
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
+  // v_catbonus: group-key-grain P1/P3 for per-category bonus rates (fast path)
+  upsell_team_groups:{type:'bulk-upsell-team-groups',tab:'upsell_team_groups',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -16346,6 +16394,7 @@ const _csvSentinelSpec={
   outlets:{minCols:4},
   handover:{minCols:8},
   upsell_team:{minCols:5},
+  upsell_team_groups:{minCols:5},
   current_movements:{minCols:8},
   qnrr:{minCols:13}
 };
@@ -16963,7 +17012,7 @@ async function loadFromCloudflareR2(){
   // getCurrentRole() alone can be empty if profile not yet settled at this point
   const _isSalesMode=(Object.keys(_salesR2Override).length>0)||
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
-  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
+  const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
   if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
@@ -17266,7 +17315,7 @@ async function _preloadFromIndexedDB(){
   // _cloudLoadedTabs, which is now always the case, so qnrr always routes
   // through _fetchQnrrBundle()'s correct merge (still fast — each half has its
   // own IDB cache).
-  var EXTRA=['categories','sku_current','outlets','upsell_team','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
+  var EXTRA=['categories','sku_current','outlets','upsell_team','upsell_team_groups','current_movements']; // v222+v226+v259: also preload — cache:true in IDB
   var TABS=_isSalesPreload
     ? [...CRITICAL,...EXTRA].filter(function(t){return t!=='portview'&&t!=='handover';})
     : [...CRITICAL,...EXTRA];
@@ -35497,6 +35546,45 @@ function _commResolveRuleForMetric(planCode, metricCode, metricVariant, previewR
   return _commGetRuleForMetric(planCode, metricCode, metricVariant);
 }
 
+// v_catbonus (2026-07-19): per-category / per-group_key Upsell bonus rates.
+// Resolves the ONE shared override map for a scheme — a single
+// upsell_gmv/category_bonus rule row whose tier_config holds
+// { category_rates:{cat->rate}, group_rates:{group_key->rate} }, applied to
+// BOTH P1 and P3 (Bush's decision: one shared map, not per-variant). Empty
+// {} when no bonus configured → every lookup falls back to the base rate, so
+// this is a no-op until an admin sets a rate. Same tier_config-on-the-rule
+// mechanism handover's gmv_tiers uses. Returns normalized
+// { categoryRates, groupRates } (both plain objects, never null).
+function _commResolveUpsellRateMap(planCode, previewResolver) {
+  const EMPTY = { categoryRates: {}, groupRates: {} };
+  try {
+    if (!planCode) return EMPTY;
+    const rule = _commResolveRuleForMetric(planCode, 'upsell_gmv', 'category_bonus', previewResolver);
+    if (!rule || rule.active === false || !rule.tier_config) return EMPTY;
+    const tc = rule.tier_config;
+    return {
+      categoryRates: (tc.category_rates && typeof tc.category_rates === 'object') ? tc.category_rates : {},
+      groupRates:    (tc.group_rates    && typeof tc.group_rates    === 'object') ? tc.group_rates    : {}
+    };
+  } catch (e) { return EMPTY; }
+}
+
+// Resolve the effective Upsell rate for one line item, precedence
+// group_key override > category override > base rate (Bush's decision).
+// A stored rate of 0 is a real "pay nothing on this group" choice and MUST
+// win over base — hence the explicit `!= null` checks, not `||`.
+function _commUpsellRateFor(rateMap, baseRate, category, groupKey) {
+  if (rateMap) {
+    if (groupKey != null && rateMap.groupRates && rateMap.groupRates[groupKey] != null)
+      return Number(rateMap.groupRates[groupKey]);
+    if (category != null && rateMap.categoryRates && rateMap.categoryRates[category] != null)
+      return Number(rateMap.categoryRates[category]);
+  }
+  return baseRate;
+}
+window._commResolveUpsellRateMap = _commResolveUpsellRateMap;
+window._commUpsellRateFor = _commUpsellRateFor;
+
 // ── Thai month helpers ──────────────────────────────────────────
 const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                     'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -35643,6 +35731,14 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
     const p3MinIncr  = (p3Rule && p3Rule.params.min_incremental != null) ? Number(p3Rule.params.min_incremental) : _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
     const p1MinGmv   = (p1Tier && p1Tier.min_value != null) ? Number(p1Tier.min_value) : _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
+    // v_catbonus: shared per-category/group override map (applies to both P1
+    // and P3). Empty when unconfigured → _commUpsellRateFor returns the base
+    // p1Rate/p3Rate, i.e. no behavior change. groupCategory maps a groupKey
+    // to its category_high_level (carried on the ingested rows, since a bare
+    // group_key string can't be mapped to a category in JS otherwise).
+    const _rateMap = _commResolveUpsellRateMap(planCode, previewResolver);
+    const _groupCategory = (bulkUpsellData && bulkUpsellData.groupCategory) || {};
+
     // MTD mode — commission on actual amounts, no projection
     // MTD mode — actual MTD vs full month baseline, no day scaling
     let daysElapsed = new Date().getDate();
@@ -35702,10 +35798,15 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
           const rawTotalGmv = row.totalGmv || 0;
           const rawExistingGmv = row.existingGmv || 0;
 
+          // v_catbonus: category of this group_key (for the override lookup)
+          const _cat = _groupCategory[groupKey];
+
           if (isP1) {
             // P1: outlet × group_key ใหม่ — this month's own total GMV × rate
             if (rawTotalGmv < p1MinGmv) return;
-            p1Groups.push({ accountId, outletId, groupKey, total_gmv: rawTotalGmv, commission: rawTotalGmv * p1Rate });
+            const _r = _commUpsellRateFor(_rateMap, p1Rate, _cat, groupKey);
+            p1Groups.push({ accountId, outletId, groupKey, category: _cat || null, applied_rate: _r,
+              total_gmv: rawTotalGmv, commission: rawTotalGmv * _r });
             return;
           }
 
@@ -35725,11 +35826,12 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
           if (rawExistingGmv <= maxBaseline * p3Thresh) return;
           const incremental = rawExistingGmv - maxBaseline;
           if (incremental < p3MinIncr) return;
-          p3Groups.push({ accountId, outletId, groupKey,
+          const _r3 = _commUpsellRateFor(_rateMap, p3Rate, _cat, groupKey);
+          p3Groups.push({ accountId, outletId, groupKey, category: _cat || null, applied_rate: _r3,
             existing_curr: rawExistingGmv,
             max_baseline: maxBaseline,
             max_baseline_month: maxBaselineMonth,
-            incremental: incremental, commission: incremental * p3Rate });
+            incremental: incremental, commission: incremental * _r3 });
         });
       });
     });
@@ -36242,15 +36344,42 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
       const p1Rate  = (_p1R && _p1R.active && _p1R.tiers[0]) ? Number(_p1R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
       const p3Rate  = (_p3R && _p3R.active && _p3R.tiers[0]) ? Number(_p3R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
       const outRate = (_outR && _outR.active && _outR.tiers[0]) ? Number(_outR.tiers[0].payout_value) : _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
-      const p1Comm  = _teamRow.p1_gmv   * p1Rate;
-      const p3Comm  = _teamRow.p3_incr  * p3Rate;
+      // v_catbonus: prefer the group-grain fast-path file
+      // (sense_upsell_team_groups.csv → bulkUpsellTeamGroups) so per-category
+      // rates apply even on the fast (no per-KAM-bundle) path. Falls back to
+      // the flat KAM-scalar multiply when that file isn't loaded (rollout-safe).
+      const _rateMap = _commResolveUpsellRateMap(planCode, previewResolver);
+      const _teamGroups = (typeof bulkUpsellTeamGroups !== 'undefined' && bulkUpsellTeamGroups)
+        ? (bulkUpsellTeamGroups[kamEmail] || bulkUpsellTeamGroups[_kamDisplayName] || null)
+        : null;
+      let p1Comm, p3Comm;
+      const _p1Groups = [], _p3Groups = [];
+      if (_teamGroups && _teamGroups.length) {
+        p1Comm = 0; p3Comm = 0;
+        _teamGroups.forEach(gr => {
+          const g1 = Number(gr.p1_gmv) || 0, g3 = Number(gr.p3_incremental) || 0;
+          if (g1 > 0) {
+            const _r = _commUpsellRateFor(_rateMap, p1Rate, gr.category, gr.group_key);
+            p1Comm += g1 * _r;
+            _p1Groups.push({ groupKey: gr.group_key, category: gr.category || null, applied_rate: _r, total_gmv: g1, commission: g1 * _r });
+          }
+          if (g3 > 0) {
+            const _r = _commUpsellRateFor(_rateMap, p3Rate, gr.category, gr.group_key);
+            p3Comm += g3 * _r;
+            _p3Groups.push({ groupKey: gr.group_key, category: gr.category || null, applied_rate: _r, incremental: g3, commission: g3 * _r });
+          }
+        });
+      } else {
+        p1Comm = _teamRow.p1_gmv  * p1Rate;
+        p3Comm = _teamRow.p3_incr * p3Rate;
+      }
       const outComm = _teamRow.outlet_gmv * outRate;
       upsellSku = {
-        p1: { gmv: _teamRow.p1_gmv,  comm: p1Comm, groups: [] },
-        p3: { gmv_incremental: _teamRow.p3_incr, comm: p3Comm, groups: [] },
+        p1: { gmv: _teamRow.p1_gmv,  comm: p1Comm, groups: _p1Groups },
+        p3: { gmv_incremental: _teamRow.p3_incr, comm: p3Comm, groups: _p3Groups },
         total_comm: p1Comm + p3Comm,
         p1_comm: p1Comm, p3_comm: p3Comm,
-        p1_groups: [], p3_groups: [],
+        p1_groups: _p1Groups, p3_groups: _p3Groups,
         total_gmv_eligible: _teamRow.p1_gmv + _teamRow.p3_incr,
         tl_upsell_base: _teamRow.tl_upsell_base || 0
       };
@@ -37932,7 +38061,13 @@ function _commBuildSnapshotRows(periodOverride) {
           gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',95),   // v835-fix: was 90
           gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.3),        // v835-fix: was 0.70
           gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0),          // v835-fix: was 0.35
-          handover_gmv_tiers:           _commGetHandoverGmvTiers()
+          handover_gmv_tiers:           _commGetHandoverGmvTiers(),
+          // v_catbonus: freeze the per-category/group override map actually in
+          // effect for this scheme when locked. The p1_rate/p3_rate above stay
+          // the BASE rate (the fallback for un-bonus'd groups); the per-group
+          // rate that actually hit each line is stored per-group in
+          // breakdown.upsell_sku.p1.groups[].applied_rate (see engine).
+          upsell_category_bonus:        _commResolveUpsellRateMap(kamPlanCode)
         }
       },
       created_by: actor,
@@ -39476,6 +39611,8 @@ function renderCommRoleDetail(body, role) {
         ${_renderRoleUpsellRateEditor(planCode, 'outlet_expansion', {
           title: 'Expansion — ร้านขยาย', accentColor: 'rgba(0,200,176,.85)'
         })}
+        <div class="comm-section-title">โบนัสตามกลุ่มสินค้า (P1 + P3)</div>
+        ${_renderRoleUpsellCategoryBonusEditor(planCode)}
       `}
       ${previewPerson ? _renderRoleLivePreview(role, previewPerson) : `<div class="comm-empty">ยังไม่มีคนใน role นี้ให้ preview</div>`}
       <div class="comm-role-override-row">
@@ -40060,6 +40197,166 @@ function _renderRoleUpsellRateEditor(planCode, metricVariant, opts) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">${rateField}${extraFields}</div>
   </div>`;
 }
+
+// ══════════════════════════════════════════════════════════════
+// SECTION:COMMISSION_SETUP_UPSELL_CATEGORY_BONUS (v_catbonus, 2026-07-19)
+// Per-category / per-group_key Upsell bonus rates — ONE shared override map
+// applied to BOTH P1 and P3 (Bush's decision). Stored on a single
+// upsell_gmv/category_bonus rule's tier_config as {category_rates,
+// group_rates} (the shape the engine's _commResolveUpsellRateMap reads),
+// plus a `rows` working array for the editor (harmless extra jsonb, ignored
+// by the engine). Modeled on the handover gmv_tiers editor. An override
+// REPLACES the base rate (not additive); precedence group > category > base.
+// ══════════════════════════════════════════════════════════════
+const _COMM_CATEGORIES = ['Beverage Alcohol','Beverage Non-alcohol','DG Food','DG Non-food','Egg','Fish & Seafood','Fruit','Meat','Processed Food','Vegetable'];
+
+// Rebuild the engine-facing maps from the editor's rows (skip incomplete rows).
+function _commSyncBonusMaps(tc) {
+  const cat = {}, grp = {};
+  (tc.rows || []).forEach(r => {
+    if (!r || r.key == null || r.key === '' || r.rate == null || r.rate === '' || isNaN(r.rate)) return;
+    const frac = Number(r.rate) / 100;
+    if (r.level === 'group') grp[r.key] = frac; else cat[r.key] = frac;
+  });
+  tc.category_rates = cat;
+  tc.group_rates = grp;
+}
+// Ensure the draft's tier_config exists + has a rows working array. On first
+// open of a DB-saved scheme (which has category_rates/group_rates but no rows),
+// reconstruct rows from the maps so the editor shows existing overrides.
+function _commRoleBonusRows(planCode) {
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  if (!d.tier_config || typeof d.tier_config !== 'object') d.tier_config = {};
+  const tc = d.tier_config;
+  if (!Array.isArray(tc.rows)) {
+    const rows = [];
+    Object.keys(tc.category_rates || {}).forEach(k => rows.push({ level:'category', key:k, rate: Number(tc.category_rates[k]) * 100 }));
+    Object.keys(tc.group_rates || {}).forEach(k => rows.push({ level:'group', key:k, rate: Number(tc.group_rates[k]) * 100 }));
+    tc.rows = rows;
+  }
+  return tc.rows;
+}
+function _commRoleAddBonusRow(planCode) {
+  const rows = _commRoleBonusRows(planCode);
+  rows.push({ level:'category', key:'', rate:'' });
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleRemoveBonusRow(planCode, idx) {
+  const rows = _commRoleBonusRows(planCode);
+  rows.splice(idx, 1);
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  _commSyncBonusMaps(d.tier_config);
+  _commMarkChanged();
+  renderCommissionCockpit();
+}
+function _commRoleSetBonusField(planCode, idx, field, value) {
+  const rows = _commRoleBonusRows(planCode);
+  if (!rows[idx]) return;
+  if (field === 'level') { rows[idx].level = value; rows[idx].key = ''; }       // reset key when switching level
+  else if (field === 'rate') rows[idx].rate = value;
+  else rows[idx].key = value;
+  const d = _commEnsureComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  _commSyncBonusMaps(d.tier_config);
+  _commMarkChanged();
+  if (field === 'level') renderCommissionCockpit(); // re-render to swap key input type
+}
+window._commRoleAddBonusRow = _commRoleAddBonusRow;
+window._commRoleRemoveBonusRow = _commRoleRemoveBonusRow;
+window._commRoleSetBonusField = _commRoleSetBonusField;
+
+// Distinct group_key list (with category) observed in the loaded fast-path
+// file — powers the group typeahead so admins pick real groups, not free text.
+function _commObservedGroupKeys() {
+  const out = [];
+  try {
+    const byKam = (typeof bulkUpsellTeamGroups !== 'undefined' && bulkUpsellTeamGroups) || {};
+    const seen = new Set();
+    Object.keys(byKam).forEach(k => (byKam[k] || []).forEach(r => {
+      if (r.group_key && !seen.has(r.group_key)) { seen.add(r.group_key); out.push(r.group_key); }
+    }));
+    out.sort();
+  } catch (e) {}
+  return out;
+}
+function _commValidateUpsellCategoryBonus(rows) {
+  const errs = [], notes = [];
+  const seen = {};
+  const catKeys = new Set(rows.filter(r => r.level === 'category' && r.key).map(r => r.key));
+  rows.forEach((r, i) => {
+    if (!r.key) return;
+    const id = r.level + '|' + r.key;
+    if (seen[id]) errs.push(`ซ้ำ: ${r.level==='group'?'กลุ่ม':'หมวด'} "${r.key}" มีมากกว่า 1 แถว`);
+    seen[id] = true;
+    if (r.rate === '' || r.rate == null || isNaN(r.rate) || Number(r.rate) < 0 || Number(r.rate) > 100)
+      errs.push(`เรตของ "${r.key}" ต้องอยู่ระหว่าง 0–100%`);
+  });
+  return { errs, notes };
+}
+
+function _renderRoleUpsellCategoryBonusEditor(planCode) {
+  // Read-only render (staging only in mutators — same ghost-row guard as the
+  // handover/upsell editors above).
+  const draft = _commGetComponentDraft(planCode, 'upsell_gmv', 'category_bonus');
+  let rows = [];
+  if (draft && draft.tier_config) {
+    if (Array.isArray(draft.tier_config.rows)) rows = draft.tier_config.rows;
+    else {
+      Object.keys(draft.tier_config.category_rates || {}).forEach(k => rows.push({ level:'category', key:k, rate: Number(draft.tier_config.category_rates[k])*100 }));
+      Object.keys(draft.tier_config.group_rates || {}).forEach(k => rows.push({ level:'group', key:k, rate: Number(draft.tier_config.group_rates[k])*100 }));
+    }
+  }
+  const inpSel = 'background:rgba(255,255,255,.08);border:1px solid rgba(var(--ink-blue),.18);border-radius:var(--r-9);padding:8px 9px;color:#e8eeff;font-size:var(--text-md);font-family:var(--tk-font-body),system-ui,sans-serif;outline:none;width:100%';
+  const inpKey = inpSel;
+  const inpPay = 'background:rgba(255,224,138,.08);border:1px solid rgba(255,224,138,.28);border-radius:var(--r-9);padding:8px 9px;color:#ffe08a;font-size:var(--text-base);font-weight:800;font-family:\'IBM Plex Mono\',monospace;text-align:right;outline:none;width:100%';
+  const groupKeys = _commObservedGroupKeys();
+  const dlId = 'comm-grpkeys-' + planCode.replace(/[^a-zA-Z0-9]/g,'');
+  const datalist = `<datalist id="${dlId}">${groupKeys.map(g=>`<option value="${_commEscapeHtml(g)}"></option>`).join('')}</datalist>`;
+
+  const rowCards = rows.map((r, i) => {
+    const catOpts = _COMM_CATEGORIES.map(c => `<option value="${c}" ${r.key===c?'selected':''}>${c}</option>`).join('');
+    const keyField = r.level === 'group'
+      ? `<input list="${dlId}" style="${inpKey}" value="${_commEscapeHtml(r.key||'')}" placeholder="พิมพ์/เลือกกลุ่มสินค้า"
+           oninput="_commRoleSetBonusField('${planCode}',${i},'key',this.value)">`
+      : `<select style="${inpSel}" onchange="_commRoleSetBonusField('${planCode}',${i},'key',this.value)">
+           <option value="">— เลือกหมวด —</option>${catOpts}</select>`;
+    return `<div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:7px">
+      <div style="width:96px">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">ระดับ</div>
+        <select style="${inpSel}" onchange="_commRoleSetBonusField('${planCode}',${i},'level',this.value)">
+          <option value="category" ${r.level!=='group'?'selected':''}>หมวด</option>
+          <option value="group" ${r.level==='group'?'selected':''}>กลุ่มย่อย</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.70);margin-bottom:3px">${r.level==='group'?'กลุ่มย่อย (group_key)':'หมวด (category)'}</div>
+        ${keyField}
+      </div>
+      <div style="width:86px">
+        <div style="font-size:var(--text-2xs);font-weight:var(--fw-bold);color:rgba(255,224,138,.85);margin-bottom:3px">เรต (%)</div>
+        <input style="${inpPay}" value="${r.rate ?? ''}" inputmode="decimal"
+          oninput="_commRoleSetBonusField('${planCode}',${i},'rate',this.value)">
+      </div>
+      <button onclick="_commRoleRemoveBonusRow('${planCode}',${i})" style="font-size:var(--text-lg);color:var(--tk-text-faint);background:none;border:none;cursor:pointer;padding:8px 4px" onmouseover="this.style.color='rgba(255,80,60,.70)'" onmouseout="this.style.color='rgba(255,255,255,.25)'">×</button>
+    </div>`;
+  }).join('');
+
+  const { errs } = _commValidateUpsellCategoryBonus(rows);
+  const errHtml = errs.length ? `<div style="font-size:var(--text-xs);color:rgba(255,120,80,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">${errs.map(_commEscapeHtml).join('<br>')}</div>` : '';
+  const emptyNote = !rows.length ? `<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);padding:8px 10px;background:rgba(0,0,0,.20);border-radius:var(--r-8);margin-bottom:9px;line-height:1.6">ยังไม่มีโบนัส — ทุกกลุ่มใช้เรต P1/P3 พื้นฐานด้านบน เพิ่มแถวเพื่อกำหนดเรตพิเศษต่อหมวด/กลุ่มสินค้า</div>` : '';
+
+  return `<div style="border-radius:13px;border:1px solid rgba(var(--ink-blue),.09);background:rgba(255,255,255,.025);padding:13px;margin-bottom:10px">
+    ${datalist}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="width:3px;height:16px;border-radius:var(--r-xxs);background:rgba(120,220,150,.85);flex-shrink:0"></span>
+      <span style="font-size:var(--text-md);font-weight:800;color:rgba(var(--ink-blue-hi),.85)">โบนัสตามกลุ่มสินค้า</span>
+    </div>
+    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.62);line-height:1.6;margin-bottom:10px">เรตพิเศษนี้ <b>แทนที่</b>เรต P1/P3 พื้นฐาน และใช้กับ<b>ทั้ง P1 และ P3</b> — ถ้าตั้งทั้งหมวดและกลุ่มย่อยที่ทับกัน กลุ่มย่อยจะชนะ</div>
+    ${errHtml}${emptyNote}${rowCards}
+    <button onclick="_commRoleAddBonusRow('${planCode}')" style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(120,220,150,.06);border:1px dashed rgba(120,220,150,.30);color:rgba(150,230,175,.85);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px">+ เพิ่มโบนัสกลุ่มสินค้า</button>
+  </div>`;
+}
+window._renderRoleUpsellCategoryBonusEditor = _renderRoleUpsellCategoryBonusEditor;
 
 function _renderTlUpsellTierRows() {
   let tiers = [];

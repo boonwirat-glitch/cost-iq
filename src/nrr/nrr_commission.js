@@ -149,7 +149,9 @@ async function nrrFetchCommissionPlans() {
   try {
     var res = await Promise.all([
       supa.from('commission_plans').select('id,plan_code,beneficiary_role,status'),
-      supa.from('commission_rules').select('id,plan_id,metric_code,active'),
+      // v_catbonus: also pull metric_variant + tier_config so the
+      // upsell_gmv/category_bonus map is available to the estimate.
+      supa.from('commission_rules').select('id,plan_id,metric_code,metric_variant,active,tier_config'),
       supa.from('commission_rule_tiers').select('rule_id,tier_order,min_value,max_value,payout_value'),
       supa.from('commission_plan_assignments').select('period_month,assignment_scope,assignee_key,plan_code')
     ]);
@@ -158,19 +160,27 @@ async function nrrFetchCommissionPlans() {
     var planById = {};
     plans.forEach(function (p) { planById[p.id] = p; });
     var tiersByPlan = {};
+    var catBonusByPlan = {}; // v_catbonus: plan_code -> {categoryRates,groupRates}
     rules.forEach(function (r) {
-      if (r.metric_code !== 'nrr' || r.active === false) return;
       var plan = planById[r.plan_id];
       if (!plan) return;
-      tiersByPlan[plan.plan_code] = tiers
-        .filter(function (t) { return t.rule_id === r.id; })
-        .sort(function (a, b) { return (a.tier_order || 0) - (b.tier_order || 0); });
+      if (r.metric_code === 'nrr' && r.active !== false) {
+        tiersByPlan[plan.plan_code] = tiers
+          .filter(function (t) { return t.rule_id === r.id; })
+          .sort(function (a, b) { return (a.tier_order || 0) - (b.tier_order || 0); });
+      }
+      if (r.metric_code === 'upsell_gmv' && r.metric_variant === 'category_bonus' && r.active !== false && r.tier_config) {
+        catBonusByPlan[plan.plan_code] = {
+          categoryRates: (r.tier_config.category_rates && typeof r.tier_config.category_rates === 'object') ? r.tier_config.category_rates : {},
+          groupRates:    (r.tier_config.group_rates    && typeof r.tier_config.group_rates    === 'object') ? r.tier_config.group_rates    : {}
+        };
+      }
     });
     var assignments = {};
     assigns.forEach(function (a) {
       assignments[a.period_month + '|' + a.assignment_scope + '|' + a.assignee_key] = a.plan_code;
     });
-    nrrCommPlansCache = { tiersByPlan: tiersByPlan, assignments: assignments, loaded: true };
+    nrrCommPlansCache = { tiersByPlan: tiersByPlan, assignments: assignments, catBonusByPlan: catBonusByPlan, loaded: true };
   } catch (e) {
     console.warn('[nrr] commission plans fetch failed', e);
     nrrCommPlansCache = { tiersByPlan: {}, assignments: {}, loaded: false, error: e.message };
@@ -178,6 +188,26 @@ async function nrrFetchCommissionPlans() {
   return nrrCommPlansCache;
 }
 window.nrrFetchCommissionPlans = nrrFetchCommissionPlans;
+
+// v_catbonus: KAM scheme's shared per-category/group override map (mirrors
+// Sense's _commResolveUpsellRateMap). /nrr's estimate is KAM-focused, so the
+// standard KAM plan is the relevant scheme. Empty when unconfigured → base
+// rate everywhere (no-op).
+function nrrCommCategoryBonus() {
+  var byPlan = (nrrCommPlansCache && nrrCommPlansCache.catBonusByPlan) || {};
+  return byPlan['KAM_NRR_STD'] || { categoryRates: {}, groupRates: {} };
+}
+// Effective rate for one line: group override > category override > base.
+// A stored 0 is a real choice and must beat base (explicit != null checks).
+function nrrCommUpsellRateFor(rateMap, baseRate, category, groupKey) {
+  if (rateMap) {
+    if (groupKey != null && rateMap.groupRates && rateMap.groupRates[groupKey] != null) return Number(rateMap.groupRates[groupKey]);
+    if (category != null && rateMap.categoryRates && rateMap.categoryRates[category] != null) return Number(rateMap.categoryRates[category]);
+  }
+  return baseRate;
+}
+window.nrrCommCategoryBonus = nrrCommCategoryBonus;
+window.nrrCommUpsellRateFor = nrrCommUpsellRateFor;
 
 // Engine's hardcoded fallback tiers (_commDefaultTiers) — used only if the
 // plan tables can't be fetched, so the estimate degrades to STD not to 0.
@@ -346,6 +376,35 @@ async function nrrFetchUpsellTeamCsv() {
 }
 window.nrrFetchUpsellTeamCsv = nrrFetchUpsellTeamCsv;
 
+// v_catbonus: sense_upsell_team_groups.csv — group-key-grain P1/P3 GMV per
+// (kam, category, group_key). Lets the /nrr headline estimate apply
+// per-category bonus rates on the fast path (parity with Sense). Absent →
+// nrrEstimateKamCommission falls back to the flat team-scalar multiply.
+var nrrUpsellTeamGroupsCache = { byEmail: {}, loaded: false };
+async function nrrFetchUpsellTeamGroupsCsv() {
+  if (nrrUpsellTeamGroupsCache.loaded) return nrrUpsellTeamGroupsCache;
+  try {
+    var resp = await fetch(R2_BASE + '/sense_upsell_team_groups.csv?cb=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var lines = (await resp.text()).split('\n').filter(function (l) { return l.trim(); });
+    var byEmail = {};
+    for (var i = 1; i < lines.length; i++) {
+      var c = parseCSVRow(lines[i]);
+      var em = (c[0] || '').trim().toLowerCase();
+      if (!em) continue;
+      if (!byEmail[em]) byEmail[em] = [];
+      byEmail[em].push({ category: (c[1] || '').trim(), group_key: (c[2] || '').trim(),
+        p1_gmv: parseFloat(c[3]) || 0, p3_incremental: parseFloat(c[4]) || 0 });
+    }
+    nrrUpsellTeamGroupsCache = { byEmail: byEmail, loaded: true };
+  } catch (e) {
+    // Non-fatal — estimate falls back to the flat scalar path.
+    nrrUpsellTeamGroupsCache = { byEmail: {}, loaded: false, error: e.message };
+  }
+  return nrrUpsellTeamGroupsCache;
+}
+window.nrrFetchUpsellTeamGroupsCsv = nrrFetchUpsellTeamGroupsCsv;
+
 // Multiplier tiers from live target_settings (tl_upsell_mult_params),
 // engine-default fallback baked in.
 function nrrCommTeamMultiplier(upsellPct) {
@@ -502,8 +561,21 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   var outRate = nrrCommRateGet('upsell_outlet', 'rate', 0.005);
   // Components kept separate (v16) — the receipt renders one line per
   // component; only the arithmetic below combines them.
-  var p1Comm = row.p1_gmv * p1Rate;
-  var p3Comm = row.p3_incremental * p3Rate;
+  // v_catbonus: if the group-grain team file is loaded, compute P1/P3 with
+  // per-category bonus rates (group > category > base); else flat scalar.
+  var p1Comm, p3Comm;
+  var _grpRows = nrrUpsellTeamGroupsCache.byEmail[(kamEmail || '').toLowerCase()];
+  if (_grpRows && _grpRows.length) {
+    var _rateMap = nrrCommCategoryBonus();
+    p1Comm = 0; p3Comm = 0;
+    _grpRows.forEach(function (gr) {
+      if (gr.p1_gmv > 0) p1Comm += gr.p1_gmv * nrrCommUpsellRateFor(_rateMap, p1Rate, gr.category, gr.group_key);
+      if (gr.p3_incremental > 0) p3Comm += gr.p3_incremental * nrrCommUpsellRateFor(_rateMap, p3Rate, gr.category, gr.group_key);
+    });
+  } else {
+    p1Comm = row.p1_gmv * p1Rate;
+    p3Comm = row.p3_incremental * p3Rate;
+  }
   var outletComm = row.outlet_gmv * outRate;
   var upsellComm = p1Comm + p3Comm + outletComm;
   // NRR gate — same thresholds/caps the engine applies (_commComputeGmvGate).
@@ -582,6 +654,11 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
   var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
 
+  // v_catbonus: shared per-category/group override map + group→category
+  // lookup (carried on the bundle rows). Empty → base rate (no-op).
+  var _rateMap = nrrCommCategoryBonus();
+  var _groupCategory = (bundle && bundle.groupCategory) || {};
+
   var p1Groups = [], p3Groups = [];
 
   Object.keys(data).forEach(function (accountId) {
@@ -610,9 +687,12 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
         var rawTotalGmv = row.totalGmv || 0;
         var rawExistingGmv = row.existingGmv || 0;
 
+        var _cat = _groupCategory[groupKey]; // v_catbonus
+
         if (isP1) {
           if (rawTotalGmv < p1MinGmv) return;
-          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, total_gmv: rawTotalGmv, commission: rawTotalGmv * p1Rate });
+          var _r1 = nrrCommUpsellRateFor(_rateMap, p1Rate, _cat, groupKey);
+          p1Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, category: _cat || null, applied_rate: _r1, total_gmv: rawTotalGmv, commission: rawTotalGmv * _r1 });
           return;
         }
 
@@ -627,9 +707,10 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
         if (rawExistingGmv <= maxBaseline * p3Thresh) return;
         var incremental = rawExistingGmv - maxBaseline;
         if (incremental < p3MinIncr) return;
-        p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey,
+        var _r3 = nrrCommUpsellRateFor(_rateMap, p3Rate, _cat, groupKey);
+        p3Groups.push({ accountId: accountId, outletId: outletId, groupKey: groupKey, category: _cat || null, applied_rate: _r3,
           existing_curr: rawExistingGmv, max_baseline: maxBaseline, max_baseline_month: maxBaselineMonth,
-          incremental: incremental, commission: incremental * p3Rate });
+          incremental: incremental, commission: incremental * _r3 });
       });
     });
   });

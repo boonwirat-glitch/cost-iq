@@ -1628,7 +1628,8 @@ async function nrrRefresh(force) {
     await nrrFetchQnrrCsv(force);
     await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force), nrrFetchCompanyCsv(force), nrrFetchSalesPipelineCsv(force)]);
     await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates(),
-                       nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv(), nrrFetchHandoverCsv()]);
+                       nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv(),
+                       nrrFetchUpsellTeamGroupsCsv(), nrrFetchHandoverCsv()]); // v_catbonus: group-grain for per-category estimate
     // Must resolve before nrrRenderAll() below -- nrr_logic.js's compute
     // functions call nrrAccountWaivedForPeriod synchronously off this cache.
     await nrrFetchExclusions();

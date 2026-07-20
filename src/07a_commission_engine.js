@@ -155,6 +155,45 @@ function _commResolveRuleForMetric(planCode, metricCode, metricVariant, previewR
   return _commGetRuleForMetric(planCode, metricCode, metricVariant);
 }
 
+// v_catbonus (2026-07-19): per-category / per-group_key Upsell bonus rates.
+// Resolves the ONE shared override map for a scheme — a single
+// upsell_gmv/category_bonus rule row whose tier_config holds
+// { category_rates:{cat->rate}, group_rates:{group_key->rate} }, applied to
+// BOTH P1 and P3 (Bush's decision: one shared map, not per-variant). Empty
+// {} when no bonus configured → every lookup falls back to the base rate, so
+// this is a no-op until an admin sets a rate. Same tier_config-on-the-rule
+// mechanism handover's gmv_tiers uses. Returns normalized
+// { categoryRates, groupRates } (both plain objects, never null).
+function _commResolveUpsellRateMap(planCode, previewResolver) {
+  const EMPTY = { categoryRates: {}, groupRates: {} };
+  try {
+    if (!planCode) return EMPTY;
+    const rule = _commResolveRuleForMetric(planCode, 'upsell_gmv', 'category_bonus', previewResolver);
+    if (!rule || rule.active === false || !rule.tier_config) return EMPTY;
+    const tc = rule.tier_config;
+    return {
+      categoryRates: (tc.category_rates && typeof tc.category_rates === 'object') ? tc.category_rates : {},
+      groupRates:    (tc.group_rates    && typeof tc.group_rates    === 'object') ? tc.group_rates    : {}
+    };
+  } catch (e) { return EMPTY; }
+}
+
+// Resolve the effective Upsell rate for one line item, precedence
+// group_key override > category override > base rate (Bush's decision).
+// A stored rate of 0 is a real "pay nothing on this group" choice and MUST
+// win over base — hence the explicit `!= null` checks, not `||`.
+function _commUpsellRateFor(rateMap, baseRate, category, groupKey) {
+  if (rateMap) {
+    if (groupKey != null && rateMap.groupRates && rateMap.groupRates[groupKey] != null)
+      return Number(rateMap.groupRates[groupKey]);
+    if (category != null && rateMap.categoryRates && rateMap.categoryRates[category] != null)
+      return Number(rateMap.categoryRates[category]);
+  }
+  return baseRate;
+}
+window._commResolveUpsellRateMap = _commResolveUpsellRateMap;
+window._commUpsellRateFor = _commUpsellRateFor;
+
 // ── Thai month helpers ──────────────────────────────────────────
 const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                     'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -301,6 +340,14 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
     const p3MinIncr  = (p3Rule && p3Rule.params.min_incremental != null) ? Number(p3Rule.params.min_incremental) : _commGetConfig('upsell_sku', 'p3_min_incremental', 8000); // v835-fix: default was 5000, live Supabase = 8000
     const p1MinGmv   = (p1Tier && p1Tier.min_value != null) ? Number(p1Tier.min_value) : _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);       // ฿5,000 gate for P1 (spec)
 
+    // v_catbonus: shared per-category/group override map (applies to both P1
+    // and P3). Empty when unconfigured → _commUpsellRateFor returns the base
+    // p1Rate/p3Rate, i.e. no behavior change. groupCategory maps a groupKey
+    // to its category_high_level (carried on the ingested rows, since a bare
+    // group_key string can't be mapped to a category in JS otherwise).
+    const _rateMap = _commResolveUpsellRateMap(planCode, previewResolver);
+    const _groupCategory = (bulkUpsellData && bulkUpsellData.groupCategory) || {};
+
     // MTD mode — commission on actual amounts, no projection
     // MTD mode — actual MTD vs full month baseline, no day scaling
     let daysElapsed = new Date().getDate();
@@ -360,10 +407,15 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
           const rawTotalGmv = row.totalGmv || 0;
           const rawExistingGmv = row.existingGmv || 0;
 
+          // v_catbonus: category of this group_key (for the override lookup)
+          const _cat = _groupCategory[groupKey];
+
           if (isP1) {
             // P1: outlet × group_key ใหม่ — this month's own total GMV × rate
             if (rawTotalGmv < p1MinGmv) return;
-            p1Groups.push({ accountId, outletId, groupKey, total_gmv: rawTotalGmv, commission: rawTotalGmv * p1Rate });
+            const _r = _commUpsellRateFor(_rateMap, p1Rate, _cat, groupKey);
+            p1Groups.push({ accountId, outletId, groupKey, category: _cat || null, applied_rate: _r,
+              total_gmv: rawTotalGmv, commission: rawTotalGmv * _r });
             return;
           }
 
@@ -383,11 +435,12 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
           if (rawExistingGmv <= maxBaseline * p3Thresh) return;
           const incremental = rawExistingGmv - maxBaseline;
           if (incremental < p3MinIncr) return;
-          p3Groups.push({ accountId, outletId, groupKey,
+          const _r3 = _commUpsellRateFor(_rateMap, p3Rate, _cat, groupKey);
+          p3Groups.push({ accountId, outletId, groupKey, category: _cat || null, applied_rate: _r3,
             existing_curr: rawExistingGmv,
             max_baseline: maxBaseline,
             max_baseline_month: maxBaselineMonth,
-            incremental: incremental, commission: incremental * p3Rate });
+            incremental: incremental, commission: incremental * _r3 });
         });
       });
     });
@@ -900,15 +953,42 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
       const p1Rate  = (_p1R && _p1R.active && _p1R.tiers[0]) ? Number(_p1R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p1_rate', 0.01);       // v835-fix: was 0.03
       const p3Rate  = (_p3R && _p3R.active && _p3R.tiers[0]) ? Number(_p3R.tiers[0].payout_value) : _commGetConfig('upsell_sku',   'p3_rate', 0.01);       // v835-fix: was 0.03
       const outRate = (_outR && _outR.active && _outR.tiers[0]) ? Number(_outR.tiers[0].payout_value) : _commGetConfig('upsell_outlet', 'rate',   0.005);      // v835-fix: was 0.015
-      const p1Comm  = _teamRow.p1_gmv   * p1Rate;
-      const p3Comm  = _teamRow.p3_incr  * p3Rate;
+      // v_catbonus: prefer the group-grain fast-path file
+      // (sense_upsell_team_groups.csv → bulkUpsellTeamGroups) so per-category
+      // rates apply even on the fast (no per-KAM-bundle) path. Falls back to
+      // the flat KAM-scalar multiply when that file isn't loaded (rollout-safe).
+      const _rateMap = _commResolveUpsellRateMap(planCode, previewResolver);
+      const _teamGroups = (typeof bulkUpsellTeamGroups !== 'undefined' && bulkUpsellTeamGroups)
+        ? (bulkUpsellTeamGroups[kamEmail] || bulkUpsellTeamGroups[_kamDisplayName] || null)
+        : null;
+      let p1Comm, p3Comm;
+      const _p1Groups = [], _p3Groups = [];
+      if (_teamGroups && _teamGroups.length) {
+        p1Comm = 0; p3Comm = 0;
+        _teamGroups.forEach(gr => {
+          const g1 = Number(gr.p1_gmv) || 0, g3 = Number(gr.p3_incremental) || 0;
+          if (g1 > 0) {
+            const _r = _commUpsellRateFor(_rateMap, p1Rate, gr.category, gr.group_key);
+            p1Comm += g1 * _r;
+            _p1Groups.push({ groupKey: gr.group_key, category: gr.category || null, applied_rate: _r, total_gmv: g1, commission: g1 * _r });
+          }
+          if (g3 > 0) {
+            const _r = _commUpsellRateFor(_rateMap, p3Rate, gr.category, gr.group_key);
+            p3Comm += g3 * _r;
+            _p3Groups.push({ groupKey: gr.group_key, category: gr.category || null, applied_rate: _r, incremental: g3, commission: g3 * _r });
+          }
+        });
+      } else {
+        p1Comm = _teamRow.p1_gmv  * p1Rate;
+        p3Comm = _teamRow.p3_incr * p3Rate;
+      }
       const outComm = _teamRow.outlet_gmv * outRate;
       upsellSku = {
-        p1: { gmv: _teamRow.p1_gmv,  comm: p1Comm, groups: [] },
-        p3: { gmv_incremental: _teamRow.p3_incr, comm: p3Comm, groups: [] },
+        p1: { gmv: _teamRow.p1_gmv,  comm: p1Comm, groups: _p1Groups },
+        p3: { gmv_incremental: _teamRow.p3_incr, comm: p3Comm, groups: _p3Groups },
         total_comm: p1Comm + p3Comm,
         p1_comm: p1Comm, p3_comm: p3Comm,
-        p1_groups: [], p3_groups: [],
+        p1_groups: _p1Groups, p3_groups: _p3Groups,
         total_gmv_eligible: _teamRow.p1_gmv + _teamRow.p3_incr,
         tl_upsell_base: _teamRow.tl_upsell_base || 0
       };
@@ -2590,7 +2670,13 @@ function _commBuildSnapshotRows(periodOverride) {
           gmv_gate_threshold_2:         _commGetConfig('gmv_gate','threshold_2',95),   // v835-fix: was 90
           gmv_gate_cap_1:               _commGetConfig('gmv_gate','cap_1',0.3),        // v835-fix: was 0.70
           gmv_gate_cap_2:               _commGetConfig('gmv_gate','cap_2',0),          // v835-fix: was 0.35
-          handover_gmv_tiers:           _commGetHandoverGmvTiers()
+          handover_gmv_tiers:           _commGetHandoverGmvTiers(),
+          // v_catbonus: freeze the per-category/group override map actually in
+          // effect for this scheme when locked. The p1_rate/p3_rate above stay
+          // the BASE rate (the fallback for un-bonus'd groups); the per-group
+          // rate that actually hit each line is stored per-group in
+          // breakdown.upsell_sku.p1.groups[].applied_rate (see engine).
+          upsell_category_bonus:        _commResolveUpsellRateMap(kamPlanCode)
         }
       },
       created_by: actor,
