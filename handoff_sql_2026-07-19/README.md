@@ -6,6 +6,34 @@
 
 ---
 
+## Quick reference — 16 ไฟล์ทั้งหมด แบ่งตาม "วิธีรัน"
+
+รายละเอียดเต็มของแต่ละไฟล์อยู่ในกลุ่ม A-D ด้านล่าง อันนี้คือสรุปเร็วๆ ว่าไฟล์ไหนต้องทำ
+อะไรต่อหลังรันใน BigQuery
+
+### ① ต้องแตก by rep เอง (รันแล้ว **ต้องรัน `splitter.py` ต่อ**) — 4 ไฟล์
+| ไฟล์ | Output ก่อนแตก | หลังแตกได้ |
+|---|---|---|
+| `Q12B_bulk_sku_outlet.sql` | `download_sku_outlet.csv` | ต่อคน |
+| `SQL1_sense_skus.sql` | `download_skus.csv` | `sense_skus_{email}.csv` |
+| `SQL2_sense_alts.sql` | `download_alts.csv` | `sense_alts_{email}.csv` |
+| `q3c_upsell_bulk_all_kams_v4.sql` | `download_upsell_bulk.csv` | `sense_upsell_{email}.csv` |
+
+### ② รันแบบ 1:1 ได้เลย (Save as CSV → upload ตรงชื่อ ไม่ต้องแตก) — 10 ไฟล์
+`Q8E_portview_v3.sql`, `Q2B_bulk_categories.sql`, `Q5B_bulk_outlets.sql`,
+`Q6B_bulk_price.sql`, `Q7B_bulk_sku_current.sql`, `Q9B_bulk_history.sql`,
+`pm_rep_view.sql`, `q3_2026_movement_rep_view.sql` (ทับไฟล์เดิม),
+`q3c_upsell_team_summary_v4.sql` (ทับไฟล์เดิม), `q3c_upsell_team_groups_v1.sql`
+(ไฟล์ใหม่ — รวมทุก KAM ในไฟล์เดียว ไม่ต้องแตก เพราะ `kam_email` เป็นแค่คอลัมน์หนึ่ง)
+
+### ③ ไม่เกี่ยวกับ pipeline อัตโนมัติของแอปเลย (Bush รันเอง → paste Google Sheet มือ) — 2 ไฟล์
+`Quarterly_KAM_portfolio_reconcile.sql`, `Quarterly_upsell_reconcile.sql` — ไม่ต้อง
+อัปโหลดขึ้น R2, แอปไม่ได้อ่านไฟล์นี้เลย
+
+**รวม ① 4 + ② 10 + ③ 2 = 16 ไฟล์**
+
+---
+
 ## กลุ่ม A — ไฟล์เดิม แก้เพิ่ม PM/AD 4 คน (9 ไฟล์) → ใช้กับ Sense
 รันแต่ละไฟล์ → Save Results as CSV → ตั้งชื่อตามตารางด้านล่างเป๊ะๆ
 
