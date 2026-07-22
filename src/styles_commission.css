@@ -1108,6 +1108,30 @@ flex-wrap:wrap;}
   cursor:pointer;white-space:nowrap;font-family:var(--tk-font-body),system-ui,sans-serif;
 }
 .comm-role-override-link:hover{text-decoration:underline;}
+/* v_cockpit3tabs: scheme switcher bar at the top of a Setup role-detail page
+   — replaces the old Rules tab (pick scheme to edit / create / archive /
+   make-default) so the whole role is manageable in one place. */
+.comm-scheme-bar{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+.comm-scheme-bar .comm-field{flex:1;min-width:180px;}
+.comm-scheme-bar-side{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:7px;
+}
+/* v_cockpit3tabs: people section (per-person scheme overrides, kam/tl only)
+   — replaces the old Assignment tab. Collapsed by default via <details>. */
+.comm-people-section summary{
+  cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:var(--text-md);font-weight:800;color:var(--tk-text-primary);
+}
+.comm-people-section summary::-webkit-details-marker{display:none;}
+.comm-people-section summary::after{content:'›';font-size:var(--text-lg);color:rgba(var(--ink-blue),.55);transition:transform .15s;}
+.comm-people-section[open] summary::after{transform:rotate(90deg);}
+.comm-people-custom{
+  font-size:var(--text-2xs);font-weight:800;color:#ffe08a;
+  background:rgba(255,224,138,.10);border:1px solid rgba(255,224,138,.28);
+  border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;
+}
 /* Phase 7: de-emphasize the pre-existing Assignment/Rules tabs now that
    Setup is the primary flow — same tabs, same logic, just visually
    secondary (smaller/dimmer) so Setup reads as the obvious default. */

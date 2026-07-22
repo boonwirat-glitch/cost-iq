@@ -2150,6 +2150,7 @@ function _commCreateRule(role) {
   _commSetDraftByCode(code, draft);
   _commSelectedRuleCode = code;
   renderCommissionCockpit();
+  return code; // for Setup-tab wrappers that select the new scheme in-place
 }
 function _commPlanStatus(p) {
   return String((p && p.status) || 'active').toLowerCase();

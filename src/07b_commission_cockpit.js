@@ -1,4 +1,15 @@
 // SECTION:COMMISSION_COCKPIT
+// v_cockpit3tabs: the legacy Assignment/Rules tabs are hidden by default —
+// everything they did now lives inside the Setup role-detail page (scheme
+// switcher + make-default + per-person section). Escape hatch for 1-2 pay
+// periods while the merged UI proves itself: ?commAdvanced=1 (or
+// localStorage commAdvanced='1') brings the old tabs back unchanged.
+function _commAdvancedTabsOn() {
+  try {
+    return /[?&]commAdvanced=1/.test(location.search) || localStorage.getItem('commAdvanced') === '1';
+  } catch (e) { return false; }
+}
+
 function ensureCommissionCockpitOverlay() {
   let ov = document.getElementById('commission-cockpit-overlay');
   if (ov) return ov;
@@ -20,9 +31,10 @@ function ensureCommissionCockpitOverlay() {
       <div class="comm-steps">
         <button class="comm-step active" id="comm-step-policy" onclick="switchCommissionStep('policy')">1 Policy</button>
         <button class="comm-step" id="comm-step-setup" onclick="switchCommissionStep('setup')">2 Setup</button>
-        <button class="comm-step comm-step-advanced" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">3 Assignment</button>
-        <button class="comm-step comm-step-advanced" id="comm-step-rules" onclick="switchCommissionStep('rules')">4 Rules</button>
-        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">5 Preview<br>& Lock</button>
+        ${_commAdvancedTabsOn() ? `
+        <button class="comm-step comm-step-advanced" id="comm-step-assignment" onclick="switchCommissionStep('assignment')">Assignment<br>(legacy)</button>
+        <button class="comm-step comm-step-advanced" id="comm-step-rules" onclick="switchCommissionStep('rules')">Rules<br>(legacy)</button>` : ''}
+        <button class="comm-step" id="comm-step-lock" onclick="switchCommissionStep('lock')">3 Preview<br>& Lock</button>
       </div>
       <div class="comm-body" id="commission-cockpit-body"></div>
       <div class="comm-footer">
@@ -553,14 +565,79 @@ function renderCommSetupStep(body) {
 }
 window._commOpenRoleDetail = function(role) {
   _commSetupDetailRole = role;
+  _commSetupDetailScheme = null; // fresh detail always opens on the role's default scheme
   _commCockpitStep = 'setup';
   renderCommissionCockpit();
 };
 window._commCloseRoleDetail = function() {
   _commSetupDetailRole = null;
+  _commSetupDetailScheme = null;
   renderCommissionCockpit();
 };
 let _commSetupDetailRole = null;
+// Which of the role's schemes the detail page is currently editing (v_cockpit3tabs:
+// scheme switcher). null = follow the role's default scheme. Replaces the old
+// Rules tab's _commSelectedRuleCode for the Setup flow.
+let _commSetupDetailScheme = null;
+
+// ── Scheme switcher handlers (v_cockpit3tabs) ────────────────────────────
+// All four are thin wrappers over the SAME staging primitives the old
+// Assignment/Rules tabs used — no new write paths, only new navigation.
+window._commSetupSelectScheme = function(role, code) {
+  _commSetupDetailScheme = code;
+  renderCommissionCockpit();
+};
+window._commSetupCreateScheme = function(role) {
+  // _commCreateRule stages the draft + re-renders (Rules-tab shaped); we
+  // re-point the Setup detail at the new scheme and render once more so the
+  // user stays exactly where they were, now editing the new scheme.
+  const code = _commCreateRule(role);
+  _commSetupDetailScheme = code || null;
+  renderCommissionCockpit();
+};
+window._commSetupArchiveScheme = function(role, code) {
+  archiveCommissionRule(code); // existing confirm-dialog + usage-count flow
+  _commSetupDetailScheme = null; // fall back to the role default after archive
+};
+window._commSetupMakeDefault = function(role, code) {
+  _commSetAssignment(_nrrExclusionCurrentPeriod(), 'role_default', role, code);
+  _commMarkChanged();
+  renderCommissionCockpit();
+};
+
+// Switcher bar — one line that replaces the entire old Rules tab for this
+// role: pick which scheme to edit, see who uses it, create/archive, and an
+// explicit "make default" action (replaces the deleted Assignment
+// "Role defaults" dropdowns with something scoped to what you're looking at).
+function _renderSchemeSwitcher(role, activeCode, defaultCode) {
+  const schemes = _commRulesForRole(role, { activeOnly:true });
+  if (schemes.length === 1 && activeCode === defaultCode) {
+    // Single-scheme role: no dropdown noise, just the create affordance.
+    return `<div class="comm-card comm-scheme-bar">
+      <div class="comm-meta">Scheme เดียว: <b>${_commEscapeHtml((schemes[0].plan_name)||activeCode)}</b> (default ของ role)</div>
+      <button class="comm-role-override-link" onclick="_commSetupCreateScheme('${role}')">+ สร้าง scheme ที่ 2 ›</button>
+    </div>`;
+  }
+  const used = _commRuleUsageCount(activeCode);
+  const isDefault = activeCode === defaultCode;
+  return `<div class="comm-card comm-scheme-bar">
+    <div class="comm-field" style="flex:1;min-width:0"><label>Scheme ที่กำลังแก้</label>
+      <select class="comm-select" onchange="_commSetupSelectScheme('${role}', this.value)">
+        ${schemes.map(p => `<option value="${p.plan_code}" ${p.plan_code===activeCode?'selected':''}>${_commEscapeHtml(p.plan_name || p.plan_code)}${p.plan_code===defaultCode?' · default':''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="comm-scheme-bar-side">
+      <div class="comm-meta">ใช้อยู่ ${used} คน</div>
+      ${isDefault
+        ? `<div class="comm-meta" style="color:var(--tk-ok-bright)">✓ default ของ role นี้</div>`
+        : `<button class="comm-role-override-link" onclick="_commSetupMakeDefault('${role}','${activeCode}')">ตั้งเป็น default ของ role</button>`}
+      <button class="comm-role-override-link" onclick="_commSetupCreateScheme('${role}')">+ สร้าง scheme ใหม่</button>
+      ${isDefault
+        ? ''
+        : `<button class="comm-role-override-link" style="color:rgba(255,100,60,.75)" onclick="_commSetupArchiveScheme('${role}','${activeCode}')">Archive</button>`}
+    </div>
+  </div>`;
+}
 
 // Pick one real person currently in this role to preview against — first
 // match is enough (the goal is "does this look right", not a full roster
@@ -638,8 +715,63 @@ window._commGoToAdvancedAssignment = function() {
   switchCommissionStep('assignment');
 };
 
+// ── People section (v_cockpit3tabs) — per-person scheme overrides for
+// kam/tl, INSIDE the Setup role detail. Replaces the old Assignment tab:
+// identical staging (_commSetAssignment scope 'kam'/'tl'), identical option
+// source (_commRulesForRole activeOnly), same Unsaved detection — only the
+// location changed, so the person-level lever no longer lives on a page
+// the Setup flow dead-ends into. Collapsed by default: the common
+// single-scheme case shouldn't pay a 20-row tax just to see the page.
+function _renderRolePeopleSection(role, defaultCode) {
+  if (role !== 'kam' && role !== 'tl') return '';
+  const period = _nrrExclusionCurrentPeriod();
+  const plans = _commRulesForRole(role, { activeOnly:true });
+  const isUnsaved = (email) => !!_commAssignmentPending[_commAssignmentKey(period, role, email)];
+  const rowHtml = (email, name, subLabel) => {
+    const current = _commGetAssignmentPlan(period, role, email, role);
+    const isCustom = current !== defaultCode;
+    return `<div class="comm-person-row">
+      <div><div class="comm-person-name">${_commEscapeHtml(name || email)}${isCustom ? '<span class="comm-people-custom">scheme เฉพาะตัว</span>' : ''}${isUnsaved(email) ? '<span class="comm-unsaved">Unsaved</span>' : ''}</div>
+      <div class="comm-person-sub">${_commEscapeHtml(subLabel || email)}</div></div>
+      <select class="comm-select" onchange="_commSetAssignment('${period}','${role}','${email}',this.value);this.classList.add('flash');_commMarkChanged()">
+        ${plans.map(p => `<option value="${p.plan_code}" ${current===p.plan_code?'selected':''}>${_commEscapeHtml(p.plan_name || p.plan_code)}${p.plan_code===defaultCode?' · default':''}</option>`).join('')}
+      </select>
+    </div>`;
+  };
+
+  let inner = '';
+  let count = 0;
+  if (role === 'tl') {
+    const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
+    count = tls.length;
+    inner = tls.map(t => rowHtml(t.email, t.name, t.email)).join('') || '<div class="comm-empty">ไม่พบ TL</div>';
+  } else {
+    const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
+    const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+    count = groups.filter(g => g.kamEmail).length;
+    inner = tls.map(t => {
+      const kams = groups.filter(g => g.kamEmail && (g.accounts || []).some(a => a.tlEmail === t.email));
+      if (!kams.length) return '';
+      return `<div class="comm-rule-group-title">${_commEscapeHtml(t.name || t.email)}</div>` +
+        kams.map(g => rowHtml(g.kamEmail, g.kamName, g.kamEmail)).join('');
+    }).join('') || '<div class="comm-empty">ไม่พบ KAM</div>';
+  }
+  const customCount = _commRoleOverrideCount(role);
+  return `<details class="comm-card comm-people-section">
+    <summary>คนใน role นี้ (${count})<span class="comm-meta" style="font-weight:400">${customCount ? customCount + ' คนใช้ scheme เฉพาะตัว · ' : ''}กดเพื่อดู/สลับ scheme รายคน</span></summary>
+    <div style="margin-top:10px">${inner}</div>
+  </details>`;
+}
+
 function renderCommRoleDetail(body, role) {
   const { planCode, state } = _commRoleSetupStatus(role);
+  // v_cockpit3tabs: planCode = the role's DEFAULT scheme (drives the on/off
+  // toggle + status). The editors below instead follow the scheme selected
+  // in the switcher bar (activeCode) so multi-scheme roles (KAM SA/MC vs
+  // KAM Chain) are fully editable here — this replaces the old Rules tab.
+  const schemes = _commRulesForRole(role, { activeOnly:true });
+  const activeCode = (_commSetupDetailScheme && schemes.some(p => p.plan_code === _commSetupDetailScheme))
+    ? _commSetupDetailScheme : planCode;
   const people = _commRolePeopleCount(role);
   const isOn = state === 'active' || state === 'draft';
   const roleLabel = _COMM_ROLE_LABEL[role] || role.toUpperCase();
@@ -674,42 +806,40 @@ function renderCommRoleDetail(body, role) {
       <button class="comm-role-toggle ${isOn ? 'on' : ''}" onclick="_commRoleSetupToggle('${role}','${planCode}')"></button>
     </div>
     ${isOn ? `
+      ${_renderSchemeSwitcher(role, activeCode, planCode)}
       <div class="comm-section-title">NRR tiers</div>
-      ${_renderCommRuleEditorByCode(planCode, role)}
+      ${_renderCommRuleEditorByCode(activeCode, role)}
       ${isTl ? `
         <div class="comm-section-title">TL Upsell Multiplier</div>
-        ${_renderRoleTierLadderEditor(planCode, 'tl_upsell_mult', {
+        ${_renderRoleTierLadderEditor(activeCode, 'tl_upsell_mult', {
           title: 'TL Upsell Multiplier', unitLabel: 'Upsell%', accentColor: 'rgba(120,200,255,.85)',
           emptyNote: 'ยังไม่มี tier — multiplier default ×1.0 เสมอ'
         })}
       ` : `
         <div class="comm-section-title">Handover</div>
-        ${_renderRoleHandoverEditor(planCode)}
+        ${_renderRoleHandoverEditor(activeCode)}
         <div class="comm-section-title">NRR / GMV Gate</div>
-        ${_renderRoleTierLadderEditor(planCode, 'portfolio_gate', {
+        ${_renderRoleTierLadderEditor(activeCode, 'portfolio_gate', {
           title: 'NRR / GMV Gate', unitLabel: 'NRR%', accentColor: 'rgba(255,140,110,.85)',
           emptyNote: 'ยังไม่มี Gate tier — role นี้จะไม่ถูกหักค่าคอมฯ เลย (cap ×1.0 เสมอ) จนกว่าจะเพิ่ม tier'
         })}
         <div class="comm-section-title">Upsell — สินค้าใหม่ (P1)</div>
-        ${_renderRoleUpsellRateEditor(planCode, 'p1_new_sku', {
+        ${_renderRoleUpsellRateEditor(activeCode, 'p1_new_sku', {
           title: 'Upsell P1 — สินค้าใหม่', accentColor: 'rgba(255,224,138,.85)', showMinGmv: true
         })}
         <div class="comm-section-title">Upsell — ยอดเติบโต (P3)</div>
-        ${_renderRoleUpsellRateEditor(planCode, 'p3_growth', {
+        ${_renderRoleUpsellRateEditor(activeCode, 'p3_growth', {
           title: 'Upsell P3 — ยอดเติบโต', accentColor: 'rgba(255,224,138,.85)', showGrowthParams: true
         })}
         <div class="comm-section-title">Expansion (ร้านขยาย)</div>
-        ${_renderRoleUpsellRateEditor(planCode, 'outlet_expansion', {
+        ${_renderRoleUpsellRateEditor(activeCode, 'outlet_expansion', {
           title: 'Expansion — ร้านขยาย', accentColor: 'rgba(0,200,176,.85)'
         })}
         <div class="comm-section-title">โบนัสตามกลุ่มสินค้า (P1 + P3)</div>
-        ${_renderRoleUpsellCategoryBonusEditor(planCode)}
+        ${_renderRoleUpsellCategoryBonusEditor(activeCode)}
       `}
       ${previewPerson ? _renderRoleLivePreview(role, previewPerson) : `<div class="comm-empty">ยังไม่มีคนใน role นี้ให้ preview</div>`}
-      <div class="comm-role-override-row">
-        <div class="comm-meta">${_commRoleOverrideCount(role)} คนใช้ rate เฉพาะตัว (ไม่ใช้ default ของ role นี้)</div>
-        <button class="comm-role-override-link" onclick="_commGoToAdvancedAssignment()">+ ตั้งค่าเฉพาะคน ›</button>
-      </div>
+      ${_renderRolePeopleSection(role, planCode)}
     ` : `<div class="comm-empty">เปิด role นี้เพื่อเริ่มตั้งค่า NRR tiers และดู live preview</div>`}
   `;
 }
@@ -724,19 +854,18 @@ function renderCommAssignmentStep(body) {
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">2. Assign Rules</div><div class="comm-hero-sub">เลือกว่าคนไหนใช้ NRR criteria ชุดไหน Rules ถูกสร้าง/แก้ใน Step 3</div></div>
+        <div><div class="comm-hero-title">Assignment (legacy)</div><div class="comm-hero-sub">หน้าเดิมก่อนรวมทุกอย่างเข้า 2 Setup — งานทั้งหมดในหน้านี้ทำได้จากหน้า role detail ใน Setup แล้ว</div></div>
         <span class="comm-badge ${Object.keys(_commAssignmentPending||{}).length?'dirty':'blue'}">${Object.keys(_commAssignmentPending||{}).length?Object.keys(_commAssignmentPending||{}).length+' unsaved':_nrrGovMonthLabel(period)}</span>
       </div>
       <div class="comm-readiness-bar ${Object.keys(_commAssignmentPending||{}).length?'warn':'ready'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${Object.keys(_commAssignmentPending||{}).length?'มี assignment change ที่ยังไม่ได้ save':'Assignments ใช้ active rules เท่านั้น · inactive rules ถูกซ่อนแล้ว'}</div></div>
     </div>
-    ${_renderCommRoleDefaultsSection(period, isUnsaved)}
     <div class="comm-section-title">Team Lead rules</div>
     ${tls.map(t=>`<div class="comm-card">
       <div class="comm-card-top"><div><div class="comm-name">${t.name||t.email}${isUnsaved('tl',t.email)?'<span class="comm-unsaved">Unsaved</span>':''}</div><div class="comm-meta">${t.email}</div></div><span class="comm-badge blue">TL</span></div>
       <div class="comm-field" style="margin-top:10px"><label>Assigned TL rule</label><select class="comm-select" onchange="_commSetAssignment('${period}','tl','${t.email}',this.value);this.classList.add('flash')">
         ${tlPlans.map(p=>`<option value="${p.plan_code}" ${_commGetAssignmentPlan(period,'tl',t.email,'tl')===p.plan_code?'selected':''}>${p.plan_name || p.plan_code}</option>`).join('')}
       </select></div>
-      <div class="comm-assignment-summary">ถ้าต้องการ criteria ใหม่ ให้ไป Step 3 Rules → Create TL Rule แล้วกลับมาเลือกที่นี่</div>
+      <div class="comm-assignment-summary">สร้าง criteria ใหม่ได้ที่ 2 Setup → Team Lead → "+ สร้าง scheme ใหม่"</div>
     </div>`).join('') || `<div class="comm-empty">ไม่พบ TL</div>`}
     <div class="comm-section-title">KAM rules by team</div>
     ${tls.map(t=>{
@@ -1619,11 +1748,20 @@ function renderCommRulesStep(body) {
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">3. Rule Library</div><div class="comm-hero-sub">สร้าง rule หลายชุด แล้วนำไป assign ให้ TL/KAM ใน Step 2</div></div>
+        <div><div class="comm-hero-title">Rule Library (legacy)</div><div class="comm-hero-sub">หน้าเดิมก่อนรวมทุกอย่างเข้า 2 Setup — สร้าง/แก้/archive scheme ทำได้จากหน้า role detail ใน Setup แล้ว</div></div>
       </div>
     </div>
     <div class="comm-section-title">Component Rates (Upsell & Gate)</div>
-    <div class="comm-card comm-component-rates-card">${_renderComponentRatesEditor()}</div>
+    <!-- v_cockpit3tabs: the global "Component Rates" card was REMOVED here.
+         It edited the LEGACY global blob (_commComponentPending →
+         target_settings) — a second, different data model from the
+         per-scheme editors in Setup (_commComponentRulePending →
+         commission_rules). Two editors over two models for the same concept
+         was the most dangerous confusion in this dialog. The engine still
+         READS the global blob as fallback for un-migrated values, so
+         removing the editor freezes those values byte-for-byte rather than
+         changing any payout. -->
+    <div class="comm-card"><div class="comm-meta">อัตรา Upsell/Gate/Handover ตั้งต่อ scheme ที่ 2 Setup → เลือก role → เลือก scheme</div></div>
     <div class="comm-rule-actions">
       <button class="comm-create-rule-btn" onclick="_commCreateRule('tl')">+ Create TL Rule</button>
       <button class="comm-create-rule-btn" onclick="_commCreateRule('kam')">+ Create KAM Rule</button>
@@ -1741,7 +1879,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
     ${tierCards}
     <button class="comm-add" onclick="addRuleTier('${planCode}')"
       style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px;font-family:var(--tk-font-body),system-ui,sans-serif">+ เพิ่ม tier</button>
-    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px;line-height:1.5">Rule นี้จะกระทบทุก TL/KAM ที่ assign ใช้ใน Step 2 · กด Save changes ที่ footer ด้านล่าง</div>
+    <div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px;line-height:1.5">Rule นี้กระทบทุกคนที่ถูก assign ให้ใช้ scheme นี้ · กด Save changes ที่ footer ด้านล่าง</div>
   </div>`;
 }
 
@@ -1833,13 +1971,13 @@ function renderCommLockStep(body) {
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
   const ready = rows.length > 0 && pending === 0;
   if (_commLockSubtab === 'retroactive') {
-    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">5. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div><div class="comm-lock-subtabs" style="margin:8px 0 4px"><button class="comm-lock-subtab" onclick="_commLockSubtab='current';renderCommissionCockpit()">เดือนนี้</button><button class="comm-lock-subtab active">Retroactive</button></div>` + _commRenderRetroactiveSection();
+    body.innerHTML = `<div class="comm-hero"><div class="comm-hero-top"><div><div class="comm-hero-title">3. Preview &amp; Lock</div><div class="comm-hero-sub">ตรวจสอบก่อน lock snapshot และ export CSV</div></div><span class="comm-badge blue">EXPOSURE</span></div></div><div class="comm-lock-subtabs" style="margin:8px 0 4px"><button class="comm-lock-subtab" onclick="_commLockSubtab='current';renderCommissionCockpit()">เดือนนี้</button><button class="comm-lock-subtab active">Retroactive</button></div>` + _commRenderRetroactiveSection();
     return;
   }
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">5. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
+        <div><div class="comm-hero-title">3. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
         <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(summary.total)}</div></div>
       </div>
       <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
@@ -2111,13 +2249,22 @@ async function saveCommissionCockpit() {
   const validation = _commValidateDrafts();
   const firstInvalid = _commFirstValidationPlan(validation);
   if (firstInvalid) {
-    // Keep the user in the Setup role-detail page when that's where they
-    // are editing — the NRR editor there renders the same inline validation
-    // errors. Bouncing to the Advanced 'rules' step mid-Setup (the old
-    // behavior) read as "save silently failed and dumped me somewhere else"
-    // — that exact confusion was reported for the AD-role setup flow.
-    const stayInSetup = _commCockpitStep === 'setup' && _commSetupDetailRole;
-    if (!stayInSetup) {
+    // Route the user to the FAILING scheme's Setup role-detail page — the
+    // NRR editor there renders the same inline validation errors. The old
+    // bounce to the Advanced 'rules' step read as "save silently failed and
+    // dumped me somewhere else" (reported during the AD-role setup), and
+    // once the Rules tab is hidden (v_cockpit3tabs) an invalid draft would
+    // otherwise be unreachable entirely.
+    const failPlan = ((_commRuleConfig && _commRuleConfig.plans) || {})[firstInvalid];
+    const failDraft = (_commRulePending || {})[firstInvalid];
+    const failRole = (failPlan && failPlan.beneficiary_role)
+      || (failDraft && (failDraft.beneficiary_role || failDraft.role)) || null;
+    if (failRole) {
+      _commCockpitStep = 'setup';
+      _commSetupDetailRole = failRole;
+      _commSetupDetailScheme = firstInvalid;
+    } else {
+      // No role resolvable (shouldn't happen) — old behavior as fallback.
       _commSelectedRuleCode = firstInvalid;
       _commCockpitStep = 'rules';
     }
