@@ -189,6 +189,7 @@
         upsell_outlet:Number((p.upsell_outlet&&p.upsell_outlet.commission)||0),
         gate_cap:cap,gate_active:!!(p.gate&&p.gate.gate_active),gate:p.gate,
         upsell_sku_detail:p.upsell_sku,upsell_outlet_detail:p.upsell_outlet,handover_detail:p.handover,
+        base_month_used:p.base_month_used||null, // v_qtrux: quarter anchor for the timeline UI
         final:Math.round((nrr+uplift+hv)*cap)};
     }catch(e){ return base; }
   }
@@ -408,6 +409,25 @@
     var upsellSub=(p1g&&p1g.length?'กลุ่มสินค้าใหม่ '+p1g.length+' รายการ':'')+(p1g&&p1g.length&&p3g&&p3g.length?' · ':'')+(p3g&&p3g.length?'ยอดเติบโต '+p3g.length+' รายการ':'');
     if(!upsellSub)upsellSub='กลุ่มสินค้าใหม่ '+p1Rate+'% · ยอดเติบโต >'+p3ThreshPct+'% → '+p3Rate+'%';
     upsellSub+=' · จ่ายทั้งไตรมาส';
+    // v_qtrux: quarter-projection sub-line — the emotional counterweight to
+    // "3%→1.5%": this month's ACTUAL stays the hero number above, but the rep
+    // sees the same effort keeps paying every remaining month of the quarter.
+    // Conditionality ("ถ้าร้านยังซื้อ") is baked into the line, not a footnote.
+    try{
+      if(src.base_month_used&&typeof _upsellQuarterTimeline==='function'&&(p1g.length||p3g.length)){
+        var _qSum=0,_qAny=false,_qLast=false,_qReady=true;
+        p1g.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p1',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
+        p3g.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p3',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
+        if(_qAny){
+          var _qLine=_qLast
+            ?'เดือนสุดท้ายของไตรมาส — รวม upsell ที่ได้ทั้งไตรมาส ≈ '+money(Math.round(_qSum))
+            :(_qReady
+              ?'ยอดนี้จ่ายต่อทุกเดือนที่เหลือ → รวม ~'+money(Math.round(_qSum))+' ทั้งไตรมาส (ถ้าร้านยังซื้อ)'
+              :'ยอดนี้จ่ายต่อทุกเดือนที่เหลือของไตรมาส (ถ้าร้านยังซื้อ)');
+          upsellSub+='<br><span style="color:rgba(255,224,138,.85);font-weight:var(--fw-bold)">'+_qLine+'</span>';
+        }
+      }
+    }catch(e){}
     var upsellHasDrill=!!(p1g&&p1g.length||p3g&&p3g.length);
     var upsellRowHtml=cRow('rgba(255,224,138,.9)','กลุ่มสินค้าใหม่ + ยอดเติบโต',upsellSub,src.upsell_sku,'#ffe08a',upsellHasDrill?'_commDrillUpsellChooser()':null);
 
@@ -529,6 +549,53 @@
     outlets.forEach(function(o,i){expandState['pvd'+i]=allExpandedInitially;});
     window._pvDrillExpandState=expandState;
 
+    // v_qtrux: per-group quarter timeline line — "ก.ค. ✓฿450 · ส.ค. ฿180 (MTD)
+    // · ก.ย. ~฿420" + status chip. Data from _upsellQuarterTimeline (07a);
+    // null (no bundle / monthly mode) → no line, drill renders as before.
+    var _tlBaseMo=(window._pvCommDrillSrc&&window._pvCommDrillSrc.base_month_used)||null;
+    var _tlEmail=(window._pvCommDrillSt&&window._pvCommDrillSt.email)||'';
+    function _tlLineHtml(g){
+      if(!_tlBaseMo||typeof _upsellQuarterTimeline!=='function')return'';
+      var t=_upsellQuarterTimeline(_tlEmail,g,type,_tlBaseMo);
+      if(!t)return'';
+      var cells=t.months.map(function(m){
+        var mo=es(m.label.split(' ')[0]);
+        if(m.state==='paid')  return '<span style="color:var(--tk-ok-bright)">'+mo+' ✓'+mon(m.comm)+'</span>';
+        if(m.state==='none')  return '<span style="color:rgba(var(--ink-blue-hi),.35)">'+mo+' —</span>';
+        if(m.state==='mtd')   return '<span style="color:rgba(var(--ink-blue-hi),.85);font-weight:800">'+mo+' '+mon(m.comm)+' (MTD)</span>';
+        return '<span style="color:rgba(255,224,138,.75)">'+mo+' '+(m.comm!=null?'~'+mon(m.comm):'~')+'</span>';
+      }).join('<span style="color:rgba(var(--ink-blue),.35)"> · </span>');
+      var chip='';
+      if(t.isLastMonth){
+        chip='<span style="color:#bcd7ff">เดือนสุดท้าย — รวมไตรมาส '+mon(Math.round(t.quarterTotal))+'</span>';
+      }else if(t.status==='growing'){
+        chip='<span style="color:var(--tk-ok-bright)">ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม</span>';
+      }else if(t.status==='kept'){
+        chip='<span style="color:var(--tk-ok-bright)">ร้านยังซื้ออยู่ · จ่ายต่อ</span>';
+      }else{
+        chip='<span style="color:rgba(var(--ink-blue-hi),.55)">เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ</span>';
+      }
+      return '<div style="grid-column:1/-1;padding:2px 0 0;font-size:var(--text-2xs);font-family:\'IBM Plex Mono\',\'Noto Sans Thai\',monospace;line-height:1.6">'+cells+'<br>'+chip+'</div>';
+    }
+    // v_qtrux: groups that earned earlier this quarter but stopped buying —
+    // gray ฿0 rows are the strongest conditionality lesson (real data, not
+    // copy). P1-only scan by design (see _upsellStoppedGroups).
+    var _stoppedHtml='';
+    try{
+      if(type==='p1'&&_tlBaseMo&&typeof _upsellStoppedGroups==='function'){
+        var _stopped=_upsellStoppedGroups(_tlEmail,groups,_tlBaseMo)||[];
+        if(_stopped.length){
+          _stoppedHtml='<div style="padding:10px 16px 6px;font-size:var(--text-2xs);font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,107,61,.75);font-family:\'IBM Plex Mono\',monospace;border-top:1px solid rgba(var(--ink-blue),.10);margin-top:6px">หยุดซื้อเดือนนี้ — ค่าคอมฯ หยุด ('+_stopped.length+')</div>'
+            +_stopped.map(function(sg){
+              return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 16px;opacity:.55;border-bottom:1px solid rgba(var(--ink-blue),.06)">'
+                +'<div><div style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.60)">'+es(sg.groupKey)+'</div>'
+                +'<div style="font-size:var(--text-2xs);color:rgba(var(--ink-blue-hi),.45)">'+es(_pvOutletName(sg.outletId,sg.accountId))+' · เคยได้ ~'+mon(sg.lastComm)+' ('+es(sg.lastLabel.split(' ')[0])+')</div></div>'
+                +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;font-weight:900;color:rgba(255,107,61,.85)">฿0</span>'
+                +'</div>';
+            }).join('');
+        }
+      }
+    }catch(e){}
     function buildRows(expanded){
       return outlets.map(function(o,i){
         var oid='pvd'+i;
@@ -540,6 +607,7 @@
               +'<span style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.65)">'+es(g.groupKey||g.group_key)+'</span>'
               +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:var(--fw-bold);color:var(--tk-ok-bright)">'+mon(g.total_gmv)+'</span>'
               +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:var(--fw-bold);color:#ffe08a">'+mon(g.commission)+'</span>'
+              +_tlLineHtml(g)
               +'</div>';
           } else {
             return '<div style="display:grid;grid-template-columns:1fr 52px 56px 52px;padding:7px 16px 7px 24px;border-bottom:1px solid rgba(var(--ink-blue),.08);align-items:center;gap:2px">'
@@ -548,6 +616,7 @@
               +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:var(--fw-bold);color:rgba(var(--ink-blue),.50)">'+mon(g.max_baseline||0)+'</span>'
               +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:var(--fw-bold);color:var(--tk-ok-bright)">'+mon(g.incremental)+'</span>'
               +'<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;text-align:right;font-weight:var(--fw-bold);color:#ffe08a">'+mon(g.commission)+'</span>'
+              +_tlLineHtml(g)
               +'</div>';
           }
         }).join('');
@@ -568,7 +637,7 @@
           +'</div>'
           +'<div id="'+oid+'" style="display:'+(isOpen?'block':'none')+'">'+skuRows+'</div>'
           +'</div>';
-      }).join('');
+      }).join('')+_stoppedHtml; // v_qtrux: stopped-buying section stays at list bottom across rebuilds
     }
 
     window._pvDrillRebuild=function(expandAll){
@@ -602,6 +671,7 @@
       +'<div style="flex:1;text-align:center"><div style="font-size:var(--text-lg2);font-weight:950;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(totalComm)+'</div><div style="font-size:var(--text-2xs);color:rgba(var(--ink-blue-hi),.52);margin-top:3px;font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.06em;font-family:\'IBM Plex Mono\',monospace">commission</div></div>'
       +'<button id="pvDrillToggleBtn" onclick="window._pvDrillRebuild(this.dataset.exp!==\'1\')" data-exp="'+(allExpandedInitially?'1':'0')+'" title="ขยาย/ย่อ" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:rgba(255,255,255,.06);border-radius:var(--r-7);cursor:pointer;color:rgba(255,255,255,.55);flex-shrink:0">'+(allExpandedInitially?'<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>':'<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor"/><rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor"/><rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor"/></svg>')+'</button>'
       +'</div>'
+      +'<div style="padding:7px 16px;font-size:var(--text-sm);color:rgba(255,224,138,.82);background:rgba(255,224,138,.05);border-bottom:1px solid rgba(var(--ink-blue),.10);line-height:1.4">ค่าคอมฯ จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนี้อยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>'
       +'<div style="display:grid;'+colsHdGrid+';padding:6px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(var(--ink-blue),.10);font-size:var(--text-2xs);font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:rgba(var(--ink-blue-hi),.52);font-family:\'IBM Plex Mono\',monospace">'+colsHdStr+'<span></span></div>'
       +'</div>'
       +'<div id="pvDrillList" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">'+buildRows(false)+'</div>'
@@ -2642,6 +2712,10 @@ function openCommissionRulebook() {
   html += secHdr('Upsell', '#ffe08a');
   html += detailRow('สินค้าใหม่ (P1)', p1Rate+'% × GMV · ต่อ outlet × กลุ่มสินค้า · min '+p1MinGmv+' · จ่ายทั้งไตรมาส');
   html += detailRow('ยอดเติบโต (P3)', p3Rate+'% × incremental · ยอดเกิน '+p3Thresh+'× baseline (เพิ่ม >'+p3GrowPct+'%) · incremental ขั้นต่ำ '+p3MinIncr+' · จ่ายทั้งไตรมาส');
+  // v_qtrux: the conditionality rule in one line — the same sentence shown
+  // at the top of the P1/P3 drill, so the Rulebook and the drill never
+  // disagree on what "จ่ายทั้งไตรมาส" actually means.
+  html += detailRow('เงื่อนไข', 'จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนั้นอยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม · เดือนสุดท้ายของไตรมาสจ่ายครั้งเดียว (ไตรมาสใหม่เริ่มนับ baseline ใหม่)');
   html += detailRow('Expansion', outRate+'% × GMV (outlet ที่ไม่เคยซื้อมาก่อนเลย ตาม first purchase date ทั้งชีวิต) · จ่ายทั้งไตรมาส');
 
   html += secHdr('Handover (Sales → KAM เท่านั้น)', '#bcd7ff');

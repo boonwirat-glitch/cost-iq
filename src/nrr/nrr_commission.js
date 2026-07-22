@@ -729,6 +729,83 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 }
 window.nrrComputeUpsellSku = nrrComputeUpsellSku;
 
+// ── Upsell quarter timeline (v_qtrux) — twin of _upsellQuarterTimeline
+// (07a_commission_engine.js), same shape/lockstep. Rep-facing display data:
+// one qualified group's month-by-month quarter journey. Display-only.
+function nrrUpsellQuarterTimeline(bundle, group, kind, baseMonthIso) {
+  try {
+    if (!baseMonthIso || !bundle || !bundle.loaded || !group) return null;
+    var data = bundle.data || {};
+    var acct = data[group.accountId] || {};
+    var outletGroups = acct[group.outletId] || {};
+    var monthData = outletGroups[group.groupKey] || {};
+
+    var parts = baseMonthIso.split('-');
+    var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
+    var TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    var qLabels = [1, 2, 3].map(function (i) {
+      var d = new Date(baseYr, baseMo - 1 + i, 1);
+      return TH[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    });
+    var currLabel = nrrCommCurrentMonthLabel();
+    var currIdx = qLabels.indexOf(currLabel);
+    if (currIdx === -1) return null;
+
+    var p1MinGmv = nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+    var p3Thresh = nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+    var p3MinIncr = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+    var rate = Number(group.applied_rate) || 0;
+
+    function monthComm(lbl) {
+      var row = monthData[lbl];
+      if (!row) return { comm: 0, has: false };
+      if (kind === 'p1') {
+        var g = row.totalGmv || 0;
+        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0 };
+      }
+      var ex = row.existingGmv || 0;
+      var base = Number(group.max_baseline) || 0;
+      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0 };
+      var incr = ex - base;
+      return { comm: incr >= p3MinIncr ? incr * rate : 0, has: ex > 0 };
+    }
+
+    var daysElapsed = new Date().getDate();
+    var daysInCurr = nrrDaysInLabel(currLabel);
+    var mtdComm = Number(group.commission) || 0;
+    var projectionReady = daysElapsed >= 5;
+    var projectedFull = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+
+    var months = qLabels.map(function (lbl, i) {
+      if (i < currIdx) {
+        var m = monthComm(lbl);
+        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, estimated: true };
+      }
+      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, estimated: false };
+      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, estimated: true };
+    });
+
+    var paidSum = 0, futureSum = 0, anyPriorPaid = false, lastPaid = null;
+    months.forEach(function (m, i) {
+      if (m.state === 'paid') { paidSum += m.comm; if (i < currIdx) { anyPriorPaid = true; lastPaid = m; } }
+      if (m.state === 'future' && m.comm != null) futureSum += m.comm;
+    });
+    var isLastMonth = currIdx === qLabels.length - 1;
+    var quarterTotal = paidSum + (isLastMonth ? mtdComm : (projectionReady ? projectedFull : mtdComm)) + futureSum;
+
+    var status = 'new';
+    if (anyPriorPaid) {
+      status = 'kept';
+      if (projectionReady && lastPaid && projectedFull > lastPaid.comm * 1.1) status = 'growing';
+    }
+    return { months: months, status: status, quarterTotal: quarterTotal, isLastMonth: isLastMonth, projectionReady: projectionReady };
+  } catch (e) {
+    console.warn('[nrr] nrrUpsellQuarterTimeline error', e);
+    return null;
+  }
+}
+window.nrrUpsellQuarterTimeline = nrrUpsellQuarterTimeline;
+
 // ── Full Table view (history) — arbitrary period, not limited to the
 // current quarter's QNRR_CFG.q_months. Same table/columns as
 // nrrFetchCommissionSnapshots, just without the quarter filter, so any

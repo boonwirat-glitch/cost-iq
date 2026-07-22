@@ -3263,7 +3263,7 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd, p1ElId
       return;
     }
     var upsell = nrrComputeUpsellSku(expansionOutletIds, bundle, QNRR_CFG.base_month);
-    var lists = nrrCommUpsellListsHtml(upsell, bd);
+    var lists = nrrCommUpsellListsHtml(upsell, bd, bundle);
     if (p1Target) p1Target.innerHTML = lists.p1;
     if (p3Target) p3Target.innerHTML = lists.p3;
   });
@@ -3334,22 +3334,48 @@ function nrrCommHandoverListHtml(ho) {
 
 // Group lists for the two upsell receipt lines — {p1, p3} html, filled
 // into their own drill targets once the per-KAM CSV resolves.
-function nrrCommUpsellListsHtml(upsell, bd) {
+// v_qtrux: bundle (optional) enables the per-group quarter timeline line —
+// "ก.ค. ✓฿450 · ส.ค. ฿180 (MTD) · ก.ย. ~฿420" via nrrUpsellQuarterTimeline.
+function nrrCommUpsellListsHtml(upsell, bd, bundle) {
+  // compact inline timeline under a group row (Fresh Canvas tokens only)
+  function tlHtml(g, kind) {
+    if (!bundle || typeof nrrUpsellQuarterTimeline !== 'function') return '';
+    var t = nrrUpsellQuarterTimeline(bundle, g, kind, QNRR_CFG.base_month);
+    if (!t) return '';
+    var cells = t.months.map(function (m) {
+      var mo = nrrEsc(m.label.split(' ')[0]);
+      if (m.state === 'paid') return '<span style="color:var(--green-deep)">' + mo + ' ✓' + nrrFmtGMVExact(m.comm) + '</span>';
+      if (m.state === 'none') return '<span style="color:var(--ink3)">' + mo + ' —</span>';
+      if (m.state === 'mtd') return '<span style="color:var(--ink);font-weight:700">' + mo + ' ' + nrrFmtGMVExact(m.comm) + ' (MTD)</span>';
+      return '<span style="color:var(--ink2)">' + mo + ' ' + (m.comm != null ? '~' + nrrFmtGMVExact(m.comm) : '~') + '</span>';
+    }).join('<span style="color:var(--ink3)"> · </span>');
+    var chip = t.isLastMonth
+      ? 'เดือนสุดท้าย — รวมไตรมาส ' + nrrFmtGMVExact(Math.round(t.quarterTotal))
+      : (t.status === 'growing' ? 'ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม'
+        : t.status === 'kept' ? 'ร้านยังซื้ออยู่ · จ่ายต่อ'
+        : 'เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ');
+    return '<div class="micro" style="padding:2px 0 6px;line-height:1.6">' + cells +
+      '<br><span style="color:' + (t.status === 'new' && !t.isLastMonth ? 'var(--ink2)' : 'var(--green-deep)') + '">' + chip + '</span></div>';
+  }
   var p1 = upsell.p1.groups, p3 = upsell.p3.groups;
   var p1Html = p1.length
     ? p1.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
           '<span class="ds-row-meta">' + nrrFmtGMVExact(g.total_gmv) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>' + tlHtml(g, 'p1');
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าใหม่ (P1) เดือนนี้</div></div>';
   var p3Html = p3.length
     ? p3.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
           '<span class="ds-row-meta">' + nrrFmtGMVExact(g.max_baseline) + ' → ' + nrrFmtGMVExact(g.existing_curr) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>' + tlHtml(g, 'p3');
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าที่เติบโต (P3) เดือนนี้</div></div>';
+  // v_qtrux: conditionality line at the top of the P1 list (once, not per row)
+  if (p1.length || p3.length) {
+    p1Html = '<div class="micro" style="padding:0 0 8px;color:var(--ink2)">จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนั้นอยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>' + p1Html;
+  }
 
   // Reconciliation note — this fetch always reflects LIVE rates; a locked
   // snapshot's upsell_sku total was computed with whatever rates were live

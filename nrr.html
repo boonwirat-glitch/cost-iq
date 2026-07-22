@@ -5372,6 +5372,83 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 }
 window.nrrComputeUpsellSku = nrrComputeUpsellSku;
 
+// ── Upsell quarter timeline (v_qtrux) — twin of _upsellQuarterTimeline
+// (07a_commission_engine.js), same shape/lockstep. Rep-facing display data:
+// one qualified group's month-by-month quarter journey. Display-only.
+function nrrUpsellQuarterTimeline(bundle, group, kind, baseMonthIso) {
+  try {
+    if (!baseMonthIso || !bundle || !bundle.loaded || !group) return null;
+    var data = bundle.data || {};
+    var acct = data[group.accountId] || {};
+    var outletGroups = acct[group.outletId] || {};
+    var monthData = outletGroups[group.groupKey] || {};
+
+    var parts = baseMonthIso.split('-');
+    var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
+    var TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    var qLabels = [1, 2, 3].map(function (i) {
+      var d = new Date(baseYr, baseMo - 1 + i, 1);
+      return TH[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    });
+    var currLabel = nrrCommCurrentMonthLabel();
+    var currIdx = qLabels.indexOf(currLabel);
+    if (currIdx === -1) return null;
+
+    var p1MinGmv = nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+    var p3Thresh = nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+    var p3MinIncr = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+    var rate = Number(group.applied_rate) || 0;
+
+    function monthComm(lbl) {
+      var row = monthData[lbl];
+      if (!row) return { comm: 0, has: false };
+      if (kind === 'p1') {
+        var g = row.totalGmv || 0;
+        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0 };
+      }
+      var ex = row.existingGmv || 0;
+      var base = Number(group.max_baseline) || 0;
+      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0 };
+      var incr = ex - base;
+      return { comm: incr >= p3MinIncr ? incr * rate : 0, has: ex > 0 };
+    }
+
+    var daysElapsed = new Date().getDate();
+    var daysInCurr = nrrDaysInLabel(currLabel);
+    var mtdComm = Number(group.commission) || 0;
+    var projectionReady = daysElapsed >= 5;
+    var projectedFull = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+
+    var months = qLabels.map(function (lbl, i) {
+      if (i < currIdx) {
+        var m = monthComm(lbl);
+        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, estimated: true };
+      }
+      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, estimated: false };
+      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, estimated: true };
+    });
+
+    var paidSum = 0, futureSum = 0, anyPriorPaid = false, lastPaid = null;
+    months.forEach(function (m, i) {
+      if (m.state === 'paid') { paidSum += m.comm; if (i < currIdx) { anyPriorPaid = true; lastPaid = m; } }
+      if (m.state === 'future' && m.comm != null) futureSum += m.comm;
+    });
+    var isLastMonth = currIdx === qLabels.length - 1;
+    var quarterTotal = paidSum + (isLastMonth ? mtdComm : (projectionReady ? projectedFull : mtdComm)) + futureSum;
+
+    var status = 'new';
+    if (anyPriorPaid) {
+      status = 'kept';
+      if (projectionReady && lastPaid && projectedFull > lastPaid.comm * 1.1) status = 'growing';
+    }
+    return { months: months, status: status, quarterTotal: quarterTotal, isLastMonth: isLastMonth, projectionReady: projectionReady };
+  } catch (e) {
+    console.warn('[nrr] nrrUpsellQuarterTimeline error', e);
+    return null;
+  }
+}
+window.nrrUpsellQuarterTimeline = nrrUpsellQuarterTimeline;
+
 // ── Full Table view (history) — arbitrary period, not limited to the
 // current quarter's QNRR_CFG.q_months. Same table/columns as
 // nrrFetchCommissionSnapshots, just without the quarter filter, so any
@@ -12599,7 +12676,7 @@ function nrrLoadCommissionUpsellSection(kamEmail, expansionOutletIds, bd, p1ElId
       return;
     }
     var upsell = nrrComputeUpsellSku(expansionOutletIds, bundle, QNRR_CFG.base_month);
-    var lists = nrrCommUpsellListsHtml(upsell, bd);
+    var lists = nrrCommUpsellListsHtml(upsell, bd, bundle);
     if (p1Target) p1Target.innerHTML = lists.p1;
     if (p3Target) p3Target.innerHTML = lists.p3;
   });
@@ -12670,22 +12747,48 @@ function nrrCommHandoverListHtml(ho) {
 
 // Group lists for the two upsell receipt lines — {p1, p3} html, filled
 // into their own drill targets once the per-KAM CSV resolves.
-function nrrCommUpsellListsHtml(upsell, bd) {
+// v_qtrux: bundle (optional) enables the per-group quarter timeline line —
+// "ก.ค. ✓฿450 · ส.ค. ฿180 (MTD) · ก.ย. ~฿420" via nrrUpsellQuarterTimeline.
+function nrrCommUpsellListsHtml(upsell, bd, bundle) {
+  // compact inline timeline under a group row (Fresh Canvas tokens only)
+  function tlHtml(g, kind) {
+    if (!bundle || typeof nrrUpsellQuarterTimeline !== 'function') return '';
+    var t = nrrUpsellQuarterTimeline(bundle, g, kind, QNRR_CFG.base_month);
+    if (!t) return '';
+    var cells = t.months.map(function (m) {
+      var mo = nrrEsc(m.label.split(' ')[0]);
+      if (m.state === 'paid') return '<span style="color:var(--green-deep)">' + mo + ' ✓' + nrrFmtGMVExact(m.comm) + '</span>';
+      if (m.state === 'none') return '<span style="color:var(--ink3)">' + mo + ' —</span>';
+      if (m.state === 'mtd') return '<span style="color:var(--ink);font-weight:700">' + mo + ' ' + nrrFmtGMVExact(m.comm) + ' (MTD)</span>';
+      return '<span style="color:var(--ink2)">' + mo + ' ' + (m.comm != null ? '~' + nrrFmtGMVExact(m.comm) : '~') + '</span>';
+    }).join('<span style="color:var(--ink3)"> · </span>');
+    var chip = t.isLastMonth
+      ? 'เดือนสุดท้าย — รวมไตรมาส ' + nrrFmtGMVExact(Math.round(t.quarterTotal))
+      : (t.status === 'growing' ? 'ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม'
+        : t.status === 'kept' ? 'ร้านยังซื้ออยู่ · จ่ายต่อ'
+        : 'เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ');
+    return '<div class="micro" style="padding:2px 0 6px;line-height:1.6">' + cells +
+      '<br><span style="color:' + (t.status === 'new' && !t.isLastMonth ? 'var(--ink2)' : 'var(--green-deep)') + '">' + chip + '</span></div>';
+  }
   var p1 = upsell.p1.groups, p3 = upsell.p3.groups;
   var p1Html = p1.length
     ? p1.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
           '<span class="ds-row-meta">' + nrrFmtGMVExact(g.total_gmv) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>' + tlHtml(g, 'p1');
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าใหม่ (P1) เดือนนี้</div></div>';
   var p3Html = p3.length
     ? p3.map(function (g) {
         return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + '</span>' +
           '<span class="ds-row-meta">' + nrrFmtGMVExact(g.max_baseline) + ' → ' + nrrFmtGMVExact(g.existing_curr) + '</span>' +
-          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>' + tlHtml(g, 'p3');
       }).join('')
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าที่เติบโต (P3) เดือนนี้</div></div>';
+  // v_qtrux: conditionality line at the top of the P1 list (once, not per row)
+  if (p1.length || p3.length) {
+    p1Html = '<div class="micro" style="padding:0 0 8px;color:var(--ink2)">จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนั้นอยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>' + p1Html;
+  }
 
   // Reconciliation note — this fetch always reflects LIVE rates; a locked
   // snapshot's upsell_sku total was computed with whatever rates were live

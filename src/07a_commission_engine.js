@@ -469,6 +469,158 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
   }
 }
 
+// ── Upsell quarter timeline (v_qtrux) ───────────────────────────
+// Rep-facing "จ่ายทั้งไตรมาส" data: for ONE qualified group (an entry from
+// _commComputeUpsellSku().p1/p3.groups), build its month-by-month quarter
+// journey from the same bulkUpsellData the engine computed from. Twin of
+// nrrUpsellQuarterTimeline (src/nrr/nrr_commission.js) — same shape, keep
+// in lockstep. Display-only: never feeds payout math.
+// Returns null when data is missing; otherwise:
+// { months:[{label, state:'paid'|'mtd'|'future'|'none', comm, estimated}],
+//   status:'new'|'kept'|'growing'|'stopped', quarterTotal, isLastMonth,
+//   projectionReady }
+function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
+  try {
+    if (!baseMonthOverride || !bulkUpsellData || !bulkUpsellData.loaded || !group) return null;
+    const byKam = bulkUpsellData.byKam || {};
+    const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const _kamKey = (_pvRow && _pvRow.kamName) ? _pvRow.kamName : kamEmail;
+    const kamData = byKam[_kamKey] || byKam[kamEmail] || {};
+    const acct = kamData[group.accountId] || {};
+    const outletGroups = (acct[group.outletId] || acct._all || {});
+    const monthData = outletGroups[group.groupKey] || {};
+
+    // The quarter's own 3 months (base+1..+3) — forward-walking WITHOUT the
+    // elapsed cap _commElapsedQuarterLabels applies.
+    const parts = baseMonthOverride.split('-');
+    const baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
+    const qLabels = [1, 2, 3].map(i => {
+      const d = new Date(baseYr, baseMo - 1 + i, 1);
+      return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    });
+    const currLabel = _commCurrentMonthLabel();
+    const currIdx = qLabels.indexOf(currLabel);
+    if (currIdx === -1) return null; // current month not in this quarter — stale config
+
+    // Gates: same resolution defaults the engine uses (display parity; a
+    // per-scheme override of GATES [not rate] would drift here — accepted,
+    // rate itself always comes from group.applied_rate which IS per-scheme).
+    const p1MinGmv  = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);
+    const p3Thresh  = _commGetConfig('upsell_sku', 'p3_threshold_pct', 2.00);
+    const p3MinIncr = _commGetConfig('upsell_sku', 'p3_min_incremental', 8000);
+    const rate = Number(group.applied_rate) || 0;
+
+    // Qualified commission for one month's raw row, per the SAME gates the
+    // engine applies — 0 when the month doesn't qualify (stopped / below gate).
+    function monthComm(lbl) {
+      const row = monthData[lbl];
+      if (!row) return { comm: 0, has: false };
+      if (kind === 'p1') {
+        const g = row.totalGmv || 0;
+        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0 };
+      }
+      const ex = row.existingGmv || 0;
+      const base = Number(group.max_baseline) || 0; // frozen all quarter
+      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0 };
+      const incr = ex - base;
+      return { comm: incr >= p3MinIncr ? incr * rate : 0, has: ex > 0 };
+    }
+
+    // Current-month full-month projection (run-rate) for the future cells.
+    let daysElapsed = new Date().getDate();
+    try {
+      const sample = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+      if (sample && sample.daysElapsed > 0) daysElapsed = sample.daysElapsed;
+    } catch (e) {}
+    const daysInCurr = _commDaysInLabel(currLabel);
+    const mtdComm = Number(group.commission) || 0;
+    const projectionReady = daysElapsed >= 5; // run-rate too noisy before day 5
+    const projectedFull = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+
+    const months = qLabels.map((lbl, i) => {
+      if (i < currIdx) {
+        const m = monthComm(lbl);
+        // 'none' = ยังไม่เกิด (group ยังไม่ qualify เดือนนั้น) → แสดง "—"
+        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, estimated: true };
+      }
+      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, estimated: false };
+      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, estimated: true };
+    });
+
+    const paidSum = months.filter(m => m.state === 'paid').reduce((s, m) => s + m.comm, 0);
+    const futureSum = months.filter(m => m.state === 'future' && m.comm != null).reduce((s, m) => s + m.comm, 0);
+    const isLastMonth = currIdx === qLabels.length - 1;
+    const quarterTotal = paidSum + (isLastMonth ? mtdComm : (projectionReady ? projectedFull : mtdComm)) + futureSum;
+
+    const anyPriorPaid = months.some((m, i) => i < currIdx && m.state === 'paid');
+    const lastPaid = [...months].reverse().find((m, ri) => months.length - 1 - ri < currIdx && m.state === 'paid');
+    let status = 'new';
+    if (anyPriorPaid) {
+      status = 'kept';
+      if (projectionReady && lastPaid && projectedFull > lastPaid.comm * 1.1) status = 'growing';
+    }
+    return { months, status, quarterTotal, isLastMonth, projectionReady };
+  } catch (e) {
+    console.warn('[CommEngine] _upsellQuarterTimeline error', e);
+    return null;
+  }
+}
+window._upsellQuarterTimeline = _upsellQuarterTimeline;
+
+// v_qtrux: groups that EARNED in an earlier elapsed month of the quarter but
+// no longer qualify this month — they're absent from _commComputeUpsellSku's
+// current groups entirely, yet showing them (gray, ฿0, "ร้านหยุดซื้อ") is the
+// strongest possible lesson that the quarter-pay is conditional.
+// Returns [{accountId, outletId, groupKey, kind, lastComm, lastLabel}].
+function _upsellStoppedGroups(kamEmail, currentGroups, baseMonthOverride) {
+  try {
+    if (!baseMonthOverride || !bulkUpsellData || !bulkUpsellData.loaded) return [];
+    const currentSet = new Set((currentGroups || []).map(g => g.accountId + '|' + g.outletId + '|' + g.groupKey));
+    const byKam = bulkUpsellData.byKam || {};
+    const baselineGroups = bulkUpsellData.baselineGroups || {};
+    const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+    const _kamKey = (_pvRow && _pvRow.kamName) ? _pvRow.kamName : kamEmail;
+    const kamData = byKam[_kamKey] || byKam[kamEmail] || {};
+    const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
+    const elapsed = _commElapsedQuarterLabels(baseMonthOverride);
+    if (elapsed.length < 2) return []; // nothing can have "stopped" in month 1
+    const priorLabels = elapsed.slice(0, -1);
+
+    const p1MinGmv = _commGetConfig('upsell_sku', 'p1_min_gmv', 5000);
+    const p1Rate = _commGetConfig('upsell_sku', 'p1_rate', 0.01);
+    const out = [];
+    Object.keys(kamData).forEach(accountId => {
+      const acctData = kamData[accountId];
+      const firstVal = acctData[Object.keys(acctData)[0] || ''];
+      const isNewFormat = firstVal && typeof firstVal === 'object' &&
+        Object.values(firstVal)[0] && typeof Object.values(Object.values(firstVal)[0])[0] === 'object';
+      const outletMap = isNewFormat ? acctData : { _all: acctData };
+      const baselineByOutlet = baselineSet[accountId] || {};
+      const legacySet = baselineByOutlet instanceof Set ? baselineByOutlet : null;
+      Object.keys(outletMap).forEach(outletId => {
+        const groups = outletMap[outletId];
+        const outletBaseline = legacySet || (baselineByOutlet[outletId] instanceof Set ? baselineByOutlet[outletId] : new Set());
+        Object.keys(groups).forEach(groupKey => {
+          if (currentSet.has(accountId + '|' + outletId + '|' + groupKey)) return;
+          if (outletBaseline.has(groupKey)) return; // P1-only scan: P3 stopped needs frozen baseline context — keep scope tight
+          const monthData = groups[groupKey];
+          for (let i = priorLabels.length - 1; i >= 0; i--) {
+            const row = monthData[priorLabels[i]];
+            const g = row ? (row.totalGmv || 0) : 0;
+            if (g >= p1MinGmv) {
+              out.push({ accountId, outletId, groupKey, kind: 'p1',
+                lastComm: g * p1Rate, lastLabel: priorLabels[i] });
+              break;
+            }
+          }
+        });
+      });
+    });
+    return out;
+  } catch (e) { return []; }
+}
+window._upsellStoppedGroups = _upsellStoppedGroups;
+
 // ── Upsell Outlet Engine ────────────────────────────────────────
 // Returns { outlet_gmv, commission, new_gmv, comeback_gmv }
 // Counts non-P1 items at new/comeback outlets only (P1 items excluded — they get 3% via P1)
@@ -1014,6 +1166,11 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
       period, kamEmail,
       nrr_pct: pct,
       nrr_payout: nrrPayout,
+      // v_qtrux: the base month the upsell computation was anchored to
+      // (null in monthly/rolling mode) — lets display surfaces build the
+      // per-group quarter timeline (_upsellQuarterTimeline) with the exact
+      // same anchor, never re-deriving policy themselves.
+      base_month_used: baseMo,
       upsell_sku: upsellSku,
       upsell_outlet: upsellOutlet,
       handover,
