@@ -18,6 +18,28 @@ function nrrCurrentPeriod(result) {
   // Prefer the latest month that actually has row data; QNRR_CFG.q_months
   // may list months that haven't started yet (e.g. Aug/Sep before they
   // occur) — result.months only contains months present in the CSV.
+  //
+  // BUT a future month can still show up in the CSV via a placeholder row
+  // — e.g. a portfolio handover scheduled ahead of time writes a
+  // transfer_out row for that future period_month with curr_gmv=0 — which
+  // alone makes .months.sort() end on a month that hasn't actually started
+  // (confirmed 2026-07-22: 28 such rows for 2026-08/09 pushed the
+  // dashboard's default period to ก.ย. instead of ก.ค.). NOTE: by_month[m]
+  // .curr_days can't be used to detect this — nrr_data.js parses it as
+  // `parseInt(...) || 30`, which silently turns a genuine 0 into 30, so a
+  // curr_days=0 placeholder row is indistinguishable from a real one there.
+  // total_gmv is reliable instead: its MOVEMENTS filter already excludes
+  // transfer_out (and core_nrr_churn) from the sum, so a month whose ONLY
+  // rows are scheduling placeholders always nets to exactly 0 — a real
+  // month never does at Freshket's scale. Walk backwards and pick the
+  // latest month with real activity; fall back to the old behavior if
+  // every month is somehow zero (narrow per-KAM/TL scopes with no data at
+  // all yet — no worse than before).
+  for (var i = result.months.length - 1; i >= 0; i--) {
+    var m = result.months[i];
+    var bm = result.by_month[m];
+    if (bm && bm.total_gmv > 0) return m;
+  }
   return result.months[result.months.length - 1];
 }
 window.nrrCurrentPeriod = nrrCurrentPeriod;
